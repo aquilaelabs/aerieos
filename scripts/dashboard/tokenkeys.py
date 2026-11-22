@@ -60,8 +60,8 @@ def keys():
 
 def _pub(k, node, uid, old=False):
     """The public half of the account's key pair on this node: X25519's
-    (R158 step 3), or with `old` the format before's, which a 0.8.x node
-    still seals with."""
+    (R158 step 3), or with `old` the format before's, which made_under
+    reads for a seal a node made in it and still holds."""
     cache = (k, node, uid, old)
     if cache not in _pub_cache:
         _pub_cache.clear() if len(_pub_cache) > 4096 else None
@@ -76,7 +76,7 @@ def _secret_for(k, node, uid, R):
     return t.secret(k, node, uid) if t.is_v2(R) else t.secret1(k, node, uid)
 
 
-def public(node, uid, old=False):
+def public(node, uid):
     """The account's public key on this node, hex, made from its own key,
     or "" with no install key: an install with none has nothing to seal
     with, and keeps its sign-ins as plain files. For an account whose store
@@ -85,10 +85,10 @@ def public(node, uid, old=False):
     it to seal a login made while the person works."""
     k = accountkeys.key_of(uid)
     if k:
-        pub = _pub(k, node, uid, old)
-        accountkeys.remember_pub(uid, node, old, pub)
+        pub = _pub(k, node, uid)
+        accountkeys.remember_pub(uid, node, False, pub)
         return pub
-    return accountkeys.pub_remembered(uid, node, old)
+    return accountkeys.pub_remembered(uid, node, False)
 
 
 def _candidates(uid):
@@ -114,13 +114,12 @@ def made_under(node, uid, v):
     return None
 
 
-def pubs(node, uids, old=False):
+def pubs(node, uids):
     """{uid: public} for these accounts on this node, for its hello: the
-    X25519 publics a 0.9 agent seals with, or with `old` the ones before,
-    which a 0.8.x agent still reads."""
+    X25519 publics a node seals with."""
     out = {}
     for u in uids:
-        p = public(node, u, old)
+        p = public(node, u)
         if p:
             out[u] = p
     return out

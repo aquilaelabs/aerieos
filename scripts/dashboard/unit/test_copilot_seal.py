@@ -40,13 +40,13 @@ class CopilotSeal(unittest.TestCase):
         for magic in (b"BBTOK2\n", b"BBTOK1\n"):
             with open(os.path.join(loginlist.SEAL_DIR, "u_12345678", "copilot.seal"), "wb") as f:
                 f.write(magic + json.dumps({"agent": "copilot", "email": "octocat"}).encode() + b"\nsealedbytes")
-            self.assertEqual(loginlist.copilot_of(home), {"email": "octocat", "plan": ""}, magic)
+            self.assertEqual(loginlist.who_of(home, "copilot", loginlist.signins()["copilot"]), {"email": "octocat", "plan": ""}, magic)
         # A dangling link into the opened copy, the copy shut, is the same: still a sign-in.
         os.makedirs(os.path.join(home, ".copilot"))
         os.symlink("/run/bb-tokens/u_12345678/copilot.json", os.path.join(home, ".copilot", "config.json"))
-        self.assertEqual(loginlist.copilot_of(home), {"email": "octocat", "plan": ""})
+        self.assertEqual(loginlist.who_of(home, "copilot", loginlist.signins()["copilot"]), {"email": "octocat", "plan": ""})
         os.unlink(os.path.join(loginlist.SEAL_DIR, "u_12345678", "copilot.seal"))
-        self.assertIsNone(loginlist.copilot_of(home))
+        self.assertIsNone(loginlist.who_of(home, "copilot", loginlist.signins()["copilot"]))
 
 
 if __name__ == "__main__":

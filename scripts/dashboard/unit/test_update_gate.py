@@ -167,7 +167,7 @@ class AgentFlush(unittest.TestCase):
             ctl = Ctl()
         j = agent.Job(Agent(), {"id": "j_gone"})
         j.say("a line\n")
-        return j.flush(), j.pending
+        return j.flush(), list(j.pending)
 
     def test_a_refused_log_is_dropped(self):
         self.assertEqual(self.flush(400), (True, []))

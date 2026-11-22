@@ -8,17 +8,24 @@
 // projects, this found some twenty ways the map read code wrong).
 // No browser. Babel is the one inside Playwright's bundle; without it the
 // babel half says it was skipped, never that it passed.
-import { ok, done, DIR } from './lib.mjs';
+import { ok, done, DIR, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const CODEMAP = `${REPO}/scripts/lib/codemap.py`;
+// The index as two files since format 5 (R228 step 16): what each file
+// calls and passes by name beside the rest, joined back here per file.
+const readIndex = root => {
+  const idx = JSON.parse(readFileSync(join(root, '.bb-map', 'map5.json'), 'utf8'));
+  const calls = JSON.parse(readFileSync(join(root, '.bb-map', 'map5-calls.json'), 'utf8'));
+  for (const [f, e] of Object.entries(idx.files)) Object.assign(e, calls.files[f] || {});
+  return idx;
+};
 const build = root => {
   execFileSync('python3', [CODEMAP, '--root', root, 'build'], { encoding: 'utf8' });
-  return JSON.parse(readFileSync(join(root, '.bb-map', 'map4.json'), 'utf8'));
+  return readIndex(root);
 };
 const show = xs => xs.slice(0, 6).map(x => JSON.stringify(x)).join(' ');
 
@@ -137,7 +144,9 @@ if (!babel) {
   ok(Object.keys(bad).length === 0 && files > 50,
      `the map agrees with babel on every definition, end, call and caller in this tree's ${files} scripts${
        Object.keys(bad).length ? ': ' + Object.entries(bad).slice(0, 3).map(([f, b]) => `${f} ${show(b)}`).join(' | ') : ''}`);
-  // The page's inline scripts, at their own lines.
+  // The page's inline scripts, at their own lines: the head's, which reads
+  // the theme before the first paint and begins the page's reads, and the
+  // one line that runs boot() (page-boot.js holds the rest since R9 step 5).
   const page = 'scripts/dashboard/index.html';
   const html = readFileSync(join(REPO, page), 'utf8');
   const only = html.replace(/[^\n]/g, ' ').split('');
@@ -147,8 +156,11 @@ if (!babel) {
   }
   const tp = truth(only.join(''), 'page.js');
   const bp = tp ? compare(idx.files[page], tp) : [{ babel: 'could not parse' }];
-  ok(bp.length === 0 && tp.defs.length > 20,
-     `...and on index.html's inline scripts (${tp ? tp.defs.length : 0} definitions)${bp.length ? ': ' + show(bp) : ''}`);
+  // They define nothing of their own since then (a whole run's copy adds
+  // the coverage counter to the first), so what holds the check to them is
+  // their calls: the head's reads and boot().
+  ok(bp.length === 0 && tp.calls.length > 0,
+     `...and on index.html's inline scripts (${tp ? tp.defs.length : 0} definitions, ${tp ? tp.calls.length : 0} calls)${bp.length ? ': ' + show(bp) : ''}`);
 }
 
 // ---- 2. this tree's python against its own ast ----------------------------------
@@ -156,6 +168,9 @@ if (!babel) {
   const py = execFileSync('python3', ['-c', `
 import ast, json, sys
 idx = json.load(open(sys.argv[1]))
+calls = json.load(open(sys.argv[3]))["files"]
+for p, f in idx["files"].items():
+    f.update(calls.get(p) or {})
 bad = []
 for p, f in idx["files"].items():
     if f["lang"] != "py":
@@ -177,7 +192,7 @@ for p, f in idx["files"].items():
             if nm and (nm, n.lineno) not in calls:
                 bad.append([p, "call", nm, n.lineno])
 print(json.dumps(bad[:10] + [len(bad)]))
-`, join(REPO, '.bb-map', 'map4.json'), REPO], { encoding: 'utf8' });
+`, join(REPO, '.bb-map', 'map5.json'), REPO, join(REPO, '.bb-map', 'map5-calls.json')], { encoding: 'utf8' });
   const r = JSON.parse(py);
   ok(r[r.length - 1] === 0, `the map agrees with python's ast on every def, its end and every call in this tree${
     r.length > 1 ? ': ' + show(r.slice(0, -1)) : ''}`);

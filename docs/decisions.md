@@ -517,6 +517,77 @@ upgrade suite starts this tree on every supported one, so a change that
 loses an account or a notebook entry on upgrade fails a test, not an
 install; `bb version release` refuses a version that has none.
 
+**A migration that fails stops the start and puts /config back (13 Nov
+2026).** A migration that raised was one line in the log and the new build
+ran on state half changed, to be tried again at the next start. The
+operator's choice: the copy taken before the first migration is put back,
+what the failed start wrote is kept aside, a note in /config says which
+build, which migration and why, and the controller does not start, so the
+release from before starts on /config as it left it. The same build is not
+tried again until the note is removed: each try would copy the whole state
+and move another aside. The boot's check and the supervisor ask the same
+question as the server, so the container stops with the sentence instead of
+starting the server again. The upgrade suite reads values back, not names:
+doing so found a shipped migration that read a file by a name nothing
+stores and had changed no install, which its own unit test, written
+against the same wrong name, had passed.
+
+**A patch release carries no migration (13 Nov 2026, kept).** Migrations
+are one numbered sequence and /config remembers the highest number that
+ran. A 0.9.1 that took the next number would stamp /config past the
+migrations a 0.10.0 branch already holds under lower numbers, and an
+install going from 0.9.1 to 0.10.0 would skip them. Allowing it means
+recording every migration that ran by name, a change to the state file, the
+start's gate and the downgrade check; the operator weighed that against
+how rarely a patch needs to repair stored data and kept the rule. A patch
+that meets wrong stored data reads around it in code, and the repair is a
+migration in the next minor. Lint refuses a new migration on a patch line.
+
+**A dev build's release is published by its own build, once it is whole
+(11 Nov 2026).** Every release starts as a draft so its owner can read it
+before anybody else sees it, and the dashboard's Publish refuses one still
+short of a file. The git host's own page checks nothing, though, and two dev
+builds were published from it minutes after their tags, while their images
+were still building; one image build then failed, and that release stayed
+out without its stick image and ISO. A dev build has no notes anyone waits
+to read, so the press bought nothing and cost that. The tag's last job now
+publishes it, and only when every file `.release-files` names is on it; a
+failed image job never gets there, and the release stays a draft. A stable
+release is unchanged: a draft until its owner publishes it.
+
+**A dev build's list of files is signed in a run of its own, after the
+Android app (20 Nov 2026).** Every install checks a file it takes against
+the release's signed list, so a release is whole only with it, and the list
+must cover every file. The Android app is signed on a controller with the
+app's own key, minutes to hours after the tag's run has ended, so no job of
+that run can make the list, and no key of the app's is to become a CI
+secret to change that. The tag's run therefore ends at a draft, and
+`seal-release.yml` makes the list, attaches it and publishes: started by
+the controller once it has attached the app, or by a person from the
+Actions page. It takes each file on more than the release's own word, a
+build attestation by the workflow that builds it or, for the app, its
+signature by a named certificate, which is also what lets it replace a
+list when the app is signed again. The release key is read by that run and
+by one job of the tag's, both in an environment limited to `v*` tags; every
+other build ships the agent unsigned.
+
+**A move carries the secrets on a machine of its own, through root, as
+plain words (11 Nov 2026).** There the secrets folder is root's and the
+dashboard's account can neither read nor write it, so a move left its
+`*.env` files and `ssh/` keys to be copied by hand. The operator's line:
+the system should handle that, as long as a coding agent has no way to it.
+A root helper the controller's account alone may run packs the folder on
+the old home and places it on the new. Two things keep that from being a
+way to root. What it places is data: the controller's start reads those
+files as root, so a line lands only as a secret the start knows by name
+with a value that has no shell in it, written out again quoted, and a key
+is a plain file. And the account that may run it is the controller's, never
+a session's: a coding agent runs as another account, and a move is the
+owner's. The install key still travels by its own tick. The controller's start reads
+those files by the same rule since: as `NAME=value` lines taken as words,
+where it used to run each file as a shell script, as root, so one line
+setting `PATH` stopped the controller starting.
+
 ## A VM manager beside the Containers page
 
 **VMs are made the way containers are, by the node that runs them, from a
@@ -580,9 +651,15 @@ its gate), nor its Docker. How each is held:
   groups, in no docker group, with no sudo but the one command that starts a
   view (`bb-session`). On this node the job account is kept out of the
   docker group, which every other node puts it in: docker is root on a
-  machine with a daemon, and the root here is the controller's. So this
-  node is enrolled without containers (`package-build` only); a project's
-  containers go where they go on a container install.
+  machine with a daemon, and the root here is the controller's. Its
+  containers are the root agent's instead (9 Nov 2026): the agent runs
+  docker on the system's programs alone, from a folder under `/var/lib` only
+  root opens, and the job account stays off the daemon. A session's build
+  there waits for a person whatever its dial says, since a session writes
+  the compose and a compose is root on this machine; what a compose asks of
+  the host, the controller's own folders named with it, is shown once to
+  the person who presses. It opens no Shell in a container, whose terminal
+  runs from the job account's store.
 - **Files.** The state is 0700, the env file 0640 root's and the
   controller's group's, `/run/builderbot` 0700 root's, the deploy-key
   agent's socket in a folder only the controller's group enters.
@@ -633,6 +710,36 @@ at the end of every turn and resumed only in the agent it is with. What an
 agent has no hook for is said in the project's settings rather than implied.
 Steps 12 to 14, a model router and an open agent for any model, wait for
 0.8.0 (the operator, 22 Oct).
+
+**How a shipped agent is installed is its pack's recipe, and the catalog's
+copy wins when it is newer (11 Nov 2026).** The recipes were a table inside
+the node agent, so when OpenCode's installer moved where it puts its program
+the fix was a release of the agent, and every install waited for it. The
+operator's point: with the agents published in the catalog, a recipe kept
+anywhere else is hard-wired. Each agent's manifest now carries
+`agent.install`, the controller hands it to the node with the job, and the
+catalog's signed index can pin a newer one, which every install then uses
+with no release. Two limits keep that from widening what a catalog can do.
+A recipe is one shape, the vendor's installer over https handed to a shell
+with plain arguments, and both the controller and the node refuse anything
+else, so the catalog can move an installer's address, its arguments, its
+variables and where the program lands, and nothing more. And the catalog's
+recipe is used only when its `rev` is higher than the release's, so a
+catalog left behind never undoes what a release fixed. The node keeps its
+own table for a controller that sends no recipe.
+
+**A higher rev never buys a weaker hold, and a piped installer is no
+recipe (21 Nov 2026).** A catalog's row or recipe replaced a shipped one
+on its `rev` alone, so whoever could get an index signed could put a
+command that fetches as it runs in the place of a pinned download, on
+every install at its next Library read, with nobody told. What a recipe's
+downloads are held to is already one word worked out from the entry
+(`pinned`, `installer`, `open`), so the rule is that word: the catalog's
+is taken only where it is held to as much as the shipped one, and one
+held to nothing replaces none. The `script` form of an agent's recipe, a
+vendor's installer handed to a shell as it arrives, held nothing by
+construction and no shipped recipe had used it since pack format 5, so it
+is refused as a shape. Each replacement is a line in the audit.
 
 ## The repository laid out by part
 
@@ -697,3 +804,19 @@ boot without a word, and a package the node needs is the image's to carry.
 Debian's own docker in place of Docker's repository, since a pinned snapshot
 has to hold everything the image is made of. [image.md](image.md) is the
 image whole.
+
+**The ISO is the file a machine updates from, not an installer, until the
+installer is on the machine's own screen (the operator, 11 Nov 2026).** A
+machine being set up has a monitor, and what it should show there is
+AerieOS's own setup: the disk the system goes on, then the machine's disks
+as a pool or an array, the way the first page already sets them up. The
+console installer the ISO opened asked for one disk in a text menu and left
+the rest to a browser on another device, and installed from a VM's drive it
+was found not to start at all on a blank machine. So the ISO keeps its place
+on each release, since every running AerieOS updates from it, and loses its
+Install entry; a new machine starts from the USB edition. The installer to
+come is AerieOS's setup page in a full-screen browser on the machine,
+rather than a separate installer program with its own partitioning screens,
+so storage is built once; the console installer stays in the image behind
+the kernel's command line, for a serial line and for the build's check that
+the ISO lays out a blank disk.

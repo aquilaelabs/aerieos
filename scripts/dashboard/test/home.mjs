@@ -3,15 +3,8 @@
 // own rows; the last ten jobs, each opening its row on the Jobs page; the
 // pinned projects at a glance; read whole on open and light when the queue
 // moves, never on a timer of its own.
-import { URL, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, quiet, settled, api, section } from './lib.mjs';
 
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
   while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }
@@ -30,7 +23,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
    'Home is a page of its own on the rail, at #/home');
 
 // ---- the tiles: across the install, and what /api/home says --------------------
-{
+await section("the tiles: across the install, and what /api/home says", async () => {
   const h = await api('/api/home');
   const tiles = await page.$$eval('.doc.on .hometiles .tile', ts => ts.map(t => ({
     key: t.dataset.htile, value: t.querySelector('.tv')?.textContent, label: t.querySelector('.tl')?.textContent })));
@@ -45,25 +38,26 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   const listed = await page.evaluate(() => (state?.sessions || []).length);
   ok(by.sessions.value === String(listed) && listed > 0,
      `...and sessions open is what the Sessions page lists, terminals included (${by.sessions.value} of ${listed})`);
-}
+});
 
 // ---- updates due counts each thing behind once (B28) ------------------------
-{
+await section("updates due counts each thing behind once", async () => {
   const n = await page.evaluate(() => {
     const was = state.attention;
     state.attention = [
       {kind: 'toolchain', tools: [{name: 'a'}, {name: 'b'}]},
       {kind: 'image', containers: [{name: 'c1'}, {name: 'c2'}, {name: 'c3'}]},
-      {kind: 'nginx'}, {kind: 'agent'}, {kind: 'relocate'}];
+      {kind: 'nginx'}, {kind: 'agent'}, {kind: 'relocate'}, {kind: 'disk'},
+      {kind: 'host', what: 'reboot'}, {kind: 'some-kind-added-later'}];
     const got = homeUpdates();
     state.attention = was;
     return got;
   });
-  ok(n === 7, `updates due is two toolchains, three containers, nginx and an agent, and no move (${n})`);
-}
+  ok(n === 7, `updates due is two toolchains, three containers, nginx and an agent, and no move, failing disk or restart owed (${n})`);
+});
 
 // ---- a job that fails shows on Home by itself, through the jobs token ----------
-{
+await section("a job that fails shows on Home by itself, through the jobs token", async () => {
   const q = await api('/api/v1/nodes', { action: 'exec', id: 'local', argv: ['sh', '-c', 'echo from home; exit 3'] });
   ok(/^j_/.test(q.job || ''), `a job is queued on the controller (${q.job})`);
   const seen = await until(() => page.evaluate(id => !!document.querySelector(`.doc.on [data-hjob="${id}"] .pill.bad`), q.job), 30000);
@@ -77,10 +71,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.waitForFunction(id => tabOf(panes[0])?.kind === 'jobs'
     && document.querySelector(`.jbrow[data-job="${id}"].focus .jblog`), q.job, { timeout: 15000 });
   ok(true, 'a row on Last jobs opens its job on the Jobs page, brought into view with its log open');
-}
+});
 
 // ---- a tile is a link into its page ----------------------------------------
-{
+await section("a tile is a link into its page", async () => {
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .hometiles [data-htile="nodes"]', { timeout: 15000 });
   await page.click('.doc.on .hometiles [data-htile="nodes"]');
@@ -104,10 +98,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   ok(marked, '...and a press marks the Attention card where the updates are listed');
   ok(await page.evaluate(() => homeTiles().find(t => t.key === 'updates').label === (homeUpdates() === 1 ? 'update due' : 'updates due')),
      '...its label in the singular for one');
-}
+});
 
 // ---- Attention is the bell's rows, and the pinned projects are at a glance ----
-{
+await section("Attention is the bell's rows, and the pinned projects are at a glance", async () => {
   const same = await page.evaluate(() => {
     const card = document.querySelector('.doc.on .homegrid .hcard');
     return { home: card.querySelectorAll('.bnote').length, bell: needsRows().length,
@@ -143,10 +137,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   ok(true, '...and its name opens the space\'s page');
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .homegrid', { timeout: 15000 });
-}
+});
 
 // ---- the top bar's search (B72) ------------------------------------------------
-{
+await section("the top bar's search", async () => {
   ok(await page.$eval('#jump', i => i.placeholder) === 'jump to a page, space, container or node',
      'at 1280 the search\'s whole hint is shown, not cut mid-word');
   await page.fill('#jump', 'zzzz');
@@ -164,17 +158,21 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.keyboard.press('ArrowDown');
   const want = await page.$eval('#jumpList .jrow.on .jl', e => e.textContent);
   await page.keyboard.press('Enter');
-  await sleep(400);
+  await page.waitForFunction(() => document.getElementById('jumpList').hidden && document.getElementById('jump').value === '',
+    null, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval('#jumpList', l => l.hidden) && await page.$eval('#jump', i => i.value) === '',
      `...and Enter opens the marked row (${want})`);
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .homegrid', { timeout: 15000 });
-}
+});
 
 // ---- on a phone the cards stack and nothing scrolls sideways -----------------
-{
+await section("on a phone the cards stack and nothing scrolls sideways", async () => {
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(400);
+  // The page at the new width and drawn for it: the breakpoint's listeners run
+  // before a frame's callbacks.
+  await page.waitForFunction(() => innerWidth === 393, null, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const lay = await page.evaluate(() => {
     const [a, b] = [...document.querySelectorAll('.doc.on .homegrid .hcard')].map(c => c.getBoundingClientRect());
     return { stacked: b.top >= a.bottom - 1, over: document.documentElement.scrollWidth - innerWidth,
@@ -183,7 +181,151 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   ok(lay.stacked && lay.over <= 0 && lay.tiles,
      `on a phone Attention and Last jobs stack, and the tiles fit the width (${JSON.stringify(lay)})`);
   await page.setViewportSize({ width: 1280, height: 900 });
-}
+});
+
+// ---- no ring where it has no room -------------------------------------------
+// A press still waiting after a moment wears a ring (pressHold), and on the
+// rail that was a third line under the group pressed, pushing every group
+// below it; on a sub-nav it widened the page pressed (the operator, 13 Nov:
+// where the wheel would disrupt a small space, like the rail's icons, none
+// pops up). A button with room still wears it.
+await section("no ring where it has no room", async () => {
+  // The delay is the subject: a read slow enough that a press would wear a ring.
+  const slow = async r => { await sleep(1200); await r.continue().catch(() => {}); };
+  const boxes = () => page.evaluate(() => [...document.querySelectorAll('#rail .ritem, .pane .bar.page .pseg button')]
+    .filter(b => b.checkVisibility()).map(b => { const r = b.getBoundingClientRect(); return [r.top, r.left, r.width, r.height].map(Math.round).join(','); }).join(' '));
+  const rings = () => page.evaluate(() => [...document.querySelectorAll('button.working, a.btn.working')].map(b => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 20)));
+  await page.click('#rail [data-rail="home"]');
+  await page.waitForSelector('.doc.on .hometiles .tile', { timeout: 20000 });
+  // The page at rest before its boxes are the measure: its reads landed, and
+  // every tween that ends over.
+  await settled(page);
+  await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+  const before = await boxes();
+  await page.route('**/api/**', slow);
+  const seen = [], moved = [];
+  for (const sel of ['#rail [data-rail="home"]', '.pane .bar.page .pseg button']){
+    await page.click(sel);
+    for (let i = 0; i < 12; i++){ await quiet(100); seen.push(...await rings()); if (await boxes() !== before) moved.push(sel); }
+  }
+  ok(seen.length === 0, `a group on the rail and a page of the sub-nav wear no ring while their page reads (${JSON.stringify([...new Set(seen)])})`);
+  ok(moved.length === 0, `...and nothing on the rail or the sub-nav moves (${JSON.stringify([...new Set(moved)])})`);
+  // A button with room: one in a row of its own, its press starting a slow read.
+  const ring = await page.evaluate(async () => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:300px;top:300px;width:400px;display:flex;gap:6px;z-index:99';
+    host.innerHTML = '<button type="button" id="ringProbe">Read it again</button>';
+    document.body.append(host);
+    const b = host.firstChild;
+    b.onclick = () => { getJSON('/api/home'); };
+    return true;
+  });
+  await page.click('#ringProbe');
+  const wore = await until(async () => (await rings()).includes('Read it again'), 1500, 50);
+  // ...and the same button where one more thing does not fit: its row is as wide as it is.
+  await page.evaluate(() => { const b = document.getElementById('ringProbe'); b.classList.remove('working'); b.parentElement.style.cssText += ';width:auto;flex-wrap:wrap;max-width:' + b.offsetWidth + 'px'; });
+  // The first press over: the slow read it started has landed, and nothing is tied to the button.
+  await page.waitForFunction(() => { const b = document.getElementById('ringProbe'); return !b.__pending && !b.dataset.pressWorking; },
+    null, { timeout: 10000 }).catch(() => {});
+  await page.click('#ringProbe');
+  let tight = false;
+  for (let i = 0; i < 12; i++){ await quiet(100); if ((await rings()).includes('Read it again')) tight = true; }
+  ok(ring && wore && !tight, `...while a button with room wears it, and the same button in a row it just fits does not (${wore}, ${tight})`);
+  await page.unroute('**/api/**');
+  await page.evaluate(() => document.getElementById('ringProbe').parentElement.remove());
+  // The reads the route still holds let go and answered.
+  await settled(page, { cap: 5000 });
+});
+
+// ---- the controller restarts under the page (R246) -------------------------
+// With nothing unsaved the page starts again at once, as it always did. With
+// work on it that is not saved it waits (the operator, 13 Nov): a band under
+// the header says the controller was updated and what would be lost, with
+// Reload, and the page stays as it was left. It reloaded at once before, and
+// a staged edit or a half-typed message went with it.
+await section("the controller restarts under the page", async () => {
+  await page.evaluate(() => { window.__sameLoad = true; chatDraft.suite = 'half a message'; bootSeen = 'the run before this one'; });
+  await page.evaluate(() => refresh());
+  await page.waitForFunction(() => !document.getElementById('newBuild').hidden, null, { timeout: 10000 }).catch(() => {});
+  const held = await page.evaluate(() => ({ same: window.__sameLoad === true, shown: !document.getElementById('newBuild').hidden,
+    said: document.getElementById('newBuildSay').textContent, draft: chatDraft.suite }));
+  ok(held.same && held.shown && /The controller was updated\. Reload to use it: a message being typed is not saved yet\./.test(held.said)
+     && held.draft === 'half a message',
+     `a restart under unsaved work is held: the band says so and the page is as it was left (${held.said})`);
+  const box = await page.evaluate(() => { const b = document.getElementById('newBuild').getBoundingClientRect(), g = document.getElementById('newBuildGo').getBoundingClientRect();
+    return { w: Math.round(b.width), over: document.documentElement.scrollWidth > innerWidth, go: Math.round(g.height) }; });
+  ok(box.w > 300 && !box.over && box.go === 32, `...across the page under the header, its Reload a control's height (${JSON.stringify(box)})`);
+  await Promise.all([page.waitForNavigation({ timeout: 15000 }), page.click('#newBuildGo')]);
+  await ready(page);
+  ok(await page.evaluate(() => window.__sameLoad !== true && document.getElementById('newBuild').hidden),
+     '...and Reload starts the page again, the band gone');
+  // Nothing unsaved: the page starts again by itself, and stays drawn as it
+  // was until the new run's first read lands (Perch): the reload paints the
+  // page's kept copy, inert, where the placeholder's shapes went, and the
+  // first read draws the page in its place. The read is held back here for
+  // three seconds, so the copy can be seen.
+  await page.evaluate(() => { window.__sameLoad = true; bootSeen = 'the run before this one'; });
+  let hold = true;
+  await page.route('**/api/status*', async r => {
+    if (hold) await new Promise(res => setTimeout(res, 3000));
+    r.continue().catch(() => {});
+  });
+  const nav = page.waitForNavigation({ timeout: 15000 }).then(() => true, () => false);
+  await page.evaluate(() => { refresh(); });
+  ok(await nav, 'with nothing unsaved a restart reloads the page at once, as before');
+  const kept = await page.evaluate(() => {
+    const k = document.querySelector('#pane0 > .snapback');
+    return { kept: !!k, inert: !!k?.inert, words: (k?.textContent || '').trim().length, ids: k ? k.querySelectorAll('[id]').length : -1,
+             shapes: !!document.querySelector('#pane0 .skboot'), stored: sessionStorage.getItem('aerie.restartKeep') };
+  });
+  ok(kept.kept && kept.inert && kept.words > 40 && kept.ids === 0 && !kept.shapes && kept.stored === null,
+     `...and stays drawn as it was across it: the kept copy, inert and without ids, where the shapes went, read once (${JSON.stringify(kept)})`);
+  await page.waitForFunction(() => !document.querySelector('#pane0 > .snapback') && document.querySelector('#pane0 > .stack .doc.on'),
+                             null, { timeout: 15000 });
+  hold = false;
+  await page.unroute('**/api/status*');
+  ok(true, '...until the first read draws the page in its place');
+  await ready(page);
+});
+
+// ---- the controller away for a restart (Perch) ------------------------------
+// Reads that stop landing after the page had been reading are a restart, said
+// calmly until they have been away longer than one takes: one band in the
+// note voice with how long, the brand and the doctor's dot quiet, the page's
+// presses dead, and the status asked for every two seconds. Past the grace it
+// is the red line with its reason, as before; back, it is all gone.
+await section("the controller away for a restart", async () => {
+  const before = page.errors.length;
+  await page.evaluate(() => refresh());
+  await page.route('**/api/status*', r => r.abort('connectionrefused'));
+  await page.evaluate(() => refresh());
+  const calm = await page.evaluate(() => {
+    const b = document.querySelector('#panes .pane button:not(.help)');
+    return { away: document.body.classList.contains('away'), band: !$('awayBand').hidden ? $('awayBand').textContent : '',
+             why: !$('pollWhy').hidden, red: $('dot').classList.contains('off'), quiet: $('dot').classList.contains('away'),
+             dead: b ? getComputedStyle(b).pointerEvents === 'none' : null, next: awaySince > 0 };
+  });
+  ok(calm.away && /^AerieOS is restarting, \d+ seconds? so far/.test(calm.band) && !calm.why && !calm.red && calm.quiet && calm.dead === true && calm.next,
+     `a read that does not land after the page had been reading says AerieOS is restarting, calmly, and the page's presses are dead (${JSON.stringify(calm)})`);
+  const asked = await page.evaluate(async () => { const n0 = pollFails; await new Promise(r => setTimeout(r, 4500)); return pollFails - n0; });
+  ok(asked >= 1, `...and it asks again every two seconds meanwhile (${asked} more in 4.5 seconds)`);
+  await page.evaluate(() => { awaySince = Date.now() - 91000; return refresh(); });
+  const red = await page.evaluate(() => ({ away: document.body.classList.contains('away'), band: !$('awayBand').hidden,
+                                           red: $('dot').classList.contains('off'), why: !$('pollWhy').hidden ? $('pollWhy').textContent : '' }));
+  ok(!red.away && !red.band && red.red && /not talking to the container/.test(red.why),
+     `...past the time a restart takes it is the red line with its reason, as before (${red.why})`);
+  await page.unroute('**/api/status*');
+  await page.evaluate(() => refresh());
+  const back = await page.evaluate(() => ({ away: document.body.classList.contains('away'), band: !$('awayBand').hidden,
+                                            red: $('dot').classList.contains('off') || $('dot').classList.contains('away'),
+                                            why: !$('pollWhy').hidden, since: awaySince }));
+  ok(!back.away && !back.band && !back.why && back.since === 0, `...and back, the page is as it was (${JSON.stringify(back)})`);
+  // The reads refused on purpose here are what the browser and the red
+  // line said about them, and nothing else.
+  const said = page.errors.splice(before);
+  ok(said.every(t => /api\/status|^refresh:/.test(t)), `...with nothing in the console but the refused reads (${said.length}: ${said.filter(t => !/api\/status|^refresh:/.test(t)).join(' | ')})`);
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);

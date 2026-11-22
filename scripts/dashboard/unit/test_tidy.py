@@ -94,6 +94,27 @@ class Tidy(unittest.TestCase):
         self.assertTrue(tidy.suite_running(tidy.TMP))
         self.assertEqual(tidy.processes(root=r, uid=UID, spare=set()), [])
 
+    def test_a_run_its_launcher_left_holds_no_lock_but_a_kept_one_does(self):
+        # B926: a gate ended by its own pid leaves the harness under the
+        # first process, holding the lock; that run is ended, not spared.
+        # A kept fixture is started detached and is spared.
+        r, t = self.root, Path(self.root, "tmp", "dashboard-test.d")
+        t.mkdir(parents=True)
+        (t / "lock").write_text("40")
+        saved = tidy.TMP, tidy.PROC
+        self.addCleanup(lambda: (setattr(tidy, "TMP", saved[0]), setattr(tidy, "PROC", saved[1])))
+        tidy.TMP, tidy.PROC = str(Path(r, "tmp")), r
+        proc(r, 40, "bash", "bash /tmp/bb-suite.x1/scripts/dashboard/test/run.sh cards", ppid=1)
+        self.assertFalse(tidy.suite_running(tidy.TMP), "its launcher gone")
+        self.assertIn((40, "bash", "test server"), tidy.processes(root=r, uid=UID, spare=set()))
+        Path(r, "40", "environ").write_bytes(b"PATH=/bin\0BB_TEST_HOLD=1\0")
+        self.assertTrue(tidy.suite_running(tidy.TMP), "a kept fixture")
+        proc(r, 41, "bash", "bash /tmp/bb-suite.x2/scripts/dashboard/test/run.sh", ppid=40)
+        (t / "lock").write_text("41")
+        proc(r, 30, "bash", "bash aerie tests preflight", ppid=9)
+        Path(r, "41", "stat").write_text("41 (bash) S 30 0 0\n")
+        self.assertTrue(tidy.suite_running(tidy.TMP), "a run under its launcher")
+
     def test_a_crash_handler_goes_once_no_driven_browser_is_left(self):
         proc(self.root, 70, "chrome_crashpad", "chrome_crashpad_handler", ppid=1)
         self.assertEqual(tidy.processes(root=self.root, uid=UID, spare=set()), [(70, "chrome_crashpad", "browser")])

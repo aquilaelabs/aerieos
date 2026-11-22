@@ -41,9 +41,11 @@ class GpuCache(unittest.TestCase):
     def test_the_heartbeat_never_waits_on_nvidia_smi(self):
         t0 = time.monotonic()
         first = gpu.gpu_cached()
-        self.assertLess(time.monotonic() - t0, 0.1, "the first call starts the reader and returns")
+        # Under one stand-in nvidia-smi's 0.3 s, not a guess at how fast a
+        # busy machine starts a thread (B812: 0.1 s was missed in a whole run).
+        self.assertLess(time.monotonic() - t0, 0.25, "the first call starts the reader and returns")
         self.assertEqual(first, {})
-        for _ in range(40):
+        for _ in range(200):
             if gpu.gpu_cached():
                 break
             time.sleep(0.05)

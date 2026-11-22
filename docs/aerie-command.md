@@ -49,9 +49,6 @@ function a suite calls bare, an id or class it names, an API path a
 changed python module answers through the server's route table, a file
 named outright), and in `server.py` to every suite. A whole run refreshes
 the covered run. R75's third step, so the suites are never picked by hand.
-`tools/no-net-growth.sh` is a measurement beside it, not a gate: the four
-largest files against the ceilings in `tools/ratchet.txt`, which a change
-that shrinks one lowers with `--tighten` (roadmap R77).
 
 `aerie map` is the code map a session asks instead of grepping (roadmap R75):
 one index over the tree it is in, python, the dashboard's scripts (the

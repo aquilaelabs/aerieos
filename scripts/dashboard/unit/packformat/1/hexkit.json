@@ -1,0 +1,67 @@
+{
+ "about": "Looks inside binaries: dumps, strings, headers.",
+ "guidance": "GUIDE.md",
+ "install": {
+  "steps": [
+   [
+    "sh",
+    "{dir}/install.sh"
+   ]
+  ],
+  "verify": [
+   "{dir}/bin/hexkit",
+   "--version"
+  ]
+ },
+ "label": "Hex kit",
+ "layout": {
+  "bin": [
+   "bin"
+  ],
+  "tool": "bin/hexkit"
+ },
+ "name": "hexkit",
+ "platforms": [
+  "linux/amd64",
+  "linux/arm64"
+ ],
+ "system": {
+  "apt": [
+   "libmagic1"
+  ],
+  "dnf": [
+   "file-libs"
+  ],
+  "pacman": [
+   "file"
+  ]
+ },
+ "terms": [
+  {
+   "label": "MIT",
+   "url": "https://opensource.org/license/mit"
+  }
+ ],
+ "verbs": {
+  "dump": {
+   "about": "A file's bytes as hex.",
+   "run": [
+    "{dir}/bin/hexkit",
+    "dump",
+    "{args}"
+   ],
+   "usage": "FILE"
+  },
+  "report": {
+   "about": "A report on a binary, into dist/.",
+   "run": [
+    "python3",
+    "{dir}/verbs/report.py",
+    "--out",
+    "{dist}",
+    "{args}"
+   ],
+   "usage": "FILE"
+  }
+ }
+}

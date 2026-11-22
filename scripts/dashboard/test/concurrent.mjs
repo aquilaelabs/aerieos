@@ -6,7 +6,7 @@
 // may be lost or written twice, numbers must stay unique, and the files must
 // never be seen half-written. No browser: the relay and the API are what a
 // session and the panel use.
-import { ok, done, URL, DIR, member } from './lib.mjs';
+import { ok, done, URL, DIR, member, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
@@ -118,7 +118,7 @@ ok(!lostC.length && !twiceC.length && /^# /.test(log),
 // about the notebook yet. Six sessions prompting together is these arriving
 // together; every one must answer, the meeting on a shared file must be
 // said, and nothing asked may go missing from the feed.
-{
+await section("the hooks every prompt fires, from every session at once", async () => {
   const hook = (t, body) => req('POST', '/api/v1/hook', { project: 'alpha', ...body }, 'Bearer ' + t);
   const hjobs = [];
   for (const [who, t] of sessions) {
@@ -149,6 +149,6 @@ print(json.dumps(c.feed("alpha")))`], { encoding: 'utf8' }).trim().split('\n').p
   const asked = sessions.flatMap(([who]) => [0, 1, 2].map(i => `cc ${who} asked ${i}`));
   const missing = asked.filter(a => !text.includes(a));
   ok(missing.length === 0, `every question a session asked is in the space's feed (${asked.length}${missing.length ? `, missing: ${missing.slice(0, 3).join(', ')}` : ''})`);
-}
+});
 
 await done();

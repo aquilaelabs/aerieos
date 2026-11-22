@@ -17,13 +17,46 @@ import pwd
 import re
 
 from .accounts import user_of
-from .base import log
+from .base import dir_at, give_fd, log, open_dir, write_at
+from .stores import tc_root
 
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 PACK_NAME = re.compile(r"^[a-z][a-z0-9-]{1,39}$")
 
 
 UID = re.compile(r"^u_[0-9a-f]{8}$")
+
+
+def _write_envs(base, packs, uid, gid, take_bb=False):
+    """`base`/.bb/config holding one PACK.env for each of `packs` and no
+    other, each 0600: the folder and its files `uid`'s where one is given.
+    `base` is a store or a home, an account's to write, so every step is by
+    a descriptor on the folder itself (dir_at, write_at): nothing is made,
+    owned or removed through a link left at a name. `take_bb` gives `.bb`
+    to the account too, where it is the account's own home."""
+    top = open_dir(base)
+    try:
+        bb = dir_at(top, ".bb")
+    finally:
+        os.close(top)
+    try:
+        if take_bb and uid is not None:
+            give_fd(bb, uid, gid)
+        cfg = dir_at(bb, "config", 0o700)
+    finally:
+        os.close(bb)
+    try:
+        os.fchmod(cfg, 0o700)
+        if uid is not None:
+            give_fd(cfg, uid, gid)
+        for name in os.listdir(cfg):
+            if name.endswith(".env") and name[:-4] not in packs:
+                os.unlink(name, dir_fd=cfg)
+        for pack, env in packs.items():
+            write_at(cfg, pack + ".env", "".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v),
+                     0o600, uid, gid)
+    finally:
+        os.close(cfg)
 
 
 class PackConfigMixin:
@@ -55,24 +88,11 @@ class PackConfigMixin:
                 pw = pwd.getpwnam(user_of(uid))
             except KeyError:
                 continue
-            d = os.path.join(pw.pw_dir, ".bb", "config")
             packs = by_uid.get(uid, {})
             try:
-                if not packs and not os.path.isdir(d):
+                if not packs and not os.path.isdir(os.path.join(pw.pw_dir, ".bb", "config")):
                     continue
-                os.makedirs(d, mode=0o700, exist_ok=True)
-                for p in (os.path.join(pw.pw_dir, ".bb"), d):
-                    os.chown(p, pw.pw_uid, pw.pw_gid)
-                for name in os.listdir(d):
-                    if name.endswith(".env") and name[:-4] not in packs:
-                        os.unlink(os.path.join(d, name))
-                for pack, env in packs.items():
-                    path = os.path.join(d, pack + ".env")
-                    fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-                    with os.fdopen(fd, "w", encoding="utf-8") as f:
-                        f.write("".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v))
-                    os.chown(path + ".tmp", pw.pw_uid, pw.pw_gid)
-                    os.replace(path + ".tmp", path)
+                _write_envs(pw.pw_dir, packs, pw.pw_uid, pw.pw_gid, take_bb=True)
             except OSError as e:
                 log(f"pack config: could not write {uid}'s own: {e}")
                 return
@@ -85,6 +105,11 @@ class PackConfigMixin:
         sig = hashlib.sha256(json.dumps(want, sort_keys=True).encode()).hexdigest()
         if sig == self._pack_config_sig:
             return
+        # Where this agent is root the one store written into is this node's
+        # own: a row is the controller's word, and root makes folders there.
+        if os.geteuid() == 0:
+            mine = os.path.normpath(tc_root(getattr(self, "state", None) or {}) or "/nowhere")
+            want = [r for r in want if os.path.normpath(r["store"]) == mine]
         stores = {}
         for r in want:
             stores.setdefault(r["store"], {})[r["pack"]] = {k: str(v) for k, v in (r.get("env") or {}).items() if ENV_NAME.fullmatch(str(k))}
@@ -96,25 +121,9 @@ class PackConfigMixin:
             except (KeyError, AttributeError, TypeError):
                 uid = gid = None
         for store, packs in stores.items():
-            d = os.path.join(store, ".bb", "config")
             try:
-                os.makedirs(d, mode=0o700, exist_ok=True)
-                if uid is not None:
-                    os.chown(os.path.join(store, ".bb"), uid, gid)
-                    os.chown(d, uid, gid)
-                for name in os.listdir(d):
-                    if name.endswith(".env") and name[:-4] not in packs:
-                        os.unlink(os.path.join(d, name))
-                for pack, env in packs.items():
-                    path = os.path.join(d, pack + ".env")
-                    tmp = path + ".tmp"
-                    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-                    with os.fdopen(fd, "w", encoding="utf-8") as f:
-                        f.write("".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v))
-                    if uid is not None:
-                        os.chown(tmp, uid, gid)
-                    os.replace(tmp, path)
+                _write_envs(store, packs, uid, gid)
             except OSError as e:
-                log(f"pack config: could not write {d}: {e}")
+                log(f"pack config: could not write {os.path.join(store, '.bb', 'config')}: {e}")
                 return
         self._pack_config_sig = sig

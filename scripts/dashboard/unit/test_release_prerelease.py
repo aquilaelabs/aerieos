@@ -106,6 +106,19 @@ class PreRelease(unittest.TestCase):
         self.assertIn(f"- Said after its change ({change})", text)
         self.assertIn(f"- Said with its change ({together})", text)
 
+    def test_a_line_carried_by_the_next_change_keeps_naming_its_own(self):
+        # B735: the change, its line logged after it, then another change
+        # that carried the changelog with it: the cut renamed the line to
+        # that next change, taking it for the line's own.
+        first = self.commit_file("d.py", "d = 1\n", "the change")
+        changelog.add(self.app, "Said after its change, carried by the next", sha=first, cat="Fixed")
+        (self.app / "e.py").write_text("e = 1\n")
+        nxt = self.commit("another change, with the changelog")
+        self.release(dev=True)
+        text = (self.app / "CHANGELOG.md").read_text()
+        self.assertIn(f"- Said after its change, carried by the next ({first})", text)
+        self.assertNotIn(f"({nxt})", text)
+
     def commit_file(self, name, body, msg):
         (self.app / name).write_text(body)
         return self.commit(msg)
@@ -198,6 +211,36 @@ class PreRelease(unittest.TestCase):
         self.commit(f"The new code is right (B{n})")
         bugs.set_status("app", n, "fixed", "fixed")
         self.assertEqual(releasegaps.gaps("app")["owed"], [])
+
+    def test_a_long_tracker_asks_git_no_more(self):
+        # Hundreds of bugs fixed before the release: the walk reads history
+        # once, not once a bug (it ran for minutes on a slow tree).
+        for i in range(40):
+            n = self.file_bug(f"Old bug {i}")
+            bugs.set_status("app", n, "fixed", "fixed")
+        self.release(pre="rc")
+        asked = []
+        run = subprocess.run
+
+        def counted(cmd, *a, **k):
+            asked.append(cmd)
+            return run(cmd, *a, **k)
+        with mock.patch.object(subprocess, "run", counted):
+            self.assertEqual(releasegaps.gaps("app")["owed"], [])
+        self.assertLess(len(asked), 12, [c[3:5] for c in asked])
+
+    def test_a_bug_another_s_number_starts_is_not_named_by_it(self):
+        a = self.file_bug("The total is off by one")
+        self.release(pre="rc")
+        (self.app / "app.py").write_text("def total(xs):\n    return sum(xs)\n")
+        sha = self.commit(f"Two lines\n\nThe total is right: B{a}\nand B{a}7 is another")
+        bugs.set_status("app", a, "fixed", "fixed")
+        b = next(x for x in bugs.load()["projects"]["app"] if x["id"] == a)
+        self.assertEqual(releasegaps.fix_commits("app", b, releasegaps.last_release("app")), [sha])
+        self.assertEqual(releasegaps.fix_commits("app", {**b, "id": int(f"{a}7"), "fixed_in": "", "commits": []},
+                                                 releasegaps.last_release("app")), [sha])
+        self.assertEqual(releasegaps.fix_commits("app", {**b, "id": int(f"{a}9"), "fixed_in": "", "commits": []},
+                                                 releasegaps.last_release("app")), [])
 
 
 if __name__ == "__main__":

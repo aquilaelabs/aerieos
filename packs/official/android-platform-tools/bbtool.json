@@ -1,5 +1,7 @@
 {
  "about": "adb and the other tools that talk to a phone or an emulator; the emulator and the Phone tab need it. Google ships it for x86_64 Linux only.",
+ "format": 5,
+ "framework": "5.1",
  "label": "Android platform tools",
  "layout": {
   "bin": [
@@ -8,6 +10,7 @@
   "env": {},
   "tool": "root:android/platform-tools/adb"
  },
+ "maker": "Google",
  "name": "android:platform-tools",
  "platforms": [
   "linux/amd64"
@@ -17,6 +20,7 @@
   "requires": [
    "android-tools"
   ],
+  "rev": 2,
   "source": {
    "download": {
     "resolver": "android-repo",
@@ -24,7 +28,9 @@
      "https://dl.google.com/android/repository/repository2-3.xml"
     ]
    },
+   "host": "dl.google.com",
    "kind": "sdkmanager",
+   "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing",
    "package": "platform-tools"
   },
   "updatable": true

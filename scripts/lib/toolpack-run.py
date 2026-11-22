@@ -14,13 +14,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sdkmeta  # noqa: E402
+from say import die  # noqa: E402
 
 pack_dir, project_dir, name, rest = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
-
-
-def die(msg):
-    print(f"[builderbot] ERROR: {msg}", file=sys.stderr)
-    raise SystemExit(1)
 
 
 if name == "--list":

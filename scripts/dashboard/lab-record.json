@@ -1,0 +1,61 @@
+{
+ "format": 1,
+ "walks": [
+  {
+   "at": "2026-10-13",
+   "build": "",
+   "said": "Rocky 9.8",
+   "subject": "rocky",
+   "suite": "by-hand"
+  },
+  {
+   "at": "2026-10-21",
+   "build": "",
+   "said": "AlmaLinux 9.8",
+   "subject": "almalinux",
+   "suite": "lab-systems"
+  },
+  {
+   "at": "2026-10-22",
+   "build": "",
+   "said": "Alpine 3.24",
+   "subject": "alpine",
+   "suite": "lab-systems"
+  },
+  {
+   "at": "2026-10-21",
+   "build": "",
+   "said": "Arch Linux, kernel 7.2",
+   "subject": "arch",
+   "suite": "lab-systems"
+  },
+  {
+   "at": "2026-10-21",
+   "build": "",
+   "said": "CentOS Stream 9",
+   "subject": "centos",
+   "suite": "lab-systems"
+  },
+  {
+   "at": "2026-10-21",
+   "build": "",
+   "said": "Debian 13",
+   "subject": "debian",
+   "suite": "lab-systems"
+  },
+  {
+   "at": "2026-10-21",
+   "build": "",
+   "said": "Fedora 44",
+   "subject": "fedora",
+   "suite": "lab-systems"
+  },
+  {
+   "at": "2026-10-22",
+   "build": "",
+   "said": "openSUSE Leap 16.0 and Tumbleweed",
+   "subject": "opensuse",
+   "suite": "lab-systems"
+  }
+ ]
+}

@@ -134,6 +134,34 @@ class Ftp(unittest.TestCase):
             users._save(d)
         self.assertEqual(ftp.login("n1", "alpha", "ann", "password1", "a")["access"], "")
 
+    def test_an_account_with_two_factor_gives_its_code_after_its_password(self):
+        # B723: its password alone opened its files over FTP.
+        class Mfa:
+            used = []
+
+            @staticmethod
+            def enabled(uid):
+                return uid == "u_3"
+
+            @classmethod
+            def totp_check(cls, uid, code):
+                cls.used.append((uid, code))
+                return code == "123456"
+        saved = ftp.mfa
+        self.addCleanup(setattr, ftp, "mfa", saved)
+        ftp.mfa = Mfa
+        ftp.save("alpha", {"on": True, "access": {"u_3": "r", "u_2": "rw"}}, "boss")
+        got = ftp.login("n1", "alpha", "ann", "password1", "10.0.0.5")
+        self.assertEqual(got["access"], "")
+        self.assertIn("six-digit code right after it", got["why"])
+        self.assertEqual(ftp.login("n1", "alpha", "ann", "password1000000", "10.0.0.5")["access"], "", "a code that is not the one")
+        self.assertEqual(ftp.login("n1", "alpha", "ann", "password1123456", "10.0.0.5"), {"access": "r"})
+        self.assertEqual(ftp.login("n1", "alpha", "ann", "wrong123456", "10.0.0.5")["access"], "")
+        # An account with none signs in as before, whatever its password ends in.
+        self.assertEqual(ftp.login("n1", "alpha", "adm", "password1", "10.0.0.5"), {"access": "rw"})
+        self.assertEqual(ftp.login("n1", "alpha", "adm", "password1123456", "10.0.0.5")["access"], "")
+        self.assertNotIn(("u_2", "123456"), Mfa.used, "a code is asked of an account that has a second factor, and no other")
+
     def test_failed_logins_are_throttled_per_address(self):
         ftp.save("alpha", {"on": True, "access": {"u_3": "r"}}, "boss")
         for _ in range(ftp.FAIL_LIMIT):
@@ -172,6 +200,14 @@ class Ftp(unittest.TestCase):
             self.skipTest("the port the system gave is out of range")
         ftp.node_info = lambda nid: {"name": "box", "addr": "127.0.0.1", "has_ftp": True}
         self.addCleanup(setattr, ftp, "node_info", None)
+        # Only the ports this test holds are asked for real: in a whole unit
+        # run, another module's server listening in the same ten read as
+        # this one's, and the save named it or was refused where it should
+        # pass (B968).
+        real = ftp._answers
+        mine = {held, held - 3}
+        self.addCleanup(setattr, ftp, "_answers", real)
+        ftp._answers = lambda addr, p: p in mine and real(addr, p)
         j, code = ftp.save("alpha", {"on": True, "port": held - 3}, "boss")
         self.assertEqual(code, 400)
         self.assertIn(f"port {held} is already in use on box", j["error"])
@@ -187,11 +223,18 @@ class Ftp(unittest.TestCase):
         ftp.report("n1", [{"project": "alpha", "up": True, "port": free, "addr": "127.0.0.1"}])
         self.assertEqual(ftp.save("alpha", {"on": True, "port": free, "access": {"u_3": "r"}}, "boss")[1], 200)
 
-    def test_setting_it_up_is_the_project_owners_or_an_admins_and_never_a_sessions(self):
+    def test_setting_it_up_is_file_access_write_and_never_a_sessions(self):
         self.assertEqual(users.may(users.get("boss"), "ftp", "alpha"), "", "the space's owner")
-        self.assertEqual(users.may(users.get("adm"), "ftp", "alpha"), "", "an administrator (R152)")
-        self.assertIn("space's owner or an administrator", users.may(users.get("ann"), "ftp", "alpha"))
-        sess = {"name": "session:alpha", "role": "owner", "projects": ["alpha"], "session": "alpha", "uid": "u_1"}
+        self.assertEqual(users.may(users.get("adm"), "ftp", "alpha"), "", "an administrator")
+        self.assertEqual(users.may(users.get("ann"), "ftp", "alpha"), "", "a role giving File access Write")
+        roles.set_role("reader", "projects", {"projects": "write", "files": "read"})
+        with users._lock:
+            d = users.load()
+            d["users"]["ann"]["project_roles"] = {"alpha": ["reader"]}
+            users._save(d)
+        self.assertIn("File access", users.may(users.get("ann"), "ftp", "alpha"),
+                      "File access Read alone does not set it up, and the refusal names the area")
+        sess = {"name": "session:alpha", "role": "owner", "projects": ["alpha"], "session": "alpha", "seat": "u_1"}
         self.assertIn("session", users.may(sess, "ftp", "alpha"))
 
     def test_a_login_is_no_more_than_the_accounts_roles_give(self):

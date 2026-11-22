@@ -18,49 +18,13 @@ person should be given a group of permissions.
 """
 import contextlib
 import json
-import os
 import re
 import threading
 from pathlib import Path
 
-NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
+import statefile
 
-# Every capability the gate asks about, with its group and the sentence the
-# tab shows beside it. `work` is everything a person does on a project that
-# is not listed on its own below: the notebook, a Claude session, settings,
-# builds and tests, the phone it is lent.
-CAPS = {
-    "read": ("projects", "read a space: its notebook, code and state"),
-    "work": ("projects", "work on a space: the notebook, an agent's session, its settings, builds and tests"),
-    "version": ("projects", "move a space's version and release it"),
-    "lock": ("projects", "nothing any more: a space's owner or an administrator locks it (deprecated, goes in 0.8.0)"),
-    "rename": ("projects", "rename a space"),
-    "trash": ("projects", "delete a space"),
-    "git-auth": ("projects", "change how a space authenticates to its remote"),
-    "docker-write": ("projects", "start, stop and rebuild containers"),
-    "command-pin": ("projects", "move the pinned commands, one set for everybody"),
-    "ftp": ("projects", "turn on a space's file access over FTP, its port, and who may sign in to it"),
-    "node": ("nodes", "set which node a space builds on"),
-    "toolchains-write": ("nodes", "install and remove toolchains on a node"),
-    "jobs": ("nodes", "run a command on a node as a job"),
-    "terminal": ("nodes", "a shell on a node"),
-    "create": ("controller", "make a space"),
-    "runner": ("controller", "the CI runner page and its settings"),
-    "admin": ("controller", "everything else an administrator does: nodes, toolchains, settings, accounts"),
-    "debug": ("controller", "debug mode, the controller's diagnostics and nodes' logs, and granting them to a space's sessions"),
-}
-# Granted by name only (the operator, 6 Oct): `*` does not reach these, so
-# the built-in admin and a role that grants everything leave them out, and
-# only the owner has them until a role names them. ftp too (R151): who may
-# reach a project's files from outside AerieOS is the owner's to hand on.
-NAMED_ONLY = frozenset({"debug", "ftp"})
-# The capabilities whose scope is over NODES (step 3): every node, the
-# nodes of the account's projects, or named ones.
-NODE_CAPS = frozenset(c for c, (g, _) in CAPS.items() if g == "nodes")
-GROUPS = (("projects", "On a space"), ("nodes", "On a node"), ("controller", "The controller"))
-# What `work` does not cover: each needs a grant of its own.
-OWN_CAPS = frozenset(c for c in CAPS if c not in ("read", "work"))
-SCOPES = ("mine", "all")           # or a list of project names
+NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
 
 # ---- R152: areas, each Read and Write -------------------------------------
 # The operator, 7 Oct: a role is a scope and, per area, Read or Write;
@@ -82,9 +46,7 @@ AREAS = (
     ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a space's sessions reach"),
     # What the Library and the Installed page do (R174, the operator, 28
     # Oct): Install and Configure on a node, each grantable node by node,
-    # and Curate, the catalog's own entries, which every node shares. Before
-    # 0.9 these were one area, Toolchains, still read as Install for a
-    # release (ALIASES).
+    # and Curate, the catalog's own entries, which every node shares.
     ("install", "Install", "global", "the Library and the Installed page", "install, update and remove toolchains, coding agents and packs on a node"),
     ("configure", "Configure", "global", "a service's and a pack's settings on a node", "change them, and deploy or remove a service there"),
     ("curate", "Curate", "global", "the catalog's own entries", "add your own pack or app, edit and remove it"),
@@ -103,10 +65,6 @@ AREAS = (
 # The areas a Global role may hold on named nodes alone (its `nodes`, none
 # named being every node): what reaches a machine (the operator, 7 Oct).
 NODE_AREAS = frozenset({"nodes", "install", "configure", "jobs", "newprojects", "storage"})
-# An area's name before 0.9, read as today's for one release (R174): a role
-# written by a 0.8 page or a script still holding Toolchains is read as
-# Install. Migration 0017 rewrote the roles kept; this goes in 0.10.
-ALIASES = {"toolchains": "install"}
 # The areas an Everywhere role may hold instance by instance, each at its own
 # level (the operator, 16 Oct: expand an area's row to say which nodes, which
 # runners, Read or Write on each, the area's own boxes ticking every one).
@@ -134,7 +92,11 @@ CAP_AREA = {
     "runner": ("runner", "write"),
     "command-pin": ("controller", "write"), "create": ("newprojects", "write"),
     "admin": ("accounts", "write"), "debug": ("controller", "write"),
-    "ftp": ("settings", "write"),
+    # A space's file access over FTP, its port and who of its people may
+    # sign in to it: File access, the area whose files it hands out. A
+    # person on its list reaches no more than their own roles' File access
+    # gives (ftp.access_for).
+    "ftp": ("files", "write"),
     # Each its own area (R255 step 3, the operator, 16 Oct): what these
     # gated was behind accounts write whatever it was, so a role's areas
     # did not say what it could do.
@@ -145,6 +107,9 @@ CAP_AREA = {
 }
 
 _ALL = {a: "write" for a in AREA_KEYS}
+# Names no custom role takes: what a plain account and a session are called.
+RESERVED = frozenset({"user", "session"})
+
 BUILTIN = {
     # Named for a person (R255 step 1): AerieOS's owner is not a
     # project's, and neither is the Owner of X role a project's owner holds.
@@ -190,7 +155,6 @@ def configure(*, state, write_json):
 def _perms(p):
     """{area: read|write}, the ones that name a known area and level."""
     p = p if isinstance(p, dict) else {}
-    p = {**{new: p[old] for old, new in ALIASES.items() if old in p and new not in p}, **p}
     return {a: p[a] for a in AREA_KEYS if p.get(a) in LEVELS}
 
 
@@ -222,7 +186,6 @@ def _only(raw, perms, nodes=()):
     is held is in `perms` at the best level of its map, so every question
     asked without an instance (the rail, the summary) keeps its answer."""
     raw = raw if isinstance(raw, dict) else {}
-    raw = {**{new: raw[old] for old, new in ALIASES.items() if old in raw and new not in raw}, **raw}
     nodes = sorted({str(n)[:40] for n in nodes or () if str(n).strip()})[:64]
     if not raw and nodes:
         raw = {a: {n: perms[a] for n in nodes} for a in NODE_AREAS if perms.get(a)}
@@ -260,10 +223,9 @@ _read_kept = [None, None]
 
 
 def _read():
-    try:
-        st = os.stat(FILE)
-        sig = (st.st_ino, st.st_size, st.st_mtime_ns)
-    except (OSError, TypeError):
+    # What the file is, looked at once a request (statefile.sig, R228 step 1).
+    sig = statefile.sig(FILE) if FILE else None
+    if sig is None:
         return {}
     if _read_kept[0] != sig:
         try:
@@ -371,19 +333,21 @@ def get(name):
     return all_roles().get(str(name or ""))
 
 
-def set_role(name, scope="projects", perms=None, note="", grants=None, nodes=None, only=None):
+def set_role(name, scope="projects", perms=None, note="", only=None):
     """Make or change a role; owner and admin are built in and refused.
-    `grants` is the shape from before R152, converted. `only`, for an
-    Everywhere role, holds an INSTANCE_AREAS area on the instances it names,
-    each at its level; `nodes` is the shape from before it, one list for
-    every node area."""
+    `only`, for an Everywhere role, holds an INSTANCE_AREAS area on the
+    instances it names, each at its level."""
     name = str(name or "").strip()
     if not NAME_RE.match(name):
         return {"error": "a role's name is letters, digits, spaces and . _ -, up to 40"}
     if name in BUILTIN:
         return {"error": f"{name} is built in and not changed"}
-    r = _clean({"grants": grants} if grants is not None and perms is None else
-               {"scope": scope, "perms": perms or {}, "nodes": nodes or [], "only": only or {}})
+    # "user" is what every plain account and every session is called where a
+    # role is asked for, so a role made under that name would have been
+    # granted to all of them at once.
+    if name.lower() in RESERVED:
+        return {"error": f"{name} is what every account without a role is called, so no role takes that name"}
+    r = _clean({"scope": scope, "perms": perms or {}, "only": only or {}})
     r["note"] = str(note or "")[:200]
     if r["scope"] == "projects" and any(a not in PROJECT_AREAS for a in r["perms"]):
         bad = ", ".join(a for a in r["perms"] if a not in PROJECT_AREAS)

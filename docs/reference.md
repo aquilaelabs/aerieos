@@ -240,7 +240,8 @@ aerie changelog add "..." --cat NAME   log what a change means for the person us
                    Added (somebody can do something they could not), Changed
                    (already here, now different), Deprecated (going away),
                    Removed (gone), Fixed (was wrong in a released version,
-                   now right; --bug N says which bug), Security (act on it
+                   now right; --bug N says which bug, several by repeating
+                   it), Security (act on it
                    because of what it exposed). When two fit, the one a reader would look under;
                    something nobody using the product would notice gets no
                    entry, and neither does a fix to something no release has
@@ -274,6 +275,11 @@ aerie changelog missing [TAG]  the bugs fixed since the last release (or TAG)
 aerie changelog skip N "why"   a fixed bug that needs no Fixed line, and why
                    (the release never had it, nobody using it meets it); kept
                    in the bug's notes, as add's --bug N is for the line itself
+aerie changelog link N BUG...  the unreleased line N answers these bugs: kept in
+                   the notebook, where each bug's row lists the line and the
+                   release that carried it; the public line names its commits
+                   alone, and an edit, a merge or the editor's Save keeps the
+                   bugs tied; `unlink N BUG...` unties them
 aerie projects        the space dirs here and their branches
 aerie shell           login shell as the builder user
 aerie login           Claude Code subscription auth flow, on the machine it is
@@ -345,10 +351,13 @@ aerie nodes           the machines enrolled as nodes, each with the agent it run
                    read-only in a terminal; the Nodes page is where they are edited
 aerie nodes show NAME one of them in full, by name or id: its agent against the one
                    this controller ships, and what Update agent would fix
-aerie nodes enroll-token NAME [--user U] [--own]
+aerie nodes enroll-token NAME [--user U] [--own] [--pins]
                    a new node's enrollment token, printed once, from a shell on
                    the controller: Enroll node's Just a token, for a scripted setup;
-                   --own is the controller's own machine, on a bare-metal install
+                   --own is the controller's own machine, on a bare-metal install;
+                   --pins adds, a line each, what the provisioner is handed with
+                   it: the release key the node pins, and the digest and the
+                   signature the agent it fetches is held to
 aerie projects adopt FOLDER [--name NAME]
                    a folder already under the spaces share made a space, as
                    if AerieOS had made it, from a shell on the controller: a
@@ -411,7 +420,7 @@ aerie devapp new [NAME] [--branch REF] [--compose FILE] [--override FILE] [--nod
                    files (site/compose.yml), the root's own by default; --override
                    lays another compose file from the tree over it, for this one
                    container (its own ports, env or an extra service). --node
-                   puts it on a hosting node ticked under the space's Also
+                   puts it on a hosting node listed under the space's Also
                    works on (marked Hosting only): built on the space's own
                    node and shipped there. On ask, one request carries all of it and
                    Approve makes and builds it
@@ -461,12 +470,17 @@ aerie sign status [TAG]
                    node with its tools) and how the newest went: handed over,
                    signed and attached with the key's fingerprint, or what
                    stopped it, in the bell's words
-aerie sign release --why "..."
+aerie sign release [--again TAG] --why "..."
                    look for unsigned release APKs now and sign a failed one
                    again, as the Signing view's Look for unsigned APKs now,
                    under Sign a build: auto starts it, ask waits for the owner;
                    then waits for the look and says what it found, run by run,
-                   or why it found nothing
+                   or why it found nothing. Only a release's own run is signed
+                   from (the one its tag started, on the tag's commit, in the
+                   repository itself; any other is refused, saying why), and
+                   a release is signed once: --again TAG replaces the signed
+                   APK on TAG's release with its own run's, signed again,
+                   which waits for the owner whatever the setting
 aerie emu create API  build the AVD for an API level, installing its image if missing
 aerie emu install APK install an APK on the running emulator
 aerie emu shot [FILE] screenshot the emulator into dist/emu/
@@ -526,6 +540,12 @@ aerie bug add "..."   report one (--sev, --area, --repro, ...); `note N`, `fix N
                    --repro, --reproduces always|sometimes|once|untried says how
                    often those steps showed it; --report N files diagnostics
                    report N with its words, area, repro and that answer
+aerie bug fix N [N...] "what fixed it" [--commit SHA]
+                   close the bugs one commit fixed, after committing it: each
+                   records the commit the space is on (or the ones --commit
+                   names) as its Fixed in, which ties it to the changelog
+aerie bug fixed-in N [SHA...] [--drop SHA...]
+                   the commits that fixed a bug: listed, added or taken off
 aerie tests run [ARGS]  run the space's test command, time it, and record the run: says first when it should
                    finish, and ends by NAMING what went wrong: the failed assertions per file, and for a file
                    that CRASHED the line it died on, the assertions that had already failed before it did,
@@ -549,9 +569,23 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests bisect SUITE GOOD BAD [--check WORDS] [--times N]   the first commit between GOOD and
+                   BAD where SUITE fails (or prints a FAIL line holding WORDS), found by halving and
+                   running it --at each commit; a suite that has flaked runs three times a commit
+aerie tests flakes [DAYS]  the suites that failed in a whole run and passed when run again, counted over
+                   the last 30 days (or DAYS), the most often first, each with the check that failed
+                   last; the harness records one as it names it, and aerie tests preflight fails on one
+                   in a suite it ran
+aerie tests root      the root tier (scripts/dashboard/roottier): what the root agent and the root
+                   helpers do in a folder an account controls, with a link planted where root
+                   works, as root in a throwaway container of the controller's image where docker
+                   answers; `aerie devapp test root-tier` runs it in the space's dev instance, and CI
+                   on every pull request and release
 aerie tests lab       the lab suites (test/lab-*.mjs) against real services rather than stand-ins.
                    Each names what it needs and skips in one line without it, so a missing service
-                   is never a failure, and nothing records them: a lab run is a proof, not a timing.
+                   is never a failure. Each subject a suite walks whole (a system, a git host) is
+                   written, dated, into scripts/dashboard/lab-record.json, which the vetted lines
+                   are read from: commit it with the work.
                    Two services are known. A Gitea: the `gitea` service of AerieOS's own dev
                    stack, under its compose file's `lab` profile, brought up from the Containers page
                    like any space's stack (`BB_LAB_GITEA`, the local one by default), and
@@ -597,8 +631,12 @@ aerie design file [--from FILE]   docs/design-language.md as the notebook writes
                    of the saved design, so a branch writes the file from its own
 aerie design json     the record: the language, the pages, and the presets by key
 aerie design schema   the record's shape with every limit, for a save that lands first time
-aerie design save FILE   write a record of that shape back, whole: how a session
-                   puts a design language it was given into the notebook
+aerie design save FILE [--file]   write a record of that shape back, whole: how a
+                   session puts a design language it was given into the notebook
+aerie design edit NAME --text FILE|--append FILE [--file]   one rule's text (as
+                   show names it: a-dialog/layout) or one page's notes, changed
+                   in place and saved, printing what changed; - reads stdin.
+                   --file, here and on save, writes docs/design-language.md
 aerie wiki            the space's wiki, from the notebook's Wiki view: its pages,
                    who changed each last, and where it is pushed
 aerie wiki show NAME [--rev]   one page's Markdown (--rev: the revision a save checks)
@@ -618,6 +656,13 @@ aerie transcripts show ID [--tz ZONE] [--all]   one of them as text: what was sa
 aerie transcripts fetch ID [--into DIR]   the file itself into this machine's folder
                    for it: how a node holding its spaces as a synced copy
                    resumes a conversation it does not have (bb-tty runs it)
+aerie transcripts label ID WORDS   the name one of yours is listed and picked by,
+                   in place of its first words; no words takes it off.
+                   aerie transcripts note ID WORDS says more of it, shown
+                   where it is picked
+aerie transcripts keep ID   keep a copy of one of yours on the controller, where
+                   its agent's own cleanup does not reach, so it can still
+                   be read and resumed; unkeep ID lets the copy go
 aerie memory          your memories on this repository, kept for every coding agent:
                    the index, newest first (aerie -p REPO for another repository
                    of the space, which keeps them when it moves)
@@ -761,21 +806,24 @@ aerie logs --node NAME [--agent|--runner|--nginx|--system|--kernel|--crash] [N]
                    mode** is on in Controller settings, the session's space
                    has been granted that node's logs under **Debug** in its
                    settings, its own node included, and the session's account
-                   has the **debug** grant, which is the owner's unless a role
-                   names it. The space is the session's own, proved by its
+                   has **Controller** Write on its roles (the owner's and an
+                   administrator's, and a role's that gives it). The space is the session's own, proved by its
                    token. What can be read is a table of three streams;
                    anything else is refused, not run
 aerie diag [--json] [SECTION...]
                    the controller's diagnostics, read-only: its build and the
-                   images it ran, its switches, the doctor's every check, each
+                   images it ran, its switches, the home tunnel (running,
+                   registered, whether its name reaches here, its last lines),
+                   the doctor's every check, each
                    node's agent and session half, the Claude plugins each
                    account installed on each node, the last day's jobs and the
                    failures, error lines from its own logs and the audit
                    trail, with anything shaped like a credential redacted. The
-                   **debug** grant's: the owner's, or a role's that names it.
+                   **Controller** Write's: the owner's, an administrator's, or
+                   a role's that gives it.
                    A session reads it only while **debug mode** is on, its
                    space is granted **the controller's diagnostics** on
-                   the Debug page, and its account has the grant.
+                   the Debug page, and its account has Controller Write.
                    Its `reports` section is what sessions on any space
                    reported about AerieOS, kept until a person clears them
 aerie report "..." [--area A] [--repro "..." --reproduces always|sometimes|once|untried]
@@ -803,13 +851,18 @@ aerie pc [VERB] [--why "..."]
 aerie doctor          check everything that usually goes wrong
 
 # developing AerieOS itself, from inside it
-aerie dashboard test  browser-test the dashboard from this checkout, isolated
+aerie dashboard test [SUITE...] [--at REF] [--loaded]  browser-test the dashboard from
+                   this checkout, isolated; --at runs a commit as it was (git archive, not the
+                   working tree); --loaded runs one suite beside a whole run's load, the gate's
+                   workers taking the longest of the rest, so a suite that fails only in a gate
+                   fails on demand
 aerie dashboard dev   serve the live dashboard from ./scripts/dashboard (--off reverts)
 aerie dashboard status  which copy of the dashboard is serving
 aerie dashboard trace [SECONDS]  what the dashboard was asked over the last SECONDS, by endpoint and who asked, with how long each took
 aerie drift           what this checkout changed that the container is not serving
 aerie map VERB ...    the code map, which a session asks before grepping: find NAME,
-                   who-calls NAME, calls NAME, defs FILE, draws ID|.class,
+                   show NAME|FILE:LINE (the definition whole), who-calls NAME,
+                   calls NAME, defs FILE, draws ID|.class,
                    suites FILE..., state [FILE], sections FILE, unused [FILE],
                    addresses [FILE...], coverage, covered NAME, uncovered [FILE],
                    affected --base REF FILES..., languages (which files it
@@ -836,6 +889,14 @@ aerie capture reel --video FILE|--url URL|--emu [PKG]|--display :N [--seconds N]
                    Only the sheet and frames.json land in dist/: the recording
                    and the full-size frames are on this machine's disk, where
                    frames.json says
+aerie capture browsers | devices [WORDS]
+                   what a page's shot or reel can be opened in and as: the
+                   browsers installed here, and the devices Playwright knows
+                   (each with its size, density and touch). --browser NAME|all
+                   picks one, or a picture in each; --device NAME or --size WxH
+                   the screen; --scheme dark|light and --set NAME=VALUE the
+                   rest of what a browser's context takes (locale, timezoneId,
+                   reducedMotion)
 aerie capture ls      the captures in this space's dist/ (reels and emulator
                    shots), each with who asked and when: the Artifacts view's
                    Captures fold, in the terminal
@@ -848,10 +909,13 @@ aerie capture prune [--days N] [NAME...]
 aerie tool            the tools toolchains add to a session, each under its own name
 aerie tool search [WORDS...]  the vetted catalog's tool packs and apps, each with
                    its tier and what it is, and whether it is added here
-aerie tool install NAME --why "..."  ask for a pack from the vetted catalog, as the
+aerie tool install NAME --why "..."  ask for a toolchain AerieOS ships, or a pack
+                   from the vetted catalog, on this session's node, as the
                    space's Install a tool pack setting says: refused, asked
-                   of a person on the bell, or added now; a person installs
-                   it on a node from the Library
+                   of a person on the bell whose Allow installs it there, or
+                   installed now. One the node has is said at once; one whose
+                   install accepts an agreement is a person's to install
+                   from the Library
 aerie tool graphics CMD  pictures a session can make and then read back, with the
                    graphics toolchain on its node: info, resize, crop, compose,
                    annotate, diff, svg2png and optimize, into dist/img/, and

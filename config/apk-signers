@@ -1,0 +1,15 @@
+# The certificates an AerieOS release's Android app may be signed by: the
+# SHA-256 fingerprint of each, one a line, as apksigner and a release's
+# notes write it (colons or none, either case). A line after # is a comment.
+#
+# The app is the one file of a release no build attests: its build hands it
+# over unsigned, and a controller signs it with the app's own key and
+# attaches it afterwards (scripts/dashboard/releasesign.py). So what says a
+# release's APK is AerieOS's is that signature, and the release's list of
+# files is signed only over an APK apksigner verifies as signed by a
+# certificate named here (tools/release-sign.py, its one reader). The
+# fingerprint is public: every release's notes give it.
+#
+# A key rotated to a new one adds the new certificate's line under the old,
+# in the commit that maps the app to the new key.
+DE:66:E7:9C:EE:81:22:51:55:AB:7D:00:85:79:64:CE:9F:F8:0A:FF:A5:56:BA:D9:73:9C:EB:F1:57:D4:D7:0F

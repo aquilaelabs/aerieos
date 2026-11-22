@@ -1,21 +1,112 @@
 {
  "about": "Grok Build, run by sessions as grok",
  "agent": {
+  "allow": {
+   "flag": "--allow",
+   "how": "flag",
+   "rule": "Bash({cmd}:*)"
+  },
   "briefing": "system-prompt-file",
   "command": "grok",
   "guards": "hooks",
+  "install": {
+   "also": [
+    ".grok/downloads/grok"
+   ],
+   "bin": ".local/bin/grok",
+   "env": {},
+   "fetch": [
+    {
+     "platform": "linux/amd64",
+     "sha256": "a3dface51d9bdc71fd121e0481dd02d9b46a721f7a6b892f756480e9666eba1f",
+     "to": "dl/grok",
+     "track": {
+      "resolver": "text",
+      "url": "https://x.ai/cli/stable"
+     },
+     "url": "https://x.ai/cli/grok-{version}-linux-x86_64",
+     "version": "1.0.89"
+    },
+    {
+     "platform": "linux/arm64",
+     "sha256": "641b3e500d6420d3b07117a2c857cceeb82b33f4b53d23a95895bd76a4773f96",
+     "to": "dl/grok",
+     "track": {
+      "resolver": "text",
+      "url": "https://x.ai/cli/stable"
+     },
+     "url": "https://x.ai/cli/grok-{version}-linux-aarch64",
+     "version": "1.0.89"
+    }
+   ],
+   "fresh": "",
+   "pin": null,
+   "rev": 2,
+   "steps": [
+    [
+     "mkdir",
+     "-p",
+     "{home}/.grok/downloads",
+     "{home}/.local/bin"
+    ],
+    [
+     "install",
+     "-m",
+     "755",
+     "{dir}/dl/grok",
+     "{home}/.grok/downloads/grok"
+    ],
+    [
+     "ln",
+     "-sfn",
+     "{home}/.grok/downloads/grok",
+     "{home}/.local/bin/grok"
+    ]
+   ]
+  },
   "latest_url": "https://x.ai/cli/stable",
   "login_job": "grok-login",
   "logout_job": "grok-logout",
   "product": "Grok Build",
   "provider": "xAI",
   "reported": "grok",
+  "signin": {
+   "env": {
+    "GROK_DISABLE_AUTOUPDATER": "1"
+   },
+   "flow": {
+    "code_after": "Confirm this code in your browser",
+    "ends": "exit",
+    "kept": ".grok/auth.json",
+    "logout": [
+     "grok",
+     "logout"
+    ],
+    "url": [
+     "https://accounts.x.ai/",
+     "https://auth.x.ai/",
+     "https://x.ai/",
+     "https://grok.com/"
+    ],
+    "who": {
+     "named": "an xAI account"
+    }
+   },
+   "login": [
+    "grok",
+    "login",
+    "--device-auth"
+   ]
+  },
   "state": "hooks",
   "tool": "grok-build",
   "transcripts": ".grok/sessions",
   "update_job": "grok-update"
  },
+ "format": 5,
+ "framework": "5.2",
  "label": "Grok",
+ "maker": "xAI",
  "name": "grok",
  "platforms": [
   "linux/*"

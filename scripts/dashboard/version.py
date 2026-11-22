@@ -83,11 +83,15 @@ import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from names import running_session   # noqa: E402
 from fields import field   # noqa: E402
+import contextlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import threading
 
 # `aerie` execs this module by path, so its directory is not on sys.path the way
 # it is when the dashboard imports it. One module object per process either
@@ -97,6 +101,7 @@ if _here not in sys.path:
     sys.path.insert(0, _here)
 import statefile  # noqa: E402
 import time
+from vers import vkey  # noqa: E402
 from pathlib import Path
 
 WORKSPACE = None
@@ -156,6 +161,12 @@ def configure(*, workspace, state, write_json, roadmap_mod=None, bugs_mod=None,
     globals()["FILE"] = Path(state) / "versions.json"
 
 
+# The tree a release is judged by, while one is (R206 step 4): (project,
+# a tree of the commit, the branch it was pushed on). This thread's alone:
+# every other question asked meanwhile is about the space's own directory.
+_judging = threading.local()
+
+
 def root(project):
     """The tree a question is asked of: the project directory, or the
     worktree the caller stands in (BB_VERSION_TREE, which bb sets from its
@@ -168,6 +179,9 @@ def root(project):
     the project's own repository wherever it is (a Claude Code worktree
     under the project's .claude/worktrees, B214), so the variable cannot
     point this at another project's tree."""
+    at = getattr(_judging, "tree", None)
+    if at and at[0] == project:
+        return at[1]
     want = os.environ.get("BB_VERSION_TREE") or ""
     if want:
         try:
@@ -421,12 +435,12 @@ LINE_RE = re.compile(r"(?:^|/)v?(\d{1,4}\.\d{1,5}\.\d{1,6})$")
 _VER = re.compile(r"\d{1,4}\.\d{1,5}\.\d{1,6}")
 
 
-def vkey(v):
-    """A version as a tuple that sorts as versions do."""
-    return tuple(int(x) for x in v.split("."))
-
-
 def branch_of(project):
+    # A release's own tree of its commit is on no branch: the one the commit
+    # was pushed on is what its line and its channel are read from.
+    at = getattr(_judging, "tree", None)
+    if at and at[0] == project:
+        return at[2]
     b = (_git(project, "rev-parse", "--abbrev-ref", "HEAD") or "").strip()
     return "" if b in ("", "HEAD") else b
 
@@ -593,7 +607,7 @@ def parts(project, comp="", repo=None):
     if repo is None:
         return {"target": tgt, "error": err or no_history(project),
                 "ordinal": None, "sha": None, "tag": "", "dirty": False,
-                "describe": None, "released": False}
+                "describe": None, "released": False, "pre": ""}
     where = _sub(project, comp)
     rel = _relspec(project, where) if comp else None
     # A component counts only the commits that touched it. Still monotonic,
@@ -620,7 +634,45 @@ def parts(project, comp="", repo=None):
     return {"target": tgt, "error": err,
             "ordinal": int(ordinal) if (ordinal or "").isdigit() else None,
             "sha": repo["sha"], "tag": tag, "dirty": repo["dirty"],
-            "describe": repo["describe"], "released": bool(tag)}
+            "describe": repo["describe"], "released": bool(tag),
+            "pre": "" if tag else pre_on_head(repo["tags"], tgt, comp)}
+
+
+# A pre-release's tag as HEAD carries it: vX.Y.Z-LABEL.N, a component's with
+# its directory in front.
+_PRE_TAG = re.compile(r"v(\d{1,4}\.\d{1,5}\.\d{1,6})-([a-z][a-z0-9]{0,15})\.(\d{1,9})")
+
+
+def pre_on_head(tags, tgt, comp=""):
+    """The pre-release HEAD is tagged as, X.Y.Z-LABEL.N, or "".
+
+    A build of the tag reports the number the tag says (R217): the image's
+    workflow stamped the tag's own words while this said X.Y.Z-dev.N+sha of
+    the same commit, and a release candidate's tag read here as a dev build
+    (R206 step 9). Where HEAD carries several, the one this build was
+    started for (BB_VERSION_TAG, which a tag's workflow sets) is taken, then
+    one of this tree's own version, the newest, a named one before a dev
+    build's.
+    """
+    front = f"{comp}-" if comp else ""
+    found = []
+    for t in tags or []:
+        m = _PRE_TAG.fullmatch(t[len(front):]) if t.startswith(front) else None
+        if m:
+            ver, label, n = m.group(1), m.group(2), int(m.group(3))
+            found.append((t == os.environ.get("BB_VERSION_TAG", ""), ver == tgt, vkey(ver), label != "dev", n,
+                          f"{ver}-{label}.{n}"))
+    return max(found)[-1] if found else ""
+
+
+def _pre_pep440(pre, dirty):
+    """A pre-release's tag in Python's form: rc is its own word there, and
+    every other name is a development release, the name kept as the local
+    part where it is not dev."""
+    ver, rest = pre.split("-", 1)
+    label, n = rest.rsplit(".", 1)
+    local = [x for x in ("" if label in ("dev", "rc") else label, "dirty" if dirty else "") if x]
+    return ver + (f"rc{n}" if label == "rc" else f".dev{n}") + ("+" + ".".join(local) if local else "")
 
 
 def render(project, comp="", repo=None):
@@ -660,6 +712,17 @@ def render(project, comp="", repo=None):
                          pep440=tgt + (f"+{mark}" if mark else ""),
                          file=tgt + (f"-{mark}" if mark else ""),
                          msi=f"{a3}.{b3}.{ordinal}", quad=f"{tgt}.{ordinal}")
+        elif p.get("pre"):
+            # On a pre-release's tag: what the tag says, in the forms that
+            # can say it; the forms Windows compares are a dev build's, by
+            # the ordinal. A dirty tree on the tag is not that build, and
+            # says so as a release's does.
+            pre = p["pre"]
+            a3, b3, _c3 = pre.split("-", 1)[0].split(".")
+            forms.update(semver=pre + ("+dirty" if p["dirty"] else ""),
+                         pep440=_pre_pep440(pre, p["dirty"]),
+                         file=pre + ("-dirty" if p["dirty"] else ""),
+                         msi=f"{a3}.{b3}.{ordinal}", quad=f"{pre.split('-', 1)[0]}.{ordinal}")
         else:
             mark = ".dirty" if p["dirty"] else ""
             a3, b3, _c3 = tgt.split(".")
@@ -705,13 +768,9 @@ def render(project, comp="", repo=None):
 # Who may move it
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-        if isinstance(d, dict) and isinstance(d.get("projects"), dict):
-            return d
-    except (OSError, ValueError):
-        pass
+    d = statefile.read_json(FILE)            # read once while the same file (R228 step 1)
+    if isinstance(d, dict) and isinstance(d.get("projects"), dict):
+        return d
     return {"projects": {}}
 
 
@@ -786,7 +845,7 @@ def _branch_facts(project):
     if not ships:
         return None
     return {"ships": ships, "base": ships.split("/", 1)[-1],
-            "branch": _git(project, "symbolic-ref", "--short", "-q", "HEAD") or "",
+            "branch": branch_of(project),
             "in_base": _git(project, "merge-base", "--is-ancestor",
                             "HEAD", ships) is not None}
 
@@ -886,11 +945,12 @@ def channel_of(project, dev=False, stable=False):
     the channel it lands on said for the person (R190 step 1). Asked for
     neither, a release from a branch other than the one builds ship from
     is a dev pre-release: a stable one from claude/0.9.0 had to be pulled
-    (the operator, 30 Oct). --stable says otherwise in so many words."""
+    (the operator, 30 Oct). --stable asks for a stable one, which is cut only
+    from a commit on the branch builds ship from (_not_from_here)."""
     f = _branch_facts(project) if not (dev or stable) else None
     if f and f["branch"] and f["branch"] != f["base"]:
         dev = True
-    return dev, ("a dev pre-release: the dev channel takes it and Latest stays where it is" if dev
+    return dev, ("a dev pre-release: its build makes its release once everything it carries is built and has passed, and publishes it once every file is on it; the dev channel takes it and Latest stays where it is" if dev
                  else "a stable release: it becomes Latest, and every install on the stable channel is offered it")
 
 
@@ -966,8 +1026,13 @@ def _section_commit(project, comp, title, env=None, keep=None):
     if staged:
         return (f"{', '.join(staged[:4])} {'is' if len(staged) == 1 else 'are'} staged for another commit, and the "
                 f"changelog's commit for {title} would carry {'it' if len(staged) == 1 else 'them'}: commit or unstage first")
+    hist = []
+
     def cite(text, have=()):
-        return _cite(project, rel, text, have)
+        # The history read once for every entry the section dates.
+        if not hist:
+            hist.append(_changelog_added(project, rel) or [])
+        return _cite(project, rel, text, have, hist[0])
 
     if not changelog.roll(where, title, time.strftime("%Y-%m-%d"), resolve=cite, keep=keep):
         return ""
@@ -977,6 +1042,27 @@ def _section_commit(project, comp, title, env=None, keep=None):
     if _git(project, "commit", "-m", msg, "--", rel, timeout=30, env=env) is None:
         return f"{rel} has its section for {title} but committing failed; commit it by hand"
     return ""
+
+
+# Whether what the changelog owes stops a release or goes out with it said
+# (R255): the repository's Releases setting, "refuse" or "warn", handed over
+# by whoever configures this module (the server, the verbs); refuse unless.
+release_gate = None
+
+
+def _gaps_check(project, comp=""):
+    """(why the release is refused, what it owes and goes out with anyway):
+    at most one of them is said."""
+    why = _gaps_refusal(project, comp)
+    if not why:
+        return "", ""
+    try:
+        mode = release_gate(project) if release_gate else "refuse"
+    except Exception:  # noqa: BLE001  (a setting that cannot be read refuses, as the default does)
+        mode = "refuse"
+    if mode == "warn":
+        return "", f"Released with lines still owed (this repository's Releases setting warns): {why}"
+    return why, ""
 
 
 def _gaps_refusal(project, comp=""):
@@ -992,41 +1078,166 @@ def _gaps_refusal(project, comp=""):
         return ""
 
 
-def _uncommitted(project, comp=""):
-    """What would make the tag mark something other than the commit: a
-    tracked file changed, or the VERSION file the tag's number comes from
-    not committed (untracked or changed). Other untracked files are in no
-    commit either way, so they do not count: the controller's copy of a tree
-    carries the files a session keeps out of git with .git/info/exclude,
-    which is each clone's own and does not travel, and every tag was refused
-    for 'uncommitted changes' the session's own status never showed (B628).
-    The rows, "" when clean."""
-    rows = (_git(project, "status", "--porcelain", "--untracked-files=no") or "").strip()
-    where = _sub(project, comp)
-    if where is not None:
+# A release is of a commit, and of the one that is pushed (R206 step 4).
+#
+# The tag was judged by the controller's copy of the tree: its VERSION and
+# changelog as files, its `git status`. That copy is where a node's sync
+# lands, so it carried files a session keeps out of git, and once a mode bit
+# the share had changed, and every tag was refused for 'uncommitted changes'
+# the session's own status never showed (B628); a real change there, in a
+# file nobody had committed, would as easily have been read into a release
+# it was not part of. So nothing of that directory's files is read: the
+# commit is the branch's head as origin has it, which must be the commit
+# this tree is on, and what a release reads (the version, the changelog,
+# the snapshot) it reads from a tree of that commit made for the purpose
+# and thrown away.
+
+def _short(sha):
+    return (sha or "")[:7]
+
+
+def _judged(project, env=None, remote=True):
+    """(commit, branch, error): the commit a release tags. Where the space
+    pushes to an origin, the head of this branch there, which must be the
+    commit this tree is on: commits not pushed, or a remote that has moved
+    on, are said with what puts it right. A tree on no branch, or on one
+    origin does not have, releases the branch on origin whose head its
+    commit is. With no origin (or `remote` false: nothing will be pushed),
+    this tree's own commit."""
+    sha = _git(project, "rev-parse", "HEAD")
+    if not sha:
+        return "", "", no_history(project)
+    branch = branch_of(project)
+    if not remote or _git(project, "remote", "get-url", "origin") is None:
+        return sha, branch, ""
+    try:
+        r = subprocess.run(["git", "-C", str(root(project)), *_creds_c(project), "ls-remote", "--heads", "origin"],
+                           capture_output=True, text=True, timeout=60, check=False,
+                           env={**os.environ, **(env or {})})
+        said = "" if r.returncode == 0 else (r.stderr or r.stdout or "").strip()
+        failed = r.returncode != 0
+    except (OSError, subprocess.SubprocessError) as e:
+        said, failed = str(e), True
+    if failed:
+        # Never a credential: a URL with one in it is cut to its host.
+        said = re.sub(r"(https?://)[^@/\s]*@", r"\1", said)[-300:]
+        return "", "", ("origin did not say where its branches are" + (f" ({said})" if said else "")
+                        + ": a release tags the commit that is pushed, so nothing is tagged")
+    heads = {}
+    for ln in r.stdout.splitlines():
+        got = ln.split()
+        if len(got) == 2 and got[1].startswith("refs/heads/"):
+            heads[got[1][len("refs/heads/"):]] = got[0]
+    there = heads.get(branch) if branch else None
+    if there == sha:
+        return sha, branch, ""
+    if there is None:
+        # Not this branch's, then: the default branch's head, or any other's.
+        base = (_ships_from(project) or "").split("/", 1)[-1]
+        same = sorted((n for n, h in heads.items() if h == sha), key=lambda n: (n != base, n))
+        if same:
+            return sha, same[0], ""
+        if not branch:
+            return "", "", ("this tree is on no branch, and its commit heads no branch on origin: a release tags "
+                            "the head of a pushed branch, so check one out and push it, then release")
+        return "", "", f"{branch} is not on origin: push it, then release, so the tag marks a commit the remote has"
+    # Which is ahead of which: origin's commit is fetched first where this
+    # tree has never heard of it, so "moved past" is not said as "apart".
+    if _git(project, "cat-file", "-e", f"{there}^{{commit}}") is None:
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(["git", "-C", str(root(project)), *_creds_c(project), "fetch", "--quiet", "origin", branch],
+                           capture_output=True, text=True, timeout=120, check=False, env={**os.environ, **(env or {})})
+    if _git(project, "merge-base", "--is-ancestor", there, sha) is not None:
+        n = int(_git(project, "rev-list", "--count", f"{there}..{sha}") or 0)
+        return "", "", (f"{n} commit{'s' if n != 1 else ''} here {'are' if n != 1 else 'is'} not pushed to origin's {branch}: "
+                        "push, then release, since the tag marks what is pushed")
+    if _git(project, "merge-base", "--is-ancestor", sha, there) is not None:
+        return "", "", f"origin's {branch} has moved past this tree: pull, then release"
+    return "", "", (f"origin's {branch} and this tree have each moved, and neither holds the other: pull or push "
+                    "until they are one commit, then release")
+
+
+class _NoTree(Exception):
+    """A tree of the release's commit could not be made."""
+
+
+@contextlib.contextmanager
+def _commit_tree(project, sha, branch):
+    """A tree of the commit `sha`, in a folder of its own, which every
+    question this thread asks about `project` is answered from until it
+    ends: a worktree of the space's repository, detached at the commit,
+    removed afterwards. Its files are the commit's and nothing else's."""
+    main = WORKSPACE / project
+    d = Path(tempfile.mkdtemp(prefix="aerie-release-"))
+    tree = d / "tree"
+    run = dict(capture_output=True, text=True, check=False, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    try:
         try:
-            rel = str((where / VERSION_FILE).relative_to(root(project).resolve()))
-        except ValueError:
-            rel = VERSION_FILE
-        vrow = (_git(project, "status", "--porcelain", "--", rel) or "").strip()
-        if vrow and vrow not in rows:
-            rows = (rows + "\n" + vrow).strip()
-    return rows
+            r = subprocess.run(["git", "-C", str(main), "-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach",
+                                "--force", str(tree), sha], timeout=600, **run)
+        except (OSError, subprocess.SubprocessError) as e:
+            raise _NoTree(str(e)) from e
+        if r.returncode != 0:
+            raise _NoTree((r.stderr or r.stdout or "git made no worktree").strip()[-300:])
+        _judging.tree = (project, tree, branch)
+        yield tree
+    finally:
+        _judging.tree = None
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(["git", "-C", str(main), "worktree", "remove", "--force", str(tree)], timeout=120, **run)
+        shutil.rmtree(d, ignore_errors=True)
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(["git", "-C", str(main), "worktree", "prune"], timeout=60, **run)
 
 
-def release_plan(project, comp="", dev=False, stable=False, pre=""):
+def _of_the_commit(fn, project, env, remote, *a, **k):
+    """`fn` run in a tree of the commit a release tags, or the refusal."""
+    sha, branch, why = _judged(project, env, remote)
+    if why:
+        return {"error": why}
+    try:
+        with _commit_tree(project, sha, branch):
+            return fn(project, *a, **k)
+    except _NoTree as e:
+        print(f"[dashboard] release: a tree of {_short(sha)} could not be made: {e}", flush=True)
+        return {"error": "a tree of the pushed commit could not be made to read the release from, so nothing is tagged"}
+
+
+def _not_from_here(project, name, label):
+    """Why a release that is not a dev build may not be cut from this
+    commit, or "" (the operator, 14 Nov): a stable release or a named
+    pre-release is cut from a commit that is on the branch builds come from;
+    a dev build is tagged where it was built. A space whose remote names no
+    such branch is not held to it."""
+    if label == "dev":
+        return ""
+    ships = _ships_from(project)
+    if not ships or _git(project, "merge-base", "--is-ancestor", "HEAD", ships) is not None:
+        return ""
+    base = ships.split("/", 1)[-1]
+    kind = f"a {label} pre-release" if label else "a stable release"
+    return (f"{name} is {kind}, which is cut from {base}, and this commit is not on {base}: merge the branch into "
+            f"{base} and release there, or cut a dev build from here")
+
+
+def release_plan(project, comp="", dev=False, stable=False, pre="", env=None, may_push=True):
     """What a release here would tag, without doing it: {tag, sha, target}
     or {error}, from the same refusals release() makes first. A session's
     ask is made from this (aerie version release, R138), so the person asked
     reads which tag on which commit, and a release that could not happen is
     refused before anybody is asked. With `dev` the tag is the dev build's
     (R179), as release() names it; planned as the plain one, a dev release
-    was refused because the last release's tag already existed."""
+    was refused because the last release's tag already existed. Judged by
+    the pushed commit, as the release is (_judged)."""
     if (dev or pre) and stable:
         return {"error": "a release is a pre-release or --stable, not both"}
     label, err = pre_label(dev, pre)
     if err:
         return {"error": err}
+    return _of_the_commit(_plan_in_tree, project, env, may_push, comp, dev, stable, label)
+
+
+def _plan_in_tree(project, comp, dev, stable, label):
     dev, channel = channel_of(project, bool(label), stable)
     label = label or ("dev" if dev else "")
     tgt, err = target(project, comp)
@@ -1058,16 +1269,13 @@ def release_plan(project, comp="", dev=False, stable=False, pre=""):
         if on and (sha.startswith(on) or on.startswith(sha)):
             return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "pre": label, "channel": channel}
         return {"error": f"{name} already exists: bump to the next number first"}
-    if why := _gaps_refusal(project, comp):
+    if why := _not_from_here(project, name, label):
         return {"error": why}
-    dirty = _uncommitted(project, comp)
-    if dirty:
-        # Named, since the copy a session works in can be clean while the
-        # controller's holds a change nobody there can see (B628).
-        rows = dirty.splitlines()
-        shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
-        return {"error": "there are uncommitted changes in the space directory: commit or "
-                         f"discard them first, so the tag marks what is actually in the commit ({shown})"}
+    if why := _gaps_check(project, comp)[0]:
+        return {"error": why}
+    # Every kind ships an install, and a fresh install's floor is the one it carries.
+    if why := floor_behind(project, comp):
+        return {"error": why}
     # A dev build is no release an install upgrades from, so it needs no
     # snapshot, as release() has it; planned with one, it was refused.
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
@@ -1086,10 +1294,64 @@ UPGRADE_SNAPSHOTS = "scripts/dashboard/test/upgrade"
 def no_upgrade_snapshot(project, comp, tgt):
     """Why `tgt` may not be released for want of its snapshot, or ""."""
     d = root(project) / UPGRADE_SNAPSHOTS
-    if comp or not d.is_dir() or (d / str(tgt) / "manifest.json").is_file():
+    if comp or not d.is_dir():
         return ""
-    return (f"{tgt} has no /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/: run tools/upgrade-snapshot.py, "
-            f"commit what it writes, then release")
+    mf = d / str(tgt) / "manifest.json"
+    if not mf.is_file():
+        return (f"{tgt} has no /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/: run tools/upgrade-snapshot.py, "
+                f"commit what it writes, then release")
+    # ...and one taken at this release's own state: a snapshot from weeks
+    # before the release, at an older state, satisfied this while the
+    # release shipped migrations it had never been taken with (the audit of
+    # 13 Nov: 0.9.0's was at state 19 with the tree at 21).
+    try:
+        had = json.loads(mf.read_text()).get("state")
+    except (OSError, ValueError):
+        had = None
+    now = max((int(p.name[:4]) for p in (root(project) / "scripts" / "dashboard" / "statemigrations").glob("[0-9][0-9][0-9][0-9]_*.py")),
+              default=None)
+    if isinstance(had, int) and now is not None and had < now:
+        return (f"{tgt}'s /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/ was taken at state {had} and this tree is at "
+                f"{now}: run tools/upgrade-snapshot.py again (it keeps the older one beside the new), commit, then release")
+    return ""
+
+
+# A tree that ships a catalog floor (AerieOS's own, config/catalog-floor:
+# the oldest signed catalog index an install that holds none takes)
+# releases only with the floor at the newest index the catalog has signed:
+# the floor is moved by hand, and a release that carried an old one let a
+# fresh install take any index signed since. `catalog_made` is the server's
+# (catalogindex): () -> the `generated` of the signed index this controller
+# holds, read fresh where it can be, or "" where none is known.
+CATALOG_FLOOR = "config/catalog-floor"
+catalog_made = None
+
+
+def floor_behind(project, comp=""):
+    """Why this tree's catalog floor is older than the catalog's signed
+    index, or cannot be held to it, or "": nothing is said where the tree
+    ships no floor. A tree that ships one is not released while the
+    catalog's newest signed index cannot be read: an old floor would go
+    out unseen."""
+    if comp or catalog_made is None:
+        return ""
+    f = root(project) / CATALOG_FLOOR
+    if not f.is_file():
+        return ""
+    unread = f"the catalog's newest signed index could not be read, so whether {CATALOG_FLOOR} is behind it cannot be told: release once it answers"
+    try:
+        lines = [ln.strip() for ln in f.read_text(encoding="utf-8").splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+        newest = str(catalog_made() or "")
+    except Exception:  # noqa: BLE001 (any failure to read is the refusal's one reason)
+        return unread
+    stamp = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
+    if not re.fullmatch(stamp, newest):
+        return unread
+    floor = lines[0] if len(lines) == 1 and re.fullmatch(stamp, lines[0]) else ""
+    # The stamps are one fixed-width UTC form, so they order as text.
+    if floor and floor >= newest:
+        return ""
+    return f"{CATALOG_FLOOR} says {floor or 'no moment'} and the catalog's newest signed index was made at {newest}: move the floor to it, commit, then release"
 
 
 def _creds_c(project):
@@ -1140,6 +1402,21 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
     label, err = pre_label(dev, pre)
     if err:
         return {"error": err}
+    was = _git(project, "rev-parse", "HEAD") or ""
+    out = _of_the_commit(_release_in_tree, project, env, push and may_push, comp, env, may_push, push, label)
+    # The changelog's commit was made in the release's own tree and pushed:
+    # the space's directory is brought up to it, as a pull would, and where
+    # it cannot be (a file there in the way) the release says so.
+    if out.get("section") and was:
+        if (_git(project, "rev-parse", "HEAD") or "") == was \
+                and _git(project, "-c", "core.hooksPath=/dev/null", "merge", "--ff-only", "--quiet", out["section"], timeout=60) is None:
+            out["note"] = " ".join(x for x in (out.get("note", ""), f"The changelog's commit {out['section']} is on the "
+                                                "branch and this tree is one commit behind it: pull.") if x)
+    return out
+
+
+def _release_in_tree(project, comp, env, may_push, push, label):
+    """release()'s own work, in a tree of the commit it tags."""
     dev = bool(label)
     tgt, err = target(project, comp)
     if err:
@@ -1181,17 +1458,10 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
         if here == "this commit" and push and may_push:
             return _push_tag(project, name, {"ok": True, "tag": name, "sha": sha, "target": tgt,
                                              "pushed": False, "finished": True}, env)
-        return {"error": f"{name} already exists, on {here}. A published tag is not "
-                         f"moved from here: bump to the next number, or move it "
-                         f"yourself in a terminal if it was never pushed."}
-    # A dirty tree is not what the tag would mark: the tag names a commit,
-    # and a tracked file changed beside it is not in it (B628, _uncommitted).
-    dirty = _uncommitted(project, comp)
-    if dirty:
-        rows = dirty.splitlines()
-        shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
-        return {"error": "there are uncommitted changes: commit or discard them "
-                         f"first, so the tag marks what is actually in the commit ({shown})"}
+        return {"error": f"{name} already exists on {'this' if here == 'this commit' else 'another'} commit, and a "
+                         "published tag is not moved from here: bump to the next number"}
+    if why := floor_behind(project, comp):
+        return {"error": why}
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
         return {"error": why}
     # The commit that SHIPS is not always the commit you are standing on.
@@ -1221,11 +1491,12 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
                 and _git(project, "merge-base", "--is-ancestor",
                          "HEAD", ships) is not None):
             branch = ships.split("/", 1)[-1]
-            return {"error": f"this tree is on {sha}, and {ships} has moved past "
-                             f"it to {tip}. A build comes from {branch}, so a tag "
-                             f"here would name a commit nothing was ever built "
-                             f"from. Check out {branch} and pull, then release."}
-    if why := _gaps_refusal(project, comp):
+            return {"error": f"{ships} has moved past this tree, so a tag here would name a commit "
+                             f"nothing was built from: check out {branch} and pull, then release"}
+    if why := _not_from_here(project, name, label):
+        return {"error": why}
+    why, owed = _gaps_check(project, comp)
+    if why:
         return {"error": why}
     wrote = ""
     if section:
@@ -1238,9 +1509,8 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
         # will not take it (somebody pushed meanwhile) undoes the commit here
         # and tags nothing.
         if push and may_push and (why := _push_branch(project, env)):
-            _git(project, "reset", "--keep", "HEAD~1")
             return {"error": f"the changelog's section for {tgt} could not be pushed ({why}); nothing is tagged "
-                             "and the commit is taken back: pull, then release again"}
+                             "and its commit is left nowhere: pull, then release again"}
         if dev:
             now, _ = _pre_tgt(project, comp, base, label)
             if now != tgt:
@@ -1250,22 +1520,22 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
     if _git(project, "tag", "-a", name, "-m", msg, env=env) is None:
         return {"error": f"could not create the tag {name}"}
     out = {"ok": True, "tag": name, "sha": sha, "target": tgt, "pushed": False,
-           **({"section": wrote} if wrote else {})}
+           **({"section": wrote} if wrote else {}), **({"note": owed} if owed else {})}
     if not push:
         return out
     if not may_push:
         # The tag is made either way: a project with no push rights still
         # gets its marker, and the sentence says what is missing rather than
         # undoing the half that worked.
-        out["note"] = (f"{name} is on this commit here. This space has no push "
-                       f"rights, so nothing was pushed.")
+        out["note"] = " ".join(x for x in (owed, f"{name} is on this commit here. This space has no push "
+                                                 f"rights, so nothing was pushed.") if x)
         return out
     return _push_tag(project, name, out, env)
 
 
 def _push_branch(project, env=None):
     """HEAD pushed to its branch on origin, never forced: the error said, or ""."""
-    branch = _git(project, "symbolic-ref", "--short", "-q", "HEAD")
+    branch = branch_of(project)
     if not branch:
         return "this tree is on no branch"
     try:
@@ -1298,9 +1568,9 @@ def _push_tag(project, name, out, env=None):
     if failed:
         # Never a credential: a URL with one in it is cut to its host.
         said = re.sub(r"(https?://)[^@/\s]*@", r"\1", said)[-400:]
-        out["note"] = (f"{name} is on this commit here, but the push failed"
-                       + (f": {said}" if said else "")
-                       + f"; push it with `git push origin {name}` once that is put right.")
+        out["note"] = " ".join(x for x in (out.get("note", ""), f"{name} is on this commit here, but the push failed"
+                                           + (f": {said}" if said else "")
+                                           + f"; push it with `git push origin {name}` once that is put right.") if x)
         return out
     out["pushed"] = True
     return out
@@ -1388,33 +1658,50 @@ def _stamp(project, value, part, env=None):
     return sorted(touched() - before), ""
 
 
-def _cite(project, rel, text, have=()):
-    """The commits an entry names once it is dated (B284): the commit that
-    introduced its line where its stamp is the one aerie changelog add put on
-    it, HEAD of the moment, the commit before; a stamp the line was given by
-    hand, naming the change it is about, is kept (B702: a cut named the
-    changelog's commits in place of the changes)."""
-    out = _git(project, "log", "--format=%h", "-S", f"- {text}", "--", rel, timeout=30)
-    shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-    if not shas:
-        return list(have)
-    intro = shas[-1]
-    before = _git(project, "rev-parse", "--short=7", f"{intro}^") or ""
+def _changelog_added(project, rel):
+    """Each commit that changed the changelog, oldest first, with the lines
+    it added: one walk of its history for every entry a cut dates (R228 step
+    22), where each entry was a `git log -S` of its own, 0.65 s apiece, and
+    one that ran past its 30 s kept its old stamp without a word. None when
+    git cannot say."""
+    out = _git(project, "log", "--reverse", "-p", "-U0", "--format=%x00%h", "--", rel, timeout=120)
+    if out is None:
+        return None
+    hist = []
+    for chunk in out.split("\0")[1:]:
+        sha, _, diff = chunk.partition("\n")
+        hist.append((sha.strip(), [ln[1:] for ln in diff.split("\n")
+                                   if ln.startswith("+") and not ln.startswith("+++")]))
+    return hist
+
+
+def _cite(project, rel, text, have=(), hist=None):
+    """The commits an entry names once it is dated (B284): the commits its
+    line was stamped with, and the commit that introduced its line where it
+    has none or where its stamp is a commit that changed nothing but the
+    changelog, which is never the change (a line logged while its change was
+    still uncommitted, HEAD then being the last line's commit). A stamp
+    naming a change is kept as written: aerie changelog add stamps the
+    commit the line is about (HEAD after the change was committed, or a tied
+    bug's fix commits), and the line then rides in whatever commit comes
+    next. Taking that next commit for the change whenever the stamp was the
+    one before it (B710's guess) renamed the right commit to the wrong one
+    when the next commit was another change (B735). `hist` is the
+    changelog's history as _changelog_added reads it, read here when not
+    given."""
     have = [h for h in have if h]
-    if not have:
-        return [intro]
-    if before and all(before.startswith(h) or h.startswith(before) for h in have):
-        # The stamp is the commit before the line's. That is add's HEAD of
-        # the moment when the line landed with its change; when the line's
-        # commit touched the changelog alone and the one before it changed
-        # something else, that one is the change, and the stamp already
-        # names it (B710).
-        def others(c):
-            out = _git(project, "show", "--format=", "--name-only", c, timeout=30) or ""
-            return [f for f in out.split() if f != rel]
-        if others(intro) or not others(before):
-            return [intro]
-    return have
+
+    def changelog_only(c):
+        # A commit this repository holds that touched the changelog alone;
+        # one it does not hold is a stamp given by hand, and kept.
+        out = _git(project, "show", "--format=", "--name-only", c, timeout=30)
+        return out is not None and out.split() == [rel]
+    if have and not all(changelog_only(h) for h in have):
+        return have
+    hist = _changelog_added(project, rel) if hist is None else hist
+    needle = f"- {text}"
+    intro = next((sha for sha, added in hist or () if any(needle in ln for ln in added)), "")
+    return [intro] if intro else have
 
 
 def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
@@ -1430,9 +1717,13 @@ def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
     cl_rel = None
     note = ""
 
+    hist = []
+
     def cite(text, have=()):
         rel = str((where / changelog.FILE).relative_to(root(project).resolve()))
-        return _cite(project, rel, text, have)
+        if not hist:
+            hist.append(_changelog_added(project, rel) or [])
+        return _cite(project, rel, text, have, hist[0])
 
     # A stable version gathers the pre-releases since the last stable one,
     # leaving out the fixes to what only they had (R217).
@@ -2012,7 +2303,8 @@ SESSIONS = None
 AUDIT = None
 FORGE = None        # (project, tag, version, sha, comp) -> the forge's release (forgerelease.publish)
 MADE = None         # (project, tag): a release's tag pushed, dev or not (what follows it is looked for)
-_VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE", "MADE")
+UNSEALED = None     # (project) -> why the host would not start what finishes a release, or "" (releasesign.unstartable)
+_VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE", "MADE", "UNSEALED")
 
 
 def configure_verbs(**parts):
@@ -2047,6 +2339,10 @@ def verb(name, act, req, who, principal):
         # comes back through this same branch.
         pre = field(req, "pre") or ""
         dev = req.get("dev") is True or bool(pre)
+        # Before the tag: a release whose list of files the host will not
+        # start the workflow to sign stays a draft for good (v0.9.0-dev.6049).
+        if UNSEALED and (why := UNSEALED(name)):
+            return {"error": f"The release would stay a draft: {why}, so put it there first"}, 409
         r = release(name, comp=comp, env={**CREDS_ENV(), **GIT_ENV(who, name)},
                     may_push=MAY_PUSH(name), dev=dev, pre=pre)
         if r.get("error"):

@@ -1,0 +1,26 @@
+services:
+  ledger:
+    image: ghcr.io/example/ledger:3.1.0
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      TITLE: ${SITE_NAME}
+      CURRENCY: ${CURRENCY}
+      SIGNUPS: ${SIGNUPS}
+      LLM_BASE: ${LLM_URL}
+      LLM_API_KEY: ${LLM_KEY}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${PORT}:8020"
+      - "${SYNC_PORT}:7070"
+    volumes:
+      - ${BOOKS}:/books
+  db:
+    image: docker.io/library/postgres:16.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${DB}:/var/lib/postgresql/data

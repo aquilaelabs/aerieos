@@ -1,0 +1,42 @@
+{
+  "_comment": "The images AerieOS's own services run, each named by its tag and the digest of what is pulled (the manifest list's, which covers every platform the list names). The one copy: services.py reads it, each service's entry carries its row as `images` (packs/services is written from it), a node pulls each image by its digest, and tools/pins.py --file moves it (check, move, pin, verify). A row's name is its service's pack, and each image goes by the name its service's module reads it by.",
+  "services": [
+    {
+      "name": "model-router",
+      "rev": 1,
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "images": {
+        "litellm": "ghcr.io/berriai/litellm:main-stable@sha256:ef798594ca3db8d81bad2e1439f536f49b71fe095ee9f20416f5e149b4e22035",
+        "db": "postgres:16-alpine@sha256:1d5b02d3a9941fbd52437db4107f8c52d6297dac553ca1e5c299ebb3756b4857",
+        "ollama": "ollama/ollama:0.40.16@sha256:910d0d8107b538fb0894e63163eb195de0cc7aefcbc666dc62d3b18f71124592"
+      }
+    },
+    {
+      "name": "nginx",
+      "rev": 1,
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "images": {
+        "nginx": "nginx:1.31-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7"
+      }
+    },
+    {
+      "name": "scanners",
+      "rev": 1,
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "images": {
+        "semgrep": "semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b",
+        "trivy": "aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa",
+        "mobsfscan": "opensecurity/mobsfscan:0.4.5@sha256:7d1d06ee36ec550d11071c6aa6f4a9d5c8ce60197067d59da0c86d8ba529834f"
+      }
+    }
+  ]
+}

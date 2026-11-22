@@ -1,5 +1,7 @@
 {
  "about": "Java 21, which Gradle, sdkmanager and the emulator tools need. The first thing a node needs for Android work.",
+ "format": 5,
+ "framework": "5.1",
  "label": "JDK 21 (Temurin)",
  "layout": {
   "bin": [
@@ -10,6 +12,7 @@
   },
   "tool": "bin/java"
  },
+ "maker": "Eclipse Adoptium",
  "name": "jdk",
  "platforms": [
   "linux/amd64",
@@ -20,16 +23,27 @@
  "shipped": {
   "probe": "jdk",
   "reports": "java",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "json",
-    "path": "0.binary.package.checksum",
-    "url": {
-     "darwin/amd64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=mac&vendor=eclipse",
-     "darwin/arm64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=aarch64&image_type=jdk&os=mac&vendor=eclipse",
-     "linux/amd64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
-     "linux/arm64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=aarch64&image_type=jdk&os=linux&vendor=eclipse"
-    }
+    "found": {
+     "from": "json",
+     "path": "binaries.0.package.checksum",
+     "url": {
+      "darwin/amd64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=x64&image_type=jdk&os=mac",
+      "darwin/arm64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=aarch64&image_type=jdk&os=mac",
+      "linux/amd64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=x64&image_type=jdk&os=linux",
+      "linux/arm64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=aarch64&image_type=jdk&os=linux"
+     }
+    },
+    "from": "pin",
+    "sha256": {
+     "darwin/amd64": "9aa1d1c17ae5467a022679e7e0af5c00797d94ac462ed1a46f4db07a8a34a6dd",
+     "darwin/arm64": "bf036b35b071bfb2f54f2c0af8ee8d88afa95ee6eb3dce02c0f94cfc2524d04a",
+     "linux/amd64": "d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c",
+     "linux/arm64": "e3522e707fc7dbe2a72c30746b1e7068301a0213ecd213d4491f35a14eb55578"
+    },
+    "version": "jdk-21.0.13+9"
    },
    "download": {
     "bytes": 200000000,
@@ -42,15 +56,20 @@
     "linux/*": 1
    },
    "url": {
-    "darwin/amd64": "https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse",
-    "darwin/arm64": "https://api.adoptium.net/v3/binary/latest/21/ga/mac/aarch64/jdk/hotspot/normal/eclipse",
-    "linux/amd64": "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse",
-    "linux/arm64": "https://api.adoptium.net/v3/binary/latest/21/ga/linux/aarch64/jdk/hotspot/normal/eclipse"
+    "darwin/amd64": "https://api.adoptium.net/v3/binary/version/{version}/mac/x64/jdk/hotspot/normal/eclipse",
+    "darwin/arm64": "https://api.adoptium.net/v3/binary/version/{version}/mac/aarch64/jdk/hotspot/normal/eclipse",
+    "linux/amd64": "https://api.adoptium.net/v3/binary/version/{version}/linux/x64/jdk/hotspot/normal/eclipse",
+    "linux/arm64": "https://api.adoptium.net/v3/binary/version/{version}/linux/aarch64/jdk/hotspot/normal/eclipse"
    },
    "verify": [
     "{dir}/bin/java",
     "-version"
-   ]
+   ],
+   "version": {
+    "match": "\"(jdk-[0-9.+]+)\"",
+    "resolver": "match",
+    "url": "https://api.adoptium.net/v3/info/release_names?release_type=ga&version=%5B21%2C22%29&page_size=1&sort_order=DESC"
+   }
   }
  },
  "terms": [

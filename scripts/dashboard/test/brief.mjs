@@ -9,11 +9,10 @@
 // Through startClaude, the entry the Claude button reaches once a node is
 // settled: a project made here has no node, and pressing Claude on one of
 // those says so before anything else, which is cards.mjs's to hold.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, REPO, aerie } from './lib.mjs';
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const BRIEF = 'Build a planner for armor stats.\n\n- one page\n- "quotes" and $HOME stay as typed';
 
@@ -75,8 +74,8 @@ ok(staged.pending && staged.staged && staged.text === EDITED.trim()
 
 // ---- the session takes it as it starts ----------------------------------------
 // What bb-tty does for a new session, as the session: its token, its project.
-const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
-  { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
+const token = project => aerie(['users', 'token', project, 'test'],
+  { env: { DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const tok = token('briefly');
 const asSession = async body => (await fetch(base + '/api/brief', { method: 'POST',
   headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();

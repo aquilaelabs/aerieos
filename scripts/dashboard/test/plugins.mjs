@@ -4,7 +4,7 @@
 // controller shows a person theirs on the Profile tab and every account's in
 // aerie diag. Then the two recipes that give the language-server plugins what
 // they run, since a session cannot npm install -g into the store.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, OWNER as ADMIN, asSession as bearer, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,8 +12,6 @@ import { join } from 'node:path';
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
 const BB = join(HERE, '..', 'aerie');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -21,7 +19,6 @@ const call = async (path, body, headers = ADMIN) => {
   let j = {}; try { j = JSON.parse(t); } catch { /* 204 */ }
   return { status: r.status, ...j };
 };
-const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
 
 // ---- aerie login --list reads them off the disk --------------------------------
@@ -74,13 +71,15 @@ ok(here && here.plugins.length === 3 && here.plugins.some(p => p.id.startsWith('
    `the heartbeat puts them on the account's profile, under the node's name (${here?.plugins.length} on ${here?.name})`);
 const store = () => JSON.parse(readFileSync(`${DIR}/state/claude-plugins.json`, 'utf8'));
 const at = store()[owner][minted.id].at;
+// A write is stamped in whole seconds: the clock has to be past this one
+// for a second write to show.
 await sleep(1100);
 await beat([{ ...mine, email: '' }]);
 ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a heartbeat must not cost one');
 
 // The Installed page says them, per agent on that node (R95 step 15, on
 // each agent's row there since R172), and says where they are changed.
-{
+await section("The Installed page says them, per agent on that node", async () => {
   const browser = await launch();
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL); await ready(page);
@@ -105,17 +104,21 @@ ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a h
   // Taken off the node: gone from the page.
   await beat([{ uid: owner, email: '', plugins: null, mcp: {} }]);
   await page.evaluate(id => openInstalledOn(id, 'claude'), minted.id);
-  await page.evaluate(() => loadInstalled()); await sleep(800);
+  await page.evaluate(() => loadInstalled());
+  // The page drawn from that read: the section from before the node said
+  // none is still on the page until it is.
+  await page.waitForFunction(s => { const t = (document.querySelector(`${s} .agextras`)?.closest('.agpart')?.textContent || '').replace(/\s+/g, ' ');
+    return /your plugins\s*none/.test(t) && /your MCP servers\s*none/.test(t); }, PAGE('claude-code'), { timeout: 15000 }).catch(() => {});
   await page.waitForSelector(`${PAGE('claude-code')} .agextras`, { timeout: 15000 });
   const empty = await read('claude-code');
   ok(/your plugins\s*none/.test(empty) && /your MCP servers\s*none/.test(empty),
      `a node that says the account has none takes them off (${empty.slice(0, 60)})`);
   await browser.close();
-}
+});
 
 // ---- aerie diag, for an administrator ----------------------------------------
 await beat([{ ...mine, email: '' }]);
-{
+await section("aerie diag names every account", async () => {
   const r = await call('/api/diag', { sections: ['plugins'] });
   const row = (r.plugins || []).find(x => x.node === 'plugbox');
   ok(row && row.account === 'test' && row.plugins.includes('pyright-lsp@claude-plugins-official 1.0.0 (off)')
@@ -125,27 +128,37 @@ await beat([{ ...mine, email: '' }]);
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_CONTROLLER: base, DASHBOARD_AUTH: 'test:test' } });
   ok(/== plugins ==/.test(out) && /test on plugbox: .*code-simplifier/.test(out),
      `...and prints them readably (${out.trim().split('\n')[1]?.slice(0, 70)})`);
-}
+});
 
 // ---- what the language-server plugins run -----------------------------------
-{
+await section("what the language-server plugins run", async () => {
   const cat = JSON.parse(readFileSync(join(HERE, '..', '..', 'config', 'toolchains.json'), 'utf8')).toolchains;
   const ls = cat.find(p => p.name === 'language-servers'), kt = cat.find(p => p.name === 'kotlin-lsp');
+  // What it installs is a lock the row carries (pack format 5): the names
+  // it asks for, each package's tarball a declared download held to its
+  // sha256, and npm run with no network over what landed.
   const run = ls?.source?.run?.join(' ') || '';
+  const asks = (ls?.source?.lock || []).flatMap(l => l.kind === 'npm' ? l.requirements : []);
+  const got = (ls?.source?.fetch || []).filter(f => /^[0-9a-f]{64}$/.test(f.sha256 || '')).map(f => f.url);
   ok(ls && ls.layout.bin.includes('node_modules/.bin') && ls.requires.includes('node')
-     && /pyright@/.test(run) && /typescript-language-server@/.test(run) && /typescript@5/.test(run),
-     'the language-servers recipe puts pyright and typescript-language-server on PATH from the store, beside node');
+     && ['pyright', 'typescript-language-server', 'typescript@5'].every(n => asks.includes(n))
+     && [/\/pyright\/-\/pyright-[0-9.]+\.tgz$/, /\/typescript-language-server-[0-9.]+\.tgz$/, /\/typescript-5\.[0-9.]+\.tgz$/].every(re => got.some(u => re.test(u)))
+     && /npm ci --offline/.test(run) && /--ignore-scripts/.test(run) && !/npm install/.test(run),
+     `the language-servers recipe puts pyright and typescript-language-server on PATH from the store, beside node, each package pinned (${got.length} tarballs)`);
   ok(kt && kt.layout.tool === 'bin/kotlin-lsp' && /ln -sfn \.\.\/server\/bin\/intellij-server/.test(kt.source.run.join(' ')),
      'kotlin-lsp is JetBrains\' server under the name the plugin runs');
-  // The version is read out of GitHub's answer for the latest release; a
-  // copy of that answer's shape, since the harness has no network.
-  const sed = kt.source.run[2].match(/sed -n '([^']+)'/)[1];
-  const answer = join(DIR, 'kls-release.json');
-  writeFileSync(answer, '{\n  "url": "x",\n  "tag_name": "kotlin-lsp/v263.4702.0",\n  "name": "v263.4702.0"\n}\n');
-  const v = execFileSync('sed', ['-n', sed, answer], { encoding: 'utf8' }).trim();
-  ok(v === '263.4702.0', `...whose version is read out of GitHub's latest-release answer (${v})`);
+  // The server's archive is pinned in the row: the version and the sha256
+  // of each platform's file. An install asks nobody what is newest, so the
+  // harness, which has no network, can read what one would fetch.
+  const pin = kt.source.checksum;
+  ok(pin.from === 'pin' && /^[0-9.]+$/.test(pin.version) && Object.keys(kt.source.url).every(p => /^[0-9a-f]{64}$/.test(pin.sha256[p])),
+     `...whose archive is pinned for each platform it names (${pin.version})`);
+  const ktPlan = execFileSync('bash', [BB, 'toolchains', 'plan', 'kotlin-lsp'], { encoding: 'utf8' });
+  ok(ktPlan.split('\n').some(l => /^version\s/.test(l) && l.trim().endsWith(pin.version))
+     && ktPlan.includes(`/kotlin-server/${pin.version}/kotlin-server-${pin.version}`),
+     '...and its plan names that version and the address made from it, with nobody asked');
   const plan = execFileSync('bash', [BB, 'toolchains', 'plan', 'language-servers'], { encoding: 'utf8' });
-  ok(/kind\s+command/.test(plan) && /npm install --prefix/.test(plan), 'aerie toolchains plan shows what an install would run');
-}
+  ok(/kind\s+command/.test(plan) && /npm ci --offline/.test(plan), 'aerie toolchains plan shows what an install would run');
+});
 
 await done();

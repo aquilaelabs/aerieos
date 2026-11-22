@@ -14,7 +14,6 @@
 
 let jobsList = null;             // last answer, or null before the first
 let jobsNodes = {};              // id -> name, from the same answer
-let jobsRev = 0;                 // bumped when it changes, so panes repaint
 let jobsErr = "";
 // The chip in force: "" for every job, else a state group's key (JOB_GROUPS).
 // A view, never a setting: kept for the page's life, nothing saved; Home's
@@ -23,6 +22,7 @@ let jobsShow = "";
 const jobsOpen = new Set();      // ids whose log is unfolded
 const jobsLogs = {};             // id -> the log fetched for an unfolded row
 let jobsFocus = "";              // a row to bring into view on the next draw (openJob)
+const jobsLogsEnded = new Set();  // open rows whose log was read after their job ended
 let jobsMarked = "";             // ...and to mark, across redraws, until another is opened
 
 function openJobsTab(){
@@ -40,38 +40,36 @@ function openJob(id){
   loadJobs();
 }
 
-async function loadJobs(){
-  try{
-    const j = await (await bootFetch("/api/v1/jobs?n=100")).json();
-    jobsErr = j.error || "";
-    jobsList = j.jobs || [];
-    jobsNodes = j.nodes || {};
-    // An unfolded log follows its job: refetched with the list, so a running
-    // job's tail moves on the same revision that moves its row.
-    await Promise.all([...jobsOpen].map(async id => {
-      const r = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(id)}`)).json();
-      // A job answers with its own fields, `error` among them for one that
-      // failed; a refused request has no id. Reading a failed job's error
-      // as the request's kept its log out, so every failed job read "(this
-      // job wrote nothing)" (B658, the operator, 11 Oct).
-      if (r.id) jobsLogs[id] = r.log || "";
-    }));
-  }catch(e){
-    jobsErr = String(e);
-    jobsList = jobsList || [];
-  }
-  jobsRev++;
-  if (tabs.some(t => t.kind === "jobs")) drawPanes();
+function loadJobs(){
+  return readKept("jobs", "/api/v1/jobs?n=100", {
+    err: said => { jobsErr = said; },
+    keep: () => { jobsList = jobsList || []; },
+    land: async j => {
+      jobsList = j.jobs || [];
+      jobsNodes = j.nodes || {};
+      // An unfolded log follows its job: refetched with the list, so a running
+      // job's tail moves on the same revision that moves its row.
+      await Promise.all([...jobsOpen].map(async id => {
+        // One that has ended and been read already writes no more (R228
+        // step 13): its row was read again on every read of the list.
+        const row = jobsList.find(x => x.id === id);
+        if (row && ["succeeded", "failed", "canceled"].includes(row.state) && jobsLogs[id] !== undefined
+            && jobsLogsEnded.has(id)) return;
+        if (row && ["succeeded", "failed", "canceled"].includes(row.state)) jobsLogsEnded.add(id);
+        // Its last 4,000 characters, which is all a row draws (R228 step 13).
+        const r = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}&tail=4000`);
+        // A job answers with its own fields, `error` among them for one that
+        // failed; a refused request has no id. Reading a failed job's error
+        // as the request's kept its log out, so every failed job read "(this
+        // job wrote nothing)" (B658, the operator, 11 Oct).
+        if (r.id) jobsLogs[id] = r.log || "";
+      }));
+    },
+  });
 }
 
-async function jobAct(body){
-  const j = await (await fetch("/api/v1/jobs", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body)})).json().catch(() => ({error: "no answer"}));
-  if (j.error) notify(j.error, true);
-  await loadJobs();
-  return j;
-}
+// A job's action: a refusal said, the jobs read again, the answer back.
+function jobAct(body){ return poster("/api/v1/jobs", {reload: () => loadJobs()})(body); }
 
 // What the job is, in the words the operator used to start it: a compose
 // job says its action and instance, an exec says its command.
@@ -93,8 +91,14 @@ function jobTitle(j){
   if (j.type === "storage") return "measure the disks";
   // Each coding agent's sign-in, sign-out and install by its own name, every
   // agent's job named <id>-login, -logout and -update (B291).
+  // A pack's agent's sign-in and sign-out are one pair of jobs for all of
+  // them (R233 step 6), the spec naming which.
+  const pk = (j.type === "agent-login" || j.type === "agent-logout") && AGENTS.find(a => a.id === s.agent);
+  if (pk) return `sign ${esc(pk.name)} ${j.type === "agent-login" ? "in" : "out"}`;
   const ag = (j.type || "").match(/^([a-z]+)-(login|logout|update)$/);
-  const who = ag && AGENTS.find(a => a.id === ag[1]);
+  // By its id or by its program: OpenCode's jobs are named after the
+  // program (opencode-update) and its id is open, so its row read "exec".
+  const who = ag && AGENTS.find(a => a.id === ag[1] || a.command === ag[1]);
   if (who) return ag[2] === "login" ? `sign ${esc(who.name)} in` : ag[2] === "logout" ? `sign ${esc(who.name)} out`
     : `${s.action === "remove" ? "remove" : "update"} ${esc(who.product)}`;
   if (j.type === "sign") return `sign ${esc(s.file || "a build")}`;
@@ -161,7 +165,7 @@ function jobTook(j){
   const took = j.started && j.ended ? `${Math.max(1, j.ended - j.started)}s` : "";
   // Said once: a reason that already names the exit code keeps it.
   const code = j.exit_code !== null && j.exit_code !== undefined && j.exit_code !== 0
-    && !String(j.error || "").includes(`exit ${j.exit_code}`) ? `exit ${j.exit_code}` : "";
+    && !String(j.error || "").includes(`exit ${j.exit_code}`) ? `exit ${esc(String(j.exit_code))}` : "";
   return [took, code].filter(Boolean).join(" · ");
 }
 // The list's groups by how a job stands, for its chips (B74): what is not
@@ -244,27 +248,31 @@ function renderJobsInto(i){
     // Its template (R218 step 16): the bar's filter and the table's head are
     // the page's own; the count and the rows are on their way.
     d.setBar("");
-    d.list.innerHTML = skTpl(jobsSection(skTable(JOB_COLS, 6, "jbtbl"), ""));
+    drawHTML(d.list, skTpl(jobsSection(skTable(JOB_COLS, 6, "jbtbl"), "")));
     wireJobsTab(d.el);
     loadJobs();
     return;
   }
   if (jobsErr){
-    d.list.innerHTML = `<div class="hint bad">${esc(jobsErr)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(jobsErr)}</div>`);
     return;
   }
   // Its count is its tiles' (the operator, 25 Oct: no loose words at a
   // page's top).
   d.setBar("");
   const shown = jobsShown(jobsList);
-  const rows = shown.map(j => {
+  // Only the rows on show are built, a page at a time (pageLimit, R228 step
+  // 13), and as far as the row a link asked for (openJob).
+  const focusAt = jobsFocus ? shown.findIndex(j => j.id === jobsFocus) : -1;
+  const lim = Math.max(pageLimit(d.list, "jbList", shown.length), focusAt + 1);
+  const rows = shown.slice(0, lim).map(j => {
     const open = jobsOpen.has(j.id);
     const over = ["succeeded", "failed", "canceled"].includes(j.state);
     return `
     <div class="row stack2 jbrow${j.id === jobsMarked ? " focus" : ""}" data-job="${esc(j.id)}" data-state="${esc(j.state)}">
       ${tblLine(JOB_COLS, [jobTitle(j), jobStatePill(j), esc(j.type), jobNode(j), jobBy(j), jobWhen(j), jobTook(j),
         over || j.cancel ? "" : `<div class="actbar">
-          <button type="button" class="danger" data-jb="cancel"
+          <button type="button" class="caution" data-jb="cancel"
             title="${j.state === "queued" ? "take it off the queue before it starts"
                      : "stop it where it is: the row moves when the runner reports that it did"}">Cancel</button>
         </div>`], "div", "jbopen",
@@ -302,12 +310,12 @@ function renderJobsInto(i){
   const chips = chipBar(JOB_VIEWS.map(g => ({key: g.key, label: g.label, count: count(g.is)})), jobsShow, "data-jbshow",
                         jobsList.length);
   const said = JOB_VIEWS.find(g => g.key === jobsShow);
-  d.list.innerHTML = tiles + chips + jobsSection(shown.length ? tblWrap(JOB_COLS, rows, "jbtbl")
+  patch(d.list, tiles + chips + jobsSection(shown.length ? tblWrap(JOB_COLS, rows, "jbtbl")
     : `<div class="empty">${said ? (said.key === "live" ? "nothing is running or waiting"
                                      : `nothing ${said.key === JOB_TODAY.key ? "failed today" : said.key} among the last ${jobsList.length} jobs`)
                                    + ` <button type="button" data-jbshow="">Show every job</button>`
                                  : "no jobs yet: a compose action, an exec on a node, or an agent update will appear here"}</div>`,
-    shown.length ? `${shown.length}` : "none");
+    shown.length ? `${shown.length}` : "none"));
   d.list.querySelectorAll("[data-jbfollow]").forEach(b => b.onclick = e => {
     e.stopPropagation();
     openLogTab(`log:job:${b.dataset.jbfollow}`, `Log: ${b.dataset.label}`);
@@ -318,7 +326,7 @@ function renderJobsInto(i){
   // Its section stands open at a desk and takes its turn on a phone.
   wireSections(d.list);
   const tbl = d.list.querySelector(".jbtbl");
-  if (tbl) paginate(tbl, ":scope > .jbrow", {key: "jbList", noun: "jobs"});
+  if (tbl) paginate(tbl, ":scope > .jbrow", {key: "jbList", noun: "jobs", total: shown.length, more: () => renderJobsInto(i)});
   if (jobsFocus){
     const row = d.list.querySelector(`.jbrow[data-job="${CSS.escape(jobsFocus)}"]`);
     if (row){ row.scrollIntoView({block: "nearest"}); jobsFocus = ""; }
@@ -329,7 +337,7 @@ function renderJobsInto(i){
 function wireJobsTab(root){
   root.querySelectorAll("[data-jbshow]").forEach(b => b.onclick = () => chipMove(
     () => document.querySelector(".pane .doc.on .jobstab") || root, ".jbrow",
-    () => { jobsShowSet(b.dataset.jbshow); jobsRev++; drawPanes(); shellSync(); }));
+    () => { jobsShowSet(b.dataset.jbshow); readMoved("jobs"); drawPanes(); shellSync(); }));
   // Every tail sits at its own bottom after a draw: the end is where the
   // reason is, the same rule the manager's compose log keeps.
   root.querySelectorAll('.jblog[data-tail="1"]').forEach(t => { t.scrollTop = t.scrollHeight; });

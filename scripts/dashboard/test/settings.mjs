@@ -6,7 +6,7 @@
 // identity landing in the repo's own config through /api/prefs and coming out
 // of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
-import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, sleep } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -19,11 +19,7 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
 await page.goto(URL);
 await ready(page);
-const post = (path, body) => page.evaluate(async ([p, b]) => {
-  const r = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, [path, body]);
+const post = (path, body) => pageCall(page, path, body);
 
 // ---- the tab ---------------------------------------------------------------
 await page.evaluate(() => openSettingsTab());
@@ -77,7 +73,7 @@ ok(await page.$eval('#resetmodal', m => m.hidden), '...and Keep it closes it wit
 const noword = await post('/api/reset', { confirm: 'yes' });
 ok(noword.status === 400 && /type reset to confirm; nothing was changed/.test(noword.body.error || ''),
    `the endpoint refuses anything but the word (${noword.body.error})`);
-{
+await section("+ r.dest +", async () => {
   const { execFileSync } = await import('node:child_process');
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, tempfile
@@ -96,12 +92,12 @@ print(json.dumps({"left": sorted(p.name for p in d.iterdir()), "moved": sorted(p
   ok(r.moved.join() === 'logs,users.json' && r.left.join() === '.reset-20260101-000000,' + r.dest + ',runner-tokens'
      && r.old_kept && /^\.reset-\d{8}-\d{6}$/.test(r.dest) && r.kept.join() === 'runner-tokens',
      `the reset moves everything into a dated directory beside it, leaves earlier resets and the root-only token store alone, and says what it kept (${JSON.stringify(r)})`);
-}
+});
 const groups = await page.$$eval('.settingstab [data-group]', gs => gs.map(g => g.dataset.group));
 // No Update window here: the fixture is the container edition, which cannot apply a release to itself (B648).
 ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog|Apps|Mail|Room on the nodes|Backup|Backup copies|Maintenance|Move|Reset',
    `the tab's groups are the ones that survived the question "does this need to exist": the logs, the idle rule, where what grows is kept (the operator, 10 Oct), how often each update check runs (R176), the vetted catalog's address and its mirror (R169), the apps offered (R272), the mail server the bell goes out through (R149), the room a node keeps (R110), the terminal tabs open in (R133), maintenance mode (the owner's), and the reset (${groups.join(', ')})`);
-{
+await section("The room a node keeps", async () => {
   // The room a node keeps (R110 steps 1 and 5): whole numbers held to their
   // range by the server, the browser's own min and max beside them.
   const room = await page.$eval('[data-group="Room on the nodes"]', g => [...g.querySelectorAll('input[type=number]')]
@@ -114,8 +110,8 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   ok(room === 'room_floor_gb=10:1-1000 room_mem_pct=92:50-99 container_mem_gb=0:0-1024' && good.ok
      && /whole number from 50 to 99/.test(bad.error || ''),
      `Room on the nodes is three numbers with their ranges, saved in range and refused out of it (${room}; ${JSON.stringify(bad)})`);
-}
-{
+});
+await section("The vetted catalog", async () => {
   // The vetted catalog (R169 step 6, B444): its address, saved as an
   // address where every text was held to a hostname (B445), and a mirror
   // imported from the page only when its index is the maintainers'.
@@ -130,6 +126,24 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   await set({catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/', smtp_port: '', smtp_from: '', tls_email: ''});
   ok(/aerieos-catalog/.test(drawn.url) && /No mirror imported/.test(drawn.said) && good.ok && /an address like/.test(bad.error || '') && mail.ok,
      `Vetted catalog draws the catalog's address and says no mirror is held; an address saves, a port, a From line and an email too, and ftp is refused (${drawn.url}; ${bad.error}; ${mail.error || 'mail saved'})`);
+  // When the index in use was made, and a mirror held, are the status read's
+  // own keys: drawn from there, where the groups are handed its settings part.
+  const lines = await page.evaluate(() => {
+    const keep = [state.catalog_index, state.catalog_mirror];
+    const d = document.createElement('div');
+    const read = () => { d.innerHTML = catalogIntro(); return [d.querySelector('[data-catalogmade]')?.textContent || '', d.textContent.replace(/\s+/g, ' '), catalogStatus()]; };
+    state.catalog_index = null; state.catalog_mirror = null;
+    const none = read();
+    state.catalog_index = { made: '2026-10-29T00:00:00Z', read: Math.floor(Date.now() / 1000) - 7200 };
+    state.catalog_mirror = { packs: 3, repos: 2, generated: '2026-10-28T00:00:00Z' };
+    const some = read();
+    [state.catalog_index, state.catalog_mirror] = keep;
+    return { none, some };
+  });
+  ok(lines.none[0] === 'No index has been read yet.' && /No mirror imported/.test(lines.none[1]) && lines.none[2] === 'applies at once'
+     && /^The index in use was made 2026-10-29T00:00:00Z, read 2 ?h/.test(lines.some[0]) && /3 entries from 2 repositories, made 2026-10-28/.test(lines.some[1])
+     && /a mirror made 2026-10-28T00:00:00Z answers/.test(lines.some[2]),
+     `...and says when the index in use was made and what mirror is held, from the status read's own keys (${lines.some[0]} | ${lines.some[2]})`);
   const dir = `${DIR}/mirror-src/catalog-mirror`;
   mkdirSync(`${dir}/repos`, { recursive: true });
   writeFileSync(`${dir}/index.json`, JSON.stringify({ version: 1, generated: '2026-10-29T00:00:00Z', packs: [] }));
@@ -144,11 +158,11 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
      `a mirror whose index another key signed is refused on Import, said, and nothing is held (${toast})`);
   rmSync(`${DIR}/mirror-src`, { recursive: true, force: true });
   rmSync(arc, { force: true });
-}
+});
 // Sections, and a page of settings (the operator, 16 Oct): a list of them
 // beside the one picked, each row saying what is in it, and Revert beside
 // each Apply putting the section's fields back to what is saved.
-{
+await section("Sections, and a page of settings", async () => {
   const sects = await page.$$eval('.settingstab details.sect', ds => ds.map(d => d.querySelector('summary .t').textContent));
   const rows = await page.$$eval('.settingstab .snav [data-spick]', bs => bs.map(b => ({ k: b.dataset.spick, said: b.querySelector('.rtags .dim')?.textContent || '' })));
   ok(sects.length >= 6 && rows.length === sects.length && rows.every(r => r.said),
@@ -183,12 +197,12 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   await splitPick(page, 'tunnel');
   ok(await page.$eval('.networktab [data-group="Reach from outside"] .setsteps', ol => ol.querySelectorAll('li').length === 4 && /localhost:\d+/.test(ol.textContent)),
      'the Reach from outside section carries its own setup steps, with the controller\'s port in them, on the Network page');
-}
+});
 
 // The home tunnel (R176): a hostname, two secrets never shown back, and the
 // controller running cloudflared itself (the harness's stub) from them, with
 // the group's line reading the process. The token is nowhere in the page.
-{
+await section("The home tunnel", async () => {
   const G = '.networktab [data-group="Reach from outside"]';
   await page.evaluate(() => openNetworkTab());
   await page.waitForSelector('.networktab .snav .rrow', { timeout: 15000 });
@@ -242,7 +256,7 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   await page.waitForFunction(sel => /off: paste a tunnel token/.test(document.querySelector(sel + ' .actbar .state')?.textContent || ''), G, { timeout: 20000 });
   ok(true, '...and taking the token off stops the tunnel');
   await post('/api/settings', { set: { tunnel_host: '' } });
-}
+});
 // Gone on 7 Oct (the operator): a node's Claude Code is updated when Update
 // is pressed, and never before a session starts.
 ok(await page.$('.settingstab [data-set="claude_autoupdate"]') === null,
@@ -327,7 +341,7 @@ const bare = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), '
 ok(bare.git_name === 'T. Person', '...for a shell with no project too');
 // The projects this one reads (prefs.reads) show in aerie settings, so a
 // session knows its own list without the briefing.
-{
+await section("The projects this one reads", async () => {
   const envs = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner };
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: ['beta'] }) })).json()));
@@ -337,7 +351,7 @@ ok(bare.git_name === 'T. Person', '...for a shell with no project too');
      `aerie settings names the spaces this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: [] }) })).json()));
-}
+});
 await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
 await page.waitForSelector('#rnmodal:not([hidden])');
 // The dialog asks again (17 Sep), but for a different thing: the old field
@@ -368,8 +382,8 @@ ok(elsewhere.git_name === 'T. Person',
 // project's own rules on the Briefing, each with a switch for THIS project,
 // and an administrator adds and edits them there for every project. A rule
 // typed in one project's notebook comes back out of every project's preamble.
-{
-  const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+await section("global rules", async () => {
+  const auth = OWNER;
   const pre = async p => (await (await fetch(URL.replace(/\/$/, '') + `/api/preamble?project=${p}`, { headers: auth })).json()).text || '';
   const globals = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/global-rules', { headers: auth })).json()).rules || []);
   await page.evaluate(() => openSettingsTab());
@@ -396,6 +410,10 @@ ok(elsewhere.git_name === 'T. Person',
   await page.click('.nb .grule.editing .grSave');
   await page.waitForFunction(() => [...document.querySelectorAll('.nb #rlGlobal .grule .btitle')].some(e => e.textContent.trim() === 'no-secrets'),
     null, { timeout: 15000 });
+  // Stored, asked of the server until it says so: the page lists the rule
+  // as it is saved, and under load the list was read a moment before the
+  // save had landed (three whole runs of 14 and 15 Nov).
+  await until(async () => (await globals()).some(r => r.name === 'no-secrets' && !r.builtin), 15000, 200);
   ok((await globals()).some(r => r.name === 'no-secrets' && !r.builtin), 'an administrator adds a global rule from a space\'s notebook, stored once');
   ok(/Never write credentials/.test(await pre('alpha')) && /Never write credentials/.test(await pre('beta')) && /\(global\)/.test(await pre('beta')),
      '...and every space\'s sessions are handed it, marked global');
@@ -429,7 +447,7 @@ ok(elsewhere.git_name === 'T. Person',
     body: JSON.stringify({ action: 'save', rules: [], disabled: [] }) });
   await fetch(URL.replace(/\/$/, '') + '/api/rules', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', action: 'save', rules: (await (await fetch(URL.replace(/\/$/, '') + '/api/rules?project=alpha', { headers: auth })).json()).rules, globals_off: [] }) });
-}
+});
 
 // ---- the time zone is this browser's (the gear, R218 step 31) ------------
 // A cookie, not the account: a phone abroad and the desk at home each keep
@@ -437,7 +455,7 @@ ok(elsewhere.git_name === 'T. Person',
 // zone moves them all, and "This device's own" takes the cookie away again.
 // It sits in the gear beside the scheme, the other choice that is this
 // browser's, and Profile no longer lists it.
-{
+await section("the time zone is this browser's", async () => {
   await page.evaluate(() => openProfileTab());
   await page.waitForSelector('.profiletab .snav [data-spick]', { timeout: 15000 });
   ok(await page.$('.profiletab .snav [data-spick="browser"]') === null && await page.$('.profiletab #pfTZ') === null,
@@ -468,13 +486,13 @@ ok(elsewhere.git_name === 'T. Person',
   await page.evaluate(() => { document.cookie = 'bb_tz=Not%2FAZone; path=/'; });
   ok(await page.evaluate(() => userTZ() === ''), 'a zone this browser does not know is ignored, not trusted');
   await page.evaluate(() => { setUserTZ(''); toggleUiMenu(false); });
-}
+});
 
 // ---- a project's settings live in its notebook (R119 step 3) ---------------
 // The row's gear went, and the form is the notebook's Settings view: the
 // same form, moved there while the view is on screen, each section saving
 // itself, and back to the dialog when another view is picked.
-{
+await section("a project's settings live in its notebook", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); });
   // The sidebar's row carries no gear; the Projects page's card offers
   // Settings in its menu by design (R218 step 3), not as a button on its
@@ -531,7 +549,8 @@ ok(elsewhere.git_name === 'T. Person',
   // People stays when the view is asked for again (B: the form was put back
   // and People hidden until its read landed, on every ask).
   await page.evaluate(() => openProjectSettings('alpha'));
-  await page.waitForTimeout(300);
+  // What the view reads again in place (People among it) answered.
+  await settled(page);
   const still = await page.evaluate(() => ({ people: !document.querySelector('details[data-sect="rn:people"]').hidden,
     pick: document.querySelector('.nbsettings .snav .rrow.on')?.dataset.spick }));
   ok(still.people && still.pick === 'yours', `...and asked for again it keeps People and the section picked (${JSON.stringify(still)})`);
@@ -599,12 +618,13 @@ ok(elsewhere.git_name === 'T. Person',
       await r.fulfill({ response: before });
     });
     await page.evaluate(() => { refresh(); });
-    for (let i = 0; i < 300 && !read; i++) await sleep(100);
+    await until(() => read, 30000, 100);
     // Elsewhere, after this window opened: the color (another section) and
     // the build command (this one), as a session or another window would.
     await post('/api/prefs', { project: 'alpha', color: 'teal', build: 'make theirs' });
     await rnSect(page, 'build');
     await page.fill('#rnBuildCmd', 'make mine');
+    // The delay is the case: the read out since before the other save lands after Save is pressed.
     setTimeout(release, 1500);
     const first = await sectSave(page, 'build');
     await page.unroute('**/api/status');
@@ -632,24 +652,27 @@ ok(elsewhere.git_name === 'T. Person',
     // draws, reads the nodes, and draws again.
     await page.evaluate(() => { getNotebook('alpha')?.view('roadmap'); nodesList = null; openProjectSettings('alpha'); });
     await page.waitForFunction(() => nodesList !== null, null, { timeout: 15000 });
-    await page.waitForTimeout(800);
-    const also = await page.evaluate(id => ({ ticked: !!document.querySelector(`#rnNodesMore input[value="${id}"]`)?.checked,
+    // The second draw, the one that had nodes to draw, and what it asked for answered.
+    await page.waitForFunction(id => $('rnNodesMore').dataset.drawn && document.querySelector(`#rnNodesMore .rnmore[data-id="${id}"]`),
+      other.id, { timeout: 15000 }).catch(() => {});
+    await settled(page);
+    const also = await page.evaluate(id => ({ listed: !!document.querySelector(`#rnNodesMore .rnmore[data-id="${id}"]`),
       unsaved: !document.querySelector('.snav [data-spick="runs"] .sunsaved')?.hidden }), other.id);
-    ok(also.ticked && !also.unsaved,
-       `a space's second node is ticked under Also works on when its settings open before the node list is read, and Nodes holds nothing unsaved (${JSON.stringify(also)})`);
+    ok(also.listed && !also.unsaved,
+       `a space's second node is listed under Also works on when its settings open before the node list is read, and Nodes holds nothing unsaved (${JSON.stringify(also)})`);
     await post('/api/prefs', { project: 'alpha', node: first.id, nodes: [first.id] });
     await post('/api/v1/nodes', { action: 'retire', id: other.id });
   }
   await page.evaluate(() => getNotebook('alpha').view('roadmap'));
   ok(await page.evaluate(() => !!document.querySelector('#rnmodal > .box') && $('rnmodal').hidden),
      '...and picking another view puts the form back where the dialog keeps it');
-}
+});
 
 // ---- a project's daily snapshots (R165) ------------------------------------------
 // In the project's settings: how many days are kept, and a Snapshots fold
 // listing each day with Restore; a restore of one file puts it back, and the
 // line it leaves names the snapshot taken first, which undoes it.
-{
+await section("a project's daily snapshots", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); openProjectSettings('alpha'); });
   await page.waitForSelector('#rnSnapDays', { state: 'attached', timeout: 15000 });
   ok(await page.$eval('#rnSnapDays', i => i.value) === '14', 'a space keeps 14 days of snapshots unless set otherwise');
@@ -661,7 +684,11 @@ ok(elsewhere.git_name === 'T. Person',
     const was = page.viewportSize(), apart = [];
     for (const width of [1280, 393]){
       await page.setViewportSize({ width, height: 900 });
-      await page.waitForTimeout(200);
+      // Laid out at the new width: the breakpoint's listeners run before a frame's callbacks, and what they slide has landed.
+      await page.waitForFunction(w => innerWidth === w, width, { timeout: 10000 });
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+        && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
       apart.push(...(await page.$$eval('#rnCaptureDays, #rnSnapDays, #rnDevKeep', is => is.map(i => {
         const a = i.getBoundingClientRect(), b = i.nextElementSibling.getBoundingClientRect();
         // On the box's line (the row lines up at the bottom) and after it.
@@ -677,13 +704,23 @@ ok(elsewhere.git_name === 'T. Person',
   ok(took.status === 200 && took.body.files > 0, `Take one now snapshots the tree (${took.body.files} files)`);
   await page.evaluate(() => { openProjectSettings('alpha'); });
   await openFold(page, 'details.sect[data-sect="rn:snapshots"]');
-  await page.waitForSelector('#rnSnapRows .rnsnap', { timeout: 15000 });
+  await page.waitForSelector('#rnSnapRows .snaprec', { timeout: 15000 });
+  // The days are a record list (Perch): a row read-only in its columns, a
+  // Take one now in the section's own bar over it, and its Restore opening
+  // the row in place.
+  const shape = await page.$eval('#rnSnapRows', b => ({ take: !!b.querySelector(':scope > .addbar [data-snaptake]'),
+    heads: [...b.querySelectorAll('.tbl.snaprecords .thead .th')].map(h => h.textContent.trim()).filter(Boolean),
+    shut: !b.querySelector('.snaprec [data-snapfile]') }));
+  ok(shape.take && shape.heads.join(',') === 'Taken,Files,Size,Kept' && shape.shut,
+     `the days are a record list with Take one now over it, each row shut until its Restore opens it (${JSON.stringify(shape)})`);
+  await page.click('#rnSnapRows .snaprec [data-snapopen]');
+  await page.waitForSelector('#rnSnapRows .snaprec.open [data-snapfile]', { timeout: 10000 });
   writeFileSync(`${DIR}/ws/alpha/snapped.txt`, 'tampered\n');
   page.dialogs.length = 0;
-  await page.fill('#rnSnapRows .rnsnap [data-snapfile]', 'snapped.txt');
-  await page.click('#rnSnapRows .rnsnap [data-snapone]');
+  await page.fill('#rnSnapRows .snaprec.open [data-snapfile]', 'snapped.txt');
+  await page.click('#rnSnapRows .snaprec.open [data-snapone]');
   await page.waitForFunction(() => /restored: 1 written/.test(document.querySelector('#notify, .notify, .toast')?.textContent || '')
-                             || document.querySelectorAll('#rnSnapRows .rnsnap').length >= 2, null, { timeout: 15000 });
+                             || document.querySelectorAll('#rnSnapRows .snaprec').length >= 2, null, { timeout: 15000 });
   ok(readFileSync(`${DIR}/ws/alpha/snapped.txt`, 'utf8') === 'as it was\n' && page.dialogs.length === 1
      && /Put snapped.txt back/.test(page.dialogs[0]),
      'Restore file asks, then puts the file back as it was that day');
@@ -694,41 +731,47 @@ ok(elsewhere.git_name === 'T. Person',
   {
     await page.evaluate(() => { openProjectSettings('alpha'); });
     await openFold(page, 'details.sect[data-sect="rn:snapshots"]');
-    await page.waitForSelector('#rnSnapRows .rnsnap [data-snappin="pin"]', { timeout: 15000 });
-    const day = await page.$eval('#rnSnapRows .rnsnap', r => r.dataset.day);
-    await page.click(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin]`);
-    await page.waitForSelector(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin="unpin"]`, { timeout: 15000 });
-    const marked = await page.$eval(`#rnSnapRows .rnsnap[data-day="${day}"]`, r => /pinned/.test(r.textContent));
+    await page.waitForSelector('#rnSnapRows .snaprec', { timeout: 15000 });
+    const day = await page.$eval('#rnSnapRows .snaprec:not([data-day*="before"])', r => r.dataset.day);
+    if (!await page.$(`#rnSnapRows .snaprec.open[data-day="${day}"]`)) await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snapopen]`);
+    await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
+    await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
+    await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="unpin"]`, { timeout: 15000 });
+    const marked = await page.$eval(`#rnSnapRows .snaprec[data-day="${day}"]`, r => /pinned/.test(r.textContent));
     const listed = (await page.evaluate(async () => (await (await fetch('/api/snapshots?project=alpha')).json())));
     const hint = await page.$eval('#rnSnapHint', h => h.textContent);
-    await page.click(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin]`);
-    await page.waitForSelector(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
-    ok(marked && listed.days.find(d => d.day === day)?.pinned === true && listed.on === true && /1 pinned/.test(hint),
+    await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
+    await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
+    ok(marked && listed.days.find(d => d.day === day)?.pinned === true && /1 pinned/.test(hint),
        `Pin keeps a day and its row says pinned, Unpin lets it go again (${day} ${hint})`);
   }
-  // Daily snapshots switched off from Build and test, staged and saved like
-  // the days kept, and back on (R105).
+  // The daily snapshot switch is gone (0 days kept takes none), and the API
+  // does not take the key back: nothing is stored for it and nothing reads it.
   {
     await rnSect(page, 'rn:build');
     await openFold(page, 'details.sect[data-sect="rn:build"]');
-    const on = await page.$eval('#rnSnapOn', c => c.checked);
-    const r = await post('/api/prefs', { project: 'alpha', snapshots_on: false });
-    const off = (await page.evaluate(async () => (await (await fetch('/api/snapshots?project=alpha')).json()))).on;
-    await post('/api/prefs', { project: 'alpha', snapshots_on: true });
-    ok(on && r.status === 200 && off === false, `daily snapshots are on by default and can be switched off (${on} ${r.status} ${off})`);
+    const drawn = await page.$('#rnSnapOn');
+    const r = await post('/api/prefs', { project: 'alpha', snapshots_on: false, term_scheme: 'red' });
+    const got = await page.evaluate(async () => {
+      const snaps = await (await fetch('/api/snapshots?project=alpha')).json();
+      const row = ((await (await fetch('/api/status')).json()).projects || []).find(p => p.name === 'alpha') || {};
+      return { on: 'on' in snaps, pref: 'snapshots_on' in (row.prefs || {}), yours: 'term_scheme' in (row.yours || {}) };
+    });
+    ok(!drawn && r.status < 500 && !got.on && !got.pref && !got.yours,
+       `the daily snapshot switch and a space's terminal colors are not drawn, stored or served (${!!drawn} ${r.status} ${JSON.stringify(got)})`);
   }
   // From outside the page, which carries no sign-in: nothing is listed.
   const anon = (await fetch(URL.replace(/\/$/, '') + '/api/snapshots?project=alpha')).status;
   ok(anon === 401 || anon === 403, `...and nothing is listed to a caller who is not signed in (${anon})`);
   rmSync(`${DIR}/ws/alpha/snapped.txt`, { force: true });
-}
+});
 
 // ---- where the controller keeps what grows (paths.py, the operator, 10 Oct) ----
 // Each kind on its own line of the Storage section with the path in use;
 // Apply moves what is there to the new path and switches once it is all
 // there; a path in the projects or one with something in it is refused in
 // words; and the default comes back with what was moved.
-{
+await section("where the controller keeps what grows", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); openSettingsTab(); });
   await page.waitForSelector('.settingstab .snav [data-spick="paths"]', { timeout: 15000 }); await splitPick(page, 'paths');
   await page.waitForSelector('.settingstab [data-group="Storage"] input[data-path="gitview"]', { timeout: 15000 });
@@ -761,12 +804,12 @@ ok(elsewhere.git_name === 'T. Person',
                              `${DIR}/state/gitview`, { timeout: 20000 });
   ok(back.status === 200 && existsSync(`${DIR}/state/gitview/marker/f`),
      '...and an empty path puts it back at its default, with what is there');
-}
+});
 
 // ---- Profile's What you may do on a phone (B76) -------------------------------
 // One column of facts, every value starting at one line: each began where
 // its own label ended, two ragged columns.
-{
+await section("Profile's What you may do on a phone", async () => {
   const phone = await newPage(browser, { viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
   await phone.goto(URL);
   await ready(phone);
@@ -774,17 +817,22 @@ ok(elsewhere.git_name === 'T. Person',
   await phone.waitForSelector('.profiletab [data-spick="may"]', { timeout: 15000 });
   await phone.click('.profiletab [data-spick="may"]');
   await phone.waitForSelector('.profiletab dl.facts:not(.pghfacts) dd', { timeout: 10000 });
+  // ...and one of them laid out: there in the page while its section was
+  // still opening, none had a height yet and nothing was measured.
+  await phone.waitForFunction(() => [...document.querySelectorAll('.profiletab dl.facts:not(.pghfacts) .fact dd')].some(d => d.offsetHeight)
+    && !document.querySelector('.profiletab')?.getAnimations({ subtree: true }).some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)),
+    null, { timeout: 10000 }).catch(() => {});
   const xs = await phone.$$eval('.profiletab dl.facts:not(.pghfacts) .fact dd', ds => [...new Set(ds.filter(d => d.offsetHeight)
     .map(d => Math.round(d.getBoundingClientRect().left)))]);
   const over = await phone.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   if (process.env.BB_SHOT_DIR) await phone.screenshot({ path: `${process.env.BB_SHOT_DIR}/profile-may-360.png` });
   ok(xs.length === 1 && over <= 0, `on a phone What you may do lines its values up in one column (starts at ${xs.join('/')})`);
   await phone.close();
-}
+});
 
 // ---- a split page's head on a phone (B370) ----------------------------------
 // The page's head is on top, as at a desk, not under the list of sections.
-{
+await section("a split page's head on a phone", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
   await phone.goto(URL);
   await ready(phone);
@@ -792,6 +840,12 @@ ok(elsewhere.git_name === 'T. Person',
   for (const [open, name] of [['openSettingsTab', 'Controller settings'], ['openProfileTab', 'Profile']]){
     await phone.evaluate(f => window[f](), open);
     await phone.waitForSelector('.pane .doc.on .ssplit > .pghead', { timeout: 15000 });
+    // ...laid out, the page before it gone: in the page while it was still
+    // coming in, its head had no height and was measured as 0 against 0.
+    await phone.waitForFunction(() => {
+      const h = document.querySelector('.pane .doc.on .ssplit > .pghead');
+      return !!h && h.getBoundingClientRect().height > 0 && !document.querySelector('.pane .doc.leaving');
+    }, null, { timeout: 15000 }).catch(() => {});
     seen.push(await phone.$eval('.pane .doc.on .ssplit', s => {
       const h = s.querySelector(':scope > .pghead').getBoundingClientRect(), n = s.querySelector(':scope > .snav').getBoundingClientRect();
       return h.height > 0 && h.bottom <= n.top + 1 ? '' : `${Math.round(h.top)} vs ${Math.round(n.top)}`;
@@ -799,6 +853,6 @@ ok(elsewhere.git_name === 'T. Person',
   }
   ok(seen.every(x => !x), `on a phone a settings page's head is above its sections (${seen.filter(Boolean).join(', ') || 'both'})`);
   await phone.close();
-}
+});
 
 await done(browser);

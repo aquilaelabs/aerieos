@@ -18,8 +18,21 @@
 
 "use strict";
 
-let lib = null, libNode = "", libRev = 0, libSeq = 0, libLanded = 0, libFollow = null;
+let lib = null, libNode = "", libFollow = null;
 let libQ = "", libKind = "", libTier = "";
+// The rest of what narrows it (R256): a topic, the order, and whether what
+// runs on other systems is shown too; all in the address, none saved.
+let libTopic = "", libSort = "", libAll = false;
+// Cards or rows, this browser's (the Spaces page's Full and Compact): a list
+// on a phone opens in rows until somebody picks.
+let libView = (() => { try{ return localStorage.getItem("bb.libview") || ""; }catch(e){ return ""; } })();
+// How many a list asks for at a time.
+const LIB_PAGE = 30;
+// Whether the source chips drew the last time the page did: a library whose
+// cards all come from one source draws none, and its waiting template then
+// holds no row for them (it stood a row lower than the page it waited for
+// once every catalog entry was Packaged by Aerie).
+let libHadTiers = false;
 const libSeen = {};            // what a pack's Look brought back, by row key ("looking" while it is asked)
 let libWantAgent = "";         // the agent whose card a door asked to open, until the rows land
 // The sections, in the page's order: what a session runs first, then what
@@ -29,11 +42,49 @@ const LIB_KINDS = [["agent", "Coding agents"], ["toolchain", "Toolchains"], ["pa
 // The chips after All that pick cards by where they stand rather than by
 // kind, each across every kind's section (the operator, 29 Oct: Installed,
 // then Updates).
-const LIB_STANDS = {installed: r => r.installed, update: r => r.update};
+// An update is a newer version of what is installed, or a newer pin of a
+// pack kept from the catalog. Both wear the accent and both count under
+// Updates, and each says which it is (the operator, 13 Nov): Software
+// update puts a newer program on the node, Manifest update keeps the
+// catalog's newer definition of a pack, and two presses reading Update for
+// two different things were confusing.
+const LIB_STANDS = {installed: r => r.installed, update: r => r.update || !!r.repin};
 // The section a card sits in: its kind, or the group it names (R169 step 9: a
 // pack that brings a coding agent is a pack's card under Coding agents).
 function libGroup(r){ return r.group || r.kind; }
-const LIB_TIERS = [["official", "Official"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
+// Who stands behind a card (the operator, 12 Nov): what AerieOS ships or
+// its maintainers wrote, a verified vendor's own pack, anybody's pack the
+// maintainers reviewed, and what a person added themselves.
+const LIB_TIERS = [["official", "Packaged by Aerie"], ["verified", "Verified"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
+function libTierWord(t){ return (LIB_TIERS.find(([k]) => k === t) || [t, t])[1]; }
+// Every row the page holds now: a list's page so far, or the front page's
+// shelves and what is on the node, and the entry page's own.
+function libKnown(){
+  return [...(lib?.rows || []), ...(lib?.here || []), ...(lib?.shelves || []).flatMap(s => s.rows || []), ...(entryLib?.rows || [])];
+}
+function libFind(f){ return libKnown().find(f) || null; }
+// What the page asks for (R256): the server narrows, counts and pages, so
+// the page never holds the whole catalog.
+function libQuery(offset = 0){
+  const p = new URLSearchParams({node: libNode, view: "browse", limit: String(LIB_PAGE), offset: String(offset)});
+  for (const [k, v] of [["q", libQ.trim()], ["kind", libKind], ["topic", libTopic], ["tier", libTier], ["sort", libSort]]) if (v) p.set(k, v);
+  if (libAll) p.set("all", "1");
+  return "/api/library?" + p;
+}
+// The narrowing as the address carries it (?kind=app&topic=media&q=...).
+function libAddr(){
+  const p = new URLSearchParams();
+  for (const [k, v] of [["q", libQ.trim()], ["kind", libKind], ["topic", libTopic], ["tier", libTier], ["sort", libSort]]) if (v) p.set(k, v);
+  if (libAll) p.set("all", "1");
+  const s = p.toString();
+  return s ? "?" + s : "";
+}
+// ...and read back from one, as the page opens on it.
+function libFromAddr(query){
+  const p = new URLSearchParams(query || "");
+  libQ = p.get("q") || ""; libKind = p.get("kind") || ""; libTopic = p.get("topic") || "";
+  libTier = p.get("tier") || ""; libSort = p.get("sort") || ""; libAll = p.get("all") === "1";
+}
 
 function openLibrary(){
   openTab({kind: "library", arg: "__library", label: "Library"});
@@ -41,106 +92,105 @@ function openLibrary(){
 // ...on a node somebody named (the bell's rows, a node's page): read for
 // first when the page has not listed it yet (B754's lesson).
 function openLibraryOn(id, agent = ""){
-  if (id && id !== libNode){ libNode = id; lib = null; }
   // A door that names a coding agent (a project's Sign in on NODE, the
   // bell's row) opens that agent's card on its sign-in once the rows land.
   if (agent) libWantAgent = agent;
-  if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
-  try{ localStorage.setItem("bb.libnode", id); }catch(e){ /* private */ }
-  const was = location.hash;
-  openLibrary();
-  libRev++;
-  const to = routeOf(tabOf(panes[0]));
-  if (to && to !== was) shellPush(to);
-  loadLibrary();
+  openKindOn("library", id);
 }
 
 // The node the page opens on: the one it showed last, else the first agent
 // node, as the Toolchains page picked. The toolchain and pack verbs act on
 // tcNode, so the pick is theirs too.
 function libPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
-  let want = libNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem("bb.libnode") || localStorage.getItem("bb.tcnode") || ""; }catch(e){ want = ""; }
-  }
-  if (!live.some(n => n.id === want)) want = live[0]?.id || "";
+  // ...and where this browser kept none, the one a node's toolchains were
+  // last read for (tcPick's key).
+  const live = liveAgents(), want = keptNode("library", {have: live, also: "bb.tcnode"});
   libNode = want;
   if (want && want !== tcNode){ tcNode = want; toolchains = null; tcDriverPick = ""; }
   return live.find(n => n.id === want) || null;
 }
 
-// A read for a node already on its way is shared by the calls that come in
-// while it has only just set out: a rail press, the tab's open and the
-// revisions poll each asked at once, and the page waited on three reads
-// where one would do. A call later than that reads again, so nothing it
-// was asked about is missed.
-let libFlight = null;
-async function loadLibrary(){
-  if (libFlight && libFlight.node === libNode && Date.now() - libFlight.at < 500) return libFlight.p;
-  const flight = {node: libNode, at: Date.now(), p: null};
-  libFlight = flight;
-  flight.p = loadLibraryNow().finally(() => { if (libFlight === flight) libFlight = null; });
-  return flight.p;
-}
-
-async function loadLibraryNow(){
-  const asked = ++libSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== libSeq) return;
-  if (!libPick()){
-    lib = {nonode: true};
-    libRev++; drawPanes();
-    return;
-  }
-  // A reply is kept when it is still about the node on show and nothing
-  // asked after it has landed first (B154: dropping every overtaken reply
-  // was a livelock on a loaded box).
-  const node = libNode;
-  const keep = () => libNode === node && asked > libLanded;
-  try{
-    const r = await fetch("/api/library?node=" + encodeURIComponent(node));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (!keep()) return;
+// One read at a time (reading), an ask about the same node within half a
+// second of a read's start sharing it: the page's open, its node's census
+// and the revisions poll each asked at once, and the page waited on three
+// reads where one would do. A call later than that reads again, so nothing
+// it was asked about is missed.
+function loadLibrary(){
+  return reading("library", async () => {
+    if (nodesList === null || nodesStale) await nodesKnown();
+    if (!libPick()){ lib = {nonode: true}; return; }
+    // A reply is kept while it is still about the node on show.
+    const node = libNode, asked = libQuery();
+    const got = await getJSON(asked);
+    // An answer about another node, or to words since changed, is not drawn,
+    // and what the page wants now is asked for: a read sent before the
+    // address's narrowing was applied (a reload of a list) answered the
+    // front page, and dropped with nothing asked after it, the list never
+    // came.
+    if (libNode !== node || libQuery() !== asked){ if (libNode) setTimeout(loadLibrary); return; }
     lib = got;
-  }catch(e){ if (!keep()) return; lib = {error: failWords(e)}; }
-  libLanded = asked;
-  if (libWantAgent && !lib.error){
-    const r = (lib.rows || []).find(x => x.kind === "agent" && x.agent === libWantAgent);
-    libWantAgent = "";
-    // The agent's own entry page (R183), once the card is drawn.
-    if (r) setTimeout(() => openEntry(libNode, `agent:${r.name}`));
-  }
-  // The lines the Toolchains and Agents pages draw read their own page's
-  // state: the node's sandbox flag (Install them now on a system line) and
-  // this person's plugins and MCP servers there (an agent's Yours).
-  if (!lib.error){
-    tcSandboxNow = !!lib.sandbox; agYours = lib.yours || {plugins: [], mcp: {}};
-    // ...and tcAct refuses a second job by the Toolchains page's record of
-    // the one running, which this read keeps current for it.
-    if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = lib.job; else toolchains = {name: lib.name, job: lib.job, items: []};
-  }
-  // One follow-up while a job writes a row, not a poll: the toolchains
-  // revision moves when the job ends, and the row's "installing" until then.
-  clearTimeout(libFollow); libFollow = null;
-  if ((lib.rows || []).some(r => r.running)) libFollow = setTimeout(loadLibrary, 3000);
-  libRev++;
-  drawPanes();
+    if (libWantAgent && !lib.error){
+      const want = libWantAgent;
+      libWantAgent = "";
+      // An agent's card may be past the shelf's eight: asked for by kind.
+      const found = libFind(x => x.kind === "agent" && x.agent === want)
+        || ((await getJSON(`/api/library?node=${encodeURIComponent(node)}&view=browse&kind=agent&limit=60`)).rows || []).find(x => x.kind === "agent" && x.agent === want);
+      // The agent's own entry page (R183), once the card is drawn.
+      if (found) setTimeout(() => openEntry(libNode, `agent:${found.name}`));
+    }
+    // What the store's own lines and tcAct read off this page's read.
+    if (!lib.error) toolchainsSeen(lib);
+    // One follow-up while a job writes a row, not a poll: the toolchains
+    // revision moves when the job ends, and the row's "installing" until then.
+    clearTimeout(libFollow); libFollow = null;
+    if (libKnown().some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
+  }, {join: 500, about: libQuery()});
 }
 
-// What the search box matches: the name, what it is, its kind and its tier.
-function libMatch(r, q){
-  if (!q) return true;
-  const hay = `${r.label} ${r.name} ${r.about} ${r.kind} ${r.tier} ${(r.platforms || []).join(" ")}`.toLowerCase();
-  return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+// After a press: the list, and the entry's page where it is on show.
+function libReload(){ return Promise.all([loadLibrary(), entryKey && typeof shown === "function" && shown("entry") ? loadEntry() : null]); }
+
+// A list narrowed anew starts from its first page.
+function libPagesFrom(){ if (typeof pageState === "object") delete pageState.liblist; }
+
+// A list's next page, put under the rows it has: one already there (the
+// list moved under it) is not drawn twice.
+async function libMore(){
+  if (!lib?.rows || lib.moreAsked) return;
+  lib.moreAsked = true;
+  const node = libNode, asked = libQuery(lib.rows.length), was = lib;
+  try{
+    const got = await getJSON(asked);
+    if (lib !== was || libNode !== node || got.error) return;
+    const have = new Set(lib.rows.map(r => `${r.kind}:${r.name}`));
+    lib.rows = [...lib.rows, ...(got.rows || []).filter(r => !have.has(`${r.kind}:${r.name}`))];
+    lib.total = got.total;
+  } finally {
+    if (lib === was) lib.moreAsked = false;
+  }
+  readMoved("library"); drawPanes();
 }
 
 // The pills a row wears: its tier (the three read on every row), what is
 // installed, and what an update would move it to, which alone is news.
+// Who a tool is by, in a sentence for its Details (the operator, 12 Nov):
+// its maker, or, where a pack carries several makers' tools and is
+// AerieOS's own putting together, each tool with who it is by.
+function makerLine(r){
+  if (!r.maker) return "";
+  const cs = (r.credits || []).filter(c => c.name);
+  if (!cs.length) return `<span class="sub lcmaker">By ${esc(r.maker)}.</span>`;
+  return `<span class="sub lcmaker">Put together by ${esc(r.maker)} from other people's work: ${cs.map(c => `${esc(c.name)}${c.maker ? ` (${esc(c.maker)})` : ""}`).join(", ")}.</span>`;
+}
+
+// A card's line under its name: who the tool is by, in the quiet voice at
+// the left, then who stands behind the pack (the tier), its version and
+// what is out. The maker is the tool's, the tier the pack's: Google's
+// program, packaged by Aerie.
 function libPills(r){
-  const tier = `<span class="pill${r.tier === "vetted" ? " ok" : ""}">${esc(r.tier)}</span>`;
-  const ver = r.version && r.version !== "-" && r.version !== "present" ? ` <span class="pill" title="installed">${esc(r.version)}</span>` : "";
+  const by = r.maker ? `<span class="lcby" title="who ${esc(r.label)} is by">${esc(r.maker)}</span>` : "";
+  const tier = `${by}<span class="pill${r.tier === "vetted" || r.tier === "verified" ? " ok" : ""}">${esc(libTierWord(r.tier).toLowerCase())}</span>`;
+  const pill = packVersionPill(r), ver = pill && ` ${pill}`;
   const upd = r.update && r.latest ? ` <span class="pill warn" title="update available">${esc(r.latest)} is out</span>` : "";
   const dev = r.dev ? devMark() : "";
   return `${tier}${ver}${upd}${dev}`;
@@ -148,39 +198,50 @@ function libPills(r){
 
 // Where the row stands on the node, in a few words at its right.
 function libState(r){
-  const w = (t, cls = "") => `<span class="state${cls ? " " + cls : ""}">${t}</span>`;
+  const w = packState;
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.kind === "agent" && r.installed ? "updating" : "installing")}<span class="dots"></span>`);
+  // Pressed while another job ran: it goes when that one ends.
+  if (r.queued) return w("queued, after the job running now");
+  // One this AerieOS is too old for: said plainly, in the muted voice, since
+  // nothing is wrong with the card or the machine.
+  if (r.too_new) return w(esc(r.too_new.charAt(0).toUpperCase() + r.too_new.slice(1).replace(/ \(.*$/, "")));
   // An app runs where Docker does (R170 step 7): said when this node has none.
   if (r.kind === "app") return lib && !lib.docker ? w("this node runs no Docker: New container picks another", "warn") : w("");
   if (r.kind === "service") return r.installed ? w("deployed", "ok") : r.ready ? w(esc(r.ready), "warn") : w("");
   if (r.kind === "companion") return r.download ? w(esc(r.version ? `held, ${r.version}` : "held")) : w(esc(r.absent ? `not in ${r.absent}` : "not fetched yet"), "warn");
   if (r.wrong_platform) return w(esc(r.wrong_platform), "warn");
   if (r.machine){
-    const m = r.machine, st = m.state;
-    if (!m.managed) return w("installed by hand on this machine", "");
-    // A newer version of what is here is the news, whatever runs the card now.
-    if (m.here && m.newer && st !== "nocard" && st !== "leaving") return w("update available", "warn");
-    if (r.name === "nvidia-driver") return st === "absent" ? w("") : st === "loaded" ? w("installed and in use", "ok")
-      : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "update available" : "installed, takes the card at a restart", "warn");
-    return st === "absent" ? w("") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
-      : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
+    const m = r.machine;
+    // A newer version of what is here is the news, whatever runs the card
+    // now: the card is where it is installed from, so it says that first.
+    if (m.managed && m.here && m.newer && m.state !== "nocard" && m.state !== "leaving") return w("software update available", "warn");
+    return packMachineState(r);
   }
-  if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");
-  if (r.unknown) return w("installed, version unknown");
-  return w("");
+  // A pack kept here that does not fit this AerieOS is switched off until
+  // one that does is kept (the operator, 12 Nov): said in the warning
+  // voice, since it was working before the update.
+  if (r.pack?.disabled) return w(esc(r.pack.disabled) + (r.repin ? ": Manifest update keeps one that fits" : r.tier === "sideloaded" ? ": Edit keeps a version that names this one" : ""), "warn");
+  // The catalog pins a newer commit of a pack kept from it: said as what
+  // it is, the pack's manifest and not the program on the node.
+  if (r.repin) return w("manifest update available", "warn");
+  return packHeldState(r);
 }
 
 // The one verb a row takes, and Remove where it is installed (the
 // Toolchains page's Remove and the Agents page's, moved here).
-// Why the store's verbs are held on every card, or "": a job running on
-// the node (one at a time), a node not reporting, a store it cannot write.
+// Why the store's verbs are held on every card, or "": a node not reporting,
+// a store it cannot write. A job running there holds nothing: a press queues
+// behind it (toolchains.store_gate).
 // Set by the draw; the notice over the cards says the last two in full.
 let libHold = "";
 function libActs(r, may){
   const n = libNode, a = (act, words, cls = "", held = "") =>
     `<button type="button"${cls ? ` class="${cls}"` : ""} data-libact="${act}" data-libkind="${esc(r.kind)}" data-libname="${esc(r.name)}"${
       held ? ` disabled title="${esc(held)}"` : ""}>${esc(words)}</button>`;
-  if (r.running) return "";
+  if (r.running || r.queued) return "";
+  // Written in a format this AerieOS has not met (R234): nothing to press,
+  // and the card's state says which AerieOS takes it.
+  if (r.too_new) return "";
   if (r.kind === "companion") return r.download
     ? `<a class="btn primary" href="${esc(r.download.url)}" download title="${esc(r.download.file)} · sha256 ${esc((r.download.sha256 || "").slice(0, 12))}…">Download</a>`
     : `<button type="button" class="primary" disabled>Download</button>`;
@@ -192,18 +253,35 @@ function libActs(r, may){
   // something is behind it, set on the Installed page.
   if (r.kind === "service") return !may.configure || r.installed ? "" : `<button type="button" class="primary" data-libact="install" data-libkind="service" data-libname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}: set on the Installed page"` : ""}>Install</button>`;
   if (!may.install || !n) return "";
+  // One for other systems, shown when somebody asked to see them (R256):
+  // its Install dead, the card's state saying why.
+  if (r.wrong_platform && !r.installed) return a(r.kind === "pack" && r.catalog ? "add" : "install", "Install", "primary", r.wrong_platform);
   if (r.kind === "pack" && !r.installed && r.catalog) return a("add", "Install", "primary", libHold);
   if (r.machine && (!r.machine.managed || r.machine.imaged)) return "";
   // The container toolkit installed but unknown to Docker is put right by
   // installing it again, which its line on the Installed page says.
-  const again = r.machine?.state === "unconfigured";
-  const verb = r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
+  const again = r.machine?.state === "unconfigured"
+    // ...and a pack whose copy here an earlier manifest made (B799).
+    || !!(r.installed && r.receipt?.stale);
+  // One switched off for not fitting this AerieOS is not installed anywhere
+  // new: its way back is the catalog's newer pin, below.
+  const verb = r.pack?.disabled ? "" : r.update ? a("install", "Software update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
     : r.installed ? "" : a("install", "Install", "primary", libHold);
-  const edit = r.kind === "pack" && r.pack ? a("edit", "Edit") : "";
+  // Edit on what a person added themselves, as on an app: a pack kept from
+  // the catalog is not theirs to edit (the operator, 12 Nov: no Edit on
+  // Gemini's card), and its kept copy is reached from its Details page.
+  const edit = r.kind === "pack" && r.pack && r.tier === "sideloaded" ? a("edit", "Edit") : "";
   // The catalog pins a newer commit of a pack kept from it (R169 step 4):
-  // the dialog on that pin, its changes marked, before anything is kept.
-  const repin = r.repin && may.packs ? a("repin", "Catalog update") : "";
-  return `${verb}${repin}${edit}`;
+  // Manifest update, in the accent as every update is and named apart from
+  // a program's Software update (the operator, 13 Nov), opens the dialog on that
+  // pin, its changes marked, before anything is kept. It is the card's one
+  // verb while it stands. A pack has no version of its own to compare, so
+  // its card never carries a Software update: the manifest is what moves.
+  // Keeping one changes what the controller and its sessions read at once
+  // and reinstalls nothing: a node's copy made by the earlier manifest's
+  // install steps stays, and its card then offers Install again (B799).
+  if (r.repin && may.packs) return `${a("repin", "Manifest update", "primary")}${edit}`;
+  return `${verb}${edit}`;
 }
 
 // The whole description, on the open row (rows-you-open): what it fetches
@@ -228,18 +306,26 @@ function libDetail(r){
   // pack's Look, an app's compose with its blanks, a companion's files.
   const key = `${r.kind}:${r.name}`;
   const lines = [];
+  if (makerLine(r)) lines.push(makerLine(r));
+  // Written for a later framework than this AerieOS reads: taken, with what
+  // is newer left out, said so nobody wonders where a part of it is.
+  if (r.ahead) lines.push(`<span class="sub warn">It is ${esc(r.ahead)}.</span>`);
   if (r.platforms?.length) lines.push(`<span class="sub">Platforms: ${esc(r.platforms.join(", "))}</span>`);
   if (r.kind === "toolchain" || r.kind === "pack"){
     if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.</span>`);
     lines.push(tcTermsLine(r));
+    if (tcHeldLine(r)) lines.push(tcHeldLine(r));
     if (r.size) lines.push(`<span class="sub">About ${esc(r.size)} on the store.</span>`);
     if (r.machine) lines.push(`<span class="sub">${r.name === TC_DRIVER ? "Built for the machine's kernel, installed as root, taking the card at the next restart." : "From NVIDIA's own package source, which installing adds and removing takes away."} Its state and Remove are on the Installed page.</span>`);
-    if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>aerie tool ${esc(r.name)}</code>.</span>`);
+    if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>aerie tool ${esc(r.name)}</code>.${
+      r.tier !== "sideloaded" && lib?.may?.install && !r.running ? ` <button type="button" class="link" data-libact="edit" data-libkind="pack" data-libname="${esc(r.name)}">Look for a newer pin, or remove it</button>` : ""}</span>`);
     if (r.catalog) lines.push(`<span class="sub">From <code>${esc(r.catalog.url)}</code>${r.catalog.path ? ` (${esc(r.catalog.path)})` : ""} at ${esc((r.catalog.commit || "").slice(0, 12))}, its archive's sha256 checked on the way in. Install opens the Add tool pack dialog on that commit, and Add keeps exactly that.</span>`);
-    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Catalog update shows what it changes before it is kept.</span>`);
+    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Manifest update shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))} on each node, set on the Installed page once it is there.</span>`);
     if (r.wrong_platform) lines.push(`<span class="sub warn">${esc(r.wrong_platform)}</span>`);
+    if (r.pack?.disabled) lines.push(`<span class="sub warn">It is ${esc(r.pack.disabled)}. No session uses it, and it offers no agent, until a version that names this AerieOS is kept; where it is installed it stays.</span>`);
+    if (r.too_new) lines.push(`<span class="sub">This one ${esc(r.too_new)}. Nothing is fetched or added until then.</span>`);
     if (r.pack && !r.pack.here || r.catalog){
       const seen = libSeen[key];
       lines.push(seen === "looking" ? `<span class="sub">Looking at the repository<span class="dots"></span></span>`
@@ -250,7 +336,7 @@ function libDetail(r){
   }
   if (r.kind === "service"){
     lines.push(`<span class="sub">Deployed on the node as a written container; configured, read and removed on the Installed page under Machines.</span>`);
-    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Catalog update shows what it changes before it is kept.</span>`);
+    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Manifest update shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))}.</span>`);
   }
   if (r.kind === "agent"){
@@ -258,10 +344,19 @@ function libDetail(r){
     lines.push(`<span class="sub">${a?.product ? `${esc(a.product)}, installed` : "Installed"} once per node for its session account${a?.provider ? `; each person signs in with ${/^(?:[AEIOU]|x(?=[A-Z]))/.test(a.provider) ? "an" : "a"} ${esc(a.provider)} account on the Installed page` : ""}.${r.latest ? ` The latest is ${esc(r.latest)}.` : ""}</span>`);
   }
   if (r.kind === "app"){
+    // Whether every image it runs is named by its digest (pack format 5),
+    // in one line, as a toolchain's Details says of its downloads.
+    if (r.held?.word) lines.push(`<span class="sub tcheld">${r.held.word === "pinned"
+      ? "Every image it runs is named by its digest."
+      : "Its images are named by tag alone: a tag is whatever was last pushed under it."}</span>`);
     if (r.tier === "sideloaded") lines.push(`<span class="sub">Added${r.by ? ` by ${esc(r.by)}` : ""}${r.at ? ` ${ago(r.at)}` : ""}, kept as sideloaded: Edit changes it, and Remove in there takes it off the catalog.</span>`);
-    lines.push(`<span class="sub">New container opens the Containers page's dialog with ${esc(r.label)} picked: its folders, the user, the time zone and the port are filled in, and Create makes it a container there${r.port ? `, on port ${esc(String(r.port))}` : ""}. Each press makes another, under its own name.</span>`);
-    if (r.secrets?.length) lines.push(`<span class="sub">Made for it when it is created: ${esc(r.secrets.join(", "))}.</span>`);
-    if (r.blanks?.length) lines.push(`<span class="sub">Its blanks, filled from what you type: ${r.blanks.map(b => `<code>${esc(b)}</code>`).join(", ")}.</span>`);
+    if (r.going) lines.push(`<span class="sub warn">${esc(r.going)}</span>`);
+    lines.push(`<span class="sub">New container opens the Containers page's dialog on ${esc(r.label)}'s panel, and Create makes it a container there${
+      r.network === "host" ? `, on the machine's own network, answering on ${esc(String(r.port))}` : r.port ? `, on port ${esc(String(r.port))} unless you pick another` : ""}. Each press makes another, under its own name.</span>`);
+    // What its panel asks for (R238): its own fields, then AerieOS's.
+    const asks = [...(r.fields || []).map(f => f.kind === "secret" ? `${f.label} (made for it)` : f.label),
+      ...(r.own || []).includes("PUID") ? ["who it runs as"] : [], ...(r.own || []).includes("TZ") ? ["the time zone"] : []];
+    if (asks.length) lines.push(`<span class="sub">Asks for ${esc(asks.join(", "))}.</span>`);
     if (r.compose) lines.push(`<pre class="libcompose mono">${esc(r.compose.trim())}</pre>`);
   }
   if (r.kind === "companion"){
@@ -289,14 +384,14 @@ const LIB_ICONS = {
 // to (an added pack at its own, a catalog offer at the catalog's, its archive
 // checked against the catalog's sha256), drawn as the dialog draws it.
 async function libLook(key){
-  const r = (lib?.rows || []).find(x => `${x.kind}:${x.name}` === key);
+  const r = libFind(x => `${x.kind}:${x.name}` === key);
   if (!r || libSeen[key] === "looking") return;
-  libSeen[key] = "looking"; libRev++; drawPanes();
+  libSeen[key] = "looking"; readMoved("library"); drawPanes();
   const body = r.catalog ? {action: "preview", url: r.catalog.url, commit: r.catalog.commit, sha256: r.catalog.sha256, path: r.catalog.path || ""}
     : {action: "preview", url: r.pack.url, commit: r.pack.commit, path: r.pack.path || ""};
-  const j = await (await postJSON("/api/toolpacks", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/toolpacks", body);
   libSeen[key] = j;
-  libRev++; drawPanes();
+  readMoved("library"); drawPanes();
 }
 
 // The driver's version on its card (R102, the operator 6 Oct: the branch
@@ -318,10 +413,10 @@ function libDriverPick(m){
 // ...Details opening the entry's own page (R183), never the card in place.
 function libRow(r, may){
   const key = `${r.kind}:${r.name}`;
-  const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && lib?.job?.errors?.[r.name] ? `<div class="sub bad">${esc(lib.job.errors[r.name])}</div>` : "";
+  const err = packJobErr(r, lib?.job);
   return `<div class="lcard${r.running ? " busy" : ""}" data-lrow="${esc(key)}">
     <div class="lchead">${libIcon(r)}
-      <div class="lctitle"><div class="name">${esc(r.label)} <button type="button" class="link lmore" data-libmore="${esc(key)}">Details</button></div><div class="lcmeta">${libPills(r)}</div></div></div>
+      <div class="lctitle"><div class="name"><span class="lcname">${esc(r.label)}</span> <button type="button" class="link lmore" data-libmore="${esc(key)}">Details</button></div><div class="lcmeta">${libPills(r)}</div></div></div>
     <div class="lcabout">${esc(r.about)}</div>
     ${r.machine && r.name === TC_DRIVER ? libDriverPick(r.machine) : ""}${err}
     <div class="pcacts actbar">${libState(r)}${libActs(r, may)}</div>
@@ -337,47 +432,92 @@ function libRow(r, may){
 // The sources count within the kind picked (the operator, 31 Oct: a kind
 // picked says how many of it each source has); the kinds, the first row,
 // count the whole library, so a source picked never empties that row.
-function libFilterBand(kindRows, tierRows, acts = ""){
-  const count = (key, f) => kindRows.filter(f).length;
-  // Installed, then Updates, first after All (the operator, 29 Oct): every
-  // card installed, or with an update due, each in its own kind's section;
-  // drawn only while one is.
-  const kinds = [{key: "installed", label: "Installed", count: count("installed", LIB_STANDS.installed)},
-                 {key: "update", label: "Updates", count: count("update", LIB_STANDS.update)},
-                 ...LIB_KINDS.map(([k, l]) => ({key: k, label: l, count: count(k, r => libGroup(r) === k)}))];
-  const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: tierRows.filter(r => r.tier === k).length}));
+function libFilterBand(acts = ""){
+  const c = lib.counts || {kind: {}, tier: {}, topic: {}, all: 0};
+  // Installed, then Updates, first after All (the operator, 29 Oct), each
+  // drawn while it has cards; the counts are the server's, under the other
+  // narrowings (R256).
+  const kinds = [{key: "installed", label: "Installed", count: c.kind.installed || 0},
+                 {key: "update", label: "Updates", count: c.kind.update || 0},
+                 ...LIB_KINDS.map(([k, l]) => ({key: k, label: l, count: c.kind[k] || 0}))];
+  // A source picked keeps its chip while it narrows to nothing, so it can
+  // be let go; the chips draw only where two sources are present.
+  const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: c.tier[k] || (k === libTier ? 0.5 : 0)}));
+  const tierChips = tiers.filter(t => t.count).length > 1 || libTier ? chipButtons(tiers.map(t => ({...t, count: Math.floor(t.count)})).filter(t => t.count || t.key === libTier), libTier, "data-libtier", undefined, "Any source") : "";
+  libHadTiers = !!tierChips;
+  // A topic (the catalog's fixed list, R256) and the order, each a pulldown
+  // beside the search; a topic with nothing under the rest is left out.
+  const topics = (lib.topics || []).filter(([k]) => c.topic[k] || k === libTopic);
+  const topicSel = topics.length ? `<label class="pick libtopic"><select id="libTopic" aria-label="topic">
+      <option value="">Any topic</option>${topics.map(([k, l]) => `<option value="${esc(k)}"${k === libTopic ? " selected" : ""}>${esc(l)}${c.topic[k] ? ` (${c.topic[k]})` : ""}</option>`).join("")}</select></label>` : "";
+  const sortSel = `<label class="pick libsort"><select id="libSort" aria-label="order">${[["", libQ.trim() ? "Best match" : "By name"], ...(libQ.trim() ? [["name", "By name"]] : []), ["added", "Recently added"]]
+      .map(([k, l]) => `<option value="${k}"${k === libSort ? " selected" : ""}>${l}</option>`).join("")}</select></label>`;
+  const view = viewSeg("libview", libViewNow(), "each a card with what it is", "each a row, more to a screen", "", ["Cards", "Rows"]);
   return `<div class="field lfilter libfilter">
     <div class="libsearchrow"><input id="libFind" type="search" maxlength="80" autocomplete="off" spellcheck="false" aria-label="search the library"
-      placeholder="search by name or what it does" value="${esc(libQ)}">${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
-    <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", kindRows.length)}</div>
-    <div class="chips" data-chips="libtier">${chipButtons(tiers, libTier, "data-libtier", undefined, "Any source")}</div>
+      placeholder="search by name, maker or what it does" value="${esc(libQ)}"><span class="libnarrow">${topicSel}${sortSel}${view}</span>${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
+    <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", c.all)}</div>
+    <div class="chips" data-chips="libtier">${tierChips}</div>
   </div>`;
 }
 
-function libSections(rows, may){
-  return LIB_KINDS.map(([k, title]) => {
-    const all = (lib.rows || []).filter(r => libGroup(r) === k);
-    const here = rows.filter(r => libGroup(r) === k);
-    if (libKind && !LIB_STANDS[libKind] && libKind !== k) return "";
-    if (LIB_STANDS[libKind] && !here.length) return "";
-    // No packs at all is no group (the operator, 29 Oct): nothing to list, and
-    // Add your own is on the bar; the Tool packs chip still opens it empty.
-    if (k === "pack" && !all.length && libKind !== k) return "";
-    const inst = all.filter(r => r.installed).length;
-    const count = !all.length ? "" : k === "app" || k === "companion" ? `${all.length}` : `${inst} of ${all.length} installed`;
-    // The catalog's trouble is the packs' alone, said over them, never in the node's head.
-    // Over the packs: the catalog's trouble, and the way to offer one of
-    // yours to everybody (R169 step 3's vetting: a pull request there).
-    const submit = k === "pack" && lib.catalog_repo && may.packs
-      ? `<div class="hint">Made a pack worth sharing? <a href="${esc(lib.catalog_repo)}" target="_blank" rel="noopener">Submit it to the vetted catalog ↗</a>: a pull request there, reviewed and signed by the maintainers.</div>` : "";
-    const note = (k === "pack" && lib.catalog_error ? `<div class="hint warn">${esc(lib.catalog_error)}</div>` : "") + submit
-      || (k === "companion" && featureOff("apps") ? deadWhy(featureOff("apps")) : "");
-    const body = k === "companion" && featureOff("apps") ? ""
-      : here.length ? `<div class="lgrid">${here.map(r => libRow(r, may)).join("")}</div>`
-      : `<div class="empty">${all.length ? "Nothing here matches." : k === "companion" ? "This controller offers no apps for your own machines: an administrator picks them on the Controller page, under Apps."
-        : k === "pack" ? "Nothing added yet: Add your own brings in a tool pack of yours, and the vetted catalog's offers land here." : "Nothing here yet."}</div>`;
-    return `<div class="libgroup" data-libgroup="${esc(k)}"><h3 class="libgname">${esc(title)}${count ? ` <span class="dim">${esc(count)}</span>` : ""}</h3>${note}${body}</div>`;
+// Cards or rows: the browser's pick, else rows for a list on a phone and
+// cards everywhere else (R256).
+function libViewNow(){
+  if (libView === "cards" || libView === "list") return libView;
+  return innerWidth < 600 && libNarrowed() ? "list" : "cards";
+}
+function libNarrowed(){ return !!(libQ.trim() || libKind || libTopic || libTier); }
+
+// What a group says over its cards: the catalog's trouble and the way to
+// submit a pack, over the Tool packs (never in the node's head).
+function libPackNote(may){
+  const submit = lib.catalog_repo && may.packs
+    ? `<div class="hint">Made a pack worth sharing? <a href="${esc(lib.catalog_repo)}" target="_blank" rel="noopener">Submit it to the vetted catalog ↗</a>: a pull request there, reviewed and signed by the maintainers.</div>` : "";
+  const past = lib.catalog_past ? `<div class="hint warn">The catalog lists ${lib.catalog_past.toLocaleString()} more than this AerieOS reads; a newer AerieOS reads them all.</div>` : "";
+  return (lib.catalog_error ? `<div class="hint warn">${esc(lib.catalog_error)}</div>` : "") + past + submit;
+}
+
+function libCards(rows, may){
+  return `<div class="lgrid${libViewNow() === "list" ? " lrows" : ""}">${rows.map(r => libRow(r, may)).join("")}</div>`;
+}
+
+// The front page (R256, the operator, 18 Nov: shelves, never the whole
+// catalog): what is on this node, then a shelf per kind of at most eight
+// cards, Packaged by Aerie first, each with All N opening that kind's list.
+function libShelves(may){
+  const shelf = (key, title, total, rows, note = "") => `<div class="libgroup" data-libgroup="${esc(key)}">
+    <h3 class="libgname">${esc(title)} <span class="dim">${esc(String(total))}</span>${
+      total > rows.length ? `<button type="button" class="link libshelfall" data-libshelf="${esc(key)}">All ${esc(String(total))} ›</button>` : ""}</h3>${note}${libCards(rows, may)}</div>`;
+  const here = lib.here || [];
+  const mine = here.length ? shelf("installed", "On this node", here.length, here.slice(0, 8)) : "";
+  const kinds = (lib.shelves || []).map(sh => {
+    const title = (LIB_KINDS.find(([k]) => k === sh.kind) || [sh.kind, sh.kind])[1];
+    if (sh.kind === "companion" && featureOff("apps")) return "";
+    return shelf(sh.kind, title, sh.total, sh.rows, sh.kind === "pack" ? libPackNote(may) : "");
   }).join("");
+  // No packs at all is no shelf (the operator, 29 Oct), but what the
+  // catalog has to say over them is still said.
+  const packsSaid = !(lib.shelves || []).some(sh => sh.kind === "pack") && libPackNote(may)
+    ? `<div class="libgroup" data-libgroup="pack"><h3 class="libgname">Tool packs</h3>${libPackNote(may)}</div>` : "";
+  // No app at all is no shelf either (R238: none is shipped), and an
+  // install that read no catalog and keeps none says so in a line.
+  const appsSaid = !(lib.shelves || []).some(sh => sh.kind === "app") && lib.apps_note
+    ? `<div class="libgroup" data-libgroup="app"><h3 class="libgname">Apps</h3><div class="hint warn">${esc(lib.apps_note)}</div></div>` : "";
+  return mine + kinds + packsSaid + appsSaid || `<div class="empty">Nothing here yet.</div>`;
+}
+
+// A list (a chip, a topic or the search): one sorted list, a page at a time.
+function libList(may){
+  const rows = lib.rows || [];
+  const kindWord = LIB_STANDS[libKind] ? (libKind === "update" ? "with an update" : "installed") : "";
+  const noun = libKind && !LIB_STANDS[libKind] ? (LIB_KINDS.find(([k]) => k === libKind) || ["", "entries"])[1].toLowerCase() : "entries";
+  const hidden = lib.hidden ? `<div class="hint libhidden">${lib.hidden} more ${lib.hidden === 1 ? "runs" : "run"} only on other systems than ${esc(lib.name || "this node")}'s. <button type="button" class="link" data-liball="1">Show ${lib.hidden === 1 ? "it" : "them"}</button></div>`
+    : libAll ? `<div class="hint libhidden">Showing what runs on other systems too, each marked. <button type="button" class="link" data-liball="0">Hide them</button></div>` : "";
+  const note = libKind === "pack" ? libPackNote(may) : libKind === "app" && lib.apps_note ? `<div class="hint warn">${esc(lib.apps_note)}</div>` : "";
+  const body = rows.length ? libCards(rows, may)
+    : `<div class="empty">${libQ.trim() ? `Nothing ${kindWord ? kindWord + " " : ""}matches ${esc(libQ.trim())}.` : "Nothing here matches."}</div>`;
+  return `<div class="libgroup libone" data-libgroup="list">${note}${hidden}${body}</div>`;
 }
 
 function renderLibraryInto(i){
@@ -386,15 +526,15 @@ function renderLibraryInto(i){
   if (lib === null){
     d.setBar("");
     const skcard = () => `<div class="lcard skcard"><div class="lchead"><span class="lcicon"></span><div class="lctitle">${skv(7, "name")}${skv(4)}</div></div>${skRows(1)}</div>`;
-    d.list.innerHTML = skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
-      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name or what it does"><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div><div class="chips">${skel("chips", 3)}</div></div>`
-      + `<div class="field libgroups">${LIB_KINDS.map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}</h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`);
-    if (!libSeq) loadLibrary();
+    drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
+      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name, maker or what it does"><span class="libnarrow"><label class="pick libsort"><select disabled aria-label="order"><option>By name</option></select></label>${viewSeg("libviewsk", libViewNow(), "", "", " disabled", ["Cards", "Rows"])}</span><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
+      + `<div class="field libgroups">${[["installed", "On this node"], ...LIB_KINDS].map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}<button type="button" class="link libshelfall" disabled>All ›</button></h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
+    if (!readRev("library") && !readBusy("library")) loadLibrary();
     return;
   }
   if (lib.nonode){
     d.setBar("");
-    d.list.innerHTML = noNodeYet("toolchains and coding agents install on a node", "libnone");
+    drawHTML(d.list, noNodeYet("toolchains and coding agents install on a node", "libnone"));
     return;
   }
   const may = lib.may || {};
@@ -409,38 +549,32 @@ function renderLibraryInto(i){
   d.setBar("");
   const acts = may.install
     ? `${busy ? abortBtn('data-libabort', job.aborting) : ""}
-       <button type="button" data-libcheck${busy || stale ? " disabled" : ""} title="ask each upstream what it has now">${
+       <button type="button" data-libcheck${stale ? " disabled" : ""} title="ask each upstream what it has now">${
          busy && job.action === "check" ? `${barSaid("Checking for updates", "Checking")}<span class="dots"></span>`
          : barSaid("Check for updates", "Check")}</button>${
         may.packs ? `<button type="button" class="primary" data-libadd>${barSaid("Add your own", "Add")}</button>` : ""}${
-        clean.length ? `<button type="button" class="danger" data-libclean${busy ? " disabled" : ""}>Remove</button>` : ""}` : "";
+        clean.length ? `<button type="button" class="danger" data-libclean>Remove</button>` : ""}` : "";
   if (lib.error){
-    paint(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
+    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
     return;
   }
-  // A card not for this node is not drawn (R170 step 9): counted in the head.
-  const all = (lib.rows || []).filter(r => !r.wrong_platform);
-  const notHere = (lib.rows || []).length - all.length;
+  // What the head says is about the whole Library on the node, whatever is
+  // narrowed: the server counts it (R256). A card not for this node is left
+  // out of a list and counted (R170 step 9), and an entry this AerieOS does
+  // not take is never shown (the operator, 12 Nov).
+  const f = lib.facts || {};
   // The last update installed takes the Updates chip with it, the last
   // thing removed the Installed chip: back to All.
-  if (LIB_STANDS[libKind] && !all.some(LIB_STANDS[libKind])) libKind = "";
-  const inKind = r => !libKind || (LIB_STANDS[libKind] ? LIB_STANDS[libKind](r) : libGroup(r) === libKind);
-  const tierRows = all.filter(inKind);
-  // A kind whose cards come from one source alone draws no source chips,
-  // and a source the kind has none from draws none: a source picked before
-  // is let go then rather than narrowing out of sight.
-  if (libTier && (LIB_TIERS.filter(([k]) => tierRows.some(r => r.tier === k)).length < 2
-                  || !tierRows.some(r => r.tier === libTier))) libTier = "";
-  const kindRows = all;
-  const rows = all.filter(r => libMatch(r, libQ) && inKind(r) && (!libTier || r.tier === libTier));
-  const inst = all.filter(r => r.installed).length, due = all.filter(r => r.update).length;
+  if (LIB_STANDS[libKind] && !(lib.counts?.kind?.[libKind]) && !(lib.rows || []).length && !libQ.trim()){ libKind = ""; setTimeout(loadLibrary); }
+  const inst = f.installed || 0, due = f.updates || 0, notHere = f.other_platform || 0, notBuild = f.not_this_build || 0;
   const free = lib.store?.free_mb ? `${humanBytes(lib.store.free_mb * 1048576)} free` : "";
   const head = pageHead({facts: [
-    ["Installed", `${inst} of ${all.filter(r => r.kind !== "app" && r.kind !== "companion").length}`],
+    ["Installed", `${inst} of ${f.offered || 0}`],
     ["Updates due", due ? String(due) : ""],
     ["Store", lib.store?.root ? `${lib.store.root}${free ? ", " + free : ""}` : ""],
     ["Versions checked", lib.store?.checked ? ago(lib.store.checked) : ""],
     ["Not for this node", notHere ? String(notHere) : ""],
+    ["Not for this AerieOS", notBuild ? `${notBuild} in the catalog` : ""],
     ["Remove takes", clean.length ? clean.map(c => `<code>${esc(c.dir)}</code> (${esc(c.what)})`).join(", ") : "", {html: true}],
   ]});
   // What the Toolchains page said over its rows (step 5): a node that has
@@ -451,13 +585,24 @@ function renderLibraryInto(i){
     pro ? `<div class="field"><div class="notice warn libro">${esc(lib.name || "This node")}'s toolchain store is read-only to it, so nothing installs here: what is in it is what it has. Make it writable on the machine to install.</div></div>` : ""}${
     unmet.length ? `<div class="field"><div class="notice warn libsys">System packages ${esc(lib.name || "this node")} lacks for what its store holds (${esc(lib.sysdeps.family || "")}): ${
       unmet.map(([r, ps]) => `${esc(r)}: ${esc(ps.join(" "))}`).join("; ")}. ${lib.sandbox && may.install
-        ? `<button type="button" data-libsysdeps${busy || stale ? " disabled" : ""} title="install these on ${esc(lib.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
+        ? `<button type="button" data-libsysdeps${stale ? " disabled" : ""} title="install these on ${esc(lib.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : ""}`;
-  libHold = busy ? "another toolchain job is running on this node" : stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
-  paint(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(kindRows, tierRows, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
+  libHold = stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
+  // Patched into what is there (R244): the search being typed in keeps its
+  // focus and its caret through the redraw its own key brings.
+  patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(acts)}<div class="field libgroups">${
+    libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
+  // A list a page at a time (the long-lists rule): its foot says how much
+  // of how many, and the next page comes as the foot scrolls into view.
+  const one = d.list.querySelector(".libone .lgrid");
+  if (one) paginate(one, ":scope > .lcard", {key: "liblist", total: lib.total || 0, more: libMore,
+    noun: libKind && !LIB_STANDS[libKind] ? (LIB_KINDS.find(([k]) => k === libKind) || ["", "entries"])[1].toLowerCase() : "entries"});
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.
   if (!tcDotsTimer && d.list.querySelector(".dots")) tcDotsTimer = setInterval(tcTickDots, 400);
+  // The order's answers change with the search (Best match comes and goes):
+  // each pulldown is held to its longest answer again.
+  fitPickersSoon();
   wireLibrary(d.el);
 }
 
@@ -476,20 +621,33 @@ function wireLibrary(root){
     if (i.complete && !i.naturalWidth) broke(); else i.onerror = broke;
   });
   wireSections(root);
-  if (typeof wireSignin === "function") wireSignin(root);
+  wireSignin(root);
+  // Each narrowing asks the server again (R256), the address following it,
+  // and a list starts from its first page.
+  const ask = set => { set(); if (lib) lib.moreAsked = false; libPagesFrom(); shellSync(); loadLibrary(); };
   const q = root.querySelector("#libFind");
   if (q){
-    q.oninput = () => { libQ = q.value; libRev++; drawPanes(); keepFocus(q); };
+    onTyping(q, () => { if (q.value === libQ) return; ask(() => { libQ = q.value; if (!libQ.trim() && libSort === "") libSort = ""; }); });
   }
-  // A chip rearranges the shelf (R192): the cards that stay slide to their
-  // places, the ones it leaves out fade away, the ones it brings fade up.
-  const shelf = () => document.querySelector(".pane .doc.on .librarytab");
-  const move = set => chipMove(shelf, ".lcard, .libgname", () => { set(); libRev++; drawPanes(); });
-  root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => move(() => { libKind = b.dataset.libkind; }));
-  root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => move(() => { libTier = b.dataset.libtier; }));
+  root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => ask(() => { libKind = b.dataset.libkind; }));
+  root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => ask(() => { libTier = b.dataset.libtier; }));
+  root.querySelectorAll("[data-libshelf]").forEach(b => b.onclick = () => ask(() => { libKind = b.dataset.libshelf; }));
+  root.querySelectorAll("[data-liball]").forEach(b => b.onclick = () => ask(() => { libAll = b.dataset.liball === "1"; }));
+  const tsel = root.querySelector("#libTopic");
+  if (tsel) tsel.onchange = () => ask(() => { libTopic = tsel.value; });
+  const ssel = root.querySelector("#libSort");
+  if (ssel) ssel.onchange = () => ask(() => { libSort = ssel.value; });
+  root.querySelectorAll("[data-libview]").forEach(b => b.onclick = () => {
+    libView = b.dataset.libview;
+    try{ localStorage.setItem("bb.libview", libView); }catch(e){ /* private */ }
+    readMoved("library"); drawPanes();
+  });
   root.querySelectorAll("[data-libmore]").forEach(b => b.onclick = () => openEntry(libNode, b.dataset.libmore));
   const chk = root.querySelector("[data-libcheck]");
-  if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking"); await tcAct("check"); await loadLibrary(); });
+  // ...and the vetted catalog read again with it: its index is kept for an
+  // hour, so a newer pin showed up to an hour after Check (B793).
+  if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking");
+    await Promise.all([tcAct("check"), fetch("/api/catalog?fresh=1").catch(() => null)]); await loadLibrary(); });
   const ab = root.querySelector("[data-libabort]");
   if (ab) ab.onclick = async () => { await tcAct("abort"); loadLibrary(); };
   const sd = root.querySelector("[data-libsysdeps]");
@@ -499,7 +657,7 @@ function wireLibrary(root){
     const dirs = (lib?.cleanable || []).map(c => c.dir);
     if (!dirs.length || !await askYes(`Take ${dirs.join(", ")} off the store?\n\nNo node runs from ${dirs.length === 1 ? "it" : "them"}; what is in ${dirs.length === 1 ? "it" : "them"} is gone for good.`, {verb: "Remove", danger: true})) return;
     busy(cl, "Removing");
-    const j = await (await postJSON("/api/toolchains", {action: "clean", node: libNode, names: dirs})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/toolchains", {action: "clean", node: libNode, names: dirs});
     if (j.error) notify(j.error, true);
     loadLibrary();
   };
@@ -511,26 +669,16 @@ function wireLibrary(root){
   root.querySelectorAll("[data-liblook]").forEach(b => b.onclick = () => libLook(b.dataset.liblook));
 }
 
-// The search keeps its caret through the redraw its own keystroke brings.
-function keepFocus(q){
-  const at = q.selectionStart;
-  queueMicrotask(() => {
-    const again = document.getElementById("libFind");
-    if (again && document.activeElement !== again){ again.focus(); try{ again.setSelectionRange(at, at); }catch(e){ /* a type without a caret */ } }
-  });
-}
-
-// The pack dialogs read the Toolchains page's rows (tpOpen's Edit finds the
-// pack there), so they are read for this node first where they are not yet.
+// The pack dialogs read the store's rows (tpOpen's Edit finds the pack
+// there), so they are read for this node first where they are not yet.
 async function libWithToolchains(f){
-  if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== libNode) await loadToolchains();
+  await toolchainsFor(libNode);
   f();
 }
 
 async function libAct(b, act, kind, name){
-  const r = (lib?.rows || []).find(x => x.kind === kind && x.name === name);
+  const r = libFind(x => x.kind === kind && x.name === name);
   if (!r) return;
-  const n = (nodesList || []).find(x => x.id === libNode), where = n?.name || "this node";
   if (kind === "app"){
     if (act === "edit"){ tpOpenApp(name); return; }
     // One the vetted catalog offers is kept first, from its pin in the
@@ -538,30 +686,16 @@ async function libAct(b, act, kind, name){
     // runs Docker.
     if (r.catalog){
       busy(b, "Taking");
-      const j = await (await postJSON("/api/nasapps", {action: "add-catalog", app: name})).json().catch(() => ({error: "no answer"}));
-      if (j.error){ notify(j.error, true); await loadLibrary(); return; }
+      const j = await postJSON("/api/nasapps", {action: "add-catalog", app: name});
+      if (j.error){ notify(j.error, true); await libReload(); return; }
       if (typeof cApps !== "undefined") cApps = null;
-      await loadLibrary();
+      await libReload();
     }
     openNewContainerApp(name, lib?.docker ? libNode : "");
     return;
   }
-  if (kind === "service"){
-    busy(b, "Deploying");
-    const j = await (await postJSON("/api/library", {action: "install", node: libNode, pack: r.name})).json().catch(() => ({error: "no answer"}));
-    if (j.error) notify(j.error, true);
-    else if (j.job) notify(`deploying ${r.label}: its row on the Containers page has the build`);
-    await loadLibrary();
-    return;
-  }
-  if (kind === "agent"){
-    if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
-    busy(b, "Asking");
-    const j = await (await postJSON("/api/agents", {action: act, node: libNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
-    if (j.error) notify(j.error, true);
-    await loadLibrary();
-    return;
-  }
+  if (kind === "service"){ await packDeploy(b, libNode, r, "install", libReload); return; }
+  if (kind === "agent"){ await agentUpdate(b, libNode, r, libReload); return; }
   if (act === "add"){ libWithToolchains(() => tpOpenCatalog({...r.catalog, name: r.name, tier: r.tier, about: r.about, platforms: r.platforms})); return; }
   if (act === "edit"){ libWithToolchains(() => tpOpen(r.name)); return; }
   if (act === "repin"){ libWithToolchains(() => tpOpen(r.name, r.repin)); return; }
@@ -569,5 +703,5 @@ async function libAct(b, act, kind, name){
   // with its agreements asked the way that page asks them.
   busy(b, r.installed ? "Updating" : "Installing");
   await tcAct("install", [r.name]);
-  await loadLibrary();
+  await libReload();
 }

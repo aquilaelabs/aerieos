@@ -1,0 +1,704 @@
+/* The page's stylesheet, in four cascade layers (R9 step 4), each a file:
+   page-skin.css, page-components.css, page-surfaces.css and
+   page-overrides.css, linked in that order by index.html. A layer later in
+   the order wins over every rule of an earlier one, whatever either's
+   specificity or place in the file; inside a layer, specificity and order
+   decide as they always do. So a rule goes in the layer of what it styles,
+   and is written as plainly as that allows:
+
+     skin        the tokens, the twelve schemes and their light halves, and
+                 what a bare element looks like (a button, a field, a link)
+     components  what more than one page draws: rows, sections and their
+                 bars, tiles, facts, chips, pills, menus, dialogs, toasts
+     surfaces    what one page or one part of the page draws: the header,
+                 the rail, the dock, a page, a notebook view
+     overrides   what must win whatever else says: hidden is hidden, less
+                 motion is none, a theme's crossfade while it runs, a
+                 floated menu stays where it was put, a reason line keeps
+                 its color
+
+   xterm's own stylesheet, loaded with the first terminal, is outside the
+   layers, so its rules for its own parts win over the page's rules for bare
+   elements (its hidden input stays hidden whatever a field looks like). */
+@layer skin, components, surfaces, overrides;
+@layer skin {
+/* The design language is docs/design-language.md, held by the house rule
+   `design` and measured by test/uniform.mjs. */
+:root,.sw[data-theme="default"]{
+  --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
+  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#facc15; --bad:#f2707a;
+  --note:#8cc8ff;
+  /* Good, warning and error are one set in every scheme: they mean the same
+     whatever the theme, a shade for the dark half here and one for the
+     light half below, never a scheme's own: green, a true yellow, and red.
+     A surface tinted with one of them is mixed over --ground, a neutral no
+     scheme and no space's color moves, its words in --ground-ink: mixed
+     over a space's panel, the warning's band read as a dirty olive. A
+     warning's own surface (a band, a banner) is --warn-wash with
+     --warn-wash-ink and its edge --warn-edge: in the dark half a faint
+     yellow over --ground that the page shows through, the yellow carried by
+     the words and the edge (the operator, 17 Nov: see-through, where the
+     solid yellow had replaced a tint over the space's color that read
+     dirty); in the light half a pale wash. */
+  --pass:#3fb950;
+  --ground:#141922; --ground-ink:#eef1f6;
+  --warn-wash:color-mix(in srgb, #facc15 12%, var(--ground)); --warn-wash-ink:#facc15; --warn-edge:#facc15;
+  /* Derived, not chosen. Buttons and the active/primary family were hardcoded
+     hex: #232b34 eleven times, #1f6f36 and #2ea043 across every tab, pane and
+     primary, which meant a scheme could repaint the page and leave every
+     control the color it always was. They are mixed from the scheme's own
+     panel and accent instead, so eleven recolors cost nothing to maintain.
+     Each is declared twice on purpose: the flat value first for a browser with
+     no color-mix, the mix second where there is one. */
+  --btn:#232b34;        --btn:color-mix(in srgb, var(--panel), #ffffff 5%);
+  --btn-hi:#2b3540;     --btn-hi:color-mix(in srgb, var(--panel), #ffffff 9%);
+  /* What a lit control is filled with: the scheme's second color (the
+     operator, 16 Oct: a selected tab, a primary button, a button that is on
+     carry the second color, filled; the accent keeps the rail, the dots and
+     the notebook's group row). Every lit surface below is mixed from it, so
+     the names keep "accent" for where they came from. */
+  --lit:var(--note);
+  --accent-mid:#1f6feb; --accent-mid:color-mix(in srgb, var(--lit), #000000 14%);
+  --accent-deep:#1a4f8f;--accent-deep:color-mix(in srgb, var(--lit), #000000 40%);
+  /* What is written on a filled accent: the ink in a dark scheme, where the
+     ink is light; white in a light one, where the ink is dark and the fill
+     is still the darkened accent (R216). */
+  --on-fill:var(--ink);
+  /* The shade at a scrolling edge (more below, more above): a deep one on a
+     dark page, a faint one on a light page, where the same shade read as a
+     smear of soot (the light half, 13 Oct), and a shade lighter on both
+     (the operator, 16 Oct: it read too dark), then shorter and a touch
+     darker again the same day. */
+  /* ...and capped below, in the block under this one. Every filled accent
+     surface on the page draws --ink on --accent-deep: the active tab, a
+     primary button, a view bar's current tab, an open select's chosen row,
+     the text selection, and forty percent of black is not enough darkening
+     when the scheme's accent is a bright one. MEASURED across the twelve:
+     nostromo's label sat at 3.56:1, moss at 4.17, sepia 4.23, ice 4.25,
+     all of them under AA, and the tab's icons at --dim were 2.5 to 3.1
+     against the same fill. */
+  /* The sunk surface: a field, a memory row, a send box; anything that reads
+     as set INTO the panel rather than sitting on it. Hardcoded as #161b22 in
+     eight places, which is why every text field, the memory folds and the
+     pane's own title bar stayed the default scheme's blue-gray while the rest
+     of the page changed color. Twelve percent of black against the panel is
+     what that hex was, to the byte. */
+  --sunk:#161b22;       --sunk:color-mix(in srgb, var(--panel), #000000 12%);
+  /* The flyout: what the terminal's bottom bar opens (Keys, Commands,
+     Sessions, Chat). It was --panel, the color of the bar under it, the
+     cards beside it and the tab strip above, so on a phone, where it sits in
+     the flow between the terminal and the bar, nothing said where it ended
+     (19 Sep). Tinted a tenth towards the scheme's accent, the color of the
+     button that opened it: measured across the twelve schemes, --dim on it
+     stays at 5.0:1 or better and --ink at 9.6. */
+  /* Tinted with the second color, as the lit controls on it are (the
+     operator, 17 Oct: tinted with the accent it clashed in a theme whose
+     two colors differ). */
+  --flyout:#243633;     --flyout:color-mix(in srgb, var(--panel), var(--lit, var(--accent)) 8%);
+  /* What floats over the page and is easy to miss on it (the operator, 18
+     Nov: a tour's card read as part of the page): the tour, the header's
+     pop-outs (the bell's, the doctor's, the gear's), a row's menu, a help
+     pop, the phone's More sheet and a toast. The panel a step brighter,
+     with a breath of the second color so each scheme keeps its own, and a
+     firmer edge; the buttons and the banded heads on it moved with it, so
+     a button still stands off the surface it sits on. */
+  --float:#222c3e;      --float:color-mix(in srgb, color-mix(in srgb, var(--panel), #ffffff 8%), var(--lit, var(--accent)) 4%);
+  --float-edge:#5d6f8f; --float-edge:color-mix(in srgb, var(--line), var(--ink) 25%);
+  --float-btn:#2d3749;  --float-btn:color-mix(in srgb, var(--float), #ffffff 6%);
+  --float-btn-hi:#364052; --float-btn-hi:color-mix(in srgb, var(--float), #ffffff 11%);
+  --float-sunk:#1c2535; --float-sunk:color-mix(in srgb, var(--float), #000000 12%);
+  /* The tail matters on Android: none of the named desktop faces exist
+     there, and bare `monospace` lets Chrome and Firefox each pick their own
+     default: the same page in two fonts. Roboto/Noto/Droid Mono are what
+     Android devices actually carry. */
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Roboto Mono",
+         "Noto Sans Mono","Droid Sans Mono",monospace;
+  /* Prose read at length, the wiki's articles and nothing else (the
+     operator, 2 Oct: read like an encyclopedia). The same Android care as
+     the mono: Noto Serif is what those devices carry. */
+  --serif:"Linux Libertine","Georgia","Times New Roman","Noto Serif","Droid Serif",serif;
+  /* The display face (R218 step 7): a big number's, a tile's figure. The
+     platform's display cut where it has one (Windows 11's Segoe UI Variable
+     Display, a Mac's SF Pro Display), Inter where somebody installed it, the
+     system sans otherwise; set with tabular figures and a touch of negative
+     tracking wherever it is used, so figures line up and read as one. */
+  --display:"Segoe UI Variable Display","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+  /* 32px, the height the group header's New VM and Enroll were alone in
+     (the operator, 13 Nov: a more reasonable size for a button everywhere;
+     it was 38px). Every control takes it: a button, a field and a pulldown
+     on one row stay one height. */
+  --tap:32px;
+  /* One height for every control a person types into or presses beside
+     another, the finger's: a field, a pulldown, a one-line prose box and a
+     button on the same row were 35, 35, 38 and 30px (the operator, 29 Sep),
+     and the rows that already matched did so at --tap. */
+  --ctl:var(--tap);
+  --doc-w:1080px;
+  /* The room between a page's cards at a desk, each card's top margin. */
+  --card-gap:12px;
+  /* What a band that spans the pane (a pane's bar, the notebook's view
+     strip) sets in by so its contents start where the centered column's do:
+     half of what the pane has past the column, nothing on a narrower one.
+     Read where it is used, so 100% is that band's own box. */
+  --doc-in:max(0px, calc((100% - var(--doc-w)) / 2));
+  /* A card's head: the ink a step into the panel, its own shade in every
+     scheme (the operator, 18 Oct: a head the card's color did not pop). */
+  --head-bg:color-mix(in srgb, var(--ink) 6%, var(--panel));
+  /* Every page's bar is the height of a project's header (the operator,
+     17 Oct: it reads better with that much room): its 32px controls and
+     6px above and below them. */
+  --pbar-h:45px;
+  /* The row a page's tabs sit in: one height on every page, a group's under
+     its header and a page standing alone (Home, Spaces), with an action in
+     it or not. The size a group's row has with a button in it. */
+  --tabrow-h:40px;
+  /* A group's head over that row (Machines, Build, Containers): its node's
+     picker and state pill, a little taller than the tabs under it. */
+  --ghead-h:44px;
+  /* The three corners on the page: a surface (card, panel, dialog), a
+     control (tab, button, field) and a small thing (a pill's box, a bar's
+     cap). Named so a scheme can square them all at once: nostromo does,
+     because a machined edge is part of that look and a rounded corner on it
+     read as a soft highlight bending round a hard tab. Circles and full
+     pills are not these and stay round everywhere. */
+  --r-surface:6px; --r-control:6px; --r-small:4px;
+  /* A hairline (R218 step 7): one device pixel where the screen has two or
+     more to the CSS pixel, so a border is a line and not a stroke; 1px
+     elsewhere, where half a pixel would round away. Every border drawn in
+     --line is this width. */
+  --hair:1px;
+  /* The widest a control, or a row of them, may be on a document surface:
+     a field that runs the whole width of a tab reads as a
+     form pretending to be a page (docs/design-language.md, Controls). */
+  --ctl-w:30rem;
+  /* The inset of a band on a document surface: a notebook row, a modal's
+     field, a document tab's row, a findings rule. One value, because a band
+     retyped by hand is how one tab ends up with four different left edges. */
+  --row-y:12px; --row-x:16px;
+  /* The gap between the stacked things inside one band: a label-and-field
+     pair, a hint, a row of them. One value, so a dialog cannot invent its
+     own rhythm (the sandbox VM dialog had 0, 0, 10, 10, 0 down one form). */
+  --field-gap:8px;
+  /* ...and between a label and the control it heads, which is a tighter
+     gap because they are one thing. Two values existed for this, 5px on a
+     dialog's label and 4px inside .setrow.col. */
+  --label-gap:4px;
+  /* The page's three secondary voices, named once. Before this they were
+     retyped at every use: 11px/1.4, /1.45, /1.5 and /1.6 all coexisted for
+     the same "quiet explainer under a control", which is the kind of drift
+     nobody chooses and everybody inherits. */
+  --f-note:11px/1.5 system-ui,sans-serif;      /* the quiet explainer */
+  --f-ui:12px/1.5 system-ui,sans-serif;        /* secondary UI text */
+  /* A ROW'S OWN WORDS: a roadmap item, a bug's title, a changelog entry, a
+     branch name. The one voice above --f-ui, and the line between them is
+     what a row IS against what is about it. Named because it had drifted
+     into two: 13px in some rows and 12.5px in others, for the same job, a
+     half-pixel apart and nobody's decision. */
+  --f-row:13px/1.45 system-ui,sans-serif;      /* what a row says */
+  /* WHAT YOU TYPE INTO: every text field and picker, named once. Mono, and
+     a step below --f-ui, because mono at the size of the text beside it
+     reads a size larger (the operator, 25 Sep and again 28 Sep). The 16px
+     iOS needs on a typed field is its own rule, further down. */
+  --f-field:11px/1.5 var(--mono);
+  --f-tag:600 10px/1 system-ui,sans-serif;     /* pills and badges */
+  /* A SECTION'S HEADING: the one voice above a row's, since it names what
+     the rows under it are about. It was --f-ui at 600, a step below the
+     rows it headed, and read as small (the operator, 7 Oct). */
+  --f-sect:600 14px/1.4 system-ui,sans-serif;
+  /* A ROW'S FACTS: the mono line under a name (ports, a path, a revision),
+     named so it moves with the scale below rather than staying 12px while
+     everything around it grew. */
+  --f-data:12px/1.4 var(--mono);
+  /* code and logs read as prose in mono: a diff, a commit message, a log */
+  --f-code:12px/1.5 var(--mono);
+  --f-pill:11px/1 var(--mono);
+  /* A tile's number (R216): the one voice above --f-sect, for a figure a
+     tab is about, read from across the room. */
+  --f-stat:650 24px/1.05 var(--display);
+  /* The badge palette: who/what colors used by tags across the notebook.
+     Hex was retyped at every site, and the day one shade drifts is the day
+     "reference" and "na" stop looking like the same family. */
+  --purple:#b79ae0; --purple-edge:#38294a;
+  --green2:#7fc08a; --green2-edge:#1f3f28;
+  --blue2:#77b7e8;  --blue2-edge:#1e3a4a;
+  --gold:#d8b25c;   --gold-edge:#4a3c1e;
+  --red2:#e0796f;   --red2-edge:#94423d;
+}
+@media(min-resolution:2dppx){ :root{--hair:.5px}
+}
+/* ONE STEP UP AT A DESK (the operator, 13 Oct: "a lot of text looks too
+   small on desktop in a lot of places"). The phone keeps the sizes above,
+   which were set against a thumb's width; a desk reads from further away
+   and had the same 11px explainers and 12px mono facts. Every voice moves
+   together, by one pixel, so the ladder between them (note under ui under
+   row under sect) is the same ladder at both sizes. The breakpoint is the
+   layout's own (the rail becomes the bottom bar under 901px). */
+@media(min-width:901px){
+  :root{
+    --f-note:12px/1.5 system-ui,sans-serif;
+    --f-ui:13px/1.5 system-ui,sans-serif;
+    --f-row:14px/1.45 system-ui,sans-serif;
+    --f-field:12px/1.5 var(--mono);
+    --f-sect:600 15px/1.4 system-ui,sans-serif;
+    --f-data:13px/1.4 var(--mono);
+    --f-code:13px/1.5 var(--mono);
+    --f-pill:12px/1 var(--mono);
+    --f-stat:650 30px/1.05 var(--display);
+  }
+}
+/* The cap. A lightness ceiling rather than more black, because "more black"
+   is the wrong knob: it darkens the schemes that were already fine into mud
+   while still not being enough for the brightest. min() leaves an accent that
+   is already deep alone: carbon, nocturne, plum, rust and the default are
+   untouched, and only pulls down the five that were failing. 0.48 is where
+   the worst scheme clears 4.96:1; 0.50 leaves nostromo at 4.54, which is AA
+   by four hundredths and not worth standing on.
+
+   In @supports, and that is not decoration: a custom property holds whatever
+   tokens it is given, so an unsupported function here would not fall back to
+   the declaration above it; it would resolve to nothing at use time and take
+   every accent surface on the page with it. */
+@supports (color: oklch(from red calc(min(l, 0.5)) c h)){
+  :root{
+    --accent-deep:oklch(from color-mix(in srgb, var(--lit), #000000 40%)
+                        calc(min(l, 0.48)) c h);
+  }
+}
+/* ---- color schemes ----------------------------------------------------
+   Twelve, each with a dark half and a light one (the light halves follow,
+   under their own switch). A scheme is nine custom properties and nothing else: every rule in
+   the sheet already draws from them, which is what makes a recolor cheap and
+   a new one three lines.
+
+   Each palette is written once and claimed by two selectors: the page under
+   that theme, and that theme's own swatch in the menu. So a swatch is not a
+   picture of the scheme, it IS the scheme, rendered small; there is no second
+   copy of the colors to drift. Default's live on :root beside the tokens no
+   scheme touches (the fonts, the tap target, the badge family), because those
+   are the same in every scheme and a scheme that had to restate them would
+   invite them apart. */
+html[data-theme="nostromo"],.sw[data-theme="nostromo"]{
+  --bg:#0b0f13; --panel:#121920; --line:#33404c; --ink:#d3dbe3;
+  --dim:#8b98a5; --accent:#ffb000; --note:#6fa8dc}
+/* Square corners are the dark half's, the hallways (the operator,
+   16 Oct); the light half, the white corridors, is rounded like every other
+   scheme. */
+html[data-theme="nostromo"]:not([data-mode="light"]),html:not([data-mode="light"]) .sw[data-theme="nostromo"]{
+  --r-surface:0; --r-control:0; --r-small:0}
+html[data-theme="slate"],.sw[data-theme="slate"]{
+  --bg:#181c23; --panel:#1f242d; --line:#4f5a68; --ink:#dfe5ec;
+  --dim:#9fa6ae; --accent:#6ea8fe; --note:#a6d96a}
+html[data-theme="carbon"],.sw[data-theme="carbon"]{
+  --bg:#141417; --panel:#1c1c1f; --line:#53535b; --ink:#e8e8ea;
+  --dim:#9d9da4; --accent:#e64e53; --note:#3cc6b5}
+html[data-theme="nocturne"],.sw[data-theme="nocturne"]{
+  --bg:#181825; --panel:#202031; --line:#53537b; --ink:#e4e2f5;
+  --dim:#a2a0c1; --accent:#9d7cff; --note:#5fdcb4}
+html[data-theme="moss"],.sw[data-theme="moss"]{
+  --bg:#161f1b; --panel:#1d2920; --line:#48604f; --ink:#dfe9df;
+  --dim:#9daba0; --accent:#63c98a; --note:#b49cf0}
+html[data-theme="ember"],.sw[data-theme="ember"]{
+  --bg:#1f1814; --panel:#271f1a; --line:#67533e; --ink:#f0e4d8;
+  --dim:#af9f90; --accent:#f0873f; --note:#4cc9d0}
+html[data-theme="abyss"],.sw[data-theme="abyss"]{
+  --bg:#111d20; --panel:#18262a; --line:#3e5e66; --ink:#dcecee;
+  --dim:#93a9ac; --accent:#2fb8c6; --note:#e391d9}
+html[data-theme="plum"],.sw[data-theme="plum"]{
+  --bg:#1e1623; --panel:#261d2d; --line:#654d73; --ink:#eddff2;
+  --dim:#ae9cb7; --accent:#c874d8; --note:#7dd8a0}
+html[data-theme="rust"],.sw[data-theme="rust"]{
+  --bg:#1e1614; --panel:#261d1a; --line:#6a4e4a; --ink:#ecdedb;
+  --dim:#ae9d99; --accent:#cf6a4c; --note:#6cc2a8}
+html[data-theme="ice"],.sw[data-theme="ice"]{
+  --bg:#151c21; --panel:#1c252c; --line:#465b6c; --ink:#e3edf5;
+  --dim:#9aa8ae; --accent:#58c7e8; --note:#b8a2ff}
+html[data-theme="sepia"],.sw[data-theme="sepia"]{
+  --bg:#1f1b14; --panel:#272219; --line:#63563e; --ink:#ece0cb;
+  --dim:#b0a28c; --accent:#d3a94f; --note:#5fbdb0}
+/* ---- the light half (R216) -----------------------------------------------
+   Every scheme has a light half: the same hue family token for token, with
+   the page near white, the ink dark, and the accent and the marks pulled
+   down to read on it (each at AA against --bg or better; the generator and
+   its ratios are in the commit that added them). html[data-mode="light"] is
+   the switch, set by the gear beside the scheme and before first paint from
+   localStorage, so a swatch in the gear shows the half that is on. What the
+   dark half derives by lightening (a button's ground, the sunk field) the
+   light half derives by darkening, and a filled accent carries white rather
+   than the ink. The purple family and its edges, the shades a few badges
+   wear, flip with it. */
+html[data-mode="light"]{
+  color-scheme:light;
+  --pass:#1a7f37;
+  --ground:#fbfbf8; --ground-ink:#1d2633;
+  --warn-wash:#fdf1bf; --warn-wash-ink:#1d2633; --warn-edge:#d8b62a;
+  /* A lit control in the light half is a soft tint of the second color with
+     its edge in the color itself and the ink on it (the operator, 16 Oct:
+     the second color filled, darkened for white text, was too dark). The
+     ink clears AA on the tint in every scheme; the color as text on it would
+     not. */
+  --on-fill:var(--ink);
+  --accent-mid:var(--lit);
+  --accent-deep:color-mix(in srgb, var(--panel), var(--lit) 16%);
+  --btn:#f0f2f5;        --btn:color-mix(in srgb, var(--panel), #000000 4%);
+  --btn-hi:#e6e9ee;     --btn-hi:color-mix(in srgb, var(--panel), #000000 8%);
+  --sunk:#f3f5f8;       --sunk:color-mix(in srgb, var(--panel), #000000 5%);
+  /* ...and in the light half the brightest there is, white, the firmer
+     edge doing what the step brighter does in the dark. */
+  --float:#ffffff;
+  --float-edge:#9eaabb; --float-edge:color-mix(in srgb, var(--line), var(--ink) 22%);
+  --float-btn:#f5f5f5;  --float-btn:color-mix(in srgb, var(--float), #000000 4%);
+  --float-btn-hi:#ebebeb; --float-btn-hi:color-mix(in srgb, var(--float), #000000 8%);
+  --float-sunk:#f2f2f2; --float-sunk:color-mix(in srgb, var(--float), #000000 5%);
+  --purple:#6b45a8; --purple-edge:#dcd0f0;
+  --green2:#2f7a3e; --green2-edge:#cfe8d4;
+  --blue2:#2b6fa8;  --blue2-edge:#d3e4f3;
+  --gold:#8a6a1c;   --gold-edge:#efe3bf;
+  --red2:#b03a30;   --red2-edge:#f3cdc9;
+}
+html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
+  --bg:#eef3fb; --panel:#fbfdff; --line:#c4d2e6; --ink:#1d2633;
+  --dim:#566275; --accent:#0059c7; --warn:#7d6608; --bad:#c62828; --note:#0a5fb0}
+/* The default scheme alone fills what is pressed in its third hue, copper, so
+   words and links stay blue and information never reads as a warning. */
+html:not([data-theme]),.sw[data-theme="default"]{--lit:#ff8f4a}
+html[data-mode="light"]:not([data-theme]),html[data-mode="light"] .sw[data-theme="default"]{--lit:#b8470f}
+/* Nostromo's light half is the ship's white corridors: cool gray-white
+   walls and panels and the hazard marking's red-orange for what is the one
+   (the operator, 16 Oct); its graphics are with the dark half's, below. */
+html[data-mode="light"][data-theme="nostromo"],html[data-mode="light"] .sw[data-theme="nostromo"]{
+  --bg:#e4e5e2; --panel:#f6f6f3; --line:#bfc1bc; --ink:#232628;
+  --dim:#595d60; --accent:#b23a0a; --note:#3d7322}
+html[data-mode="light"][data-theme="slate"],html[data-mode="light"] .sw[data-theme="slate"]{
+  --bg:#f1f3f7; --panel:#fcfdff; --line:#cbd2da; --ink:#24272a;
+  --dim:#606468; --accent:#2a61b1; --note:#4e761e}
+html[data-mode="light"][data-theme="carbon"],html[data-mode="light"] .sw[data-theme="carbon"]{
+  --bg:#f3f3f5; --panel:#fdfdfe; --line:#d0d0d5; --ink:#262627;
+  --dim:#636367; --accent:#b6192c; --note:#22776c}
+html[data-mode="light"][data-theme="nocturne"],html[data-mode="light"] .sw[data-theme="nocturne"]{
+  --bg:#f2f3f9; --panel:#fdfdff; --line:#cecfe6; --ink:#26252e;
+  --dim:#626173; --accent:#6a44c2; --note:#1b795b}
+html[data-mode="light"][data-theme="moss"],html[data-mode="light"] .sw[data-theme="moss"]{
+  --bg:#f0f5f3; --panel:#fbfefc; --line:#c8d5cb; --ink:#232823;
+  --dim:#5e6660; --accent:#00783f; --note:#794ee4}
+html[data-mode="light"][data-theme="ember"],html[data-mode="light"] .sw[data-theme="ember"]{
+  --bg:#f6f3f1; --panel:#fffdfb; --line:#dbcfc3; --ink:#2b2520;
+  --dim:#6a6159; --accent:#a34100; --note:#21787d}
+html[data-mode="light"][data-theme="abyss"],html[data-mode="light"] .sw[data-theme="abyss"]{
+  --bg:#eff5f6; --panel:#fbfeff; --line:#c3d5d9; --ink:#212829;
+  --dim:#5a6667; --accent:#007480; --note:#bb30aa}
+html[data-mode="light"][data-theme="plum"],html[data-mode="light"] .sw[data-theme="plum"]{
+  --bg:#f6f2f8; --panel:#fffcff; --line:#d9cbe1; --ink:#2a242c;
+  --dim:#695f6e; --accent:#8c3a9b; --note:#247b45}
+html[data-mode="light"][data-theme="rust"],html[data-mode="light"] .sw[data-theme="rust"]{
+  --bg:#f7f2f1; --panel:#fffdfc; --line:#ddcdca; --ink:#2b2523;
+  --dim:#6a615f; --accent:#a14123; --note:#247b60}
+html[data-mode="light"][data-theme="ice"],html[data-mode="light"] .sw[data-theme="ice"]{
+  --bg:#f0f4f6; --panel:#fbfeff; --line:#c7d3dd; --ink:#23272b;
+  --dim:#5d6568; --accent:#00708f; --note:#7347ff}
+html[data-mode="light"][data-theme="sepia"],html[data-mode="light"] .sw[data-theme="sepia"]{
+  --bg:#f5f3f0; --panel:#fffdfb; --line:#d7d0c3; --ink:#2b261c;
+  --dim:#6a6256; --accent:#835c00; --note:#22776b}
+
+/* ---- Nostromo -----------------------------------------------------------
+   The one scheme that is more than a recolor: the ship itself, a half for
+   each of its interiors (the operator, 16 Oct). Its dark half is the
+   hallways: cold blue-black steel, grated deck, silver pipe under amber
+   lamps, a chamfered bulkhead, copper seams, square corners. Its light half,
+   below, is the white corridors. The graphics are hand-written SVG under
+   static/nostromo, text in the tree like the favicon's source, served by the
+   same allow-list, each one's opacity baked into its file. No raster: a PNG
+   would be a binary in the repository for something a few paths say.
+
+   Only the deck goes under text, through the smoked glass of the panes;
+   a card's own face stays clean: that is where a stack trace is read. */
+
+/* Smoked glass: the pane bars and the ground under a document let the deck
+   show, at three tenths (the operator, 24 Sep). The stack's ground, so the
+   document fading in does not take its glass with it; a terminal keeps its
+   own solid ground: output read through a pattern is output misread. */
+html[data-theme="nostromo"]:not([data-mode="light"]){--glass:color-mix(in srgb, var(--panel) 70%, transparent)}
+
+/* The hallway behind the page: two amber lamps up in the ceiling, a cold
+   blue haze down the corridor's far end, the dark closing in at the edges,
+   a bulkhead's frame at the foot and the deck grating under it all.
+   ABSOLUTE, not fixed: body never scrolls, so the two are the same
+   rectangle, and `fixed` promoted a full-viewport layer Chrome
+   re-composited against every scrolling surface (bug #57). */
+html[data-theme="nostromo"]:not([data-mode="light"]) body::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(38% 30% at 18% 0%, rgba(255,176,0,.09) 0%, rgba(255,176,0,0) 70%),
+    radial-gradient(38% 30% at 82% 0%, rgba(255,176,0,.07) 0%, rgba(255,176,0,0) 70%),
+    radial-gradient(50% 40% at 50% 55%, rgba(80,130,190,.06) 0%, rgba(80,130,190,0) 70%),
+    radial-gradient(140% 120% at 50% 110%, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 60%),
+    url(/static/nostromo/bulkhead.svg) right -60px bottom -60px / 340px no-repeat,
+    url(/static/nostromo/grate.svg) repeat}
+
+/* ---- Nostromo's light half: the ship's white corridors (the operator,
+   16 Oct) ------------------------------------------------------------------
+   Rounded like every scheme, and a ship of its own: large chamfered wall
+   panels behind the page, one wall panel's octagon relief set into its foot,
+   the ceiling's grilles and light panels across the header's middle, the
+   buttons with a lit top edge, and the door's red and white stripe on its
+   swatch. The bars and the ground under a document are smoked as the dark
+   half's are, a little more opaque, since dark ink reads through less. */
+html[data-mode="light"][data-theme="nostromo"]{--glass:color-mix(in srgb, var(--panel) 80%, transparent)}
+html[data-mode="light"][data-theme="nostromo"] body::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(120% 70% at 50% 0%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 55%),
+    radial-gradient(140% 120% at 50% 120%, rgba(0,0,0,.07) 0%, rgba(0,0,0,0) 60%),
+    url(/static/nostromo/relief.svg) right -40px bottom -40px / 300px no-repeat,
+    url(/static/nostromo/panels.svg) repeat}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);display:flex;
+  flex-direction:column;overflow:hidden;
+  font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left)}
+/* A link in words is the scheme's second color, --note, so each scheme
+   shows two hues and a pointer elsewhere never reads as a control, which
+   is the accent's (the operator, 16 Oct: every scheme but the default was
+   shades of one color). Without this a link was the browser's own blue. */
+a{color:var(--note)}
+/* The selection, in the scheme's own colors. It was the one color on the
+   page the schemes could not reach: left unstyled, Chrome draws it in the
+   DEVICE's accent, so on an Android with an amber Material You palette a
+   selection is bright yellow: a color that exists nowhere in any of the
+   twelve schemes. It matters beyond taste: a highlight left behind in a
+   stale tile while a phone scrolls (bug #57) is then a bright yellow block
+   nobody can place, where in the scheme's own accent it reads as what it
+   is. Both halves declared, because a background with no color beside it
+   inherits the text color it happens to land on. */
+::selection{background:var(--accent-deep);color:var(--on-fill)}
+@keyframes bellwait{
+  0%,100%{background:var(--warn)}
+  50%{background:color-mix(in srgb, var(--warn) 22%, var(--ground))}
+}
+@keyframes bellbad{
+  0%,100%{background:transparent;--sheen:none}
+  50%{background:var(--bad);color:var(--bg)}
+}
+@keyframes splitIn{from{opacity:0;transform:translateX(32px)} to{opacity:1;transform:none}}
+@keyframes splitBack{from{opacity:0;transform:translateX(-32px)} to{opacity:1;transform:none}}
+/* A swatch's second color is its own scheme's note color, resolved on the
+   tile: the page's --lit is computed once at the root and would be inherited
+   by every tile. The default scheme's tile keeps its copper (its own rule
+   above). */
+.sw{--lit:var(--note)}
+
+/* The page's own secondary voice, not the browser's: `font:12px/1 inherit`
+   is not valid shorthand (inherit cannot ride inside it), so the whole
+   declaration was dropped and every button wore 13.3px Arial (B711). */
+/* A press has a little depth (the operator, 13 Nov: a subtle gradient, to
+   look nicer): lighter at its top edge, darker at its foot, laid over
+   whatever color the button wears, so the accent, the danger tone and a
+   space's own color keep theirs. --sheen is the button's own and never its
+   parent's (inherits: false); a rule that gives a press no ground of its
+   own (a link, a picture alone, a tab of a strip) says --sheen:none beside
+   its background:none. Important, because a color is set with the
+   background shorthand all over this sheet, which would take the image
+   off. */
+@property --sheen{syntax:"*";inherits:false;initial-value:linear-gradient(180deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,0) 48%, rgba(0,0,0,.14) 100%)}
+button{background:var(--btn);color:var(--ink);border:var(--hair) solid var(--line);
+  border-radius:var(--r-control);padding:4px 12px;font:var(--f-ui);cursor:pointer;
+  white-space:nowrap;min-height:var(--tap);touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent}
+/* A control that is dead but still answers a press with why (the roadmap's
+   arrows, B213): the same fade, and the pointer stays, because pressing it
+   does something. */
+button[aria-disabled="true"]{opacity:.5}
+/* Every box and radio the page has, not just the one tab that remembered to
+   ask. The toolchains list set accent-color and nothing else did, so a checkbox
+   in a dialog stayed the browser's own blue under every scheme.
+
+   accent-color only paints a box that is TICKED. An empty one is drawn by the
+   browser, which without being told otherwise draws it for a light page: a
+   white square on a dark panel, which is what the unticked toolchains looked
+   like. color-scheme says which set of native controls to use; it belongs on
+   the root and it is every scheme's answer, since all twelve are dark. It also
+   darkens the scrollbars, which were the same tell.
+
+   Deliberately NOT on the terminal iframes: color-scheme:dark on one of those
+   turns its canvas white, which is documented where .pane iframe is styled. */
+input[type="checkbox"],input[type="radio"]{accent-color:var(--accent-mid)}
+/* An open <select> is the other half of that story, and until recently it had
+   no answer at all. The list is drawn by the BROWSER rather than by the page:
+   a system dialog on Android, a wheel on iOS, a menu of the platform's own on
+   each desktop, and no selector reaches inside any of them. color-scheme was
+   the whole of what could be said about one, and it buys the dark half of the
+   browser's palette rather than this page's, so on a phone the node picker
+   opened in Android's purple against whichever of the twelve schemes was on.
+
+   appearance:base-select takes the list off the browser and draws it in the
+   page, where the tokens reach it. The element is still a <select>: its
+   keyboard handling, its typeahead, its screen-reader semantics and the option
+   list itself stay the browser's, and only the paint is ours. That is the
+   reason for this rather than a menu built out of buttons, which would have to
+   re-implement all four and get them right on a phone as well.
+
+   The box IS the page's menu, to the value: .pinmenu's ground, edge, radius,
+   padding, shadow and menuIn. A picker that opened looking like nothing else
+   here would only have moved the problem.
+
+   All of it sits inside @supports, so a browser without base-select renders
+   exactly what it rendered before, which is the dark native picker: a fallback
+   rather than a break. The UA already lays the button out, label at the start
+   and arrow at the end, so nothing below says so a second time.
+
+   One behavior does change: a base select is as wide as the option CHOSEN
+   rather than as wide as the longest one, so an auto-width picker shifts a
+   little when the pick is longer. Every full-width select is unaffected. */
+@supports (appearance: base-select){
+  /* nowrap and the clip are the one thing a base select does worse than a
+     native one: a native select TRUNCATES its label, a base one wraps to two
+     lines, and the Phone tab's node picker did exactly that at phone width
+     (the bar's max-width:88% squeezes it, and the base button needs a few
+     more pixels than the native one for the same text). Sticky rather than
+     absolute for the arrow so it is pinned inside the clip instead of being
+     clipped with the text, and it carries the field's own ground so what
+     slides under it disappears rather than showing through. */
+  /* ...and the arrow owns the end padding. With the padding on the select,
+     text that slid under the pinned arrow showed again in the strip of
+     padding beyond it ("sessions until one is pic ▼ c" on a phone). The
+     !important is the point: every site gives its selects a padding, and on
+     a base select the end of it belongs to the arrow, whoever set it. */
+  select{appearance:base-select;white-space:nowrap;overflow:hidden;
+    padding-inline-end:0 !important}
+  select:disabled{opacity:.5;cursor:default}
+  select::picker-icon{position:sticky;inset-inline-end:0;background:inherit;
+    padding-inline:6px 9px;color:var(--dim);transition:transform .14s}
+  select:open::picker-icon{transform:rotate(180deg)}
+  select::picker(select){appearance:base-select;background:var(--panel);
+    border:var(--hair) solid var(--line);border-radius:var(--r-surface);padding:5px;margin-top:4px;
+    box-shadow:0 6px 18px rgba(0,0,0,.5);
+    /* The cap is what stops a forty-level API list running off the screen;
+       the rest of it scrolls. */
+    max-height:min(60vh,320px);overflow-y:auto;
+    animation:menuIn .22s cubic-bezier(.33,1,.68,1)}
+  /* border-box, or --tap is the height of the TEXT and every row comes out at
+     50px: an option's box is content-box by default. */
+  select option{display:flex;align-items:center;gap:8px;box-sizing:border-box;
+    min-height:var(--tap);padding:6px 9px;border-radius:var(--r-control);
+    background:none;--sheen:none;color:var(--ink)}
+  select option:hover,select option:focus{background:var(--sunk)}
+  select option:checked{background:var(--accent-deep);color:var(--on-fill)}
+  select option:disabled{color:var(--dim);background:none;--sheen:none}
+  select option::checkmark{flex:0 0 auto;color:var(--accent)}
+}
+/* ...and where base-select is not there (Firefox, Safari: the operator, 18
+   Oct, asked that they match Chrome), the CLOSED picker is still drawn the
+   page's way: the native one put a chevron of the platform's own in a box
+   20px wider than Chrome's. Its ▼ is two half squares in --dim, as
+   gradients, since a data URI cannot read a token and a select has no
+   ::after; the end padding is the arrow's, as it is above. The open list
+   stays the browser's, which nothing here can reach. */
+@supports not (appearance: base-select){
+  /* :not([multiple]) for weight: the field skin below is as heavy as a
+     bare select and comes later, and its background shorthand cleared the
+     arrow. */
+  select:not([multiple]){appearance:none;-webkit-appearance:none;padding-inline-end:28px !important;
+    background-image:linear-gradient(45deg, transparent 50%, var(--dim) 50%),
+      linear-gradient(135deg, var(--dim) 50%, transparent 50%);
+    background-position:calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+    background-size:5px 5px;background-repeat:no-repeat;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  select:disabled{opacity:.5;cursor:default}
+}
+/* A number field's spin arrows: Chrome shows them on hover alone, Firefox
+   drew them always, crowding the five characters the field is wide for. */
+input[type="number"]{-moz-appearance:textfield}
+/* The page behind a dialog holds still. Scrolling it while a detour is open
+   loses your place for no reason you asked for, and on a touch screen it is
+   what a flick past the end of the dialog does. */
+html:has(.modal:not([hidden]):not(.inline)){overflow:hidden}
+/* Every modal arrives rather than appearing: the room dims, and the box rises
+   into it. As an animation and not a transition, because these are toggled by
+   `hidden`; there is no frame in which a transition could start. One rule
+   covers all of them, so a modal cannot be added without it. */
+@keyframes modalIn{from{opacity:0} to{opacity:1}}
+@keyframes modalBoxIn{from{opacity:0;transform:translateY(10px) scale(.985)}
+  to{opacity:1;transform:none}}
+/* The field skin, once, for EVERY control. This was an allowlist of container
+   classes, which meant each new surface had to remember to join it, and the
+   Analysis tab did not, so the same filter bar rendered house-styled inside a
+   notebook and browser-default in the tab. Styling the elements themselves
+   inverts the failure: a new tab is covered by existing, and only a control
+   that WANTS to look native has to say so. :where() keeps the specificity at
+   zero, so any single-class rule still overrides this. A site declares only
+   what is its own: font, padding, size. */
+input:where(:not([type="checkbox"],[type="radio"],[type="range"],[type="file"])),
+textarea,select{
+  background:var(--sunk);color:var(--ink);border:var(--hair) solid var(--line);
+  border-radius:var(--r-control)}
+/* A select whose longest option is wider than it reports that width as its
+   own, and every box around it grew by it: the project settings scrolled
+   sideways on a phone once every section stood open (8 Oct). Paint
+   containment keeps it in its box; its focus ring is drawn wholly inside,
+   where containment cannot clip it. */
+select{contain:paint}
+select:focus{outline-offset:-2px}
+@keyframes pullspin{to{transform:rotate(360deg)}}
+@keyframes pjNew{0%,30%{box-shadow:inset 3px 0 var(--pc, transparent),0 0 0 2px var(--accent),0 0 18px 2px color-mix(in srgb, var(--accent) 45%, transparent)}
+  100%{box-shadow:inset 3px 0 var(--pc, transparent),0 0 0 2px transparent,0 0 18px 2px transparent}}
+/* A row's own inset is tighter on a phone, every row on every tab. */
+@media(max-width:900px){ :root{--row-y:8px}
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+pre{margin:0;padding:9px 11px;font:var(--f-code);white-space:pre-wrap;
+  word-break:break-word;max-height:300px;overflow:auto;color:color-mix(in srgb, var(--ink) 80%, var(--dim))}
+/* Loading and empty are not the same thing and had been wearing the same
+   clothes: .empty, italic and still, for both "there is nothing here" and
+   "this has not arrived yet". A placeholder that is waiting says so by
+   breathing. Not a bar and not a percentage: nothing here knows one, and
+   inventing one would be a lie about progress. */
+@keyframes waiting{0%,100%{opacity:.35} 50%{opacity:.75}}
+@keyframes shimmer{from{background-position:100% 0} to{background-position:0 0}}
+/* Content, once it is there. Short and only on the first real paint; see
+   paint(): a fade on every poll that changed a word would be a flicker, not
+   a transition. */
+@keyframes contentIn{from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none}}
+
+/* Built fresh each time it is opened, so the animation runs on the element
+   coming into being: the Resume/New chooser under a Claude button, which
+   used to snap into place. 8px over .22s on the ease-out cubic the bottom
+   bar's sheet uses, a little shorter for a smaller thing, so a menu at a
+   desk moves the way the sheet on a phone does (the operator, 16 Oct: the
+   quicker drop read as a pop). */
+@keyframes menuIn{from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none}}
+/* ...and one that opens upward from what opened it, the bottom bar's More,
+   rises into place rather than dropping, a sheet's travel rather than a
+   menu's twitch: 16px over .32s on an ease-out cubic, fading the whole way
+   (the operator, 16 Oct). */
+@keyframes menuUp{from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none}}
+/* ...and a context menu that opens above what was pressed rises the same
+   8px over the same time a menu below it drops (menuIn): the motion goes the
+   way the menu opened (the operator, 18 Oct). */
+@keyframes menuRise{from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none}}
+/* Up, it slides out of its line rather than appearing (the operator,
+   16 Oct): the pane starts where the line sat, all but the line below the
+   frame, and rises to its height. The ground it uncovers is the page's. */
+@keyframes dockUp{from{transform:translateY(calc(100% - 44px))} to{transform:none}}
+@keyframes dockDown{from{top:var(--dock-top,50%)} to{top:calc(100% - 44px)}}
+html,body{overscroll-behavior-x:none}
+/* A document brought to the front fades in, the way painted content does,
+   over its own ground. The ground is the stack's, painted while a document is
+   the child on show, and never the document's own: the fade is on the
+   document, so a document that painted its ground faded it in with the rest,
+   over the pane's black, and every switch to a notebook opened on a black
+   pane for the first frames (the operator, 27 Sep). The ground is there on
+   the first frame now, in every scheme, and only what is drawn on it
+   arrives. The frames are contentIn's under a name of their own: a document
+   that paint() drew straight into wears .justpainted for good, a class that
+   asks for the name an element already has starts nothing, and Projects,
+   drawn that way, snapped to the front while every other document faded. */
+@keyframes docIn{from{opacity:0} to{opacity:1}}
+/* ...and the page it replaces fades out first, quickly, so the two are
+   never laid over each other at full strength: a fade through, not a double
+   exposure (the operator, 16 Oct: the even crossfade read as muddled). The
+   old page is gone by .09s; the new one starts at .06s and eases in. */
+@keyframes docOut{from{opacity:1} to{opacity:0}}
+}

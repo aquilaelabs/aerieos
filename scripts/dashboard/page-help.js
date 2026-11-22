@@ -11,7 +11,7 @@
 
 "use strict";
 
-let helpIndex = null, helpErr = "", helpCur = "", helpRev = 0;
+let helpIndex = null, helpErr = "", helpCur = "";
 const helpDocs = {};                 // name -> {name, title, text} | {error}
 const helpAsked = new Set();         // reads on their way
 let helpQ = "", helpHits = null, helpMore = 0, helpTimer = 0, helpAnchor = "";
@@ -20,26 +20,28 @@ function openHelp(){
   openTab({kind: "help", arg: "__help", label: "Help"});
 }
 
-async function loadHelp(){
-  if (!helpIndex){
-    try{
-      const j = await (await fetch("/api/help")).json();
-      if (j.error) helpErr = j.error; else { helpIndex = j; helpErr = ""; }
-    }catch(e){ helpErr = "the docs could not be read: " + e; }
-    if (!helpCur && helpIndex) helpCur = helpIndex.home;
-    helpRev++; drawPanes();
-  }
-  if (helpCur) helpRead(helpCur);
+function loadHelp(){
+  return reading("help", async () => {
+    if (!helpIndex){
+      try{
+        const j = await getJSON("/api/help");
+        if (j.error) helpErr = j.error; else { helpIndex = j; helpErr = ""; }
+      }catch(e){ helpErr = "the docs could not be read: " + e; }
+      if (!helpCur && helpIndex) helpCur = helpIndex.home;
+      readMoved("help"); drawPanes();
+    }
+    if (helpCur) helpRead(helpCur);
+  });
 }
 
 async function helpRead(name){
   if (helpDocs[name] || helpAsked.has(name)) return;
   helpAsked.add(name);
   try{
-    helpDocs[name] = await (await fetch("/api/help?doc=" + encodeURIComponent(name))).json();
+    helpDocs[name] = await getJSON("/api/help?doc=" + encodeURIComponent(name));
   }catch(e){ helpDocs[name] = {error: "could not be read: " + e}; }
   helpAsked.delete(name);
-  helpRev++; drawPanes();
+  readMoved("help"); drawPanes();
 }
 
 // Every doc the index lists, README first: what a link may open.
@@ -66,7 +68,7 @@ function helpGo(name, anchor = ""){
   const to = "#/help" + (name && name !== helpIndex?.home ? "/" + encodeURIComponent(name) : "");
   if (location.hash !== to) shellPush(to);
   helpRead(name);
-  helpRev++; drawPanes();
+  readMoved("help"); drawPanes();
   if (!anchor) document.querySelector(".doc.on")?.scrollTo?.({top: 0});
 }
 
@@ -115,13 +117,13 @@ function helpResults(){
 
 async function helpSearch(){
   const q = helpQ.trim();
-  if (q.length < 2){ helpHits = null; helpRev++; drawPanes(); return; }
+  if (q.length < 2){ helpHits = null; readMoved("help"); drawPanes(); return; }
   try{
-    const j = await (await fetch("/api/help?q=" + encodeURIComponent(q))).json();
+    const j = await getJSON("/api/help?q=" + encodeURIComponent(q));
     if (q !== helpQ.trim()) return;               // typed on meanwhile
     helpHits = j.results || []; helpMore = j.more || 0;
   }catch(e){ helpHits = []; }
-  helpRev++; drawPanes();
+  readMoved("help"); drawPanes();
 }
 
 function renderHelpInto(i){
@@ -133,15 +135,15 @@ function renderHelpInto(i){
     d.setBar(`<input id="helpQ" type="search" placeholder="search the docs" aria-label="search the docs" autocomplete="off" spellcheck="false">`);
     const q = d.bar.querySelector("#helpQ");
     q.value = helpQ;
-    q.oninput = () => { helpQ = q.value; clearTimeout(helpTimer); helpTimer = setTimeout(helpSearch, 220); };
-    q.onkeydown = e => { if (e.key === "Escape" && q.value){ q.value = ""; helpQ = ""; helpHits = null; helpRev++; drawPanes(); } };
+    onTyping(q, () => { helpQ = q.value; clearTimeout(helpTimer); helpTimer = setTimeout(helpSearch, 220); });
+    q.onkeydown = e => { if (e.key === "Escape" && q.value){ q.value = ""; helpQ = ""; helpHits = null; readMoved("help"); drawPanes(); } };
   }
   if (!helpIndex){
-    d.list.innerHTML = helpErr ? `<div class="hint bad">${esc(helpErr)}</div>`
-      : skTpl(`<div class="field wkreader"><nav class="wknav">${skRows(8)}</nav><article class="wkarticle">${skel("lines", 12)}</article></div>`);
+    drawHTML(d.list, helpErr ? `<div class="hint bad">${esc(helpErr)}</div>`
+      : skTpl(`<div class="field wkreader"><nav class="wknav">${skRows(8)}</nav><article class="wkarticle">${skel("lines", 12)}</article></div>`));
     return;
   }
-  if (!paint(d.list, `<div class="field wkreader">${helpNav()}${helpHits ? helpResults() : helpArticle()}</div>`)) return;
+  if (!patch(d.list, `<div class="field wkreader">${helpNav()}${helpHits ? helpResults() : helpArticle()}</div>`)) return;
   const root = d.list;
   root.querySelectorAll(".wknav a[data-page]").forEach(a => a.onclick = e => { e.preventDefault(); helpGo(a.dataset.page); });
   const pick = root.querySelector("#helpPick");

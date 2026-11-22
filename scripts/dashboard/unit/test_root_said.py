@@ -34,7 +34,7 @@ class RootTmpRefused(unittest.TestCase):
         verbs = os.path.join(os.path.dirname(__file__), "..", "..", "lib", "root-verbs.py")
         with tempfile.NamedTemporaryFile(dir="/tmp") as f:
             r = subprocess.run([sys.executable, verbs, "run", "cat", f.name], capture_output=True, text=True, timeout=30,
-                               env=os.environ | {"BB_PHONE_AUTH": "x", "BB_PHONE_WHY": "x", "BB_DASHBOARD": "http://127.0.0.1:9"})
+                               env=os.environ | {"BB_AUTH_HEADER": "x", "BB_PHONE_WHY": "x", "BB_DASHBOARD": "http://127.0.0.1:9"})
         self.assertEqual(r.returncode, 1)
         self.assertIn("nobody was asked", r.stderr)
         self.assertNotIn("asked ", r.stderr.replace("nobody was asked", ""))

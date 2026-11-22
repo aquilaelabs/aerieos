@@ -2,7 +2,7 @@
 
 Each check AerieOS makes by itself has a cadence under Controller
 settings, Update checks: the release (a newer AerieOS), the container
-images, nginx, the scanners, and the catalog (the toolchains, the coding
+images, and the catalog (the toolchains, the coding
 agents and the vetted index this controller offers), each daily, weekly
 (the default), monthly or off, with Check now beside it. A node's own
 version check (what its store holds against what is out) is that node's
@@ -14,13 +14,18 @@ What a check last ran at is its own module's to say (last()); the release's
 and the catalog's, which kept theirs in memory, are stamped here in
 STATE/checks.json so a restart is not a reason to ask again.
 """
+import contextlib
 import json
 import threading
 import time
 from pathlib import Path
 
+import statefile
+
 CADENCE = {"daily": 86400, "weekly": 7 * 86400, "monthly": 30 * 86400, "off": None}
-KINDS = ("release", "images", "nginx", "scanners", "catalog")
+# Every check, in the order Controller settings lists them. AerieOS's own
+# services have none: each runs the images its entry names by digest.
+KINDS = ("release", "images", "catalog")
 STATE = Path("/config")
 settings = None
 _last = {}       # kind -> fn returning the epoch it last ran, or 0
@@ -49,8 +54,63 @@ def due(kind, last_at, now=None):
     return e is not None and (time.time() if now is None else now) >= int(last_at or 0) + e
 
 
+def guarded(lock, record, fetch, keep=None, flag=None):
+    """One check of what is newest at a time, and its record stamped.
+
+    record() answers the record, a dict, under `lock`. Its "checking" says a
+    check is in flight, or `flag`'s does, a dict of the caller's own where
+    the record is a file's and does not carry it; a second asker is answered
+    the record as it stands. fetch() runs outside the lock and answers
+    (found, error): the fields it read, {} when it read none so the last
+    answer stays, and why it read none. The record then takes when it was
+    asked (at) and the error, then what was found, and goes to keep() where
+    it is kept in a file. The answer is a copy of the record."""
+    with lock:
+        on = record() if flag is None else flag
+        if on["checking"]:
+            return dict(record())
+        on["checking"] = True
+    found, error = fetch()
+    with lock:
+        rec = record()
+        rec.update(at=int(time.time()), error=error)
+        rec.update(found)
+        if keep:
+            keep(rec)
+        (rec if flag is None else flag)["checking"] = False
+        return dict(rec)
+
+
+def loop(kind, last_at, run, delay, nap, on=None):
+    """A check's own loop, a thread's target: after `delay` seconds, and
+    every `nap` seconds from then, run() when the cadence of `kind` says it
+    is due, counted from last_at(), so a restart is not a reason to ask
+    again. One bad run is not the loop's end. `on`, where a check has a
+    switch of its own, is read on every pass: off, nothing is looked at."""
+    time.sleep(delay)
+    while True:
+        if (on is None or on()) and due(kind, last_at()):
+            with contextlib.suppress(Exception):
+                run()
+        time.sleep(nap)
+
+
 def _file():
     return STATE / "checks.json"
+
+
+def _own_mode():
+    """The mode a file this process makes is given, 0666 less its umask: 0644
+    in the container, and 0600 on a machine of its own, where what the
+    controller writes is its account's alone (host-boot.sh)."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("Umask:"):
+                    return 0o666 & ~int(line.split()[1], 8)
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0o644
 
 
 def stamped(kind):
@@ -67,9 +127,7 @@ def stamp(kind, at=None):
         except (OSError, ValueError):
             d = {}
         d[kind] = int(at or time.time())
-        tmp = _file().with_suffix(".tmp")
-        tmp.write_text(json.dumps(d))
-        tmp.replace(_file())
+        statefile.write_text(_file(), json.dumps(d), mode=_own_mode())
 
 
 def view():

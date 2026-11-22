@@ -11,17 +11,17 @@ let chatDrawn = "";                  // what the open conversation was last pain
 
 const chatKey = w => w?.project ? `p:${w.project}` : w?.who ? `dm:${w.who}` : "";
 
-async function loadChat(){
-  if (!chatWith){ drawChat(); return; }
-  try{
-    const r = await (await fetch("/api/chat", { method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "read", ...chatWith }) })).json();
-    if (r.error){ notify(r.error, true); chatWith = null; }
-    else { chatMsgs = r.messages || []; chatSeenRev = r.rev; }
-  }catch(e){ /* the poll will come back to it */ }
-  drawChat();
-  refreshSoon();                     // the unread counts move with it
+function loadChat(){
+  return reading("chat", async () => {
+    if (!chatWith){ drawChat(); return; }
+    try{
+      const r = await postJSON("/api/chat", { action: "read", ...chatWith });
+      if (r.error){ notify(r.error, true); chatWith = null; }
+      else { chatMsgs = r.messages || []; chatSeenRev = r.rev; }
+    }catch(e){ /* the poll will come back to it */ }
+    drawChat();
+    refreshSoon();                     // the unread counts move with it
+  });
 }
 
 // An open chat follows the chat's revision, which every message moves (R218
@@ -44,7 +44,7 @@ function renderChatInto(i){
   if (!el) return;
   if (!el.classList.contains("flush")) el.classList.add("flush");
   if (!el.querySelector(":scope > .chattab")){
-    el.innerHTML = `<div class="chattab"><div class="chatlist"></div><div class="chatthread" id="chat"></div></div>`;
+    drawHTML(el, `<div class="chattab"><div class="chatlist"></div><div class="chatthread" id="chat"></div></div>`);
     chatDrawn = "";
   }
   drawChat();
@@ -61,7 +61,7 @@ function drawChat(){
 // The people and the project channels, each with its unread count.
 function drawChatList(el){
   const c = state?.chat;
-  if (!c || !c.people) return paint(el, `<div class="hint">sign in to chat</div>`);
+  if (!c || !c.people) return patch(el, `<div class="hint">sign in to chat</div>`);
   const unread = c.unread || {};
   const cur = chatKey(chatWith);
   const here = new Set(c.online || []);
@@ -96,7 +96,7 @@ function drawChatList(el){
      </button>`;
   });
   const mine = ps.filter(p => !notMine(p)).length;
-  if (!paint(el, `<div class="sub chathead">people</div>`
+  if (!patch(el, `<div class="sub chathead">people</div>`
       + (people.length ? people.join("") : `<div class="hint">no other accounts</div>`)
       + (projs.length ? `<div class="sub chathead">projects${
            mine < ps.length ? `, yours first` : ""}</div>` + projs.join("") : ""))) return;
@@ -109,10 +109,10 @@ function drawChatList(el){
 // The open conversation: its head, the log and the composer at the foot.
 function drawChatThread(el){
   const c = state?.chat;
-  if (!c || !c.people){ chatDrawn = ""; return paint(el, ""); }
+  if (!c || !c.people){ chatDrawn = ""; return patch(el, ""); }
   if (!chatWith){
     chatDrawn = "";
-    return paint(el, `<div class="hint chatpick">a person or a space's channel, from the list</div>`);
+    return patch(el, `<div class="hint chatpick">a person or a space's channel, from the list</div>`);
   }
   // A person's name carries when they were last here, as it does in the list.
   const lastIn = n => new Set(c.online || []).has(n) ? "here now"
@@ -132,7 +132,7 @@ function drawChatThread(el){
   const was = el.querySelector("#chatlog");
   const atEnd = !was || was.scrollTop + was.clientHeight >= was.scrollHeight - 8;
   const keep = was ? was.scrollTop : 0;
-  paint(el, `
+  patch(el, `
     <div class="chathead">
       <button type="button" class="link" id="chatBack">‹ all</button>
       <b class="grow">${esc(title)}</b>
@@ -156,9 +156,7 @@ function drawChatThread(el){
     if (!text.trim()) return;
     inp.value = ""; chatDraft[key] = "";
     try{
-      const r = await (await fetch("/api/chat", { method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", ...chatWith, text }) })).json();
+      const r = await postJSON("/api/chat", { action: "send", ...chatWith, text });
       if (r.error){ notify(r.error, true); inp.value = text; chatDraft[key] = text; }
       else { chatMsgs = r.messages || []; drawChat(); }
     }catch(e){ inp.value = text; chatDraft[key] = text; }

@@ -26,8 +26,7 @@ function applyMotion(reduce, {save = true} = {}){
   const use = reduce ? "reduce" : "system";
   try{ localStorage.setItem("bb.motion", use); localStorage.setItem("bb.motion.who", state?.me || ""); }catch(e){ /* private mode */ }
   motionSaved = use;
-  fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "prefs", prefs: { motion: use } }) }).catch(() => {});
+  postJSON("/api/users", { action: "prefs", prefs: { motion: use } }).catch(() => {});
 }
 // ...taken up only by a browser that has none of its own (adoptTheme's rule).
 function adoptMotion(m, who){
@@ -85,6 +84,19 @@ function armModal(el){
         () => { if (this.classList.contains("leaving")){ this.classList.remove("leaving"); this.setAttribute("hidden", ""); } },
         () => {});                        // canceled: it was shown again, and stays
     }});
+  // A press on the dimmed page around it is its way out, as Escape is: its
+  // own backdrop handler where it has one, else its foot's Cancel or Close.
+  // One holding something shown once (data-keep-stray) keeps the press.
+  el.addEventListener("click", e => {
+    if (e.target !== el || el.dataset.keepStray !== undefined) return;
+    setTimeout(() => { if (!el.hidden) modalWayOut(el)?.click(); }, 0);
+  });
+}
+// A dialog's way out at its foot: the one marked data-way-out where its
+// words are its own (Keep it), else its Cancel or Close.
+function modalWayOut(m){
+  const bs = [...m.querySelectorAll(":scope > .box .foot button")].filter(b => !b.disabled);
+  return bs.find(b => b.dataset.wayOut !== undefined) || bs.find(b => /^(cancel|close)$/i.test(b.textContent.trim())) || null;
 }
 
 // ---- a dialog and the keyboard ------------------------------------------
@@ -112,6 +124,8 @@ function modalOpened(el){
   const i = openModals.indexOf(el);
   if (i >= 0) openModals.splice(i, 1);
   openModals.push(el);
+  if (el.dataset.keepStray === undefined && !el.__backTok)
+    el.__backTok = backHold(() => { el.__backTok = 0; dismissModal(el); });
   const a = document.activeElement;
   el.__opener = a && a !== document.body && !el.contains(a) ? a : null;
   // A dialog is named by its title for a screen reader, which the markup
@@ -126,6 +140,7 @@ function modalOpened(el){
   // box itself otherwise, not its first field: a phone would raise its
   // keyboard over a dialog the person came to read.
   requestAnimationFrame(() => {
+    toastPlace();
     if (el.hidden || el.contains(document.activeElement)) return;
     const box = el.querySelector(":scope > .box") || el;
     if (!box.hasAttribute("tabindex")) box.setAttribute("tabindex", "-1");
@@ -136,6 +151,8 @@ function modalOpened(el){
 function modalClosed(el){
   const i = openModals.indexOf(el);
   if (i >= 0) openModals.splice(i, 1);
+  toastPlace();
+  if (el.__backTok){ backRelease(el.__backTok); el.__backTok = 0; }
   const back = el.__opener, a = document.activeElement;
   el.__opener = null;
   // Only when the focus was still in the dialog: a Save that opened a tab
@@ -149,6 +166,66 @@ function modalClosed(el){
   back.focus({preventScroll: true});
 }
 
+// ---- a dialog and Back ----------------------------------------------------
+// Back puts the dialog on show away and leaves the page under it where it
+// was, as a phone's own apps do. A dialog opened holds an entry in the
+// history: the page's own address, its number in the entry's state. Back
+// leaving that entry puts away everything held after the entry it lands
+// on, each as Escape would. Put away any other way, a dialog gives its entry
+// back, unless the page has moved on from it. One holding something shown
+// once (data-keep-stray) holds none, and Back passes it by.
+let backHolds = [], backSeq = 0, backGiving = false, backAfter = null;
+
+// Hold an entry for something Back puts away with `shut`; its number.
+function backHold(shut){
+  const tok = ++backSeq, cur = history.state?.dlg;
+  const st = {...(history.state || {}), dlg: tok};
+  // An entry a dialog just put away has not given back yet is this one's.
+  if (cur && !backHolds.some(h => h.tok === cur)) history.replaceState(st, "", location.href);
+  else history.pushState(st, "", location.href);
+  backHolds.push({tok, shut});
+  return tok;
+}
+
+// Let a hold go when what it held was put away some other way.
+function backRelease(tok){
+  const i = backHolds.findIndex(h => h.tok === tok);
+  if (i < 0) return;
+  backHolds.splice(i, 1);
+  setTimeout(() => {
+    if (history.state?.dlg !== tok) return;        // the page moved on, or another dialog took it
+    backGiving = true;
+    history.back();
+  }, 0);
+}
+
+// The page's popstate: Back (or Forward) moved between entries.
+function backPressed(){
+  const at = history.state?.dlg || 0;
+  if (backGiving){
+    backGiving = false;
+    // A page opened while the entry was being given back is put in the
+    // history now that it has gone: pushed before, the give-back landed
+    // after it and took the page back with it (shellPush, shellSync).
+    if (backAfter){ const to = backAfter; backAfter = null; history.pushState(null, "", to); shellSeen = to; }
+    else shellSync();
+    // One opened while its entry was being given back holds one again.
+    const top = backHolds.at(-1);
+    if (top && at < top.tok) history.pushState({...(history.state || {}), dlg: top.tok}, "", location.href);
+    return;
+  }
+  const gone = backHolds.filter(h => h.tok > at);
+  backHolds = backHolds.filter(h => h.tok <= at);
+  gone.reverse().forEach(h => h.shut());
+}
+
+// Go to a page from a dialog: the dialog's entry becomes the page's, so
+// Back from there comes to the page the dialog was opened on.
+function hashGo(to){
+  if (history.state?.dlg) location.replace(to);
+  else location.hash = to;
+}
+
 function modalFocusables(m){
   return [...m.querySelectorAll(`a[href], button, input, select, textarea, [contenteditable="true"],
                                  [tabindex]:not([tabindex="-1"])`)]
@@ -157,17 +234,15 @@ function modalFocusables(m){
 
 // Escape closes the dialog the way it closes itself: its backdrop's "never
 // mind" where it has one (which may tidy up, as closeEditor and closeRename
-// do), else its foot's Cancel or Close, else simply hidden.
+// do), else its foot's way out (modalWayOut), else simply hidden.
 function dismissModal(m){
   m.dispatchEvent(new MouseEvent("click", {bubbles: true}));
   if (m.hidden) return;
-  const c = [...m.querySelectorAll(":scope > .box .foot button")]
-    .find(b => !b.disabled && /^(cancel|close)$/i.test(b.textContent.trim()));
-  if (c) c.click();
+  modalWayOut(m)?.click();
   if (!m.hidden) m.hidden = true;
 }
 
-// The page's one keydown listener for dialogs, wired at load in index.html
+// The page's one keydown listener for dialogs, wired at load by page-boot.js
 // ahead of the page's other Escape listeners: a dialog's Escape is its own,
 // and the menus and armed arrows under it are not closed with it. A field
 // that does something with Escape itself (a filter clearing its search)
@@ -213,9 +288,24 @@ function scrollHint(el){
   el.classList.toggle("scrollup", more && el.scrollTop > 2);
   el.classList.toggle("scrolldown", more && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
 }
+// Without a root, the parts on show alone: a pane's page, an open dialog, an
+// open menu (R228 step 14). A box in a page left behind the one on show is
+// one content-visibility spares laying out, and measuring it laid it out
+// again, every look.
+const HINT_ROOTS = ".pane .doc.on, .modal:not([hidden]), .mpanel.show";
 function scrollHints(root){
-  (root || document).querySelectorAll(SCROLL_HINTED).forEach(scrollHint);
-  if (root?.matches?.(SCROLL_HINTED)) scrollHint(root);
+  if (!root){ document.querySelectorAll(HINT_ROOTS).forEach(scrollHints); return; }
+  root.querySelectorAll(SCROLL_HINTED).forEach(scrollHint);
+  if (root.matches?.(SCROLL_HINTED)) scrollHint(root);
+}
+// ...and once a frame after a draw, however many parts it drew (drawHTML
+// and patch ask), so a box a draw made long says so at once rather than at
+// the clock's next look. The clock stays for what grows without a draw of
+// either (a notebook moved into its pane, a fold's last frame, a log).
+let hintFrame = 0;
+function hintSoon(){
+  if (hintFrame) return;
+  hintFrame = requestAnimationFrame(() => { hintFrame = 0; if (!document.hidden) scrollHints(); });
 }
 
 // Things that move to a new place slide there from the old one: their
@@ -262,12 +352,25 @@ function foldHeight(el, from, to, done){
 // the end, whichever direction it went.
 function slideDetails(el, willOpen){
   const sum = el.querySelector("summary");
-  if (!sum || noMotion()){ el.open = willOpen; return; }
+  // A slide still running is this one's to replace, from where it has got
+  // to: left to finish, its end wrote its own open or shut over this press
+  // (a fold opened while its closing slide ran shut again a moment later).
+  const running = el.getAnimations().filter(a => a.id === "fold");
+  if (!sum || noMotion()){ running.forEach(a => a.cancel()); el.open = willOpen; delete el.dataset.slideTo; return; }
   const from = el.offsetHeight;
+  running.forEach(a => a.cancel());
   el.open = true;
   const to = willOpen ? el.offsetHeight : sum.offsetHeight;
-  if (from === to){ el.open = willOpen; return; }
-  foldHeight(el, from, to, () => { el.open = willOpen; });
+  if (from === to){ el.open = willOpen; delete el.dataset.slideTo; return; }
+  el.dataset.slideTo = willOpen ? "1" : "0";
+  foldHeight(el, from, to, () => { el.open = willOpen; delete el.dataset.slideTo; });
+}
+// Whether a fold reads as open to a press: where its slide is headed while
+// one runs, since it is held open for the tween, else its own flag. Read as
+// open mid-slide, a second press to open a fold sliding shut shut it (B838).
+function foldOpen(el){
+  return el.dataset.slideTo && el.getAnimations().some(a => a.id === "fold" && a.playState === "running")
+    ? el.dataset.slideTo === "1" : el.open;
 }
 
 // A plain block that is shown and hidden. Same tween, collapsed height zero.
@@ -324,7 +427,9 @@ function fadeIn(els){
 // stood, in the parent the redraw left (or drew again) there, so the page's
 // rules still dress it, and fades out on docOut's .09s while the new part
 // fades in. The copy is inert, has no ids and wears .fghost, which every
-// reader of the parts skips.
+// reader of the parts skips, and is the page's own (data-own), which a
+// patch landing while it fades steps over: matched by the key it was
+// copied with, it would be taken for the part it copies (R244).
 function ghostOf(el){
   if (!el || !el.offsetParent) return null;
   return { g: el.cloneNode(true), r: el.getBoundingClientRect(), home: el.parentNode };
@@ -339,6 +444,7 @@ function ghostOut(w, home){
   g.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
   g.inert = true;
   g.setAttribute("aria-hidden", "true");
+  g.setAttribute("data-own", "");
   Object.assign(g.style, { position: "absolute", left: "0", top: "0", margin: "0", boxSizing: "border-box",
                            width: `${w.r.width}px`, height: `${w.r.height}px`, pointerEvents: "none", zIndex: "1" });
   at.appendChild(g);
@@ -427,6 +533,7 @@ function chipMove(scope, items, swap){
     g.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
     g.inert = true;
     g.setAttribute("aria-hidden", "true");
+    g.setAttribute("data-own", "");
     Object.assign(g.style, {position: "absolute", left: "0", top: "0", margin: "0", boxSizing: "border-box",
                             width: `${was.r.width}px`, height: `${was.r.height}px`, pointerEvents: "none", zIndex: "1"});
     ghosts.push([g, was]);
@@ -475,7 +582,7 @@ function slideMark(box, key, vertical = false){
   // or three times on one press), so a slide already under way goes on.
   let m = box.querySelector(":scope > .slmark") || SLIDE_MARKS[key]?.el;
   if (!on){ m?.remove(); if (box.classList.contains("slides")) box.classList.remove("slides"); return; }
-  if (!m){ m = document.createElement("span"); m.className = "slmark"; m.setAttribute("aria-hidden", "true"); }
+  if (!m){ m = document.createElement("span"); m.className = "slmark"; m.setAttribute("aria-hidden", "true"); m.setAttribute("data-own", ""); }
   if (m.parentNode !== box) box.append(m);
   // Written only when it changes: a draw that moves nothing writes nothing.
   if (!box.classList.contains("slides")) box.classList.add("slides");
@@ -508,38 +615,178 @@ function slideHidden(el, willShow, after){
 
 
 // ---- a press that is taken -------------------------------------------------
-// Any request a press starts holds its button until the answer comes, and a
-// button still waiting after a moment wears the spinner pressing() gives (the
-// operator, 8 Nov: buttons that answered nothing for a while read as missed).
-// The press is the last button or a.btn clicked; a question it asked passes
-// it on, so the request after the answer is still the asker's. Requests a
-// page makes on its own (the polls) come long after any press and are not tied.
-let pressEl = null, pressAt = 0;
-const PRESS_TIE_MS = 1500;
-function pressTrackDown(e){
-  const b = e.target.closest?.("button, a.btn");
-  if (!b) return;
-  if (b.closest(".askdlg")){ if (pressEl) pressAt = performance.now(); return; }
-  pressEl = b; pressAt = performance.now();
+// A press's own work holds its button until it is done, and a button still
+// waiting after a moment wears the ring (the operator, 8 Nov: buttons that
+// answered nothing for a while read as missed). Its work is what the press
+// asked for, never what happened to start near it: a request sent while a
+// click is being handled (postJSON, getJSON) asks for the clicked button's
+// ring, and a click handler set on an element (every press's, since R244
+// sets them as properties) holds it through the promise it returns, the
+// questions it asks on the way included. A poll that starts just after a
+// click on a slow link is the page's own and holds nothing.
+//
+// One mechanism for the three ways a press says it is taken: pressHold is
+// the ring, pressing() is a press that is also kept from being pressed again
+// while it runs, and busy() puts a word in the button's place, which the
+// ring stands down for.
+const PRESS_SHOW_MS = 200;
+// ...unless the ring has no room (the operator, 13 Nov: where the wheel would
+// disrupt a small space, like the rail's icons, none pops up). A strip of
+// presses packed side by side, or one over another, is that by its shape: a
+// group on the rail or the phone's bar grew a third line and pushed every
+// group under it, a page of a sub-nav widened and slid its neighbors. There
+// the page arriving is the answer. Anywhere else the ring is tried and
+// taken back off if it made its button taller, or its row taller or wider
+// than its box: a row of buttons that just fits a phone.
+const PRESS_TIGHT = ".rail, .railbar, .railmore, .pseg, .nbtabs, .dockline, .chip, .lfilter, header";
+function pressRing(b){
+  if (b.closest(PRESS_TIGHT)) return false;
+  const row = b.parentElement;
+  const was = {h: b.offsetHeight, rh: row ? row.offsetHeight : 0, over: row ? Math.max(0, row.scrollWidth - row.clientWidth) : 0};
+  b.classList.add("working");
+  if (b.offsetHeight <= was.h && (!row || (row.offsetHeight <= was.rh && row.scrollWidth - row.clientWidth <= was.over))) return true;
+  b.classList.remove("working");
+  return false;
+}
+// The button a click is a press of: the button or a.btn it landed on. Not
+// one that opens a panel (the bell, the doctor, the gear), which has
+// answered when the panel shows, and not a question's answer, whose asker's
+// press goes on holding its own button.
+function pressOf(e, within){
+  const b = e?.target?.closest?.("button, a.btn");
+  if (!b || (within && !within.contains(b))) return null;
+  if (b.hasAttribute("aria-haspopup") || b.closest(".askdlg")) return null;
+  return b;
+}
+// The ring waits while something else has the person's attention: a word
+// busy() put in the button's place, or a dialog the button is not in (a
+// question the press asked, which is answered before anything is sent).
+function pressQuiet(b){
+  if (b.getAttribute("aria-busy") === "true" && !b.dataset.pressWorking) return true;
+  for (const m of document.querySelectorAll(".modal:not([hidden]):not(.inline)")) if (!m.contains(b)) return true;
+  return false;
 }
 function pressHold(b, p){
+  if (!b) return;
   b.__pending = (b.__pending || 0) + 1;
-  const t = setTimeout(() => {
-    if (!b.__pending || !b.isConnected || b.getAttribute("aria-busy") === "true") return;
-    b.classList.add("working"); b.dataset.pressWorking = "1";
+  const t = setInterval(() => {
+    if (!b.__pending || !b.isConnected || b.dataset.pressWorking || b.__noRing) return;
+    if (pressQuiet(b)) return;
+    if (pressRing(b)){ b.dataset.pressWorking = "1"; b.setAttribute("aria-busy", "true"); }
+    else b.__noRing = true;
   }, PRESS_SHOW_MS);
   const done = () => {
-    clearTimeout(t);
+    clearInterval(t);
     b.__pending -= 1;
-    if (b.__pending <= 0 && b.dataset.pressWorking){ b.classList.remove("working"); delete b.dataset.pressWorking; }
+    if (b.__pending > 0) return;
+    delete b.__noRing;
+    if (b.dataset.pressWorking){ b.classList.remove("working"); b.removeAttribute("aria-busy"); delete b.dataset.pressWorking; }
   };
-  p.then(done, done);
+  Promise.resolve(p).then(done, done);
 }
-function pressTrackFetch(orig){
-  return function(...args){
-    const p = orig.apply(this, args);
-    const b = pressEl;
-    if (b && b.isConnected && performance.now() - pressAt < PRESS_TIE_MS) pressHold(b, p);
-    return p;
-  };
+// A request asks for the ring of the press it was sent from: the button
+// whose handler is running, or the one the click being handled landed on
+// (window.event is that click while its listeners and what they await at
+// once run, and nothing after).
+let pressNow = null;
+function pressTie(p){
+  const ev = window.event;
+  const b = pressNow || (ev?.type === "click" ? pressOf(ev) : null);
+  if (b?.isConnected) pressHold(b, p);
+  return p;
+}
+// Every click handler set as a property runs as its press: requests it sends
+// at once ask for its button's ring, and the promise it returns holds it.
+// The handler read back is the one set, so a draw comparing it sees its own.
+function pressHook(){
+  const d = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "onclick");
+  if (!d?.set || HTMLElement.prototype.__pressHooked) return;
+  const own = new WeakMap();
+  Object.defineProperty(HTMLElement.prototype, "onclick", {
+    configurable: true, enumerable: d.enumerable,
+    get(){ return own.has(this) ? own.get(this) : d.get.call(this); },
+    set(fn){
+      if (typeof fn !== "function"){ own.delete(this); d.set.call(this, fn); return; }
+      own.set(this, fn);
+      d.set.call(this, function(e){ return pressRun(this, e, fn); });
+    }});
+  Object.defineProperty(HTMLElement.prototype, "__pressHooked", {value: true});
+}
+function pressRun(el, e, fn){
+  const b = pressOf(e, el), was = pressNow;
+  if (b) pressNow = b;
+  let out;
+  try{ out = fn.call(el, e); }finally{ pressNow = was; }
+  if (b && out && typeof out.then === "function") pressHold(b, out);
+  return out;
+}
+// A press kept from being pressed again until it has done. Disabled at once:
+// for the second or two of a round trip the control looked as it did before
+// the click, and a second press queued a second job or met a refusal of
+// "one at a time". The ring after a moment where it has room, and given back as
+// its markup has it at the end (pressBack): a surface the page patches
+// (R244) keeps the button the press began on, which a redraw during the
+// press may have drawn disabled, or made another button in its place. Put
+// an `await askYes()` BEFORE the call, so canceling leaves the button alive.
+async function pressing(btn, fn){
+  if (!btn || btn.disabled) return undefined;
+  btn.disabled = true;
+  const p = (async () => fn())();
+  pressHold(btn, p);
+  try{ return await p; }
+  finally{ pressBack(btn); }
+}
+
+// A press that says in a word what it set going (the progress rule: a word
+// and an animated ellipsis, never a bar of the page's own guessing), dead
+// while it runs; the ring stands down for it.
+function busy(btn, word){
+  if (!btn) return;
+  btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
+  drawHTML(btn, `${esc(word)}<span class="dots"></span>`);
+  // The one ticker every .dots on the page shares; it stops itself when
+  // the last one is repainted away.
+  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
+}
+
+// ...and the other half, for a press that can fail without a repaint behind
+// it. Most busy() calls need none: the round trip redraws the surface and
+// the button with it, but the notebook's Send and Save both stay on screen
+// when the server says no, and a button left wearing "Sending…" over a
+// refusal is the worst of both.
+function unbusy(btn, word){
+  if (!btn) return;
+  btn.removeAttribute("aria-busy");
+  // A button a patched surface drew (R244) is given back as its markup has
+  // it now: the redraw the press brought may have drawn it with another
+  // label (a branch switched to) or disabled, and the word kept from before
+  // the press would undo that.
+  if (btn.__markupHtml !== undefined){
+    if (btn.innerHTML !== btn.__markupHtml){ btn.innerHTML = btn.__markupHtml; for (const c of btn.children) patchRecord(c); drawn(btn); }
+    pressBack(btn);
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = word;
+}
+
+// The word a press wears for its verb, where a page's buttons carry the verb
+// as data (data-vm="stop", data-starray="sync"): one table for every page, so
+// a verb is worded once. A verb the table has not got says Working.
+const BUSY_WORDS = {
+  start: "Starting", stop: "Stopping", restart: "Restarting", remove: "Removing", rename: "Renaming",
+  set: "Saving", snapshot: "Saving", paths: "Saving", turns: "Saving", take: "Taking",
+  revert: "Reverting", "snapshot-rm": "Deleting", eject: "Ejecting", "disk-grow": "Growing", "disk-add": "Adding",
+  sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking", mover: "Moving", "to-sync": "Moving",
+  on: "Mounting", off: "Unmounting", init: "Creating", clone: "Starting", link: "Starting",
+  "update-agent": "Updating", test: "Asking", drain: "Draining", online: "Undraining", "cache-clear": "Clearing",
+  retire: "Removing", discard: "Discarding", uninstall: "Uninstalling", lockdown: "Locking down",
+  reboot: "Rebooting", poweroff: "Shutting down", "gpu-apply": "Applying",
+  "sync-stop": "Stopping", "sync-resume": "Resuming", "sync-clean": "Cleaning",
+};
+// busy() by the verb. `extra` is the page's own words, looked at first: for a
+// verb whose word depends on the press, or that means something else there.
+function busyFor(btn, verb, extra = {}){
+  busy(btn, extra[verb] ?? BUSY_WORDS[verb] ?? "Working");
 }

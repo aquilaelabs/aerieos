@@ -6,12 +6,15 @@ import json
 import os
 import pwd
 import re
+import secrets
 import shutil
+import stat
 import subprocess
 import sys
+import tarfile
 import threading
 import time
-from .jobs import pump
+from .jobs import watched
 from .base import (
     AGENT_INSTALLS,
     agent_prefixes,
@@ -21,8 +24,14 @@ from .base import (
     DOCKER_BIN,
     FIREWALL_CMD,
     FIREWALL_EVERY_S,
+    HELD_CHANGED,
+    HELD_UNFETCHED,
     IDLE_UNIT,
+    installer_stub,
+    NETCUT_BIN,
     NFT_BIN,
+    recipe_checked,
+    recipe_version,
     respawnable,
     SESSION,
     ROOT_BUNDLE_DIR,
@@ -40,26 +49,108 @@ from .stores import noexec, tc_root
 from .backends import _have
 from .toolchains import sdk_env
 from .census import controller_ip, network_now
+from .accounts import kept_lookup
 
 
 
-def _pin_release(pin_dir, cmd, root):
+# What reads an installed agent out of an account's home for root to pin: a
+# process of that account, so a name there that was pointed at a file only
+# root reads between the look and the read is refused to it as to the
+# account. A release folder goes out as a tar on its standard output.
+_TREE_OUT = r"""
+import sys, tarfile
+with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as tar:
+    tar.add(sys.argv[1], arcname=".")
+"""
+
+
+def _file_as(who, src, dest):
+    """`src` as root's file `dest`, 0755: its bytes read by a process of
+    the account `who` and written by this one, which alone holds `dest`
+    open. Raises OSError when they could not be read."""
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(dest)
+    p = subprocess.Popen(["cat", "--", src], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd="/", **(who or {}))
+    try:
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o755)
+        with os.fdopen(fd, "wb") as f:
+            shutil.copyfileobj(p.stdout, f, 1 << 20)
+            os.fchmod(f.fileno(), 0o755)
+    finally:
+        p.stdout.close()
+        code = p.wait()
+    if code != 0:
+        with contextlib.suppress(OSError):
+            os.unlink(dest)
+        raise OSError(f"{src} could not be read as the account it was installed for")
+
+
+def _tree_as(who, root, new):
+    """The folder `root` as root's folder `new`: read by a process of the
+    account `who` (_TREE_OUT) and written here from what it sent, which is
+    the account's word: plain files, folders and links that stay inside,
+    each made only where its real folder is under `new`, executable where
+    it was, and nothing else. Raises OSError when it could not be read."""
+    os.makedirs(new, mode=0o755)
+    top = os.path.realpath(new)
+    p = subprocess.Popen([sys.executable, "-I", "-c", _TREE_OUT, root], stdout=subprocess.PIPE,
+                         stderr=subprocess.DEVNULL, cwd="/", **(who or {}))
+    try:
+        with tarfile.open(fileobj=p.stdout, mode="r|") as tar:
+            for m in tar:
+                name = os.path.normpath(m.name)
+                if name == ".":
+                    continue
+                if name.startswith(("/", "..")):
+                    raise OSError(f"{m.name} is outside the folder")
+                dest = os.path.join(top, name)
+                parent = os.path.realpath(os.path.dirname(dest))
+                if parent != top and not parent.startswith(top + os.sep):
+                    raise OSError(f"{m.name} is outside the folder")
+                if m.isdir():
+                    os.makedirs(dest, mode=0o755, exist_ok=True)
+                elif m.isreg():
+                    mode = 0o755 if m.mode & 0o111 else 0o644
+                    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+                    with os.fdopen(fd, "wb") as f:
+                        shutil.copyfileobj(tar.extractfile(m), f, 1 << 20)
+                        os.fchmod(f.fileno(), mode)
+                elif m.issym():
+                    inside = os.path.normpath(os.path.join(os.path.dirname(name), m.linkname))
+                    if not os.path.isabs(m.linkname) and not inside.startswith(".."):
+                        os.symlink(m.linkname, dest)
+    except (tarfile.TarError, EOFError) as e:
+        raise OSError(f"{root} could not be read as the account it was installed for ({e})") from e
+    finally:
+        p.stdout.close()
+        code = p.wait()
+    if code != 0:
+        raise OSError(f"{root} could not be read as the account it was installed for")
+    # A link's words are checked as it is made, and a chain of links that
+    # each read as inside can still lead out once one is followed: each is
+    # held to where it really leads, now that all of them are there.
+    for folder, dirs, files in os.walk(top):
+        for name in dirs + files:
+            at = os.path.join(folder, name)
+            if os.path.islink(at):
+                real = os.path.realpath(at)
+                if real != top and not real.startswith(top + os.sep):
+                    shutil.rmtree(new, ignore_errors=True)
+                    raise OSError(f"{os.path.relpath(at, top)} leads outside the folder")
+
+
+def _pin_release(pin_dir, cmd, root, who=None):
     """Pin an agent the vendor installs as a release folder (Codex CLI's:
     bin/codex, bin/codex-code-mode-host and codex-resources beside them): the
     whole folder copied root-owned to <pin_dir>/release, swapped in whole,
     and the command and each helper beside it a link into it, so the agent
     finds its helpers where it looks, beside its own executable. Copying the
     one binary left Codex 0.163 without codex-code-mode-host, and every
-    command a session ran failed (B247)."""
+    command a session ran failed (B247). The folder is read as the account
+    `who` it was installed for (_tree_as)."""
     new, rel, old = (os.path.join(pin_dir, n) for n in (".release.new", "release", ".release.old"))
     shutil.rmtree(new, ignore_errors=True)
-    shutil.copytree(root, new, symlinks=True)
-    for d, dirs, files in os.walk(new):
-        for n in dirs + files:
-            with contextlib.suppress(OSError):
-                os.lchown(os.path.join(d, n), 0, 0)
-    os.lchown(new, 0, 0)
-    os.chmod(new, 0o755)
+    _tree_as(who, root, new)
     shutil.rmtree(old, ignore_errors=True)
     if os.path.isdir(rel) and not os.path.islink(rel):
         os.replace(rel, old)
@@ -90,6 +181,17 @@ def _release_root(exe, src, home):
     return "" if os.path.realpath(root) in homes or root in ("/", "/usr", "/usr/local") else root
 
 
+def steady(title):
+    """A session's title with the frame of its working mark taken out: an
+    agent at work turns a mark at the head of its title several times a
+    second, and which frame a look caught is not a change to send. The
+    waiting mark is left, so working and waiting still differ."""
+    title = str(title or "")
+    if len(title) > 1 and title[1] == " " and title[0] != "✳" and ord(title[0]) > 127 and not title[0].isalnum():
+        return "~" + title[1:]
+    return title
+
+
 class SessionWatch:
     """The node's sessions reported the moment one changes (a session
     starting, ending, a Claude pane turning from waiting to working), so
@@ -116,7 +218,7 @@ class SessionWatch:
         if not self.agent.session_up:
             return
         rows = self.agent.sessions_now() or []
-        key = sorted((r.get("name", ""), r.get("title", "")) for r in rows)
+        key = sorted((r.get("name", ""), steady(r.get("title", ""))) for r in rows)
         if key == self.last:
             return
         if self.last is not None:
@@ -415,8 +517,20 @@ class SessionsMixin:
         who = self.as_user(env, self.session_account())
         into = self.bundle(None, who)
         if not into:
+            # Refused, with no bundle from before to run: said where the
+            # node's row reads why it has no terminals.
+            if getattr(self, "bundle_refused", None) and not self.session_up:
+                SESSION.update(up=False, user=self.session_account(), bundle="",
+                               why="this node refused the controller's bundle: its files are not ones a key "
+                                   "this node trusts signed (the node's log says which)")
             return
-        self.session_bundle = self.session_digest or digest
+        now = self.session_digest or digest
+        # The controller's bundle was refused (release.may_keep_bundle) and
+        # the terminals already run the one this node keeps: nothing moved,
+        # so nothing starts again at every hello that names the refused one.
+        if self.session_up and now == self.session_bundle:
+            return
+        self.session_bundle = now
         self.session_tried = time.time()
         self.session_start(into)
 
@@ -483,7 +597,9 @@ class SessionsMixin:
         # Every account user there is, the setting on or not: one turned off
         # still has its sessions running until they end (R125).
         if os.geteuid() == 0:
-            users += sorted(p.pw_name for p in pwd.getpwall() if p.pw_name.startswith("bbu-"))
+            # ...read once a minute, not every turn (accounts.kept_lookup).
+            users += kept_lookup("bbu-users", lambda: sorted(p.pw_name for p in pwd.getpwall()
+                                                              if p.pw_name.startswith("bbu-")))
         return users
 
     def _tmux_as(self, user, argv, timeout=10, quiet=False):
@@ -574,7 +690,12 @@ class SessionsMixin:
             return None
         # Where accounts own their homes (R125) the session account can read
         # none of them: read as root, and only from the root-owned bundle,
-        # which nothing outside a view can change.
+        # which nothing outside a view can change. On a node that pinned a
+        # release key that copy is unpacked only from a bundle whose every
+        # shipped file its release signed, this lister among them
+        # (release.may_keep_bundle, R267 step 6), so what root runs here is
+        # the release's and not the controller's word; a node with no key
+        # takes its controller's, as it takes its agent.
         lister = os.path.join(ROOT_BUNDLE_DIR, "current", "scripts", "lib", "login-list.py")
         if any(u.startswith("bbu-") for u in self._tmux_users()) and os.path.isfile(lister):
             try:
@@ -730,36 +851,139 @@ class SessionsMixin:
 
     def agent_update(self, job, spec):
         """Install, update or remove one of the other coding agents for the
-        SESSION account (R95 step 2). Which agent and how is AGENT_INSTALLS's
-        row for this job's type, never anything the controller sent."""
+        SESSION account (R95 step 2). Which agent is AGENT_INSTALLS's row
+        for this job's type; how is the recipe the controller handed over
+        (R169 step 13), held to its shape."""
         how = AGENT_INSTALLS.get(job.job.get("type") or "")
         if not how:
             job.say("refused: no coding agent is installed by this job\n")
             return "failed", 78
-        return self.agent_install(job, spec, how)
+        how = self.agent_recipe(job, spec, how)
+        return self.agent_install(job, spec, how) if how else ("failed", 78)
+
+    def agent_recipe(self, job, spec, row):
+        """The agent's row with the install recipe the controller sent, the
+        row alone when it sent none (which is enough to take the agent off,
+        and installs nothing: agent_install), or None with the reason said
+        when what it sent is not a recipe: nothing is run then, rather than
+        some other way run in silence."""
+        if spec.get("recipe") is None:
+            return row
+        recipe, why = recipe_checked(spec["recipe"])
+        if why:
+            job.say(f"refused: the install recipe the controller sent for {row['product']} is not one: {why}\n")
+            return None
+        return {**row, **recipe, "by": "catalog" if spec.get("recipe_from") == "catalog" else ""}
+
+    def held_install(self, job, how, who, home):
+        """What runs a held recipe: (the command, the row it reads on its
+        standard input), or (None, None) with the reason said.
+
+        The command is held-run.sh from this node's bundle, root's own copy
+        where this agent is root, which the session account cannot write:
+        sdk.sh's one mechanism for every entry's declared downloads, so the
+        fetch over https, the sha256, a publisher's signature under the
+        recipe's own keys and the cut are the ones a toolchain's install
+        goes through. The row is the recipe as that mechanism reads an
+        entry: its downloads, its keys, its sentence or that its steps run
+        with no network, and the steps."""
+        into = self.bundle(job, who)
+        rooted = os.path.join(ROOT_BUNDLE_DIR, "current")
+        if into and os.geteuid() == 0 and os.path.isdir(rooted):
+            into = os.path.realpath(rooted)
+        helper = os.path.join(into, "scripts", "lib", "held-run.sh") if into else ""
+        if not helper or not os.path.isfile(helper):
+            job.say(f"refused: {how['product']}'s recipe holds what it fetches, and this node has no copy of aerie that can hold it "
+                    "(no scripts/lib/held-run.sh in its bundle): nothing was fetched and nothing run\n")
+            return None, None
+        online = how.get("online") or ""
+        row = {"name": how["product"],
+               "source": {"kind": "command", "fetch": how["fetch"], "keyring": how["keyring"], "steps": how["steps"],
+                          **({"online": online} if online else {"offline": True})}}
+        version = recipe_version(how)
+        argv = ["bash", helper, how["product"], f"home={home}"] + ([f"version={version}"] if version else [])
+        return argv, json.dumps({"toolchains": [row]}).encode()
+
+    def held_cut(self, who):
+        """The helper this agent cuts the network with for the account an
+        install is for, or "" where it does not: bb-netcut, when this agent
+        is root and drops to an account that is not.
+
+        A toolchain's install runs as the account this node's jobs run as,
+        which cuts for itself: by a network namespace of its own, or, where
+        the machine keeps those from an account, through the one sudo rule
+        this agent writes for bb-netcut. A coding agent is installed as the
+        session account, which is another account on purpose, and that
+        rule is not its: its one way to root is bb-session, and it is given
+        no second. So where the session account cannot make a namespace it
+        cut nothing, and a recipe that reads pinned ran its steps with the
+        network. This agent is root and needs no rule: it runs the steps
+        through the helper itself (agent_install), naming the account to it
+        as sudo would. The helper is root's own file or it is not used."""
+        if os.geteuid() != 0 or not who or not who.get("user"):
+            return ""
+        # Kept as root's copy of the bundle has it, as a toolchain's install keeps it.
+        refresh = getattr(self, "refresh_netcut_tool", None)
+        if refresh:
+            with contextlib.suppress(OSError):
+                refresh()
+        try:
+            st = os.lstat(NETCUT_BIN)
+        except OSError:
+            return ""
+        if not (stat.S_ISREG(st.st_mode) and st.st_uid == 0 and not st.st_mode & 0o022 and st.st_mode & 0o100):
+            return ""
+        # ...and it cuts here: asked for nothing, as the account, the way
+        # an install's shell asks before it relies on it (sdk.sh
+        # sdk_net_cut). A machine that lets nobody make a namespace
+        # installs all the same, with the network, and the install says so.
+        try:
+            made = subprocess.run([NETCUT_BIN, "true"], env=self.held_cut_env(who), cwd="/", timeout=20, check=False,
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            made = False
+        return NETCUT_BIN if made else ""
+
+    @staticmethod
+    def held_cut_env(who):
+        """What bb-netcut is started with by this agent: a plain PATH, and
+        the account to become, said where sudo says a caller. Nothing of
+        an install's environment: that is set once the helper has become
+        the account."""
+        return {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "SUDO_UID": str(who["user"])}
 
     def claude_update(self, job, spec):
         """Install the current Claude Code for the SESSION account, and pin it
         (claudecode.py on the controller). Queued by an administrator's press
         and by nothing else; the controller ended the Claude sessions here
         before queueing it, since the binary is swapped under nothing."""
-        return self.agent_install(job, spec, CLAUDE_INSTALL)
+        how = self.agent_recipe(job, spec, CLAUDE_INSTALL)
+        return self.agent_install(job, spec, how) if how else ("failed", 78)
 
     def agent_install(self, job, spec, how):
         """One coding agent installed, updated or removed for the SESSION
         account, from its row (AGENT_INSTALLS, CLAUDE_INSTALL): one path for
         every agent (R95 step 18).
 
-        The vendor's installer runs as the session account, into its home,
-        the way the provisioner first installed it. Then, where this agent
-        is root, the binary is copied into the row's pin folder, root-owned,
-        which the session's PATH reads first: that copy is what a session
-        runs and what the account cannot write, so an update typed in a
-        session changes nothing that runs. A guest node, where the agent is
-        not root, keeps the account's own copy and says so."""
+        The recipe runs as the session account, into its home. A held one
+        (held_install): what it declares is fetched and held to its sha256
+        or its publisher's signature first, and its steps then run from
+        that, with no network unless the recipe says its installer keeps it:
+        cut by this agent where it is root (held_cut), by the account
+        itself where it is not and the machine lets it.
+        One of the older form is a vendor's installer handed to a shell as
+        it arrives, run as it was and said to be held by nothing. Then,
+        where this agent is root, the binary is copied into the row's pin
+        folder, root-owned, which the session's PATH reads first: that copy
+        is what a session runs and what the account cannot write, so an
+        update typed in a session changes nothing that runs. A guest node,
+        where the agent is not root, keeps the account's own copy and says
+        so."""
         product, cmd = how["product"], how["command"]
         who_name = self.session_account()
-        env = dict(sdk_env(self.state))
+        # The store's toolchains on PATH, and none of the variables their
+        # layouts set: one a pack set would steer what an installer fetches.
+        env = dict(sdk_env(self.state, layout_env=False))
         try:
             who = self.as_user(env, who_name)
         except RuntimeError as e:
@@ -776,12 +1000,25 @@ class SessionsMixin:
         # session runs and the account's own install under its home.
         if spec.get("action") == "remove":
             gone = []
-            for path in (os.path.join(pin_dir, cmd), os.path.join(home, how["bin"]),
-                         *(os.path.join(home, a) for a in how.get("also", ()))):
+            path = os.path.join(pin_dir, cmd)
+            if os.path.lexists(path):
+                with contextlib.suppress(OSError):
+                    shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
+                    gone.append(path)
+            # What is under the account's home goes by a process of the
+            # account: a name there is the account's to point elsewhere,
+            # and root would remove what it pointed at.
+            mine = [os.path.join(home, how["bin"]), *(os.path.join(home, a) for a in how.get("also", ()))]
+            # ...the link an install made where the agent is not root...
+            link = os.path.join(home, ".local", "bin", cmd)
+            if os.path.islink(link) and os.readlink(link) == os.path.join(home, how["bin"]):
+                mine.append(link)
+            for path in mine:
                 if os.path.lexists(path):
-                    with contextlib.suppress(OSError):
-                        shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
-                        gone.append(path)
+                    with contextlib.suppress(OSError, ValueError, subprocess.SubprocessError):
+                        if subprocess.run(["rm", "-rf", "--", path], env=env, cwd="/", timeout=120, check=False,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **who).returncode == 0:
+                            gone.append(path)
             # ...and a pinned release folder, with the links into it.
             rel = os.path.join(pin_dir, "release")
             if os.path.isdir(rel) and not os.path.islink(rel):
@@ -796,41 +1033,116 @@ class SessionsMixin:
             job.say("\n")
             self.hello_again(f"{product} was removed")
             return "succeeded", 0
+        # No recipe, no install: this agent carries no installer of its own
+        # to run in its place, which nothing would hold.
+        if not how.get("steps"):
+            job.say(f"refused: the controller sent no install recipe for {product}, and an install is run from one alone: "
+                    "what a recipe fetches is held to what the recipe carries, and this node keeps no installer of its own beside it\n")
+            return "failed", 78
         env["PATH"] = ":".join([os.path.join(home, ".local", "bin"), env.get("PATH") or "/usr/local/bin:/usr/bin:/bin"])
         env.setdefault("LANG", "C.UTF-8")
         for k, v in how["env"].items():
             env[k] = v.format(home=home)
-        want = str(spec.get("to") or "")
+        # The version asked for. A held recipe whose steps run with no
+        # network installs the program it declares, at the version that
+        # says: the pin decides, whatever is newest at its vendor.
+        pins = recipe_version(how) if not how.get("online") else ""
+        want = pins or str(spec.get("to") or "")
         if want and how["pin"] and re.fullmatch(r"\d+\.\d+\.\d+", want):
             env[how["pin"][0]] = how["pin"][1].format(v=want)
-        stub = os.environ.get(f"BUILDERBOT_{how['id'].upper()}_INSTALLER")
-        argv = ["bash", stub] if stub else ["bash", "-c", how["script"]]
-        job.say(f"installing {product} for {who_name}" + (f" ({want} is out)" if want else "") + "\n")
-        try:
-            job.proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                        cwd=home if os.path.isdir(home) else "/tmp", env=env,
-                                        start_new_session=True, close_fds=True, **who)
-        except (OSError, ValueError) as e:
-            job.say(f"could not start the installer: {e}\n")
-            return "failed", 70
-        deadline = time.monotonic() + int(spec.get("timeout") or 900)
-        # Posted as it goes and timed by the clock, not by the next line: it
-        # read on this thread, so nothing was posted until the end and a
-        # silent hang never reached its deadline.
-        reader = pump(job, job.proc.stdout)
-        while reader.is_alive():
-            reader.join(0.5)
-            if job.pending:
-                job.flush()
-            if time.monotonic() > deadline:
-                job.say("the installer did not finish in time\n")
-                job.cancel()
+        stub = installer_stub(how["id"])
+        job.say(f"installing {product} for {who_name}" + (f" ({want} is the version its recipe pins)" if pins else f" ({want} is out)" if want else "")
+                + (f", by the catalog's recipe (rev {how.get('rev')})" if how.get("by") == "catalog" else "") + "\n")
+        cwd = home if os.path.isdir(home) else "/tmp"
+        held, top = not stub, ""
+        if held:
+            argv, feed = self.held_install(job, how, who, home)
+            if not argv:
+                return "failed", 69
+            # What is started, in order: (command, what it reads, its
+            # environment, the account it is started as). One run of
+            # held-run.sh as the account does it all: it fetches, holds and
+            # runs the steps, cutting the network for them itself where
+            # the account can.
+            runs = [(argv, feed, env, who)]
+            netcut = "" if how.get("online") else self.held_cut(who)
+            if netcut:
+                # The steps run with no network, and this agent is root: it
+                # makes the cut, since the session account has no rule for
+                # the helper (held_cut). Two runs of held-run.sh, both as
+                # the account: the first, with the network, fetches and
+                # holds into a directory of the account's own; the second
+                # is started by this process through bb-netcut, which makes
+                # the namespace, becomes the account for good and only then
+                # starts it. The account is the one this node's own state
+                # names for sessions (session_account), handed to the
+                # helper as sudo hands it a caller, so nothing a job says
+                # chooses whom the steps run as; the helper runs nothing as
+                # root. Its environment is a plain one, so the install's is
+                # handed over as words.
+                top = os.path.join(home, ".cache", "aerie-held." + secrets.token_hex(8))
+                runs = [(argv[:2] + ["--fetch", top] + argv[2:], feed, env, who),
+                        ([netcut, "env", *(f"{k}={v}" for k, v in env.items()), *argv[:2], "--run", top, *argv[2:]], None,
+                         self.held_cut_env(who), {})]
+        else:
+            runs = [(["bash", stub], None, env, who)]
+
+        def drop():
+            """The directory a fetch left for a run that did not end by
+            itself, taken away as the account whose it is."""
+            if top:
+                with contextlib.suppress(OSError, ValueError, subprocess.SubprocessError):
+                    subprocess.run(["rm", "-rf", "--", top], env=env, cwd="/", timeout=60, check=False,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **who)
+
+        # One clock for the whole install, however many runs it is.
+        until = time.monotonic() + int(spec.get("timeout") or 900)
+        for n, (argv, feed, run_env, as_who) in enumerate(runs):
+            try:
+                # Started in the account's home where it is started as the
+                # account; the run this process starts as itself goes there
+                # once it is the account (held-run.sh --run).
+                p = subprocess.Popen(argv, stdin=subprocess.PIPE if feed is not None else None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     cwd=cwd if n == 0 else "/", env=run_env, start_new_session=True, close_fds=True, **as_who)
+            except (OSError, ValueError) as e:
+                job.say(f"could not start the installer: {e}\n")
+                drop()
+                return "failed", 70
+            if feed is not None:
+                # The recipe's row, which held-run.sh reads whole before it
+                # fetches anything; from a thread, so a row larger than a
+                # pipe holds never waits on a reader that is not there yet.
+                def hand(p=p, feed=feed):
+                    with contextlib.suppress(OSError, ValueError):
+                        p.stdin.write(feed)
+                    with contextlib.suppress(OSError, ValueError):
+                        p.stdin.close()
+                threading.Thread(target=hand, name="agent-recipe", daemon=True).start()
+            # Seen to its end as every job's child is (jobs.watched): posted as
+            # it goes and timed by the clock. One that runs past its time is
+            # killed and has failed, in its own words: it was canceled instead,
+            # which read as a person having stopped it.
+            code, killed, stopped = watched(job, p, max(1, int(until - time.monotonic())), late="the installer did not finish in time")
+            if stopped or killed or code != 0:
+                drop()
+            if stopped:
+                job.say("stopped\n")
+                return "canceled", 130
+            if killed:
                 return "failed", 75
-        code = job.proc.wait()
-        job.proc = None
-        if code != 0:
-            job.say(f"the installer exited {code}\n")
-            return "failed", code
+            if code == HELD_CHANGED and held and n == 0:
+                # A declared download answered other bytes than the recipe
+                # holds (held-run.sh, which said each digest above): nothing
+                # of it was run, and nothing is until a newer recipe moves
+                # the pin.
+                job.say(f"refused: {product}'s {'installer' if how.get('online') else 'download'} is not the file its recipe pins: nothing was run\n")
+                return "failed", code
+            if code == HELD_UNFETCHED and held and n == 0:
+                job.say(f"nothing of {product} was run: what its recipe declares could not be fetched, so there was nothing to hold it to\n")
+                return "failed", code
+            if code != 0:
+                job.say(f"the installer exited {code}\n")
+                return "failed", code
         # The binary the installer just put down: the version asked for in
         # the folder it leaves, where the row names one (Claude Code's
         # ~/.local/share/claude/versions), else whatever its launcher resolves
@@ -852,22 +1164,37 @@ class SessionsMixin:
         if os.geteuid() == 0:
             try:
                 os.makedirs(pin_dir, mode=0o755, exist_ok=True)
+                # Read out of the account's home by a process of the
+                # account, and written here by root: a name there is the
+                # account's to point at a file only root reads.
                 root = _release_root(exe, src, home)
                 if root:
-                    _pin_release(pin_dir, cmd, root)
+                    _pin_release(pin_dir, cmd, root, who)
                 else:
                     # One binary, and any release folder an earlier pin made
                     # (B262) goes with what it held.
                     shutil.rmtree(os.path.join(pin_dir, "release"), ignore_errors=True)
                     tmp = os.path.join(pin_dir, cmd + ".new")
-                    shutil.copy2(src, tmp)
-                    os.chown(tmp, 0, 0)
-                    os.chmod(tmp, 0o755)
+                    _file_as(who, src, tmp)
                     os.replace(tmp, os.path.join(pin_dir, cmd))
                 job.say(f"pinned {ver} at {pin_dir}/{cmd}, root-owned: a session runs this copy and cannot change it\n")
             except OSError as e:
                 job.say(f"installed {ver} for {who_name}, but could not pin it: {e}\n")
         else:
+            # No pinned copy, so a session finds the account's own on its
+            # PATH: ~/.local/bin, where an installer that keeps its program
+            # elsewhere (OpenCode's ~/.opencode/bin) is given a link.
+            link = os.path.join(home, ".local", "bin", cmd)
+            # A file already there is left alone, unless the recipe names it
+            # as the program's older place: then it is the old copy, which
+            # would run in place of the new one.
+            old_place = os.path.join(".local", "bin", cmd) in how.get("also", ())
+            if os.path.abspath(exe) != link and (os.path.islink(link) or not os.path.exists(link) or old_place):
+                with contextlib.suppress(OSError):
+                    os.makedirs(os.path.dirname(link), exist_ok=True)
+                    if os.path.lexists(link):
+                        os.unlink(link)
+                    os.symlink(exe, link)
             job.say(f"installed {ver} for {who_name} (the agent is not root here, so the account's own copy is what runs)\n")
         # New terminals get the PATH with the pinned copy on it, tmux
         # sessions untouched (there are none).
@@ -965,13 +1292,39 @@ class SessionsMixin:
     def stats_now(self):
         """What each running container here uses, by name: [cpu %, memory %],
         for the hour's ring the controller keeps (R218 step 9). One docker
-        stats a minute, cached between like published_now; None where there
-        is no docker or it did not answer, and absent from the heartbeats
-        between, which the controller reads as no news."""
-        now = time.time()
-        if now - getattr(self, "stats_at", 0) < 60:
-            return None
-        self.stats_at = now
+        stats a minute, read on a thread of its own (R228 step 18): it takes
+        two seconds, and on the loop's own turn a job, a cancel or a sync
+        hint waited them out. Its answer rides the first heartbeat after it
+        lands; None meanwhile, where there is no docker or it did not
+        answer, and in the heartbeats between, which the controller reads as
+        no news."""
+        lock = self.__dict__.setdefault("stats_lock", threading.Lock())
+        with lock:
+            got, self.stats_got = getattr(self, "stats_got", None), None
+            if got is not None:
+                return got or None
+            now = time.time()
+            if now - getattr(self, "stats_at", 0) < 60 or getattr(self, "stats_reading", False):
+                return None
+            self.stats_at = now
+            if not shutil.which(DOCKER_BIN):        # on the PATH (B764)
+                return None
+            self.stats_reading = True
+
+        def read():
+            got = None
+            try:
+                got = SessionsMixin.stats_read(self)
+            finally:
+                with lock:
+                    # {} for no answer: handed over as None, and the read done.
+                    self.stats_got = got if got is not None else {}
+                    self.stats_reading = False
+        threading.Thread(target=read, name="docker-stats", daemon=True).start()
+        return None
+
+    def stats_read(self):
+        """One docker stats, read into {name: [cpu %, memory %]}, or None."""
         docker = shutil.which(DOCKER_BIN)       # on the PATH (B764)
         if not docker:
             return None

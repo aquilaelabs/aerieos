@@ -32,6 +32,7 @@ judged, so a change made on the share some other way is found.
 """
 import contextlib
 import hashlib
+import io
 import os
 import re
 import stat as st
@@ -708,6 +709,28 @@ def git_guard(rel, link):
     if link:
         return "a link inside .git is not synced from a node"
     return ""
+
+
+# Removals a node sends in one call (B789): after a git gc packs the loose
+# objects, a tick holds thousands, and one request each took many minutes.
+GONE_MAX = 1000
+
+
+def gone(nid, project, paths):
+    """Many removals in one call, each applied as put() applies one, in the
+    order sent: [[path, base], ...] answered with each one's own answer and
+    status, {"results": [...]}. A node whose controller has no such action
+    sends them one at a time, as before."""
+    if not isinstance(paths, list) or not paths or len(paths) > GONE_MAX:
+        return {"error": f"one to {GONE_MAX} removals a call"}, 400
+    out = []
+    for item in paths:
+        if not (isinstance(item, list) and len(item) == 2 and all(isinstance(x, str) for x in item)):
+            out.append({"error": "not a path and its base", "code": 400})
+            continue
+        r, code = put(nid, project, {"path": [item[0]], "base": [item[1]], "gone": ["1"]}, io.BytesIO(b""), 0)
+        out.append({**r, "code": code})
+    return {"results": out}, 200
 
 
 def put(nid, project, q, stream, length):

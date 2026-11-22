@@ -21,6 +21,19 @@ class Paths(unittest.TestCase):
         paths.configure(state=self.root / "state", workspace=self.root / "ws")
         paths._moving.clear()
 
+
+    def test_room_is_the_space_where_config_and_the_spaces_live_and_the_databases_size(self):
+        (self.root / "state").mkdir(parents=True, exist_ok=True)
+        (self.root / "ws").mkdir(parents=True, exist_ok=True)
+        (self.root / "state" / "builderbot.db").write_bytes(b"x" * 1000)
+        (self.root / "state" / "builderbot.db-wal").write_bytes(b"x" * 24)
+        r = paths.room()
+        self.assertTrue(r["config"]["total"] >= r["config"]["free"] > 0)
+        self.assertTrue(r["spaces"]["total"] > 0)
+        self.assertEqual(r["db"], 1024, "the database with its log")
+        (self.root / "state" / "builderbot.db").unlink()
+        (self.root / "state" / "builderbot.db-wal").unlink()
+        self.assertNotIn("db", paths.room(), "no database, no size said")
     def tearDown(self):
         self.tmp.cleanup()
 

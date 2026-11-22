@@ -35,6 +35,29 @@ TTY_ENV = "/run/bb-session/tty-env.json"
 NOT_GROUPS = frozenset(("docker", "sudo", "wheel", "adm", "systemd-journal", "root", "lxd", "libvirt"))
 EVERY_S = 60
 
+# Who is in which group, and which account users there are, kept a minute
+# (R228 step 18): the session list every turn read every account, and each
+# job and terminal started as an account read every group. Forgotten the
+# moment this agent makes or changes an account (accounts_moved).
+KEPT_S = 60
+_kept = {}
+
+
+def kept_lookup(key, read):
+    """read(), or what it gave under `key` within the last KEPT_S."""
+    now = time.monotonic()
+    got = _kept.get(key)
+    if got is not None and now - got[0] < KEPT_S:
+        return got[1]
+    value = read()
+    _kept[key] = (now, value)
+    return value
+
+
+def accounts_moved():
+    """An account or a group was made or changed here: read them afresh."""
+    _kept.clear()
+
 
 def user_of(account):
     return PREFIX + account[2:] if UID_RE.match(account or "") else ""
@@ -136,6 +159,7 @@ class AccountsMixin:
             grp.getgrnam(GROUP)
         except KeyError:
             subprocess.run(["groupadd", "-r", GROUP], capture_output=True, timeout=30, check=False)
+            accounts_moved()
 
     def _account_user(self, account, home, sa):
         """The account's user, made if it is missing: a system user with no
@@ -152,9 +176,11 @@ class AccountsMixin:
             missing = [g for g in extra if name not in (grp.getgrnam(g).gr_mem if g in {x.gr_name for x in grp.getgrall()} else [name])]
             if missing:
                 subprocess.run(["usermod", "-aG", ",".join(missing), name], capture_output=True, timeout=30, check=False)
+                accounts_moved()
             return have
         p = subprocess.run(["useradd", "-r", "-M", "-U", "-d", home, "-s", "/usr/sbin/nologin",
                             "-G", ",".join(extra), name], capture_output=True, text=True, timeout=30, check=False)
+        accounts_moved()
         if p.returncode != 0:
             log(f"accounts: could not make {name}: {(p.stderr or '').strip()[:160]}")
             return None

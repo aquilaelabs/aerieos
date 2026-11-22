@@ -8,8 +8,11 @@ AerieOS deploys itself (each node's nginx, its scanners and its model
 router) are the **System** section at the top of the Containers page: rows
 like any other container's, with **Configure**, which opens that
 container's own settings page (the nginx page, the Scanners page, the
-router's row on Installed). Their env and compose file are that page's to
-write and never the row's; a container you want otherwise is one you deploy
+router's row on Installed). All three are services: each is installed on a
+node from its card under Services in the Library, and has a row under
+Services on that node's Installed page, where **Open** leads to the same
+page and **Remove** takes it off the node. Their env and compose file are
+that page's to write and never the row's; a container you want otherwise is one you deploy
 yourself. A page opened that way carries a small top header with **Back**,
 naming the page it was opened from and returning there. A space's own
 containers are also its page's Docker view. This doc covers the manager, a
@@ -113,8 +116,9 @@ be off is asked nothing, rather than waiting on a machine that is not there
 until a timeout.
 
 **With more than one docker host, the node is picked in the Containers
-group's header over the page** (the pick holds for nginx too, and the
-Containers sub-tab says *not here* on a node without Docker). Nodes
+group's header over the page** (the Containers sub-tab says *not here* on
+a node without Docker; the nginx page, beside Installed, has the Machines
+group's pick). Nodes
 with the `docker-host` capability are listed online or not; picking one
 switches the whole view to that node's daemon: one page, redrawn, never a
 page per node. Each node's last-known container list is kept, so switching to
@@ -165,17 +169,43 @@ CLI waiting on a pull leaves the download running if only the CLI is asked to
 stop. The row then says how the job ended rather than silently reverting to
 whatever state it was in.
 
-**From the catalog** (R164): New container opens on a pick of ready apps
-(Jellyfin, Plex, the arr stack, qBittorrent, Immich, Nextcloud, Home
-Assistant, Syncthing, any an administrator added from the Library's Add
-your own, and any kept from the vetted catalog's apps, R170), each a compose file pinned to a tag with its blanks
-in the environment: where its data goes and which share's folder it serves
-or syncs (folders under a pool, the array or a share), the user it runs as
-(the one that owns those folders), the time zone and its port, with a
-database password or an admin password made for the apps that need one.
-Fill the definition in puts the compose file and the environment in the
-dialog's own tabs, to read and change before Create makes it as any
-container; the registry update check says when an image's tag moves. The
+**From the Library** (R164, R170): an app's New container on the Library
+opens this dialog on that app: one kept from the vetted catalog's apps
+(Jellyfin, Plex, Sonarr, Radarr, Prowlarr, qBittorrent, Immich, Nextcloud,
+Home Assistant and Syncthing are among them), or one an administrator
+added from the Library's Add your own. AerieOS ships none itself: an app
+is offered because the catalog's signed index lists it, and is added,
+fixed or re-pinned there with no release of AerieOS
+([tool-packs.md](tool-packs.md#docker-apps-in-the-catalog)). New
+container opened anywhere else offers no apps, since they are picked on
+the Library alone. The app's part of the dialog is a panel of its
+own over the rest, headed as its Library card is, with the fields the app
+declares (Immich asks for its photos and videos and for its database's
+folder, a media server for its media), then who it runs as, the time zone
+and its port where its compose reads them. A folder suggests each of the
+node's pools and shares with the app's own folder under it; a secret is
+made for it when left empty, once, and kept on every later edit; an app
+that calls models picks the model router it uses, which makes the container
+a key of its own there, counted in the router's spend under the
+container's name and deleted with it, given by whoever may set the router
+up. The panel
+owns those values: the Compose tab shows the app's file as the catalog
+wrote it, read-only, and the Environment tab holds only the other
+variables, one the panel sets refused there by name. **Edit the definition
+by hand** under the compose file asks first, then folds the panel to a line
+and leaves the file and the environment as plain text, the values as they
+stood; Start over from the Library puts the fields back. Create makes it
+as any container, keeping beside its compose file which app it came from.
+Each press makes another: a second from the same app is offered a name of
+its own (immich-2), its folders under that name, followed as it is typed,
+and the ports after the ones the containers already made from apps hold
+on that node, counted even while one is still starting. Its row's
+**Configure** opens the same panel with each value read back
+from its environment, offering a newer definition the Library has kept
+since; its row offers Update when that definition names another image
+([Image updates](#image-updates)). Home
+Assistant runs on the machine's own network and answers on its own port.
+The
 app answers on its port on the node; a hostname and a certificate for it
 are that node's nginx page. On the controller's own machine these run
 where the Containers page runs them, under R165's arrangement of the own
@@ -186,7 +216,9 @@ takes the **space** it belongs to (Send to Docker manager takes the same,
 with the space it is built from picked by default): a
 name, a compose file and an environment, which is the shape Portainer's stacks
 and Dockge use. Labels are not a fourth box, in compose they belong in the
-YAML. The compose file is checked by compose itself before it is saved, and
+YAML. **Import a compose file**, beside the Compose pane's hint, fills that
+pane from a file on your computer and the name from the file's, when none is
+typed. The compose file is checked by compose itself before it is saved, and
 kept in `/config/containers/<name>/` where no space scan can see it; its
 relative bind sources resolve against its own data directory under `/devdata`,
 which is a path the daemon has; this container too where the share is
@@ -270,6 +302,11 @@ and runs build → down → up, unless the rebuild finds new settings in
 example with the old values preserved in comments, and leaves Up for the
 operator. Before the first build the button reads
 **Build**, and nothing is built until it is pressed.
+Up, Down and Rebuild ask nothing by themselves. A build asks once, in one
+question, when its compose file asks for more than its own directory (until
+that list has been said yes to) or would run a service beside the app that
+the last build did not ship; a session's rebuild that meets either is a
+request on the bell naming them, and Allow is the yes.
 **Build from** picks the branch it is built from. A space's tree is shared, one checkout for every session and person on it, so this does not switch it:
 the build comes from a git worktree of that branch beside the space, marked
 with a `.bbignore` so the spaces list knows what it is, and the space's own
@@ -392,6 +429,11 @@ what it is (docs/nodes.md §7).
 
 ## nginx
 
+nginx is a service: **Install** on its card under Services in the Library
+puts it on the node picked there, and its row on that node's Installed page
+opens the nginx page (at `#/machines/nginx`; Configure on its container's
+row opens it too).
+
 Each node's nginx is what stands in front of its containers, unless you
 choose to run your own proxy: a container, a site included, serves plain
 HTTP on a port of its own with the smallest server it needs, and its
@@ -405,18 +447,17 @@ routed, and is deleted only when nothing routes it, the refusal saying
 where it is. A route's hostname is picked from that list, so several routes,
 nodes and spaces' containers use one name without typing it again.
 
-nginx keeps up to date like the toolchains and the agent (R192, the
-operator, 11 Oct). The controller reads the registry's tag list once a week
-(Check for updates on the nginx page reads it at once) and keeps the newest release
-line's alpine tag with its digest; a node's nginx is pinned to a digest when
-it is deployed or updated, written into its compose file as
-`nginx:TAG@sha256:...`, so a Save rebuilds with exactly what it had and
-nothing moves under it. A deployed nginx behind the newest line says so on
-the nginx page's node and on its Containers page row, each with Update, which pins
-the new digest and rebuilds; the bell carries a note of its own kind, to the
-digest, so Dismiss holds until the registry moves the line again. One
-deployed before any check had read the registry is unpinned, and behind
-whatever is newest until its first Update.
+nginx runs the image AerieOS names for it, by its digest (R192, the
+operator, 11 Oct and 20 Nov). Nothing asks a registry what is newest: the
+image is part of nginx's entry, `nginx:TAG@sha256:...`, and a newer one
+arrives with an update of AerieOS. A node's nginx is pinned to that digest
+when it is deployed or updated, written into its compose file, so a Save
+rebuilds with exactly what it had and nothing moves under it. A deployed
+nginx behind the image its entry names says so on the nginx page's node and
+on its Containers page row, each with Update, which pins the new digest and
+rebuilds; the bell carries a note of its own kind, to the digest, so
+Dismiss holds until the entry names another. One whose record names no
+image yet is pinned to the entry's the next time its file is written.
 
 ### Certificates from Let's Encrypt
 
@@ -433,20 +474,20 @@ need not be reachable at all; the domain must be on that account. The pair
 is kept like a pasted one, filed under its hostname, and renewed thirty
 days before it ends, the way it was first got; a renewal that fails is on
 the bell and tried again a few hours later. The client is `acme.py`,
-AerieOS's own on the `cryptography` library; `BB_ACME_DIRECTORY` points
-it at another ACME directory (a staging one, or a private CA).
+AerieOS's own on the `cryptography` library, and it asks Let's Encrypt.
 
 ## Scanners
 
-The Scanners page, opened from the scanners' row in the System section,
+The Scanners page, opened from the Scanners' row on the Installed page or
+from the scanners' row in the System section,
 deploys AerieOS's own static analysis
 scanners (Semgrep, Trivy, mobsfscan) to each node that holds spaces as
-one compose space of one-shot services, their versions pinned at the
-deploy like nginx's image (R145), and runs them there on one schedule over
+one compose space of one-shot services, each the image AerieOS names by its
+digest, pinned at the deploy like nginx's (R145), and runs them there on one schedule over
 the spaces whose node it is; each node sends its SARIF up to the
 controller over the agent's own API, so nothing of the controller's is
 mounted on a node, and the Analysis page reads what came. The page says
-each node's state and versions, Update when newer are out (checked weekly),
+each node's state and versions, Update when this AerieOS names newer images,
 each node's last run with its log, Run now, Remove, and the spaces
 nothing covers with why. The whole of it is [scanners.md](scanners.md).
 
@@ -494,8 +535,20 @@ anonymous token (imagecheck.py). One that differs says so on its row with
 Update, which pulls (`compose pull --ignore-buildable`) and starts it again;
 the bell carries one note per node. What is built from code is not asked:
 Rebuild is what moves that, and it is ghosted until the code has moved. An
-image pinned by digest (nginx's) is its own page's, an image never pulled is
-pulled by Up, and a private one says the registry would not answer. A
+image never pulled is pulled by Up, and a private one says the registry
+would not answer.
+
+An image run by its digest (`name:tag@sha256:...`) is not asked about
+either: the tag beside a digest is not what runs, so a newer build of that
+tag is no update. For such a container Update means that its entry names
+another image: the app it was made from, once the catalog pins a newer
+definition of it and the Library has kept that, or, for the model router,
+the image this AerieOS names. Its row then says the image with the first
+digits of the digest it would move to, and Update writes that reference
+into its compose file's image line, leaving the rest of the file and its
+environment as they were, then pulls and starts it again. nginx's is its
+own page's and row's, and the scanners' their page's. A container you wrote
+by hand with a bare tag keeps the registry's check. A
 space's container is named whatever its owner wants: Send to Docker
 offers the space's name and the compose file's folder or variant, and the
 Edit dialog renames it while it is down, its record carrying the name while

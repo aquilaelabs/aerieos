@@ -4,8 +4,8 @@
 // (R8).
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -220,48 +220,52 @@ const TABKINDS = {
   term:     { multi: true },
   notebook:     { multi: true, label: t => "Notebook: " + projLabel(t.arg),
               icon: TOOL_ICONS.notebook,
-              render: (i, t) => renderNotebookInto(i, t.arg), live: "always" },
+              render: (i, t) => renderNotebookInto(i, t.arg), live: "always",
+              // Shown again: its tokens asked for now, since the poll left a
+              // notebook not on show out (R228 step 10) and may be a few
+              // seconds from its next tick.
+              open: () => pollRevs() },
   // The Library (R170): one list of everything an AerieOS installs or
   // runs, for one node; its own read, the node list, and the sign-in,
   // which rides the status poll (an agent's row carries it).
   library:  { multi: false, label: () => "Library",
               icon: TOOL_ICONS.toolchains,
-              render: (i) => renderLibraryInto(i), live: () => `${libRev}/${nodesRev}/${signinRev()}`,
+              render: (i) => renderLibraryInto(i), live: () => `${readRev("library")}/${readRev("nodes")}/${signinRev()}`,
               open: () => loadLibrary() },
   // What is installed on a node (R172): the Library's read kept to what is
   // there, its own node, and the sign-in, which rides the status poll.
   installed: { multi: false, label: () => "Installed",
               icon: TOOL_ICONS.nodes,
-              render: (i) => renderInstalledInto(i), live: () => `${instRev}/${nodesRev}/${signinRev()}`,
+              render: (i) => renderInstalledInto(i), live: () => `${readRev("installed")}/${readRev("nodes")}/${signinRev()}`,
               open: () => loadInstalled() },
   // A machine's files (R224): its roots through its agent, its own node.
   files:     { multi: false, label: () => "Files",
               icon: TOOL_ICONS.nodes,
-              render: (i) => renderFilesInto(i), live: () => `${flRev}/${nodesRev}`,
+              render: (i) => renderFilesInto(i), live: () => `${readRev("files")}/${readRev("nodes")}`,
               open: () => loadFiles() },
-  // A Library entry's own page (R183): the Library's read, one card of it,
-  // opened by its Details and named for the entry.
+  // A Library entry's own page (R183): its one row of the Library, read on
+  // its own (R256), opened by its Details and named for the entry.
   entry:     { multi: false, label: () => entryLabel(),
               icon: TOOL_ICONS.toolchains,
-              render: (i) => renderEntryInto(i), live: () => `${libRev}/${nodesRev}/${entryKey}`,
-              open: () => { if (!lib) loadLibrary(); } },
+              render: (i) => renderEntryInto(i), live: () => `${readRev("entry")}/${readRev("nodes")}/${entryKey}`,
+              open: () => { if (!entryLib) loadEntry(); } },
   // An installed thing's own page (R181 step 2): Installed's read, one row
   // of it, opened by a press and named for the thing.
   thing:     { multi: false, label: () => thingLabel(),
               icon: TOOL_ICONS.nodes,
-              render: (i) => renderThingInto(i), live: () => `${instRev}/${nodesRev}/${signinRev()}/${thingKey}`,
+              render: (i) => renderThingInto(i), live: () => `${readRev("installed")}/${readRev("nodes")}/${signinRev()}/${thingKey}`,
               open: () => { if (!inst) loadInstalled(); } },
-  // nodesRev and jobsRev as well as its own: a node's images arrive on its
+  // the nodes' revision and the jobs' as well as its own: a node's images arrive on its
   // census, and an image job moves the queue.
   emulator: { multi: false, label: () => "Emulator",
               icon: TOOL_ICONS.emulator,
-              render: (i) => renderEmulatorInto(i), live: () => `${emuRev}/${nodesRev}`,
+              render: (i) => renderEmulatorInto(i), live: () => `${readRev("emulator")}/${readRev("nodes")}`,
               open: () => loadEmulator() },
   // The Notifications page (R218 step 6): the account's record, read on
   // open, and the asks, which ride the phone payload, on every draw.
   // Help (R258): the docs' list on open, each doc read when it is opened.
   help:     { multi: false, label: () => "Help",
-              render: (i) => renderHelpInto(i), live: () => helpRev,
+              render: (i) => renderHelpInto(i), live: () => readRev("help"),
               open: () => loadHelp() },
   notices:  { multi: false, label: () => "Notifications",
               render: (i) => renderNoticesInto(i), live: "always",
@@ -282,9 +286,9 @@ const TABKINDS = {
               render: (i) => renderSessionsInto(i), live: "always" },
   projects: { multi: false, label: () => "Spaces",
               render: (i) => renderProjectsInto(i), open: () => projectsShown(), live: "always" },
-  // nodesRev as well as dockerRev: the node PICKER on this tab is drawn from
+  // the nodes' revision as well as the containers' revision: the node PICKER on this tab is drawn from
   // the node list, and that list arrives on its own schedule. Watching only
-  // dockerRev meant a fresh page whose first tab was this one drew before
+  // the containers' revision meant a fresh page whose first tab was this one drew before
   // the list landed and never drew again, so a box with two nodes showed no
   // picker at all until something else happened to repaint it. And the list
   // is asked for on open for the same reason, rather than only by the Nodes
@@ -292,94 +296,100 @@ const TABKINDS = {
   docker:   { multi: false, label: () => "Docker",
               icon: TOOL_ICONS.docker,
               render: (i) => renderDockerInto(i),
-              // ...and phRev, because a session's rebuild request is answered
-              // on this tab and arrives on the phone payload's ask list.
-              live: () => `${dockerRev}/${dmNodesKey()}/${phRev}`,
+              // ...and the phone list's revision, because a session's rebuild request is answered
+              // on this tab and arrives on the phone payload's ask list;
+              // and each space's Run its container dial, which a row's Agent
+              // pill says and which arrives on the status read, not with
+              // the list (a dial changed kept the old words until the
+              // containers were read again).
+              live: () => `${readRev("docker")}/${dmNodesKey()}/${readRev("phone")}/${(state?.projects || []).map(p => p.prefs?.devbuild || "").join(",")}`,
               open: () => { const t = dockerTab();
                             if (!dockerNode && t?.arg && t.arg !== "__docker")
                               dockerNode = t.arg;
-                            if (!dockerList && !dockerFetching) loadDocker();
-                            if (nodesList === null) loadNodes(); } },
+                            if (!dockerList && !readBusy("docker")) loadDocker();
+                            if (nodesList === null) nodesKnown(); } },
   nodes:    { multi: false, label: () => "Nodes",
               icon: TOOL_ICONS.nodes,
-              render: (i) => renderNodesInto(i), live: () => `${nodesRev}/${signinRev()}/${phRev}`,
+              render: (i) => renderNodesInto(i), live: () => `${readRev("nodes")}/${signinRev()}/${readRev("phone")}`,
               open: () => loadNodes() },
-  // nodesRev as well as its own: a node coming or going moves the sections.
+  // the nodes' revision as well as its own: a node coming or going moves the sections.
   nginx:    { multi: false, label: () => "nginx",
               icon: TOOL_ICONS.nginx,
-              render: (i) => renderNginxInto(i), live: () => `${nginxRev}/${nodesRev}`,
+              render: (i) => renderNginxInto(i), live: () => `${readRev("nginx")}/${readRev("nodes")}`,
               open: () => loadNginx() },
   // The Scanners page (R145): AerieOS's own scanners on each node.
   scanners: { multi: false, label: () => "Scanners",
               icon: TOOL_ICONS.scanners,
-              render: (i) => renderScannersInto(i), live: () => `${scannersRev}/${nodesRev}/${jobsRev}`,
+              render: (i) => renderScannersInto(i), live: () => `${readRev("scanners")}/${readRev("nodes")}/${readRev("jobs")}`,
               open: () => loadScanners() },
   // The VMs page (R91): its records, and the census a node's hello carries.
   vms:      { multi: false, label: () => "VMs",
               icon: TOOL_ICONS.vms,
-              render: (i) => renderVmsInto(i), live: () => `${vmsRev}|${vmView}|${vmsNode}|${vmsChip}|${vmsSearch}`,
+              render: (i) => renderVmsInto(i), live: () => `${readRev("vms")}|${vmView}|${vmsNode}|${vmsChip}|${vmsSearch}`,
               open: () => loadVms() },
-  // nodesRev as well as its own: a hello carries a fresh walk.
+  // the nodes' revision as well as its own: a hello carries a fresh walk.
   storage:  { multi: false, label: () => "Storage",
               icon: TOOL_ICONS.storage,
-              render: (i) => renderStorageInto(i), live: () => `${storageRev}/${nodesRev}`,
+              render: (i) => renderStorageInto(i), live: () => `${readRev("storage")}/${readRev("nodes")}`,
               open: () => loadStorage() },
   // From the status read and the node list: drawn on every poll, painted
   // only when it changed.
   debug:    { multi: false, label: () => "Debug",
               icon: TOOL_ICONS.debug,
               render: (i) => renderDebugInto(i), live: "always" },
-  // jobsRev as well as its own: a schedule's run is a job.
+  // the jobs' as well as its own: a schedule's run is a job.
   schedules: { multi: false, label: () => "Schedules",
               icon: TOOL_ICONS.schedules,
-              render: (i) => renderSchedulesInto(i), live: () => `${schedRev}/${jobsRev}`,
+              render: (i) => renderSchedulesInto(i), live: () => `${readRev("schedules")}/${readRev("jobs")}`,
               open: () => loadSchedules() },
   jobs:     { multi: false, label: () => "Jobs",
               icon: TOOL_ICONS.jobs,
-              render: (i) => renderJobsInto(i), live: () => jobsRev,
+              render: (i) => renderJobsInto(i), live: () => readRev("jobs"),
               open: () => loadJobs() },
   // A phone and a CI runner are tools of their own again, each with a node
   // picker (R121, the operator 4 Oct): inside a node's page they were hard
   // to find, and the Nodes tab is a machine's configuration.
   phone:    { multi: false, label: () => "Phone",
               icon: TOOL_ICONS.phone,
-              render: (i) => renderPhoneInto(i), live: () => phRev,
+              render: (i) => renderPhoneInto(i), live: () => readRev("phone"),
               open: () => phFetch(null, true) },
   runner:   { multi: false, label: () => "CI runner",
               icon: TOOL_ICONS.runner,
-              render: (i) => renderRunnerInto(i), live: () => `${nodesRev}/${(state?.node_runners || []).length}`,
+              render: (i) => renderRunnerInto(i), live: () => `${readRev("nodes")}/${(state?.node_runners || []).length}`,
               open: () => loadNodes() },
   // The install key and what is kept under it (R154).
   keys:     { multi: false, label: () => "Keys",
               icon: TOOL_ICONS.keys,
-              render: (i) => renderKeysInto(i), live: () => keysRev,
+              render: (i) => renderKeysInto(i), live: () => readRev("keys"),
               open: () => loadKeys() },
   // Who did what to this install (R158 step 8).
   audit:    { multi: false, label: () => "Audit",
               icon: TOOL_ICONS.audit,
-              render: (i) => renderAuditInto(i), live: () => auditRev,
+              render: (i) => renderAuditInto(i), live: () => readRev("audit"),
               open: () => loadAudit() },
   network:  { multi: false, label: () => "Network",
               icon: TOOL_ICONS.network,
-              render: (i) => renderNetworkInto(i), live: () => settingsLive() + nodesRev,
+              render: (i) => renderNetworkInto(i), live: () => settingsLive() + readRev("nodes"),
               open: () => loadNodes() },
-  machine:  { multi: false, label: () => "This machine",
+  machine:  { multi: false, label: () => "This controller",
               icon: TOOL_ICONS.machine,
               // ...and on the held start and the stick's report, which ride the
               // status poll: Start and the hold-next box show what they did.
-              render: (i) => renderMachineInto(i), live: () => `${nodesRev}/${JSON.stringify(state?.held || {})}/${state?.firstboot?.at || 0}`,
+              render: (i) => renderMachineInto(i), live: () => `${readRev("nodes")}/${JSON.stringify(state?.held || {})}/${state?.firstboot?.at || 0}`,
               open: () => loadNodes() },
   settings: { multi: false, label: () => "Controller settings",
               render: (i) => renderSettingsInto(i), live: settingsLive,
-              open: () => loadApps() },
+              // ...and an armed move read again, whose clock stops while
+              // another page is on show (R228 step 10).
+              open: () => { loadApps(); if (moveData?.prepared && !moveTimer) loadMove(); } },
   users:    { multi: false, label: () => "Users",
-              render: (i) => renderUsersInto(i), live: () => usersRev,
+              render: (i) => renderUsersInto(i), live: () => readRev("users"),
               open: () => loadUsers() },
   roles:    { multi: false, label: () => "Roles",
-              render: (i) => renderRolesInto(i), live: () => rolesRev,
+              render: (i) => renderRolesInto(i), live: () => readRev("roles"),
               open: () => loadRoles() },
   profile:  { multi: false, label: () => "Profile",
-              render: (i) => renderProfileInto(i), live: () => `${profileRev}/${keyMineRev}`,
+              render: (i) => renderProfileInto(i), live: () => `${readRev("profile")}/${readRev("keymine")}`,
               open: () => loadProfile() },
   findings: { multi: false, label: () => "Analysis",
               icon: TOOL_ICONS.findings,
@@ -387,9 +397,11 @@ const TABKINDS = {
               // The ages list as well as the mtime: the mtime is a MAX, so a
               // report appearing with an OLD stamp: the exact shape of a
               // stale copy: moves it nowhere, and the tab never heard.
+              // ...and its own counter, which a load and a filter move
+              // (B756: the Files page's took its place in a rename).
               live: () => `${state?.reports_mtime ?? ""}:${
                 (state?.reports_ages || []).map(r => r.name + (r.stale ? "!" : ""))
-                  .join(",")}:${flRev}`,
+                  .join(",")}:${readRev("findings")}`,
               open: () => loadFindings() },
 };
 
@@ -405,8 +417,8 @@ const identity = t => t.kind === "term" ? "tmux:" + sessionOf(t.arg)
 // sat in, and a phone has no hover). The words a `title` carries are kept for
 // a screen reader and never drawn: an element with no text of its own (an
 // icon button, a swatch, a field) is named by them, and one with text is
-// described by them. One observer over the page does it to whatever any
-// draw writes, so no surface needs to remember to.
+// described by them. The draw that writes one does it (drawn, page-paint.js),
+// so no surface needs to remember to.
 function untitle(el){
   const s = el.getAttribute("title");
   el.removeAttribute("title");
@@ -419,15 +431,6 @@ function untitleIn(root){
   if (root.nodeType !== 1) return;
   if (root.hasAttribute("title") && !(root instanceof SVGElement)) untitle(root);
   root.querySelectorAll("[title]").forEach(el => { if (!(el instanceof SVGElement)) untitle(el); });
-}
-function untitleWatch(){
-  untitleIn(document.body);
-  new MutationObserver(ms => {
-    for (const m of ms){
-      if (m.type === "attributes"){ if (m.target.hasAttribute("title") && !(m.target instanceof SVGElement)) untitle(m.target); }
-      else m.addedNodes.forEach(untitleIn);
-    }
-  }).observe(document.body, {subtree: true, childList: true, attributes: true, attributeFilter: ["title"]});
 }
 
 // A ? and its words in a tooltip beside it (the operator, 26 Oct, where on
@@ -546,9 +549,9 @@ function renderGuarded(spec, i, t){
   }
   catch(e){
     const el = $("doc" + i);
-    if (el) el.innerHTML = `<div class="hint bad" data-style="padding:var(--row-y) var(--row-x)">
+    if (el) drawHTML(el, `<div class="hint bad" data-style="padding:var(--row-y) var(--row-x)">
       this tab's renderer failed: the rest of the page is fine.
-      ${esc(String(e && e.message || e))}</div>`;
+      ${esc(String(e && e.message || e))}</div>`);
     setTimeout(() => { throw e; });
   }
 }
@@ -584,7 +587,7 @@ function drawCard(id, fn){
   try{ fn(); }
   catch(e){
     const el = id && $(id);
-    if (el) paint(el, `<div class="empty warn">not drawn; this card's draw failed
+    if (el) patch(el, `<div class="empty warn">not drawn; this card's draw failed
       on the container's answer; the rest of the page is fine.
       ${esc(String(e && e.message || e))}</div>`);
     setTimeout(() => { throw e; });
@@ -665,7 +668,12 @@ function show(t){
   if (!openedNow.has(t.id)) TABKINDS[t.kind]?.open?.();
   // Only when it is a different project's: switching back to a notebook must
   // not reload it, or whatever is staged in it goes.
-  refreshSoon();      // a just-opened terminal's session appears in Sessions
+  // A just-opened terminal's session appears in Sessions: now, and twice
+  // more as it comes to exist. Any other page reads the status once, as it
+  // opens; it has no session to wait for, and the two reads after were the
+  // heaviest read there is, made three times for every press on the rail.
+  if (t.kind === "term") refreshSoon();
+  else refresh();
 }
 
 // The status poll is every fifteen seconds, which is the right cadence for

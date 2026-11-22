@@ -33,7 +33,7 @@ const me = await page.evaluate(async () => (await (await fetch('/api/profile')).
 const rows = (me.signins || []);
 const mine = rows.find(r => r.agent === 'Chrome on Windows');
 ok(rows.length >= 1 && !!mine, `Profile lists the browser signed in, by name (${rows.map(r => r.agent).join(', ') || 'none'})`);
-const ended = await page.evaluate(async id => (await (await postJSON('/api/profile', { action: 'signin-out', id })).json()), mine ? mine.id : 'x');
+const ended = await page.evaluate(async id => (await postJSON('/api/profile', { action: 'signin-out', id })), mine ? mine.id : 'x');
 ok(ended.ok === true && ended.this === false, 'Sign out on another browser\'s row answers that it is not this one');
 ok(await status(c1, CHROME) === 401, '...and that browser\'s cookie is nobody\'s from its next request');
 
@@ -51,4 +51,15 @@ ok(seen.refused, 'the refused cookie is on it as a line of its own');
 await page.selectOption('#auditPerson', 'test');
 await page.waitForFunction(() => { const rows = [...document.querySelectorAll('.audittab .auditrow')]; return rows.length > 0 && rows.every(r => r.textContent.includes('test')); }, null, { timeout: patience(15000) });
 ok(true, 'picked to one person, every row is theirs');
+
+// A notebook's presence beat changes nothing a person reads the audit for,
+// and it came every fifteen seconds an open notebook (R228 step 7): it is
+// not a row, while a write beside it still is.
+const audited = await page.evaluate(async () => {
+  for (let i = 0; i < 3; i++) await postJSON('/api/presence', { project: 'alpha', client: 'audit-probe', where: 'roadmap' });
+  const j = await (await fetch('/api/audit?n=500')).json();
+  return { beats: j.rows.filter(r => r.action.startsWith('/api/presence')).length,
+           signout: j.rows.some(r => r.action === '/api/profile:signin-out') };
+});
+ok(audited.beats === 0 && audited.signout, `a presence beat is not an audit row, a sign-out is (${audited.beats} beats on it)`);
 await done(browser);

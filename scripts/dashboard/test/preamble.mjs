@@ -10,7 +10,7 @@
 // So what is measured here is the assembly itself (order, joins, the cap) and
 // then the thing that makes it worth having: the tab renders the SAME string
 // the endpoint returns, byte for byte, rather than its own idea of it.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, patience } from './lib.mjs';
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, patience, OWNER, section, REPO } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -61,7 +61,7 @@ const droid = await api('/api/preamble?project=alpha&topic=android');
 ok(/^## Building and testing/.test(build.text || '') && /this node carries git, tmux, jq, python3 and curl by itself/.test(build.text || '')
    && /^## Android/.test(droid.text || '')
    && (await fetch(URL.replace(/\/$/, '') + '/api/preamble?project=alpha&topic=nope',
-        { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).status === 404,
+        { headers: OWNER })).status === 404,
    'a topic is its section whole, a gated one answers when asked for, and an unknown name is refused');
 // The line between the two: the briefing states what is true of the machine,
 // a shipped rule is an obligation, and nothing is said in both. An obligation
@@ -134,7 +134,6 @@ ok((p.parts || []).map(x => x.name).join(',') === 'core,rules,briefing,live,road
 
 // What a prompt names arrives on that prompt, by its words or its number,
 // once a conversation, through the hook every prompt runs.
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const hook = input => execFileSync('python3', [`${REPO}/scripts/dashboard/bb-prompt-relay`, 'alpha', 'u_pre'],
   { input: JSON.stringify(input), encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`,
@@ -196,7 +195,7 @@ ok(page.errors.length === 0,
 // config/templates/ to /opt/aerieos/templates/ and the first version of
 // preamble.py looked in /opt/aerieos/config/templates/. This asserts the two
 // agree by reading the Dockerfile, rather than trusting either.
-{
+await section("the briefing has to be where the IMAGE puts it", async () => {
   const root = join(import.meta.dirname, '..', '..', '..');
   const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
   const py = readFileSync(join(root, 'scripts', 'dashboard', 'preamble.py'), 'utf8');
@@ -206,14 +205,14 @@ ok(page.errors.length === 0,
      `preamble.py looks for the briefing where the image puts it (${dest})`);
   ok(existsSync(join(root, 'config', 'templates', 'briefing.md')),
      '...and the file it ships is in the tree');
-}
+});
 
 // ---- aerie status tells a refusal from a silence (R62) --------------------------
 // The first version reported an expired token as "the controller did not
 // answer", which is the mistake bbapi.request exists to prevent and that
 // bb-gate had already made once. A session sent chasing a network problem
 // when the answer is "open this session's tab" is the cost.
-{
+await section("aerie status tells a refusal from a silence", async () => {
   const root = join(import.meta.dirname, '..', '..', '..');
   const run = (env) => {
     try {
@@ -230,6 +229,6 @@ ok(page.errors.length === 0,
                           BB_TOKEN: 'bbs_nonsense', BB_PROJECT: 'alpha' }));
   ok(/did not answer/.test(away),
      `...and a controller that is really not there reads as silence (${away})`);
-}
+});
 
 await done(browser);

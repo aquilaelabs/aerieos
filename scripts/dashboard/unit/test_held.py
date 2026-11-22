@@ -36,7 +36,7 @@ class Held(unittest.TestCase):
         self.assertTrue(got["held"])
         self.assertIn("not clean", got["why"][0])
         self.assertTrue(held.is_held())
-        self.assertIn("press Start on This machine", held.said())
+        self.assertIn("press Start on This controller", held.said())
         r = held.start("user:test")
         self.assertEqual((r["ok"], r["held"]), (True, False))
         self.assertFalse(held.is_held())

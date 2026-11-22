@@ -33,35 +33,32 @@ import time
 
 import agents
 
-# The URL the flow prints, and the two things it says when it is over.
-AUTH_URL = re.compile(r"https://(?:claude\.com|console\.anthropic\.com|"
-                      r"platform\.claude\.com)/\S+")
+# The words the card waits for where a flow wants a code pasted back.
 PROMPT = "Paste code"
 
-# Each coding agent's flow as its log reads (R95 step 3): the link it
-# prints, the one-time code a device flow shows beside it (the person types
-# it on the provider's page, and nothing comes back down), and the prompt a
-# flow that wants a code pasted back waits at. Claude's asks for a code;
-# Codex's device login (`codex login --device-auth`, 0.163.0) and Copilot's
-# (`copilot login --device-code`, 1.0.102) show one.
-FLOWS = {
-    "claude": {"url": AUTH_URL, "code": None, "prompt": PROMPT},
-    # The link ends at a space or at the color code Codex prints around it
-    # (\x1b[...m): taken with \S+ the reset came along, the link opened a
-    # page that said the session had ended.
-    "codex": {"url": re.compile(r"https://auth\.openai\.com/[^\s\x1b]+"),
-              "code": re.compile(r"one-time code[^\n]*\n\s*(?:\x1b\[[0-9;]*m)*([A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+)"),
-              "prompt": None},
-    "copilot": {"url": re.compile(r"https://github\.com/login/device[^\s\x1b]*"),
-                "code": re.compile(r"enter code\s+([A-Z0-9]{4}-[A-Z0-9]{4})"),
-                "prompt": None},
-    # Grok Build's device code (`grok login --device-auth`): a link on an
-    # x.ai host and a code beside it, matched broadly since its words are
-    # documented as "a URL and a code" (25 Oct).
-    "grok": {"url": re.compile(r"https://(?:[a-z0-9-]+\.)*(?:x\.ai|grok\.com)/[^\s\x1b]*"),
-             "code": re.compile(r"(?<![A-Z0-9-])([A-Z0-9]{4,}-[A-Z0-9]{4,})(?![A-Z0-9-])"),
-             "prompt": None},
-}
+# Every coding agent's flow reads the same in its job's log (R233 step 6,
+# R234 step 6): its own screens are driven on the node by
+# scripts/lib/login-flow.py from what its row in the agents' table or its
+# pack's manifest says of them (signin.flow), and what comes up the log is
+# that driver's lines, the link on one, a one-time code on another (the
+# person types it on the provider's page, and nothing comes back down), and
+# the prompt's words where the flow wants a code pasted back.
+FLOW = {"url": re.compile(r"(?<=\[aerieos\] open this link to sign in: )https://[^\s\x1b]+"),
+        "code": re.compile(r"\[aerieos\] then enter this code there: ([A-Za-z0-9-]{4,40})"),
+        "prompt": PROMPT}
+
+
+def flow_of(agent):
+    """How an agent's flow reads in its job's log, or None for one that
+    signs in nowhere the page can run."""
+    a = agents.get(agent)
+    return FLOW if a is not None and a.login_job and agents.flow_of(agent) else None
+
+
+def pastes(agent):
+    """Whether the agent's flow wants a code pasted back (a field on the
+    card), as against showing one to type on the provider's page."""
+    return bool((agents.flow_of(agent) or {}).get("prompt"))
 
 
 # How long start_on_node() waits for the URL before answering. The flow takes
@@ -73,7 +70,10 @@ FLOWS = {
 URL_WAIT = 10
 
 _lock = threading.Lock()
-_flow = None
+# The flow running for each account, {uid: flow}: each is a job on its own
+# node, so two people signing in at once is two jobs, and an account's new
+# sign-in replaces only its own.
+_flows = {}
 
 # What verb() and take_code() need from the server, set by server.py: the
 # node registry a flow runs on, and a session token minted for the account
@@ -81,16 +81,9 @@ _flow = None
 nodes = None
 mint = None
 
-# What a flow's log carries around its link that is not the link. Claude Code
-# prints the link as a terminal hyperlink (OSC 8: ESC ] 8 ; ; URI BEL, the
-# text, then the same closed), and wraps it at the pty's width, which a job's
-# pty leaves at its default: taken with \S+ off one line, the link opened was
-# its first eighty-odd characters, without its state or code challenge, and
-# the sign-in page said only that it did not complete; and the failure's
-# reason was a piece of the link's last line, "]8;;" and all.
-OSC8 = re.compile(r"\x1b\]8;[^;\x07\x1b]*;([^\x07\x1b]*)(?:\x07|\x1b\\)")
+# What a job's pty adds to the driver's lines that is not what they say:
+# escapes and carriage returns.
 ESCAPES = re.compile(r"\x1b\]8;[^;\x07\x1b]*;[^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b|\r")
-URL_PART = re.compile(r"[A-Za-z0-9%._~:/?#\[\]@!$&'()*+,;=-]+")
 
 
 def plain(out):
@@ -98,28 +91,11 @@ def plain(out):
     return ESCAPES.sub("", out or "")
 
 
-def link(out, rx):
-    """The flow's link, whole: a hyperlink's own target where the flow
-    printed one (never wrapped), else the text's, its wrapped lines joined
-    back while each next line is nothing but more of a URL."""
-    for target in OSC8.findall(out or ""):
-        m = rx.match(target)
-        if m:
-            return m.group(0)
-    text = plain(out)
-    m = rx.search(text)
-    if not m:
-        return ""
-    url, prev = m.group(0), text[text.rfind("\n", 0, m.start()) + 1:m.end()]
-    if text[m.end():m.end() + 1] == "\n":
-        for line in text[m.end() + 1:].split("\n"):
-            part = line.strip()
-            # More of the link: URL characters alone, after a line the
-            # wrap filled, or carrying the query's own marks.
-            if not part or not URL_PART.fullmatch(part) or not (len(prev) >= 60 or any(c in part for c in "%=&")):
-                break
-            url, prev = url + part, line
-    return url
+def link(out):
+    """The flow's link, whole, from the driver's line: it reads the
+    program's screen on the node and says the link on one line."""
+    m = FLOW["url"].search(plain(out))
+    return m.group(0) if m else ""
 
 
 # What gets removed from a pasted code before it is handed to the flow:
@@ -152,7 +128,7 @@ class NodeFlow:
         self._nodes, self.node, self.job = nodes, node_id, job_id
         self.node_name = name
         self.uid = str(uid or "")          # whose sign-in it is: theirs to type into
-        self.agent = agent if agent in FLOWS else "claude"
+        self.agent = agent if flow_of(agent) else "claude"
         self.sent = False
 
     def _log(self):
@@ -180,23 +156,28 @@ class NodeFlow:
     def state(self):
         j, out = self._log()
         done = (j.get("state") or "") in ("succeeded", "failed", "canceled")
-        flow = FLOWS[self.agent]
-        url = link(out, flow["url"])
-        c = flow["code"].search(out) if flow["code"] else None
-        prompt = flow["prompt"]
+        url = link(out)
+        c = FLOW["code"].search(out)
+        code = c.group(1) if c else ""
+        prompt = PROMPT if pastes(self.agent) else None
         why = ""
         if done and j.get("state") != "succeeded":
             # The last line that says something: never a piece of the link.
             for line in reversed(plain(out).splitlines()):
                 line = line.strip()
-                if line and not line.startswith("http") and line not in url and (not prompt or prompt not in line):
-                    why = line[-300:]
+                if line and not line.startswith("http") and line not in url and not (url and url in line) and (not prompt or prompt not in line):
+                    # Without the mark a driver's or a check's line opens with.
+                    why = re.sub(r"^\[(?:aerieos|builderbot)\]\s*", "", line)[-300:]
                     break
             why = why or "the sign-in did not finish"
         return {"running": not done, "url": url,
                 # A device flow's code, shown for the person to type on the
                 # provider's page; "" for a flow that wants one pasted back.
-                "code": c.group(1) if c else "", "agent": self.agent,
+                "code": code, "agent": self.agent,
+                # Whether this flow takes a code back: the card draws the
+                # field for one that does and the code to type for one that
+                # does not.
+                "paste": pastes(self.agent),
                 "waiting": bool(prompt and prompt in out) and not self.sent and not done,
                 "sent": self.sent and not done,
                 "done": done, "ok": j.get("state") == "succeeded",
@@ -206,12 +187,11 @@ class NodeFlow:
 
 
 def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
-    """Begin a flow on a node. Same contract as start(): it replaces whatever
-    was running and waits a moment for the URL, so the button that is already
-    waiting gets the link in its own answer."""
-    global _flow
+    """Begin a flow on a node for account `uid`: it replaces that account's
+    own, if one was running, and waits a moment for the URL, so the button
+    that is already waiting gets the link in its own answer."""
     with _lock:
-        old = _flow
+        old = _flows.get(str(uid))
     if old:
         old.cancel()
     # The token is what lets the flow REPORT what it signed in as: minted
@@ -226,7 +206,7 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
         return r
     f = NodeFlow(nodes, node_id, r["job"], name, uid=uid, agent=a.id)
     with _lock:
-        _flow = f
+        _flows[str(uid)] = f
     t0 = time.time()
     while time.time() - t0 < URL_WAIT and not f.state()["url"] \
             and f.state()["running"]:
@@ -236,40 +216,58 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
 
 
 
-def submit(code):
-    with _lock:
-        f = _flow
-    return f.submit(code) if f else {"error": "no sign-in is running"}
+def resume():
+    """The flows found again after the controller restarted (R227 step 13):
+    a sign-in is a job on a node, which the restart did not end, and what
+    its page draws is read from that job's log, so each one still going is
+    its account's flow again, its link shown and its code taken. They were
+    kept in memory alone, and a person half-way through was left with a job
+    running on the node and a page that said no sign-in was. The count."""
+    if nodes is None:
+        return 0
+    found = 0
+    for j in nodes.jobs_going("user:signin"):
+        uid = str(j["spec"].get("uid") or "")
+        if not uid or not j["node"]:
+            continue
+        n = nodes.node(j["node"]) or {}
+        f = NodeFlow(nodes, j["node"], j["id"], n.get("name") or "", uid=uid, agent=str(j["spec"].get("agent") or "claude"))
+        with _lock:
+            # The newest of an account's, as a new sign-in replaces its own.
+            _flows[uid] = f
+        found += 1
+    return found
 
 
-def cancel():
-    """Stop the running flow and forget it. Forgotten at once, not when the
-    node reports the job stopped: a node that has gone quiet never does, and
-    a flow nobody can finish must not hold the next sign-in back."""
-    global _flow
+def submit(code, uid):
     with _lock:
-        f, _flow = _flow, None
+        f = _flows.get(str(uid))
+    return f.submit(code) if f else {"error": "no sign-in of yours is running"}
+
+
+def cancel(uid):
+    """Stop this account's flow and forget it. Forgotten at once, not when
+    the node reports the job stopped: a node that has gone quiet never does,
+    and a flow nobody can finish must not hold the next sign-in back."""
+    with _lock:
+        f = _flows.pop(str(uid), None)
     if f:
         f.cancel()
     return {"ok": True}
 
 
-def state(uid=None):
-    """The running flow as its row draws it. With `uid`, only that account's
-    own: the link a flow prints signs somebody in, so it is shown to the
-    person it was started for and nobody else."""
+def state(uid):
+    """This account's flow as its row draws it: the link a flow prints signs
+    somebody in, so it is shown to the person it was started for and nobody
+    else."""
     with _lock:
-        f = _flow
-    if not f or (uid is not None and getattr(f, "uid", "") != str(uid or "")):
-        return {"running": False}
-    return f.state()
+        f = _flows.get(str(uid or ""))
+    return f.state() if f else {"running": False}
 
 
-def owner():
-    """The account the running flow was started for, or "" when none is."""
-    with _lock:
-        f = _flow
-    return getattr(f, "uid", "") if f else ""
+def running(uid):
+    """Whether this account has a flow going."""
+    return bool(state(uid).get("running"))
 
 
 # ---- the row's verbs, one call each from the dashboard -------------------------
@@ -296,7 +294,7 @@ def verb(action, node_id, uid, agent="claude"):
     stop the one that is running, once server.py has said this person may
     and that the node is theirs to see. (payload, status)."""
     if action == "cancel":
-        return cancel() | {"signin": state(uid)}, 200
+        return cancel(uid) | {"signin": state(uid)}, 200
     n = nodes.node(node_id) if nodes is not None and node_id else None
     why = cannot(n, agent)
     if why:
@@ -323,7 +321,7 @@ def sign_out(node_id, uid, agent="claude"):
     return {"ok": True, "job": r["job"], "on": n["name"]}, 200
 
 
-def take_code(code):
+def take_code(code, uid):
     """Hand the code from the browser to the sign-in flow.
 
     Transport, not judgment. The only property this end owes the pty is
@@ -348,6 +346,6 @@ def take_code(code):
     if len(code) > 2048:
         return {"error": "that is far too long to be a code; "
                          "copy just the code"}, 400
-    r = submit(code)
-    r = r | {"signin": state(owner())}
+    r = submit(code, uid)
+    r = r | {"signin": state(uid)}
     return r, (400 if r.get("error") else 200)

@@ -10,6 +10,7 @@ import os
 import sys
 
 import dash
+from say import need
 
 reg = dash.load("testreg", dash.beside(sys.argv[1]))
 statefile = dash.statefile(dash.beside(sys.argv[1]))
@@ -23,12 +24,6 @@ rest = argv[1:]
 
 def secs(ms):
     return "-" if ms is None else f"{ms / 1000:.1f}s"
-
-
-def bail(r):
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr)
-        sys.exit(1)
 
 
 if op in ("list", "ls"):
@@ -111,7 +106,7 @@ elif op == "show":
               "polling timeout rather than work")
     elif t.get("accepted"):
         print(f"  accepted: sits on {t['sits_on']}s, and that is the work: {t['accepted']}")
-    print(f"  protects: {t['protects'] or '(nothing written yet)'}")
+    print(f"  protects: {t['protects'] or ('(its name says it)' if t.get('described') else '(nothing written yet)')}")
     print(f"  exercises: {t['notes'] or '(nothing written yet)'}")
 elif op == "describe" and rest[:1] == ["--from"]:
     # A bulk fill, from a file of {key: {protects, notes}}: one load and one
@@ -122,7 +117,7 @@ elif op == "describe" and rest[:1] == ["--from"]:
     with open(os.environ.get("BB_TESTS_FILE", ""), encoding="utf-8") as fh:
         rows = _json.load(fh)
     r = reg.describe_many(proj, rows)
-    bail(r)
+    need(r)
     print(f"described {r['wrote']} tests")
     if r["unknown_n"]:
         print(f"  {r['unknown_n']} keys named no test here; the registry and the "
@@ -143,13 +138,13 @@ elif op in ("note", "describe"):
             words.append(rest[i]); i += 1
     r = reg.describe(proj, rest[0], protects=" ".join(words),
                      **({"notes": how} if how is not None else {}))
-    bail(r)
+    need(r)
     print(f"described {rest[0]}")
 elif op == "ingest":
     src = os.environ.get("BB_TESTS_FILE", "")
     with open(src, encoding="utf-8", errors="replace") as fh:
         r = reg.ingest(proj, fh.read(), by="claude")
-    bail(r)
+    need(r)
     print(f"ingested {r['n']} results from {len(r['suites'])} suite"
           f"{'' if len(r['suites']) == 1 else 's'}")
     for kind, rows in (("new", r["added"]), ("gone", r["gone"]),
@@ -206,7 +201,7 @@ elif op == "accept":
         print("usage: aerie tests accept <key> \"why the time is the work\"  |  aerie tests accept <key> --no",
               file=sys.stderr); sys.exit(1)
     r = reg.accept(proj, rest[0], "" if rest[1] == "--no" else " ".join(rest[1:]))
-    bail(r)
+    need(r)
     print(f"{rest[0]}: " + ("no longer accepted; flagged again if it sits on a round number"
                             if rest[1] == "--no" else "accepted; it will not be flagged"))
 else:

@@ -8,8 +8,16 @@ installer's --update; the controller's account never does).
 The container edition has its own path (the image, pulled by the host), so
 nothing here is drawn for it: `attention` and `status` answer nothing when
 the install is not bare metal.
+
+What a release says its container image is (R199) is read here too, for
+whoever compares an image with a registry's tag (imagecheck.py): each
+release carries one line naming the image its tag pushed by digest
+(aerieos-image-VER.digest), in the release's signed list of its files, so a
+registry's `:dev` or `:latest` can be held to what the newest signed
+release names (signed_image).
 """
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -18,7 +26,9 @@ import threading
 import time
 import urllib.request
 
-RELEASES_URL = (os.environ.get("BB_APPS_RELEASES_URL")
+import seams
+
+RELEASES_URL = (seams.get("BB_APPS_RELEASES_URL")
                 or "https://api.github.com/repos/aquilaelabs/aerieos/releases")
 BOOT_DELAY = float(os.environ.get("BB_RELEASE_BOOT_DELAY") or 120)
 EVERY = 24 * 3600
@@ -28,6 +38,27 @@ VER = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 # A pre-release of any name (R218): vX.Y.Z-dev.N, -rc.N, -beta.N, N the
 # commit's ordinal whatever the name, so one number orders them all.
 DEV = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)-[a-z][a-z0-9]*\.(\d+)(?:\+[0-9a-f]+)?$")
+# A release's tag by its shape, which is what says which release it is: a
+# stable one is vX.Y.Z, a pre-release has a name and the commit's ordinal
+# after it. The channel a release is offered on and who may have signed its
+# list of files (R199) both follow the tag, never the flag the git host
+# keeps beside it, which whoever can edit a release can flip.
+STABLE_TAG = re.compile(r"v\d+\.\d+\.\d+")
+PRE_TAG = re.compile(r"v\d+\.\d+\.\d+-[a-z][a-z0-9]*\.\d+")
+# AerieOS's own container image, as a registry names it, and the tags of it
+# people follow: publishing a release moves :dev onto it, and a stable
+# release :latest too (publish-release.yml).
+IMAGE = seams.get("BB_RELEASE_IMAGE") or "ghcr.io/aquilaelabs/aerieos"
+FOLLOWED = ("dev", "latest")
+# The one line of a release's aerieos-image-VER.digest: the image by digest.
+IMAGE_LINE = re.compile(r"([a-z0-9][a-z0-9._/:-]{0,200})@(sha256:[0-9a-f]{64})")
+# How many of the newest releases are asked for one that names its image.
+IMAGE_LOOK = 3
+# The release line updates follow, X.Y, when the install names one
+# (BB_RELEASE_LINE, a stick's aerieos.env line the boot hands the
+# controller's environment): releases and dev builds of that line alone are
+# offered. Anything else named there is no line, and every release is.
+LINE = re.compile(r"v?(\d+)\.(\d+)")
 
 _lock = threading.Lock()
 _latest = {"version": "", "tag": "", "at": 0, "error": "", "checking": False, "url": "", "dev": {"version": "", "tag": "", "url": ""}}
@@ -101,6 +132,13 @@ def window_pass(now=None):
     return v
 
 
+def tag_kind(tag):
+    """"stable" for a stable release's tag, "pre" for a pre-release's, ""
+    for anything else."""
+    t = str(tag or "")
+    return "stable" if STABLE_TAG.fullmatch(t) else "pre" if PRE_TAG.fullmatch(t) else ""
+
+
 def parse(v):
     """(major, minor, patch) of a released version, or None for anything
     else (a dev build, unstamped)."""
@@ -123,14 +161,26 @@ def rank(v):
     return parse_dev(v)
 
 
-def check():
-    """Ask what the newest published release is, now. The record."""
-    with _lock:
-        if _latest["checking"]:
-            return dict(_latest)
-        _latest["checking"] = True
+def line():
+    """The release line this install follows, "0.9", or "" for every one."""
+    m = LINE.fullmatch(os.environ.get("BB_RELEASE_LINE", "").strip())
+    return f"{int(m.group(1))}.{int(m.group(2))}" if m else ""
+
+
+def on_line(tag, want):
+    """Whether a release's tag is of the line `want` ("" takes every one)."""
+    r = rank(str(tag or "").lstrip("v"))
+    return bool(r) and (not want or f"{r[0]}.{r[1]}" == want)
+
+
+def _read():
+    """What the releases list says now, for the record: ({version, tag, url}
+    of the newest release when there is one, with the dev channel's newest
+    under dev when the list was read, why not). The versions debug mode
+    picks from and the drafts' files are kept as it reads."""
     version, tag, url, error = "", "", "", ""
     token = _token()
+    follow = line()
     try:
         # A page long enough that dev builds never push the newest release off it.
         url_ = RELEASES_URL + ("?per_page=100" if RELEASES_URL.startswith("https://") else "")
@@ -139,20 +189,26 @@ def check():
             req.add_unredirected_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:   # noqa: S310 (our releases, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             rows = json.loads(r.read(8 << 20) or b"[]")
-        # A stable release's draft too where asked with the token.
-        live = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and not x.get("prerelease") and parse(x.get("tag_name"))]
+        # The stable channel's: a release whose tag is a stable release's
+        # (tag_kind), whatever the pre-release flag beside it says. The flag
+        # is the git host's, flipped by whoever can edit a release; the tag
+        # is what the release's files are signed for. A stable release's
+        # draft too where asked with the token. Both channels keep to the
+        # release line the install follows, where it names one.
+        live = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and tag_kind(x.get("tag_name")) == "stable"
+                and on_line(x.get("tag_name"), follow)]
         live.sort(key=lambda x: parse(x.get("tag_name")), reverse=True)
         if live:
             tag = str(live[0].get("tag_name") or "")
             version = ".".join(str(n) for n in parse(tag))
             url = str(live[0].get("html_url") or "")
         else:
-            error = "no published release"
+            error = f"no published release on the {follow} line" if follow else "no published release"
         # The dev channel's newest (R179): a pre-release whose tag is a dev
         # build's, never taken on the normal channel; a draft only where
         # it was asked with the token (debug mode, the dev channel).
         dev = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and parse_dev(x.get("tag_name"))
-               and (x.get("prerelease") or x.get("draft"))]
+               and (x.get("prerelease") or x.get("draft")) and on_line(x.get("tag_name"), follow)]
         dev.sort(key=lambda x: parse_dev(x.get("tag_name")), reverse=True)
         devrec = {"version": str(dev[0]["tag_name"]).lstrip("v"), "tag": str(dev[0]["tag_name"]), "url": str(dev[0].get("html_url") or ""),
                   "draft": dev[0].get("draft") is True} if dev else {"version": "", "tag": "", "url": "", "draft": False}
@@ -168,13 +224,14 @@ def check():
     except (OSError, ValueError) as e:
         error = f"the releases did not answer: {e}"[:200]
         devrec = None
-    with _lock:
-        _latest.update(checking=False, at=int(time.time()), error=error)
-        if version:
-            _latest.update(version=version, tag=tag, url=url)
-        if devrec is not None:
-            _latest["dev"] = devrec
-        return dict(_latest)
+    return {**({"version": version, "tag": tag, "url": url} if version else {}),
+            **({"dev": devrec} if devrec is not None else {})}, error
+
+
+def check():
+    """Ask what the newest published release is, now. The record."""
+    import checks
+    return checks.guarded(_lock, lambda: _latest, _read)
 
 
 def latest():
@@ -254,6 +311,49 @@ def fetch_draft(tag, dest):
         return _fetch["error"]
     _fetch["done"] = True
     return ""
+
+
+def signed_image(follow):
+    """What the newest signed release says its container image is, for the
+    tag of it somebody follows (`dev`: every published release; `latest`:
+    the stable ones): {tag, image, digest, ref, signed}, ref the image by
+    its digest and signed who signed the release's list of files. {why}
+    where none says: no release published, or none whose list this install
+    takes (the one check the Library's downloads make, apps._signed_list).
+    A release whose list is not taken is passed over for the one before
+    it, since what it names is nobody's word; one that is signed and names
+    no image, or whose image file is not the one its list names, ends the
+    look with that said, never an older release's image in its place.
+    Published releases alone, asked without a token."""
+    import apps
+    kinds = ("stable",) if follow == "latest" else ("stable", "pre")
+    try:
+        rows = json.loads(apps._get(RELEASES_URL + ("?per_page=100" if RELEASES_URL.startswith("https://") else ""), 8 << 20))
+    except (OSError, ValueError) as e:
+        return {"why": f"the releases did not answer: {e}"[:200]}
+    live = [r for r in rows if isinstance(r, dict) and not r.get("draft") and tag_kind(r.get("tag_name")) in kinds]
+    live.sort(key=lambda r: rank(str(r["tag_name"]).lstrip("v")), reverse=True)
+    why = "there is no published release"
+    for rel in live[:IMAGE_LOOK]:
+        tag = str(rel["tag_name"])
+        listed, signature, refused = apps._signed_list(rel)
+        if listed is None:
+            # Not taken: said if no release before it answers either.
+            why = refused
+            continue
+        name = f"aerieos-image-{tag.lstrip('v')}.digest"
+        asset = next((a for a in rel.get("assets") or [] if isinstance(a, dict) and a.get("name") == name), None)
+        if name not in listed or not asset:
+            return {"tag": tag, "why": f"{tag} is signed and names no image: it was made before a release said which image is its own"}
+        try:
+            body = apps._get(apps._where(asset), 4096)
+        except (OSError, ValueError) as e:
+            return {"tag": tag, "why": f"{tag}'s {name} did not come: {e}"[:200]}
+        m = IMAGE_LINE.fullmatch(body.decode("utf-8", "replace").strip())
+        if hashlib.sha256(body).hexdigest() != listed[name] or not m:
+            return {"tag": tag, "why": f"{tag}'s {name} is not the file its signed list names, so which image is {tag}'s cannot be told"}
+        return {"tag": tag, "image": m.group(1), "digest": m.group(2), "ref": f"{m.group(1)}@{m.group(2)}", "signed": signature}
+    return {"why": why}
 
 
 def attention(own_node_id):

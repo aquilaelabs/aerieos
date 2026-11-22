@@ -95,7 +95,7 @@ async function phoneRowPress(b, e){
   const post = async body => {
     busy(b, "");
     try{
-      const j = await (await postJSON("/api/phone", body)).json();
+      const j = await postJSON("/api/phone", body);
       if (j.error) notify(j.error, true);
       else notify(body.action === "lend" ? `your phone is lent to ${projLabel(p.name)}: each command asks you` : `your phone is back from ${projLabel(p.name)}`);
     }catch(err){ notify("could not reach the controller: " + err, true); }
@@ -147,12 +147,22 @@ function byProjectGroup(list){
 // nowhere else, so it cannot drift from the poll.
 function projectJobHtml(){
   const pJob = state?.project_job || null;
-  return pJob?.running
+  // One pressed while another ran is queued behind it, named under it; one
+  // that failed with another starting after it is kept until dismissed.
+  const after = (pJob?.waiting || []).length ? ` · then ${esc(pJob.waiting.join(", "))}` : "";
+  const earlier = (pJob?.earlier || []).map(e => `<div class="row jobfail">
+         <div class="grow">
+           <div class="name">${esc(e.name)}</div>
+           <div class="sub bad">${esc(e.error)}</div>
+         </div>
+         ${pJob?.running ? "" : `<span class="acts"><button data-jobok>Dismiss</button></span>`}
+       </div>`).join("");
+  return earlier + (pJob?.running
     ? `<div class="row job">
          <div class="grow">
            <div class="name">${esc(pJob.name)}</div>
            <div class="sub">${esc(pJob.step || pJob.kind)}<span class="dots"></span>${
-             pJob.for > 4 ? ` · ${pJob.for}s` : ""}</div>
+             pJob.for > 4 ? ` · ${pJob.for}s` : ""}${after}</div>
          </div>
          <span class="acts">${abortBtn('id="bJobStop"', pJob.aborting,
              "stop it: a half-cloned directory is removed, a remote already set stays")}</span>
@@ -168,7 +178,7 @@ function projectJobHtml(){
          </div>
          <span class="acts"><button id="bJobOk">Dismiss</button></span>
        </div>`
-    : "";
+    : "");
 }
 
 // A draw of the projects draws the Projects page where it is on show, and
@@ -185,17 +195,13 @@ function pJobWire(){
   const stop = $("bJobStop"), okd = $("bJobOk");
   if (stop) stop.onclick = () => pJobAct("abort");
   if (okd)  okd.onclick  = () => pJobAct("dismiss");
+  document.querySelectorAll("[data-jobok]").forEach(b => { b.onclick = () => pJobAct("dismiss"); });
   // page-toolchains.js owns the timer; starting it here too means the Projects
   // card animates whether or not a page of toolchains has ever been opened.
   if (stop && !tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
-  // While a job runs the two things that would start another are dead, the
-  // same rule the toolchain buttons follow: the server answers 409 anyway,
-  // and a button that earns an error is worse than one that waits.
-  const busy = !!state?.project_job?.running;
-  const nb = $("bNewProjTab"); if (nb) nb.disabled = busy;
-  // ...and never re-enabled past the grant (R137 step 4): the busy pass
-  // undid the row's disabled for an account without git-auth.
-  document.querySelectorAll(".pgrid [data-l]").forEach(b => setDisabled(b, busy || state?.can?.["git-auth"] === false));
+  // A press while a job runs queues behind it, so nothing is held for it;
+  // a row's link stays dead without the grant (R137 step 4).
+  document.querySelectorAll(".pgrid [data-l]").forEach(b => setDisabled(b, state?.can?.["git-auth"] === false));
 }
 
 // ---- a project's job: the clone or the first push -----------------------
@@ -223,30 +229,30 @@ function pJobSeen(j){
 
 async function pJobPoll(){
   pJobTimer = null;
-  try{ pJobSeen(await (await fetch("/api/project-job")).json()); }
+  try{ pJobSeen(await getJSON("/api/project-job")); }
   catch{ pJobTimer = setTimeout(pJobPoll, 3000); }   // a blip, not a finish
 }
 
 async function pJobAct(action){
   try{
-    const j = await (await postJSON("/api/project-job", {action})).json();
+    const j = await postJSON("/api/project-job", {action});
     if (j.error) notify(j.error, true);
   }catch(e){ notify("could not reach the server: " + failWords(e), true); }
   pJobPoll();
 }
 
 // ---- a project's archive and lock ----------------------------------------
-// Two presses since the operator split them (R119, 23 Oct). Archive is out of
-// sight and nothing else: no question asked, since nothing stops. Lock holds
-// people out, so its question says whom, and names the sessions it ends.
+// Two presses. Archive is each person's own and folds a card away on their
+// Spaces page, nothing else: no question asked, since nothing stops. Lock
+// holds people out, so its question says whom, and names the sessions it ends.
 
 async function setArchived(name, on){
   const key = reposOf(name) || name;
   try{
-    const j = await (await postJSON("/api/archive", {name, archived: on})).json();
+    const j = await postJSON("/api/archive", {name, archived: on});
     if (j.error){ notify(j.error, true); return; }
     applyNow((p, k) => { if (k === key) p.archived = !!j.archived; });
-    notify(on ? `${projectName(key)} archived: in Archived at the foot of the Spaces page, and working as before`
+    notify(on ? `${projectName(key)} archived for you: in Archived at the foot of your Spaces page, and working as before`
               : `${projectName(key)} unarchived`);
   }catch(e){ notify("archive failed: " + failWords(e), true); }
   refresh();
@@ -269,7 +275,7 @@ async function setLocked(name, on){
       : `Lock ${name}?\n\nEvery session here but yours ends now. Nobody but you starts a session `
         + `in it or changes it until you unlock it. It stays on the Spaces page with its lock mark.`)) return;
   try{
-    const j = await (await postJSON("/api/lock", {name: key, locked: on})).json();
+    const j = await postJSON("/api/lock", {name: key, locked: on});
     if (j.error){ notify(j.error, true); return; }
     for (const s of j.ended || []){
       const t = tabs.find(x => x.kind === "term" && sessionOf(x.arg) === s);
@@ -298,7 +304,7 @@ async function askProjectGroup(btn){
                                    options: groups, allowEmpty: true});
   if (got === null || got === (p?.group || "")) return;
   try{
-    const j = await (await postJSON("/api/project-group", {name: key, group: got})).json();
+    const j = await postJSON("/api/project-group", {name: key, group: got});
     if (j.error){ notify(j.error, true); return; }
     applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
     notify(got ? `${projectName(key)} is in ${got}` : `${projectName(key)} is in no group`);
@@ -324,10 +330,13 @@ function pickProjectColor(btn){
   if (open || !line) return;
   const pop = document.createElement("div");
   pop.className = "pcpop pcpick";
+  // The page's own while it is open, which a redraw of the card or the
+  // header it is in leaves where it is (R244).
+  pop.setAttribute("data-own", "");
   pop.setAttribute("role", "radiogroup");
   pop.setAttribute("aria-label", `your color for ${projectName(key)}`);
-  pop.innerHTML = PROJECT_COLORS.map(([n, tone]) => `<button type="button" role="radio" data-color="${n}" aria-checked="${n === cur}"
-      aria-label="${esc(n || "none")}" title="${esc(n || "none")}"${n ? ` data-style="--pc:${tone}"` : ""}></button>`).join("");
+  drawHTML(pop, PROJECT_COLORS.map(([n, tone]) => `<button type="button" role="radio" data-color="${n}" aria-checked="${n === cur}"
+      aria-label="${esc(n || "none")}" title="${esc(n || "none")}"${n ? ` data-style="--pc:${tone}"` : ""}></button>`).join(""));
   // On a card's back the swatches take the repositories' place, its height
   // held while they are open (askInline's way).
   const back = line.closest(".pcback");
@@ -351,7 +360,7 @@ function pickProjectColor(btn){
     done();
     if (color === cur) return;
     try{
-      const j = await (await postJSON("/api/project-color", {name: key, color})).json();
+      const j = await postJSON("/api/project-color", {name: key, color});
       if (j.error){ notify(j.error, true); return; }
       applyNow((x, k) => { x.color = (j.colors || {})[k] || ""; });
     }catch(err){ notify("color: " + err, true); }
@@ -371,15 +380,14 @@ function pickProjectColor(btn){
 // asking the projects endpoint about a command.
 async function setProjectPinned(name, on){
   try{
-    const r = await postJSON("/api/project-pin", {name: reposOf(name) || name, pinned:on});
-    const j = await r.json();
+    const j = await postJSON("/api/project-pin", {name: reposOf(name) || name, pinned:on});
     if (j.error){ notify(j.error, true); return; }
     // The answer IS the new state: the server sends back the whole pinned
     // set, so the page adopts it and redraws now. Waiting for the next
     // /api/status put a poll's latency between the click and the button
     // moving, on a control whose whole job is instant.
     applyNow((p, k) => { p.pinned = (j.pinned || []).includes(k); });
-  }catch(e){ notify("pin failed: " + failWords(e), true); }
+  }catch(e){ notify("the favorite was not saved: " + failWords(e), true); }
   refresh();                       // ...and reconcile, in the background
 }
 

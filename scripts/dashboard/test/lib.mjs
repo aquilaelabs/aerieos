@@ -5,6 +5,7 @@
 import os from 'node:os';
 import { mkdirSync } from 'node:fs';
 import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'module';
 import { writeFileSync, readFileSync } from 'fs';
 import { execFileSync } from 'child_process';
@@ -36,6 +37,40 @@ export const ok = (cond, name) => {
   lastAt = Date.now();
   console.log((cond ? 'PASS' : 'FAIL') + '  ' + gap + name);
   cond ? pass++ : fail++;
+};
+// What a lab suite walked, for the lab's own record (R3 step 8): one line
+// for a subject (a system, a git host) and what it said it was, printed only
+// when nothing has failed since `since` (failed(), read before the
+// subject's first check). `aerie tests lab` reads these lines off the run and
+// keeps each, dated, in scripts/dashboard/lab-record.json, which the vetted
+// lines are read from.
+export const failed = () => fail;
+export const record = (suite, subject, said, since = 0) => {
+  if (fail > since) return false;
+  console.log(`RECORD  suite=${suite} subject=${subject} said=${String(said || '').replace(/\s+/g, ' ').trim().slice(0, 200)}`);
+  return true;
+};
+// A part of a suite, run so that what throws inside it is one FAIL under
+// its name and the file goes on to its next part (R7 step 6). A suite is a
+// run of blocks, each about one thing; a wait that ran out or a press on
+// something that was not there threw, the file ended there with no total,
+// and everything after it in the file went unrun and unsaid: the next
+// reader fixed the first failure to find the second. What was thrown is
+// said with where in the suite it was, and counts as one failure.
+export const section = async (name, fn) => {
+  try { await fn(); }
+  catch (e) {
+    // Where in the suite, not where in this library: the first place on
+    // the way out that is the suite's own, and what was being waited for
+    // where the browser says (a timeout's first line names neither).
+    const frames = [...String(e?.stack || '').matchAll(/([\w.-]+\.mjs):(\d+):\d+/g)];
+    const where = frames.find(f => f[1] !== 'lib.mjs') || frames[0];
+    const lines = String(e?.message || e).split('\n').map(l => l.replace(/\x1b\[\d+m/g, '').trim()).filter(Boolean);
+    const waited = lines.find(l => /^- waiting for /.test(l));
+    console.log(`FAIL  ${name}: this part stopped${where ? ` at ${where[1]}:${where[2]}` : ''} (${
+      (lines[0] || 'it threw').slice(0, 220)}${waited ? `; ${waited.slice(2, 200)}` : ''})`);
+    fail++;
+  }
 };
 // The browser is optional: not every file here drives a page. version.mjs
 // exercises a module through the CLI that shares it, and still wants the
@@ -164,11 +199,34 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // What the page has in flight, for the wrapper below: a wait that runs
   // out while the page is still asking the server is a slow page, not an
   // absent element.
-  let inFlight = 0, lastDone = Date.now();
-  page.on("request", () => { inFlight++; });
-  for (const ev of ["requestfinished", "requestfailed"]) page.on(ev, () => { inFlight = Math.max(0, inFlight - 1); lastDone = Date.now(); });
+  // Each request by when it began, not a count that goes up and down: a
+  // request cut off by a reload or a navigation never says it finished or
+  // failed (measured 14 Nov: twelve in flight at a reload stayed counted
+  // for good, and cards.mjs, which reloads often, read 34 in flight on a
+  // page at rest), so a suite that reloads read as asking the server
+  // forever: every wait that ran out was given three budgets, and
+  // settled() never saw the page at rest (R228 step 19). What
+  // is still open when the page asks for a new document of its own is the
+  // old document's and is dropped; and a request that began longer ago
+  // than BUSY_MS is not a page about to answer.
+  const BUSY_MS = 20000;
+  const open = new Map();
+  let lastDone = Date.now();
+  const inFlight = () => {
+    const cut = Date.now() - BUSY_MS;
+    let n = 0;
+    for (const at of open.values()) if (at >= cut) n++;
+    return n;
+  };
+  page.on("request", r => {
+    let own = false;
+    try { own = r.isNavigationRequest() && r.frame() === page.mainFrame(); } catch (e) { /* a frame already gone */ }
+    if (own) open.clear();
+    open.set(r, Date.now());
+  });
+  for (const ev of ["requestfinished", "requestfailed"]) page.on(ev, r => { open.delete(r); lastDone = Date.now(); });
   // For settled() below: what is in flight, and when the last answer came.
-  page.inFlight = () => ({ n: inFlight, lastDone });
+  page.inFlight = () => ({ n: inFlight(), lastDone });
   for (const m of ["waitForFunction", "waitForSelector"]){
     const real = page[m].bind(page);
     page[m] = async (...args) => {
@@ -185,25 +243,50 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       const last = args[args.length - 1];
       if (last && typeof last === "object" && typeof last.timeout === "number")
         args[args.length - 1] = { ...last, timeout: patience(last.timeout) };
-      // A timeout is only a timeout on a page that is at rest on a box
-      // that is not saturated. Four workers on four cores timed out a
-      // dozen checks a day that passed alone every time (27 Sep): the
-      // redraw came, after the budget. So a wait that runs out while the
-      // page has requests in flight, or while the load average is at the
-      // core count, gets the same budget again, three times at most; an
-      // element that never comes still fails, with its snapshot, later.
-      let tries = 0;
+      // A wait has one budget (R7 step 7). It had three: one that ran out
+      // while the page had requests in flight, or while the machine's load
+      // was at its cores, was given the same time twice more, since four
+      // workers on four cores timed out a dozen checks a day (27 Sep). The
+      // suites wait on what they check now and run at half the cores, and a
+      // whole run with one budget and no doubling flaked no more than one
+      // with three (15 Nov); what the spare budgets did by then was make a
+      // wait that could never come true cost three times as long.
       const budget = () => (typeof args[args.length - 1]?.timeout === "number" ? args[args.length - 1].timeout : patience(30000));
-      const busy = () => inFlight > 0 || os.loadavg()[0] >= os.cpus().length;
-      try {
+      // A predicate that answers with a Promise (an async function, or one
+      // that returns new Promise) is not asked again by Playwright: the
+      // Promise is its answer at the first look, whatever it resolves to
+      // (measured 14 Nov: one call and 23 ms for a predicate that resolves
+      // false). Twelve waits on the server's answer and two suites' own
+      // "at rest" helpers were written that way and waited for nothing. So
+      // such a predicate is asked from here, its answer awaited each time,
+      // until it is true or the budget is spent; a page that navigates
+      // under it is asked again, as Playwright's own wait would be.
+      const promised = m === "waitForFunction" && typeof args[0] === "function"
+        && (args[0].constructor?.name === "AsyncFunction" || /new Promise|\bawait\b|\.then\(/.test(String(args[0])));
+      const asked = async () => {
+        const o = args.length >= 3 && args[2] && typeof args[2] === "object" ? args[2] : {};
+        const every = typeof o.polling === "number" ? o.polling : 100;
+        const end = Date.now() + budget();
         for (;;){
-          try { return await real(...args); }
-          catch (e) {
-            if (!/Timeout .*exceeded/.test(String(e)) || ++tries >= 3 || !busy()) throw e;
-            console.log(`[wait] ran out after ${budget()}ms with ${inFlight} request(s) in flight and a load of ${
-              os.loadavg()[0].toFixed(1)} on ${os.cpus().length} cores: waiting the same again (${tries} of 2)`);
+          let h = null;
+          try {
+            h = await page.evaluateHandle(args[0], args[1]);
+            if (await h.evaluate(v => !!v)) return h;
+          } catch (e) {
+            if (!/context was destroyed|navigation|Target .*closed|frame was detached/i.test(String(e))) throw e;
+            if (/Target .*closed/i.test(String(e))) throw e;
           }
+          if (h) await h.dispose().catch(() => {});
+          if (Date.now() >= end){
+            const e = new Error(`page.waitForFunction: Timeout ${budget()}ms exceeded.`);
+            e.name = "TimeoutError";
+            throw e;
+          }
+          await sleep(every);
         }
+      };
+      try {
+        return await (promised ? asked() : real(...args));
       } catch (e) {
         // A timeout here says what was waited for and nothing about WHY it
         // never came, which is how the same few files have been rewaited
@@ -257,13 +340,37 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // With the URL, because "Failed to load resource: 400" names neither what
   // asked nor what was asked for, and a console error nobody can locate is
   // one nobody fixes.
+  // The box's own networks changing under the browser (B753): a suite that
+  // brings a compose project up or down beside this one makes or takes a
+  // Docker network, and Chromium cuts what it has in flight with
+  // ERR_NETWORK_CHANGED. That is this machine, not the page: what it cut
+  // is not an error of the page's, and a page whose script or document it
+  // cut never ran that script, so it is loaded again, a few times at most.
+  let netReloads = 0;
+  page.on('requestfailed', r => {
+    if (!/ERR_NETWORK_CHANGED/.test(r.failure()?.errorText || '')) return;
+    if (['document', 'script', 'stylesheet'].includes(r.resourceType()) && netReloads < 3){
+      netReloads++;
+      console.log(`[net] a network change on this box cut ${r.url().replace(/^https?:\/\/[^/]+/, '')}: loading the page again (${netReloads} of 3)`);
+      page.reload().catch(() => {});
+    }
+  });
+  // Only what names the cut itself: the three seconds after one in which a
+  // failed fetch or a name not defined was let through as its doing came
+  // off with the other layers (R7 step 7).
+  const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);
   page.on('console', m => {
     if (m.type() !== 'error') return;
     const url = m.location()?.url || '';
-    if (url.includes('/term')) return;
+    if (url.includes('/term') || cutByNet(m.text())) return;
     page.errors.push(url ? `${m.text()} [${url.replace(/^https?:\/\/[^/]+/, '')}]` : m.text());
   });
-  page.on('pageerror', e => page.errors.push(String(e)));
+  // ...and a name the cut script would have defined, missed right after it.
+  page.on('pageerror', e => {
+    const t = String(e);
+    if (cutByNet(t)) return;
+    page.errors.push(t);
+  });
   page.on('dialog', d => { page.dialogs.push(d.message()); d.accept(); });
   // The page's own questions (page-ask.js, R121) are answered the way the
   // browser's were: their words recorded on page.dialogs, and the first
@@ -448,6 +555,25 @@ export async function animatedDuring(page, act){
 // about the code, and then an hour proving that.
 export const SLOW = Number(process.env.BB_TEST_SLOW || 1) || 1;
 export const patience = ms => Math.round(ms * SLOW);
+// Until `fn` answers something true, looked at every `every` ms, for `ms`
+// at most (stretched as every wait here is): what a fixed sleep was a guess
+// at (R7 step 4). It answers what `fn` last did, so the check after it
+// reads the thing that was waited for and fails in its own words when it
+// never came. For the page itself, page.waitForFunction; this is for what
+// a suite reads from outside it: a file, a tmux session, a job's row.
+export const until = async (fn, ms = 5000, every = 50) => {
+  const end = Date.now() + patience(ms);
+  for (;;){
+    let got;
+    try { got = await fn(); } catch (e) { got = false; }
+    if (got || Date.now() >= end) return got;
+    await sleep(every);
+  }
+};
+// A pause on purpose, for a check that something did NOT happen: there is
+// no event to wait for, only time in which it could have. Named apart from
+// sleep so that what is left of the fixed pauses says it is one of these.
+export const quiet = ms => sleep(ms);
 
 // A project's settings save a section at a time (the operator, 10 Oct):
 // each section's bar has Save, or with a session of this account running and
@@ -651,9 +777,11 @@ export async function finger(page, x, y, x2, y2, holdMs){
   const n = 10;
   for (let i = 1; i <= n; i++){
     await touch('touchMove', x + (x2 - x) * i / n, y + (y2 - y) * i / n);
-    await sleep(16);
+    await sleep(16);                                   // a finger's pace: a frame a step
   }
   await touch('touchEnd', 0, 0);
+  // The gesture's own tail: the recognizer decides what the lift was (a
+  // tap, a fling) a moment after it, and nothing on the page says when.
   await sleep(250);
   await cdp.detach();
 }
@@ -672,10 +800,28 @@ export const nbShown = (page) =>
 export async function nbGo(page, v, scope = '.pane .nb'){
   // Found as Playwright finds it, so a scope in its own selector language
   // (version.mjs's :text-is) works here as it does in a click.
-  const el = await page.$(`${scope} .nbtabs [data-v="${v}"]`);
-  const g = el ? await el.evaluate(b => b.hidden && b.dataset.in ? b.dataset.in : '') : '';
-  if (g) await page.click(`${scope} .nbtabs .nbgroups [data-g="${g}"] >> visible=true`);
-  await page.click(`${scope} .nbtabs [data-v="${v}"] >> visible=true`);
+  const sel = `${scope} .nbtabs [data-v="${v}"]`;
+  // The view's button is in its group's row, drawn only while that group
+  // is open, and which group is open can still be changing when this is
+  // asked: rules.mjs pressed Roadmap and came straight here, the Overview
+  // row read as still open, and the press then waited a minute for a
+  // button the redraw had hidden (14 Nov, under load, twice running). So
+  // the button is looked at until it shows, its group pressed whenever it
+  // does not.
+  const until = Date.now() + patience(30000);
+  for (;;){
+    const el = await page.$(sel);
+    const st = el ? await el.evaluate(b => ({ shown: b.checkVisibility(), g: b.dataset.in || '' })).catch(() => null) : null;
+    if (st?.shown){
+      try { await page.click(`${sel} >> visible=true`, { timeout: 3000 }); return; }
+      catch (e) { if (Date.now() > until) throw e; }
+    } else if (st?.g){
+      await page.click(`${scope} .nbtabs .nbgroups [data-g="${st.g}"] >> visible=true`, { timeout: 3000 }).catch(() => {});
+    }
+    // Out of time: the plain press, whose own error says what was not there.
+    if (Date.now() > until) return page.click(`${sel} >> visible=true`);
+    await sleep(100);
+  }
 }
 export const nbTab = async (page, v) => {
   await nbGo(page, v);
@@ -713,9 +859,19 @@ export async function unfold(page, project){
   await page.evaluate(() => { if (tabOf(panes[active])?.kind !== 'projects') openProjectsTab(); });
   const card = `.pgrid .pcard[data-row="${project}"]`;
   await page.waitForSelector(card, { timeout: 15000 });
-  if (!await page.$eval(card, c => c.classList.contains('flipped'))) await page.click(`${card} .pcfront [data-pedit]`);
+  const pressed = Date.now();
+  const turning = !await page.$eval(card, c => c.classList.contains('flipped'));
+  if (turning) await page.click(`${card} .pcfront [data-pedit]`);
   await page.waitForSelector(`${card}.flipped .pcback:not([inert])`, { timeout: 5000 });
-  await page.waitForTimeout(450);                    // the turn, so a press lands where it is drawn
+  // The turn over, so a press lands where it is drawn: neither face still
+  // on the stylesheet's tween.
+  await page.waitForFunction(sel => { const c = document.querySelector(sel);
+    return !!c && ![...c.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length); }, card, { timeout: 10000 }).catch(() => {});
+  // ...and the grid's own redraw behind it: flipCard draws the cards again
+  // 450 ms after a turn, on a timer nothing on the page shows, and a box
+  // opened on the back before it would be drawn over. The one clock here:
+  // what is left of that half second since the press.
+  if (turning) await sleep(Math.max(0, 500 - (Date.now() - pressed)));
 }
 
 // The owner takes a project on (R135): a suite that drops a project
@@ -756,7 +912,7 @@ export async function takeOn(...names) {
   const have = me?.projects || [];
   const want = [...have, ...names.filter(n => !have.includes(n))];
   const r = await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'projects', name: 'test', projects: want }) });
+    body: JSON.stringify({ action: 'edit', name: 'test', projects: want }) });
   return (await r.json()).projects || [];
 }
 
@@ -765,6 +921,81 @@ export async function takeOn(...names) {
 // role a suite gives the accounts it makes, the way an administrator would
 // on the Roles tab: work on the projects the account is on, and read their
 // settings, releases, credential and containers, with the shielded console.
+// ---- asking the server from outside the page (R7 step 5) --------------------
+// Who asks and how were written out in suite after suite: the owner's Basic
+// header by hand in fifty-six files, an api() of one of two shapes in
+// thirty-three, asUser() in four, a session's token minted by a python
+// snippet in four. One of each, here.
+//
+// asUser(name, password): the headers an account asks with. OWNER is the
+// fixture's own owner. asSession(token): a session's.
+export const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
+                                    'Content-Type': 'application/json' });
+export const OWNER = asUser(CREDS.username, CREDS.password);
+export const asSession = token => ({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' });
+// call(path, body, headers): a GET when there is no body, else a POST of it
+// as JSON, as the owner unless headers say who. Answers { status, body },
+// the body {} where the server sent none and null where it was not JSON.
+// api() is the same and answers the body alone, for a suite that reads only
+// what was said.
+export const call = async (path, body, headers = OWNER) => {
+  const r = await fetch(URL.replace(/\/$/, '') + path, body === undefined ? { headers }
+    : { method: 'POST', headers, body: JSON.stringify(body) });
+  let j = {};
+  if (r.status !== 204){ try { j = await r.json(); } catch (e) { j = null; } }
+  return { status: r.status, body: j };
+};
+export const api = async (path, body, headers = OWNER) => (await call(path, body, headers)).body;
+// jobEnd(id, { ms, step, headers, base }): a job waited for from outside the
+// page, asked for by its id every `step` ms until it has succeeded, failed
+// or been canceled. Answers its row, or null when `ms` ran out first; the
+// time is the caller's own and is not stretched as until's is. Asked as the
+// owner of this run's server unless `headers` and `base` say who and where.
+export async function jobEnd(id, { ms = 60000, step = 250, headers = OWNER, base = URL } = {}){
+  const at = `${base.replace(/\/$/, '')}/api/v1/jobs?id=${id}`, end = Date.now() + ms;
+  while (Date.now() < end){
+    const j = await (await fetch(at, { headers })).json().catch(() => null);
+    if (j && ['succeeded', 'failed', 'canceled'].includes(j.state)) return j;
+    await sleep(step);
+  }
+  return null;
+}
+// pageCall(page, path, body): the server asked from inside a page, as the
+// page itself asks it: a GET when there is no body, else a POST of it as
+// JSON. Answers { status, body }, and throws when the answer is not JSON.
+export async function pageCall(page, path, body){
+  return page.evaluate(async ([p, b, post]) => {
+    const r = await fetch(p, post ? { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) } : {});
+    return { status: r.status, body: await r.json() };
+  }, [path, body, body !== undefined]);
+}
+// REPO: the checkout the suite runs from, with no trailing slash, for a
+// suite that reads a file of the tree or runs one of its scripts.
+export const REPO = fileURLToPath(new globalThis.URL('../../..', import.meta.url)).replace(/\/$/, '');
+// aerie(args, { env, cwd, input, timeout }): the checkout's own aerie run with
+// those arguments, and what it printed. `env` is laid over this process's,
+// `input` is what it reads, and a run that fails throws as execFileSync does,
+// with the status, stdout and stderr on the error.
+export function aerie(args, { env = {}, cwd, input, timeout } = {}){
+  return execFileSync('bash', [`${REPO}/scripts/aerie`, ...args],
+    { encoding: 'utf8', env: { ...process.env, ...env }, cwd, input, timeout });
+}
+// usersPy(expr): users.py asked for `expr` over the fixture's own state, and
+// what it printed. mint(project, who, ttl): a session's token for a space,
+// made as the server makes one, for the account `who` (by name) when said.
+const TREE = REPO;
+export const usersPy = expr => execFileSync('python3', ['-c', `
+import importlib.util, json, os
+spec = importlib.util.spec_from_file_location("users", "${TREE}/scripts/dashboard/users.py")
+u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
+def wj(p, d):
+    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
+u.configure(state="${DIR}/state", write_json=wj)
+print(${expr})`], { encoding: 'utf8' }).trim();
+export const mint = (project, who = '', ttl = null) => usersPy(
+  `u.mint_session(${JSON.stringify(project)}${ttl === null ? '' : `, ttl=${Number(ttl)}`}, uid=(u.load()["users"][${JSON.stringify(who)}]["uid"] if ${JSON.stringify(who)} else ""))`);
+
 export const MEMBER = { projects: 'write', settings: 'read', releases: 'read', gitauth: 'read',
                         files: 'write', containers: 'read', terminal: 'read' };
 export async function member(...names) {
@@ -783,6 +1014,56 @@ export async function member(...names) {
     await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
       body: JSON.stringify({ action: 'assign', name, project_roles }) });
     await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-      body: JSON.stringify({ action: 'projects', name, projects: was }) });
+      body: JSON.stringify({ action: 'edit', name, projects: was }) });
   }
+}
+
+// The Library narrowed as a person would (R256): it opens on shelves of
+// eight, so a suite after a card past them, or every card of a kind, asks
+// for it: `q` its search, `kind` a chip (its every page brought in), `all`
+// the cards for other systems too (left out, as the page leaves them). Resolves once the list is drawn whole.
+export async function libraryShow(page, { q = '', kind = '', all = false } = {}){
+  await page.evaluate(([q, kind, all]) => { libQ = q; libKind = kind; libTopic = ''; libTier = ''; libAll = all;
+    if (lib) lib.moreAsked = false; libPagesFrom(); shellSync(); loadLibrary(); }, [q, kind, all]);
+  await page.waitForFunction(([q, kind]) => libQ === q && libKind === kind && lib && !readBusy('library') && Array.isArray(lib.rows)
+    && (!(q || kind) || !!document.querySelector('.doc .librarytab .libone')), [q, kind], { timeout: 20000 });
+  for (let i = 0; i < 20 && await page.evaluate(() => (lib.rows || []).length < (lib.total || 0)); i++){
+    await page.evaluate(() => libMore());
+    await page.waitForFunction(() => !lib.moreAsked, null, { timeout: 20000 });
+  }
+  await page.waitForFunction(() => document.querySelectorAll('.doc .librarytab .libone .lcard').length >= (lib.rows || []).length, null, { timeout: 20000 }).catch(() => {});
+}
+// ...and back to the front page's shelves.
+export async function libraryFront(page){ await libraryShow(page, { all: false }); }
+// What is wrong with the Library's Rows as drawn, card by card (R256): the
+// verbs on the card's own lines (its name, who made it and its pills) at
+// the card's right edge, the name never squeezed under a few words' width,
+// anything else the card carries (the driver's version, a failed job's
+// words) on a line of its own under those, the card's width, and on a
+// phone a card two lines tall. An empty list is all well.
+export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrows > .lcard'){
+  return page.$$eval(sel, cs => cs.flatMap(c => {
+    const r = e => e.getBoundingClientRect(), card = r(c);
+    const icon = c.querySelector('.lcicon'), name = c.querySelector('.lchead .name'), meta = c.querySelector('.lchead .lcmeta');
+    const acts = c.querySelector(':scope > .pcacts');
+    if (!icon || !name || !acts) return [`${c.dataset.lrow}: no name or verbs`];
+    const own = [icon, name, meta].filter(e => e && r(e).height).map(r);
+    const top = Math.min(...own.map(b => b.top)), bottom = Math.max(...own.map(b => b.bottom));
+    const a = r(acts), n = r(name), wrong = [];
+    const mid = a.top + a.height / 2;
+    if (acts.childElementCount && (mid < top - 2 || mid > bottom + 2)) wrong.push(`${c.dataset.lrow}: the verbs are not on the card's own lines (${Math.round(mid)} vs ${Math.round(top)}..${Math.round(bottom)})`);
+    if (acts.childElementCount && card.right - a.right > 40) wrong.push(`${c.dataset.lrow}: the verbs stop ${Math.round(card.right - a.right)}px short of the card's right edge`);
+    if (n.width < 96) wrong.push(`${c.dataset.lrow}: the name is ${Math.round(n.width)}px wide`);
+    let extra = 0;
+    for (const x of c.querySelectorAll(':scope > :not(.lchead,.lcabout,.pcacts)')){
+      const b = r(x);
+      if (!b.height) continue;
+      extra += b.height;
+      if (b.top < bottom - 1) wrong.push(`${c.dataset.lrow}: its ${x.className || x.tagName} is on the card's own lines, not under them`);
+      if (b.width < (card.width - 2 * 24) * 0.9) wrong.push(`${c.dataset.lrow}: its ${x.className || x.tagName} is ${Math.round(b.width)}px of the card's ${Math.round(card.width)}`);
+    }
+    if (innerWidth < 600 && card.height - extra > 96) wrong.push(`${c.dataset.lrow}: ${Math.round(card.height)}px tall on a phone`);
+    if (c.scrollWidth > c.clientWidth + 1) wrong.push(`${c.dataset.lrow}: runs past its card`);
+    return wrong;
+  }));
 }

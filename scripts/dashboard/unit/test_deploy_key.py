@@ -47,6 +47,23 @@ class DeployKey(unittest.TestCase):
         self.assertNotIn("xyz", repr(body))
         self.assertEqual(projects.deploy_key("app", "key-store", "not a key")[1], 400)
 
+    def test_an_install_keys_change_seals_the_deploy_keys_again_or_says_it_could_not(self):
+        # The pass installkey runs over every sealed store (R243).
+        from unittest import mock
+        self.assertEqual(projects.deploy_keys_seal_all(), 0, "a start with no change: the helper's own load does it")
+        with mock.patch.object(projects.os.path, "exists", lambda p: False):
+            self.assertEqual(projects.deploy_keys_seal_all(again=True), 0, "no helper here, so no deploy key was ever made")
+        self.assertEqual(self.calls, [])
+        with mock.patch.object(projects.os.path, "exists", lambda p: True):
+            projects._key_helper = lambda argv, text=None: (self.calls.append((argv, text)) or ("2", ""))
+            self.assertEqual(projects.deploy_keys_seal_all(again=True), 2)
+            self.assertEqual(self.calls, [(["--reseal"], None)])
+            # It failed: raised, so the key before is kept and the pass runs again at the next start.
+            projects._key_helper = lambda argv, text=None: ("", "app-deploy could not be opened to seal it again")
+            with self.assertRaises(OSError) as e:
+                projects.deploy_keys_seal_all(again=True)
+            self.assertIn("were not sealed again", str(e.exception))
+
     def test_a_read_only_clone_gets_none(self):
         self.push = {}
         body, st = projects.deploy_key("app", "key-make")

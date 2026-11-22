@@ -17,7 +17,10 @@
 # AerieOS: a Claude Code workstation and the controller for build nodes,
 # the machines where builds, tests, CI and the Android emulator actually run.
 ##############################################################################
-FROM ubuntu:24.04
+# The base image by its tag and the digest of its list, so an image built
+# again starts from the same bytes until the digest moves (tools/pins.py
+# check and move --file Dockerfile, with the other pins).
+FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289
 
 LABEL org.opencontainers.image.title="AerieOS" \
       org.opencontainers.image.description="Claude Code workstation and build-node controller" \
@@ -26,9 +29,6 @@ LABEL org.opencontainers.image.title="AerieOS" \
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG NODE_MAJOR=22
-# noVNC draws a VM's screen in the dock (R99): pinned, and checked by digest.
-ARG NOVNC_VERSION=1.7.0
-ARG NOVNC_SHA256=b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6
 ARG TARGETARCH
 
 # --- Playwright build knob -------------------------------------------------
@@ -48,10 +48,11 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Deliberately NOT disabling `npm audit`: that one is a real signal.
 # PYTHONDONTWRITEBYTECODE: a session that runs `python3 -m py_compile` (or any
 # script) in a mounted project should not leave __pycache__ litter in the
-# repo. NODE_PATH: the image's global modules (Playwright above all) resolve
-# from a `require()` in any directory, instead of every session symlinking
-# them into a scratch node_modules first. (ESM `import` ignores NODE_PATH;
-# use createRequire, as scripts/dashboard/test/lib.mjs does.)
+# repo. NODE_PATH: the image's global modules (Playwright above all, linked
+# there from the prefix its lock installs it into) resolve from a
+# `require()` in any directory, instead of every session symlinking them
+# into a scratch node_modules first. (ESM `import` ignores NODE_PATH; use
+# createRequire, as scripts/dashboard/test/lib.mjs does.)
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -91,25 +92,29 @@ RUN set -eux; \
 #   The Docker CLI talks to the host daemon through a mounted
 #   /var/run/docker.sock; no daemon runs inside this container. Which
 #   packages: the list's vendor and docker rows (config/controller-packages.tsv).
+#
+#   Each of the three package sources is held to its publisher's key as the
+#   tree carries it (config/apt-keys), never to a key fetched as the image
+#   is built: apt then takes only packages signed under it. A publisher that
+#   replaces its key fails the build here until the carried one is replaced.
 # ---------------------------------------------------------------------------
+COPY config/apt-keys/ /tmp/apt-keys/
 # hadolint ignore=SC2046
 RUN set -eux; \
     pkgs="$(bash /opt/aerieos/scripts/lib/controller-packages.sh deb vendor docker)"; \
     [ "$(printf '%s\n' "$pkgs" | wc -l)" -ge 5 ]; \
     install -m 0755 -d /etc/apt/keyrings; \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
+    gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg < /tmp/apt-keys/nodesource.asc; \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list; \
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-        -o /etc/apt/keyrings/githubcli.gpg; \
-    chmod 0644 /etc/apt/keyrings/githubcli.gpg; \
+    gpg --dearmor -o /etc/apt/keyrings/githubcli.gpg < /tmp/apt-keys/github-cli.asc; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli.gpg] https://cli.github.com/packages stable main" \
         > /etc/apt/sources.list.d/github-cli.list; \
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; \
+    gpg --dearmor -o /etc/apt/keyrings/docker.gpg < /tmp/apt-keys/docker.asc; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list; \
+    chmod 0644 /etc/apt/keyrings/nodesource.gpg /etc/apt/keyrings/githubcli.gpg /etc/apt/keyrings/docker.gpg; \
+    rm -rf /tmp/apt-keys; \
     apt-get update; \
     apt-get install -y --no-install-recommends $(printf '%s\n' "$pkgs"); \
     rm -rf /var/lib/apt/lists/*
@@ -117,30 +122,33 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # Linters for the file types every project here carries: Dockerfiles, GitHub
 # workflows, YAML, Python. shellcheck came from apt above; these three are
-# static single binaries with no Ubuntu package worth having. Resolved to the
-# newest release at build time, same policy as the runner and bundletool:
-# the weekly rebuild is what keeps them current. `ruff` installs via pipx so
-# it is isolated from both the system Python and any project venv.
+# static single binaries with no Ubuntu package worth having, and so is
+# `ruff`, taken as its own release's binary so it needs neither the system
+# Python nor a project venv.
 #
-# Each one held to the digest GitHub states for it (scripts/lib/gh-fetch,
-# B335), which asks GitHub's release API: anonymously it allows 60 calls an
-# hour per address and CI's shared addresses have usually spent them, so CI
-# hands the build its token as a secret (gh_token), in no layer of the image.
+# Each of the four is the release its row in config/image-tools.json pins:
+# a version, and the sha256 of the exact file, which scripts/lib/pin-fetch
+# holds the download to before it is kept. Nothing is asked what is newest,
+# so an image built again holds the same files until a pin moves, and
+# tools/pins.py moves one (check, move, verify, with the other tables).
 #
 # The point of having them *in the image* rather than only in CI: a session
 # (or a person) can run the same checks CI will run, before the push. That
 # is what `aerie lint` does.
 # ---------------------------------------------------------------------------
-COPY scripts/lib/gh-fetch /usr/local/bin/bb-gh-fetch
-RUN --mount=type=secret,id=gh_token,required=false \
-    set -eux; \
-    bb-gh-fetch hadolint/hadolint latest 'hadolint-linux-x86_64' /usr/local/bin/hadolint; \
-    bb-gh-fetch mikefarah/yq latest 'yq_linux_amd64' /usr/local/bin/yq; \
+COPY scripts/lib/pin-fetch /usr/local/bin/bb-pin-fetch
+COPY config/image-tools.json /opt/aerieos/config/image-tools.json
+RUN set -eux; \
+    pins=/opt/aerieos/config/image-tools.json; \
+    bb-pin-fetch "$pins" hadolint linux/amd64 /usr/local/bin/hadolint; \
+    bb-pin-fetch "$pins" yq linux/amd64 /usr/local/bin/yq; \
     chmod +x /usr/local/bin/hadolint /usr/local/bin/yq; \
-    bb-gh-fetch rhysd/actionlint latest 'actionlint_*_linux_amd64.tar.gz' /tmp/actionlint.tar.gz; \
+    bb-pin-fetch "$pins" actionlint linux/amd64 /tmp/actionlint.tar.gz; \
     tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint; \
     rm -f /tmp/actionlint.tar.gz; \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install ruff; \
+    bb-pin-fetch "$pins" ruff linux/amd64 /tmp/ruff.tar.gz; \
+    tar -xzf /tmp/ruff.tar.gz -C /usr/local/bin --strip-components=1 ruff-x86_64-unknown-linux-gnu/ruff; \
+    rm -f /tmp/ruff.tar.gz; \
     hadolint --version; \
     actionlint --version >/dev/null; \
     yq --version; \
@@ -149,17 +157,17 @@ RUN --mount=type=secret,id=gh_token,required=false \
 # ---------------------------------------------------------------------------
 # Language/version tooling that lives outside apt: uv (Python) and mise.
 #
-# Each vendor's release asset, held to GitHub's digest for it (B335), where
-# a vendor's install script piped into sh was taken on trust. The final
-# `--version` calls make a silently-missing tool a build failure rather than
-# a runtime surprise.
+# Each vendor's release asset as config/image-tools.json pins it, held to
+# the pinned sha256 (scripts/lib/pin-fetch), where a vendor's install script
+# piped into sh was taken on trust. The final `--version` calls make a
+# silently-missing tool a build failure rather than a runtime surprise.
 # ---------------------------------------------------------------------------
-RUN --mount=type=secret,id=gh_token,required=false \
-    set -eux; \
-    bb-gh-fetch astral-sh/uv latest 'uv-x86_64-unknown-linux-gnu.tar.gz' /tmp/uv.tar.gz; \
+RUN set -eux; \
+    pins=/opt/aerieos/config/image-tools.json; \
+    bb-pin-fetch "$pins" uv linux/amd64 /tmp/uv.tar.gz; \
     tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1 uv-x86_64-unknown-linux-gnu/uv uv-x86_64-unknown-linux-gnu/uvx; \
     rm -f /tmp/uv.tar.gz; \
-    bb-gh-fetch jdx/mise latest 'mise-v*-linux-x64' /usr/local/bin/mise; \
+    bb-pin-fetch "$pins" mise linux/amd64 /usr/local/bin/mise; \
     chmod +x /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/mise; \
     uv --version; \
     mise --version
@@ -179,6 +187,16 @@ RUN --mount=type=secret,id=gh_token,required=false \
 # The env var keeps its value for the same reason: every project's playwright,
 # the dashboard's tests and `bb shot` name that directory, and it is now a
 # link rather than a directory.
+#
+# The module is installed by its lock (config/image-npm/playwright: the one
+# version its package.json names, and package-lock.json with every package's
+# tarball and integrity): `npm ci` installs exactly the lock's set, holds
+# each tarball to its integrity, and with --ignore-scripts runs nobody's
+# install script, as root or otherwise. It lands in a prefix of its own and
+# is linked into the global modules and onto the PATH, so NODE_PATH and the
+# `playwright` command are where they were. tools/pins.py moves the lock
+# (check, move --file config/image-npm). The browsers themselves are not
+# npm's: Playwright fetches, for each, the build its own version names.
 # ---------------------------------------------------------------------------
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 # A project's own Playwright installing its browsers here (or into the store
@@ -190,9 +208,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_GC=1
 # install-deps`, which runs apt-get install itself in this same layer; the
 # scanner only recognizes a literal install and reports the update as alone.
 #trivy:ignore:AVD-DS-0017
+COPY config/image-npm /usr/local/lib/aerieos-npm
 RUN set -eux; \
     if [ "${INSTALL_PLAYWRIGHT}" != "true" ]; then echo "skipping Playwright"; exit 0; fi; \
-    npm install -g --foreground-scripts playwright; \
+    npm ci --ignore-scripts --no-audit --prefix /usr/local/lib/aerieos-npm/playwright; \
+    ln -s /usr/local/lib/aerieos-npm/playwright/node_modules/playwright "$(npm root -g)/playwright"; \
+    ln -s /usr/local/lib/aerieos-npm/playwright/node_modules/.bin/playwright /usr/local/bin/playwright; \
     apt-get update; \
     playwright install-deps chromium firefox webkit; \
     npm cache clean --force; \
@@ -238,10 +259,15 @@ RUN set -eux; \
 #
 # web-ext (MPL) is here: the controller carries what it needs in the image,
 # and there is no package list at boot (R29, then the operator's call:
-# everything else is a toolchain installed on a node).
+# everything else is a toolchain installed on a node). Installed by its
+# lock as Playwright is (config/image-npm/web-ext), every package of its
+# tree at the version and the integrity the lock names.
 # ---------------------------------------------------------------------------
 RUN set -eux; \
-    npm install -g --foreground-scripts web-ext; \
+    npm ci --ignore-scripts --no-audit --prefix /usr/local/lib/aerieos-npm/web-ext; \
+    ln -s /usr/local/lib/aerieos-npm/web-ext/node_modules/web-ext "$(npm root -g)/web-ext"; \
+    ln -s /usr/local/lib/aerieos-npm/web-ext/node_modules/.bin/web-ext /usr/local/bin/web-ext; \
+    web-ext --version; \
     corepack enable; \
     npm cache clean --force
 
@@ -250,35 +276,37 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # noVNC: the browser's half of a VM's screen (R99), the page and the RFB
 # client it imports, served by the dashboard under /novnc/. MPL-2.0, its
-# license kept beside it.
+# license kept beside it. Its release's source as config/image-tools.json
+# pins it, held to the pinned sha256 (scripts/lib/pin-fetch) like every
+# other tool the image takes.
 RUN set -eux; \
-    curl -fsSL -o /tmp/novnc.tar.gz \
-        "https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz"; \
-    echo "${NOVNC_SHA256}  /tmp/novnc.tar.gz" | sha256sum -c -; \
+    v="$(bb-pin-fetch /opt/aerieos/config/image-tools.json novnc linux/amd64 /tmp/novnc.tar.gz)"; \
     mkdir -p /opt/aerieos/novnc; \
     tar xzf /tmp/novnc.tar.gz -C /opt/aerieos/novnc --strip-components=1 \
-        "noVNC-${NOVNC_VERSION}/core" "noVNC-${NOVNC_VERSION}/vendor" \
-        "noVNC-${NOVNC_VERSION}/vnc_lite.html" "noVNC-${NOVNC_VERSION}/LICENSE.txt"; \
+        "noVNC-${v}/core" "noVNC-${v}/vendor" \
+        "noVNC-${v}/vnc_lite.html" "noVNC-${v}/LICENSE.txt"; \
     rm -f /tmp/novnc.tar.gz; \
     test -f /opt/aerieos/novnc/core/rfb.js
 
 # cloudflared: the home tunnel the controller can run itself (R176), from
-# Cloudflare's release for this architecture. Latest rather than pinned,
-# like the provisioner's copy on a node: the client is kept in step with
-# Cloudflare's edge by the weekly rebuild, and a pin here would be the one
-# copy left behind. Absent on an architecture it is not built for, and the
+# Cloudflare's release for this architecture, the one config/image-tools.json
+# pins, held to the pinned sha256 (scripts/lib/pin-fetch): the client moves
+# when its pin does (tools/pins.py), where the newest release of the day of
+# the build was taken. Absent on an architecture it is not built for, and the
 # Settings tab then says the tunnel cannot run from here.
-RUN --mount=type=secret,id=gh_token,required=false \
-    set -eux; \
+RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
         amd64|arm64) ;; \
         *) echo "no cloudflared build for ${arch}; the home tunnel is not run from here"; exit 0 ;; \
     esac; \
-    bb-gh-fetch cloudflare/cloudflared latest "cloudflared-linux-${arch}" /usr/local/bin/cloudflared; \
+    bb-pin-fetch /opt/aerieos/config/image-tools.json cloudflared "linux/${arch}" /usr/local/bin/cloudflared; \
     chmod +x /usr/local/bin/cloudflared; \
     cloudflared --version
 
+# A plain COPY, with the chmod in the step below: the installer on a machine
+# of its own lays a release out from these lines, read as "COPY SRC DEST"
+# (install-controller.sh lay_out), and one with a flag in it is not read.
 COPY scripts/ /opt/aerieos/scripts/
 COPY config/skel/ /opt/aerieos/skel/
 COPY config/templates/ /opt/aerieos/templates/
@@ -291,6 +319,18 @@ COPY config/toolchains.json /opt/aerieos/config/toolchains.json
 COPY config/release-keys/ /opt/aerieos/config/release-keys/
 # ...and the vetted catalog maintainers' key its signed index is checked against (R169).
 COPY config/catalog.pub /opt/aerieos/config/catalog.pub
+# ...and the oldest index this release takes, so an install that holds none
+# yet is not handed one from before it (catalogindex.floor).
+COPY config/catalog-floor /opt/aerieos/config/catalog-floor
+# ...and AerieOS's own release key, public half, which the Enroll script hands
+# a node to pin (R227): without it here no script carried one.
+COPY config/aerieos-release.pub /opt/aerieos/config/aerieos-release.pub
+# ...and who may sign a release (R199), which the updates of a machine that
+# runs this image, a bare-metal install laid out by these lines, and the
+# Library's downloads check a release's file list against: read from here,
+# so a key is trusted because the install held it, never because a release
+# names it.
+COPY config/release-signers /opt/aerieos/config/release-signers
 # The operating systems a VM is made from (R91), read by vms.py the same way.
 COPY config/vm-images.json /opt/aerieos/config/vm-images.json
 # What a sandbox VM is made from, one per hypervisor, which the Nodes tab
@@ -306,6 +346,9 @@ COPY nodes/provision-macos.sh /opt/aerieos/nodes/provision-macos.sh
 # The root helper that builds a session's view, in the bundle a node fetches;
 # its agent installs it (R35).
 COPY nodes/bb-session /opt/aerieos/nodes/bb-session
+# ...and the one that cuts the network for a declared pack's install steps
+# where a node's job account cannot make a network namespace itself (R234).
+COPY nodes/bb-netcut /opt/aerieos/nodes/bb-netcut
 COPY nodes/vm/ /opt/aerieos/nodes/vm/
 # AerieOS's own docs, for the Help page (helpdocs.py, R258): the Markdown
 # alone, two levels above server.py as in a checkout; the screenshots stay
@@ -322,8 +365,19 @@ COPY CHANGELOG.md /opt/aerieos/CHANGELOG.md
 # scripts/startup.d/05-unraid-icon.root.sh.
 COPY config/icon.png /opt/aerieos/icon.png
 
+# The scripts' bytecode, made here (R228 step 8): PYTHONDONTWRITEBYTECODE
+# above keeps a session's tree clean, and with it nothing ever wrote any, so
+# every relayed verb's python compiled its modules again (200 ms where 30
+# would do) and the dashboard compiled itself at each start. A node's agent
+# is unaffected: its bundle takes only the .py files (bundle.sources). So is
+# the bundle of aerie a node fetches, which leaves the bytecode out
+# (scripts/lib/bundleparts.py): a release signs the list of that bundle's
+# files from the tree, so nothing here may write or rewrite any other file
+# under the parts it names, or every node that pinned the release key
+# refuses the image's bundle.
 RUN set -eux; \
     chmod -R +x /opt/aerieos/scripts; \
+    python3 -m compileall -q -j 0 /opt/aerieos/scripts; \
     ln -sf /opt/aerieos/scripts/aerie /usr/local/bin/aerie; \
     # /opt/aerieos/bin sits first on PATH and holds privilege-dropping
     # wrappers, so `docker exec -it Aerie-Workshop aerie` runs as `builder`

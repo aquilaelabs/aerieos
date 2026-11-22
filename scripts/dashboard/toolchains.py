@@ -29,8 +29,11 @@ from pathlib import Path
 # import finds nothing.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fields import field  # noqa: E402
-from names import tmux_name  # noqa: E402
+from names import agent_sessions, tmux_name  # noqa: E402
 import agents  # noqa: E402
+import catalogrows  # noqa: E402
+import packformat  # noqa: E402
+import seams  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 
@@ -41,8 +44,7 @@ run = None
 write_json = None
 STATE = None
 nodes = None          # the node store, once the server has opened it (phase 6)
-claudecode = None     # claudecode.py, set by the server: Claude Code as a node's toolchain (R145)
-agentcode = None      # agentcode.py, set by the server: the other coding agents' rows (R95 step 2)
+agentcode = None      # agentcode.py, set by the server: the coding agents' rows, Claude Code's first (R145, R95 step 2)
 
 
 def configure(*, run, write_json, state, project_nodes=None, workspace=None):
@@ -55,6 +57,9 @@ def configure(*, run, write_json, state, project_nodes=None, workspace=None):
     globals()["VERSIONS_FILE"] = Path(state) / "toolchain-versions.json"
     globals().update(zip(("_tc_versions", "_tc_checked", "_tc_remembered",
                           "_tc_local"), load_versions(), strict=True))
+    # What was pressed behind a running job and not yet started when the
+    # controller last stopped: taken up again, in order.
+    _tc_next_load()
 
 
 # The catalog lives beside the code rather than in it: config/toolchains.json,
@@ -88,6 +93,9 @@ def load_toolchains(packs=()):
         rows = doc["toolchains"]
     except (OSError, ValueError, KeyError, TypeError):
         return []
+    # A shipped row whose recipe the catalog holds newer is that one, in
+    # its place (R234 step 4), as the bundle the nodes install from has it.
+    rows = catalogrows.merged(rows)
     if isinstance(rows, list) and packs:
         names = {r.get("name") for r in rows if isinstance(r, dict)}
         rows = rows + [r for r in packs if isinstance(r, dict) and r.get("name") not in names]
@@ -136,6 +144,11 @@ def load_toolchains(packs=()):
                  and isinstance(t.get("label"), str) and str(t.get("url") or "").startswith("https://")]
         if terms:
             row["terms"] = terms[:8]
+        # Who it is by, and each tool's maker where it carries several.
+        if packformat.maker_of(r):
+            row["maker"] = packformat.maker_of(r)
+        if packformat.credits_of(r):
+            row["credits"] = packformat.credits_of(r)
         lay = r.get("layout")
         if isinstance(lay, dict):
             row["layout"] = {
@@ -176,7 +189,27 @@ def load_toolchains(packs=()):
                            "runs": {str(v): [str(w) for w in (x.get("run") or [])][:40]
                                     for v, x in list((r.get("verbs") or {}).items())[:40] if isinstance(x, dict)},
                            "steps": [[str(w) for w in (t.get("run") or [])][:40]
-                                     for t in ((r.get("source") or {}).get("then") or [])[:20] if isinstance(t, dict)]}
+                                     for t in ((r.get("source") or {}).get("then") or [])[:20] if isinstance(t, dict)],
+                           # ...and the downloads it declares (pack format 3),
+                           # each as its manifest is kept: the three keys,
+                           # then the platform and the signature of one that
+                           # names them (format 5), so what Look reads of a
+                           # newer manifest compares with it key for key.
+                           "fetch": [{**{k: str(f.get(k) or "")[:2000] for k in ("url", "sha256", "to")},
+                                      **({"platform": str(f["platform"])[:40]} if f.get("platform") else {}),
+                                      **({"signed": {k: str(f["signed"].get(k) or "")[:2000] for k in ("sig", "keys")}}
+                                         if isinstance(f.get("signed"), dict) else {})}
+                                     for f in ((r.get("source") or {}).get("fetch") or [])[:32] if isinstance(f, dict)]}
+            # ...and the same downloads as a page reads them (below).
+            row["pack"]["downloads"] = packformat.downloads_said((r.get("source") or {}).get("fetch"))
+        # What its downloads are held to (pack format 5), worked out here
+        # from the whole row, which is not kept: one of pinned, installer
+        # and open, with the sentence that says why (packformat.held).
+        row["held"] = packformat.held_of(r)
+        # Each download it declares, as a page reads one: how it is held
+        # (its sha256, or its publisher's signature and the keys' name) and
+        # the platform it is for (packformat.downloads_said).
+        row["downloads"] = packformat.downloads_said((r.get("source") or {}).get("fetch"))
         out.append(row)
     # Sorted here rather than trusted from the file, so a toolchain added at the
     # end of the catalog still lands where somebody would look for it. Leading
@@ -286,9 +319,10 @@ _sdk_root_cache = []
 # image, the checkout's copy under `aerie dashboard dev`. Same relative position
 # either way, and it keeps the pair in step: a page offering a subcommand
 # the bb beside it does not have would be a button that cannot work.
-# BB_BIN exists for the test harness, which points it at a stub: the suite
-# must be able to drive install and remove without downloading gigabytes.
-BB = os.environ.get("BB_BIN") or str(HERE.parent / "aerie")
+# BB_BIN exists for the test harness, which points it at a stub in the
+# source tree alone (seams.py): the suite must be able to drive install and
+# remove without downloading gigabytes.
+BB = seams.get("BB_BIN") or str(HERE.parent / "aerie")
 
 
 def sdk_root_path():
@@ -464,6 +498,8 @@ def payload():
         busy = _tc_job["running"]
         job = {k: (list(v) if isinstance(v, list) else v)
                for k, v in _tc_job.items()}
+        # What was pressed behind it, each started in turn (start_job).
+        job["waiting"] = [{"action": a, "names": list(ns)} for a, ns in _tc_next]
     # Nothing is probed while a job runs. The toolchain being installed has a
     # directory that is filling up, and every probe here reads a non-empty
     # directory as a finished install: a half-written NDK reported itself
@@ -515,6 +551,7 @@ def payload():
             origin = ""
         items.append({**{k: p[k] for k in ("name", "label", "about")},
                       "terms": p.get("terms") or [],
+                      "maker": p.get("maker") or "", "credits": p.get("credits") or [],
                       # The tool this recipe adds under `aerie tool`, one name
                       # per recipe, so a row says what installing it adds to
                       # a session and the suite holds two from claiming one.
@@ -524,6 +561,9 @@ def payload():
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
                       "updatable": bool(p.get("updatable")),
+                      # What its downloads are held to: {word, why}; and
+                      # each download it declares, as a page reads one.
+                      "held": p.get("held"), "downloads": p.get("downloads") or [],
                       # What it needs, and what needs it, so a toolchain that
                       # exists to serve another says so rather than looking
                       # like an unexplained independent choice.
@@ -566,7 +606,7 @@ def is_mount(path):
 # meaning any more; they are simply noise that would otherwise fill the sixteen
 # lines kept from a job, since sdkmanager redraws its bar with carriage returns
 # and playwright draws its own with box characters.
-_PROGRESS_FRAME = re.compile(r"^(\[[=\s]*\]\s*\d+%|\|[\u25a0\s]*\|\s*\d+%)")
+_PROGRESS_FRAME = re.compile(r"^(\[[=\s]*\]\s*\d+%|\|[\u25a0\s]*\|\s*\d+%|#+\s+\d+(\.\d)?%)")
 
 # The decimal matters: on "100.0%" a bare \d{1,3} match lands on the 0 after
 # the point and reports nought percent for a finished download.
@@ -579,16 +619,29 @@ def _job_tail(out, keep=16):
 # What git says on the way to a fetch: where from, which ref, how far. Not a
 # reason, and a pack's install prints it right before the one that is.
 _GIT_NOISE = re.compile(r"^(\* branch\b|From |remote: |Receiving objects|Resolving deltas|Unpacking objects|hint: )")
+# A digest or a key's fingerprint: the log says each on a line of its own,
+# for whoever compares them there, and the row never carries one.
+_DIGEST = re.compile(r"[0-9A-Fa-f]{40,}")
 
 
 def _reason(said, last, cap=400):
-    """A failed row's line: the log's last lines (bb's own prefix and git's
-    fetch chatter dropped), then `last`, the verb and its exit. Too long,
-    whole lines go from the front, and the one left that alone is too long
-    keeps its start and loses its end at a word: a cut by characters from
-    the end began mid-word, '3pack · * branch' (B83)."""
+    """A failed row's line: the log's last lines (bb's own prefix, git's
+    fetch chatter and the lines that carry a digest dropped), then `last`,
+    the verb and its exit. Too long, whole lines go from the front, and the
+    one left that alone is too long keeps its start and loses its end at a
+    word: a cut by characters from the end began mid-word, '3pack · *
+    branch' (B83)."""
     lines = [re.sub(r"^\[builderbot\]\s*", "", s.strip()) for s in said]
-    parts = [s for s in lines if s and not _GIT_NOISE.match(s)][-4:] + [last]
+    # A refusal is its own one sentence, said after the lines that are its
+    # detail (what holds a toolchain in use, and its pid): taken alone.
+    refused = [s for s in lines if s.startswith("refused:")]
+    if refused:
+        return " · ".join([refused[-1][:cap], last])
+    # ...and so is bb's ERROR, the one sentence of why it failed: the lines
+    # after it (the partial copy removed) and before it (a tool's own words,
+    # a progress bar) stay in the log.
+    errors = [s for s in lines if s.startswith("ERROR:") and not _DIGEST.search(s)]
+    parts = (errors[-1:] or [s for s in lines if s and not _GIT_NOISE.match(s) and not _DIGEST.search(s)][-4:]) + [last]
     while len(parts) > 2 and len(" · ".join(parts)) > cap:
         # bb's ERROR is the reason, so the lines around it go first.
         parts.pop(next((i for i, s in enumerate(parts[:-1]) if not s.startswith("ERROR:")), 0))
@@ -620,16 +673,6 @@ def job_rev():
     return (f"{j['running']}:{j['action']}:{j['current']}:{len(j['done'])}"
             f":{len(j['failed'])}"
             f":{_tc_checked}:{_tc_sizing[0]}:{store}")
-
-
-def job_is_automatic():
-    """Whether the job in the way is the daily check rather than a person's.
-
-    The refusal an operator sees depends on it, and being told "an install is
-    already running" when nobody started an install wastes an evening.
-    """
-    with _tc_lock:
-        return bool(_tc_job.get("auto"))
 
 
 # The recipes `aerie toolchains update` knows, as the agent's tc_verbs has them.
@@ -984,8 +1027,8 @@ def last_check(nid):
 
 def attention(project_nodes):
     """Bell rows, one per live agent node with a toolchain behind what is
-    out: every toolchain its last check found an update for, and Claude
-    Code beside them (claudecode.behind), each as {name, label, from, to}.
+    out: every toolchain its last check found an update for, each as
+    {name, label, from, to} (the coding agents' are agent_attention's).
     One shape for all of them, with Open on the Library for that node,
     which is where each is updated (the operator, 9 Oct). Computed on every
     poll, so a row leaves the moment its update lands. `project_nodes` is
@@ -996,7 +1039,7 @@ def attention(project_nodes):
         if n.get("kind") != "agent" or not n.get("live"):
             continue
         running = set()
-        for j in nodes.jobs_for(node_id=n["id"], type="toolchain", active=True, n=1):
+        for j in nodes.jobs_for(node_id=n["id"], type="toolchain", active=True, n=20):
             running |= {str(x) for x in ((j.get("spec") or {}).get("names") or [])}
         rows, _ = last_check(n["id"])
         tools = [{"name": name, "label": labels[name], "from": r["installed"], "to": r["latest"]}
@@ -1019,13 +1062,10 @@ def agent_attention(project_nodes):
         if n.get("kind") != "agent" or not n.get("live"):
             continue
         tools = []
-        if claudecode and claudecode.behind(n) and not claudecode.updating(n["id"]):
-            tools.append({"name": "claude-code", "label": "Claude Code",
-                          "from": claudecode.installed(n), "to": claudecode.latest()["version"]})
         for a in agentcode.tracked() if agentcode else ():
             if agentcode.behind(n, a.id) and not agentcode.updating(n["id"], a.id):
                 tools.append({"name": a.tool, "label": a.product,
-                              "from": agentcode.installed(n, a.id), "to": agentcode.latest(a.id)["version"]})
+                              "from": agentcode.installed(n, a.id), "to": agentcode.offered(a.id)})
         if tools:
             live = claude_running(n["id"], project_nodes)
             out.append({"kind": "agents", "node": n["name"], "id": n["id"], "tools": tools,
@@ -1250,11 +1290,52 @@ def pin_rows(nid, rep):
                      f"plugin cannot fetch it into a store a session cannot write. "
                      + ("The store holds it." if held else "The store lacks it: tick it and Install."),
             "terms": terms.get(f"android:{kind}") or [],
+            # ...and by whoever its kind's row is by.
+            "maker": next((p.get("maker") or "" for p in TOOLCHAINS if p["probe"] == f"android:{kind}"), ""),
             "tool": "", "updatable": False, "wrong_platform": "",
             "installed": held, "unknown": False, "pinned_by": [proj for proj, _ in who],
             "path": "", "version": v if held else "", "size": "", "size_from": "",
             "latest": "", "state": ""})
     return rows
+
+
+def receipt_of(nid, rep, name, p, plat=""):
+    """An installed pack's receipt as its row says it (R234): what the node
+    reported (commit, tree, files, bytes, at, and what its steps ran with:
+    net, and why where the entry kept the network), with `stale` naming the
+    commit kept now when the copy there came from an earlier manifest,
+    `before` the tree the same manifest made there the last time where it
+    was another, `differs` each other node whose copy of the same
+    manifest is another set of files, and `downloads` each download its
+    entry declares that a machine of `plat` fetches, with how it is held.
+    None for one installed before receipts, or by an agent from before
+    them."""
+    rc = (rep.get("toolchain_receipts") or {}).get(name) if isinstance(rep.get("toolchain_receipts"), dict) else None
+    if not isinstance(rc, dict) or not rc.get("tree"):
+        return None
+    out = {k: rc.get(k) for k in ("commit", "tree", "files", "bytes", "at")}
+    # An entry that declares its downloads: whether its steps ran with the
+    # network cut there ("cut"), the node could not ("open"), or the entry
+    # kept it because its installer downloads the rest ("online"), with the
+    # entry's own sentence as `why` ("" for the other two).
+    out["net"] = rc.get("net") or ""
+    out["why"] = str(rc.get("why") or "") if out["net"] == "online" else ""
+    # The downloads its entry declares that a machine of this platform
+    # fetches, each with how it is held (its sha256, or its publisher's
+    # signature and the keys' name) and the platform it names: from the
+    # entry as kept now, which is the one installed unless `stale` says not.
+    out["downloads"] = [d for d in p.get("downloads") or [] if packformat.fits_machine(d.get("platform"), plat)]
+    kept = str(((p.get("source") or {}).get("commit")) or "")
+    out["stale"] = kept if kept and rc.get("commit") and kept != rc["commit"] else ""
+    out["before"] = rc.get("before") or ""
+    out["differs"] = []
+    for other in nodes.node_list() if nodes else []:
+        if other.get("id") == nid:
+            continue
+        theirs = ((other.get("reported") or {}).get("toolchain_receipts") or {}).get(name)
+        if isinstance(theirs, dict) and theirs.get("commit") == rc.get("commit") and theirs.get("tree") and theirs["tree"] != rc["tree"]:
+            out["differs"].append({"node": other.get("name") or other.get("id") or "", "tree": theirs["tree"]})
+    return out
 
 
 def payload_for_node(nid):
@@ -1306,6 +1387,7 @@ def payload_for_node(nid):
         kb = _tc_remembered.get(name)
         items.append({**{k: p[k] for k in ("name", "label", "about")},
                       "terms": p.get("terms") or [],
+                      "maker": p.get("maker") or "", "credits": p.get("credits") or [],
                       # The tool this recipe adds under `aerie tool`, one name
                       # per recipe, so a row says what installing it adds to
                       # a session and the suite holds two from claiming one.
@@ -1315,6 +1397,12 @@ def payload_for_node(nid):
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
                       "updatable": bool(p.get("updatable")),
+                      # What its downloads are held to (pack format 5):
+                      # {word: pinned, installer or open, why}, from its
+                      # entry alone, whether or not it is installed here;
+                      # and each download it declares, as a page reads one
+                      # (packformat.downloads_said), for every platform.
+                      "held": p.get("held"), "downloads": p.get("downloads") or [],
                       # Said on the row, so a toolchain this node cannot have
                       # reads that way rather than offering an install that
                       # is refused at the press.
@@ -1328,6 +1416,8 @@ def payload_for_node(nid):
                       # (R137): {algo, where}, algo "none" with why; absent
                       # for one installed before that.
                       "verified": ver.get(name) if here else None,
+                      # What a pinned install left behind (R234): its receipt.
+                      "receipt": receipt_of(nid, rep, name, p, plat) if here else None,
                       "latest": "", "state": ""})
     # The versions this node's projects pin (B712), beside the catalog's rows.
     items.extend(pin_rows(nid, rep))
@@ -1374,9 +1464,9 @@ def payload_for_node(nid):
             i["reopen"] = sum(1 for c in started if 0 < c < at)
     job = None
     if nodes:
-        for j in nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=1):
-            names = [DRIVER if str(x).startswith(DRIVER + ":") else str(x)
-                     for x in (j.get("spec") or {}).get("names", [])]
+        cur, behind = current_of(nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=50))
+        for j in [cur] if cur else []:
+            names = [base_name(x) for x in (j.get("spec") or {}).get("names", [])]
             # How far through the batch it is, from the name the agent says
             # it is on (step): the ones before it are behind it, the ones
             # after it still to come. Every name sat in the queue for the
@@ -1389,7 +1479,11 @@ def payload_for_node(nid):
                    "passed": names[:at] if at >= 0 else [],
                    "current": cur,
                    "log": nodes.job_tail(j["id"], 1200).splitlines()[-16:], "done": [],
-                   "failed": [], "aborting": bool(j.get("cancel")), "node": nid, "id": j["id"]}
+                   "failed": [], "aborting": bool(j.get("cancel")), "node": nid, "id": j["id"],
+                   # The jobs pressed behind it, each started in turn.
+                   "waiting": [{"action": (w.get("spec") or {}).get("action", ""),
+                                "names": [str(x) for x in (w.get("spec") or {}).get("names", [])], "id": w["id"]}
+                               for w in behind]}
             break
         if job is None:
             # The last FINISHED one, so the tab can clear what it selected.
@@ -1406,7 +1500,7 @@ def payload_for_node(nid):
                 if j.get("state") not in ("succeeded", "failed", "canceled"):
                     break
                 sp = j.get("spec") or {}
-                names = [DRIVER if str(x).startswith(DRIVER + ":") else str(x) for x in (sp.get("names") or [])]
+                names = [base_name(x) for x in (sp.get("names") or [])]
                 act = sp.get("action") or "install"
                 here = {i["name"] for i in items if i["installed"]}
                 here |= {r["name"] for r in (driver_row(n), container_row(n)) if r and r["here"]}
@@ -1494,6 +1588,21 @@ def payload_for_node(nid):
 DRIVER = "nvidia-driver"
 
 
+def base_name(x):
+    """A job's name as its row is called: nvidia-driver for the
+    nvidia-driver:PACKAGE a picked branch is queued as, any other as it is."""
+    x = str(x)
+    return DRIVER if x.startswith(DRIVER + ":") else x
+
+
+def is_machine(x):
+    """Whether a job's name is one of the machine's own two, the NVIDIA
+    driver (with a branch's package or without) or the container toolkit:
+    what no store holds."""
+    x = str(x)
+    return x == TOOLKIT or x == DRIVER or x.startswith(DRIVER + ":")
+
+
 def _imaged(rep):
     """Whether this machine runs an AerieOS image, whose driver and toolkit
     are part of the image rather than installed on it."""
@@ -1545,7 +1654,7 @@ def _store_share(n):
 
     Two machines pointing `toolchains` at one share ARE one store, and the
     controller has to know which pairs those are: the same path STRING says
-    nothing: /var/lib/builderbot/toolchains is every node's default and is a
+    nothing: /var/lib/aerieos/toolchains is every node's default and is a
     different disk on each.
 
     The store's own id first (nodes.store_id, a marker file inside it),
@@ -1587,8 +1696,8 @@ def _store_settling(job, items):
     if j.get("state") != "succeeded" or time.time() - int(j.get("ended") or 0) > 120:
         return False
     here = {i["name"] for i in items if i["installed"]}
-    names = [n for n in ((j.get("spec") or {}).get("names") or []) if n != DRIVER and not str(n).startswith(DRIVER + ":")
-             and n != TOOLKIT and n in {i["name"] for i in items}]
+    names = [n for n in ((j.get("spec") or {}).get("names") or [])
+             if not is_machine(n) and n in {i["name"] for i in items}]
     want = job["action"] != "remove"
     return any((n in here) != want for n in names)
 
@@ -1758,6 +1867,16 @@ def node_has(n):
     return out
 
 
+def node_whole(n):
+    """The toolchain names this node's store holds with their tool in them:
+    node_has's, without the folders the node lists as incomplete (an install
+    that did not finish: a directory with no tool its layout runs, which
+    the installer clears before it installs again). What is installed, where
+    node_has is what holds files."""
+    rep = (n or {}).get("reported") or {}
+    return node_has(n) - set((rep.get("store_dirs") or {}).get("incomplete") or [])
+
+
 def installed_where(name):
     """The names of the nodes whose store holds `name`, by what each last
     reported: what a tool pack's removal is refused over (B84), since a pack
@@ -1855,6 +1974,31 @@ def unsupported(names, plat):
             for x in names if x in by and not supports(by[x], plat)]
 
 
+def unfit(n, names):
+    """Why this node cannot have these toolchains, or "": one packaged for
+    another platform, or one whose system packages are named for other
+    package managers alone. Asked before a job is queued, and before a
+    person is asked to allow one a session wants."""
+    # Seven of these recipes name linux-x86_64 in their URL and one names
+    # ubuntu24.04, so a node of another platform would download a couple
+    # of hundred megabytes and fail on exec, or install and fail later.
+    # Refused by name instead. arm64 Linux needs no new agent to reach
+    # this, which is why it is a live wrong answer rather than a future
+    # one (roadmap #18).
+    plat = platform_of(n)
+    no = unsupported(names, plat)
+    if no:
+        return (f"{n['name']} is {plat}, and "
+                + "; ".join(f"{x} is packaged for {p}" for x, p in no)
+                + ". The catalog names the platform each recipe works on; "
+                  "adding another is a URL per row, not a code change.")
+    fam = str(((n.get("reported") or {}).get("sysdeps") or {}).get("family") or "")
+    by = {p["name"]: p for p in TOOLCHAINS}
+    off = [(x, family_miss(by.get(x) or {}, fam)) for x in names]
+    off = [(x, w) for x, w in off if w]
+    return "; ".join(f"{x} is not for {n['name']}: {w}" for x, w in off)
+
+
 def _need_kb(name):
     """What installing this will cost the store, in KB: measured here the
     last time it was installed, or 0 for one this controller never had."""
@@ -1866,8 +2010,16 @@ def _need_kb(name):
 STORE_JOBS = ("toolchain", "image")
 
 
-def _store_job_on(node_id):
-    return any(nodes.jobs_for(node_id=node_id, type=t, active=True, n=1) for t in STORE_JOBS)
+def _store_jobs_at_work(node_id, skip=""):
+    """The toolchain and image jobs a node has been handed and not finished:
+    one queued behind them waits its turn (job_next asks store_gate), so it
+    is not counted, and neither is `skip`, the job asking."""
+    return [j for t in STORE_JOBS for j in nodes.jobs_for(node_id=node_id, type=t, active=True, n=8)
+            if j.get("state", "running") in ("assigned", "running") and j.get("id") != skip]
+
+
+def _store_job_on(node_id, skip=""):
+    return bool(_store_jobs_at_work(node_id, skip))
 
 
 def store_areas(names, action="install", where=""):
@@ -1884,7 +2036,7 @@ def store_areas(names, action="install", where=""):
     out = set()
     for x in names:
         x = str(x)
-        if x == TOOLKIT or x == DRIVER or x.startswith(DRIVER + ":"):
+        if is_machine(x):
             continue
         out.add((where, "android" if x == "android-tools" or x.startswith("android:") else x))
     return out
@@ -1903,16 +2055,19 @@ def _job_areas(j, where):
     return store_areas(sp.get("names") or [], sp.get("action") or "install", where)
 
 
-def store_busy(nid, names=None, action="install"):
+def store_busy(nid, names=None, action="install", skip=""):
     """Why this node's toolchain store cannot take this job now, or "".
 
     On the node itself, one toolchain or image job at a time: its tab shows
     one job. Across machines that share the store, a job waits only for one
     writing the same directory (store_areas): each keeps its toolchains in
     its own, so that is the Android system images under <store>/shared.
-    `names` None is any write to the store (an image job: the Android SDK)."""
+    `names` None is any write to the store (an image job: the Android SDK).
+    Only jobs at work count: a press while one runs queues behind it rather
+    than being refused (store_gate holds it until its turn), and `skip` is
+    the queued job asking."""
     n = nodes.node(nid)
-    if _store_job_on(nid):
+    if _store_job_on(nid, skip):
         return f"a toolchain or image job is already running on {n['name']}. One at a time on a node."
     mine = (store_areas(names, action, _dir_of(n)) if names is not None
             else _image_areas(_dir_of(n)))
@@ -1920,7 +2075,9 @@ def store_busy(nid, names=None, action="install"):
         return ""
     for other in store_sharers(nid):
         for t in STORE_JOBS:
-            for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=4):
+            for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=8):
+                if j.get("state", "running") not in ("assigned", "running"):
+                    continue
                 both = sorted(a for _, a in mine & _job_areas(j, _dir_of(other)))
                 if both:
                     return (f"{other['name']} is installing {', '.join(both)} into the toolchain store "
@@ -1938,6 +2095,31 @@ def store_busy(nid, names=None, action="install"):
             return (f"this container is installing {', '.join(both)} into the toolchain store "
                     f"it shares with {n['name']}; this waits for it")
     return ""
+
+
+def current_of(active):
+    """The job a node is on among these (jobs_for's, newest first): the one
+    at work, else the oldest queued, which goes first; and the rest, oldest
+    first. (job or None, [waiting])."""
+    jobs = list(reversed(active))
+    cur = next((j for j in jobs if j.get("state", "running") in ("assigned", "running")), jobs[0] if jobs else None)
+    return cur, [j for j in jobs if j is not cur]
+
+
+def store_gate(job, nid):
+    """Whether a queued toolchain or image job waits on this node (nodes.job_next):
+    a press while another writes the store queues, and the job is handed
+    over once nothing it would collide with is at work."""
+    sp = job.get("spec") or {}
+    if job.get("type") == "image":
+        return bool(store_busy(nid, None, skip=job.get("id", "")))
+    names = None if sp.get("action") == "clean" else list(sp.get("names") or [])
+    return bool(store_busy(nid, names, sp.get("action") or "install", skip=job.get("id", "")))
+
+
+def queued_behind(r, why):
+    """A job's answer, saying what it waits for when it waits."""
+    return r | {"waits": why} if why and r.get("ok") else r
 
 
 TOOLKIT = "nvidia-container-toolkit"
@@ -2078,28 +2260,15 @@ def node_job(principal, nid, action, names, driver=""):
     if action == "install" and names:
         # What these need, ahead of them. android-tools without a jdk fails
         # inside sdkmanager with a message that names neither.
-        have = node_has(n)
+        # One whose folder holds no tool (an install that did not finish)
+        # is not there to build on: it is installed again, ahead of what
+        # needs it.
+        have = node_whole(n)
         ordered, _ = with_requires(names, have)
         names, added = ordered, [x for x in ordered if x not in names]
-        # Seven of these recipes name linux-x86_64 in their URL and one names
-        # ubuntu24.04, so a node of another platform would download a couple
-        # of hundred megabytes and fail on exec, or install and fail later.
-        # Refused by name instead. arm64 Linux needs no new agent to reach
-        # this, which is why it is a live wrong answer rather than a future
-        # one (roadmap #18).
-        plat = platform_of(n)
-        no = unsupported(names, plat)
-        if no:
-            return {"error": f"{n['name']} is {plat}, and "
-                             + "; ".join(f"{x} is packaged for {p}" for x, p in no)
-                             + ". The catalog names the platform each recipe works on; "
-                               "adding another is a URL per row, not a code change."}
-        fam = str(((n.get("reported") or {}).get("sysdeps") or {}).get("family") or "")
-        by = {p["name"]: p for p in TOOLCHAINS}
-        off = [(x, family_miss(by.get(x) or {}, fam)) for x in names]
-        off = [(x, w) for x, w in off if w]
-        if off:
-            return {"error": "; ".join(f"{x} is not for {n['name']}: {w}" for x, w in off)}
+        why = unfit(n, names)
+        if why:
+            return {"error": why}
         need_kb = sum(_need_kb(x) for x in names)
         free = store.get("free_mb")
         if need_kb and free is not None and free * 1024 < need_kb * 1.2:
@@ -2107,13 +2276,16 @@ def node_job(principal, nid, action, names, driver=""):
                              f"and this needs about {human_kb(int(need_kb * 1.2))}: "
                              "point the store somewhere bigger first"}
     busy = store_busy(nid, names + [x for x in (drv, ctk) if x], action)
-    if busy:
-        return {"error": busy}
+    # The same press while it waits its turn is that job, not a second.
+    every = names + [x for x in (drv, ctk) if x]
+    for j in nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=20):
+        sp = j.get("spec") or {}
+        if j["state"] == "queued" and sp.get("action") == action and sorted(sp.get("names") or []) == sorted(every):
+            return {"ok": True, "job": j["id"], "already": True}
     # Two architectures on one store used to be refused here, because a flat
     # store could not hold both. It is scoped by platform now: each machine
     # installs under <store>/<os>-<arch> (roadmap R19), so a Mac and a Linux
     # box sharing a share is the design, not a mistake.
-    every = names + [x for x in (drv, ctk) if x]
     # Two limits (the operator, 12 Oct): each toolchain's step gets an hour,
     # which the agent enforces and then moves on; the job as a whole gets
     # an hour per toolchain, which is what the controller holds it to. One
@@ -2124,7 +2296,7 @@ def node_job(principal, nid, action, names, driver=""):
                        "timeout": TC_STEP_S * max(1, len(every)) + 600})
     if r.get("ok") and added:
         r["added"] = added
-    return r
+    return queued_behind(r, busy)
 
 
 # The unmet set each node was last sent a system-packages job for, so one
@@ -2172,39 +2344,113 @@ def auto_sysdeps(nid):
     return r
 
 
-def start_job(action, names, auto=False):
-    """Queue a toolchain job, unless one is already going. False if it is."""
+# What a person pressed for this container's own store while it was busy,
+# each started once it is free (_tc_waiter): (action, names).
+_tc_next = []
+_tc_waiting = {"thread": None}
+
+
+def _tc_next_file():
+    return STATE / "toolchain-queue.json"
+
+
+def _tc_next_keep():
+    """The waiting presses on disk, so a restart does not drop them without
+    a word; under _tc_lock. The file goes when nothing waits."""
+    try:
+        if _tc_next:
+            write_json(_tc_next_file(), {"waiting": [{"action": a, "names": list(ns)} for a, ns in _tc_next]})
+        else:
+            _tc_next_file().unlink(missing_ok=True)
+    except (OSError, TypeError) as e:
+        print(f"dashboard: toolchains: the waiting installs were not kept: {e}", file=sys.stderr, flush=True)
+
+
+def _tc_next_load():
+    """Presses kept by a controller that stopped before starting them."""
+    try:
+        d = json.loads(_tc_next_file().read_text())
+    except (OSError, ValueError):
+        return
+    known = {p["name"] for p in TOOLCHAINS}
     with _tc_lock:
-        if _tc_job["running"]:
-            return False
-        # The other half of the shared-store rule: a node unpacking into the
-        # store this container is about to write is the same collision, seen
-        # from the other side.
-        if nodes:
-            try:
-                me = nodes.node(nodes.LOCAL)
-                mine = store_areas(list(names), action, _dir_of(me))
-                for other in store_sharers(nodes.LOCAL):
-                    for t in STORE_JOBS:
-                        for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=4):
-                            if mine & _job_areas(j, _dir_of(other)):
-                                return False
-            except sqlite3.Error as e:
-                print(f"dashboard: toolchains: store sharers unread, going ahead: {e}",
-                      file=sys.stderr, flush=True)
-        if action == "install":
-            here = {p["name"] for p in TOOLCHAINS if _tc_path(p["probe"])}
-            names, _added = with_requires(list(names), here)
-        _tc_job.update(running=True, queue=list(names), action=action,
-                        current="", log=[], done=[], failed=[], auto=auto,
-                        aborting=False,
-                        # Fixed in phase 1 (toolchains install here) and a
-                        # seam on purpose: phase 6 makes this a job placed on
-                        # any node's toolchain store, and this call site is
-                        # where the node picker's answer lands.
-                        node="local")
+        for w in (d.get("waiting") or [])[:20] if isinstance(d, dict) else []:
+            names = [n for n in (w.get("names") or []) if n in known]
+            if w.get("action") in ("install", "remove", "check") and names:
+                _tc_next.append((w["action"], names))
+        if _tc_next and _tc_waiting["thread"] is None:
+            _tc_waiting["thread"] = threading.Thread(target=_tc_waiter, daemon=True)
+            _tc_waiting["thread"].start()
+
+
+def _tc_clash(names, action):
+    """The other half of the shared-store rule: a node unpacking into the
+    store this container is about to write is the same collision, seen
+    from the other side. True when one is."""
+    if not nodes:
+        return False
+    try:
+        me = nodes.node(nodes.LOCAL)
+        mine = store_areas(list(names), action, _dir_of(me))
+        for other in store_sharers(nodes.LOCAL):
+            for t in STORE_JOBS:
+                for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=8):
+                    if j.get("state") in ("assigned", "running") and mine & _job_areas(j, _dir_of(other)):
+                        return True
+    except sqlite3.Error as e:
+        print(f"dashboard: toolchains: store sharers unread, going ahead: {e}",
+              file=sys.stderr, flush=True)
+    return False
+
+
+def _tc_waiter():
+    """Start what was pressed while the store was busy, in turn, as it frees."""
+    while True:
+        time.sleep(3)
+        with _tc_lock:
+            if not _tc_next:
+                _tc_waiting["thread"] = None
+                return
+            if _tc_job["running"] or _tc_clash(_tc_next[0][1], _tc_next[0][0]):
+                continue
+            action, names = _tc_next.pop(0)
+            _tc_next_keep()
+            _tc_begin(action, names, False)
+        threading.Thread(target=_tc_worker, daemon=True).start()
+
+
+def start_job(action, names, auto=False):
+    """Start a toolchain job on this container's own store, or queue it
+    behind the one running (a person's press is never refused for another
+    job). The automatic version check steps aside instead: False then."""
+    with _tc_lock:
+        if _tc_job["running"] or _tc_next or _tc_clash(names, action):
+            if auto:
+                return False
+            _tc_next.append((action, list(names)))
+            _tc_next_keep()
+            if _tc_waiting["thread"] is None:
+                _tc_waiting["thread"] = threading.Thread(target=_tc_waiter, daemon=True)
+                _tc_waiting["thread"].start()
+            return True
+        _tc_begin(action, names, auto)
     threading.Thread(target=_tc_worker, daemon=True).start()
     return True
+
+
+def _tc_begin(action, names, auto):
+    """The job record set for a start; under _tc_lock."""
+    if action == "install":
+        here = {p["name"] for p in TOOLCHAINS if _tc_path(p["probe"])}
+        names, _added = with_requires(list(names), here)
+    _tc_job.update(running=True, queue=list(names), action=action,
+                    current="", log=[], done=[], failed=[], auto=auto,
+                    aborting=False,
+                    # Fixed in phase 1 (toolchains install here) and a
+                    # seam on purpose: phase 6 makes this a job placed on
+                    # any node's toolchain store, and this call site is
+                    # where the node picker's answer lands.
+                    node="local")
 
 
 # A version check on the way up, and once a day after that.
@@ -2292,14 +2538,11 @@ def node_checks_due(now=None):
         if r.get("ok") or r.get("job"):
             queued.append(n["id"])
             getattr(nodes, "checks_wanted", set()).discard(n["id"])
-    # Claude Code on the same clock (R145): asked once for every node, since
-    # what is out is one answer, when any node was due or a week has passed.
+    # The coding agents on the same clock, Claude Code first (R145, R95 step
+    # 2): each asked once for every node, since what is out is one answer,
+    # when any node was due or a week has passed.
     import checks
     agents_every = checks.every("catalog") or TC_CHECK_EVERY
-    if claudecode and (queued or now - int(claudecode.latest().get("at") or 0) >= agents_every):
-        with contextlib.suppress(Exception):
-            claudecode.check()
-    # The other coding agents on the same clock (R95 step 2).
     for a in agentcode.tracked() if agentcode else ():
         if queued or now - int(agentcode.latest(a.id).get("at") or 0) >= agents_every:
             with contextlib.suppress(Exception):
@@ -2331,11 +2574,10 @@ def verb(action, req, principal):
             want = [d for d in (req.get("names") or []) if d in offered]
             if not want:
                 return {"error": "nothing on this store is waiting to be taken off"}, 400
-            if (why := store_busy(nid, None)):
-                return {"error": why}, 409
+            why = store_busy(nid, None)
             r = nodes.job_add(principal, {"node": nid}, "toolchain", {"action": "clean", "names": want,
                                                                      "timeout": 3600})
-            return (r, 400) if r.get("error") else ({"ok": True, "job": r.get("job"), "queued": want}, 200)
+            return (r, 400) if r.get("error") else (queued_behind({"ok": True, "job": r.get("job"), "queued": want}, why), 200)
         if action not in ("install", "remove", "sysdeps", "check"):
             return {"error": "a node takes install, remove, sysdeps or check"}, 400
         node = nodes.node(nid)
@@ -2395,10 +2637,191 @@ def verb(action, req, principal):
         names = [p["name"] for p in TOOLCHAINS]
     if not names:
         return {"error": "nothing selected"}, 400
-    if not start_job(action, names):
-        # Which one, because the automatic version check holds the queue
-        # too and being told "an install is already running" when nobody
-        # started an install is the kind of answer that wastes an evening.
-        return {"error": "a version check is running; try again in a moment"
-                if job_is_automatic() else "an install is already running"}, 409
+    start_job(action, names)
     return {"ok": True, "queued": names}, 200
+
+
+# ---- what a session asks for with `aerie tool install` ---------------------
+# A session names a tool and it is installed on the node that session runs
+# on, once its space's Install a tool pack dial lets it: at once (auto), or
+# when a person allows the ask on the bell, in that person's name. The name
+# is a toolchain AerieOS ships, installed as the Library's Install does, or
+# a pack of the vetted catalog, added here first when it is not yet. An ask
+# used to add the pack and stop: Allow installed nothing on any node and
+# said so to nobody, and a shipped toolchain's name was looked up among the
+# packs and kept as one beside the toolchain it named.
+#
+# The four below are the server's, handed over as packs_rows is: this
+# module reads neither the catalog's index, the kept packs nor the bell.
+pack_entry = None     # name -> the vetted catalog's pack entry of that name, withdrawn ones left out, or None
+pack_have = None      # toolpacks.packs: {name: record} of the packs kept here
+pack_add = None       # (entry, by, may_root) -> the pack kept at the index's pin, or {"error"}
+pack_ask = None       # phone.ask_pack: the ask held for a person on the bell
+# What an ask holds of a pack's entry in the signed index until a person
+# answers: where it is fetched from and at which pin, its tier, and the
+# format it is written in, which a build too old for it refuses by.
+PIN_KEYS = ("url", "commit", "sha256", "path", "tier", "format", "framework")
+
+
+def shipped_names():
+    """The names of the toolchains AerieOS ships: the catalog's rows that
+    no pack brought."""
+    return {p["name"] for p in TOOLCHAINS if not p.get("pack")}
+
+
+def shipped_name(name):
+    """The shipped toolchain `name` means, or "": a row's own name, or the
+    vetted catalog's word for an Android part (android-ndk for android:ndk,
+    a pack's name taking no colon)."""
+    name = str(name or "")
+    have = shipped_names()
+    if name in have:
+        return name
+    part = "android:" + name[len("android-"):] if name.startswith("android-") else ""
+    return part if part in have else ""
+
+
+def session_node(mine, said="", uid="", project="", shown="", what="it"):
+    """(node id, "") for the node a session of `project` asks from, or
+    ("", why). `mine` is the space's nodes, its own first and then the ones
+    it also works on. A space on one node is on that one. On several, the
+    session says which: the id its terminal was told, believed only when it
+    is one of the space's own, since a variable is the session's to set.
+    One that says none is found by the heartbeats, when exactly one node of
+    the space's reports a session of this account's on this space."""
+    mine = [i for i in dict.fromkeys(mine or []) if i]
+    shown = shown or project or "this space"
+    if not mine or not nodes:
+        return "", (f"{shown} runs on no node, so there is no machine to install {what} on: "
+                    "a node is picked in the space's settings")
+    if said in mine:
+        return said, ""
+    if len(mine) == 1:
+        return mine[0], ""
+    want = set(agent_sessions(project)) if project and uid else set()
+    live = nodes.node_sessions() if want else {}
+    on = [nid for nid in mine
+          if any(str((r or {}).get("name") or "").startswith(f"{uid}~")
+                 and _OWNER.sub("", str((r or {}).get("name") or "")) in want
+                 for r in (live.get(nid) or ("", []))[1])]
+    if len(on) == 1:
+        return on[0], ""
+    names = ", ".join((nodes.node(i) or {}).get("name") or i for i in mine)
+    return "", (f"{shown} works on several nodes ({names}) and which one this session runs on could not be told: "
+                f"start the session again from the dashboard, or have a person install {what} on its node from the Library")
+
+
+def _accepts(name, node_name):
+    """(why, the agreements) when installing `name` is not a session's to
+    start, or ("", []): it accepts an agreement (Google's Android SDK
+    terms, NVIDIA's CUDA license), and only a person accepts one, by name,
+    in the Library. Never an Allow on the bell, which would accept it on
+    the strength of a session's reason."""
+    need = agreements([name])
+    if not need:
+        return "", []
+    return (f"installing {name} accepts {' and '.join(t['label'] for t in need)}, which only a person accepts: "
+            f"a person installs {name} on {node_name} from the Library, where they accept it"), need
+
+
+def session_install(project, req, *, mine, uid="", mode="ask", asker="", shown=""):
+    """A session's `aerie tool install NAME`, once server.py has read whose
+    session asks: the tool on the node that session runs on, as its space's
+    Install a tool pack dial says. One the node holds whole is said at
+    once and nobody is asked; deny refuses; ask holds it for a person on
+    the bell, naming the node; auto installs it now, as the session's own.
+    (payload, status)."""
+    name = field(req, "name")
+    tc = shipped_name(name)
+    entry = None
+    if not tc:
+        entry = pack_entry(name) if pack_entry else None
+        if not entry:
+            return {"error": f"no tool pack called {name or 'nothing'} in the vetted catalog: "
+                             "aerie tool search WORDS lists them"}, 400
+        # One the index calls official that is no toolchain's row is a coding
+        # agent AerieOS ships: never a pack to add, and not a session's.
+        if entry.get("tier") == "official":
+            return {"error": f"{name} is part of AerieOS itself, not a tool pack to add: "
+                             "a person installs or updates it from the Library"}, 400
+    what = tc or name
+    nid, no_node = session_node(mine, field(req, "node"), uid, project, shown, what)
+    n = nodes.node(nid) if nid else None
+    added = bool(tc) or what in (pack_have() if pack_have else {})
+    if n and added and what in node_whole(n):
+        return {"ok": True, "installed": True, "name": what, "node": n["name"],
+                "note": f"{what} is installed on {n['name']} already"
+                        + ("" if tc else ": a pack is switched on for a space under its settings' Toolchains")}, 200
+    if mode == "deny":
+        return {"error": f"{project}'s settings say an agent may not add a tool pack (Install a tool pack is deny): "
+                         "a person adds one from the Library, or changes that in the space's settings"}, 403
+    if not n:
+        return {"error": no_node or f"the node {shown or project} runs on is gone: pick another in the space's settings"}, 400
+    if n.get("kind") != "agent":
+        return {"error": f"{n['name']} runs no agent, so nothing is installed there from here: "
+                         "toolchains are installed there by hand"}, 400
+    # What would be refused on Allow is refused now, before a person is
+    # asked: a platform it is not packaged for, an agreement to accept.
+    if added:
+        why = unfit(n, with_requires([what], node_whole(n))[0])
+        if why:
+            return {"error": why}, 400
+        why, need = _accepts(what, n["name"])
+        if why:
+            return {"error": why, "accept": need}, 409
+    elif entry.get("platforms") and not supports({"platforms": entry["platforms"]}, platform_of(n)):
+        return {"error": f"{n['name']} is {platform_of(n)}, and {what} is packaged for "
+                         f"{', '.join(str(x) for x in entry['platforms'])}"}, 400
+    held = {"name": what, "node": nid, "node_name": n["name"], "toolchain": bool(tc),
+            **({k: entry[k] for k in PIN_KEYS if entry.get(k) is not None} if entry else {})}
+    if mode == "ask":
+        r = pack_ask(field(req, "why") or f"install {what} on {n['name']}", project, held, asker_name=asker) \
+            if pack_ask else {"error": "no ask is wired up here"}
+        return (r, 400) if r.get("error") else (r | {"name": what}, 200)
+    r = session_do(held, f"session:{project}")
+    return r, (400 if r.get("error") else 200)
+
+
+def session_do(held, by, pack_by="", may_root=False):
+    """Install what a session asked for on the node it asked from: a pack
+    not yet kept here is added first, at the pin the ask held (as
+    `pack_by`, with `may_root` for an administrator's Allow), and then the
+    install is queued there as `by`, the way the Library's Install queues
+    it. Run at once for a dial at auto, and by a person's Allow on the bell.
+    {ok, job, said, ...}, {ok, said} where there was nothing left to do, or
+    {error}: `said` is the sentence for whoever asked and whoever allowed,
+    which the job's id is put after."""
+    name, nid = str(held.get("name") or ""), str(held.get("node") or "")
+    n = nodes.node(nid) if nodes and nid else None
+    if not n:
+        return {"error": f"the node {name} was asked for on is gone: ask again from a session on the space's node"}
+    added = False
+    if not held.get("toolchain"):
+        rec = (pack_have() if pack_have else {}).get(name)
+        if rec is None:
+            r = pack_add(held, pack_by or by, may_root) if pack_add else {"error": "no tool pack path is wired up here"}
+            if r.get("error"):
+                return r
+            refresh_packs()
+            added = True
+        elif ((rec.get("manifest") or {}).get("touches") or {}).get("root") and not may_root:
+            # Added by an administrator, and still theirs to put on a node.
+            return {"error": f"{name}: it needs root on the node (its touches say so): "
+                             f"an administrator installs it on {n['name']} from the Library"}
+    kept = f"{name} is added to the catalog here, and " if added else ""
+    if name in node_whole(n):
+        return {"ok": True, "name": name, "node": nid, "node_name": n["name"], "added": added,
+                "said": f"{kept}{'it' if added else name} is installed on {n['name']} already"}
+    why = _accepts(name, n["name"])[0]
+    if why:
+        return {"error": kept + why}
+    r, _ = verb("install", {"node": nid, "names": [name]}, by)
+    if r.get("error"):
+        return {"error": f"{kept}its install on {n['name']} was refused: {r['error']}" if added else r["error"]}
+    also = [x for x in (r.get("added") or []) if x != name]
+    said = (f"{name} is already queued to install on {n['name']}" if r.get("already")
+            else f"{kept}installing {'it' if added else name} on {n['name']}"
+                 + (f", with {' and '.join(also)} which it needs" if also else "")
+                 + (", once the job running there ends" if r.get("waits") else ""))
+    return {"ok": True, "job": r.get("job") or "", "name": name, "node": nid, "node_name": n["name"],
+            "added": added, "also": also, "said": said}

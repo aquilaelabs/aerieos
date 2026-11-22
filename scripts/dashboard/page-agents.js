@@ -42,7 +42,8 @@ function agentsAdopt(rows){
   for (let i = AGENTS.length - 1; i >= 0; i--)
     if (AGENTS[i].pack && !want.some(r => r.id === AGENTS[i].id)){ delete AGENT_MODELS[AGENTS[i].id]; delete AGENT_GUARDS[AGENTS[i].id]; AGENTS.splice(i, 1); }
   for (const r of want){
-    const row = {id: r.id, name: r.name, product: r.product, command: r.command, provider: r.provider || "", live: true, pack: true};
+    // `signin`: its pack says how it signs in, so the page signs it in (R233 step 6).
+    const row = {id: r.id, name: r.name, product: r.product, command: r.command, provider: r.provider || "", live: true, pack: true, signin: !!r.signin};
     const at = AGENTS.findIndex(a => a.id === r.id);
     if (at < 0) AGENTS.push(row); else AGENTS[at] = row;
     AGENT_MODELS[r.id] = {models: Array.isArray(r.models) ? r.models : [], efforts: []};
@@ -107,6 +108,10 @@ function agentsWord(names){
 // for any session's): the agent it names (R95), or Claude, whose sessions
 // were the only ones before a record named its agent.
 function agentAsker(rec){ return agentById(rec?.agent)?.name || "Claude"; }
+// Who did it, from the word a record stores: a session by its agent's name
+// (agentAsker, with the record that names it), a person as "you", and
+// anything else as it is stored. Without a record a session reads Claude.
+function byWho(by, rec){ return by === "claude" ? agentAsker(rec) : by || ""; }
 // The argument that opens an agent's session on a project: `claude:alpha`.
 function agentArg(id, project){ return `${(agentById(id) || AGENTS[0]).id}:${project}`; }
 // ...and its slot's (R143), which bb-tty reads by suffix before the boot, so

@@ -1,0 +1,67 @@
+{
+ "about": "Merlin Code, run by sessions as merlin",
+ "agent": {
+  "briefing": "instructions-file",
+  "command": "merlin",
+  "guards": "hooks",
+  "install": {
+   "also": [
+    ".merlin/bin/merlin"
+   ],
+   "bin": ".local/bin/merlin",
+   "env": {
+    "MERLIN_INSTALL_DIR": "{home}/.local/bin"
+   },
+   "fetch": [
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+     "to": "dl/install.sh",
+     "track": {
+      "repo": "merlin-code/merlin",
+      "resolver": "github-release",
+      "trim_prefix": "v"
+     },
+     "url": "https://github.com/merlin-code/merlin/releases/download/v{version}/install.sh",
+     "version": "3.4.0"
+    }
+   ],
+   "fresh": "",
+   "online": "Its installer downloads the Merlin Code build for this machine from github.com/merlin-code/merlin's releases, and checks it against the sha256 that release states.",
+   "pin": [
+    "MERLIN_VERSION",
+    "{v}"
+   ],
+   "rev": 1,
+   "steps": [
+    [
+     "sh",
+     "{dir}/dl/install.sh",
+     "--no-modify-path"
+    ]
+   ]
+  },
+  "latest_url": "https://registry.npmjs.org/merlin-code/latest",
+  "login_job": "",
+  "logout_job": "",
+  "product": "Merlin Code",
+  "provider": "Merlin Labs",
+  "reported": "merlin",
+  "state": "hooks",
+  "tool": "merlin-code",
+  "transcripts": ".merlin/sessions",
+  "update_job": "merlin-update"
+ },
+ "format": 5,
+ "framework": "5.1",
+ "label": "Merlin",
+ "maker": "Merlin Labs",
+ "name": "merlin",
+ "platforms": [
+  "linux/*"
+ ],
+ "terms": [],
+ "tier": "official"
+}

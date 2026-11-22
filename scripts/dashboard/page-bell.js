@@ -3,8 +3,8 @@
 // held change).
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -39,6 +39,21 @@ let toastHeld = false;
 // rather than as a JavaScript error; anything else as it came (B301).
 const unreached = e => e instanceof TypeError && /fetch|network|load failed/i.test(e.message || "");
 const failWords = e => unreached(e) ? "the controller did not answer" : String(e?.message || e);
+// What nothing caught is said rather than lost (R9 step 1): a promise a
+// press or a draw dropped with its failure in it, as a toast in words, once
+// a minute for the same words so a loop that keeps failing is one line. A
+// read the page itself called off (AbortError) is no failure.
+const unheardSaid = new Map();
+function sayUnheard(e){
+  const why = e?.reason;
+  if (why?.name === "AbortError") return;
+  const words = failWords(why ?? "something failed with nothing said");
+  const now = Date.now();
+  if (now - (unheardSaid.get(words) || 0) < 60000) return;
+  unheardSaid.set(words, now);
+  toastAdd(words, "bad");
+  logNote(words, true);
+}
 
 // `opts.kind` is what the record files it under ("said", the default, or
 // "ask" or "job"); `opts.job` names the job it is about.
@@ -49,13 +64,36 @@ function notify(msg, bad, opts = {}){
   keepNotice({text: String(msg), level: lv, kind: opts.kind || "said", job: opts.job || ""});
 }
 
+// Where the stack sits while a dialog is open on a phone: there every
+// dialog is the whole screen and covers the dock's line the stack sits
+// above, which left a toast floating over the dialog's words half way up.
+// Just above the dialog's foot instead, its buttons, which is where the
+// press it answers was; back above the dock's line when the dialog goes.
+// At a desk a dialog is a box over the page and the stack stays put.
+function toastPlace(){
+  const stack = $("toast");
+  if (!stack) return;
+  const m = innerWidth <= 900 ? topModal() : null;
+  const sheet = m && !m.classList.contains("inline") ? m : null;
+  // ...and above a question whole, which is a short sheet at the foot
+  // (R265): by its laid-out height, not where it is drawn at this moment,
+  // since it is placed while the sheet is still coming in and a few pixels
+  // short of where it rests.
+  const ask = sheet?.classList.contains("askdlg") && !sheet.classList.contains("typed") ? sheet.querySelector(":scope > .box") : null;
+  const r = ask ? null : sheet?.querySelector(":scope > .box > .foot, :scope > .box > .dlgbody > .foot")?.getBoundingClientRect();
+  stack.style.bottom = ask?.offsetHeight ? `${ask.offsetHeight + 8}px`
+    : r?.height ? `${Math.round(innerHeight - r.top + 8)}px`
+    : sheet ? "calc(8px + env(safe-area-inset-bottom))" : "";
+}
+
 function toastAdd(text, lv){
   const stack = $("toast");
   if (!stack) return null;
+  toastPlace();
   const el = document.createElement("div");
   el.className = "tst " + lv;
-  el.innerHTML = `<span class="tic">${TOAST_ICONS[lv] || TOAST_ICONS.info}</span><span class="tmsg"></span>
-    <button type="button" class="ic tx" aria-label="dismiss">×</button>`;
+  drawHTML(el, `<span class="tic">${TOAST_ICONS[lv] || TOAST_ICONS.info}</span><span class="tmsg"></span>
+    <button type="button" class="ic tx" aria-label="dismiss">×</button>`);
   el.querySelector(".tmsg").textContent = text;
   el.querySelector(".tx").onclick = () => toastGone(el);
   stack.append(el);
@@ -101,6 +139,17 @@ function toastGone(el){
 const jobToasts = new Map();     // job id -> {el, label}
 // onEnd(job), when given, is called once the job is over: what pressed it
 // frees itself then, rather than waiting out a window of its own (B862).
+// Why a job failed, as a toast and the record's line say it: the reason's
+// first sentence, without a leading "refused: " or "ERROR: ", and no longer
+// than a line or two (the operator, 20 Nov: a node's refusal of an update
+// came up as a paragraph, with which keys it takes and what its console
+// can do). The whole of it is the job's own, on its row and in its log.
+function toastWhy(error){
+  let s = String(error || "").replace(/\s+/g, " ").trim().replace(/^(refused|error):\s*/i, "");
+  const end = s.search(/[.;](\s|$)/);
+  if (end > 0) s = s.slice(0, end);
+  return s.length > 140 ? s.slice(0, 139).trimEnd() + "…" : s;
+}
 function notifyJob(id, label, onEnd){
   if (!id) return notify(label);
   const el = toastAdd(`${label}: queued`, "info");
@@ -112,12 +161,12 @@ function notifyJob(id, label, onEnd){
 async function jobToastsCheck(){
   for (const [id, t] of [...jobToasts]){
     let j;
-    try{ j = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(id)}`)).json(); }catch(e){ continue; }
+    try{ j = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}`); }catch(e){ continue; }
     // A job carries an error field of its own (a failed one's reason), so
     // the read is good when it names the job.
     if (!j || j.id !== id){ jobToasts.delete(id); continue; }
     const over = ["succeeded", "failed", "canceled"].includes(j.state);
-    const line = over ? `${t.label}: ${j.state}${j.state === "failed" && j.error ? " (" + j.error + ")" : ""}`
+    const line = over ? `${t.label}: ${j.state}${j.state === "failed" && toastWhy(j.error) ? " (" + toastWhy(j.error) + ")" : ""}`
       : `${t.label}: ${j.state === "running" && j.step ? j.step : j.state}`;
     if (t.el?.isConnected) t.el.querySelector(".tmsg").textContent = line;
     if (!over) continue;
@@ -126,7 +175,7 @@ async function jobToastsCheck(){
     const lv = j.state === "failed" ? "bad" : j.state === "canceled" ? "warn" : "info";
     if (t.el?.isConnected){
       t.el.className = "tst " + lv;
-      t.el.querySelector(".tic").innerHTML = TOAST_ICONS[lv];
+      drawHTML(t.el.querySelector(".tic"), TOAST_ICONS[lv]);
       t.el.left = lv === "info" ? 4000 : 7000;
       toastTick(t.el);
     }
@@ -200,7 +249,7 @@ function attRow(a){
       <div class="bsum">${a.tools.map(t => esc(t.label)).join(", ")}</div>
       ${cc ? `<div class="bwarn">Updating Claude Code ends the Claude sessions there
         (${a.sessions} running)</div>` : ""}
-      <details class="bdetail"${sectAttr((ag ? "bell:ag:" : "bell:tc:") + a.id)}><summary>versions${cc ? " and sessions" : ""}</summary><pre>${
+      <details class="bdetail chev"${sectAttr((ag ? "bell:ag:" : "bell:tc:") + a.id)}><summary>versions${cc ? " and sessions" : ""}</summary><pre>${
         a.tools.map(t => `${esc(t.label)}: ${esc(t.from || "?")} → ${t.to === "newer" ? "a newer version" : esc(t.to)}`).join("\n")}${
         cc ? `\n\nsessions there: ${a.projects.map(esc).join(", ")}` : ""}</pre></details>
       <div class="bfoot"><span>in the ${where}</span>
@@ -217,6 +266,17 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bheld="${esc(a.node_id)}" data-session="${esc(a.session)}" data-claude="${esc(a.claude || a.session)}">Resume</a></span></div></div>`;
   }
+  // A session working with no word from its hooks (B1009): its gate and
+  // what AerieOS refuses are not running there. Starting it again brings
+  // them back, which is the space's Manage agent.
+  if (a.kind === "unguarded"){
+    return `<div class="bnote att bad">
+      <div class="bt">A session in ${esc(projLabel(a.project))} is working without its guards</div>
+      <div class="bsum">${esc(a.who ? `${a.who}'s` : "A")} ${esc(a.agent || "coding agent")} session on ${esc(a.node)} worked a turn${a.since ? `, ${esc(ago(a.since))},` : ""} with nothing heard from its hooks: nothing AerieOS refuses is refused there</div>
+      <div class="bfoot"><span>Restart it under Manage agent</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bspace="${esc(a.project)}">Open the space</a></span></div></div>`;
+  }
   // A copy or move that did not happen: the reason, which used to sit on
   // the container's row for ever, here where it can be put away.
   if (a.kind === "relocate"){
@@ -229,9 +289,12 @@ function attRow(a){
   }
   // A release's APK signed on its project's node (R106): what would stop it, said
   // before the release in amber, and a signing that failed after one in red.
+  // `sealing`: the APK is signed, and the workflow that signs the release's
+  // list of files could not be started (R199); the row says what to do.
   if (a.kind === "release-sign"){
     return `<div class="bnote att${a.bad ? " bad" : ""}">
-      <div class="bt">${a.bad ? `${esc(a.tag)}'s APK in ${esc(projLabel(a.project))} is not signed`
+      <div class="bt">${a.sealing ? `${esc(a.tag)}'s list of files in ${esc(projLabel(a.project))} is not signed`
+        : a.bad ? `${esc(a.tag)}'s APK in ${esc(projLabel(a.project))} is not signed`
         : `${esc(projLabel(a.project))}'s next release cannot be signed`}</div>
       <div class="bsum">${esc(a.why)}</div>
       <div class="bfoot"><span>${a.bad ? (a.at ? esc(ago(a.at)) : "after the release") : "before its release"}</span>
@@ -329,8 +392,6 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bag="${esc(a.id)}">Library</a></span></div></div>`;
   }
-  // A node's retired token presented again after its grace (R135 step 4): a
-  // copy of its credential is in use somewhere, and its tokens are revoked.
   // A node whose agent is turned away (B569): it is running and asking, and
   // the controller will not take its credential, so it is quiet for good.
   if (a.kind === "node-refused"){
@@ -341,10 +402,12 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
   }
+  // A node's retired token presented again after its grace (R135 step 4): a
+  // copy of its credential is in use somewhere, and its tokens are revoked.
   if (a.kind === "token-reuse"){
     return `<div class="bnote att bad">
-      <div class="bt">${esc(a.node)}'s credential was used from a copy</div>
-      <div class="bsum">a token it had already replaced was presented again, so every token of ${esc(a.node)} is revoked: enroll it again from the Nodes page, and treat that machine's disk as copied</div>
+      <div class="bt">${esc(a.node)} looks like a restored or copied machine</div>
+      <div class="bsum">it presented a token it had already replaced, so every token of it is revoked: Enroll script on its row if you restored it, and treat its disk as copied if you did not</div>
       <div class="bfoot"><span>${esc(ago(a.at))}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
@@ -387,7 +450,7 @@ function attRow(a){
       <div class="bsum">${esc(a.said)}</div>
       <div class="bfoot"><span>${until}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
-          ${machine ? `<a href="#" data-bmachine="${machine}">This machine</a>` : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
+          ${machine ? `<a href="#" data-bmachine="${machine}">Nodes page</a>` : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
   }
   // The controller's own machine's power (R164 step 3): on its UPS
   // battery, the battery low or to be replaced, the UPS silent; and its
@@ -397,7 +460,7 @@ function attRow(a){
   // step 2): to the Installed page, where Remove is.
   if (a.kind === "pack"){
     return `<div class="bnote att bad">
-      <div class="bt">The catalog withdrew ${esc(a.name)}</div>
+      <div class="bt">${a.unfit ? `${esc(a.name)} is switched off` : `The catalog withdrew ${esc(a.name)}`}</div>
       <div class="bsum">${esc(a.said)}</div>
       <div class="bfoot"><span>until it is removed</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
@@ -414,13 +477,13 @@ function attRow(a){
   }
   if (a.kind === "power" || a.kind === "host"){
     const title = {battery: "On the UPS battery", low: "The UPS battery is low", replace: "The UPS battery needs replacing", silent: "The UPS does not answer",
-                   security: "Security updates waiting", reboot: "A restart is needed"}[a.what] || "This machine";
+                   security: "Security updates waiting", reboot: "A restart is needed"}[a.what] || "This controller";
     return `<div class="bnote att${a.bad ? " bad" : ""}">
       <div class="bt">${esc(title)} on ${esc(a.node)}</div>
       <div class="bsum">${esc(a.said)}</div>
-      <div class="bfoot"><span>${a.kind === "power" ? "until the power is back" : "under This machine's Updates"}</span>
+      <div class="bfoot"><span>${a.kind === "power" ? "until the power is back" : a.what === "reboot" ? "under Advanced on the Nodes page" : "under This controller's Updates"}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
-          <a href="#" data-bmachine="${a.kind === "power" ? "power" : "updates"}">This machine</a></span></div></div>`;
+          ${a.kind === "power" || a.what === "reboot" ? `<a href="#" data-bmachine="${a.kind === "power" ? "power" : "advanced"}">Nodes page</a>` : `<a href="#" data-bmachine="updates">This controller</a>`}</span></div></div>`;
   }
   // A move's landing cut midway (B622): what is where, and the press that
   // finishes it, under Controller settings.
@@ -453,15 +516,36 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnginx="${esc(a.id)}">nginx page</a></span></div></div>`;
   }
+  // A node that refused this controller's bundle (R267 step 6): it pinned
+  // a release key and the files it was sent are not ones a key it trusts
+  // signed. In the note's own voice, as a node held for a signed build is:
+  // nobody chose it, and its terminals and jobs go on with the aerie it
+  // had. One phrase for what was wrong, and nothing of the keys that node
+  // takes: its log says the rest (the operator, 20 Nov).
+  if (a.kind === "bundle-refused"){
+    return `<div class="bnote att">
+      <div class="bt">${esc(a.node)} refused this controller's bundle</div>
+      <div class="bsum">${esc(a.why || "it is not signed by a key that node trusts")}</div>
+      <div class="bfoot"><span>its terminals and jobs run the aerie it had</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bnode="${esc(a.id)}" data-bwhat="sessions">Nodes page</a></span></div></div>`;
+  }
+  // A node from a newer window than this controller's (one gone back to an
+  // older image) is held as one from an older is, and said as newer: an
+  // update would send it back, which a node that pinned a key refuses.
   return `<div class="bnote att${a.window ? " bad" : ""}">
     <div class="bt">${a.window ? `${esc(a.node)}'s agent is out of window` : `Agent update on ${esc(a.node)}`}</div>
-    <div class="bsum">runs agent ${esc(a.from)} and this controller ships ${esc(a.to)}${a.window
+    <div class="bsum">runs agent ${esc(a.from)}${a.newer ? ", newer than" : " and"} this controller ships ${esc(a.to)}${a.window
       ? `: ${a.projects.length ? `${a.projects.length} space${a.projects.length === 1 ? "" : "s"} cannot build, test or use the emulator there`
-                               : "nothing works there"} until it is updated` : ""}</div>
-    ${a.window && a.projects.length ? `<details class="bdetail"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
+                               : "nothing works there"} until ${a.newer ? "the two agree" : "it is updated"}` : ""}</div>
+    ${a.window && a.projects.length ? `<details class="bdetail chev"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
       a.projects.map(esc).join(", ")}</pre></details>` : ""}
-    ${a.failed ? `<div class="bsum bad">its last update failed: ${esc(a.failed)}</div>` : ""}
+    ${a.back ? `<div class="bsum bad">it took the update and went back to the agent it had: it ${esc(a.back)}</div>` : ""}
+    ${a.failed && !a.back ? `<div class="bsum bad">its last update failed: ${esc(a.failed)}</div>` : ""}
+    ${a.held && !a.failed && !a.back ? `<div class="bsum">${esc(a.held)}</div>` : ""}
     <div class="bfoot"><span>${a.window ? "work on it is stopped"
+      : a.back ? "not sent again by itself: Update agent there tries it again"
+      : a.held ? (a.older ? "not sent by itself: that node keeps the newer agent it runs" : "not sent by itself: it waits for a signed build")
       : a.auto ? (a.failed ? "tried again once the node is idle, or press Update agent there" : "updates itself once the node is idle")
       : "on the Nodes page"}</span>
       <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
@@ -519,6 +603,9 @@ function askTag(a){
           : a.kind === "release-withdraw" ? `withdraw the ${esc(a.tag || "")} release of ${esc(a.project ? projLabel(a.project) : "a project")} and its tag: needs your answer`
           : a.kind === "phone-use" ? `your phone, from ${esc(a.project ? projLabel(a.project) : "a project")}: needs your answer`
           : a.kind === "push" ? `a push from ${esc(a.project ? projLabel(a.project) : "a project")} looks sensitive: needs your answer`
+          // A tool a session asked for (aerie tool install): which one, and
+          // the node Approve installs it on.
+          : a.kind === "pack" ? `install ${esc(a.name || "a tool")} on ${esc(a.node_name || "its node")}: needs your answer`
           : "needs your answer");
 }
 
@@ -526,7 +613,7 @@ function askTag(a){
 // verbs, adb's for a phone.
 function askCmd(a){
   const pre = a.kind === "root" ? "# " : a.kind === "phone-use" ? ""
-    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push"].includes(a.kind) ? "aerie " : "adb ";
+    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push", "pack"].includes(a.kind) ? "aerie " : "adb ";
   return pre + esc((a.cmd || []).join(" "));
 }
 
@@ -557,11 +644,11 @@ function askActs(a, {deny, allow, session = "data-session"}){
 // the account's record (kind "ask"): which ask, and what was said to it.
 function askAnswer(id, allow, session = false){
   const a = (ph?.asks || []).find(x => x.id === id);
-  if (allow){ phBusy = "running it"; phRev++; drawPanes(); }
+  if (allow){ phBusy = "running it"; readMoved("phone"); drawPanes(); }
   phFetch(allow ? {action: "allow", id, session} : {action: "deny", id});
   if (a){
     const plain = document.createElement("i");
-    plain.innerHTML = askTag(a).replace(/: needs your answer$/, "");
+    drawHTML(plain, askTag(a).replace(/: needs your answer$/, ""));
     keepNotice({text: `${allow ? (session ? "Approved for the session" : "Approved") : "Denied"}: ${plain.textContent}${
       (a.cmd || []).length ? ` (${a.cmd.join(" ")})` : ""}`, level: allow ? "info" : "warn", kind: "ask"});
   }
@@ -650,18 +737,18 @@ function drawBell(){
         // A push (R219) is approved by reading the lines that look like a
         // secret or something private, whole, open, each with its file and
         // line: Approve sends them and okays these exact lines.
-        a.kind === "push" ? `<details class="bdetail" open><summary>the ${a.count || ""} flagged line${a.count === 1 ? "" : "s"}: approving okays these exact lines until they change</summary><pre class="bflag">${
+        a.kind === "push" ? `<details class="bdetail chev" open><summary>the ${a.count || ""} flagged line${a.count === 1 ? "" : "s"}: approving okays these exact lines until they change</summary><pre class="bflag">${
             esc(a.detail || "")}</pre></details>` : ""}${
         // A container is approved by reading its compose file, the way root
         // is approved by reading its argv (R71): the file is the request, so
         // it is here whole, folded, with the env file's keys and never its
         // values, which is where a token would be.
-        a.kind === "container" ? `<details class="bdetail"${sectAttr("bell:detail:" + a.id)}><summary>the compose file${
+        a.kind === "container" ? `<details class="bdetail chev"${sectAttr("bell:detail:" + a.id)}><summary>the compose file${
             a.env_keys?.length ? `, and an env file setting ${a.env_keys.map(esc).join(", ")}` : ""}${
             a.for ? `, for ${esc(a.for)}` : ""}</summary><pre>${esc(a.detail || "")}</pre></details>` : ""}${
         // An edit of a release (R139) is approved by reading the notes it
         // would put on the page, whole.
-        a.kind === "release-edit" && a.detail ? `<details class="bdetail"${sectAttr("bell:detail:" + a.id)}><summary>the new notes</summary><pre>${
+        a.kind === "release-edit" && a.detail ? `<details class="bdetail chev"${sectAttr("bell:detail:" + a.id)}><summary>the new notes</summary><pre>${
             esc(a.detail)}</pre></details>` : ""}
         <div class="bfoot"><span>${a.asker || a.project ? esc(askWho(a)) + " · " : ""}${askLeft(a)}</span>
           <span class="acts"><a href="#" data-bdeny="${a.id}">Deny</a>${
@@ -712,12 +799,15 @@ function drawBell(){
   // ...headed as the doctor's and the gear's are (the operator, 22 Oct),
   // See all at the head's right where the eye starts.
   const head = `<div class="popbar"><b>Notifications</b><button type="button" id="bellAll">See all</button></div>`;
-  panel.innerHTML = head + (answer.length + needs.length + said.length
+  // Patched, and left alone when nothing in it moved (R228 step 14): it was
+  // written whole on every poll, open or not, and every press bound again.
+  // What is bound below is set as a property, so a row kept keeps its own.
+  if (!patch(panel, head + (answer.length + needs.length + said.length
     ? group("Waiting on you", answer) + group("Needs attention", needs)
       + group("Recent", said.slice(0, 5), `<button type="button" id="bellClear">Clear</button>`, said.length)
     // Before the first status read nothing is known yet, which is not
     // nothing to report.
-    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway;
+    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway, true)) return;
   // Any press in the drawer closes it, after the press's own handler has
   // run (the operator, 7 Oct): Approve, Deny, an invitation's answer, Clear,
   // a link to where a row is about. One listener on the drawer, so a row
@@ -744,8 +834,8 @@ function drawBell(){
   panel.querySelectorAll("[data-binvite]").forEach(a => a.onclick = async e => {
     e.preventDefault();
     const yes = a.dataset.yes === "1";
-    const j = await (await postJSON("/api/members", {action: yes ? "accept" : "decline",
-                                                     id: Number(a.dataset.binvite)})).json().catch(() => ({}));
+    const j = await postJSON("/api/members", {action: yes ? "accept" : "decline",
+                                                     id: Number(a.dataset.binvite)});
     notify(j.error || (yes ? (j.owner ? `you own ${projLabel(j.project)} now` : `you are on ${projLabel(j.project)} now`)
                            : `declined ${projLabel(j.project)}`), !!j.error);
     refresh();
@@ -805,8 +895,7 @@ function wireNeeds(root, after = () => {}){
   // every browser it opens; a newer version notes again.
   root.querySelectorAll("[data-bdismiss]").forEach(a => a.onclick = async e => {
     e.preventDefault();
-    const j = await (await postJSON("/api/bell", {action: "dismiss", keys: a.dataset.bdismiss.split(" ")}))
-      .json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/bell", {action: "dismiss", keys: a.dataset.bdismiss.split(" ")});
     if (j.error) notify(j.error, true);
     refresh();
   });
@@ -817,15 +906,14 @@ function wireNeeds(root, after = () => {}){
     e.preventDefault();
     if (a.getAttribute("aria-busy") === "true") return;
     a.setAttribute("aria-busy", "true");
-    const j = await (await postJSON("/api/bell", {action: "resume", node: a.dataset.bheld, session: a.dataset.session}))
-      .json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/bell", {action: "resume", node: a.dataset.bheld, session: a.dataset.session});
     a.removeAttribute("aria-busy");
     notify(j.error || (j.sent ? `told ${a.dataset.claude} to pick up where it stopped`
                                 : `the line is in ${a.dataset.claude}'s input, not sent: it was busy (a turn or its check running) or a question was on its screen; Enter in it sends it`), !!j.error);
     refresh();
   });
   root.querySelectorAll("#bellRestore, [data-brestore]").forEach(restore => restore.onclick = async () => {
-    const j = await (await postJSON("/api/bell", {action: "restore"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/bell", {action: "restore"});
     if (j.error) notify(j.error, true);
     refresh();
   });
@@ -850,6 +938,11 @@ function wireNeeds(root, after = () => {}){
   });
   root.querySelectorAll("[data-bleftover]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); deleteProjectCard(a.dataset.bleftover);
+  });
+  root.querySelectorAll("[data-bspace]").forEach(a => a.onclick = e => {
+    e.preventDefault();
+    after();
+    openNotebook(a.dataset.bspace);
   });
   root.querySelectorAll("[data-bsign]").forEach(a => a.onclick = e => {
     e.preventDefault();
@@ -888,7 +981,8 @@ function wireNeeds(root, after = () => {}){
   });
   root.querySelectorAll("[data-bmachine]").forEach(a => a.onclick = e => {
     e.preventDefault();
-    openMachineTab(a.dataset.bmachine);
+    const what = a.dataset.bmachine;
+    if (what === "updates") openMachineTab(what); else openNodesTab(ownMachine()?.id, what);
   });
   root.querySelectorAll("[data-bstorage]").forEach(a => a.onclick = e => {
     e.preventDefault();
@@ -904,7 +998,7 @@ function wireNeeds(root, after = () => {}){
   // ...and a release's Update (R90 step 5): the own node's job, said once queued.
   root.querySelectorAll("[data-brelease]").forEach(a => a.onclick = async e => {
     e.preventDefault();
-    const j = await (await postJSON("/api/v1/nodes", {action: "controller-update", id: a.dataset.brelease})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "controller-update", id: a.dataset.brelease});
     notify(j.error || "updating: the installer runs on this machine's node, and the page comes back on the new release", !!j.error);
     after();
   });

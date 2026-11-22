@@ -1,0 +1,235 @@
+{
+  "_comment": "The programs the controller's image takes from their vendors' GitHub releases as it is built, noVNC's source at its release's tag, and mkosi's, which the OS image's build runs (.github/workflows/os-image.yml, at the version image/build.sh names), each with its pin: the version, and the sha256 of the exact file for every architecture the image takes it for. The one copy: the Dockerfile and the bare-metal installer fetch each through scripts/lib/pin-fetch, which keeps a file only when it is those bytes, so an image built again holds the same files until a pin moves, and tools/pins.py --file moves it (check, move, pin, verify). A row's source is written as a toolchain's is: tarball for an archive the build unpacks, script for a file that is itself the program.",
+  "tools": [
+    {
+      "name": "hadolint",
+      "source": {
+        "kind": "script",
+        "url": {
+          "linux/amd64": "https://github.com/hadolint/hadolint/releases/download/v{version}/hadolint-linux-x86_64"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "hadolint/hadolint",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "2.15.1",
+          "sha256": {
+            "linux/amd64": "c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "yq",
+      "source": {
+        "kind": "script",
+        "url": {
+          "linux/amd64": "https://github.com/mikefarah/yq/releases/download/v{version}/yq_linux_amd64"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "mikefarah/yq",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "4.54.3",
+          "sha256": {
+            "linux/amd64": "129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "actionlint",
+      "source": {
+        "kind": "tarball",
+        "url": {
+          "linux/amd64": "https://github.com/rhysd/actionlint/releases/download/v{version}/actionlint_{version}_linux_amd64.tar.gz"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "rhysd/actionlint",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "1.7.12",
+          "sha256": {
+            "linux/amd64": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "ruff",
+      "source": {
+        "kind": "tarball",
+        "url": {
+          "linux/amd64": "https://github.com/astral-sh/ruff/releases/download/{version}/ruff-x86_64-unknown-linux-gnu.tar.gz"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "astral-sh/ruff",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "0.17.6",
+          "sha256": {
+            "linux/amd64": "94b33791f48cd54ab35ad673a443a5c001d3e6d87effeaba9899070b700d45f3"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "uv",
+      "source": {
+        "kind": "tarball",
+        "url": {
+          "linux/amd64": "https://github.com/astral-sh/uv/releases/download/{version}/uv-x86_64-unknown-linux-gnu.tar.gz",
+          "linux/arm64": "https://github.com/astral-sh/uv/releases/download/{version}/uv-aarch64-unknown-linux-gnu.tar.gz"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "astral-sh/uv",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "0.13.9",
+          "sha256": {
+            "linux/amd64": "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5",
+            "linux/arm64": "0797542018e541a9288855df555c8077eed06f7a47d206362030480e8ecc9f3d"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "mise",
+      "source": {
+        "kind": "script",
+        "url": {
+          "linux/amd64": "https://github.com/jdx/mise/releases/download/v{version}/mise-v{version}-linux-x64",
+          "linux/arm64": "https://github.com/jdx/mise/releases/download/v{version}/mise-v{version}-linux-arm64"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "jdx/mise",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "2026.11.11",
+          "sha256": {
+            "linux/amd64": "be6f46a4cc3d5532acf359f163cf7ce80ceb43e5718d7b9049165a340fb02e2d",
+            "linux/arm64": "2fd4b495e19d8a10dcfc0e0badea539fd745bd697473b59d18acc2ee8ef8c815"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "cloudflared",
+      "source": {
+        "kind": "script",
+        "url": {
+          "linux/amd64": "https://github.com/cloudflare/cloudflared/releases/download/{version}/cloudflared-linux-amd64",
+          "linux/arm64": "https://github.com/cloudflare/cloudflared/releases/download/{version}/cloudflared-linux-arm64"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "cloudflare/cloudflared",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "2026.11.1",
+          "sha256": {
+            "linux/amd64": "97bb3b02d23a5980fc9c15a1a270e692da1923f103f920d5b16d4931d5ab55e7",
+            "linux/arm64": "b155cec3e48e489cfb8e5c602769fb8c771083018d8881d68b4d18a791567c5a"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "novnc",
+      "source": {
+        "kind": "tarball",
+        "url": "https://github.com/novnc/noVNC/archive/refs/tags/v{version}.tar.gz",
+        "version": {
+          "resolver": "github-release",
+          "repo": "novnc/noVNC",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "1.7.0",
+          "sha256": "b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6",
+          "found": {
+            "from": "none"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "mkosi",
+      "source": {
+        "kind": "tarball",
+        "url": "https://github.com/systemd/mkosi/archive/refs/tags/v{version}.tar.gz",
+        "version": {
+          "resolver": "github-release",
+          "repo": "systemd/mkosi",
+          "trim_prefix": "v",
+          "numeric": true,
+          "tag": "^v25\\."
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "25.3",
+          "sha256": "7b039fb3b34e1680173a7f4af1bc24b475465afe335c8b21c213167734061e35",
+          "found": {
+            "from": "none"
+          }
+        }
+      },
+      "rev": 1
+    }
+  ]
+}

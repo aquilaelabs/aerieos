@@ -26,6 +26,7 @@ It runs the plan the CONTROLLER sent and nothing of its own: same argvs, same
 order, same {cdir} substitution, same outputs. That is what keeps it honest:
 if it had opinions about compose it could pass while the product failed.
 """
+import http.client
 import json
 import os
 import subprocess
@@ -38,6 +39,19 @@ import urllib.request
 
 URL = os.environ["STUB_AGENT_URL"].rstrip("/")
 TOKEN = os.environ["STUB_AGENT_TOKEN"]
+
+# The stub dials from 127.0.0.2, so the controller sees it at an address of
+# its own as it sees a node on the LAN, never its own 127.0.0.1: a node's
+# address is the socket's, not a header it sends (B722).
+FROM = "127.0.0.2"
+
+
+class _From(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(lambda host, **kw: http.client.HTTPConnection(host, source_address=(FROM, 0), **kw), req)
+
+
+_open = urllib.request.build_opener(_From()).open
 CDIR_ROOT = os.environ["STUB_AGENT_DIR"]
 # What the row reports. sshd is the load-bearing one (see the module docstring);
 # the rest is a plausible small VM so the meters have something to draw.
@@ -87,14 +101,9 @@ def call(verb, body, timeout=60):
         f"{URL}/api/v1/agent/{verb}", method="POST",
         data=json.dumps(body).encode(),
         headers={"Authorization": f"Bearer {TOKEN}",
-                 "Content-Type": "application/json",
-                 # Every call, not just the enrollment: the controller
-                 # refreshes the address from the request on hello AND on
-                 # every heartbeat, so a stub that only claimed to be `stub`
-                 # once was 127.0.0.1 again within a poll.
-                 "X-Forwarded-For": "stub"})
+                 "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _open(req, timeout=timeout) as r:
             if r.status == 204:
                 return None
             return json.loads(r.read() or b"null")
@@ -237,10 +246,9 @@ def scan(job):
         q = urllib.parse.urlencode({"scanner": svc, "projects": ",".join(projects)})
         req = urllib.request.Request(f"{URL}/api/v1/agent/scan-put?{q}", method="POST",
                                      data=json.dumps(doc).encode(),
-                                     headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/octet-stream",
-                                              "X-Forwarded-For": "stub"})
+                                     headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/octet-stream"})
         try:
-            urllib.request.urlopen(req, timeout=60).read()
+            _open(req, timeout=60).read()
             sent.append(svc)
             say(f"   {svc} sent up\n")
         except OSError as e:
@@ -274,9 +282,9 @@ def run_exec(job):
                             f"{URL}/api/v1/agent/artifact?job={job['id']}&name={os.path.basename(hit)}",
                             method="POST", data=f.read(),
                             headers={"Authorization": f"Bearer {TOKEN}",
-                                     "Content-Type": "application/octet-stream", "X-Forwarded-For": "stub"})
+                                     "Content-Type": "application/octet-stream"})
                     try:
-                        urllib.request.urlopen(req, timeout=60).read()
+                        _open(req, timeout=60).read()
                     except OSError:
                         pass
     return state, code, []
@@ -444,6 +452,13 @@ def main():
                 sample["held"] = json.load(f)
         except (OSError, ValueError):
             sample["held"] = []
+        # ...and its sessions' rows, where a suite planted them (the guard
+        # that went quiet, B1009): a name and a pane title each.
+        try:
+            with open(os.path.join(CDIR_ROOT, "sessions.json")) as f:
+                sample["sessions"] = json.load(f)
+        except (OSError, ValueError):
+            pass
         j = call("work", {"sample": sample, "running": len(running),
                           "wait": 5}, timeout=30)
         if isinstance(j, dict) and j.get("id"):

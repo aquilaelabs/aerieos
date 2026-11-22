@@ -16,7 +16,6 @@
 
 let storageList = null;          // last answer, or null before the first
 let storageErr = "";
-let storageRev = 0;
 let storageMay = false;          // whether this account may measure now
 let storageNode = "";            // the node the tab shows
 let storageDisk = "";
@@ -27,31 +26,20 @@ function openStorageTab(node){
   openTab({kind: "storage", arg: "__storage", label: "Storage"});
 }
 
-async function loadStorage(){
-  try{
-    const j = await (await bootFetch("/api/storage")).json();
-    storageErr = j.error || "";
-    storageList = j.nodes || [];
-    storageMay = !!j.may_measure;
-  }catch(e){
-    storageErr = String(e);
-    storageList = storageList || [];
-  }
-  storageRev++;
-  if (tabs.some(t => t.kind === "storage")) drawPanes();
+function loadStorage(){
+  return readKept("storage", "/api/storage", {
+    err: said => { storageErr = said; },
+    keep: () => { storageList = storageList || []; },
+    land: j => { storageList = j.nodes || []; storageMay = !!j.may_measure; },
+  });
 }
 
 // The node the tab opens on: the one it showed last (remembered in this
 // browser), else the first in the answer, else nothing.
 function storagePick(){
   const have = storageList || [];
-  let want = storageNode;
-  if (!have.some(n => n.node === want)){
-    try{ want = localStorage.getItem("bb.stnode") || ""; }catch(e){ want = ""; }
-  }
-  if (!have.some(n => n.node === want)) want = have[0]?.node || "";
-  storageNode = want;
-  return have.find(n => n.node === want) || null;
+  storageNode = keptNode("storage", {have, idOf: n => n.node});
+  return have.find(n => n.node === storageNode) || null;
 }
 
 // MB as a person reads it: TB above ten million, GB from one (a decimal
@@ -176,7 +164,7 @@ function storageMachineDisks(n){
       return tblWrap(cols, disks.map(d => {
         const sm = d.smart || {};
         const health = [sm.health === "failing" ? `<span class="pill bad">failing</span>` : sm.health === "ok" ? `<span class="pill ok">ok</span>` : "",
-                        sm.temp_c !== undefined ? `${sm.temp_c} °C` : "", sm.hours !== undefined ? `${Math.round(sm.hours / 24)} d on` : ""].filter(Boolean).join(" · ") || "<span class=\"dim\">no SMART</span>";
+                        sm.temp_c !== undefined ? `${esc(String(sm.temp_c))} °C` : "", sm.hours !== undefined ? `${Math.round(Number(sm.hours) / 24) || 0} d on` : ""].filter(Boolean).join(" · ") || "<span class=\"dim\">no SMART</span>";
         const holds = d.parts?.length ? d.parts.map(p => `${esc(p.name)}: ${esc(p.holds)}`).join("<br>") : esc(d.holds || "nothing");
         return `<div class="row${sm.health === "failing" ? " bad" : ""}" data-disk="${esc(d.name)}">${tblLine(cols, [
           `<span class="name">${esc(d.name)}</span>${d.system ? ` <span class="tag ndown">system</span>` : ""}${d.removable ? ` <span class="pill">removable</span>` : ""}`,
@@ -193,7 +181,7 @@ function storageMachineDisks(n){
 // in front of the data disks (the adopted ones, in their order) or the
 // array. A select's value for the mover is "FROM>TO", or "" for off.
 function movePools(){
-  const own = typeof ownMachine === "function" ? ownMachine() : null;
+  const own = ownMachine();
   return ((own?.reported?.adopted || {}).mounts || []).map(m => String(m.where || "")).filter(w => w && !/^\/mnt\/disk\d+$/.test(w)).map(w => w.split("/").pop());
 }
 const movePlace = p => p === "array" ? "the array" : p;
@@ -223,7 +211,7 @@ function moveRead(share, land, mover){
 function storageShares(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("machine", "Features section")} installs them.`
+  const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const shares = n.shares || [];
   // On an array taken over, each share at the top of /mnt/user has its
@@ -238,9 +226,13 @@ function storageShares(n){
     const names = [...(s.accounts || m.users || []).map(x => `${esc(x)}: read/write`), ...(s.readers || m.readers || []).map(x => `${esc(x)}: read-only`)];
     return `private: ${names.join(", ") || "nobody yet"}`;
   };
+  // Somebody named with no share password yet (R243): it is kept only for
+  // people a share names, and made as they next sign in.
+  const waiting = s => (s.waiting || []).length
+    ? `<div class="sub warn">${s.waiting.map(esc).join(", ")}: it opens for ${s.waiting.length === 1 ? "them" : "each"} once they have signed in to AerieOS again, or set a share password on Profile</div>` : "";
   const rows = shares.map(s => `<div class="row stack2 stshare" data-share="${esc(s.name)}"><div class="grow">
       <div class="name">${esc(s.name)} <code>${esc(s.path)}</code>${s.smb?.on || s.nfs?.on ? ` <span class="pill ok">exported</span>` : ` <span class="pill">internal</span>`}${lockedMounts.some(m => s.path === m || s.path.startsWith(m + "/")) ? ` <span class="pill warn">its pool is locked: unlock it under Pools</span>` : ""}</div>
-      ${s.smb?.on ? `<div class="sub">SMB${s.smb.tm ? ", a Time Machine target" : ""}, ${access(s)}</div>` : ""}
+      ${s.smb?.on ? `<div class="sub">SMB${s.smb.tm ? ", a Time Machine target" : ""}, ${access(s)}</div>${waiting(s)}` : ""}
       ${s.nfs?.on ? `<div class="sub">NFS${s.nfs.ro ? ", read-only" : ""}: ${(s.nfs.clients || []).map(esc).join(", ")} · ${esc(n.name)}:${esc(s.path)}</div>` : ""}
       ${s.smb?.on || s.nfs?.on ? "" : `<div class="sub">On this machine only: nothing serves it until you export it.</div>`}
       ${moveOf(s) ? `<div class="sub">${esc(moveSaid(moveOf(s)))}.</div>` : ""}
@@ -332,13 +324,13 @@ function wireStorageShares(root, n){
       if (!body.name || !body.path){ notify("a share takes a name and a folder", true); return; }
     } else if (!await askYes(`Remove the share ${body.name}? The folder and what is in it stay; nobody reaches it over the network after.`, {title: "Remove the share?", verb: "Remove", danger: true})) return;
     busy(b, act === "set" ? "Saving" : "Removing");
-    const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", body);
     // A share at the top of the merged tree of an array taken over has its
     // places set beside it, once the share itself was taken.
     const top = `${n.array?.mount || "/mnt/user"}/${body.name}`;
     if (!j.error && act === "set" && $("stShareLand") && body.path === top){
       const m = moveRead(body.name, $("stShareLand").value, $("stShareMover").value);
-      const k = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.node, array: "moves", moves: [m]})).json().catch(() => ({error: "no answer"}));
+      const k = await postJSON("/api/v1/nodes", {action: "storage-array", id: n.node, array: "moves", moves: [m]});
       notify(k.error ? `the share is saved; where its files go was not: ${k.error}` : `saved: ${moveSaid(m).toLowerCase()}; the jobs run on the machine`, !!k.error);
       await refresh();
       return;
@@ -356,7 +348,7 @@ function wireStorageShares(root, n){
 function storagePools(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.zfs ? `No zpool on this machine yet: Storage on its ${pageLink("machine", "Features section")} installs it.`
+  const why = !n.zfs ? `No zpool on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [];
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));
@@ -403,8 +395,8 @@ function storagePools(n){
   const importRows = found.map(p => `<div class="row stack2 stpoolfound" data-poolfound="${esc(p.name)}"><div class="grow">
       <div class="name">${esc(p.name)} <span class="pill${p.state === "online" ? "" : " warn"}">${esc(p.state || "unknown")}</span></div>
       ${p.said ? `<div class="sub dim">${esc(p.said)}</div>` : ""}</div>${admin && !why
-        ? `<span class="acts"><button type="button" data-stpool="import" data-name="${esc(p.name)}" title="imported as it is, never upgraded; its datasets under /mnt">Import</button></span>` : ""}</div>`).join("");
-  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks, made by another machine: importing one keeps it as it is (nothing upgraded, so the other machine can take it back), its datasets under /mnt. One the other machine did not export is refused rather than forced.</div><div class="rows">${importRows}</div></div>` : "";
+        ? `<span class="acts"><button type="button" data-stpool="import" data-name="${esc(p.name)}"${p.elsewhere ? ` data-elsewhere="1"` : ""} title="imported as it is, never upgraded">${p.elsewhere ? "Import anyway" : "Import"}</button></span>` : ""}</div>`).join("");
+  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks: importing one keeps it as it is, nothing upgraded, so the system that made it can take it back. One last used by another system and never exported (this machine's own pools, after its stick died and a new one was written) is imported anyway with its name typed, back where it was.</div><div class="rows">${importRows}</div></div>` : "";
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet${n.zfs ? ": the form below makes one" : ""}.</div>`}${importBox}${form}`;
   const sick = pools.filter(p => !["online", ""].includes(p.health)).length;
   return docSection("storage", "pools", "Pools", pools.length ? `${pools.length}${sick ? `, ${sick} not online` : ""}` : "", body, {cls: sick ? "bad" : ""});
@@ -422,10 +414,9 @@ function wireStoragePools(root, n){
       if (typed === null || typed === undefined) return;
       body.passphrase = String(typed);
     } else if (!await askYes(`Stop keeping ${b.dataset.name}'s key here? It is asked for on this page after every boot from now on, and the pool and its shares wait until then.`, {title: "Forget the key here?", verb: "Forget", danger: true})) return;
-    busy(b, act === "unlock" ? "Unlocking" : "Saving");
-    const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
-    notify(j.error || {unlock: "the passphrase goes to the machine at its next check-in; the pool opens within a minute", keep: "kept: the pool unlocks at boot from now on", forget: "forgotten here: asked after every boot from now on"}[act], !!j.error);
-    await refresh();
+    await sayPost(b, act === "unlock" ? "Unlocking" : "Saving", "/api/v1/nodes", body,
+      {unlock: "the passphrase goes to the machine at its next check-in; the pool opens within a minute", keep: "kept: the pool unlocks at boot from now on", forget: "forgotten here: asked after every boot from now on"}[act],
+      () => refresh());
   }));
   root.querySelectorAll("[data-stpool]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.stpool, body = {action: "storage-pool", id: n.node, pool: act, name: b.dataset.name || ""};
@@ -450,13 +441,18 @@ function wireStoragePools(root, n){
       body.confirm = body.name;
     } else if (act === "export"){
       if (!await askYes(`Export the pool ${body.name}? Its datasets are unmounted and the disks let go, to import elsewhere or here again.`, {title: "Export the pool?", verb: "Export"})) return;
-    } else if (act === "import"){
-      if (!await askYes(`Import the pool ${body.name}?\n\nIt is taken as it is, never upgraded, so the machine that made it can take it back; its datasets appear under /mnt, and it comes back after every boot until it is exported.`, {title: "Import the pool?", verb: "Import"})) return;
+    } else if (act === "import" && b.dataset.elsewhere){
+      // Last used by another system (B938): the machine's own pools after
+      // its stick died, or disks still in use elsewhere, which this would
+      // break; said so, and its name typed.
+      if (!await askTyped(`Import ${body.name} anyway?\n\nIt was last used by another system and never exported. That is what this machine's own pools look like after its stick died and a new one was written: then this brings it back as it was. If these disks are in use by another machine that is still running, importing it here damages it.\n\nType the pool's name to import it.`,
+                          body.name, {title: "Import anyway?", verb: "Import anyway", label: "The pool's name", refused: "that is not the pool's name: nothing was imported"})) return;
+      body.force = true; body.confirm = body.name;
     }
-    busy(b, act === "scrub" ? "Scrubbing" : "Working");
-    const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `${act}: the job runs on the machine; the page follows its next check-in`, !!j.error);
-    await refresh();
+    // A pool exported cleanly is imported with no question (R265: a press asks only where its yes costs something): it
+    // is taken as it is, never upgraded, and Export lets it go again.
+    busyFor(b, act);
+    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
   }));
 }
 
@@ -468,7 +464,7 @@ const SNAP_KINDS = [["hourly", "Hourly", "0 * * * *"], ["daily", "Daily, at 4:00
 function storageSnapshots(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("machine", "Features section")} installs it.`
+  const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [], snaps = n.snapshots || {}, scheds = n.snapshot_schedules || [];
   const when = at => at ? new Date(at * 1000).toLocaleString() : "";
@@ -509,34 +505,27 @@ function wireStorageSnapshots(root, n){
       const was = (n.snapshot_schedules || []).find(x => x.pool === pool && x.kind === kind);
       const body = {action: "save", ...(was ? {id: was.id} : {}), name: `Snapshots of ${pool}, ${kind}`, cron: SNAP_KINDS.find(k => k[0] === kind)[2],
                     node: n.node, on: true, system: {apply: "storage-snapshot", config: {pool, kind, keep}}};
-      busy(b, "Saving");
-      const j = await (await postJSON("/api/schedules", body)).json().catch(() => ({error: "no answer"}));
-      notify(j.error || `${pool}: ${kind} snapshots, ${keep} kept (${j.schedule?.words || ""}); the row is on the Schedules page too`, !!j.error);
-      await refresh();
+      await sayPost(b, "Saving", "/api/schedules", body,
+        j => `${pool}: ${kind} snapshots, ${keep} kept (${j.schedule?.words || ""}); the row is on the Schedules page too`, () => refresh());
       return;
     }
     const body = {action: "storage-snapshot", id: n.node, snapshot: act, pool: b.dataset.pool || "", name: b.dataset.name || "", dataset: b.dataset.pool || ""};
     if (act === "rollback"){
-      const typed = await askText(`Roll ${body.pool} back to ${body.name}?\n\nEverything written to the pool since then is gone, and every snapshot since it with it.`, {verb: "Roll back", label: "The snapshot's name, typed again"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== body.name){ notify("the name typed is not the snapshot's; nothing rolled back", true); return; }
+      if (!await askTyped(`Roll ${body.pool} back to ${body.name}?\n\nEverything written to the pool since then is gone, and every snapshot since it with it.`,
+                          body.name, {verb: "Roll back", label: "The snapshot's name, typed again", refused: "the name typed is not the snapshot's; nothing rolled back"})) return;
       body.confirm = body.name;
     } else if (act === "destroy"){
       if (!await askYes(`Delete the snapshot ${body.name} of ${body.pool}?`, {title: "Delete the snapshot?", verb: "Delete it", danger: true})) return;
     } else {
       body.kind = "manual"; body.keep = 50;
     }
-    busy(b, act === "take" ? "Taking" : "Working");
-    const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `${act}: the job runs on the machine; the page follows its next check-in`, !!j.error);
-    await refresh();
+    busyFor(b, act);
+    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
   }));
   root.querySelectorAll("[data-stsnapsched]").forEach(b => b.onclick = () => pressing(b, async () => {
     const x = (n.snapshot_schedules || []).find(y => y.id === b.dataset.stsnapsched);
     if (!await askYes(`Remove the ${x?.kind || ""} schedule of ${x?.pool || "the pool"}? The snapshots it took stay.`, {title: "Remove the schedule?", verb: "Remove"})) return;
-    const j = await (await postJSON("/api/schedules", {action: "remove", id: b.dataset.stsnapsched})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "the schedule is gone", !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/schedules", {action: "remove", id: b.dataset.stsnapsched}, "the schedule is gone", () => refresh());
   }));
 }
 
@@ -562,7 +551,7 @@ function arrayVerifyWord(v){
 function storageArray(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("machine", "Features section")} installs them.`
+  const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const a = n.array || {}, has = (a.data || []).length > 0, scheds = (n.snapshot_schedules || []).filter(x => x.array);
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));
@@ -590,7 +579,7 @@ function storageArray(n){
         ${pctBar(a.running ? a.progress : "", `${a.running === "verify" ? "parity check" : a.running} progress`)}
         <div class="ndmeters">${meter("used", total ? usedT / total * 100 : 0, `${sgb(usedT)} / ${sgb(total)}`, `${(a.data || []).length} data, ${(a.parity || []).length} parity`)}</div>
         ${factGrid([["Last sync", when(a.last_sync)], ["Last scrub", when(a.last_scrub)], ["Last check", when(a.last_check)],
-                    ...("verify" in a ? [["Last parity check", arrayVerifyWord(a.verify), {cls: a.verify?.at && (!a.verify.ok || (a.verify.found && a.verify.fixed < a.verify.found)) ? "bad" : ""}]] : []),
+                    ["Last parity check", arrayVerifyWord(a.verify), {cls: a.verify?.at && (!a.verify.ok || (a.verify.found && a.verify.fixed < a.verify.found)) ? "bad" : ""}],
                     ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
         <div class="sub">${kinds}</div>
         ${a.status ? `<div class="sub dim">${esc(a.status)}</div>` : ""}
@@ -600,7 +589,7 @@ function storageArray(n){
         `<button type="button" data-starray="scrub" title="read a part of the array back against its parity">Scrub</button>`,
         `<button type="button" data-starray="check" title="SnapRAID's status: what is out of date and what it found">Check</button>`,
         ...(a.adopted ? [`<button type="button" data-starray="mover" title="each share's files from one place to another now, as its settings say">Move now</button>`] : []),
-        ...("verify" in a ? [`<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`] : []),
+        `<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`,
         `<button type="button" class="danger" data-starray="destroy" title="unmounted and forgotten; the disks keep their files">Destroy</button>`])}</span>` : ""}</div>
       <div class="rows">${(a.data || []).map(x => slotRow("d", x)).join("")}${(a.parity || []).map(x => slotRow("p", x)).join("")}</div>
       ${admin && !why ? `${a.adopted ? "" : `<div class="field stnewslot"><div class="hint">Add a data disk: it is wiped, takes the next slot, and the parity is synced after${free.length ? "" : "; no disk here is free"}.</div>
@@ -637,10 +626,8 @@ function wireStorageArray(root, n){
       const kind = $("stArraySched")?.value || "sync", k = ARRAY_KINDS.find(x => x[0] === kind);
       const was = (n.snapshot_schedules || []).find(x => x.array === kind);
       const body = {action: "save", ...(was ? {id: was.id} : {}), name: `Array ${kind}`, cron: k[2], node: n.node, on: true, system: {apply: "storage-array", config: {array: kind}}};
-      busy(b, "Saving");
-      const j = await (await postJSON("/api/schedules", body)).json().catch(() => ({error: "no answer"}));
-      notify(j.error || `the array's ${kind}: ${j.schedule?.words || ""}; the row is on the Schedules page too`, !!j.error);
-      await refresh();
+      await sayPost(b, "Saving", "/api/schedules", body,
+        j => `the array's ${kind}: ${j.schedule?.words || ""}; the row is on the Schedules page too`, () => refresh());
       return;
     }
     const body = {action: "storage-array", id: n.node, array: act};
@@ -670,15 +657,12 @@ function wireStorageArray(root, n){
       if (!how) return;
       body.correct = how === "correct";
     } else if (act === "destroy"){
-      const typed = await askText("Destroy the array?\n\nIt is unmounted and forgotten; every data disk keeps its files, readable on any Linux, and the parity disks are left as they are.", {verb: "Destroy", label: "Type array to go on"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== "array"){ notify("the word typed is not array; nothing destroyed", true); return; }
+      if (!await askTyped("Destroy the array?\n\nIt is unmounted and forgotten; every data disk keeps its files, readable on any Linux, and the parity disks are left as they are.",
+                          "array", {verb: "Destroy", label: "Type array to go on", refused: "the word typed is not array; nothing destroyed"})) return;
       body.confirm = "array";
     }
-    busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking", mover: "Moving"}[act] || "Working");
-    const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, !!j.error);
-    await refresh();
+    busyFor(b, act);
+    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, () => refresh());
   }));
 }
 
@@ -747,10 +731,10 @@ function wireStorageOther(root, n){
       if (!await askYes("Forget this mount? It is unmounted first; nothing on it is touched.", {title: "Remove the mount?", verb: "Remove", danger: true})) return;
       body = {action: "remove", id: b.dataset.id};
     } else body = {action: act, id: b.dataset.id};
-    busy(b, {set: "Saving", remove: "Removing", off: "Unmounting", on: "Mounting"}[act] || "Working");
-    const j = await (await postJSON("/api/extmounts", body)).json().catch(() => ({error: "no answer"}));
-    notify(j.error || {set: "recorded: the machine mounts it within a minute", remove: "forgotten", off: "unmounted within a minute: the row says when it is safe to pull", on: "mounted within a minute"}[act], !!j.error);
-    await refresh();
+    busyFor(b, act);
+    await sayPost(null, "", "/api/extmounts", body,
+      {set: "recorded: the machine mounts it within a minute", remove: "forgotten", off: "unmounted within a minute: the row says when it is safe to pull", on: "mounted within a minute"}[act],
+      () => refresh());
   }));
 }
 
@@ -807,25 +791,23 @@ function wireStorageBackups(root, n){
     if (act === "set"){
       const body = {action: "set", name: ($("stBackupName")?.value || "").trim(), source: ($("stBackupSrc")?.value || "").trim(), dest: ($("stBackupDest")?.value || "").trim(), keep: parseInt($("stBackupKeep")?.value || "7", 10)};
       if (!body.name || !body.source || !body.dest){ notify("a backup takes a name, a folder to copy and where its runs go", true); return; }
-      busy(b, "Adding");
-      const j = await (await postJSON("/api/storebackups", body)).json().catch(() => ({error: "no answer"}));
-      notify(j.error || "added: Run now copies it, or give it a schedule", !!j.error);
-      await refresh(); return;
+      await sayPost(b, "Adding", "/api/storebackups", body, "added: Run now copies it, or give it a schedule", () => refresh());
+      return;
     }
     if (act === "remove"){
       if (!await askYes("Forget this backup? The runs already copied stay where they are.", {title: "Remove the backup?", verb: "Remove", danger: true})) return;
-      const j = await (await postJSON("/api/storebackups", {action: "remove", id: b.dataset.id})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || "forgotten", !!j.error); await refresh(); return;
+      await sayPost(null, "", "/api/storebackups", {action: "remove", id: b.dataset.id}, "forgotten", () => refresh());
+      return;
     }
     if (act === "nightly"){
       // The record and its schedule in one press: the pool to the array's
       // backups folder, seven nights kept, daily at 4:00.
       const name = `pool-${b.dataset.pool}`;
       busy(b, "Adding");
-      const j = await (await postJSON("/api/storebackups", {action: "set", name, source: b.dataset.mount, dest: `${n.array.mount || "/mnt/array"}/backups`, keep: 7})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/storebackups", {action: "set", name, source: b.dataset.mount, dest: `${n.array.mount || "/mnt/array"}/backups`, keep: 7});
       if (j.error){ notify(j.error, true); await refresh(); return; }
-      const k = await (await postJSON("/api/schedules", {action: "save", name: `Backup ${name}`, cron: "0 4 * * *", node: n.node, on: true,
-                                                        system: {apply: "storage-backup", config: {name}}})).json().catch(() => ({error: "no answer"}));
+      const k = await postJSON("/api/schedules", {action: "save", name: `Backup ${name}`, cron: "0 4 * * *", node: n.node, on: true,
+                                                        system: {apply: "storage-backup", config: {name}}});
       notify(k.error || `${b.dataset.pool} is backed up to the array nightly at 4:00; Run now takes the first copy`, !!k.error);
       await refresh(); return;
     }
@@ -833,15 +815,12 @@ function wireStorageBackups(root, n){
       const was = (n.snapshot_schedules || []).find(x => x.backup === b.dataset.name);
       const body = {action: "save", ...(was ? {id: was.id} : {}), name: `Backup ${b.dataset.name}`, cron: act === "daily" ? "0 4 * * *" : "0 4 * * 0", node: n.node, on: true,
                     system: {apply: "storage-backup", config: {name: b.dataset.name}}};
-      busy(b, "Saving");
-      const j = await (await postJSON("/api/schedules", body)).json().catch(() => ({error: "no answer"}));
-      notify(j.error || `${b.dataset.name}: ${j.schedule?.words || act}; the row is on the Schedules page too`, !!j.error);
-      await refresh(); return;
+      await sayPost(b, "Saving", "/api/schedules", body,
+        j => `${b.dataset.name}: ${j.schedule?.words || act}; the row is on the Schedules page too`, () => refresh());
+      return;
     }
-    busy(b, "Copying");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-backup", id: n.node, name: b.dataset.name})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "copying: the job runs on the machine; its log is on the Jobs page and the row follows the next check-in", !!j.error);
-    await refresh();
+    await sayPost(b, "Copying", "/api/v1/nodes", {action: "storage-backup", id: n.node, name: b.dataset.name},
+      "copying: the job runs on the machine; its log is on the Jobs page and the row follows the next check-in", () => refresh());
   }));
 }
 
@@ -942,7 +921,7 @@ function storageBody(n, where){
 // on the Storage page of the machine they are in (the controller's own),
 // with the same Check, Adopt, Release and shares, folded as Storage's are.
 function storageAdopt(n){
-  const own = typeof ownMachine === "function" ? ownMachine() : null;
+  const own = ownMachine();
   if (!own || own.id !== n.node) return "";
   const p = adoptParts(own);
   return p ? docSection("storage", p.id, p.title, p.status, p.body, p.opts) : "";
@@ -954,7 +933,7 @@ function renderStorageInto(i){
   if (storageList === null){
     // The page's own bar and body, given nothing.
     d.setBar("");
-    d.list.innerHTML = skTpl(storageBody(null));
+    drawHTML(d.list, skTpl(storageBody(null)));
     loadStorage();
     return;
   }
@@ -964,7 +943,7 @@ function renderStorageInto(i){
   const missing = (storageList || []).filter(n => !known.has(n.node) && !storageAskedNodes.has(n.node));
   if (missing.length){ missing.forEach(n => storageAskedNodes.add(n.node)); loadNodes(); }
   if (storageErr){
-    d.list.innerHTML = `<div class="hint bad">${esc(storageErr)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(storageErr)}</div>`);
     return;
   }
   const where = ["workspace", "cache", "artifacts", "appdata", "emulator", "builds"];
@@ -972,8 +951,8 @@ function renderStorageInto(i){
   // The node is the group header's (R177) and Measure now the head's, so
   // the page's own bar has nothing to carry.
   d.setBar("");
-  d.list.innerHTML = n ? storageBody(n, where)
-    : noNodeYet("the disks measured here are a node's");
+  patch(d.list, n ? storageBody(n, where)
+    : noNodeYet("the disks measured here are a node's"));
   wireStorageTab(d.el);
   if (n) wireStorageShares(d.el, n);
   if (n) wireStoragePools(d.el, n);
@@ -990,7 +969,7 @@ function wireStorageTab(root){
   wireSections(root);
   root.querySelectorAll("[data-stdisk]").forEach(c => c.onclick = () => chipMove(
     () => document.querySelector(".pane .doc.on .storagetab") || root, ".sect", () => {
-    storageDisk = c.dataset.stdisk; storageRev++; drawPanes();
+    storageDisk = c.dataset.stdisk; readMoved("storage"); drawPanes();
   }));
   root.querySelectorAll("[data-stprune]").forEach(a => a.onclick = e => {
     e.preventDefault();
@@ -998,10 +977,7 @@ function wireStorageTab(root){
     openDockerOn(a.dataset.stprune);
   });
   root.querySelectorAll("[data-stmeasure]").forEach(b => b.onclick = async () => {
-    busy(b, "Asking");
-    const j = await (await postJSON("/api/storage", {action: "measure", node: b.dataset.stmeasure})).json().catch(() => ({error: "no answer"}));
-    if (j.error) notify(j.error, true);
-    else notify("measuring: the numbers arrive with the node's next report, in a minute or so");
-    await loadStorage();
+    await sayPost(b, "Asking", "/api/storage", {action: "measure", node: b.dataset.stmeasure},
+      "measuring: the numbers arrive with the node's next report, in a minute or so", () => loadStorage());
   });
 }

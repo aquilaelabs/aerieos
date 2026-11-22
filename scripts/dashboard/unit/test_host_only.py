@@ -107,6 +107,7 @@ class Lockdown(unittest.TestCase):
         nodes._exec("UPDATE nodes SET config = ? WHERE id = ?", (json.dumps(cfg), self.nid))
         self.assertEqual(nodes.host_refuses(self.nid, "work"), "")
         self.assertIn("locked down", nodes.host_refuses(self.nid, "devdata"))
+        self.assertEqual(nodes.host_refuses(self.nid, "moved"), "", "it knocks where its controller moved (B955)")
         n = nodes.node(self.nid)
         mine = {"type": "system", "spec": {"apply": "lockdown"}, "placement": {"node": self.nid}}
         self.assertTrue(nodes.fits(mine, n))

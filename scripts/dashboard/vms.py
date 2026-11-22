@@ -22,6 +22,8 @@ import time
 import urllib.parse
 from pathlib import Path
 
+import nodeset
+
 HERE = Path(__file__).resolve().parent
 CATALOG_FILE = HERE.parent.parent / "config" / "vm-images.json"
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,30}")
@@ -166,9 +168,9 @@ def hosts():
     """The nodes a VM can go on: an agent node, not retired, whose VM host
     feature is installed and whose machine has /dev/kvm."""
     out = []
-    for n in node_list():
+    for n in nodeset.live_agents(node_list()):
         fe = ((n.get("reported") or {}).get("features") or {}).get("vmhost") or {}
-        if n.get("kind") == "agent" and n.get("state") not in ("retired", "pending") and fe.get("installed") and fe.get("kvm"):
+        if fe.get("installed") and fe.get("kvm"):
             out.append(n)
     return out
 

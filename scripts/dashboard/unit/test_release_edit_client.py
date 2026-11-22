@@ -47,7 +47,7 @@ class Client(unittest.TestCase):
 
     def run_edit(self, *words, stdin=""):
         env = {**os.environ, "BB_CONTROLLER": f"http://127.0.0.1:{self.srv.server_address[1]}",
-               "BB_WORKSPACE": self.ws, "BB_VERSION_AUTH": "Bearer t", "PYTHONPATH": LIB}
+               "BB_WORKSPACE": self.ws, "BB_AUTH_HEADER": "Bearer t", "PYTHONPATH": LIB}
         return subprocess.run([sys.executable, os.path.join(LIB, "release-edit.py"), "app", "release", "--edit", *words],
                               input=stdin, capture_output=True, text=True, timeout=30, env=env,
                               cwd=os.path.join(self.ws, "app"))

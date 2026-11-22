@@ -23,7 +23,7 @@ function openThing(node, key, at = ""){
   const to = `#/machines/installed/${encodeURIComponent(instNode || "")}/${encodeURIComponent(thingKey)}`;
   shellCame(was, to);
   openTab({kind: "thing", arg: "__thing", label: "Installed"});
-  instRev++;
+  readMoved("installed");
   if (to !== was) shellPush(to, was);
   // Read afresh, as opening Installed is: a press is somebody asking now.
   loadInstalled();
@@ -42,7 +42,7 @@ const THING_SECTS = {
     ["about", "What it is", r => instAboutLines(r)],
     ["signin", "Your sign-in", r => {
       const n = (nodesList || []).find(x => x.id === instNode), a = agentById(r.agent);
-      return n && (r.installed || r.agent === "claude") && typeof signinBlock === "function" && a?.provider ? signinBlock(n, r.agent) : "";
+      return n && (r.installed || r.agent === "claude") && a?.provider ? signinBlock(n, r.agent) : "";
     }],
     ["yours", "Yours", r => { const a = agentById(r.agent); return r.installed && a ? agExtras(a) : ""; }],
   ],
@@ -52,6 +52,17 @@ const THING_SECTS = {
   ],
   pack: [
     ["about", "What it is", r => instAboutLines(r)],
+    // A pack's coding agent whose pack says how it signs in is signed in
+    // here as a shipped one is (R233 step 6); one that does not signs in in
+    // its own session's terminal, said here, where every agent's sign-in is
+    // looked for.
+    ["signin", "Your sign-in", r => {
+      const a = r.group === "agent" ? agentById(r.name) : null;
+      const n = (nodesList || []).find(x => x.id === instNode);
+      if (a && r.installed && a.signin && n) return signinBlock(n, a.id);
+      return a && r.installed ? `<span class="sub">${esc(a.name)} signs in${a.provider ? ` with ${/^(?:[AEIOU]|x(?=[A-Z]))/.test(a.provider) ? "an" : "a"} ${esc(a.provider)} account` : ""} in its own terminal: start a ${esc(a.name)} session on a space on ${esc(inst?.name || "this node")} (Start agent on the space's card), open the link it shows, and paste the code it gives back into that terminal.</span>
+        <span class="sub">A sign-in is this node's alone: each node you work on is signed in from a session there.</span>` : "";
+    }],
     ["configure", "Configure", r => instConfigLines(r)],
   ],
   service: [
@@ -64,34 +75,37 @@ function renderThingInto(i){
   const d = docSurface(i, "thing");
   if (!d) return;
   d.setBar("");
+  // A page that came back without the thing it was for (the browser's kept
+  // layout after a reload that did not land on its address) has nothing to
+  // name: it is the Installed page then, where the row is.
+  if (!thingKey){ d.list.innerHTML = ""; setTimeout(() => { if (!thingKey) openInstalledTab(); }, 0); return; }
   if (inst === null){
-    d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["Installed", GHOST]]}) + docSection("thing", "about", "What it is", "", skRows(3)));
-    if (!instSeq) loadInstalled();
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["Installed", GHOST]]}) + docSection("thing", "about", "What it is", "", skRows(3))));
+    if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
   }
   const r = thingRow();
   if (inst.error || !r){
-    paint(d.list, `<div class="field"><div class="notice ${inst.error ? "bad" : "warn"}">${esc(inst.error
+    patch(d.list, `<div class="field"><div class="notice ${inst.error ? "bad" : "warn"}">${esc(inst.error
       ? "could not read what is installed: " + inst.error
       : `${thingLabel()} is not installed on ${inst.name || "this node"} now: the Library installs it.`)}</div></div>`);
     return;
   }
   const may = inst.may || {};
-  const ver = r.version && r.version !== "-" && r.version !== "present" ? r.version : "";
   // Its version and an update as the row wears them, then where it stands.
-  const pills = `${ver ? `<span class="pill" title="installed">${esc(ver)}</span>` : ""}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""}`;
+  const pills = `${packVersionPill(r)}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""}`;
   const head = pageHead({title: r.label, pills, facts: [
     ["Node", inst.name || ""],
   ], actions: `<span class="irow" data-irow="${esc(thingKey)}" data-style="display:contents">${instState(r)}${instActs(r, may)}</span>`})
     // Its glyph or its own icon beside its name, as a Library entry's page
     // draws it (the operator, 29 Oct: the two pressed pages one shape).
     .replace('<div class="name">', `<div class="name">${libIcon(r)}`);
-  const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && inst?.job?.errors?.[r.name] ? `<div class="field"><div class="sub bad">${esc(inst.job.errors[r.name])}</div></div>` : "";
+  const bad = packJobErr(r, inst?.job), err = bad && `<div class="field">${bad}</div>`;
   const sects = (THING_SECTS[r.kind] || THING_SECTS.toolchain).map(([k, title, body]) => {
     const html = body(r);
     return html ? docSection("thing", k, title, "", `<div class="field irow idetail" data-irow="${esc(thingKey)}">${html}</div>`, {open: true}) : "";
   }).join("");
-  paint(d.list, `<div data-instnode="${esc(instNode)}" data-thing="${esc(thingKey)}">${head}${err}${sects}</div>`);
+  patch(d.list, `<div data-instnode="${esc(instNode)}" data-thing="${esc(thingKey)}">${head}${err}${sects}</div>`);
   wireInstalled(d.el);
   if (thingAt){
     d.el.querySelector(`details.sect[data-sect="${CSS.escape("thing:" + thingAt)}"]`)?.scrollIntoView({block: "start"});

@@ -181,15 +181,15 @@ itself opens nothing. A space with no repository yet says so, and its
 Start agent waits for one.
 
 **Edit** turns the card over in place, to its **back**, the same size as the
-front: the space's name with a pencil to rename it; each repository with
-icons for a **shell** in it, its **git host** (linking it, or the host's
-settings once linked), lending it **your phone** when your phone is
-connected on its node, **rename**, **move** to another space and
-**delete**; and along the foot one line of icons, each named when hovered:
-**Color**, **Group**, **Lock** (its owner's or an administrator's), **Report
-bug** (which repository it is about, the first unless you pick another) and
-**Settings**. **Done** turns it back. Each face's buttons are one line, and
-there is no menu on a card.
+front: the space's name with a pencil to rename it and **Settings**, a gear,
+at the top right where Edit stood; each repository with icons for a
+**shell** in it, its **git host** (linking it, or the host's settings once
+linked), lending it **your phone** when your phone is connected on its node,
+**rename**, **move** to another space and **delete**; and along the foot one
+line of icons, each named when hovered: **Color**, **Group**, **Lock** (its
+owner's or an administrator's), **Report bug** (which repository it is
+about, the first unless you pick another) and, last, **Back**, which turns
+it back. Each face's buttons are one line, and there is no menu on a card.
 
 A repository's own page keeps **Start agent**, **Shell** and a menu in its
 header (link, phone, report, archive, lock, pin, settings). **Color** is your
@@ -202,16 +202,18 @@ on the Spaces page, and nothing else follows from it.
 header is the node its work runs on. A space with none says nothing more;
 its Start agent is ghosted with where to pick one.
 
-**A pin** per space, the pin by its name or **Pin** on its back, decides whether
-Home's glance shows it.
-The pins are each person's own: unpinning takes a space off your glance
-and nobody else's, and nothing else: the Spaces page lists everything
-under `/workspace`, pinned or not, with the same controls on each card and
-*unpinned* after the name of one that is not. Pins live per account in
-`/config/pinned-projects.json`. An account made since 7 Oct starts with
-nothing pinned and pins what it wants from the Spaces page; one made
-before that with no set yet still sees everything pinned. The page lists
-spaces by name, case aside.
+**A favorite**, the star by a space's name or **Add to favorites** in its
+page's menu, puts the space on Home and under the Spaces page's
+**Favorites** chip. Favorites are each person's own: taking one off takes it
+off your Home and nobody else's, and nothing else: the Spaces page lists
+everything under `/workspace`, favorite or not, by name, case aside, with
+the same controls on each card. **Full** and **Compact** beside its search
+choose how the cards are drawn: Compact folds each to its name line, and a
+press opens one, folding the one open before it; the choice is kept in your
+browser. Favorites live per account in
+`/config/pinned-projects.json`. An account made since 7 Oct starts with no
+favorite and stars what it wants from the Spaces page; one made before that
+with no set yet still has every space as a favorite.
 
 **Delete**, a repository's bin icon on a card's back, moves it to
 `/workspace/.trash/<name>` with every file kept: a second delete of the same
@@ -258,11 +260,13 @@ already there when this arrived were recorded once, as they were.
 
 ## Archiving and locking a space
 
-**Archive**, by a space's name or on its back, puts a space out of sight and changes
-nothing else: its card folds under **Archived** at the foot of the Spaces
-page and leaves Home's pinned spaces, and the space keeps working for
-everybody on it, sessions included. **Unarchive**, in the same places, brings
-it back. The space's owner or an administrator archives one.
+**Archive**, by a space's name, moves its card into **Archived**, a section
+shut at the foot of your Spaces page, and changes nothing else: the space
+keeps working for everybody on it, sessions included, its card keeps its
+star, group and every control, and a favorite stays on Home. An archive is
+each person's own, as favorites are: anybody signed in archives a space for
+themselves, and nobody else's page changes. **Unarchive**, in the same
+place, brings it back.
 
 **Lock** keeps people out of a space, and it comes in two kinds. The
 space's owner locks it with **Lock**: every other account's session on it
@@ -549,7 +553,11 @@ turns it on, picks the port, and gives each account that sees the space
 administrator's; signing in also needs File access on the account's roles
 on that space (R152), and gets the lesser of the two, so a role without it
 refuses even the space's owner. A session never may set it. Anybody else on the space
-is shown only that it is on, and where.
+is shown only that it is on, and where. An account with two-factor sign-in
+gives its password with its authenticator app's six-digit code right after
+it, as one word: its password alone is refused, with that sentence, and an
+account whose only second factor is a passkey adds an authenticator app
+under Profile to use FTP.
 
 The server is the space's primary node's: the **ftp** toolchain's
 `bb-ftpd` (pyftpdlib), one per space, which the agent starts from what

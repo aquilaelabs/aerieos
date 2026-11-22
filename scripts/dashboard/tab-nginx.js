@@ -22,13 +22,13 @@
 
 let nginxList = null;             // last answer, or null before the first
 let nginxErr = "";
-let nginxRev = 0;
 let nginxNode = "";               // the node the tab shows
 let nginxWant = "";               // a node asked for that the last read did not list yet
-let nginxLatest = {};             // the registry's newest line, from the same answer
+let nginxLatest = {};             // the image nginx's entry names, from the same answer
 let nginxCertOpen = false;        // Add a certificate pressed: its form unrolled
 let nginxAcmeOpen = false;  // the Let's Encrypt form unrolled (R150)
 let nginxHostnames = [];          // every node's hostnames: [{name, used: [{node, path, port}]}]
+let nginxHostTyped = "";          // a hostname being typed to add, kept across a redraw as the forms are
 // The routes being edited, per node, until Save or Revert; absent while a
 // node shows what is saved.
 const nginxDraft = {};
@@ -41,57 +41,41 @@ function openNginxTab(node){
   openTab({kind: "nginx", arg: "__nginx", label: "nginx"});
 }
 
-// Which read is the newest asked: a read started before a Save and slowed by
+// One read at a time (reading): a read started before a Save and slowed by
 // a node's daemon landed after the Save's own and put the old port and the
-// plain "deployed" back for seconds (B99, B65). A read older than the last
-// one drawn is dropped.
-let nginxAsked = 0, nginxDrawn = 0;
-async function loadNginx(){
-  const asked = ++nginxAsked;
-  try{
-    const j = await (await bootFetch("/api/nginx")).json();
-    if (asked < nginxDrawn) return;
-    nginxDrawn = asked;
+// plain "deployed" back for seconds (B99, B65).
+function loadNginx(){
+  return reading("nginx", async () => {
+    const j = await getJSON("/api/nginx");
     nginxErr = j.error || "";
-    nginxList = j.nodes || [];
-    nginxLatest = j.latest || {};
-    nginxHostnames = j.hostnames || [];
-    if (nginxWant && nginxList.some(n => n.node === nginxWant)){ nginxNode = nginxWant; nginxWant = ""; }
-  }catch(e){
-    if (asked < nginxDrawn) return;
-    nginxErr = String(e);
-    nginxList = nginxList || [];
-  }
-  nginxRev++;
-  if (tabs.some(t => t.kind === "nginx")){ const f = nginxKeepTyping(); drawPanes(); nginxRefocus(f); }
+    if (!j.error){
+      nginxList = j.nodes || [];
+      nginxLatest = j.latest || {};
+      nginxHostnames = j.hostnames || [];
+      if (nginxWant && nginxList.some(n => n.node === nginxWant)){ nginxNode = nginxWant; nginxWant = ""; }
+    } else nginxList = nginxList || [];
+    if (tabs.some(t => t.kind === "nginx")) nginxKeepTyping();
+  });
 }
 
 // What is being typed survives a re-read (B729): the rows are read into the
-// node's draft before the poll's redraw, and the field with focus gets it
-// back with its caret, so a hostname half typed is not swapped for the
-// pulldown it was typed in place of.
+// node's draft before the poll's redraw, which draws the form from it, so a
+// hostname half typed is drawn as the box it is typed in and not as the
+// pulldown it was typed in place of; the patch (R244) keeps that box, its
+// focus and its caret.
 function nginxKeepTyping(){
   const sect = document.querySelector(".nginxtab [data-ngnode]");
   const n = sect && (nginxList || []).find(x => x.node === sect.dataset.ngnode);
-  if (!n || !sect.querySelector("#ngCert")) return null;    // undeployed: no rows to read
+  if (!n || !sect.querySelector("#ngCert")) return;    // undeployed: no rows to read
   nginxReadDraft(sect, n);
-  const a = document.activeElement, row = a?.closest?.(".ngroute");
-  return row && a.dataset.ng ? {i: row.dataset.i, k: a.dataset.ng, pos: a.selectionStart} : null;
-}
-function nginxRefocus(f){
-  const el = f && document.querySelector(`.nginxtab .ngroute[data-i="${f.i}"] [data-ng="${f.k}"]`);
-  if (!el) return;
-  el.focus();
-  if (typeof f.pos === "number"){ try{ el.setSelectionRange(f.pos, f.pos); }catch(e){ /* a select */ } }
 }
 
 async function nginxAct(body){
-  const j = await (await postJSON("/api/nginx", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/nginx", body);
   if (j.error) notify(j.error, true);
   else if (j.note) notify(j.note, true);
   else if (j.job) notify(`${body.action === "deploy" ? "deploying" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx"}${
     body.action === "deploy" ? " nginx" : ""}: its row on the Containers page has the build`);
-  else if (body.action === "check") notify(`the registry lists nginx:${j.latest?.tag || "?"}`);
   // A hostname added or deleted comes back with the list as it now is, so
   // the pull-downs hold it the moment the answer lands rather than after
   // the whole tab is read again (every node's daemon, B721).
@@ -106,7 +90,7 @@ async function nginxAct(body){
   if (n){
     n.routes = Array.isArray(j.routes) ? j.routes : (body.routes || []).map(r => ({...r}));
     if (j.job) n.state = {...(n.state || {}), job: {...(n.state?.job || {}), id: j.job, running: true}};
-    nginxRev++;
+    readMoved("nginx");
     loadNginx();
     return j;
   }
@@ -119,13 +103,8 @@ async function nginxAct(body){
 // draw, so a node retired under the tab is not shown as if it were there.
 function nginxPick(){
   const have = nginxList || [];
-  let want = nginxNode;
-  if (!have.some(n => n.node === want)){
-    try{ want = localStorage.getItem("bb.ngnode") || ""; }catch(e){ want = ""; }
-  }
-  if (!have.some(n => n.node === want)) want = have[0]?.node || "";
-  nginxNode = want;
-  return have.find(n => n.node === want) || null;
+  nginxNode = keptNode("nginx", {have, idOf: n => n.node});
+  return have.find(n => n.node === nginxNode) || null;
 }
 
 // A route as a row of fields: hostname, path, port, TLS, and Remove.
@@ -176,17 +155,17 @@ function nginxHostPick(r){
 }
 
 // The list itself, as records the way Routes is (the operator, 22 Oct):
-// each name with where it is routed, Delete on one routed nowhere, and a
-// box to add one under the table.
+// each name with where it is routed, Delete on one routed nowhere, and the
+// box to add one over the table (the record-lists rule).
 const NG_HOST_COLS = [{label: "Hostname"}, {label: "Routed on", w: "minmax(0,.7fr)"}, {act: true, w: "3rem"}];
 function nginxHostLines(){
   const rows = nginxHostnames.map(h => `<div class="row nghost">${tblLine(NG_HOST_COLS, [
       `<code>${esc(h.name)}</code>`,
       h.used.length ? esc([...new Set(h.used.map(u => u.node))].join(", ")) : `<span class="dim">not routed yet</span>`,
       h.used.length ? "" : rmIcon(`data-nghostrm="${esc(h.name)}"`, `delete ${h.name}`)])}</div>`).join("");
-  return `${rows ? tblWrap(NG_HOST_COLS, rows, "nghosts") : `<div class="field"><div class="hint">none yet</div></div>`}
-    <div class="field"><div class="actbar"><input data-nghostnew placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
-      <button type="button" data-nghostadd>Add</button></div></div>`;
+  return `<div class="field"><div class="addbar ctlrow"><input id="ngHostNew" data-nghostnew value="${esc(nginxHostTyped)}" placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
+      <button type="button" data-nghostadd>Add</button></div></div>
+    ${rows ? `<div class="field">${tblWrap(NG_HOST_COLS, rows, "nghosts")}</div>` : `<div class="field"><div class="hint">none yet</div></div>`}`;
 }
 
 // Routes as records (R218 step 44, the design's record-lists rule, the
@@ -239,7 +218,7 @@ function nginxRoutesTable(n){
 
 // A repaint of the tab: its live key is the revision, so a draft's change
 // moves it (drawPanes repaints a tab only when its key has).
-function nginxRedraw(){ nginxRev++; drawPanes(); }
+function nginxRedraw(){ readMoved("nginx"); drawPanes(); }
 
 // Routes are filled from the node when they are not drafted (null), so
 // Routes' Save and Revert can let go of the routes and keep a pair half
@@ -263,22 +242,28 @@ function nginxAcmeLines(n){
     p.state === "failed" ? `no certificate: ${esc(p.error || "it failed")}` : `${esc(p.state || "asking")} (${esc(p.method || "http-01")}, ${esc(ago(p.at))})`}</div></div>`).join("");
 }
 
+// The pairs as records (the record-lists rule): a row a pair, read-only, its
+// domain, the names it covers, when it ends and the routes that serve it,
+// its bin at the right; a pair from Let's Encrypt says so as a pill, and a
+// public box's warning about a wide pair is said under its line.
+const NG_CERT_COLS = [{label: "Domain"}, {label: "Covers", w: "minmax(0,1fr)"}, {label: "Until", w: "7rem"},
+  {label: "Routes", w: "5rem", num: true}, {act: true, w: "3rem"}];
 function nginxCertLines(n, d){
   const own = Object.entries(n.certs || {}).filter(([, c]) => c?.set).sort(([a], [b]) => a.localeCompare(b));
   if (!own.length) return `<div class="hint">none yet: every route answers on 80 only</div>`;
   const routes = d?.routes || n.routes || [];
-  return own.map(([k, c]) => {
+  return tblWrap(NG_CERT_COLS, own.map(([k, c]) => {
     const when = c?.expires ? new Date(c.expires * 1000).toLocaleDateString() : "";
     const used = routes.filter(r => r.tls !== false && (r.cert === k || (!r.cert && nginxResolve(n, r.host) === k))).length;
-    return `<div class="row ngcert"><div class="grow"><div class="name">${esc(k)}</div>
-      <div class="sub">${esc(c.subject || "")}${c.names ? ` (${esc(c.names)})` : ""}${when ? `, until ${esc(when)}` : ""}${
-        used ? `; ${used} route${used === 1 ? "" : "s"}` : "; no route"}${
-        c.acme ? `; from Let's Encrypt by ${esc(c.acme.method)}, renewed thirty days before it ends` : ""}</div>${
+    return `<div class="row ngcert">${tblLine(NG_CERT_COLS, [
+      `<span class="name">${esc(k)}</span>${c.acme ? ` <span class="pill note" title="${esc(`by ${c.acme.method}, renewed thirty days before it ends`)}">Let's Encrypt</span>` : ""}`,
+      esc(c.names || c.subject || ""), esc(when),
+      used ? `${used} route${used === 1 ? "" : "s"}` : `<span class="dim">no route</span>`,
+      rmIcon(`data-ngcertrm="${esc(k)}"`, `take ${k}'s pair off`, {title: "take this pair off the node"})])}${
       // On a public box (R93) its key lives there: a pair wider than the
       // box's own routes lends every other name to whoever takes the box.
-      n.wide?.[k]?.length ? `<div class="sub warn ngwide">Its key sits on this public box and also answers for ${esc(n.wide[k].join(", "))}: a box taken over could pass as ${n.wide[k].length === 1 ? "it" : "them"}. A pair for this box's own names alone keeps the rest safe.</div>` : ""}</div>
-      ${rmIcon(`data-ngcertrm="${esc(k)}"`, `take ${k}'s pair off`, {title: "take this pair off the node"})}</div>`;
-  }).join("");
+      n.wide?.[k]?.length ? `<div class="sub warn ngwide">Its key sits on this public box and also answers for ${esc(n.wide[k].join(", "))}: a box taken over could pass as ${n.wide[k].length === 1 ? "it" : "them"}. A pair for this box's own names alone keeps the rest safe.</div>` : ""}</div>`;
+  }).join(""), "ngcerts");
 }
 
 // What the tab says about one node: the state row, the routes, the
@@ -323,28 +308,26 @@ function nginxBody(n){
   const facts = [["Container", `nginx-${esc(n.container.replace(/^nginx-/, ""))} on the ${pageLink("docker", "Containers page")}`, {html: true}],
                  ["Routes", `${count} route${count === 1 ? "" : "s"}`],
                  ["Node", n.host_only ? "hosting-only" : ""]];
-  // The image it is pinned to, the newest line, and Update when behind
-  // (R192): its own action bar, since Check now and Update are two verbs.
-  const im = n.image || {}, lt = nginxLatest || {};
-  const pinned = `nginx:${im.tag || "?"}${im.digest ? ` (${im.digest.slice(7, 19)})` : ", not pinned to a digest yet"}`;
+  // The image it is pinned to, the one this AerieOS names, and Update when
+  // behind (R192): nothing asks a registry, so there is nothing to check.
+  const im = n.image || {};
+  const pinned = `nginx:${im.tag || "?"}${im.digest ? "" : ", not pinned to a digest yet"}`;
   // A newer build of the tag it already runs is said as that, not as the
   // same tag named twice.
   const rebuild = !!n.behind && n.behind === im.tag;
   const out = rebuild ? `a newer build of nginx:${n.behind}` : `nginx:${n.behind}`;
   const news = n.behind ? `${out} is out: Update pins it and rebuilds`
-    : lt.digest ? "the newest line the registry lists" : "no check has read the registry yet";
-  const checked = lt.at ? `checked ${ago(lt.at)}` : "never checked";
+    : "the image this AerieOS names";
   // Four sections (R218 step 29): each says its state in its head, opens
   // on one short line with the rest behind its ?, and saves what it writes
   // under itself; Remove stands apart at the page's foot.
   const pairs = Object.values(n.certs || {}).filter(c => c?.set).length;
   const image = ngSect("image", n.behind ? (rebuild ? "a newer build is out" : `${out} is out`) : `nginx:${im.tag || "?"}`,
     `<div class="field">
-      <div class="sub ngimage">${esc(pinned)}</div>
-      <div class="hint${n.behind ? " warn" : ""}">${esc(news)}.${helpIcon("The registry is read once a week by itself; a node is pinned to a digest when it is deployed or updated, so a Save never moves it.")}</div>
-      <div class="actbar ngimgbar"><span class="state">${esc(checked)}${lt.error ? ` · ${esc(lt.error)}` : ""}</span><span class="sp"></span>
-        <button type="button" data-ngcheck>Check for updates</button>
-        ${n.behind ? `<button type="button" class="primary" data-ngupdate>${rebuild ? "Update to the newer build" : `Update to ${esc(n.behind)}`}</button>` : ""}</div>
+      <div class="sub data ngimage">${esc(pinned)}</div>
+      <div class="hint${n.behind ? " warn" : ""}">${esc(news)}.${helpIcon("A node is pinned to a digest when it is deployed or updated, so a Save never moves it. A newer image comes with an update of AerieOS.")}</div>
+      ${n.behind ? `<div class="actbar ngimgbar"><span class="sp"></span>
+        <button type="button" class="primary" data-ngupdate>${rebuild ? "Update to the newer build" : `Update to ${esc(n.behind)}`}</button></div>` : ""}
     </div>`, {cls: n.behind ? "warn" : ""});
   const clash = (n.clash || []).length
     ? `<div class="field"><div class="hint bad">${esc(n.clash.join(", "))} ${n.clash.length === 1 ? "holds" : "hold"} a port nginx needs on this node: it listens on 80 and 443 there, so one of them has to give way.</div></div>` : "";
@@ -363,14 +346,12 @@ function nginxBody(n){
   const open = nginxCertOpen || !!(d.cert.trim() || d.key.trim());
   const certs = ngSect("certs", pairs ? `${pairs} pair${pairs === 1 ? "" : "s"}` : "none yet",
     `<div class="field"><div class="hint">The pairs this node holds, each known by its domain.${helpIcon(
-      "A pair is known by the domain its names say: a wildcard pair for *.example.com is example.com's, and the same again is a renewal. A key is kept on the controller and never shown.")}</div>
-      ${nginxCertLines(n, d)}</div>
-    ${nginxAcmeLines(n)}
-    <div class="field ngcertadd"${open ? " hidden" : ""}><div class="actbar"><span class="sp"></span>
+      "A pair is known by the domain its names say: a wildcard pair for *.example.com is example.com's, and the same again is a renewal. A key is kept on the controller and never shown.")}</div></div>
+    <div class="field ngcertadd"${open ? " hidden" : ""}><div class="addbar ctlrow">
       <button type="button" data-ngacmeopen${nginxAcmeOpen ? " disabled" : ""}>Get one from Let's Encrypt</button>
       <button type="button" data-ngcertopen>Add a certificate</button></div></div>
     <div class="ngacmeform"${nginxAcmeOpen ? "" : " hidden"}>
-      <div class="field"><div class="hint">A certificate for one public name, from Let's Encrypt (or the directory BB_ACME_DIRECTORY names), kept here like a pasted pair and renewed thirty days before it ends.${helpIcon(
+      <div class="field"><div class="hint">A certificate for one public name, from Let's Encrypt, kept here like a pasted pair and renewed thirty days before it ends.${helpIcon(
         "HTTP-01: Let's Encrypt fetches a token from port 80 at the name, so the name must reach this node and 80 be open to the internet; this node's nginx answers it. DNS-01: a TXT record is written through the Cloudflare API token under Controller settings, so the node need not be reachable at all; the domain must be on that Cloudflare account.")}</div></div>
       <div class="field">
         ${lbl("ngAcmeHost", "Hostname")}
@@ -407,7 +388,9 @@ function nginxBody(n){
       <div class="field"><div class="actbar ngcertbar"><span class="state"></span><span class="sp"></span>
         <button type="button" class="primary" data-ngcertsave disabled>Add</button>
         <button type="button" data-ngcertcancel>Cancel</button></div></div>
-    </div>`);
+    </div>
+    ${nginxAcmeLines(n)}
+    <div class="field ngcertlist">${nginxCertLines(n, d)}</div>`);
   // The page's head, deployed as undeployed: its state and what it runs.
   return `<div data-ngnode="${esc(n.node)}">
     ${pageHead({cls: "toolstate", pills: pill, facts})}
@@ -425,7 +408,7 @@ function nginxBody(n){
 // the node switcher, and Deploy, an undeployed node's one action, at its
 // right; waiting, which node and whether it is deployed are not known yet.
 function nginxBar(pnodes, n){
-  // The node is the Containers group's header's (R178), and Deploy sits in
+  // The node is its group's header's, the Machines group's (R178, R264), and Deploy sits in
   // an undeployed node's head, so the bar is the same on every node: none.
   return "";
 }
@@ -437,20 +420,20 @@ function renderNginxInto(i){
     // Its template (R218 step 16): the bar and the state row's words are
     // the page's own; the node and its routes are on their way.
     d.setBar(nginxBar(null));
-    d.list.innerHTML = skTpl(`${pageHead({cls: "toolstate", facts: [["Container", GHOST], ["Routes", GHOST]]})}${
-      ["image", "hostnames", "routes", "certs"].map(k => ngSect(k, "", `<div class="field">${skRows(2)}</div>`)).join("")}`);
+    drawHTML(d.list, skTpl(`${pageHead({cls: "toolstate", facts: [["Container", GHOST], ["Routes", GHOST]]})}${
+      ["image", "hostnames", "routes", "certs"].map(k => ngSect(k, "", `<div class="field">${skRows(2)}</div>`)).join("")}`));
     loadNginx();
     return;
   }
   if (nginxErr){
-    d.list.innerHTML = `<div class="hint bad">${esc(nginxErr)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(nginxErr)}</div>`);
     return;
   }
   const n = nginxPick();
   const pnodes = nginxList.map(x => ({id: x.node, name: x.name, live: x.live}));
   d.setBar(nginxBar(pnodes, n));
-  d.list.innerHTML = n ? nginxBody(n)
-    : noNodeYet("nginx runs on a node");
+  patch(d.list, n ? nginxBody(n)
+    : noNodeYet("nginx runs on a node"));
   wireNginxTab(d.el);
 }
 
@@ -468,6 +451,12 @@ function nginxReadDraft(sect, n){
   d.cert = sect.querySelector('#ngCert')?.value || "";
   d.key = sect.querySelector('#ngKey')?.value || "";
   d.certFor = sect.querySelector('[data-ng="certfor"]')?.value.trim() || "";
+  // ...and the hostname being typed to add, which is every node's list's
+  // and no node's draft: a re-read drew its box empty under the typing. The
+  // page is patched, so the box keeps its caret (R244); this keeps the text
+  // for a draw that writes the page whole.
+  const typed = sect.querySelector("[data-nghostnew]");
+  if (typed) nginxHostTyped = typed.value;
 }
 
 function wireNginxTab(root){
@@ -513,8 +502,10 @@ function wireNginxTab(root){
     const d = nginxDraftOf(n), add = sect.querySelector("[data-ngcertsave]");
     if (add) add.disabled = !(d.cert.trim() && d.key.trim());
   };
-  sect.addEventListener("input", sync);
-  sect.addEventListener("change", sync);
+  // Set, not added: the patch keeps the section across redraws (R244), and
+  // this runs after each one.
+  sect.oninput = sync;
+  sect.onchange = sync;
   // A pair taken off: asked, then saved at once, since what it leaves (a
   // route's pick falling back to its domain's pair, or 80 alone) is drawn
   // from the server's answer.
@@ -536,9 +527,13 @@ function wireNginxTab(root){
     nginxReadDraft(sect, n);
     busy(hostAdd, "Adding");
     await nginxAct({action: "host-add", name});
+    // On the list, the box is empty for the next; refused, what was typed stays.
+    if ((nginxHostnames || []).some(h => h.name === name)) nginxHostTyped = "";
     nginxRedraw();
   };
   if (hostNew) hostNew.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); hostAdd.click(); } };
+  // Kept as it is typed, so a redraw from anywhere draws the box as it was.
+  if (hostNew) hostNew.oninput = () => { nginxHostTyped = hostNew.value; };
   sect.querySelectorAll("[data-nghostrm]").forEach(b => b.onclick = async () => {
     nginxReadDraft(sect, n);
     busy(b, "Deleting");
@@ -626,13 +621,6 @@ function wireNginxTab(root){
     nginxReadDraft(sect, n);
     Object.assign(nginxDraftOf(n), {cert: "", key: "", certFor: ""});
     nginxCertOpen = false;
-    nginxRedraw();
-  };
-  const chk = sect.querySelector("[data-ngcheck]");
-  if (chk) chk.onclick = async e => {
-    nginxReadDraft(sect, n);
-    busy(e.target, "Checking");
-    await nginxAct({action: "check", node: nid});
     nginxRedraw();
   };
   const upd = sect.querySelector("[data-ngupdate]");

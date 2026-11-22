@@ -1,6 +1,6 @@
 // Real touch through Chromium's gesture recognizer: the dock's line under a
 // finger, and pull to refresh.
-import { launch, newPage, ok, done, finger, sleep, settled, URL } from './lib.mjs';
+import { launch, newPage, ok, done, finger, settled, URL, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 400, height: 700 }, hasTouch: true, isMobile: true });
@@ -18,7 +18,12 @@ const rectOf = sel => page.waitForFunction(s => { const e = document.querySelect
 // bar; the chevron puts it down; a page opened puts it down too.
 await page.evaluate(() => { for (let i = 0; i < 2; i++) newShell(''); dockToggle(false); });
 await page.waitForFunction(() => document.querySelectorAll('#pane1 .dtab[data-id]').length >= 2);
-await page.waitForTimeout(300);
+// The dock put down has slid back into its line: a tab measured mid-slide
+// is tapped where it no longer is.
+await page.waitForFunction(() => !document.getElementById('panes').classList.contains('dockdown')
+  && !document.getElementById('pane1').getAnimations({ subtree: true })
+    .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)),
+  null, { timeout: 10000 }).catch(() => {});
 const want = await page.evaluate(() => tabs.filter(t => t.kind === 'term')[1].id);
 const rb = await rectOf(`#pane1 .dtab[data-id="${want}"] .dlbl`);
 await finger(page, rb.x + 20, rb.y + rb.height / 2, rb.x + 20, rb.y + rb.height / 2, 0);
@@ -74,7 +79,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // The page scrolls inside its panes, so a phone browser's own pull never
 // fires; the page's does: a drag down from the top re-reads the dashboard,
 // and the header has no ↻ beside it any more (the operator, 2 Oct).
-{
+await section("pull to refresh", async () => {
   ok(!(await page.$('header button[aria-label="refresh now"], #hdr button[aria-label="refresh now"]')),
      'the header carries no refresh button');
   // Counted at the pull itself: the poll calls refresh() on its own clock.
@@ -131,19 +136,28 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
   await finger(page, 200, ty, 200, ty + 140);
   ok(await page.evaluate(() => window.__pulls) === 0, 'a drag down that starts on a terminal scrolls the terminal, not the page');
   await page.evaluate(() => document.getElementById('pullterm')?.remove());
-}
+});
 
 // A dock tab held and dragged takes a new place on the line (the strip's
 // gesture, kept when the dock took its place: the operator, 17 Oct), and a
 // quick swipe across the line scrolls it rather than picking a tab up. Each
 // terminal's tab carries Close beside minimize.
-{
+await section("A dock tab held and dragged takes a new place on the line", async () => {
   await page.evaluate(() => { location.hash = '#/home'; dockToggle(false); });
   await page.waitForFunction(() => document.querySelectorAll('#pane1 .dtab[data-id]').length >= 2);
   // The line keeps the newest terminal in view; its first two tabs are what
   // the finger goes for, so the line is brought back to its start.
   await page.evaluate(() => { document.querySelector('#pane1 .dockline').scrollLeft = 0; });
-  await sleep(300);
+  // At its start the line has dropped its left arrow, which moves the tabs
+  // by the line's gap, and the dock has slid down: then the tabs are where
+  // the finger will find them.
+  await page.waitForFunction(() => { const l = document.querySelector('#pane1 .dockline');
+    return l && l.scrollLeft < 1 && !l.classList.contains('chl')
+      && !document.getElementById('panes').classList.contains('dockdown')
+      && !document.getElementById('pane1').getAnimations({ subtree: true })
+        .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)); },
+    null, { timeout: 10000 }).catch(() => {});
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const order = () => page.evaluate(() => [...document.querySelectorAll('#pane1 .dtab[data-id]')].map(e => e.dataset.id));
   const before = await order();
   const box = id => page.$eval(`#pane1 .dtab[data-id="${id}"] .dlbl`, e => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
@@ -176,6 +190,6 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
   const after2 = await order();
   ok(await first() && after2[0] === before2[1],
      `...and a terminal dragged past it lands first among the terminals, Chat still at the start (${after2.slice(0, 2)})`);
-}
+});
 
 await done(browser);

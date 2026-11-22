@@ -3,17 +3,14 @@
 // harness's fixture node is enrolled by hand with a walk in its census; the
 // tab lists it with its filesystems as meters, its stores, and its projects
 // largest first; Measure now queues the agent's storage job.
-import { URL, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, api, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const base = URL.replace(/\/$/, '');
-const api = async (path, body) => (await fetch(base + path, body === undefined
-  ? { headers: H } : { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
 
 // A node with a walk in its census.
 const minted = await api('/api/v1/nodes', { action: 'enroll', name: 'diskbox' });
@@ -72,12 +69,8 @@ ok(drawn.disks.join(' | ') === '/: cache store, the accounts\' homes, Docker, ar
 const stack = await page.$$eval(`${sect} .ndmeter .track`, ts => new Set(ts.map(t => Math.round(t.getBoundingClientRect().width))).size);
 ok(stack === 1, 'every meter in the stack has the same track width');
 await page.click(`.storagetab .pghead [data-stmeasure="${minted.id}"]`);
-const job = await (async () => { for (let i = 0; i < 40; i++){
-  const js = (await api('/api/v1/jobs?active=1')).jobs || [];
-  const j = js.find(x => x.type === 'storage' && x.node === minted.id);
-  if (j) return j;
-  await new Promise(r => setTimeout(r, 250));
-} return null; })();
+const job = await until(async () => ((await api('/api/v1/jobs?active=1')).jobs || [])
+  .find(x => x.type === 'storage' && x.node === minted.id), 10000, 250);
 ok(job && job.type === 'storage', `Measure now queues the agent's storage job on that node (${job?.id})`);
 // ...and the button comes back once the press is answered: the bar's markup
 // is the same after it, and a repaint that skipped it left Asking for good.
@@ -92,7 +85,7 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
 // (the operator, 23 Oct): its phones are listed here with a link to the
 // Emulator page, where each has its Remove, refused while one runs; no
 // prune and no clear is pressed here.
-{
+await section("The page measures, and each thing is freed on the page that manages it", async () => {
   const seen = await page.evaluate(() => {
     const s = document.querySelector('.storagetab details[data-sect="storage:phones"]');
     return { rows: [...(s?.querySelectorAll('.stphone') || [])].map(r => r.textContent.replace(/\s+/g, ' ').trim()),
@@ -110,27 +103,23 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(em.rows === 2 && em.removes === 1, `the Emulator page lists the node's phones, and only the one not running has a Remove (${JSON.stringify(em)})`);
   page.answers.push(0);
   await page.click('.emutab [data-emuphone="alpha"]');
-  const avd = await (async () => { for (let i = 0; i < 40; i++){
-    const js = (await api('/api/v1/jobs?active=1')).jobs || [];
-    const j = js.find(x => x.type === 'avd-remove' && x.node === minted.id);
-    if (j) return j;
-    await new Promise(r => setTimeout(r, 250));
-  } return null; })();
+  const avd = await until(async () => ((await api('/api/v1/jobs?active=1')).jobs || [])
+    .find(x => x.type === 'avd-remove' && x.node === minted.id), 10000, 250);
   ok(avd && avd.spec?.name === 'builderbot-36' && avd.spec?.project === 'alpha',
      `Remove asks, then queues the phone's removal on that node (${JSON.stringify(avd?.spec || null)})`);
   if (avd) await api('/api/v1/jobs', { action: 'cancel', id: avd.id });
   const refused = await api('/api/emulator', { action: 'phone-remove', node: minted.id, project: 'alpha', uid: '', name: 'builderbot-35' });
   ok(/running/.test(refused.error || ''), `a running phone is refused by the server too (${refused.error})`);
-}
+});
 // The array's parity check (R163 step 15): offered where the machine's
 // agent has it, its progress on the running pill, its result a fact.
-{
+await section("The array's parity check", async () => {
   const got = await page.evaluate(async () => {
     // Laid over the record each time: the page's poll reads the list again.
     const ARR = { mount: '/mnt/array', mounted: true, policy: 'mfs', data: [{ slot: 1, id: 'ata-A', mounted: true, size_mb: 10, used_mb: 1 }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                   running: 'verify', progress: '45%, 120 MB/s', verify: { at: Math.floor(Date.now() / 1000) - 3600, ok: true, found: 3, fixed: 2, unfixed: 1, corrected: true } };
     const lay = arr => { const n = (storageList || []).find(x => x.name === 'diskbox');
-      Object.assign(n, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: arr }); storageRev++; drawPanes(); };
+      Object.assign(n, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: arr }); readMoved('storage'); drawPanes(); };
     const sectOf = async () => { for (let i = 0; i < 20; i++){ await new Promise(r => setTimeout(r, 100));
       const x = document.querySelector('.storagetab details[data-sect="storage:array"]'); if (x) return x; } return null; };
     openStorageTab();
@@ -143,52 +132,46 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
                   sched: [...(sect?.querySelectorAll('#stArraySched option') || [])].map(o => o.value) };
     // Pressing it asks first: Check, or Check and correct.
     sect.querySelector('[data-starray="verify"]').click();
-    let dlg = null;
+    // The question is on the page as the press returns: read there, before
+    // the harness's own answer to it (lib.mjs, the first choice) is pressed.
+    let dlg = document.querySelector('.modal.askdlg:not([hidden])');
     for (let i = 0; i < 20 && !dlg; i++){ await new Promise(r => setTimeout(r, 100)); dlg = document.querySelector('.modal.askdlg:not([hidden])'); }
     out.asks = [...(dlg?.querySelectorAll('button') || [])].map(b => b.textContent.trim());
     dlg?.querySelector('button:last-child')?.click();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    await new Promise(r => setTimeout(r, 200));
+    // The question put away, its leaving over.
+    for (let i = 0; i < 100 && document.querySelector('.modal.askdlg:not([hidden])'); i++) await new Promise(r => setTimeout(r, 50));
     // A pool another machine made, found on the disks (R163 step 1).
     // Laid over again until it draws: the page's poll reads the list again.
     for (let i = 0; i < 20 && !(out.found || []).length; i++){
       const m = (storageList || []).find(x => x.name === 'diskbox');
       Object.assign(m, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: ARR, zfs: true });
       m.pools_importable = [{ name: 'tank', id: '1234', state: 'online', said: 'The pool can be imported using its name or numeric identifier.' }];
-      storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 150));
+      readMoved('storage'); drawPanes(); await new Promise(r => setTimeout(r, 150));
       out.found = [...document.querySelectorAll('.storagetab [data-poolfound]')].map(r => r.dataset.poolfound + ':' + !!r.querySelector('[data-stpool="import"]'));
     }
-    const { verify, ...older } = ARR;
-    lay(older);
-    // Until the redraw without it: the section is there throughout.
-    for (let i = 0; i < 30 && document.querySelector('.storagetab [data-starray="verify"]'); i++){
-      await new Promise(r => setTimeout(r, 100));
-      if (i === 10) lay(older);
-    }
-    out.older = !!document.querySelector('.storagetab details[data-sect="storage:array"]') && !document.querySelector('.storagetab [data-starray="verify"]');
     return out;
   });
   ok(got.bar === 45, `a run that says how far it is wears a bar at that mark (${got.bar})`);
   ok(got.btn && /parity check running, 45%, 120 MB\/s/.test(got.text) && /Last parity check.*3 differed, 2 corrected, 1 could not be/.test(got.text) && got.sched.includes('verify'),
      `the array offers Check parity, says its progress and its last result, and schedules it (${got.text.slice(0, 220) || JSON.stringify(got)})`);
-  ok(got.older, 'an agent from before Check parity is not offered it');
   ok(got.asks.includes('Check') && got.asks.includes('Check and correct'), `Check parity asks: Check, or Check and correct (${JSON.stringify(got.asks)})`);
   ok(JSON.stringify(got.found) === '["tank:true"]', `a pool another machine made is listed with Import (${JSON.stringify(got.found)})`);
-}
+});
 // Each share's places on an array taken over (R163): where its new files
 // land and the mover's from and to, said on its row, filled by its Edit,
 // and sent beside the share on Save.
-{
+await section("Each share's places on an array taken over", async () => {
   const got = await page.evaluate(async () => {
     const keepOwn = ownMachine, keepPost = postJSON, posted = [];
     ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
     // Only the presses under test: the page posts its own things too (its layout).
-    postJSON = async (url, body) => { if (/^storage-/.test(body?.action || "")) posted.push(body); else return keepPost(url, body); return { json: async () => ({ ok: true }) }; };
+    postJSON = async (url, body) => { if (/^storage-/.test(body?.action || "")) posted.push(body); else return keepPost(url, body); return { ok: true }; };
     const n = (storageList || []).find(x => x.name === 'diskbox');
     const lay = () => { Object.assign(n, { own: true, smb: true, nfs: false, live: true, may_measure: true, mergerfs: true, snapraid: true,
       array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] },
-      shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] }); storageRev++; drawPanes(); };
+      shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] }); readMoved('storage'); drawPanes(); };
     const out = {};
     try {
       let row = null;
@@ -214,7 +197,9 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
     // The share's row and its Edit's places, at a desk and on a phone.
     const vp = page.viewportSize();
     for (const [w, name] of [[1440, 'desk'], [393, 'phone']]){
-      await page.setViewportSize({ width: w, height: 2400 }); await sleep(400);
+      await page.setViewportSize({ width: w, height: 2400 });
+      await page.waitForFunction(w => innerWidth === w, w, { timeout: 10000 });
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.evaluate(async () => {
         window.__own = window.__own || ownMachine;
         ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
@@ -223,11 +208,15 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
           array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                    moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }] },
           shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] });
-        storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
+        readMoved('storage'); drawPanes();
+        for (let i = 0; i < 100 && !document.querySelector('.storagetab [data-stshareedit="TV Shows"]'); i++) await new Promise(r => setTimeout(r, 50));
         const d = document.querySelector('.storagetab details[data-sect="storage:shares"]'); if (d) d.open = true;
         document.querySelector('.storagetab [data-stshareedit="TV Shows"]')?.click();
       });
-      await sleep(300);
+      // The section open and at rest, its Edit's form filled.
+      await page.waitForFunction(() => { const d = document.querySelector('.storagetab details[data-sect="storage:shares"]');
+        return d && d.open && d.getBoundingClientRect().height > 0 && !d.getAnimations({ subtree: true })
+          .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)); }, null, { timeout: 10000 }).catch(() => {});
       await page.locator('.storagetab details[data-sect="storage:shares"]').screenshot({ path: `${process.env.BB_SHOTS}/share-moves-${name}.png` });
     }
     await page.evaluate(() => { ownMachine = window.__own; });
@@ -237,7 +226,7 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(got.posted?.length === 2 && got.posted[0].action === 'storage-share' && got.posted[0].path === '/mnt/user/TV Shows'
      && JSON.stringify(got.posted[1]) === JSON.stringify({ action: 'storage-array', id: got.posted[1].id, array: 'moves', moves: [{ share: 'TV Shows', land: 'fast', from: 'fast', to: 'array' }] }),
      `Save sends the share, then its places (${JSON.stringify(got.posted)})`);
-}
+});
 await api('/api/v1/nodes', { action: 'retire', id: minted.id });
 
 await done(browser);

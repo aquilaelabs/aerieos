@@ -16,7 +16,6 @@
 // uniform.mjs; this file fills slots, one fold per section.
 "use strict";
 let rolesData = null;            // GET /api/roles, or null before the first load
-let rolesRev = 0;
 let rolesErr = "";
 let rolesWho = "";               // the account the People section is on
 let rolesPeopleDraft = null;     // {roles, project_roles} being edited
@@ -28,28 +27,18 @@ function openRolesTab(){
   openTab({kind: "roles", arg: "__roles", label: "Roles"});
 }
 
-async function loadRoles(){
-  try{
-    const r = await bootFetch("/api/roles");
-    const j = await r.json();
-    rolesErr = j.error || "";
-    rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j;
-  }catch(e){
-    rolesErr = String(e);
-    rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false};
-  }
-  rolesRev++;
-  drawPanes();
+function loadRoles(){
+  return readKept("roles", "/api/roles", {
+    err: said => { rolesErr = said; },
+    keep: () => { rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false}; },
+    land: j => { rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j; },
+  });
 }
 
 async function rolesAct(body, said){
-  try{
-    const r = await fetch("/api/roles", {method: "POST",
-      headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error){ notify(j.error || `failed (HTTP ${r.status})`, true); return false; }
-    notify(said);
-  }catch(e){ notify(String(e), true); return false; }
+  const j = await postJSON("/api/roles", body);
+  if (j.error){ notify(j.error, true); return false; }
+  notify(said);
   await loadRoles();
   return true;
 }
@@ -225,10 +214,12 @@ async function rolesAccessOpen(name, saved = () => {}){
     armModal(m);
   }
   rolesWho = ""; rolesPeopleDraft = null;
-  m.innerHTML = `<div class="box"><h3>${esc(name)}'s roles</h3><div id="raFields"></div>
-    ${dlgFoot(`<button type="button" id="raCancel">Cancel</button>`, `<button type="button" id="raSave" class="primary">Save</button>`)}</div>`;
-  const draw = () => { const box = m.querySelector("#raFields");
-    box.innerHTML = rolesAccessFields(name); wireRolesAccess(box, draw); };
+  drawHTML(m, `<div class="box"><h3>${esc(name)}'s roles</h3><div id="raFields"></div>
+    ${dlgFoot(`<button type="button" id="raCancel">Cancel</button>`, `<button type="button" id="raSave" class="primary">Save</button>`)}</div>`);
+  // In the dialog a line said alone is a field band, as every dialog's
+  // lines are; the Users page draws it in its detail column as it is.
+  const draw = () => { const box = m.querySelector("#raFields"), h = rolesAccessFields(name);
+    drawHTML(box, /^\s*<div class="field/.test(h) ? h : `<div class="field">${h}</div>`); wireRolesAccess(box, draw); };
   draw();
   m.hidden = false;
   m.onclick = e => { if (e.target === m) m.hidden = true; };
@@ -332,7 +323,9 @@ function rolesRoleBody(){
     const exp = insts.length ? `<button type="button" class="rexp" data-rexp="${esc(key)}" aria-expanded="${open ? "true" : "false"}"
       aria-label="${esc(label)} on each ${what}">${rSome && !rAll ? `${lv.filter(Boolean).length} of ${insts.length} ${what}s` : `each ${what}`}</button>` : "";
     const head = tblLine(ROLE_AREA_COLS, [
-      `<span class="rareahead">${esc(label)}${exp}</span><div class="sub dim">Read: ${esc(rd)}. Write: ${esc(wr)}.</div>`,
+      // What Read and Write give behind the area's help mark (Perch: a
+      // sentence under every area made the table twice its height).
+      `<span class="rareahead">${esc(label)}${helpIcon(`Read: ${rd}. Write: ${wr}.`)}${exp}</span>`,
       box("data-rread", key, `Read ${label}`, rAll, rSome && !rAll, off),
       box("data-rwrite", key, `Write ${label}`, wAll, wSome && !wAll, off || !rSome)],
       "div", `rarea${off && !ro ? " off" : ""}`, `data-rarea="${esc(key)}"`);
@@ -382,11 +375,11 @@ function rolesNewOpen(){
     document.body.appendChild(m);
     armModal(m);
   }
-  m.innerHTML = `<div class="box"><h3>New role</h3>
+  drawHTML(m, `<div class="box"><h3>New role</h3>
     <div class="field">${lbl("rolesNewName", "Its name")}<input id="rolesNewName" autocomplete="off"></div>
     <div class="field">${lbl("rolesNewScope", "Kind", "On a space: given per space, and holds there. Everywhere: holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
       <select id="rolesNewScope"><option value="projects">On a space</option><option value="global">Everywhere</option></select></div>
-    ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`;
+    ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`);
   // Make it wakes once a name is typed that no role has (the operator, 18
   // Oct).
   const nm = m.querySelector("#rolesNewName");
@@ -425,31 +418,31 @@ function renderRolesInto(i){
     // are the page's own; who holds what is on its way.
     const split = detail => `<div class="rsplit"><div class="rlist">${skRows(4)}</div><div class="rdetail">${detail}</div></div>`;
     const field = skField;
-    d.list.innerHTML = skTpl(pageHead({facts: [["Roles", GHOST], ["For spaces", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas")));
+    drawHTML(d.list, skTpl(pageHead({facts: [["Roles", GHOST], ["For spaces", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas"))));
     loadRoles();
     return;
   }
   if (refused){
-    d.list.innerHTML = `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>`;
+    drawHTML(d.list, `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>`);
     return;
   }
   const ro = rolesRoleBody();
   // The page's head (the operator, 29 Oct): how many roles, and how many
   // of them are a project's.
   const all = Object.values(rolesData.roles || {});
-  d.list.innerHTML = `
+  patch(d.list, `
     ${rolesErr ? `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>` : ""}
     ${pageHead({facts: [["Roles", String(all.length)], ["For spaces", String(all.filter(r => r.scope === "projects").length)]], actions: newRole})}
     <div class="rsplit${rolesPhoneOpen ? " open" : ""}">
       <div class="rlist">${ro.list}</div>
       <div class="rdetail">${ro.detail}</div>
-    </div>`;
+    </div>`);
   wireRoles(d.el);
   if (rolesMoveNext){ splitMove(d.list.querySelector(".rsplit"), rolesMoveNext); rolesMoveNext = ""; }
 }
 
 // Repaint the tab, keeping the drafts: the sections read them.
-function rolesRedraw(){ rolesRev++; drawPanes(); }
+function rolesRedraw(){ readMoved("roles"); drawPanes(); }
 
 function wireRoles(el){
   // A role picked from its list (on a phone, the detail comes over the
@@ -465,7 +458,7 @@ function wireRoles(el){
   });
   // The picked role's head is the way back on a phone, as a page of
   // settings' section head is (splitSects).
-  el.querySelectorAll("[data-rback]").forEach(b => b.onclick = () => { if (!matchMedia("(max-width: 900px)").matches) return; rolesPhoneOpen = false; rolesMoveNext = "back"; rolesRedraw(); });
+  el.querySelectorAll("[data-rback]").forEach(b => b.onclick = () => { if (!isPhone()) return; rolesPhoneOpen = false; rolesMoveNext = "back"; rolesRedraw(); });
 
   const nw = el.querySelector("#rolesNewOpen");
   if (nw) nw.onclick = () => rolesNewOpen();

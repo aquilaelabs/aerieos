@@ -3,18 +3,20 @@
 command in front of a person, Allow runs it on the node, Deny says no.
 
 The first argument is the verb (status or run); for run the rest are the
-command. BB_PHONE_AUTH is the auth header, BB_PHONE_WHY the sentence an
-administrator reads, BB_PHONE_PROJECT the project asking.
+command. BB_PHONE_WHY is the sentence an administrator reads,
+BB_PHONE_PROJECT the project asking. The auth header is bbapi's own
+(BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
 
 import bbapi
 import waits
+from say import need
 
 
 def status():
-    d = bbapi.call("/api/phone", auth=os.environ["BB_PHONE_AUTH"])
+    d = bbapi.call("/api/phone")
     if d.get("error"):
         sys.exit(f"[builderbot] ERROR: could not reach the dashboard at {bbapi.url()}: {d['error']}")
     asks = [a for a in (d.get("asks") or []) if a.get("kind") == "root"]
@@ -26,7 +28,7 @@ def status():
 
 
 def run():
-    post = lambda body: bbapi.call("/api/phone", body, auth=os.environ["BB_PHONE_AUTH"])  # noqa: E731
+    post = lambda body: bbapi.call("/api/phone", body)  # noqa: E731
 
     # A file under /tmp: on a sandbox node a session's /tmp is its own view
     # (bb-session), and the root command runs outside it, so the file is not
@@ -41,12 +43,11 @@ def run():
               "project": os.environ.get("BB_PHONE_PROJECT", ""),
               # A node the project hosts containers on, when named (--node).
               **({"node": os.environ["BB_PHONE_NODE"]} if os.environ.get("BB_PHONE_NODE") else {})})
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr); sys.exit(1)
+    need(r)
     rid = r["id"]
     print(f"[builderbot] asked {r.get('to') or 'the administrators'} (#{rid}) for root on {r.get('node') or 'the node'}, "
           "waiting up to 15 minutes for Approve on the dashboard's Nodes page or bell", file=sys.stderr)
-    o = waits.outcome(os.environ["BB_PHONE_AUTH"], rid, "denied on the dashboard; nothing ran")
+    o = waits.outcome("", rid, "denied on the dashboard; nothing ran")
     sys.stdout.write(o.get("out") or "")
     sys.exit(o.get("code") or 0)
 

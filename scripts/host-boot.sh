@@ -67,6 +67,7 @@ main() {
     record_image
     # Before the hooks, which start the dashboard (B388).
     install_key_file
+    load_deploy_keys
     run_hooks
     log "hooks done (+${SECONDS}s from start)"
     boot_ready

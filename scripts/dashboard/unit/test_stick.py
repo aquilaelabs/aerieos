@@ -51,6 +51,22 @@ class Stick(unittest.TestCase):
         self.linux = mock.patch.object(self.m.platform, "system", return_value="Linux")
         self.linux.start(); self.addCleanup(self.linux.stop)
 
+    def test_a_stick_too_small_for_the_image_is_refused_before_it_is_erased(self):
+        # B958: an 8 GB stick took the write part way and read as failing.
+        import lzma
+        head = bytearray(1 << 20)
+        hdr = b"EFI PART" + bytes(24) + (22000000 - 1).to_bytes(8, "little")
+        head[512:512 + len(hdr)] = hdr
+        img = os.path.join(self.d, "x.stick.raw.xz")
+        with lzma.open(img, "wb") as f:
+            f.write(bytes(head))
+        self.assertEqual(self.m.image_needs(img), 22000000 * 512)
+        self.assertIn("needs 11.3 GB", self.m.fits_why(img, 8 * 10 ** 9))
+        self.assertEqual(self.m.fits_why(img, 16 * 10 ** 9), "")
+        with lzma.open(img, "wb") as f:
+            f.write(bytes(4096))
+        self.assertEqual(self.m.fits_why(img, 1), "", "an image that names no size is not refused for it")
+
     def test_the_disks_are_listed_and_only_a_removable_one_may_be_written(self):
         rows = self.m.disks()
         self.assertEqual([(r["id"], r["removable"], r["system"]) for r in rows],
@@ -108,6 +124,7 @@ class Stick(unittest.TestCase):
         a = argparse.Namespace(disk="/dev/sdb", image=img, release=None, channel="normal", set=None, config=None, mirror=None, yes=True, no_verify=True)
         with mock.patch.object(self.m, "write_image", side_effect=OSError(5, "Input/output error")), \
                 mock.patch.object(self.m.shutil, "which", return_value=None), mock.patch.object(self.m, "say"), \
+                mock.patch.object(self.m, "signed"), \
                 mock.patch.object(self.m, "die", side_effect=SystemExit) as die, self.assertRaises(SystemExit):
             self.m.cmd_write(a)
         self.assertIn("the write stopped (Input/output error): the stick was unplugged or is failing", die.call_args[0][0])
@@ -311,7 +328,9 @@ class Stick(unittest.TestCase):
             got.append(url)
             raise SystemExit("fetched")
         with mock.patch.object(self.m.urllib.request, "urlopen", side_effect=lambda *a, **k: io.BytesIO(json.dumps(rows).encode())), \
-                mock.patch.multiple(self.m, die=die, say=said.append, fetch=fetch):
+                mock.patch.multiple(self.m, die=die, say=said.append, fetch=fetch, signed_list=lambda tag, name: (None, "")):
+            # (which image is picked is the subject: the release's signed
+            # list, read before it, is test_release_signing.py's)
             with self.assertRaises(SystemExit) as e:
                 self.m.release_image("latest", "normal")
             self.assertIn("pick the dev channel", str(e.exception))
@@ -327,7 +346,7 @@ class Stick(unittest.TestCase):
 
         def fetch(url, dest, say_progress=True):
             raise self.m.urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-        with mock.patch.multiple(self.m, die=die, say=lambda s: None, fetch=fetch):
+        with mock.patch.multiple(self.m, die=die, say=lambda s: None, fetch=fetch, signed_list=lambda tag, name: (None, "")):
             with self.assertRaises(SystemExit) as e:
                 self.m.release_image("v0.8.2")
         self.assertIn("the v0.8.2 release carries no stick image", str(e.exception))

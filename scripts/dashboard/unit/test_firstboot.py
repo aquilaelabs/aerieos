@@ -63,7 +63,7 @@ class Take(unittest.TestCase):
             f.write_bytes(body + b" " * (65535 - len(body)) + b"\n")
             run = Path(d, "run")
             r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
-                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run),
+                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_OS_WORK=str(run),
                                         BB_CONTROLLER_ENV=str(Path(d, "none")), PATH=d))
             self.assertEqual(r.returncode, 0, r.stderr)
             got = f.read_bytes()
@@ -75,7 +75,7 @@ class Take(unittest.TestCase):
             self.assertEqual(oct((run / "firstboot" / "firstboot.json").stat().st_mode & 0o777), "0o600")
             # A blank file is a plain stick: nothing handed over.
             shutil.rmtree(run)
-            subprocess.run([sys.executable, TAKE], env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), PATH=d), check=False)
+            subprocess.run([sys.executable, TAKE], env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_OS_WORK=str(run), PATH=d), check=False)
             self.assertFalse(run.exists())
 
 
@@ -92,7 +92,7 @@ class Take(unittest.TestCase):
             khost = Path(d, "khost"); khost.write_text("localhost")
             run = Path(d, "run")
             r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
-                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")),
+                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_OS_WORK=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")),
                                         BB_ETC=str(etc), BB_ZONEINFO=str(Path(d, "zoneinfo")), BB_KERNEL_HOSTNAME=str(khost), PATH=d))
             self.assertEqual(r.returncode, 0, r.stderr)
             handed = json.loads((run / "firstboot" / "firstboot.json").read_text())
@@ -131,7 +131,7 @@ class Take(unittest.TestCase):
             feats = Path(d, "lib", "features")
             run = Path(d, "run")
             r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
-                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")),
+                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_OS_WORK=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")),
                                         BB_SLOT=str(slot), BB_OS_FEATURES=str(feats)))
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(Path(d, "slot.said").read_text(), "args isolcpus=2-5 pcie_acs_override=downstream,multifunction\n")
@@ -155,7 +155,7 @@ class Take(unittest.TestCase):
                 (esp / "aerieos" / "firstboot.json").write_bytes(body + b" " * (65535 - len(body)) + b"\n")
                 run = Path(d, "run")
                 r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
-                                   env=dict(os.environ, BB_ESP=str(esp), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")), PATH=d))
+                                   env=dict(os.environ, BB_ESP=str(esp), BB_OS_RUN=str(run), BB_OS_WORK=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")), PATH=d))
                 self.assertEqual(r.returncode, 0, r.stderr)
                 env = (esp / "aerieos.env").read_bytes()
                 self.assertEqual(len(env), 4096, "its size kept")
@@ -186,7 +186,7 @@ class Take(unittest.TestCase):
             head = b"BB-MIRROR-1\n" + f"{len(data):012d}\n".encode()
             f.write_bytes(head + data + b" " * 100 + b"\n")
             run = Path(d, "run")
-            env = dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")), PATH=d)
+            env = dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_OS_WORK=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")), PATH=d)
             r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False, env=env)
             self.assertEqual(r.returncode, 0, r.stderr)
             got = run / "firstboot" / "catalog-mirror.tar.gz"
@@ -268,6 +268,17 @@ class Apply(unittest.TestCase):
         self.assertEqual(users.load()["users"], {})
         self.assertIn("accounts", [x["what"] for x in r["waiting"]])
         self.assertIsNone(firstboot.apply(self.handed), "once")
+        # B946: its people are kept for this account alone until the owner
+        # is made, then made with their SMB passwords, and the file goes.
+        kept = self.tmp / "firstboot-people.json"
+        self.assertEqual(oct(kept.stat().st_mode & 0o777), "0o600")
+        users.claim("boss", "a long password")
+        firstboot.people_after_claim()
+        d = users.load()["users"]
+        self.assertEqual((d["ann"]["role"], d["ann"]["smb_nt"]), ("admin", NT))
+        self.assertFalse(kept.exists())
+        self.assertIn("accounts", [x["what"] for x in firstboot.view()["done"]])
+        self.assertNotIn("accounts", [x["what"] for x in firstboot.view()["waiting"]])
 
 
 if __name__ == "__main__":

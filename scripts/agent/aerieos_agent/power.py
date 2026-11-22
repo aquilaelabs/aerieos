@@ -10,9 +10,9 @@ its updates are whole images (osimage.py), and nothing here runs there.
 import os
 import re
 import shutil
-import subprocess
 import time
 
+from .base import run_out
 from .osimage import os_release
 from .stores import save_state
 
@@ -23,12 +23,8 @@ STATUS_WORDS = {"OL": "on line", "OB": "on battery", "LB": "low battery", "CHRG"
                 "FSD": "shutting down", "OFF": "off", "BYPASS": "on bypass", "RB": "replace battery"}
 
 
-def _out(argv, timeout=20, env=None):
-    try:
-        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
-        return p.stdout
-    except (OSError, subprocess.SubprocessError):
-        return ""
+# Under this name the unit tests stand in for it.
+_out = run_out
 
 
 def ups_now():
@@ -39,7 +35,7 @@ def ups_now():
     if not upsc:
         return {}
     out = {"model": "", "status": "", "words": "", "charge": None, "runtime_s": None, "load": None, "answers": False}
-    for line in _out([upsc, f"{UPS_NAME}@localhost"]).splitlines():
+    for line in _out([upsc, f"{UPS_NAME}@localhost"], timeout=20).splitlines():
         k, _, v = line.partition(":")
         k, v = k.strip(), v.strip()
         if k == "device.model" or (k == "ups.model" and not out["model"]):
@@ -79,7 +75,13 @@ def host_updates_now(state):
     security = sum(1 for ln in sim.splitlines() if ln.startswith("Inst ") and re.search(r"[Ss]ecurity", ln))
     now = {"pending": pending, "security": security, "checked": int(time.time())}
     state["host_updates"] = now
-    save_state(state)
+    # Kept on the record of a node that is one. The census is taken while a
+    # node enrolls too, with a record still being put together and no id
+    # yet: saved then, it replaced the record the machine had with half of
+    # one before the controller had answered, and dropped the release key
+    # the enrollment was pinning (met on the dev node, 10 Nov).
+    if state.get("node_id"):
+        save_state(state)
     return {**now, "reboot": os.path.exists(REBOOT_FLAG)}
 
 
@@ -112,7 +114,7 @@ class PowerMixin:
             self.hello_again("the system's packages updated; restarting")
             self._sh(job, ["shutdown", "-r", "+1", "AerieOS: restarting after the system's updates"], timeout=30)
         elif reboot:
-            say("done; a restart is needed to run the new kernel or libraries: This machine's Reboot does it\n")
+            say("done; a restart is needed to run the new kernel or libraries: Reboot on the Nodes page does it\n")
             self.hello_again("the system's packages updated; a restart is needed")
         else:
             say("done; nothing needs a restart\n")

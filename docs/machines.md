@@ -3,7 +3,7 @@
 The Machines group on the rail: **Nodes**, every machine work runs on,
 **Storage**, what a node's disks hold, **Installed**, what the Library
 put on a node, and **Files**, what is on a node's disks. Beside it, the **Controller** group holds what the
-controller owns: **This machine** on a bare-metal install, **Settings**
+controller owns: **This controller** on a bare-metal install, **Settings**
 (Controller settings), **Network**, **Keys** and **Audit**. **Jobs**, the
 queue of work placed on the nodes, and **Schedules** are a group of their
 own on the rail. This doc covers enrolling and
@@ -21,11 +21,14 @@ nothing enrolled the page says so and offers the one thing there is to do.
 (It does keep a node record of its own, which is how a share it mounts is
 recognized as the same store a node mounts; that is plumbing, not a node on
 the page.) A controller installed bare metal can be a node of itself
-([install.md](install.md#bare-metal)): its machine is then
-[This machine](#this-machine) in the Controller group rather than a node
-here, offered in a space's node pickers as such, its session network
-always on, and the Doctor says whether the wall between its sessions and
-the controller holds. The
+([install.md](install.md#bare-metal)): its machine is then a node here
+like any other, tagged **this machine**, and in the picker of every page
+about a node but the nginx and Scanners pages', offered in a space's node
+pickers as such, its session network always on, and the Doctor says whether the wall
+between its sessions and the controller holds. Its row carries, besides a
+node's sections, where it keeps things (on a stick, **The stick** and the
+system pool), its **Console** password, what a stick's prepared configuration
+did, and the disks and apps taken over from an old system. The
 page shows one node, picked in the Machines header over it: one band for
 Nodes, Storage and Installed, with the node pulldown where a space's name
 is, when it was seen, where it dials in from (the address of its last
@@ -73,10 +76,10 @@ in rings (the operator, 11 Oct), with a box saying what un-enrolling takes
 off a machine and what it leaves, the same one Reset AerieOS shows. Always: the runners deregistered on their
 forges, then the agent and its unit, the sessions' firewall rules and their
 own networks (nothing of the isolation outlives the agent), the `aerie` and
-`builder` accounts with their homes, `/etc/builderbot` with the tunnel to
+`builder` accounts with their homes, `/etc/aerieos` with the tunnel to
 the controller, and bb-sandbox itself. Three boxes to tick: the stores on
 the machine's own disk (toolchains, caches, artifacts, dev instance data, the
-synced space copies, `/var/lib/builderbot`); what was configured from the
+synced space copies, `/var/lib/aerieos`); what was configured from the
 dashboard after enrolling (the mounts and their fstab lines, the runners'
 units, the GPU display); and, ticked for a hosting node, what it was given
 as a host (cloudflared with its token, the port 22 rule,
@@ -156,12 +159,12 @@ exists. `docs/sandbox-vm.md` is the long version.
 it makes a pending node and mints a one-time token (`bbe_…`, good for a day),
 shown once inside the command to run on the machine,
 `sudo bash provision-linux.sh --controller URL --token bbe_…`, or the two-line
-version that fetches `builderbot-agent` by hand. The provisioner downloads
+version that fetches `aerieos-agent` by hand. The provisioner downloads
 the agent from the controller itself (checking it against the digest the
 controller sends), enrolls, and leaves it running under systemd. From then
 on the node **dials out**: no port is opened on it, the controller holds no
 key that logs in anywhere, and the credential the node keeps
-(`/etc/builderbot/node.json`, 0600) opens its own record and nothing else.
+(`/etc/aerieos/node.json`, 0600) opens its own record and nothing else.
 **Revoke**, under Advanced, ends it; the agent says so in its journal and the node goes
 quiet, keeping its history. The one-day life belongs to the *enrollment*
 token only: the credential the node keeps afterwards does not expire, so an
@@ -362,7 +365,7 @@ which both the page and the agent hold to. Add a disk formats it and
 takes the next slot; Replace on a slot formats the new disk and rebuilds
 that slot from parity (a data disk) or the parity on it (a parity disk),
 hours during which the array is readable, or unprotected, as the job says.
-The record is AerieOS's own (`/etc/builderbot/array.json`), from which
+The record is AerieOS's own (`/etc/aerieos/array.json`), from which
 `snapraid.conf` and the array's fstab lines (by filesystem UUID, `nofail`)
 are written whole. Destroying the array unmounts it and forgets it: every
 data disk keeps its files, readable on any Linux. There is no cache tier and no mover (see Pools by purpose below), except on an array taken over from another system, which keeps its pools in front of its data disks and its mover ([image.md](image.md)).
@@ -419,11 +422,15 @@ person named is read/write or read-only. A share lists people and has no passwor
 of its own: a person reaches it with
 the name and password they sign in to the dashboard with, or a separate
 password if they set one on Profile under Your shares, which also lists the
-shares named to them and the address to map each by. On a machine that serves
-shares the password is also kept as the NT hash Samba needs, which is weaker
-than the sign-in's own hash; it is handed to the own machine's agent in its
-hello and imported into Samba's database there, never written in a job or
-shown again. A missing folder is made for the share, on a mounted disk only,
+shares named to them and the address to map each by. For a person a share
+names, the password is also kept as the NT hash Samba needs, which is far
+weaker than the sign-in's own hash: it is made as that person next signs in
+or changes their password, kept for nobody a share does not name, and taken
+away when the last share stops naming them, so somebody just named on a
+share signs in to the dashboard once more before it opens for them, and the
+share's row says who it is waiting for. It is handed to the own machine's
+agent in its hello and imported into Samba's database there, never written
+in a job or shown again. A missing folder is made for the share, on a mounted disk only,
 and everyone named on it writes as one account, so they see each other's files. A
 share ticked as a Mac's Time Machine target is offered to the Finder as
 one (`fruit:time machine`), found by mDNS as Samba registers it.
@@ -502,8 +509,12 @@ store holds, with the one press that installs them.
 **Files**, under Machines, is the files on one node's disks, the node
 picked in the Machines header; on a machine AerieOS is installed on, its
 own machine is one of them. It is an administrator's alone, and every
-change is written to the audit log. What it reaches is the node's
-**roots**, a chip each over the list: the spaces folder a stick names,
+change is written to the audit log. It is laid out as a file explorer is:
+the node's **places** down the left, and beside them one bar (where you
+are, a filter, **New folder** and **Upload**) over the folder's listing. On
+a phone the places are a line over the listing. What it reaches is the
+node's roots, each a place by its name and its kind in words: the spaces
+folder a stick names,
 its pools, its array, the disks it adopted from another system, its
 shares, and the disks and network shares it mounts (its Storage
 section's mounts and its other disks). The system's own folders (`/`, `/etc`, `/usr`, `/var` and the
@@ -512,9 +523,10 @@ with `..` or a link pointing elsewhere is refused by the node itself.
 Aerie Workshop's own container has no Files page of its own, since its
 files are the image's; its nodes have theirs.
 
-A folder is a table, folders first: its name, size, when it changed and
-whose it is. A folder's name opens it, the line of names over the list
-goes back up, and a file's name shows it over the page: a picture, a
+A folder is a list, folders first: its name, its size and when it changed
+(whose it is shows on its row's hint and in its preview). A folder's name
+opens it, the path in the bar goes back up, and a file's name shows it
+over the page: a picture, a
 video, a sound or a PDF as itself, anything else as its first 256 KB of
 text, with **Download** for the whole. A page or a script on a disk is
 shown as text and never runs. **Upload** sends the files you pick, or
@@ -522,8 +534,10 @@ drop on the page, to the folder on show, with its progress, asking first
 before it replaces one of the same name. **New folder** makes one. Tick
 rows for **Rename**, **Move** (to a folder of the same root),
 **Download** and **Delete**. A delete is never final: what is deleted goes
-to the root's `.aerieos-trash` folder, with a note of where it was, and
-stays there until somebody empties it. A file or folder made from here
+to its place's trash, with a note of where it was, and stays there until
+somebody empties it. **Trash**, the last of the places, opens it: tick what
+you want back and **Put back** moves it to the folder you name. A file or
+folder made from here
 takes the owner of the folder it is made in, so a share's people can
 still change what an administrator put there.
 
@@ -532,29 +546,31 @@ only the controller can reach, each one signed by the controller for
 that request and that minute. A node whose agent is older says so, and
 updating it from the Nodes page brings the Files page to it.
 
-## This machine
+## This controller
 
 On a controller installed bare metal ([install.md](install.md#bare-metal)),
-**This machine**, first in the rail's Controller group (`#/controller/machine`),
-is the computer the controller runs on: its head says what it is (its name,
-system, cores and memory, the release this install runs and how long it
-has been up, its agent and whether the wall between its sessions and the
-controller is in force), then the **Updates** section (the release running
-against the newest, **Check for updates**, **Update**: [Controller settings](#controller-settings)),
-then the machine as a node, drawn exactly as a node's page draws any node:
-its health, the spaces on it, its sessions, GPU, USB, features,
-storage, network and the advanced verbs, reboot and power off
-among them. The machine is not a row on the Nodes page and not in its
-picker; a space still picks it as its node, shown as **This machine** in
-every space's node picker, so its sessions, builds and containers run
-there as on any node. The container edition has no machine of its own and
-does not draw the page (R90 step 8, R56 step 8).
+**This controller**, first in the rail's Controller group (`#/controller/machine`),
+is what belongs to the controller and not to the node under it: its head says
+what it is (its system, the release this install runs and how long it has been
+up, and whether the wall between its sessions and the controller is in force,
+with a link to the machine's row on the Nodes page), then the **Updates**
+section (the release running against the newest, **Check for updates**,
+**Update**: [Controller settings](#controller-settings)) and the **Older
+versions** kept to boot. Everything about the computer as a node, its health,
+the spaces on it, its sessions, GPU, USB, features, storage, network and the
+advanced verbs, reboot and shut down among them, is its row on the
+[Nodes page](#the-nodes-page). A space picks it as its node, shown as **This
+machine** in every space's node picker, so its sessions and builds run there
+as on any node. It runs containers too, through its root agent, since its
+job and session accounts stay out of the docker group: a person's press
+starts them and a session's build waits for a person (Auto is Ask there), and
+it draws no Shell in a container. The container edition has no machine of its own and does not draw
+the page (R90 step 8, R56 step 8).
 
 **A held start** (R56 step 9). Not by default: after a shutdown that was
 not clean (the service writes a marker on a clean stop and the next start
 misses it), when **hold the next start** was ticked before a restart (the
-checkbox beside Restart and Shut down, under Controller settings' Power and
-in this machine's Reboot or shut down row; that one boot), or on the first
+checkbox in the machine's Reboot or shut down row on the Nodes page; that one boot), or on the first
 start of a stick's prepared configuration that asks for it, so its disks are
 seen before anything mounts, the install comes up with the dashboard,
 its agent and the network and nothing else: no agent session starts (a
@@ -612,7 +628,7 @@ https with the install's own certificate or a Let's Encrypt one for the
 hostname; the certificate's fingerprint a phone or the companion pins, and
 its download) and **Reach from outside** (the home tunnel the controller
 runs itself, with its setup steps). On a bare-metal install the machine's
-own ports, addresses and bridge are This machine's Network section.
+own ports, addresses and bridge are the Network section of its row on the Nodes page.
 
 ## Controller settings
 
@@ -638,12 +654,9 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   carries a **Channel** pulldown, Releases or Dev builds
   ([versions.md](versions.md#two-channels)); everywhere else the releases
   are the only channel and no pulldown is drawn.
-- **Power** (a controller installed bare metal, the OS and the USB edition
-  among them, R175): Restart and Shut down for the machine the controller
-  runs on, through its own node's reboot and power-off verbs with This
-  machine's words and ask, dead with why while its agent is away or a
-  system job runs there. The container edition has neither this nor
-  Updates: its image and its container are its Docker manager's.
+- The container edition has no **Updates**: its image and its container
+  are its Docker manager's. Restarting or shutting down a machine is its row
+  on the Nodes page, under Advanced.
 - **Backup** and **Backup copies** (R161): the backup password, under which
   a sealed copy of the configuration is written after every change onto the
   machine's pools and under the state (the five newest kept), Back up now,
@@ -654,9 +667,10 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
 - **Update checks** (R176): how often AerieOS asks by itself for what is
   newer, each check daily, weekly (the default), monthly or off, with when it
   last ran and **Check for updates** beside it: a newer AerieOS (a bare-metal
-  install's), the container images, nginx, the scanners and the Library (the
+  install's), the container images and the Library (the
   toolchains' and coding agents' newest versions and the vetted catalog's
-  index). Off leaves only Check for updates. A node's own check of what it holds is
+  index). nginx, the model router and the scanners are not among them:
+  each runs the images this AerieOS names by digest. Off leaves only Check for updates. A node's own check of what it holds is
   its **Version check** on its row's Advanced section, weekly unless set.
 - **Idle sessions**: the idle rule, which ends any agent's session after N minutes
   with nothing typed or written, here and on every node, where the node
@@ -730,10 +744,40 @@ entrypoint and again in the dashboard:
   images in transit, the relay and Git view repositories, the apps fetched
   from a release, earlier copies and a Reset's moved-aside state) and keeps
   every record, the database, the signing keys, the git credentials and the
-  wikis. A migration that fails is said in the log and runs again at the
-  next start; the controller starts either way.
+  wikis. The install key, where an install with no secrets folder keeps it
+  under `/config`, is left out too: it opens every sealed secret the copy
+  holds, an update never changes it, and a copy put back leaves it where it
+  is.
+- **A migration that fails**: the update did not land, and the controller
+  does not start on state half changed. `/config` is put back from the copy
+  taken just before, every migration that had run with it; what the failed
+  start left is moved to `/config/backups/rolled-back-TIME`, never deleted;
+  and `/config/update-did-not-land.txt` says which build, which migration
+  and why. The container stops with that sentence, and the same build
+  started again stops again without trying. Start the release that
+  `/config` ran before, which finds it as it left it. To try this build
+  again once the cause is mended (a full disk, a file it could not read),
+  remove the note and start it. A later build is not held by the note, and
+  one that migrates clean removes it.
+- **A state file that cannot be read**: every write of a state file is
+  synced to the disk before its name points at it, so a power cut does not
+  leave one cut short. One that is there and is not JSON all the same is
+  named in the log at start and a copy of it kept beside it
+  (`NAME.unreadable-TIME`), since its loader reads it as empty and the next
+  save would write that over it. The accounts file is held harder: while
+  `users.json` is there and cannot be read, nobody signs in, no first
+  account is offered, no move or saved configuration lands, and nothing is
+  written over it; mend it, or put back the copy under `/config/backups`,
+  and restart.
+- **Two servers on one `/config`**: the server holds a lock on
+  `/config/.server.lock` for its whole life, taken before the copy and the
+  migrations. A second one started on the same folder waits half a minute
+  for the first to go, then stops with the reason. It leaves its pid beside
+  the lock (`/config/.server.pid`), which is how the supervisor knows the
+  dashboard runs and which process to stop.
 - **An older state than this build migrates from**: the container stops,
-  saying which release to start on it first.
+  saying to install fresh, with a new `/config`. Nothing updates from a
+  release that old.
 - **A newer state** (a rollback past an upgrade): the container stops, saying
   that downgrades are not supported. Start the newer build again, or stop
   the container and put the copy back: the contents of
@@ -754,7 +798,7 @@ boot, so a generation number means the same boot in every one of them, and
 | Startup, the runner supervisor, and every later warning | `config/logs/builderbot.log` |
 | The dashboard server, in full | `config/logs/dashboard.log` |
 | Every compose call the Docker manager made | `config/logs/docker.log` |
-| Runner diagnostics | `_diag/` under the runner's directory on its node (`/var/lib/builderbot/runner/<slot>/_work/`) |
+| Runner diagnostics | `_diag/` under the runner's directory on its node (`/var/lib/aerieos/runner/<slot>/_work/`) |
 | CI job output | GitHub → Actions → the run |
 | Emulator | `home/.android/emulator.log` |
 

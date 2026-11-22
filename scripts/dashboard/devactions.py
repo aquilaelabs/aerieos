@@ -36,6 +36,7 @@ if _here not in sys.path:
     sys.path.insert(0, _here)
 import devapp  # noqa: E402
 import relocate  # noqa: E402
+import statefile  # noqa: E402
 
 
 def configure(*, runner=None):
@@ -76,17 +77,16 @@ def acting_as(principal):
 
 # One action per INSTANCE at a time. Two clicks on one row are two compose
 # calls on one project; two rows are two jobs, and the queue orders those.
-BUSY = {"error": "something is already running on this instance: one at a time"}
 
 
 def _active_job(project, instance):
-    """The compose job queued or running for this instance, if any."""
+    """The compose job this instance is on, if any: the one at work, else the
+    oldest of those queued behind each other, which goes first."""
     if devapp.queue is None:
         return None
-    for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50):
-        if (j.get("spec") or {}).get("instance", devapp.MAIN) == instance:
-            return j
-    return None
+    mine = [j for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50)
+            if (j.get("spec") or {}).get("instance", devapp.MAIN) == instance]
+    return next((j for j in mine if j.get("state") in ("assigned", "running")), mine[-1] if mine else None)
 
 
 def sync_work_tree(project, instance):
@@ -183,10 +183,7 @@ def set_compose(project, instance, text):
         return {"ok": True, "unchanged": True}
 
     def put(body):
-        tmp = cf.with_name(f".{cf.name}.bbedit")
-        tmp.write_text(body, encoding="utf-8")
-        os.chmod(tmp, cf.stat().st_mode & 0o7777)
-        os.replace(tmp, cf)
+        statefile.write_text(cf, body, mode=cf.stat().st_mode & 0o7777)
     try:
         put(text)
     except OSError as e:
@@ -298,7 +295,10 @@ def _plan(project, instance, action, extra=None):
         rebuild = rebuild[:-1] + up
     if at is not None and not ship:
         ref = str(devapp._read_rec(project, instance).get("ref") or "").strip()
-        checkout = {"name": "checking out", "timeout": 600, "env": {}, "argv": [
+        # as_job: no docker in it, so on the controller's own machine it stays
+        # the job account's rather than the root agent's (the tree is that
+        # account's, and git as root refuses a tree another account owns).
+        checkout = {"name": "checking out", "timeout": 600, "env": {}, "as_job": True, "argv": [
             # A worktree there already is the controller's own, on a disk this
             # node shares, put on the ref before the plan was sent: left alone.
             # ...and a folder there that is not a build tree (no .bbignore of
@@ -470,10 +470,8 @@ def _ship_submit(project, instance, target):
                         + ". Use a named volume, or the instance's data directory"))
                     return
                 if devapp.queue.job_release(r["job"], _ship_build_spec(project, instance, r["job"])):
-                    with devapp._lock:
-                        d = devapp._load()
-                        devapp._rec(d, project, instance)["building_since"] = int(time.time())
-                        devapp.write_json(devapp.FILE, d)
+                    with devapp.edit_rec(project, instance, create=True) as rec:
+                        rec["building_since"] = int(time.time())
         except Exception as e:                                       # noqa: BLE001
             print(f"[devapp] preparing the shipped build of {project}/{instance}: {type(e).__name__}: {e}",
                   flush=True)
@@ -705,25 +703,17 @@ def _compose_done(job, state):
     # Up to the operator. The row below would clear the flag, so this returns.
     if sp.get("gate"):
         devapp._gate_env(project, instance)
-        with devapp._lock:
-            d = devapp._load()
-            row = _kept(d, project, instance)
-            if row is not None:
-                row["await_env"] = True
-                devapp.write_json(devapp.FILE, d)
+        devapp.set_field(project, instance, "await_env", True)
         _clear_marker(project, instance)
         devapp._bump()
         return
     if action in ("up", "rebuild"):
-        with devapp._lock:
-            d = devapp._load()
-            # A record Remove forgot meanwhile is not made again (B633).
-            row = _kept(d, project, instance)
+        # A record Remove forgot meanwhile is not made again (B633).
+        with devapp.edit_rec(project, instance) as row:
             if row is not None:
                 row.pop("await_env", None)
                 if not row.get("rev") or row.get("daemon") != devapp.daemon_id():
                     _stamp(row, project, instance)
-                devapp.write_json(devapp.FILE, d)
     if action == "remove":
         _remove_records(project, instance)
     _clear_marker(project, instance)
@@ -745,28 +735,14 @@ def _stamp(row, project, instance):
                daemon=devapp.daemon_id(), daemon_uid=devapp._uid())
 
 
-def _kept(d, project, instance):
-    """The instance's record if it is still there, None once Remove forgot
-    it: what a result that lands after the removal writes to (B633), where
-    devapp._rec would make the row again. Only whether it is there: a
-    record new made with nothing set is empty, and reading one with nothing
-    but a marker as a ghost (B633's second way, closed since every marker
-    goes through here too) left a first build unstamped, the row saying
-    Build over a running container (B646)."""
-    return (d.get(project) or {}).get(instance)
-
-
 def _record_build(project, instance):
-    with devapp._lock:
-        d = devapp._load()
-        rec = _kept(d, project, instance)
+    with devapp.edit_rec(project, instance) as rec:
         # An instance removed while its rebuild was still running has no
         # record to stamp: making one here brought a Removed row back with
         # only rev, at and daemon on it (B633, 11 Oct). False says so.
         if rec is None:
             return False
         _stamp(rec, project, instance)
-        devapp.write_json(devapp.FILE, d)
     return True
 
 
@@ -785,13 +761,16 @@ def _submit(project, instance, action, extra=None, check=None):
     with its plan, or fails it with the refusal, where the row and the Jobs
     tab show the words. Before this a Rebuild answered only after parsing
     the compose on the node, up to 30s, and a phone dropped the request as
-    a NetworkError with no reason (B260). A second press meanwhile meets
-    BUSY, since the held job is active.
+    a NetworkError with no reason (B260). A press while another of the
+    instance's jobs runs is queued behind it (nodes.job_waits), and one of
+    the same action still waiting its turn is that job, not a second.
     """
     if devapp.queue is None:
         return {"error": "no job queue is configured here"}
-    if _active_job(project, instance):
-        return dict(BUSY)
+    for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50):
+        sp = j.get("spec") or {}
+        if sp.get("instance", devapp.MAIN) == instance and j.get("state") == "queued" and sp.get("action") == action:
+            return {"ok": True, "job": j["id"], "already": True}
     nid = devapp._instance_node(project, instance)
     if action == "rebuild" and shipped(project, instance):
         return _ship_submit(project, instance, nid)
@@ -827,12 +806,9 @@ def _submit(project, instance, action, extra=None, check=None):
                     # there: a Remove racing this thread had the marker make
                     # the record again, empty but for it, and the build then
                     # stamped that into a ghost row (B633, the second way).
-                    with devapp._lock:
-                        d = devapp._load()
-                        row = _kept(d, project, instance)
+                    with devapp.edit_rec(project, instance) as row:
                         if row is not None:
                             row["building_since"] = int(time.time())
-                            devapp.write_json(devapp.FILE, d)
         except Exception as e:                                       # noqa: BLE001
             # A fault preparing is the job's failure, said on its row,
             # never a thread dying quietly with the job held forever.
@@ -882,23 +858,24 @@ def route_set(project, instance, mode, port=None):
         if r.get("error"):
             return r
         job = r.get("job")
-    with devapp._lock:
-        d = devapp._load()
-        devapp._rec(d, project, instance)["route"] = {"mode": mode, "port": port}
-        devapp.write_json(devapp.FILE, d)
+    with devapp.edit_rec(project, instance, create=True) as rec:
+        rec["route"] = {"mode": mode, "port": port}
     devapp._bump()
     return {"ok": True, "job": job}
 
 
 def abort_job(project, instance):
-    """Stop this instance's job, if it has one. True if there was one."""
-    j = _active_job(project, instance)
-    if j is None:
+    """Stop this instance's jobs, the one running and any queued behind it.
+    True if there was one."""
+    jobs = [j for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50)
+            if (j.get("spec") or {}).get("instance", devapp.MAIN) == instance] if devapp.queue else []
+    if not jobs:
         return False
-    if devapp.runner is not None:
-        devapp.runner.cancel(_by.get(), j["id"])
-    else:
-        devapp.queue.job_cancel(_by.get(), j["id"])
+    for j in jobs:
+        if devapp.runner is not None:
+            devapp.runner.cancel(_by.get(), j["id"])
+        else:
+            devapp.queue.job_cancel(_by.get(), j["id"])
     devapp._bump()
     return True
 
@@ -968,6 +945,11 @@ def _remove_records(project, instance):
     if devapp.is_file_source(project, instance):
         devapp.forget_container(project)
         devapp._bump()
+        # ...and a key of its own at a model router goes with it (R238 step
+        # 7), asked behind the remove: one the router misses goes at its
+        # next spend read.
+        import router
+        threading.Thread(target=router.drop_container, args=(project,), daemon=True).start()
         return
     with devapp._lock:
         d = devapp._load()
@@ -1228,10 +1210,8 @@ def _job_up(project, instance, run):
         # On the JOB, which is what the row reads: without this a failed Up
         # left a row that said "stopped" with no account of why.
         return {"state": "failed", "error": "up failed:\n" + r["out"][-400:]}
-    with devapp._lock:
-        d = devapp._load()
-        # ...unless Remove forgot the record while this ran (B633).
-        row = _kept(d, project, instance)
+    # ...unless Remove forgot the record while this ran (B633).
+    with devapp.edit_rec(project, instance) as row:
         if row is not None:
             row.pop("await_env", None)
             # An implicit build is still a build, so the row stops claiming the
@@ -1241,7 +1221,6 @@ def _job_up(project, instance, run):
             # would go on saying so with the instance up in front of it.
             if not row.get("rev") or row.get("daemon") != devapp.daemon_id():
                 _stamp(row, project, instance)
-            devapp.write_json(devapp.FILE, d)
     devapp._bump()
     return {"state": "succeeded"}
 
@@ -1368,7 +1347,7 @@ def _job_down(project, instance, run):
 
 
 @devapp._on_instance
-def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
+def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside="", approved=True):
     """Build, then bounce, or stop at the env gate. A job: a build is
     minutes, and the poll watches it through job_rev. The name and the
     worktree are this side's and are checked in front of the answer; the
@@ -1377,10 +1356,14 @@ def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
 
     `gate` is False for a build its project's setting has already answered
     for: a session's on auto, or a person's Allow on a session's question.
-    The confirmation of what a compose asks for is a person's own press of
-    Build; a session's build follows Agents may: Run its container like
-    every other (the operator, 26 Sep: auto does it, ask asks, deny
-    refuses)."""
+    The confirmation of what a compose asks for is a person's: their own
+    press of Build, or their Allow, which acknowledges the list as it
+    stands (`approved`, and AerieOS's own containers' deploys). A session's
+    build on auto carries no yes (`approved` False): it runs at once while
+    the file asks for nothing past its own folder that a person has not
+    acknowledged, and is put to a person when it does (request; the
+    operator, 10 Nov), so here it meets the check only when the file
+    changed between that look and this build."""
     if devapp.compose_file(project) is None:
         return {"error": "no compose file here"}
     clash = devapp.name_clash(project, instance)
@@ -1392,12 +1375,16 @@ def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
     # The GPU's gate is for a session's build too: it is about what the node
     # can do, not about who confirmed what.
     # What it ships beside the app is a person's to say yes to whoever
-    # pressed it (devapp._beside_gate): a session's build carries no yes.
+    # pressed it (devapp._beside_gate): a session's build carries no yes,
+    # and a person's Allow on its question is one (ack_beside), the
+    # question having named the service (request).
     return _submit(project, instance, "rebuild",
                    check=lambda: devapp.room_gate(project, instance) or devapp.gpu_gate(project, instance)
                    or _env_gate(project, instance)
-                   or devapp._beside_gate(project, instance, beside if gate else "")
-                   or (devapp._risk_gate(project, instance, ack) if gate else ""))
+                   or (devapp.ack_beside(project, instance) if approved and not gate
+                       else devapp._beside_gate(project, instance, beside if gate else ""))
+                   or (devapp._risk_gate(project, instance, ack) if gate or not approved or devapp.on_own_machine(project, instance)
+                       else devapp.ack_risks(project, instance)))
 
 
 def run_compose_job(job, run):
@@ -1416,12 +1403,9 @@ def run_compose_job(job, run):
 
 def _clear_marker(project, instance=devapp.MAIN):
     """Drop the started-marker: the build reached an end, whichever end."""
-    with devapp._lock:
-        d = devapp._load()
-        rec = (d.get(project) or {}).get(instance)
+    with devapp.edit_rec(project, instance) as rec:
         if rec is not None:
             rec.pop("building_since", None)
-            devapp.write_json(devapp.FILE, d)
 
 
 def _job_rebuild(project, instance, run):
@@ -1489,10 +1473,7 @@ def _job_rebuild(project, instance, run):
             # Rewrite the env with the old values in comments and leave Up
             # to the operator; see the module docstring.
             devapp._gate_env(project, instance)
-            with devapp._lock:
-                d = devapp._load()
-                devapp._rec(d, project, instance)["await_env"] = True
-                devapp.write_json(devapp.FILE, d)
+            devapp.set_field(project, instance, "await_env", True, create=True)
             return {"state": "succeeded"}
         run.step("starting")
         devapp.ensure_dirs(project, instance, sink=run.line)
@@ -1657,12 +1638,18 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
     elif action == "down":
         r = down(project, instance)
     elif action == "update":
-        r = update(project, instance)
+        # One whose entry names another image than its file runs has its
+        # image lines moved to the entry's first (containers.repin): the
+        # pull is then of that digest. A service of AerieOS's writes and
+        # rebuilds its own.
+        import containers
+        pinned = containers.repin(project) if instance == devapp.MAIN and devapp.is_file_source(project) else {}
+        r = pinned if pinned.get("error") else pinned["done"] if "done" in pinned else update(project, instance)
     elif action == "test":
         r = test(project, instance, test_cmd,
                  [str(a) for a in (req.get("args") or [])][:32])
     elif action == "rebuild":
-        r = rebuild(project, instance, f(req, "ack"), gate=gate, beside=f(req, "beside"))
+        r = rebuild(project, instance, f(req, "ack"), gate=gate, beside=f(req, "beside"), approved=gate)
     elif action == "override":
         # The compose file laid over this one, or none: the next build
         # takes it, and what it adds meets the gates as the base file's does.
@@ -1770,6 +1757,34 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     sess = me.get("session") or ""
     if action == "probe":
         return probe(project, instance, req, principal)
+    # On the controller's own machine docker is root over the controller, so
+    # Auto is Ask there: what a session builds waits for a person (B743).
+    if sess and dial == "auto" and devapp.on_own_machine(project, instance):
+        dial = "ask"
+    # Auto runs at once unless the compose reaches the host (the operator,
+    # 10 Nov): a build whose file asks for more than its own folder, which
+    # no person has acknowledged, is put to a person with the list, and
+    # their Allow acknowledges it, so the same file is asked about once.
+    if sess and dial == "auto" and action == "rebuild":
+        reach = devapp.unacked_risks(project, instance)
+        if reach:
+            dial = "ask"
+            req = dict(req, why=("Its compose file asks for more than its own folder: " + "; ".join(reach[:4])
+                                 + (" …" if len(reach) > 4 else "") + ". "
+                                 + str(devapp.field(req, "why") or "")).strip()[:600])
+    # ...and the same for a service its compose now runs beside the app,
+    # which its last build did not ship (the operator, 19 Nov): the build
+    # stopped with the reason in a failed job's words, where nobody was told,
+    # and waited on a press of Rebuild on the Containers page. It is put to
+    # a person on the bell with the service named, and their Allow says it
+    # is part of the app (rebuild's ack_beside).
+    if sess and dial in ("auto", "ask") and action == "rebuild" and not devapp.is_file_source(project, instance):
+        beside = devapp.beside_new(project, instance, devapp._config(project, instance))
+        if beside:
+            dial = "ask"
+            req = dict(req, why=(f"Its compose file now runs {', '.join(beside[:4])}" + (" and more" if len(beside) > 4 else "")
+                                 + " beside the app, which its last build did not ship: Allow says that is part of the app. "
+                                 + str(devapp.field(req, "why") or "")).strip()[:600])
     # An override on a container that exists is a person's under ask: a
     # session names one for a new container (new's override), which the
     # request carries to Allow.
@@ -1828,7 +1843,7 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     # press the same button, naming the instance the server resolved. Reads
     # and the env editor are not news, so they are not on this list.
     if action in ("up", "down", "rebuild", "update", "remove", "abort"):
-        say(project, users.uid_of(me),
+        say(project, users.whose(me),
             f"{principal[len('user:'):]} ran {action} on "
             f"{project}" + (f" ({instance})" if instance != devapp.MAIN else ""))
     with acting_as(principal):

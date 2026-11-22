@@ -4,14 +4,13 @@
 // `enter` binds, covers or hides is a step of `plan`, which reads the layout
 // and changes nothing, and a scratch layout stands in for a node with two
 // projects, two accounts and the agent's stores.
-import { ok, done, DIR } from './lib.mjs';
+import { ok, done, DIR, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, symlinkSync, existsSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const HELPER = join(REPO, 'nodes', 'bb-session');
 const STAGE = '/run/bb-session';
 const L = join(DIR, 'viewlayout');
@@ -119,7 +118,7 @@ ok(coverAt > 0 && back(join(tr, slug(join(ws, 'alpha')))) && back(join(tr, slug(
    '...and the other spaces\' transcripts are not in the view even by name, a space whose name starts another\'s included, while its own are put back over the cover');
 // A project this one reads (prefs.reads) is in the view too, read-only and
 // nothing of it but the tree; itself, or a name that is no project, refused.
-{
+await section("A project this one reads", async () => {
   const r = plan({ reads: 'beta' });
   const rs = r.code === 0 ? JSON.parse(r.out) : [];
   ok(r.code === 0 && rs.some(x => x[0] === 'bindro' && x[1] === `${STAGE}/ws/beta` && x[2] === join(ws, 'beta'))
@@ -134,11 +133,11 @@ ok(coverAt > 0 && back(join(tr, slug(join(ws, 'alpha')))) && back(join(tr, slug(
   const self = plan({ reads: 'alpha' }), none = plan({ reads: 'nowhere' });
   ok(self.code !== 0 && /not a space this one could read/.test(self.out) && none.code !== 0 && /is not a space directory/.test(none.out),
      `...and refuses itself or a name that is no space (${self.out.trim().slice(0, 60)})`);
-}
+});
 // ...and applying it makes the target under the fresh /workspace before
 // the read-only bind, as the writable bind always did: the first session
 // with a read project met "mount: No such file or directory" (28 Sep).
-{
+await section("and applying it makes the target under the fresh /workspace before", async () => {
   const said = execFileSync('python3', ['-c', `
 import importlib.machinery, importlib.util, json, os, tempfile
 loader = importlib.machinery.SourceFileLoader('bbs', ${JSON.stringify(HELPER)})
@@ -157,14 +156,14 @@ print(json.dumps({'made': os.path.isdir(target), 'mounts': len(calls), 'onto': c
   const r = JSON.parse(said);
   ok(r.made && r.mounts === 4 && r.onto.endsWith('/ws/hello') && r.link,
      `a read-only bind makes its target under the view before mounting, as a writable one does, and leaves a file that is there alone (${said})`);
-}
+});
 ok(has('tmpfs', users, 'mode=0755') && has('bind', `${STAGE}/home`, myHome),
    'the account\'s home is the only home');
 // The base home is another's, and every session runs as the account that
 // owns it, so its permissions keep nothing back (B378): a session listed
 // its .ssh, its shell history and a private key beside them. In the view
 // it is new, and holds what a session runs from it and nothing else.
-{
+await section("The base home is another's, and every session runs as the account that", async () => {
   const base = steps.filter(x => String(x[x.length - 1]).startsWith(homeRoot + '/') || x[x.length - 1] === homeRoot);
   const put = base.filter(x => x[0] === 'bindro').map(x => [x[1], x[2]]);
   const kept = ['.local/bin', '.local/share/claude'];
@@ -178,7 +177,7 @@ ok(has('tmpfs', users, 'mode=0755') && has('bind', `${STAGE}/home`, myHome),
   const back = named.filter(n => steps.some(x => x[0].startsWith('bind') && x[x.length - 1] === join(homeRoot, n)));
   ok(back.length === 0 && !steps.some(x => x[0] === 'bindro' && x[1] === homeRoot),
      `...and nothing else of its owner's is put back: no keys, no history, no login, no settings, and no part of .local a session does not run (${back.join(', ') || 'none'})`);
-}
+});
 ok(has('tmpfs', myCache, 'mode=0700,owned') && bound(join(myCache, 'u', me, 'project', 'alpha')) && bound(join(myCache, 'u', me, 'account'))
    && !bound(join(myCache, 'u', me, 'project', 'beta'))
    && has('tmpfs', rootCache, 'mode=0700,owned') && bound(join(rootCache, 'machine')) && !bound(join(rootCache, 'u', me, 'project', 'gamma')),
@@ -192,34 +191,38 @@ ok(has('bindro', pkg, pkg) && !bound(join(pkg, 'jdk')) && !steps.some(x => x[0] 
 // A toolchain the project's settings switch off (R77): its directory hidden
 // after the store and its writable parts are bound, so nothing covers the
 // hide; a name that is not a toolchain's is refused by name.
-{
+await section("A toolchain the project's settings switch off", async () => {
   const offd = plan({ off: 'flutter' });
   const os2 = offd.code === 0 ? JSON.parse(offd.out) : [];
   const ix = (...s) => os2.findIndex(x => JSON.stringify(x) === JSON.stringify(s));
-  ok(ix('hide', join(pkg, 'flutter')) > ix('bindro', pkg, pkg) && ix('hide', join(pkg, 'flutter')) > ix('bindrw', join(pkg, 'flutter'), join(pkg, 'flutter'))
+  ok(ix('hide', join(pkg, 'flutter')) > ix('bindro', pkg, pkg)
+     && !os2.some(x => x[0] === 'overlay' && x[1] === join(pkg, 'flutter'))
      && !os2.some(x => x[0] === 'hide' && x[1] === join(pkg, 'jdk')),
      `--off hides that toolchain's directory in the store, after it is bound, and no other (${offd.code}: ${offd.out.slice(0, 60)})`);
   const bad = plan({ off: '../etc' });
   ok(bad.code !== 0 && /--off takes a toolchain's name/.test(bad.out), `...and --off refuses what is not a toolchain's name (${bad.out.trim().slice(0, 80)})`);
-}
+});
 const at = (...s) => steps.findIndex(x => JSON.stringify(x) === JSON.stringify(s));
 const fl = join(pkg, 'flutter');
-ok(at('bindro', pkg, pkg) < at('bindrw', fl, fl) && at('bindrw', fl, fl) < at('bindro', join(fl, 'bin'), join(fl, 'bin'))
-   && at('bindro', join(fl, 'bin'), join(fl, 'bin')) < at('bindrw', join(fl, 'bin', 'cache'), join(fl, 'bin', 'cache')),
-   '...but flutter, which writes its own tree on every run, gets it back, with its bin on PATH still read-only and only bin/cache writable again');
+// Flutter writes its own tree on every run: a session gets a layer of its own
+// over the read-only tree, in its own /tmp, and nothing of the tree is bound
+// writable (B888: a session that changed bin/cache's dart had others run it).
+ok(at('bindro', pkg, pkg) >= 0 && !steps.some(x => x[0] === 'bindrw' && String(x[1]).startsWith(fl))
+   && at('overlay', fl, '/tmp/.bb-flutter') > at('tmpfs', '/tmp', 'mode=1777'),
+   '...but flutter, which writes its own tree on every run, gets a layer of its own over the read-only tree, in the session\'s own /tmp');
 const versions = join(homeRoot, '.local', 'share', 'claude', 'versions');
 ok(has('bindro', `${STAGE}/base/.local/share/claude`, join(homeRoot, '.local', 'share', 'claude'))
    && has('bindro', `${STAGE}/base/.local/bin`, join(homeRoot, '.local', 'bin')),
    'the claude binary every account\'s session runs, and the link that names it, are read-only in the view (B157)');
-{
+await section("An account whose home IS the base home has no new home to put them in", async () => {
   // An account whose home IS the base home has no new home to put them in:
   // they are made read-only where they are, as they always were.
   const own = JSON.parse(plan({ home: homeRoot, cwd: join(ws, 'alpha') }).out || '[]');
   ok(own.some(x => x[0] === 'bindro' && x[1] === versions && x[2] === versions)
      && !own.some(x => x[0] === 'tmpfs' && x[1] === homeRoot),
      '...and where the account\'s home is the base home, that home stays and the binary is made read-only in place');
-}
-{
+});
+await section("The OTHER shape, which the dev VM has", async () => {
   // The OTHER shape, which the dev VM has: a plain wrapper script at
   // .local/bin/claude and no versions directory at all. The file itself is
   // what every account execs there, so it is the file that is bound.
@@ -255,8 +258,8 @@ ok(has('bindro', `${STAGE}/base/.local/share/claude`, join(homeRoot, '.local', '
   ok(g3.some(x => x[0] === 'bindro' && x[1] === `${STAGE}/base/tools/claude-real` && x[2] === join(odd, 'tools', 'claude-real'))
      && !g3.some(x => x[0].startsWith('bind') && x[2] === join(odd, 'tools')),
      'a launcher that points anywhere else in the base home has that one file put back, and not the folder around it');
-}
-{
+});
+await section("A file put back into a new home has a file to land on made for it", async () => {
   // A file put back into a new home has a file to land on made for it.
   const said = execFileSync('python3', ['-c', `
 import importlib.machinery, importlib.util, json, os, tempfile, errno
@@ -278,15 +281,15 @@ m.apply([('letgo', '/nowhere')], os.getuid(), os.getgid())
 m._call = busy
 try:
     m.apply([('letgo', '/nowhere')], os.getuid(), os.getgid()); held = False
-except OSError:
-    held = True
+except m.Refused as e:
+    held = 'letgo /nowhere' in str(e)
 print(json.dumps({'file': os.path.isfile(target), 'mounts': len(calls), 'held': held}))
 `], { encoding: 'utf8' }).trim();
   const r = JSON.parse(said);
   ok(r.file && r.mounts === 2 && r.held,
-     `a file bound into a new home gets a file made to land on; a mount already gone is let go quietly and any other failure stops the view (${said})`);
-}
-{
+     `a file bound into a new home gets a file made to land on; a mount already gone is let go quietly and any other failure stops the view, naming its step (${said})`);
+});
+await section("An empty TOOLCHAINS_STORE", async () => {
   // An empty TOOLCHAINS_STORE (a node with no toolchain store): no bundle bind
   // at all, which leaves the view as it was rather than failing it.
   const noStore = join(L, 'bb-session-nostore.conf');
@@ -302,7 +305,7 @@ print(json.dumps({'file': os.path.isfile(target), 'mounts': len(calls), 'held': 
      '...and a conf with no TOOLCHAINS_STORE plans no bundle bind rather than failing');
   ok(JSON.parse(g.out).some(x => x[0] === 'bindro' && x[1] === `${STAGE}/base/.local/share/claude`),
      '...while the shared launcher is still made read-only there, since that is read off the home root');
-}
+});
 ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0] === 'proc'
    && steps[steps.length - 1][0] === 'detach',
    'the view starts private with its own /proc, gets its own /tmp, and lets the staging copy of the machine go last');
@@ -311,7 +314,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
 // started again on the same conversation after a controller update found
 // its scratchpad empty, twice in a day. The launcher makes a folder for it
 // in the project's cache, and the view binds that over /tmp/claude-<uid>.
-{
+await section("What Claude Code keeps in /tmp for a conversation outlives a restart of", async () => {
   const uid = userInfo().uid;
   const scratch = join(myCache, 'u', me, 'project', 'alpha', 'scratch');
   ok(!steps.some(x => x[2] === `/tmp/claude-${uid}`), 'with no folder made for it, /tmp is the session\'s own and nothing more');
@@ -340,12 +343,12 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
      && own[ra][1].endsWith(`/u/${me}/project/alpha/claude-sessions`),
      `the space's own sessions folder is bound over ~/.claude/sessions, after the home (${JSON.stringify(own[ra] || null)})`);
   rmSync(reg, { recursive: true, force: true });
-}
-{
+});
+await section("everything a cover would hide is bound aside before the first cover", async () => {
   const firstCover = steps.findIndex(x => x[0] === 'tmpfs' && x[1] === ws);
   const lastStage = Math.max(...steps.map((x, i) => (x[0] === 'bind' && x[2].startsWith(STAGE + '/')) ? i : -1));
   ok(lastStage < firstCover, 'everything a cover would hide is bound aside before the first cover');
-}
+});
 
 // The rest of the machine (B378). The view used to cover what it was told to
 // (the projects share, the two stores, what HIDE named) and show the rest
@@ -354,7 +357,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
 // on the operator's own a session listed the dev instance's projects, every
 // share, and the base home with its keys. Now the view is built from what a
 // session is given, and what is not the system's own is out.
-{
+await section("The rest of the machine", async () => {
   const M = join(DIR, 'viewmachine');
   const mws = join(M, 'workspace'), mhome = join(M, 'home', 'builder'), mstate = join(M, 'var', 'lib', 'builderbot');
   const share = join(M, 'mnt', 'bbdata'), mstore = join(share, 'toolchains', 'linux-x86_64');
@@ -481,7 +484,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
     .map(([p, what]) => [on('--sees', p), what]);
   const let2 = no.filter(([x]) => !(x.code === 2 && /not a place a space could be shown/.test(x.out))).map(([x, what]) => `${what}: ${x.code}`);
   ok(let2.length === 0, `--sees refuses ${no.map(x => x[1]).join(', ')}${let2.length ? ` (not: ${let2.join(' | ')})` : ''}`);
-}
+});
 
 const refusals = [
   [plan({ cwd: join(ws, 'alpha', '..', 'beta') }), /not inside alpha/, 'a working directory that climbs out of the space'],
@@ -497,7 +500,7 @@ ok(bad.length === 0, `the plan refuses ${refusals.map(r => r[2]).join('; ')}${ba
 // .cache to the base home's, so its cache and the machine's are one folder.
 // That folder is covered once, keeping what either needed; covering it twice
 // buried the project's own folder under the second cover.
-{
+await section("The shape a real node has", async () => {
   const linked = 'u_2222abcd', linkedHome = join(users, linked);
   mkdirSync(linkedHome, { recursive: true });
   symlinkSync(join(homeRoot, '.cache'), join(linkedHome, '.cache'));
@@ -516,14 +519,14 @@ ok(bad.length === 0, `the plan refuses ${refusals.map(r => r[2]).join('; ')}${ba
   const refused = plan({ account: planted, home: plantedHome, cwd: join(ws, 'alpha') });
   ok(refused.code === 2 && /is not a directory, so the view could not leave other spaces out/.test(refused.out),
      `...and a cache that is itself a link is refused, never left untrimmed with other spaces' tokens in it (${refused.out.trim().slice(0, 60)})`);
-}
+});
 
 // A network of its own (R79). Where the agent has turned it on, the view
 // also puts the agent's resolver file over the node's (whose resolver sits on
 // the node's loopback, out of a namespace of its own's reach) and covers the
 // agent's folder, which says which project every other session's address is.
 // Off, or with an older layout file, the plan is the one it always was.
-{
+await section("A network of its own", async () => {
   const netConf = join(L, 'bb-session-net.conf');
   const withNet = (extra) => {
     writeFileSync(netConf, [`SESSION_USER=${userInfo().username}`, `WORKSPACE=${ws}`, `HOME_ROOT=${homeRoot}`,
@@ -550,7 +553,7 @@ ok(bad.length === 0, `the plan refuses ${refusals.map(r => r[2]).join('; ')}${ba
   const net = run('check-net');
   ok(net.code === 2 && /runs as root/.test(net.out),
      `check-net, the agent's question before it offers the setting, is root's (${net.out.trim().slice(0, 40)})`);
-}
+});
 
 const asMe = run('enter', '--project', 'alpha', '--account', me, '--home', myHome, '--cwd', join(ws, 'alpha'),
                  '--env', join(myCache, 'project', 'alpha', 'session.env'), '--', 'true');

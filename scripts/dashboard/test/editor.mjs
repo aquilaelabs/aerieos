@@ -7,25 +7,23 @@
 // own code, driven under a stand-in for VS Code's API against this server,
 // and its terminal, AerieOS's own on /termws.
 // No browser.
-import { ok, done, DIR, URL } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import Module from 'node:module';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const require = createRequire(import.meta.url);
 const { Client, Refused, signIn, API } = require(`${REPO}/apps/vscode/lib/client.js`);
 const { Term } = require(`${REPO}/apps/vscode/lib/term.js`);
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const admin = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
-  { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
+const addUser = (name, pw) => aerie(['users', 'add', name, '--role', 'user'],
+  { input: `${pw}\n${pw}\n`, env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
 // The answer to one call: its status and words, never a throw.
@@ -39,7 +37,7 @@ const people = { 'ed.rw': 'edrwpass1', 'ed.r': 'edrpass12', 'ed.none': 'ednonepa
                  'ed.mem': 'edmempass1' };
 for (const [n, pw] of Object.entries(people)) addUser(n, pw);
 for (const n of ['ed.rw', 'ed.r', 'ed.none', 'ed.cap', 'ed.mem'])
-  await admin('/api/users', { action: 'projects', name: n, projects: ['alpha'] });
+  await admin('/api/users', { action: 'edit', name: n, projects: ['alpha'] });
 // Each holds a role on alpha that gives the files area write, but ed.cap's
 // gives read: its rw in the settings is capped at r by the role (R152 (f)).
 await admin('/api/roles', { action: 'set', name: 'ed-files-w', scope: 'projects',
@@ -67,15 +65,15 @@ try { symlinkSync('../beta', `${tree}/editor-escape`); } catch {}
 const cookie = {};
 for (const [n, pw] of Object.entries(people)) cookie[n] = await signIn(base, n, pw);
 const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, cookie[n])]));
-{
+await section("the extension signs in as the person, with the cookie the dashboard would give, and a wron", async () => {
   let wrong = null;
   try { await signIn(base, 'ed.rw', 'not-the-password'); } catch (e) { wrong = e; }
   ok(Object.values(cookie).every(Boolean) && wrong instanceof Refused && /Wrong username or password/.test(wrong.message),
      'the extension signs in as the person, with the cookie the dashboard would give, and a wrong password is refused');
-}
+});
 
 // ---- which projects each may open ------------------------------------------------
-{
+await section("which projects each may open", async () => {
   const mine = {};
   for (const n of Object.keys(people)) mine[n] = (await c[n].projects()).projects;
   const acc = n => (mine[n].find(p => p.name === 'alpha') || {}).access || '';
@@ -84,10 +82,10 @@ const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, c
      && (await c['ed.rw'].projects()).api === API,
      `each is offered alpha exactly as far as the settings and roles give: rw, r, r capped by a role, none, not on it, and on it with no choice made (${
        Object.keys(people).map(n => `${n}=${acc(n) || '-'}`).join(' ')})`);
-}
+});
 
 // ---- reading and writing, as each ----------------------------------------------------
-{
+await section("reading and writing, as each", async () => {
   const read = {};
   for (const n of Object.keys(people)) read[n] = await as(c[n], 'alpha', 'read', { path: 'editor-probe.txt' });
   ok(read['ed.rw'].data && read['ed.r'].data && read['ed.cap'].data
@@ -120,10 +118,10 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
     `${DIR}/state/builderbot.db`], { encoding: 'utf8' });
   ok(/user:ed\.rw files-write alpha:editor-probe\.txt/.test(rows) && !/ed\.r files-write/.test(rows),
      `every change is on the audit trail under the person's name, and a refused one is not (${rows.trim().split('\n')[0]})`);
-}
+});
 
 // ---- what is never served -----------------------------------------------------------
-{
+await section("what is never served", async () => {
   const rw = c['ed.rw'];
   const up = await as(rw, 'alpha', 'read', { path: '../beta/README.md' });
   const git = await as(rw, 'alpha', 'read', { path: '.git/config' });
@@ -134,12 +132,12 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
        up.status} ${git.status} ${link.status})`);
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
   const r = await fetch(base + '/api/v1/files', { method: 'POST', body: JSON.stringify({ action: 'list', project: 'alpha', path: '' }),
-    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' } });
+    headers: asSession(tok) });
   ok(r.status === 403, `a session's token is refused: a session has the tree, and is never a person (${r.status})`);
-}
+});
 
 // ---- a save over a newer file, search, and changes as they happen --------------------
-{
+await section("a save over a newer file, search, and changes as they happen", async () => {
   const rw = c['ed.rw'];
   const first = await as(rw, 'alpha', 'read', { path: 'editor-probe.txt' });
   writeFileSync(`${tree}/editor-probe.txt`, 'Claude saved this meanwhile\nneedle\n');
@@ -156,19 +154,21 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
      `search finds a line across the tree for an account that may read it, never in .git, and not for one that may not (${found.matches?.length} matches)`);
   const start = await as(c['ed.r'], 'alpha', 'changes', { since: 0 });
   const waiting = as(c['ed.r'], 'alpha', 'changes', { since: start.rev, wait: 15 });
-  await new Promise(r => setTimeout(r, 500));
+  // Time for the ask to reach the server and be waiting there before the
+  // file is written: nothing outside the server says that it is.
+  await sleep(500);
   writeFileSync(`${tree}/claude-wrote-this.txt`, 'new\n');
   const t0 = Date.now();
   const got = await waiting;
   ok(got.changes?.some(x => x.path === 'claude-wrote-this.txt' && x.type === 'created') && Date.now() - t0 < 8000,
      `a file a session writes is told to a waiting editor within seconds (${JSON.stringify(got.changes)} in ${Date.now() - t0} ms)`);
-}
+});
 
 // ---- access taken away, partway --------------------------------------------------------
-{
+await section("access taken away, partway", async () => {
   await admin('/api/roles', { action: 'assign', name: 'ed.r', project_roles: { alpha: ['ed-nofiles'] } });
   const gone = await as(c['ed.r'], 'alpha', 'read', { path: 'editor-probe.txt' });
-  await admin('/api/users', { action: 'projects', name: 'ed.cap', projects: [] });
+  await admin('/api/users', { action: 'edit', name: 'ed.cap', projects: [] });
   const off = await as(c['ed.cap'], 'alpha', 'list', { path: '' });
   await admin('/api/project-ftp', { action: 'set', project: 'alpha', editor: false });
   const shut = await as(c['ed.rw'], 'alpha', 'list', { path: '' });
@@ -180,12 +180,12 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   ok(out.status === 401 && /Sign In/.test(out.error), `...and a password change signs the extension out (${out.status}: ${out.error})`);
   cookie['ed.rw'] = await signIn(base, 'ed.rw', 'edrwpass2');
   c['ed.rw'] = new Client(base, cookie['ed.rw']);
-}
+});
 
 // ---- the extension itself, under a stand-in for VS Code -------------------------------
 // The parts of VS Code's API it uses, enough to drive its file system as
 // VS Code would: activate, register, stat, read, write, watch.
-{
+await section("the extension itself, under a stand-in for VS Code", async () => {
   const fired = [];
   class Emitter { constructor() { this.subs = []; this.event = f => { this.subs.push(f); return { dispose() {} }; }; }
     fire(x) { fired.push(x); this.subs.forEach(f => f(x)); } }
@@ -250,38 +250,48 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const ed = opened[0];
   ok(!errors.length && ed && /^\/alpha\//.test(ed.uri.path) && ed.selection?.active.character - ed.selection?.anchor.character === 'again'.length,
      `...Search Space Files opens the match it picked with the word selected (${errors[0] || ed?.uri.path})`);
+  // The watch follows from the revision its first answer gives: in hand
+  // once it asks again, which is the ask that waits.
+  const filesWas = Client.prototype.files;
+  let following = false;
+  Client.prototype.files = function (project, action, extra = {}) {
+    if (action === 'changes' && extra.wait) following = true;
+    return filesWas.call(this, project, action, extra);
+  };
   const w = provider.watch(uri('/'), { recursive: true, excludes: [] });
-  await new Promise(r => setTimeout(r, 1500));
+  await until(() => following, 15000);
+  Client.prototype.files = filesWas;
   writeFileSync(`${tree}/watched.txt`, 'appears\n');
   const t0 = Date.now();
-  while (!fired.flat().some(e => e.uri?.path === '/alpha/watched.txt') && Date.now() - t0 < 12000)
-    await new Promise(r => setTimeout(r, 200));
+  await until(() => fired.flat().some(e => e.uri?.path === '/alpha/watched.txt'), 12000, 200);
   w.dispose();
   ok(fired.flat().some(e => e.uri?.path === '/alpha/watched.txt' && e.type === 2),
      `...and a file a session writes is told to VS Code as created, for open editors to follow (${Date.now() - t0} ms)`);
-}
+});
 
 // ---- the session's terminal, AerieOS's own (R133) ---------------------------------
-{
+await section("the session's terminal, AerieOS's own", async () => {
   // Opened, written to and ended through the extension's own client; the
   // reason a terminal ends with, a refusal among them, is what it closes on.
-  const run = async (who, arg, type) => {
+  // With something to type, the shell's prompt is waited for, then `want`
+  // in what it prints; with nothing, the reason the server ends it with.
+  const run = async (who, arg, type, want) => {
     const t = new Term(who, arg);
     let out = '', why = null;
     t.on('output', s => { out += s; });
     t.on('close', w => { why = w; });
     await t.open(90, 20);
-    await new Promise(r => setTimeout(r, 1500));
+    await until(() => why !== null || (type && /[$#]/.test(out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, ''))), 15000);
     if (type && why === null) {
       t.write(type);
-      await new Promise(r => setTimeout(r, 1500));
+      await until(() => why !== null || !want || want.test(out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ')), 15000);
     }
     t.close();
-    await new Promise(r => setTimeout(r, 200));
+    await until(() => why !== null);
     return { out: out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' '), why };
   };
   const owner = new Client(base, await signIn(base, 'test', 'test'));
-  const sh = await run(owner, 'sh:1:alpha', 'echo walk-$((6*7))\r');
+  const sh = await run(owner, 'sh:1:alpha', 'echo walk-$((6*7))\r', /walk-42/);
   ok(/walk-42/.test(sh.out),
      `the terminal is the dashboard's, and what is typed runs (${sh.out.slice(-80)})`);
   // Another agent's session as Open Agent Session opens it (R128): the
@@ -301,7 +311,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   // The page the Android app's WebView and a popped-out tab load: the same
   // terminal, on /termws, behind the same sign-in.
   {
-    const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const auth = OWNER;
     const page = await fetch(`${base}/terminal?arg=sh%3A1%3Aalpha`, { headers: auth });
     const body = await page.text();
     const anon = await fetch(`${base}/terminal?arg=sh%3A1%3Aalpha`, { redirect: 'manual' });
@@ -311,6 +321,6 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   }
   const no = await run(c['ed.out'], 'sh:1:alpha');
   ok(no.why, `...and the same server refuses a terminal the account may not open, saying why (${String(no.why).slice(0, 80)})`);
-}
+});
 
 await done();

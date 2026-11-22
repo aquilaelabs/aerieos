@@ -4,14 +4,28 @@
 // project on several nodes, and dialogs that scroll.
 import { launch, newPage, ok, done, ready, openArchived, doctorFixture, animatedDuring, refreshUntil,
          holdPoll, freePoll, tmuxNew, tmuxKill, tmuxFmt, nbShown, URL, DIR, unfold, registerProject,
-         saveDialog, sectSave, sleep } from './lib.mjs';
+         saveDialog, sectSave, splitPick, until, quiet, settled, sleep, OWNER, section, REPO } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync, rmSync, utimesSync,
          mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
+
+// The page at a width just set, and a frame drawn at it: what listens for
+// the phone's breakpoint runs before a frame's callbacks, so whatever it
+// draws again is drawn by then.
+const atWidth = async w => {
+  await page.waitForFunction(w => innerWidth === w, w, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+};
+// A card on its back (or on its front) with the turn over: neither face is
+// still on the stylesheet's tween.
+const turned = (sel, on = true) => page.waitForFunction(([s, on]) => {
+  const c = document.querySelector(s);
+  return !!c && c.classList.contains('flipped') === on
+    && ![...c.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length);
+}, [sel, on], { timeout: 10000 }).catch(() => {});
 
 // A card's link, lock, pin and the rest are on its back on the Projects
 // page (R138): Edit turns it over first, the way a thumb does.
@@ -23,12 +37,24 @@ const pjMenu = async name => {
   await page.evaluate(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
     const fold = c?.closest('details.sect');
     if (fold && !fold.open) fold.querySelector(':scope > summary')?.click(); }, name);
-  await page.waitForTimeout(600);
+  // The fold open and its slide over, where the card is in one.
+  await page.waitForFunction(n => { const fold = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`)?.closest('details.sect');
+    return !fold || (fold.open && !fold.getAnimations().length); }, name, { timeout: 10000 }).catch(() => {});
   await page.evaluate(n => document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`)?.scrollIntoView({ block: 'center' }), name);
-  await page.waitForTimeout(400);
-  await page.evaluate(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
-    if (c && !c.classList.contains('flipped')) c.querySelector('.pcfront [data-pedit]')?.click(); }, name);
-  await page.waitForTimeout(500);
+  await page.waitForFunction(n => { const r = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`)?.getBoundingClientRect();
+    return !r || !(r.width || r.height) || (r.bottom > 0 && r.top < innerHeight); }, name, { timeout: 10000 }).catch(() => {});
+  const pressed = Date.now();
+  const turning = await page.evaluate(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
+    if (c && !c.classList.contains('flipped')){ c.querySelector('.pcfront [data-pedit]')?.click(); return true; }
+    return false; }, name);
+  // On its back, the turn over: a press on the back lands on a face at rest.
+  await page.waitForFunction(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
+    return !c || (c.classList.contains('flipped') && ![...c.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length)); }, name, { timeout: 10000 }).catch(() => {});
+  // ...and the grid's own redraw behind it: flipCard draws the cards again
+  // 450 ms after a turn, on a timer nothing on the page shows, and a box
+  // opened on the back before it would be drawn over. The one pause here
+  // that is a clock: what is left of that half second since the press.
+  if (turning) await sleep(Math.max(0, 500 - (Date.now() - pressed)));
 };await page.goto(URL);
 await ready(page);
 // The Nostromo glass (the operator, 24 Sep): a pane's bar, the dock's line
@@ -36,7 +62,7 @@ await ready(page);
 // it is the hull that shows through. The ground is the stack's and the
 // document box paints none, so the document fading in does not take the
 // glass with it (27 Sep).
-{
+await section("The Nostromo glass", async () => {
   await page.evaluate(() => document.documentElement.dataset.theme = 'nostromo');
   const glass = await page.evaluate(() => {
     const alpha = c => {
@@ -62,7 +88,7 @@ await ready(page);
      && (glass.bar === 'no bar' || glass.bar === glass.dock) && glass.pane === 'rgba(0, 0, 0, 0)',
      `the bars, the dock and the ground wear one glass, over a pane left open (${JSON.stringify(glass)})`);
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
-}
+});
 
 // The header fits, at every width a phone comes in. It did not: measured at
 // 320px it wanted 369px and overflowed by 57, and the uptime (the only item
@@ -72,12 +98,12 @@ await ready(page);
 // Both halves are asserted, because they fail separately: a header that does
 // not overflow can still contain something ellipsised, and that is what the
 // operator saw.
-{
+await section("The header fits, at every width a phone comes in", async () => {
   const sizes = [320, 344, 360, 390, 412, 430, 768];
   const measured = [];
   for (const w of sizes){
     await page.setViewportSize({ width: w, height: 800 });
-    await new Promise(r => setTimeout(r, 200));
+    await atWidth(w);
     measured.push(await page.evaluate(async () => {
       const h = document.querySelector('header');
       // A realistic value rather than whatever the fixture is up: the point is
@@ -95,7 +121,7 @@ await ready(page);
     }));
   }
   await page.setViewportSize({ width: 1280, height: 800 });
-  await new Promise(r => setTimeout(r, 250));
+  await atWidth(1280);
   const over = measured.filter(m => m.over > 0);
   const cut = measured.filter(m => m.clipped.length);
   // ...and the search keeps room to be typed into: six buttons a thumb wide
@@ -133,13 +159,13 @@ await ready(page);
   ok(cut.length === 0,
      `...with nothing inside it ellipsised${
        cut.length ? `: ${cut.map(m => `${m.clipped.join('/')} at ${m.w}`).join(', ')}` : ''}`);
-}
+});
 
 // ---- the doctor: a dot in the top bar, its checks in a panel (R218 step 3) ----
 // The column of cards went: the dot wears the worst check's color, and its
 // panel lists problems as lines in their level's color, each with the rest
 // of what the check said under it, and passing checks as chips.
-{
+await section("the doctor: a dot in the top bar, its checks in a panel", async () => {
   await page.waitForFunction(() => document.getElementById('docDot').className.includes('ok'), null, { timeout: 15000 });
   const dd = await page.$eval('#bDocDot', b => ({ said: b.getAttribute('aria-label'), w: b.offsetWidth, top: !!b.closest('header') }));
   ok(/all 3 ok/.test(dd.said) && dd.w > 0 && dd.top,
@@ -160,8 +186,11 @@ await ready(page);
   ok(pass.dot === pass.pass && pass.dot !== pass.accent,
      `...its pass the fixed green on every scheme, not the accent (${JSON.stringify(pass)})`);
   await page.click('#bDocDot');
-  await page.waitForSelector('#docPanel:not([hidden]) #doctor .chips .pill', { timeout: 5000 });
-  ok(await page.$eval('#bDocDot', b => b.getAttribute('aria-expanded') === 'true'), '...and a press opens it, its passing checks as chips');
+  await page.waitForSelector('#docPanel:not([hidden]) #doctor .docsum', { timeout: 5000 });
+  const compact = await page.evaluate(() => ({ sum: document.querySelector('#doctor .docsum')?.textContent || '',
+    chips: document.querySelectorAll('#doctor .chips .pill').length }));
+  ok(await page.$eval('#bDocDot', b => b.getAttribute('aria-expanded') === 'true') && /^all \d+ pass/.test(compact.sum) && compact.chips === 0,
+     `...and a press opens it compact: its passing checks counted, not listed, the full ones being on Controller settings (${JSON.stringify(compact)})`);
   // One header panel at a time (the operator, 16 Oct): the gear pressed
   // with the doctor open shuts the doctor, and the bell shuts the gear.
   await page.click('#bCards');
@@ -179,13 +208,13 @@ await ready(page);
   // (B742): no tooltip says the rest.
   const long = await page.evaluate(() => {
     const keep = state.doctor.checks;
-    state.doctor.checks = [...keep, { level: 'ok', text: '2 nodes can run a session (bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name)' }];
+    state.doctor.checks = [...keep, { level: 'warn', text: 'a node cannot run a session: bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name and a fourth whose name is longer still' }];
     drawDoctor();
-    const pills = [...document.querySelectorAll('#doctor .chips .pill')];
+    const lines = [...document.querySelectorAll('#doctor .probs .sub')];
     const panel = document.getElementById('docPanel').getBoundingClientRect();
-    const out = { cut: pills.filter(p => p.scrollWidth > p.clientWidth + 1).length,
-                  out: pills.filter(p => p.getBoundingClientRect().right > panel.right + 1).length,
-                  tall: pills.some(p => p.getBoundingClientRect().height > 30) };
+    const out = { cut: lines.filter(p => p.scrollWidth > p.clientWidth + 1).length,
+                  out: lines.filter(p => p.getBoundingClientRect().right > panel.right + 1).length,
+                  tall: lines.some(p => p.getBoundingClientRect().height > 30) };
     state.doctor.checks = keep; drawDoctor();
     return out;
   });
@@ -206,15 +235,42 @@ await ready(page);
   }));
   ok(probLines.length === 2 && probLines.every(l => l.same),
      `↻ runs it again, and a FAIL turns the dot red with each problem in its level's color (${JSON.stringify(probLines.map(l => l.same))})`);
-  ok(probLines.some(l => /runner offline/.test(l.text) && /aerie logs --runner/.test(l.why)),
-     '...and carries the rest of what the check said under it');
+  ok(probLines.some(l => /runner offline/.test(l.text)) && probLines.every(l => !l.why),
+     '...each a line alone in the compact panel, what the check said under it being on Controller settings');
   ok(await page.$eval('#docPanel', p => !p.hidden), '...with the panel still open after ↻ redrew it');
   await page.keyboard.press('Escape');
   ok(await page.$eval('#docPanel', p => p.hidden), 'Escape shuts the panel');
+  // Controller settings from the panel, as the gear has Profile, on its
+  // first section, Controller (Perch), where the same checks are, with the
+  // facts that would stop the controller if they ran out.
+  await page.click('#bDocDot');
+  await page.waitForSelector('#docPanel:not([hidden]) #docSettings:not([hidden])', { timeout: 5000 });
+  await page.click('#docSettings');
+  await page.waitForSelector('.settingstab .ctlcard .ctlchecks .probs .sub', { timeout: 15000 });
+  const card = await page.evaluate(() => {
+    const c = document.querySelector('.settingstab .ctlcard');
+    return { shut: document.getElementById('docPanel').hidden,
+             facts: [...c.querySelectorAll('dl.facts dt')].map(t => t.textContent),
+             probs: [...c.querySelectorAll('.ctlchecks .probs .sub')].map(s => !!s.querySelector('.why')),
+             first: (() => { const s = c.closest('details.sect');
+               return s?.dataset.sect === 'settings:controller' && s.classList.contains('scur') && s === document.querySelector('.settingstab details.sect')
+                 && /2 to look at/.test(s.querySelector('summary').textContent); })() };
+  });
+  ok(card.shut && ['Under /config', "The spaces' share", 'Nodes', 'Sessions open'].every(f => card.facts.includes(f))
+     && card.probs.length === 2 && card.probs.some(Boolean) && card.first,
+     `the panel's Controller settings opens the page on its first section, Controller, saying the verdict on its heading, with the facts and the problems with what each said (${JSON.stringify(card)})`);
   doctorFixture('ok');
+  // Pressed once no run is out: the press rests while one runs (runDoctor),
+  // and a slow one under a whole run's load took the press with it.
+  await page.waitForFunction(() => { const b = document.querySelector('.settingstab .ctlcard #setDocRun');
+    return b && !b.disabled && !document.getElementById('bDoctor')?.disabled; }, null, { timeout: 30000 }).catch(() => {});
+  await page.click('.settingstab .ctlcard #setDocRun');
+  const again = await page.waitForFunction(() => !document.querySelector('.settingstab .ctlcard .ctlchecks .probs .sub')
+    && document.querySelector('.settingstab .ctlcard .ctlchecks .chips .pill'), null, { timeout: 30000 }).then(() => true, () => false);
+  ok(again, '...and its Run again runs the doctor, the card drawing what it found');
   await page.evaluate(() => document.getElementById('bDoctor').click());
   await page.waitForFunction(() => document.getElementById('docDot').className.includes('ok'), null, { timeout: 15000 });
-}
+});
 
 // The Analysis tab: the findings, browsable. The sidebar card is gone, since
 // its rows were only doors into each notebook, a summary nothing could be
@@ -284,20 +340,20 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
 // the same filter bar was styled in a notebook and browser-default here. The
 // skin is element-global now; this pins the agreement to a known-styled modal
 // field so the next new tab cannot ship native controls unnoticed.
-{
+await section("The tab's controls carry the house field skin", async () => {
   const skin = el => { const c = getComputedStyle(el);
     return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor, c.fontFamily].join('|'); };
   const pair = await page.evaluate(`(() => { const skin = ${skin};
     return [skin(document.querySelector('.fxtab .fxFind')),
-            skin(document.getElementById('mName'))]; })()`);
+            skin(document.getElementById('pName'))]; })()`);
   ok(pair[0] === pair[1],
      'the Analysis tab\'s filter field wears the same skin as every other field');
-}
+});
 // Every band of the tab starts at the same x. It shipped with four different
 // left edges: the filter bar flush against the edge (its padding rule named
 // an id the markup never had), the rules at 11px, the headings and the footer
 // at 14, which is what a retyped inset looks like from a phone.
-{
+await section("Every band of the tab starts at the same x", async () => {
   const xs = await page.evaluate(() => {
     // The content edge, not the box: every band is full width and it is the
     // inset that has to agree.
@@ -314,11 +370,11 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   ok(new Set(Object.values(xs)).size === 1 && !Object.values(xs).includes(null),
      'the tab\'s filter bar, headings, rules and footer all start at one x: '
      + JSON.stringify(xs));
-}
+});
 // `aerie findings sample`: the report a box with no scanner can still work on.
 // Every surface above ghosts or empties without one, and a development stack
 // has no scanner by design, so this is how they are exercised at all.
-{
+await section("`aerie findings sample`", async () => {
   const bb = (...a) => {
     try {
       return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'findings', ...a],
@@ -377,14 +433,14 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   ok(/in alpha/.test(loud) && !/--all/.test(loud),
      `...and one with findings is not told to run --all, which the relay refuses (${
        (loud.split('\n').find(l => l.startsWith('# ')) || '').slice(0, 50)})`);
-}
+});
 // Nothing readable in /reports and the way in says so: three ways to have
 // nothing (no mount, nothing in it, nothing that parses) and one sentence for
 // which, said when Analysis is pressed. A tab already open on it is closed once, when the page
 // first learns: a layout restored from last session can carry an Analysis tab
 // for a scanner that has since been unmounted, and one that stays only to say
 // "nothing here" is a tab somebody has to close by hand.
-{
+await section("Nothing readable in /reports and the way in says so", async () => {
   const keep = readFileSync(`${DIR}/reports/test.sarif`);
   rmSync(`${DIR}/reports`, { recursive: true, force: true });
   await refreshUntil(page, () => state?.reports_ok === false, { timeout: 20000 });
@@ -452,13 +508,13 @@ print(json.dumps(out))
   }
   await page.evaluate(() => openFindingsTab());
   await page.waitForSelector('.fxtab #fxProject', { timeout: 15000 });
-}
+});
 // Two projects whose names shorten to one slug are one dev instance: the same
 // compose project, env file and data directory, driven by two rows that know
 // nothing about each other. Nothing owns the moment a directory appears under
 // /workspace, so it cannot be refused; this list is the only place that sees
 // every name at once, which makes it the only place that can say so.
-{
+await section("Two projects whose names shorten to one slug are one dev instance", async () => {
   // Not empty: an empty directory is a mount point waiting for content and is
   // never listed at all.
   mkdirSync(`${DIR}/ws/My.App`, { recursive: true });
@@ -481,14 +537,14 @@ print(json.dumps(out))
   rmSync(`${DIR}/ws/my-app`, { recursive: true, force: true });
   await refreshUntil(page, () => !(state?.projects || []).some(p => p.name === 'my-app'),
                      { timeout: 20000 });
-}
+});
 // ---- a project's card on the Projects page, at a phone and at a desk ------
 // A project is a card on the Projects page (R138): its front the agent, Add
 // repository and Edit, no menu; Edit turns it over to the rest, at every
 // width.
-{
+await section("a project's card on the Projects page, at a phone and at a desk", async () => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(400);
+  await atWidth(390);
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.doc.on .projtab .pcard[data-row="alpha"]', { timeout: 10000 });
   const card = '.doc.on .projtab .pcard[data-row="alpha"]';
@@ -513,12 +569,24 @@ print(json.dumps(out))
   }, `${card} .pcback`, { timeout: 3000 }).then(h => h.jsonValue(), async () => page.$$eval(`${card} .pcback`, es => JSON.stringify(es.map(e =>
     ({ t: getComputedStyle(e).transitionProperty, conn: e.isConnected, par: e.parentElement?.className, ghost: !!e.closest('.fghost') })))));
   ok(/transform/.test(turn) && !/^\[/.test(turn), `...on a tween of its transform (${turn})`);
+  // The face away is not painted at all once the turn ends: an engine with
+  // no 3D compositing culls no back face, and drew the one away mirrored
+  // through the one on show (B1038).
+  const faces = await page.waitForFunction(sel => {
+    const c = document.querySelector(sel), v = e => getComputedStyle(e).visibility;
+    return !!c && v(c.querySelector(':scope > .pcfront')) === 'hidden' && v(c.querySelector(':scope > .pcback')) === 'visible'
+      && [...document.querySelectorAll('.pcard.pflip:not(.flipped):not(.compact)')].every(o => v(o.querySelector(':scope > .pcfront')) === 'visible' && v(o.querySelector(':scope > .pcback')) === 'hidden');
+  }, card, { timeout: 3000 }).then(() => true, () => false);
+  ok(faces, '...and a face turned away is not painted: the turned card\'s front, and every other card\'s back');
   await page.setViewportSize({ width: 1280, height: 1000 });
-  await page.waitForTimeout(400);
+  await atWidth(1280);
+  // The turn over: measured mid-turn, the icons of a face still swinging
+  // round sit at five heights.
+  await turned(card);
   // The back's foot is one line of icons, each named (the operator, 25 Oct).
   const foot = await page.$$eval(`${card} .pcback .pcacts > button`, bs => ({
     names: bs.map(b => b.getAttribute('aria-label')), tops: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size }));
-  ok(foot.tops === 1 && ['Color', 'Group', 'Report bug', 'Settings'].every(n => foot.names.includes(n)),
+  ok(foot.tops === 1 && ['Color', 'Group', 'Report bug', 'Back to the front'].every(n => foot.names.includes(n)) && !foot.names.includes('Settings'),
      `the back's controls are one line of named icons (${JSON.stringify(foot)})`);
   // A box opening on the back fades in by itself, with no copy of the face
   // fading out over it: the card's ground showed between the two, a flicker
@@ -552,7 +620,7 @@ print(json.dumps(out))
   ok(true, '...and pressing it unpins the space');
   await page.evaluate(() => setProjectPinned('alpha', true));
   await page.waitForFunction(() => document.querySelector('.doc.on .projtab .pcard[data-row="alpha"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 15000 });
-}
+});
 
 // ---- the card's notice: why nobody can be here, and who is ------------
 // The card on the Projects page says WHO is here as its state (the dot and a
@@ -563,7 +631,7 @@ print(json.dumps(out))
 // Planted rather than arranged: the fixture has no node, and the four refusals
 // worth drawing (offline, no session half, no copy yet, taken off its copy) are
 // nodes.mjs's to produce. This is about what the CARD does with one.
-{
+await section("the card's notice", async () => {
   await holdPoll(page);
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.pgrid .pcard[data-row="alpha"]', { timeout: 10000 });
@@ -598,8 +666,8 @@ print(json.dumps(out))
   ok(await page.$eval(`${C} [data-c]`, b => /^Claude: no node to run a Claude session on: pick one/.test(saidOf(b))),
      '...while the button carries the fix');
   await plant({ session_at: 'shed', node_name: 'shed', session_why: '',
-                held: 'shed runs agent 0.5.0 and this controller ships 0.6.93: a different compatibility window, so nothing sent to it is promised to work. Update it from the Nodes page' });
-  ok(/^shed runs agent 0\.5\.0 and this controller ships 0\.6\.93: .*Update it from the Nodes page$/.test(await line()),
+                held: 'shed runs agent 0.5.0, too old for this controller to work with: update it from the Nodes page' });
+  ok(/^shed runs agent 0\.5\.0, too old for this controller to work with: update it from the Nodes page$/.test(await line()),
      `a node out of window says so on the card too (${await line()})`);
   await plant({ held: '' });
   await plant({ node_name: 'shed' });
@@ -687,7 +755,7 @@ print(json.dumps(out))
      `...and your own session starting reads the status read at once, while nothing moving reads nothing (${JSON.stringify(reads)})`);
   await page.evaluate(w => { state.claude_with = w; state.claude_busy = {}; drawProjects(state.projects); }, were);
   await freePoll(page);
-}
+});
 
 await page.evaluate(() => { const t = tabs.find(x => x.kind === 'findings');
                             if (t) hideTab(t.id); });
@@ -805,7 +873,7 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefin
 // The scheme's other half (R216): Dark, Light or System beside the swatches,
 // applied on the press like a scheme, kept in the browser and on the
 // account, and the swatches show the half that is on.
-{
+await section("The scheme's other half", async () => {
   const pageBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   // Past the crossfade Default's pick above started (320ms of html.theming):
   // read mid-swap, the color to come back to was one no theme paints.
@@ -814,7 +882,9 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefin
   ok(await page.$eval('#uiMenu [data-mode="dark"]', b => b.classList.contains('on')),
      'the gear offers Dark, Light and System, on Dark to begin with');
   await page.click('#uiMenu [data-mode="light"]');
-  await page.waitForTimeout(400);
+  // Light on, and past its crossfade, as Default's above.
+  await page.waitForFunction(() => document.documentElement.dataset.mode === 'light'
+    && !document.documentElement.classList.contains('theming'), null, { timeout: 10000 }).catch(() => {});
   ok(await page.evaluate(() => document.documentElement.dataset.mode) === 'light'
      && await pageBg() !== darkBg,
      'Light repaints the page on the press, the light half of the same scheme');
@@ -879,7 +949,7 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefin
      '...and Dark puts it back, carrying no attribute at all');
   ok(swLight !== await page.$eval('#uiMenu .sw[data-theme="moss"]', b => getComputedStyle(b).backgroundColor),
      '...the swatches having shown the light half while it was on');
-}
+});
 
 // Escape shuts it, like the bell panel it sits beside.
 await page.keyboard.press('Escape');
@@ -938,7 +1008,7 @@ ok(true, '...and so does a click on the page under it');
 // One place for a dialog and the keyboard (R88): focus goes in as it opens,
 // Tab and Shift+Tab go round inside it, Escape closes the one on top, and
 // the focus comes back to what opened it.
-{
+await section("One place for a dialog and the keyboard", async () => {
   await page.focus('#bAbout');
   await page.keyboard.press('Enter');
   await page.waitForSelector('#aboutModal:not([hidden])');
@@ -979,22 +1049,22 @@ ok(true, '...and so does a click on the page under it');
     cur: panes[1] }));
   ok(tabs.list === 'tablist' && tabs.on.length === 1 && tabs.on[0] === tabs.cur,
      `the dock's line is a tablist, with the terminal showing marked selected (${JSON.stringify(tabs)})`);
-}
+});
 // ---- the welcome panel: a guide and the changelog behind one switch -------------
 // The same popup opens itself twice in an account's life: on the guide the
 // first time the account signs in, and on the changelog once after every
 // image update. Closing it is the acknowledgement. The fixture owner is
 // seeded as having read both, or every file here would open under it.
-{
+await section("the welcome panel", async () => {
   const prefs = async p => (await fetch(URL + 'api/users', { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    headers: OWNER,
     body: JSON.stringify({ action: 'prefs', prefs: p }) })).json();
   await prefs({ welcome_seen: false });
   await page.reload(); await ready(page);
   // An administrator has Home's Getting started for this (R267, the
   // operator 18 Oct): the guide over it would be two at once, so it does
   // not open by itself for one; it is About's, on its guide.
-  await sleep(2500);
+  await quiet(2500);
   ok(await page.$eval('#aboutModal', e => e.hidden),
      'an administrator who has not read the guide is not shown it on sign-in: Home\'s Getting started is theirs');
   await page.click('#bAbout');
@@ -1150,22 +1220,39 @@ print(json.dumps({"kept": [s["title"] for s in kept], "held": held, "series": se
 
   await page.click('#aboutClose');
   await page.waitForSelector('#aboutModal', { state: 'hidden' });
-  await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.seen === true, null, { timeout: 10000 });
-  ok(true, 'closing it marks the guide read, so it does not open again');
+  const seen = await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.seen === true, null, { timeout: 10000 })
+    .then(() => true, () => false);
+  ok(seen, 'closing it marks the guide read, so it does not open again');
   await page.reload(); await ready(page);
-  await new Promise(r => setTimeout(r, 800));
+  await quiet(800);
   ok(await page.$eval('#aboutModal', e => e.hidden), '...and a reload leaves it shut');
-  // An image this account has not seen: the changelog, once.
+  // An image this account has not seen: one line under the header, Updated
+  // to its version, never a dialog nobody asked for (Perch); its What
+  // changed opens the changelog.
   await prefs({ image_seen: 'ffffffffffffffffffffffffffffffffffffffff' });
   await page.reload(); await ready(page);
+  await page.waitForSelector('#updatedBand:not([hidden])', { timeout: 15000 });
+  await quiet(800);
+  const line = await page.evaluate(() => ({ said: $('updatedSay').textContent, about: !$('aboutModal').hidden }));
+  ok(/^Updated to \S/.test(line.said) && !line.about, `an image update is one line under the header, Updated to its version, and no dialog (${line.said})`);
+  await page.click('#updatedLog');
   await page.waitForSelector('#aboutModal:not([hidden])', { timeout: 15000 });
-  ok(await page.$eval('#abLog', e => !e.hidden) && await page.$eval('#abGuide', e => e.hidden),
-     'an image update opens the panel on the changelog');
+  ok(await page.$eval('#abLog', e => !e.hidden) && await page.$eval('#abGuide', e => e.hidden) && await page.$eval('#updatedBand', e => e.hidden),
+     '...its What changed opens the panel on the changelog, the line gone');
   await page.click('#aboutClose');
   await page.waitForSelector('#aboutModal', { state: 'hidden' });
   await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.image_seen === 'abc1234def5678901234567890abcdef12345678', null, { timeout: 10000 });
-  ok(true, '...and closing it acknowledges this image, so the next update is the next time');
-}
+  ok(true, '...and reading it acknowledges this image, so the next update is the next time');
+  // A press anywhere else puts the line away, and acknowledges it too.
+  await prefs({ image_seen: 'ffffffffffffffffffffffffffffffffffffffff' });
+  await page.reload(); await ready(page);
+  await page.waitForSelector('#updatedBand:not([hidden])', { timeout: 15000 });
+  await page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  const gone = await page.waitForFunction(async () => $('updatedBand').hidden
+    && (await (await fetch('/api/status')).json()).welcome.image_seen === 'abc1234def5678901234567890abcdef12345678', null, { timeout: 10000 })
+    .then(() => true, () => false);
+  ok(gone && await page.$eval('#aboutModal', e => e.hidden), '...and the next press elsewhere puts it away and acknowledges it, with no dialog');
+});
 // An image built before versions existed still has a commit, and the header
 // falls back to it rather than going blank.
 ok(await page.evaluate(() => { drawBuild({ rev: 'deadbee1234', built: '' });
@@ -1288,9 +1375,10 @@ ok(locked.menu.includes('Admin: Unlock'), `...and an administrator is offered Ad
      `...the padlock drawn as a line in the dim color, with its words beside it (${JSON.stringify(mark)})`);
 writeFileSync(`${DIR}/state/locked-projects.json`, JSON.stringify({ delta: { by: 'u_0000aaaa', admin: true } }));   // the fixture's own lock, kept
 await page.evaluate(() => refresh());
-// Archive (R119): out of sight and nothing else. Its card leaves the grid
-// for the Archived fold at the page's foot, its menu says Unarchive and
-// offers no Pin or Group, and Home's pinned projects leave it out.
+// Archive: a person's own, and the space works as any other. Its card
+// leaves the grid for the Archived fold at the page's foot, shut, with
+// Unarchive by its name and the same star, Group and controls as before;
+// a favorite stays on Home.
 await page.evaluate(() => setArchived('alpha', true));
 await page.waitForFunction(() => !!document.querySelector('.doc .projtab details.sect[data-sect="projects:archived"] .pcard[data-row="alpha"]'), { timeout: 15000 });
   const arch = await page.evaluate(() => {
@@ -1298,24 +1386,37 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
     const fold = c?.closest('details.sect');
     return { fold: fold?.dataset.sect || '', foldShut: fold ? !fold.open : null,
              said: fold?.querySelector(':scope > summary .sst')?.textContent || '',
-             menu: [...(c?.querySelectorAll('.pcback .pcacts button') || [])].map(b => b.getAttribute('aria-label')),
+             back: [...(c?.querySelectorAll('.pcback .pcacts button') || [])].map(b => b.getAttribute('aria-label')),
+             add: !!c?.querySelector('.pcfront [data-repadd]'),
+             star: !!c?.querySelector('.pcfront [data-pmark]'),
              unarchive: c?.querySelector('.pcfront [data-kmark]')?.getAttribute('aria-label') || '',
              mark: !!c?.querySelector('.lockmark'),
-             home: (state?.projects || []).filter(p => p.pinned && !p.archived).some(p => p.name === 'alpha') };
+             home: (state?.projects || []).find(p => p.name === 'alpha')?.pinned
+               ? projectList().filter(x => x.pinned).some(x => x.key === reposOf('alpha')) : null };
   });
   ok(arch.fold === 'projects:archived' && arch.foldShut === true && /^\d+ spaces?$/.test(arch.said)
-     && /^Unarchive/.test(arch.unarchive) && !arch.menu.some(t => /^Group/.test(t)) && !arch.home && !arch.mark,
-     `an archived space's card is folded away under Archived, Unarchive by its name and no Group on its back, not among the pinned, and not locked (${JSON.stringify(arch)})`);
+     && /^Unarchive/.test(arch.unarchive) && arch.star && arch.back.some(t => /^Group/.test(t)) && arch.add && arch.home !== false && !arch.mark,
+     `an archived space's card is folded away under Archived, Unarchive by its name, its star, its Group and Add repository as any card's, a favorite still a favorite, and not locked (${JSON.stringify(arch)})`);
 // Turned over inside the fold, its back is whole on the screen: every
 // control of it above the dock's line and nothing over it, the dock shut
 // as a person pulls it down to work on the page.
-{
+await section("Turned over inside the fold, its back is whole on the screen", async () => {
   await page.evaluate(() => dockToggle(false));
   await pjMenu('alpha');
   // The page scrolls smoothly: brought into view, then measured once it is there.
   await page.evaluate(() => [...(document.querySelector('.doc .projtab .pcard[data-row="alpha"]')?.querySelectorAll('.pcback .pcacts button') || [])]
     .pop()?.scrollIntoView({ block: 'center' }));
-  await page.waitForTimeout(700);
+  // What the check below reads, a toast looked through as it does.
+  await page.waitForFunction(() => {
+    const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), last = c && [...c.querySelectorAll('.pcback .pcacts button')].pop();
+    if (!last || !c.classList.contains('flipped')) return false;
+    const r = last.getBoundingClientRect(), foot = Math.min(innerHeight, document.querySelector('.pane.dock')?.getBoundingClientRect().top || innerHeight);
+    const toast = document.getElementById('toast');
+    if (toast) toast.style.visibility = 'hidden';
+    const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (toast) toast.style.visibility = '';
+    return r.bottom <= foot && (at === last || last.contains(at));
+  }, null, { timeout: 10000 }).catch(() => {});
   const seen = await page.evaluate(() => {
     const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), last = c && [...c.querySelectorAll('.pcback .pcacts button')].pop();
     if (!last) return { open: false };
@@ -1332,7 +1433,7 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
   ok(seen.open && seen.bottom <= seen.foot && seen.top,
      `...and Edit turns it over in the fold, its last control on screen and nothing over it (${JSON.stringify(seen)})`);
   await page.evaluate(() => flipCard(reposOf('alpha')));
-}
+});
 await page.evaluate(() => setArchived('alpha', false));
 // Unlocking is what is under test, so it is the LOCK that has to stop being
 // the reason. The button stays dead here for a different one (alpha has no
@@ -1369,7 +1470,7 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
 // Groups (the operator, 18 Oct): a label of this account's that keeps
 // projects together on the page, set from a card's menu in a box under its
 // name, the groups made already offered; an empty answer takes it out.
-{
+await section("Groups (the operator, 18 Oct)", async () => {
   const group = async (name, to) => {
     await pjMenu(name);
     await page.click(`.doc .projtab .pcard[data-row="${name}"] [data-pgroup]`);
@@ -1401,7 +1502,9 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
   const shut = await cardH();
   await page.click('.doc .projtab .pcard[data-row="gamma"] [data-pgroup]');
   await page.waitForSelector('.doc .projtab .askline input', { timeout: 5000 });
-  await page.waitForTimeout(400);
+  // The box in the repositories' place, its fade in over.
+  await page.waitForFunction(() => { const c = document.querySelector('.doc .projtab .pcard[data-row="gamma"]'), box = c?.querySelector('.askline');
+    return !!box && !box.getAnimations().length && !c.querySelector('.pcback .pcrepos')?.checkVisibility(); }, null, { timeout: 10000 }).catch(() => {});
   const opened = await cardH();
   const listGone = await page.$eval('.doc .projtab .pcard[data-row="gamma"] .pcback .pcrepos', l => !l.checkVisibility());
   ok(Math.abs(opened - shut) <= 1 && listGone,
@@ -1470,19 +1573,22 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
   await page.click('.doc .projtab .pcard[data-row="gamma"] [data-pgroup]');
   await page.waitForSelector('.doc .projtab .askline input', { timeout: 5000 });
   await page.click('.doc .projtab .askline [data-askno]');
-  await page.waitForTimeout(300);
+  // The box's fade and the repositories' said, then time for one more that
+  // must not come.
+  await page.waitForFunction(() => window.__fades.length >= 2, null, { timeout: 10000 }).catch(() => {});
+  await quiet(300);
   const boxFades = await page.evaluate(() => window.__fades.splice(0));
   await page.click('.doc .projtab .pcard[data-row="gamma"] .pcback [data-pedit]');
-  await page.waitForTimeout(600);
+  await turned('.doc .projtab .pcard[data-row="gamma"]', false);
   await page.click('.doc .projtab .pcard[data-row="gamma"] .pcfront [data-pmark]');
   await page.waitForFunction(() => (state.repos?.[reposOf('gamma') || 'gamma'] || {}).pinned, null, { timeout: 10000 }).catch(() => {});
-  await page.waitForTimeout(800);
+  // Time for a fade of the face that must not come, the pin's own redraw and the read after it.
+  await quiet(800);
   const markFades = await page.evaluate(() => { const f = window.__fades.splice(0); window.__unfade(); return f; });
-  // A pin moves the card to the top, so it slides there rather than fading
-  // (the operator, 26 Oct: a card that moves slides).
+  // A star marks the card where it is, so nothing of it fades.
   ok(boxFades.length === 2 && /^gamma:.*\baskline\b/.test(boxFades[0]) && /^gamma:pcrepos/.test(boxFades[1])
      && !boxFades.some(f => /through|pcface/.test(f)) && !markFades.some(f => /through|pcface/.test(f)),
-     `a box on a card's back fades in alone and the repositories fade back as it shuts, the face never faded, and a pin, which moves the card, slides it rather than fading (${JSON.stringify({ boxFades, markFades })})`);
+     `a box on a card's back fades in alone and the repositories fade back as it shuts, the face never faded, and a star, which marks the card where it is, fades nothing (${JSON.stringify({ boxFades, markFades })})`);
   await page.evaluate(() => setProjectPinned(reposOf('gamma') || 'gamma', false));
   await pjMenu('gamma');
   // The pencil beside the group's name renames it in a box under the
@@ -1510,7 +1616,7 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
     !!document.querySelector('.doc .projtab #pjGrid > .pgrid .pcard[data-row="beta"]'), null, { timeout: 15000 });
   ok(g.head === 'Clients 1' && g.cards.join() === 'beta' && offered.includes('Clients'),
      `Group puts a space under its group's name on the page, the next ask offering the groups made, and an empty answer takes it back out (${JSON.stringify({ ...g, offered })})`);
-}
+});
 
 // Unpinning takes a project off the sidebar and leaves it on the tab, whole.
 await page.evaluate(() => setProjectPinned('alpha', false));
@@ -1522,16 +1628,93 @@ ok(await page.$$eval('.doc .projtab .pcard .name',
 ok(await page.$eval('.doc .projtab .pcard[data-row="alpha"]',
      r => !!r.querySelector('[data-c]') && !!r.querySelector('[data-open]')),
    '...still carrying every control, which is the whole promise of the pin');
-// The pinned first on the page, each part by name (the operator, 18 Oct).
-{
+// The page is by name, a favorite where its name puts it; the star by a
+// space's name says which are this person's favorites, and the Favorites
+// chip narrows the grid to them, All putting the rest back.
+await section("The page is by name, and Favorites narrows it", async () => {
   const order = await page.evaluate(() => [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard')]
-    .map(c => { const p = state.repos[c.dataset.pkey]; return { n: p.name, pin: !!p.pinned }; }));
-  const firstLoose = order.findIndex(o => !o.pin);
-  const sorted = part => part.every((o, i) => !i || part[i - 1].n.localeCompare(o.n) <= 0);
-  ok(firstLoose > 0 && order.slice(firstLoose).every(o => !o.pin)
-     && sorted(order.slice(0, firstLoose)) && sorted(order.slice(firstLoose)),
-     `the pinned spaces come first, each part by name (${order.map(o => `${o.n}${o.pin ? '*' : ''}`).join(', ')})`);
-}
+    .map(c => { const p = state.repos[c.dataset.pkey]; return { n: p.name, fav: !!p.pinned }; }));
+  const sorted = order.every((o, i) => !i || order[i - 1].n.localeCompare(o.n) <= 0);
+  ok(order.length > 1 && sorted && order.some(o => o.fav) && order.some(o => !o.fav),
+     `the spaces are by name, favorite or not (${order.map(o => `${o.n}${o.fav ? '*' : ''}`).join(', ')})`);
+  const star = await page.$eval('.doc .projtab .pcard[data-row="beta"] .pcfront [data-pmark]', b => ({ on: b.getAttribute('aria-pressed'),
+    label: b.getAttribute('aria-label'), filled: getComputedStyle(b.querySelector('svg')).fill }));
+  ok(star.on === 'true' && /^Remove beta from your favorites$/.test(star.label) && star.filled !== 'none',
+     `a favorite's star by its name is pressed in and filled (${JSON.stringify(star)})`);
+  const fav = await page.evaluate(() => PJ_FAV);
+  await page.click(`.doc .projtab [data-pjchip="${fav}"]`);
+  const shown = () => page.evaluate(() => { const cs = [...document.querySelectorAll('.doc .projtab #pjGrid .pcard')];
+    return { n: cs.length, favs: cs.every(c => !!state.repos[c.dataset.pkey]?.pinned),
+             want: projectList().filter(c => c.pinned).length }; });
+  await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard')].every(c => !!state.repos[c.dataset.pkey]?.pinned),
+    null, { timeout: 8000 }).catch(() => {});
+  const narrowed = await shown();
+  ok(narrowed.n > 0 && narrowed.favs && narrowed.n === narrowed.want,
+     `the Favorites chip narrows the page to this person's favorites (${JSON.stringify(narrowed)})`);
+  await page.click('.doc .projtab [data-pjchip=""]');
+  await page.waitForFunction(n => document.querySelectorAll('.doc .projtab #pjGrid .pcard').length > n, narrowed.n, { timeout: 8000 }).catch(() => {});
+  const back = await shown();
+  ok(back.n > narrowed.n && !back.favs, `...and All puts the rest back (${JSON.stringify(back)})`);
+});
+// Full or Compact beside the search, as the Containers page's Cards and
+// List are: Compact folds every card to its name line, a press opens one,
+// a press on another opens that one and folds the first, and Full puts
+// every card back whole.
+await section("Full and Compact on the Spaces page", async () => {
+  const look = () => page.evaluate(() => { const cs = [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')];
+    return { n: cs.length, folded: cs.filter(c => c.classList.contains('compact') && !c.querySelector('.pcacts')?.checkVisibility()).length,
+             open: cs.filter(c => !c.classList.contains('compact')).map(c => c.dataset.pkey) }; });
+  const seg = await page.$$eval('.doc .projtab [data-pjview]', bs => bs.map(b => b.getAttribute('aria-label')));
+  // Every card on its face first: one turned over to its controls stays
+  // open in the compact view, as it should, and is not what is measured.
+  await page.evaluate(() => { pjEditing.clear(); drawProjects(state.projects); });
+  // What moves as it changes, recorded as the page asks for it: each
+  // card's height tween, and the switch's fade through (the operator, 18
+  // Nov: animated, as the Containers page's are).
+  await page.evaluate(() => {
+    window.__pjMoves = []; window.__pjFades = 0;
+    const animate = Element.prototype.animate;
+    Element.prototype.__pjWas = animate;
+    Element.prototype.animate = function(k, o){
+      if (this.dataset?.pkey && Array.isArray(k) && k[0] && 'height' in k[0]) window.__pjMoves.push(`${this.dataset.pkey}:${k[0].height}>${k[k.length - 1].height}`);
+      return animate.call(this, k, o);
+    };
+    const fade = fadeThrough;
+    window.__pjFadeWas = fade;
+    fadeThrough = (pick, swap) => { if (/projtab/.test(String(pick))) window.__pjFades++; return fade(pick, swap); };
+  });
+  await page.click('.doc .projtab [data-pjview="list"]');
+  await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')].every(c => c.classList.contains('compact')),
+    null, { timeout: 8000 }).catch(() => {});
+  const folded = await look();
+  const [k1, k2] = await page.$$eval('.doc .projtab #pjGrid .pcard[data-pkey]', cs => cs.slice(0, 2).map(c => c.dataset.pkey));
+  const openIs = k => page.waitForFunction(k => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')]
+    .filter(c => !c.classList.contains('compact')).map(c => c.dataset.pkey).join() === k, k, { timeout: 8000 }).catch(() => {});
+  await page.click(`.doc .projtab .pcard[data-pkey="${k1}"] [data-pjopen]`);
+  await openIs(k1);
+  const one = await look();
+  // A press on the folded card's face, not its name.
+  await page.click(`.doc .projtab .pcard[data-pkey="${k2}"]`, { position: { x: 4, y: 4 } });
+  await openIs(k2);
+  const two = await look();
+  await page.click('.doc .projtab [data-pjview="cards"]');
+  await openIs(await page.$$eval('.doc .projtab #pjGrid .pcard[data-pkey]', cs => cs.map(c => c.dataset.pkey).join()));
+  const full = await look();
+  const moved = await page.evaluate(() => {
+    const out = { moves: window.__pjMoves, fades: window.__pjFades };
+    Element.prototype.animate = Element.prototype.__pjWas; delete Element.prototype.__pjWas;
+    fadeThrough = window.__pjFadeWas;
+    return out;
+  });
+  const grew = (k, up) => moved.moves.some(m => { const [key, h] = m.split(':'); const [a, b] = h.split('>').map(parseFloat);
+    return key === k && (up ? b > a : b < a); });
+  ok(moved.fades === 2 && grew(k1, true) && grew(k2, true) && grew(k1, false),
+     `...each animated as the Containers page's are: the switch fades the cards through, a card opened grows from its name and the one it folds shrinks (${JSON.stringify(moved)})`);
+  ok(seg.join() === 'Full,Compact' && folded.n > 1 && folded.folded === folded.n,
+     `Compact beside Full folds every space's card to its name line (${JSON.stringify({ seg, folded })})`);
+  ok(one.open.join() === k1 && two.open.join() === k2 && full.open.length === full.n,
+     `...a press opens one, a press on another opens it and folds the first, and Full puts every card back (${JSON.stringify({ one, two, full })})`);
+});
 // The tab is a document, not a card adrift in one. It used to draw itself
 // inside .card, rounded, bordered and floating on a darker gutter, while the
 // notebook in the pane beside it filled the pane. One language.
@@ -1548,7 +1731,7 @@ ok(true, 'pinning it back reads Unpin again');
 // refreshes inside four seconds on top of the fifteen-second loop. Stacked,
 // each one makes the next slower, which is the shape the stuck-on-"loading…"
 // report had. Held open with a route so the overlap is deterministic.
-{
+await section("polls do not stack", async () => {
   // No read out to begin with: the pin pressed just before this asks for
   // one it does not wait for, and five asks joining that one, as they
   // rightly do, leave none to remember.
@@ -1574,7 +1757,7 @@ ok(true, 'pinning it back reads Unpin again');
   await page.evaluate(() => { refresh(); refresh(); refresh(); refresh(); refresh(); });
   for (const t1 = Date.now(); held < before + 1 && Date.now() - t1 < 20000;)
     await new Promise(r => setTimeout(r, 50));
-  await new Promise(r => setTimeout(r, 400));
+  await quiet(400);
   ok(held === before + 1,
      `polls asked while one is out do not stack (${held - before} request in flight)`);
   release();
@@ -1588,11 +1771,11 @@ ok(true, 'pinning it back reads Unpin again');
      `...and the asking is remembered, not dropped: one more goes when it lands (${
         held - before} in ${Date.now() - t0}ms)`);
   await page.unroute('**/api/status*');
-}
+});
 // ...and the revisions poll the same (R88): the timer, a tab coming back and
 // a menu let go each start one, and stacked an older reply landing second
 // set the page's revisions back and fired every watch again.
-{
+await section("and the revisions poll the same", async () => {
   let release, held = 0;
   await page.route('**/api/revs*', async route => {
     held++;
@@ -1607,7 +1790,7 @@ ok(true, 'pinning it back reads Unpin again');
   for (const t0 = Date.now(); held < 1 && Date.now() - t0 < 10000;) await new Promise(r => setTimeout(r, 50));
   const before = held;
   await page.evaluate(() => { pollRevs(); pollRevs(); pollRevs(); pollRevs(); });
-  await new Promise(r => setTimeout(r, 2000));      // past the 1.5 s timer too
+  await quiet(2000);      // past the 1.5 s timer too
   ok(held === before,
      `revision polls asked while one is out do not stack (${held - before + 1} in flight)`);
   release();
@@ -1615,7 +1798,7 @@ ok(true, 'pinning it back reads Unpin again');
   while (held < before + 1 && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 50));
   ok(held >= before + 1, `...and one more goes when it lands (${held - before} after ${Date.now() - t0}ms)`);
   await page.unroute('**/api/revs*');
-}
+});
 
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
@@ -1701,7 +1884,7 @@ ok(await page.$eval('#rnName', el => el.value) === 'alpha',
    'the rename dialog opens on the current name');
 ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e => e.textContent)),
    'the settings say the folder the space lives in, and its id, under the name');
-{
+await section("Sections, every one open by default at every width, with a jump bar", async () => {
   // Sections, every one open by default at every width, with a jump bar
   // over them (the operator, 8 Oct: too much was hidden in folds). One shut
   // stays shut for the page's life; the chain's door shows the repository's
@@ -1717,7 +1900,7 @@ ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e
      `...with a jump bar naming them (${jumps.join(', ')})`);
   await page.$eval('details[data-sect="rn:claude"] > summary', s => s.click());
   await page.waitForFunction(() => !document.querySelector('details[data-sect="rn:claude"]').open, null, { timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(300);
+  await quiet(300);   // alone: time for another section to have shut with it
   ok(shut(await folds()) === 'rn:claude', `...a heading pressed shuts its own section alone (${shut(await folds())})`);
   await page.evaluate(() => { closeRename(); renameProject('alpha', 'git'); });
   const chain = await folds();
@@ -1737,7 +1920,7 @@ ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e
   await phone.waitForSelector('#rnmodal:not([hidden])');
   ok(!shut(await folds(phone)), `on a phone every section is open too (${shut(await folds(phone)) || 'none shut'})`);
   await phone.close();
-}
+});
 ok(await page.evaluate(() => document.activeElement?.tagName) !== 'INPUT',
    '...with the keyboard down, like every other dialog here');
 ok(await page.$eval('#rnTokenField', el => el.hidden)
@@ -1780,7 +1963,7 @@ await page.click('#rnCancel');
 // the settings: a section per key with a row per route, a picked keystore
 // staged until its section's Save, its password asked for before anything
 // is sent, and a key the server will not keep refused with nothing kept.
-{
+await section("Its Android signing keys", async () => {
   const V = '.pane .nb .nbview[data-view="signing"]';
   const lastBad = () => page.evaluate(() => [...document.querySelectorAll('#toast .tst.bad .tmsg')].pop()?.textContent || '');
   const keySave = async () => {
@@ -1905,7 +2088,7 @@ await page.click('#rnCancel');
   // Back to the Projects page, where the rest of this file presses.
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.doc .projtab .pcard[data-row="alpha"]', { timeout: 15000 });
-}
+});
 
 // An invitation waiting on this account sits in the bell with its answer,
 // above the page's own notes, like every other thing waiting on you.
@@ -1988,7 +2171,7 @@ await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
 // dry-run push and draws what is missing in red under the button, a list
 // when it is more than one thing; the server's half is unit/test_auth_test.py,
 // so its answer is set here and the draw is what is read.
-{
+await section("Test (the operator, 7 Oct)", async () => {
   ok(!await page.$eval('#rnTestField', e => e.hidden), 'the chain\'s door offers Test for a space with a remote');
   let asked = null;
   const answer = { using: 'its deploy key', mode: 'ssh', read: true, push: false,
@@ -2015,7 +2198,7 @@ await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
   ok(await page.$eval('#rnTestOut', e => !e.classList.contains('bad')),
      '...and a credential with everything says it can read and push');
   await page.unroute('**/api/project-auth');
-}
+});
 
 // The remaining states need a project holding both credentials, which no
 // fixture here does, so the answer the dialog was given is set directly and
@@ -2079,7 +2262,7 @@ ok(v.onNone && !v.bad,
 // has no node here, so turning it on is refused in the dialog by name; an
 // account's access saves on its own, and reads back on the next open.
 await page.click('#rnCancel');
-{
+await section("The editor's and the apps' door is on unless a project closed it", async () => {
   await page.evaluate(n => renameProject(n), 'alpha');
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.waitForSelector('#rnFtpField:not([hidden])', { timeout: 10000 });
@@ -2124,7 +2307,7 @@ await page.click('#rnCancel');
   ok(set.status === 200 && back.body.on === false && back.body.people.find(p => p.uid === uid)?.access === 'r',
      `...and an account's access is kept while it is off (${JSON.stringify(back.body.people)})`);
   await api('/api/project-ftp', { action: 'set', project: 'alpha', access: { [uid]: '' } });
-}
+});
 
 // What Claude runs on here, back through the gear. Per project, and applied
 // when a session starts rather than typed into a running one, so the dialog's
@@ -2142,17 +2325,20 @@ ok(await page.$$eval('.rnbar', bs => bs.length >= 5 && bs.every(b => b.querySele
 // being found. It asks first, and a declined ask moves nothing.
 ok(!await page.$eval('#rnDelete', e => e.hidden) && /Delete space/.test(await page.$eval('#rnDelete', e => e.textContent)),
    'the settings dialog offers Delete space at its foot');
-{
+await section("which asks, names the bin, and moves nothing when declined", async () => {
   let asked = '';
   page.answers.push(q => { asked = q.text; return -1; });
   await page.click('#rnDelete');
-  await page.waitForFunction(() => document.getElementById('rnmodal').hidden, { timeout: 15000 });
+  await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 15000 });
+  // The settings close before the question is put: read once it has been
+  // asked and answered, not in the moment between (B817, 'asked: nothing').
+  await until(() => asked, 15000, 100);
   await page.waitForFunction(() => !document.querySelector('.askdlg'), null, { timeout: 5000 });
   ok(/moves to \/workspace\/\.trash\/alpha/.test(asked) && existsSync(`${DIR}/ws/alpha/.git`),
-     '...which asks, names the bin, and moves nothing when declined');
+     `...which asks, names the bin, and moves nothing when declined (asked: ${asked.replace(/\s+/g, ' ').slice(0, 90) || 'nothing'})`);
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])');
-}
+});
 await page.selectOption('#rnAsks', 'fewer');
 ok(!await page.$eval('#rnAsks', e => e.disabled) && !(await page.$('#rnModel')) && !(await page.$('#rnEffort'))
    && /next time Claude starts/.test(await page.$eval('#rnPrefHint', e => e.textContent))
@@ -2197,24 +2383,23 @@ await page.waitForFunction(() => document.querySelector('.doc .projtab [data-row
 const kept = await page.evaluate(() => { const p = state.projects.find(x => x.name === 'alpha'); return { mine: p.color, project: p.prefs?.color || '' }; });
 ok(kept.mine === 'teal' && kept.project === '' && !await page.$('.doc .projtab [data-row="alpha"] .pcpop'),
    `a pick wears it on the card at once and rolls the swatches up, kept as this account's and not the space's (${JSON.stringify(kept)})`);
-// Back turns the card over without saving anything, so it is no primary,
-// and wears the card's color as the front's buttons do.
-const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback [data-pedit]', b => {
-  const edit = b.closest('.pcard').querySelector('.pcfront [data-pedit]');
-  return { text: b.textContent.trim(), primary: b.classList.contains('primary'),
-           bg: getComputedStyle(b).backgroundColor, front: getComputedStyle(edit).backgroundColor,
-           plain: getComputedStyle(document.querySelector('.doc .projtab [data-row]:not(.pc) .pcfront [data-pedit]')).backgroundColor };
-});
-ok(back.text === 'Back' && !back.primary && back.bg === back.front && back.bg !== back.plain,
-   `a colored card's Back is a plain button in the card's color, as its Edit is (${JSON.stringify(back)})`);
-// A long name wraps on the back with Back held at the card's top right
-// (the operator, 26 Oct: it pushed Back onto a line of its own).
+// Settings is the gear at the back's top right, where the front's Edit
+// stands, and Back, which turns the card over saving nothing, is the last of
+// the foot's icons and no primary (the operator, 18 Nov: the two traded).
+const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback', b => ({
+  top: b.querySelector('.pcname .actbar [data-rn]')?.getAttribute('aria-label') || '',
+  foot: [...b.querySelectorAll('.pcfoot > button')].map(x => x.dataset.pedit !== undefined ? 'Back' : x.getAttribute('aria-label')),
+  primary: !!b.querySelector('.pcfoot [data-pedit].primary') }));
+ok(back.top === 'Settings' && back.foot.at(-1) === 'Back' && !back.foot.includes('Settings') && !back.primary,
+   `a card's back has Settings at its top right and Back last in its foot (${JSON.stringify(back)})`);
+// A long name wraps on the back with its Settings held at the card's top
+// right (the operator, 26 Oct: it pushed the button onto a line of its own).
 for (const w of [1280, 393]){
   await page.setViewportSize({ width: w, height: 900 });
   const line = await page.evaluate(() => {
     const p = state.projects.find(x => x.name === 'alpha'), key = reposOf('alpha') || 'alpha', was = state.repos[key].name;
     state.repos[key].name = 'Destiny-2-Armor-Stat-Planner-with-a-longer-name-still'; drawProjects(state.projects);
-    const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), back = c.querySelector('.pcback .pcname [data-pedit]');
+    const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), back = c.querySelector('.pcback .pcname [data-rn]');
     const name = c.querySelector('.pcback .pcname .name'), cr = c.getBoundingClientRect(), br = back.getBoundingClientRect(), nr = name.getBoundingClientRect();
     const out = { top: Math.round(br.top - cr.top), right: Math.round(cr.right - br.right), wraps: nr.height > 30, beside: nr.right <= br.left,
                   rowTop: Math.abs(nr.top - br.top) < 12 };
@@ -2228,56 +2413,76 @@ for (const w of [1280, 393]){
     return out;
   });
   ok(line.top < 40 && line.right < 40 && line.wraps && line.beside && line.rowTop && line.marks,
-     `a long name wraps beside Back, which stays at the card's top right, and beside pin and archive on the front, at ${w} (${JSON.stringify(line)})`);
+     `a long name wraps beside Settings, which stays at the card's top right, and beside the marks on the front, at ${w} (${JSON.stringify(line)})`);
 }
 await page.setViewportSize({ width: 1280, height: 800 });
 // One card on its back at a time (the operator, 26 Oct): Edit on another
 // turns this one back, a box open on it canceled.
-{
+await section("One card on its back at a time", async () => {
   const A = '.doc .projtab .pcard[data-row="alpha"]', G = '.doc .projtab .pcard[data-row="gamma"]';
   if (!await page.$eval(A, c => c.classList.contains('flipped'))) await page.click(`${A} .pcfront [data-pedit]`);
-  await page.waitForTimeout(500);
+  await turned(A);
   await page.click(`${A} .pcback [data-pgroup]`);
   await page.waitForSelector(`${A} .askline input`, { timeout: 5000 });
   await page.evaluate(g => document.querySelector(g)?.scrollIntoView({ block: 'center' }), G);
   await page.click(`${G} .pcfront [data-pedit]`);
-  await page.waitForTimeout(600);
+  await page.waitForFunction(([a, g]) => !document.querySelector(a).classList.contains('flipped') && document.querySelector(g).classList.contains('flipped')
+    && !document.querySelector(`${a} .askline`) && pjEditing.size === 1, [A, G], { timeout: 10000 }).catch(() => {});
+  await turned(G);
   const one = await page.evaluate(([a, g]) => ({ alpha: document.querySelector(a).classList.contains('flipped'),
     gamma: document.querySelector(g).classList.contains('flipped'), box: !!document.querySelector(`${a} .askline`),
     open: [...pjEditing] }), [A, G]);
   ok(!one.alpha && one.gamma && !one.box && one.open.length === 1,
      `Edit on another card turns the one in Edit back, its open box canceled, so one card is on its back at a time (${JSON.stringify(one)})`);
   await page.click(`${G} .pcback [data-pedit]`);
-  await page.waitForTimeout(500);
+  await turned(G, false);
   await page.evaluate(a => document.querySelector(a)?.scrollIntoView({ block: 'center' }), A);
   await page.click(`${A} .pcfront [data-pedit]`);
-  await page.waitForTimeout(500);
-}
+  await turned(A);
+});
 // A card that moves slides there, the rest closing up, and the page follows
-// the one pressed on (the operator, 26 Oct): the last card pinned moves up
-// among the pinned, slid there and in sight.
-{
+// the one pressed on (the operator, 26 Oct). A star moves nothing, the page
+// being by name; a space whose name comes to sort first (a rename's answer)
+// moves up, slid there and in sight.
+await section("A card that moves slides there, the rest closing up, and the page follows", async () => {
   await page.setViewportSize({ width: 1280, height: 600 });
   const last = await page.evaluate(() => { const g = document.querySelector('.doc .projtab #pjGrid > .pgrid');
     const cs = [...g.querySelectorAll('.pcard[data-pkey]')].filter(c => c.querySelector('.pcfront [data-pmark]:not(.on)'));
     const c = cs[cs.length - 1]; c.scrollIntoView({ block: 'end' }); return c.dataset.pkey; });
-  await page.waitForTimeout(400);
   const sel = `.doc .projtab .pcard[data-pkey="${last}"]`;
+  const place = () => page.evaluate(s => [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')].indexOf(document.querySelector(s)), sel);
+  const sliding = () => page.evaluate(() => [...document.querySelectorAll('.doc .projtab .pcard')]
+    .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))));
+  await page.waitForFunction(s => { const r = document.querySelector(s)?.querySelector('.pcfront [data-pmark]')?.getBoundingClientRect();
+    return innerHeight === 600 && !!r && r.top >= 0 && r.bottom <= innerHeight; }, sel, { timeout: 10000 }).catch(() => {});
+  const at0 = await place();
   await page.click(`${sel} .pcfront [data-pmark]`);
+  await page.waitForFunction(s => !!document.querySelector(s)?.querySelector('.pcfront [data-pmark].on'), sel, { timeout: 10000 }).catch(() => {});
+  const starred = { at: await place(), slid: await sliding() };
+  ok(starred.at === at0 && !starred.slid, `a star leaves its card where its name puts it, nothing sliding (${JSON.stringify({ at0, ...starred })})`);
+  await page.click(`${sel} .pcfront [data-pmark]`);
+  await page.waitForFunction(s => !document.querySelector(s)?.querySelector('.pcfront [data-pmark].on'), sel, { timeout: 10000 }).catch(() => {});
+  // Its name made to sort first, as the answer to a rename pressed on it.
+  await page.evaluate(k => { pjFollow = { key: k, until: Date.now() + 8000 }; const r = state.repos[k]; r.__was = r.name; r.name = '0 first'; drawProjects(state.projects); }, last);
   const r = await page.waitForFunction(s => {
     const c = document.querySelector(s); if (!c) return null;
-    const cs = [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')], at = cs.indexOf(c);
-    const first = at >= 0 && c.querySelector('[data-pmark].on') && cs.slice(0, at).every(x => x.querySelector('[data-pmark].on'));
+    const first = [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')].indexOf(c) === 0;
     const slid = [...document.querySelectorAll('.doc .projtab .pcard')].some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || []))));
     return first ? { first, slid } : null;
   }, sel, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => null);
-  await page.waitForTimeout(1200);
+  // Its slide over, since while it slides it is drawn where it left, and
+  // the page come to it where it landed.
+  await page.waitForFunction(s => { const c = document.querySelector(s);
+    if (!c || c.getAnimations().length) return false;
+    const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; }, sel, { timeout: 10000 }).catch(() => {});
   const seen = await page.$eval(sel, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; });
-  ok(r?.first && r?.slid && seen, `a card pinned from the foot slides up among the pinned, the others with it, and the page follows it there (${JSON.stringify({ ...r, seen })})`);
-  await page.click(`${sel} .pcfront [data-pmark]`);
-  await page.waitForTimeout(800);
+  ok(r?.first && r?.slid && seen, `a card whose name comes to sort first slides up, the others with it, and the page follows it there (${JSON.stringify({ ...r, seen })})`);
+  await page.evaluate(k => { const x = state.repos[k]; x.name = x.__was; delete x.__was; drawProjects(state.projects); }, last);
+  // Back in its place, and no card still sliding back.
+  await page.waitForFunction(() => ![...document.querySelectorAll('.doc .projtab .pcard')]
+      .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))), null, { timeout: 10000 }).catch(() => {});
   await page.setViewportSize({ width: 1280, height: 800 });
-}
+});
 // Leaving the page turns a card back: Projects comes back on the fronts.
 ok(await page.$eval('.doc .projtab [data-row="alpha"]', c => c.classList.contains('flipped')), 'the card is on its back before the page is left');
 await page.evaluate(() => { location.hash = '#/jobs'; });
@@ -2323,7 +2528,7 @@ await page.click('#rnCancel');
 // somebody who wanted the setting kept and their conversation left alone got
 // neither, and restarting the session by hand afterwards changed nothing,
 // because there was nothing stored to read (B88).
-{
+await section("Saving and interrupting are two decisions, and only one of them is asked", async () => {
   tmuxNew('claude-alpha', `${DIR}/ws/alpha`);
   await refreshUntil(page, () => liveSessions().has(myClaude('alpha')),
                      { timeout: 20000 });
@@ -2390,7 +2595,7 @@ await page.click('#rnCancel');
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.click('#rnCancel');
-}
+});
 
 // Ghosted where no session can start: a project locked against this account,
 // which for its owner is an administrator's lock (R119). Unlike the credential
@@ -2498,7 +2703,7 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
 // one on every element would be the easy version and the wrong one: it would
 // slow every hover and every state light on the page to make one rare action
 // look nicer.
-{
+await section("the theme crossfades", async () => {
   // What "crossfades" means, asserted without racing the 320ms window: the
   // swap turns a color transition ON for its duration. Sampling the color
   // partway through needed the evaluate to land inside that window, which a
@@ -2520,18 +2725,23 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
      `changing the scheme crossfades rather than cutting to it (${swap.eased} while swapping)`);
   await page.waitForFunction(() =>
     !document.documentElement.classList.contains('theming'), null, { timeout: 5000 });
+  // The new scheme's color in, looked for rather than read the moment the
+  // class goes: what was read then was once the old color still (the gate
+  // of 14 Nov, under load), and the check now says what it read.
+  await page.waitForFunction(w => getComputedStyle(document.body).backgroundColor !== w, was, { timeout: 5000 }).catch(() => {});
   const done = await bg();
-  ok(done !== was && /^0s?/.test(await page.$eval('body', b => getComputedStyle(b).transitionDuration)),
-     '...and the transition is taken back off, so nothing else on the page drags');
+  const eased = await page.$eval('body', b => getComputedStyle(b).transitionDuration);
+  ok(done !== was && /^0s?/.test(eased),
+     `...and the transition is taken back off, so nothing else on the page drags (${was} to ${done}, ${eased})`);
   // Reduced motion gets the swap and none of the fade.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => applyTheme('default'));
-  await page.waitForTimeout(60);
+  await quiet(60);   // well inside the 320ms a crossfade that did start would still be on
   ok(await bg() === was && !(await page.evaluate(() =>
        document.documentElement.classList.contains('theming'))),
      '...and reduced motion lands on the new scheme at once');
   await page.emulateMedia({ reducedMotion: null });
-}
+});
 
 // ---- one field skin, everywhere ----------------------------------------
 // Every text control on the page shares its ground, edge and radius from one
@@ -2539,9 +2749,12 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
 // whole contract. A field in a context the rule does not list silently wears
 // the BROWSER's default instead, which is how the log-retention box ended up
 // a 2px gray square in Arial beside a page of sunk monospace fields.
-{
+await section("one field skin, everywhere", async () => {
   await page.click('#bCards');
-  await page.waitForTimeout(400);
+  // The gear's menu come to rest, open or shut as the press left it.
+  await page.waitForFunction(() => { const m = document.getElementById('uiMenu');
+    return !m.getAnimations().length && m.hidden === (document.getElementById('bCards').getAttribute('aria-expanded') !== 'true'); },
+    null, { timeout: 10000 }).catch(() => {});
   const odd = await page.evaluate(() => {
     // Every dialog at once, so this sees the fields that live inside them.
     // What was hidden is put back hidden afterwards, ALL of it: only the
@@ -2568,36 +2781,33 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
     return bad;
   });
   ok(odd.length === 0, `every text field wears the one skin (${odd.join(' | ') || 'all'})`);
-}
+});
 
-// ---- one frame, three pieces ------------------------------------------
-// The tab strip, the panes and the bottom bar are drawn as one outline: the
-// strip owns the top corners and its own bottom edge, the panes carry the
-// sides with no top border, the bar owns the bottom corners. .col's 10px gap
-// pushed them apart into three boxes with the seams showing, which is what
-// this measures, and the pieces have to touch exactly.
-{
+// ---- one frame ---------------------------------------------------------
+// At a desk the terminal's frame ends at its panes: the band that stood
+// under them held Commands alone, which is gone (the operator, 12 Nov), and
+// the terminal's keys float over it. A band drawn there again, or a gap
+// left where it was, is what this measures.
+await section("one frame", async () => {
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')]
     .find(x => /^Terminal$/.test(x.textContent.trim())); b && b.click(); });
-  // A terminal in the dock, so the foot bar under it is drawn (R218 step 4).
+  // A terminal in the dock, in front (R218 step 4).
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) dockShow(t.id); });
-  await page.waitForTimeout(400);
-  const seams = await page.evaluate(() => {
-    const box = s => { const e = document.querySelector(s);
-      if (!e) return null; const r = e.getBoundingClientRect();
-      return r.height ? [r.top, r.bottom] : null; };
-    const parts = ['.panes', '.keys', '.mobar']
-      .map(s => [s, box(s)]).filter(p => p[1]);
-    return parts.slice(1).map((p, i) => p[1][0] - parts[i][1][1]);
-  });
-  ok(seams.length >= 1 && seams.every(g => Math.abs(g) < 0.6),
-     `the terminal frame is one outline, not three boxes (seams ${seams})`);
-}
+  // The terminal the dock's, and drawn.
+  await page.waitForFunction(() => { const t = tabs.find(x => x.kind === 'term');
+    return !!t && panes[1] === t.id && [...TERMS.values()].some(r => r.el.isConnected && r.term); }, null, { timeout: 10000 }).catch(() => {});
+  const foot = await page.evaluate(() => {
+    const bar = document.querySelector('.mobar'), panes = document.querySelector('.panes'), col = panes?.closest('.col');
+    return { band: !!bar && bar.getBoundingClientRect().height > 0,
+             gap: panes && col ? Math.round(col.getBoundingClientRect().bottom - panes.getBoundingClientRect().bottom) : null }; });
+  ok(!foot.band && foot.gap !== null && Math.abs(foot.gap) <= 1,
+     `a desk's terminal has no band under it: its frame ends at its panes (${JSON.stringify(foot)})`);
+});
 
 // ---- the logs, in the gear menu ---------------------------------------
 // The retention policy is days, not boots: a count is the wrong unit for "was
 // that this week?", and a crash loop can burn five generations in a minute.
-{
+await section("the logs, in the gear menu", async () => {
   const LD = `${DIR}/state/logs`;
   execFileSync('mkdir', ['-p', LD]);
   const old = Date.now() / 1000 - 90 * 86400;
@@ -2637,7 +2847,10 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
   await page.click('#uiProfile');
   await page.waitForSelector('.profiletab .setrow', { timeout: 15000 });
   ok(true, "the gear's door opens the account's Profile page");
+  // Its first section is Controller (Perch); Logs is picked from its list.
   await page.evaluate(() => railGo('controller'));
+  await page.waitForSelector('.settingstab .snav [data-spick="logs"]', { timeout: 15000 });
+  await splitPick(page, 'logs');
   await page.waitForSelector('.settingstab #logApply');
   ok(await page.$eval('.settingstab #logApply', b => b.disabled), 'Apply sleeps while the days are as saved');
   await page.fill('.settingstab #logDays', '3');
@@ -2645,6 +2858,9 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
   await page.click('.settingstab #logApply');
   await page.waitForFunction(() => document.querySelector('#logApply')?.textContent.trim() === 'Apply' && !('logDays' in (settingsDraft || {})),
                              { timeout: 10000 });
+  // The crop is the server's, in the request Apply sent: looked for until
+  // it is done, since the button reads Apply again a moment before.
+  await until(() => !existsSync(`${LD}/docker.log.2`), 10000);
   ok(!existsSync(`${LD}/docker.log.2`),
      'Apply crops what the new number already excludes, then and there');
   // ...the 3 saved and read back first: 30 typed over a page still holding
@@ -2712,7 +2928,7 @@ print(json.dumps({"names": z.namelist(), "diag": json.loads(z.read("diagnostics.
   ok(dg.status === 200 && dg.ct === 'application/zip' && /builderbot-diagnostics-\d{8}-\d{4}\.zip/.test(dg.cd || '')
      && 'controller' in inZip.diag && Array.isArray(inZip.diag.reports) && dg.link,
      `the diagnostics download beside them as a zip, diagnostics.json with the reports in it (${dg.cd}; ${inZip.names.join(', ')})`);
-}
+});
 
 // The command pin and the project pin are different features that spent an
 // afternoon sharing four names (/api/pin, _pin, PINS_FILE and setPinned), and
@@ -2743,7 +2959,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
 // session cannot start. A pick opens the terminal on that node, named on
 // the tab and stamped with that node's boot. Planted on the row, since the
 // fixture has one node.
-{
+await section("a project on several nodes", async () => {
   // The poll held: the rows are planted, and a poll landing between the
   // plant and the read put the server's rows back, which have one node.
   await holdPoll(page);
@@ -2824,6 +3040,11 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   writeFileSync(`${tdir}/aaaaaaaa-0000-4000-8000-000000000001.jsonl`,
     '{"type":"user","message":{"role":"user","content":"hi"}}\n'
     + '{"type":"assistant","message":{"model":"claude-fable-5-1","role":"assistant","content":[]}}\n');
+  // The chooser is the house dialog: over the dimmed page, centered as every
+  // dialog is, its box titled, its lines field bands, its presses the box's
+  // foot, held where it opened while its step changes.
+  const top1 = await page.evaluate(() => { const d = document.getElementById('rmModal');
+    return d && !d.hidden ? Math.round(d.querySelector('.box').getBoundingClientRect().top) : null; });
   await page.waitForFunction(() => { const b = document.querySelector('#resumemenu [data-n][data-node="n_ubu"]');
     if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
   // New conversation picked: the menu turns to the model and effort to start
@@ -2835,14 +3056,24 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
     models: [...m.querySelectorAll('#rmModel option')].map(o => o.value), efforts: [...m.querySelectorAll('#rmEffort option')].map(o => o.value),
     buttons: [...m.querySelectorAll('button')].map(b => b.textContent.trim()) }));
   ok(/^A new Claude conversation Claude Code on ubu$/.test(step.text) && step.models.includes('opus') && step.models.includes('fable')
-     && step.efforts.includes('high') && step.buttons.join() === 'Back,Start'
+     && step.efforts.includes('high') && step.buttons.join() === 'Start,Back'
      && !(await page.evaluate(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'))),
      `...New conversation turns the menu to Model and Effort with Start, naming the last session's model on the default, and starts nothing yet (${step.text}; ${step.buttons.join(' | ')})`);
+  const dlg = await page.evaluate(() => { const d = document.getElementById('rmModal'), b = d?.querySelector(':scope > .box');
+    const r = b?.getBoundingClientRect();
+    return { up: !!d && !d.hidden, inIt: b?.id === 'resumemenu', dim: d ? getComputedStyle(d).backgroundColor : '',
+             top: r ? Math.round(r.top) : null, h3: !!b?.querySelector(':scope > h3'), fields: b ? b.querySelectorAll(':scope > .field').length : 0,
+             foot: !!b?.querySelector(':scope > .foot [data-start]'), mid: r ? Math.round(r.top + r.height / 2) : null, vmid: Math.round(innerHeight / 2) }; });
+  ok(dlg.up && dlg.inIt && !/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(dlg.dim) && dlg.h3 && dlg.fields >= 2 && dlg.foot
+     && Math.abs(dlg.mid - dlg.vmid) <= 2 && top1 !== null && dlg.top === top1,
+     `the chooser is the house dialog over the dimmed page, centered, titled, its lines fields and its presses the box's foot, held where it opened as its step changes (${JSON.stringify({ ...dlg, top1 })})`);
   // A poll redraws the card: the step and what was picked stay.
   await page.selectOption('#rmModel', 'sonnet');
   await page.selectOption('#rmEffort', 'high');
   await page.evaluate(() => refresh());
-  await page.waitForTimeout(600);
+  // No read still out, so the card is drawn again from the one just asked for.
+  await page.waitForFunction(() => !refreshBusy && !!document.querySelector('#rmModel') && !!document.querySelector('#rmEffort'),
+    null, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval('#rmModel', e => e.value) === 'sonnet' && await page.$eval('#rmEffort', e => e.value) === 'high',
      '...and a poll redrawing the card keeps the step and the picks');
   await page.click('#resumemenu [data-start]');
@@ -2851,7 +3082,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
     return y.model === 'sonnet' && y.effort === 'high'; }, { timeout: 20000 });
   ok(true, '...and Start saves them as this account\'s for the space, which the launcher reads, and opens the session');
   await (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-    headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+    headers: OWNER,
     body: JSON.stringify({ project: 'alpha', model: '', effort: '' }) })).json();
   rmSync(tdir, { recursive: true, force: true });
   // The row planted again in the same evaluation as the read: a poll that
@@ -2889,7 +3120,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   // terminal, whatever asks for it, saying how many it lets each person run.
   {
     const cap = async n => (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-      headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+      headers: OWNER,
       body: JSON.stringify({ project: 'alpha', agent_slots: n }) })).json();
     const set = await cap(1);
     const over = await page.evaluate(async () => {
@@ -2941,54 +3172,88 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
       document.querySelector('#resumemenu [data-restart]').click();
       await new Promise(r => setTimeout(r, 300));
       const go = document.querySelector('#resumemenu [data-start]');
-      return { label: go?.textContent.trim(), danger: !!go?.classList.contains('danger'),
+      return { label: go?.textContent.trim(), amber: !!go?.classList.contains('caution') && !go.classList.contains('danger'),
                model: !!document.querySelector('#rmModel'), log: [...bbRestartLog] };
     });
-    ok(page.dialogs.length === d0 && first.label === 'Restart' && first.danger && first.model && first.log.length === 0,
-       `Restart turns the menu to the model and effort first, asking nothing and ending nothing yet (${JSON.stringify(first)})`);
+    ok(page.dialogs.length === d0 && first.label === 'Restart' && first.amber && first.model && first.log.length === 0,
+       `Restart turns the menu to the model and effort first, its Restart in amber since it loses nothing, asking nothing and ending nothing yet (${JSON.stringify(first)})`);
     const done = await page.evaluate(async () => {
       document.querySelector('#resumemenu [data-start]').click();
       for (let i = 0; i < 50 && !bbRestartLog.some(x => x[0] === 'start'); i++) await new Promise(r => setTimeout(r, 100));
       window.endSession = realEnd; window.startClaude = realStart;
       return bbRestartLog;
     });
-    ok(/Restart your Claude session on alpha on ubu\?/.test(page.dialogs.at(-1) || '') && page.dialogs.length === d0 + 1
-       && JSON.stringify(done) === JSON.stringify([['end', 'n_ubu'], ['start', '']]),
-       `...then its Restart asks, ends the session and only then starts it again (${JSON.stringify(done)})`);
+    ok(page.dialogs.length === d0 && JSON.stringify(done) === JSON.stringify([['end', 'n_ubu'], ['start', '']]),
+       `...then its Restart ends the session and only then starts it again, with no second question: the step is the question (${JSON.stringify(done)}, ${page.dialogs.length - d0} asked)`);
+    // A node that has not said the session ended within the server's half
+    // minute is waited on, said on the step, and the restart then goes on
+    // by itself: its agent takes the end at its next poll, a minute away
+    // after its own update, and the page said to press Restart again.
+    const waited = await page.evaluate(async () => {
+      const realEnd = endSession, realStart = startClaude, realPost = postJSON;
+      const log = [], said = [];
+      let asks = 0;
+      window.endSession = async () => ({ ok: true, gone: false, node: 'n_ubu', name: 'u_x~claude-alpha' });
+      window.postJSON = async (path, body) => path === '/api/session' && body.action === 'gone'
+        ? (log.push(['gone?', body.node, body.name]), { gone: ++asks >= 2 }) : realPost(path, body);
+      window.startClaude = () => log.push(['start']);
+      const why = await restartNow('alpha', { restart: { id: 'n_ubu', name: 'ubu', several: false } }, t => said.push(t));
+      if (!why) startClaude();
+      window.endSession = realEnd; window.startClaude = realStart; window.postJSON = realPost;
+      return { why, log, said: said.filter(Boolean) };
+    });
+    ok(waited.why === '' && JSON.stringify(waited.log) === JSON.stringify([['gone?', 'n_ubu', 'u_x~claude-alpha'], ['gone?', 'n_ubu', 'u_x~claude-alpha'], ['start']])
+       && /^Waiting for ubu to end it: its agent is busy or starting, \d+ seconds so far$/.test(waited.said[0] || ''),
+       `...and a node slow to say the session ended is waited on, said on the step, the restart going on by itself (${JSON.stringify(waited).slice(0, 300)})`);
   }
   // On a phone the Restart step stays on the screen, its Restart included,
   // with the model's longest choice in the box and nothing in it reaching
   // past its edge (B140). Drawn by resumePicker itself, from alpha's card.
   {
     const desk = page.viewportSize();
-    // An XL phone, 449 wide: under 420 the two fields are one column.
+    // An XL phone, 449 wide: under 600 the two fields are one column.
     await page.setViewportSize({ width: 449, height: 900 });
     await page.evaluate(() => openProjectsTab());
-    await page.waitForTimeout(600);
+    await atWidth(449);
+    // alpha's card on show with its Claude button, which the menu is hosted by.
+    await page.waitForFunction(() => [...document.querySelectorAll('.doc.on .projtab .pcard[data-row="alpha"] [data-c="alpha"]')]
+      .some(x => x.offsetParent !== null), null, { timeout: 15000 }).catch(() => {});
     const fit = await page.evaluate(() => {
-      // Hosted where the page hosts it, the pane, as placeResumeMenu does.
+      // Drawn as the dialog's box, shown, as placeResumeMenu does.
       resumeFor = 'alpha';
-      const card = resumeHostNow();
-      const anchor = card?.querySelector('[data-c="alpha"]');
-      if (!card || !anchor) return { card: !!card, anchor: !!anchor };
+      const slot = resumeHostNow();
+      if (!slot) return { slot: false };
       resumeModelNow = { project: 'alpha', model: 'claude-opus-4-1-20250805' };
       resumePick = { project: 'alpha', node: 'n_ubu', restart: true };
       const m = document.createElement('div');
-      m.className = 'pinmenu resumemenu'; m.id = 'resumemenu';
-      resumePicker(state.projects.find(x => x.name === 'alpha'), m, card, anchor,
+      m.className = 'box resumemenu'; m.id = 'resumemenu';
+      slot.hidden = false;
+      resumePicker(state.projects.find(x => x.name === 'alpha'), m, slot,
                    [{ id: 'n_ubu', name: 'ubu', where: 'node', why: '' }], false);
       const go = m.querySelector('[data-start]');
       const far = Math.max(...[...m.querySelectorAll('*')].map(e => e.getBoundingClientRect().right));
-      const out = { card: true, menu: Math.round(m.getBoundingClientRect().right), go: Math.round(go?.getBoundingClientRect().right || 0),
+      const out = { slot: true, menu: Math.round(m.getBoundingClientRect().right), go: Math.round(go?.getBoundingClientRect().right || 0),
                     far: Math.round(far), w: innerWidth, model: !!m.querySelector('#rmModel'),
                     longest: Math.max(...[...m.querySelectorAll('option')].map(o => o.textContent.length)) };
-      resumePick = null; resumeFor = null; m.remove();
+      closeResumeMenu();
       return out;
     });
     await page.setViewportSize(desk);
-    await page.waitForTimeout(300);
+    await atWidth(desk.width);
     ok(fit.model && fit.menu > 0 && fit.far <= fit.menu && fit.menu <= fit.w && fit.go > 0 && fit.go <= fit.w,
        `on a phone the Restart step stays on the screen, its Restart too (${JSON.stringify(fit)})`);
+    // ...and its Close, its backdrop and Escape each put it away.
+    const away = {};
+    for (const how of ['close', 'backdrop', 'escape']){
+      await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
+      await page.waitForFunction(() => !document.getElementById('rmModal')?.hidden && !!document.querySelector('#resumemenu [data-rmclose]'), null, { timeout: 10000 }).catch(() => {});
+      if (how === 'close') await page.click('#resumemenu [data-rmclose]');
+      else if (how === 'backdrop') await page.mouse.click(4, 860);
+      else await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.getElementById('rmModal')?.hidden && !document.getElementById('resumemenu'), null, { timeout: 5000 }).catch(() => {});
+      away[how] = await page.evaluate(() => !!document.getElementById('rmModal')?.hidden && !document.getElementById('resumemenu') && resumeFor === null);
+    }
+    ok(Object.values(away).every(Boolean), `...and its Close, its backdrop and Escape each put it away (${JSON.stringify(away)})`);
   }
   // A project on one node: its chooser names that node with what it has,
   // as each of several gets.
@@ -3054,12 +3319,28 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   ok(bands.band && bands.card === 'line' && bands.away === '' && bands.sameVisit === '' && bands.back,
      `a note in the header is a band with its x, the card's a line; put away it stays away through the notebook's views and is back once the notebook is left (${JSON.stringify(bands)})`);
   ok(bands.red && bands.yellow, `...a node removed from under it is an error's band in red, a node reconnecting a warning's in yellow (${JSON.stringify(bands)})`);
+  // A space's notes and facts are drawn once: its card and its notebook's
+  // header carry the same lines (the header's notice a band), and every
+  // facts line says a repository's branch and its id the same way.
+  const once = await page.evaluate(() => {
+    const p = { ...state.projects.find(x => x.name === 'alpha'), testing: { since: Date.now() / 1000 },
+                phone: { model: 'Pixel', owner: 'test', mine: true, lease: { project: 'alpha', by_name: 'test' } } };
+    const lines = h => [...new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html').querySelectorAll('.pnote:not(.pband)')].map(e => e.textContent.trim());
+    const text = h => new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html').body.textContent;
+    const pid = h => new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html').querySelector('.pid')?.title || '';
+    return { card: lines(projNotes(p)), head: lines(projNotes(p, true)), facts: text(projFacts(p)), repo: text(repoFacts(p)),
+             none: text(repoFacts({ ...p, git: null })), pidHead: pid(projFacts(p)), pidCard: pid(pidMark(projId(p))) };
+  });
+  ok(once.card.length >= 2 && once.card.join('|') === once.head.join('|') && once.card.some(l => /^tests running/.test(l)) && once.card.some(l => /lent here/.test(l)),
+     `a space's card and its notebook's header draw the same notes (${JSON.stringify(once)})`);
+  ok(once.repo && once.facts.includes(once.repo) && !/git:/.test(once.facts) && once.none === 'no git' && once.pidHead && once.pidHead === once.pidCard,
+     `...and every facts line says the branch and the id the same way (${JSON.stringify(once)})`);
   await page.evaluate(() => { tabs = tabs.filter(t => !(t.kind === 'term' && String(t.arg).includes(':n:')));
     state.claude_where = {};
     state.sessions = (state.sessions || []).filter(s => s.name !== myClaude('alpha')); drawPanes(); });
   await freePoll(page);
   page.errors = [];
-}
+});
 // ---- a dialog that scrolls says so, and opens at its top -------------------
 // On a short screen the project's settings dialog is taller than the room:
 // its title and its buttons stay put with their hairlines while what is
@@ -3067,7 +3348,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
 // knows which edge has more (the classes a list's hairline follows); and
 // closed and opened again it is back at its top, however far down it was
 // (the operator, 30 Sep).
-{
+await section("a dialog that scrolls says so, and opens at its top", async () => {
   await page.setViewportSize({ width: 420, height: 560 });
   const box = '#rnmodal > .box';
   const cls = () => page.$eval(box, b => ({ up: b.classList.contains('scrollup'), down: b.classList.contains('scrolldown'),
@@ -3108,12 +3389,12 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   await page.waitForFunction(() => document.getElementById('rnmodal').hasAttribute('hidden'), null, { timeout: 5000 });
   await page.evaluate(() => renameProject('alpha'));
   await page.waitForFunction(s => document.querySelector(s)?.classList.contains('scrolldown'), box, { timeout: 10000 });
-  await page.waitForTimeout(200);
+  await quiet(200);   // time for it to have gone back to where it was left
   const c = await cls();
   ok(c.top === 0 && !c.up, `...and opened again it is back at its top, not where it was left (${c.top})`);
   await page.evaluate(() => closeRename());
   await page.setViewportSize({ width: 1280, height: 900 });
-}
+});
 // A reload reads the page the address names beside the status read (the
 // operator, 18 Oct: it showed the boot's placeholder, then the page's own
 // while only then asking for its data): its reads start before the status
@@ -3142,10 +3423,13 @@ for (const [addr, reads] of [['#/people/users', ['/api/users', '/api/roles']],
     seen.push({ path: u.pathname + u.search, at: Date.now() }); };
   const onRes = r => { if (r.request() === statusReq && statusAt === Infinity) statusAt = Date.now(); };
   // The page before it quiet first: what its own open asked for is its own.
-  await page.waitForTimeout(1500);
+  await settled(page, { quiet: 400, cap: 8000 });
   page.on('request', onReq); page.on('response', onRes);
   await page.reload(); await ready(page);
-  await page.waitForTimeout(1500);
+  // Each read asked for, then the page's requests at rest and nothing new
+  // asked: a second ask of one would be among them.
+  await until(() => reads.every(u => seen.some(x => x.path === u)), 15000);
+  await settled(page, { quiet: 500, cap: 8000 });
   page.off('request', onReq); page.off('response', onRes);
   const got = reads.map(u => ({ u, n: seen.filter(x => x.path === u).length, early: seen.some(x => x.path === u && x.at <= statusAt) }));
   const twice = got.filter(g => g.n > 1).map(g => g.u);

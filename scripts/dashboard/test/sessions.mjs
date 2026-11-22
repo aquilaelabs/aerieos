@@ -3,7 +3,7 @@
 // macros only on shell tabs, middle-click ends a session, findings tab
 // behavior, and the phone's bottom bar: flyout slides and swaps, the strip
 // arrows and reveal, and the remembered view.
-import { launch, newPage, ok, done, ready, sleep, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member, OWNER, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -24,13 +24,13 @@ ok(sp.hash === '#/sessions' && sp.on && sp.head.join(',') === 'Session,Space,Nod
 const row = n => page.locator('.sesstbl .sessrow', { has: page.locator(`[data-go="${n}"]`) });
 // ...and a session on the controller itself says when it started, as a
 // node's does: its Started was blank for every one here (B149).
-{
+await section("and a session on the controller itself says when it started, as a", async () => {
   const started = await page.evaluate(() => {
     const r = document.querySelector('.sesstbl .sessrow [data-go="shell-9"]')?.closest('.sessrow');
     return r ? [...r.querySelectorAll('.td')].map(c => c.textContent.trim())[3] || '' : null;
   });
   ok(/ago|now/.test(started || ''), `a session here says when it started (${JSON.stringify(started)})`);
-}
+});
 const btn = n => row(n).locator('button').first();
 
 ok((await btn('shell-9').textContent()).trim() === 'Open', 'minimized session shows Open');
@@ -43,17 +43,69 @@ ok(await page.evaluate(() => sessionOf(tabOf(panes[1]).arg) === 'shell-9' && doc
 // mode a page up; PgDn pages back and copy mode ends itself at the bottom.
 // Pressed once the terminal shows the session, as a person would: before
 // its client attaches, keys reach bb-tty still starting, not tmux.
-for (const t0 = Date.now(); Date.now() - t0 < 15000 && tmuxFmt('shell-9', '#{session_attached}') === '0';) await sleep(200);
+await until(() => tmuxFmt('shell-9', '#{session_attached}') !== '0', 15000, 200);
+// ...and once the page's own terminal has its line to the session open: a
+// key sent before that goes nowhere, and under load the client was attached
+// a moment before the page's socket was (the gate of 15 Nov).
+await page.waitForFunction(() => [...TERMS.values()].some(r => r.el?.isConnected && r.ws?.readyState === 1), null, { timeout: 20000 }).catch(() => {});
 await page.evaluate(() => sendKey('pgup'));
-await page.waitForFunction(() => true); await sleep(300);
+await page.waitForFunction(() => true); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 'PgUp at a prompt enters copy mode (scrolls back)');
 // Any other key is the program's: it leaves copy mode first, where an arrow
 // moved tmux's cursor over the history and the program heard nothing (B254).
-await page.evaluate(() => sendKey('down')); await sleep(300);
+await page.evaluate(() => sendKey('down')); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', "...and the keys row's arrow leaves it, for the program");
-await page.evaluate(() => sendKey('pgup')); await sleep(300);
-await page.evaluate(() => sendKey('pgdn')); await sleep(300);
+await page.evaluate(() => sendKey('pgup')); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
+await page.evaluate(() => sendKey('pgdn')); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leaves copy mode by itself');
+// The hot bar (the operator, 12 Nov): at a desk, over the terminal's bottom
+// right corner and slightly translucent, the keys a terminal is most
+// reached for, a shell's on a shell's tab.
+await section("The hot bar (the operator, 12 Nov)", async () => {
+  const HOT = '#pane1 .slot.ownterm .xhot';
+  const hot = await page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return null;
+    const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
+    return { keys: [...b.querySelectorAll('.xhotkeys button')].map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
+             bottom: Math.round(h.bottom - r.bottom), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1 && r.top >= h.top,
+             seen: +getComputedStyle(b).opacity,
+             tall: [...b.querySelectorAll('button')].filter(x => !x.hidden).every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
+  ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.bottom >= 0 && hot.bottom < 24 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall
+     && hot.seen > 0.6 && hot.seen < 1,
+     `a shell's terminal wears its hot bar at its bottom right, slightly translucent: a shell's keys and a page back and on (${JSON.stringify(hot)})`);
+  await page.click(`${HOT} [data-hk="pgup"]`); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
+  const up = tmuxFmt('shell-9', '#{pane_in_mode}');
+  await page.click(`${HOT} [data-hk="down"]`); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 10000);
+  ok(up === '1' && tmuxFmt('shell-9', '#{pane_in_mode}') === '0', `its PgUp scrolls a page back and its arrow is the program's, as the keys row's are (${up})`);
+  // Links: what the terminal shows, read whole where a link runs past the
+  // pane's width, wrapped by the terminal or broken there by the program.
+  await page.evaluate(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9');
+    const type = t => termType(rec, new TextEncoder().encode(t));
+    type("clear; printf 'soft https://example.test/soft/%s end\\n' \"$(printf 'a%.0s' $(seq 1 400))\"; echo \"https://example.test/hard/$(printf 'b%.0s' $(seq 1 400))\" | fold -w \"$(tput cols)\"; echo done-links\r"); });
+  await page.waitForFunction(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); const b = rec?.term?.buffer?.active;
+    for (let i = 0; b && i < b.length; i++) if (/^done-links/.test(b.getLine(i)?.translateToString(true) || '')) return true; return false; }, null, { timeout: 15000 }).catch(() => {});
+  // Links is there whether or not the terminal shows one (the operator, 12
+  // Nov), a press with the chain's picture.
+  ok(await page.$eval(`${HOT} [data-hlinks]`, b => !b.hidden && !!b.querySelector('svg') && b.offsetParent !== null && /links/.test(b.getAttribute('aria-label') || '')),
+     'Links is on the bar always, a press with the chain\'s picture');
+  await page.click(`${HOT} [data-hlinks]`);
+  const links = await page.evaluate(sel => { const l = document.querySelector(sel + ' .xlinks');
+    return { shown: !l.hidden, hrefs: [...l.querySelectorAll('a')].map(a => a.getAttribute('href')), rel: [...l.querySelectorAll('a')].every(a => a.target === '_blank' && /noopener/.test(a.rel)),
+             copies: l.querySelectorAll('[data-hcopy]').length, wide: l.getBoundingClientRect().right <= innerWidth + 1,
+             over: l.getBoundingClientRect().bottom <= document.querySelector(sel).getBoundingClientRect().top + 1 }; }, HOT);
+  ok(links.shown && links.hrefs.includes('https://example.test/soft/' + 'a'.repeat(400)) && links.hrefs.includes('https://example.test/hard/' + 'b'.repeat(400))
+     && links.rel && links.copies === links.hrefs.length && links.wide && links.over,
+     `Links lists the terminal's links over the bar, to open or copy, each whole though it ran over several rows (${links.hrefs.map(h => h.slice(0, 34) + '… ' + h.length).join(', ')})`);
+  await page.click(`${HOT} [data-hlinks]`);
+  ok(await page.$eval(`${HOT} .xlinks`, l => l.hidden), '...and a second press puts the list away');
+  // Folded to its handle, a browser's own choice.
+  await page.click(`${HOT} .xhottog`);
+  const folded = await page.evaluate(sel => { const b = document.querySelector(sel); return { folded: b.classList.contains('folded'), keys: getComputedStyle(b.querySelector('.xhotkeys')).display,
+    kept: localStorage.getItem('bb-term-hot'), says: b.querySelector('.xhottog').getAttribute('aria-label') }; }, HOT);
+  ok(folded.folded && folded.keys === 'none' && folded.kept === '0' && /show/.test(folded.says), `its handle folds it away, and this browser keeps that (${JSON.stringify(folded)})`);
+  await page.click(`${HOT} .xhottog`);
+  ok(await page.$eval(HOT, b => !b.classList.contains('folded')), '...and brings it back');
+  await page.evaluate(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); termType(rec, new TextEncoder().encode('clear\r')); });
+});
 ok((await row('shell-9').locator('.pill.ok').textContent()).trim() === 'on screen', 'its row says it is on screen');
 ok((await row('shell-9').locator('[data-go]').evaluate(e => saidOf(e))) === await page.$eval('#pane1 .dtab.on .dlbl', el => saidOf(el)),
    "the session row and its tab on the dock's line are described by the same words");
@@ -64,35 +116,16 @@ ok((await btn('shell-9').textContent()).trim() === 'Open', 'Minimize takes the t
 await row('shell-9').locator('[data-go]').click();
 await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'shell-9'));
 
-
-// ---- the git list ghosts against the shell's directory ----------------------
-// shell-9 lives in /tmp; alpha and ep.silon are repositories, and the dotted
-// name proves the cwd-to-project mapping survives tmux's rename. No gh: a
-// node carries none (the operator, 17 Oct), so the list is git's alone.
+// Two shells in repositories, for the sections below: alpha's, and one whose
+// dotted name tmux rewrites.
 tmuxNew('shell-alpha', `${DIR}/ws/alpha`);
 tmuxNew('shell-ep_silon', `${DIR}/ws/ep.silon`);
 await page.evaluate(() => refresh());
 await page.waitForFunction(() => state.sessions.some(s => s.name === 'shell-ep_silon'));
-const gitBtn = () => page.$eval('#git [data-m="git-status"]', b => ({ dis: b.disabled }));
-await row('shell-9').locator('[data-go]').click();
-await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-9');
-ok(!(await page.$eval('#linux [data-m]', b => b.disabled)), 'linux commands live on any shell');
-ok((await gitBtn()).dis, 'outside a repo the git commands ghost');
-ok(!(await page.$('#git [data-m^="gh-"]')), '...and there are no gh commands to ghost');
-await row('shell-alpha').locator('[data-go]').click();
-await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-alpha');
-ok(!(await gitBtn()).dis, 'in a repository the git commands are live');
-await row('shell-ep_silon').locator('[data-go]').click();
-await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-ep_silon');
-ok(!(await gitBtn()).dis, '...a dotted space name included');
-// Tidy the strip for the sections below: these two tabs were this block's.
-await page.evaluate(() => { for (const s of ['shell-alpha', 'shell-ep_silon']){
-  const t = tabs.find(x => sessionOf(x.arg) === s); if (t) hideTab(t.id); } });
 
 await row('claude-alpha').locator('[data-go]').click();
 await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'claude-alpha'));
 ok((await btn('claude-alpha').textContent()).trim() === 'End', 'a Claude session with its tab open has End, and no Minimize');
-ok(await page.$eval('#linux [data-m]', b => b.disabled), 'macros grayed on a Claude tab');
 const nd = page.dialogs.length;
 await btn('claude-alpha').click();
 await page.waitForFunction(() => !document.querySelector('[data-go="claude-alpha"]'), { timeout: 15000 });
@@ -102,8 +135,9 @@ const alphaLabel = await page.evaluate(() => projLabel('alpha'));
 ok(page.dialogs[nd].includes(`Claude session on ${alphaLabel}?`) && !page.dialogs[nd].includes('claude-alpha'),
    `...the question names the space, not the tmux session (${page.dialogs[nd].split('\n')[0]})`);
 // B54: focus is not left on another row's End, where a keyboard Enter would
-// end a second session.
-await sleep(300);
+// end a second session. Read once the page has taken focus off the list,
+// which it does after the read that follows the End.
+await page.waitForFunction(() => !document.activeElement?.matches?.('[data-k]'), null, { timeout: 10000 }).catch(() => {});
 const fo = await page.evaluate(() => { const a = document.activeElement;
   return a?.matches?.('[data-k]') ? a.dataset.k : ''; });
 ok(!fo, `after End, focus is on no other row's End (${fo || 'none'})`);
@@ -145,7 +179,6 @@ await page.evaluate(() => openNotebook('alpha', 'analysis'));
 await page.waitForSelector('.pane .nb [data-view="analysis"]:not([hidden]) .rule',
                            { timeout: 20000 });
 ok(true, 'a notebook opens on its Analysis view when asked by name');
-ok(await page.$eval('#linux [data-m]', b => b.disabled), 'macros grayed on a notebook tab');
 ok(await page.$$eval('.pane .nb .rule .rid .pill', ps => ps.length > 0),
    '...with the findings for that space alone, worst level first');
 
@@ -173,7 +206,7 @@ await page.waitForFunction(n =>
 // .field inside a .field and inset twice; the rules carried the sidebar's
 // tighter 11px, so this one view had three left edges where the roadmap
 // beside it had one.
-{
+await section("The view's bands line up with every other view's", async () => {
   // (at a desk the list is a floating card, R262: a band in one is placed
   // by the card's edge, as uniform.mjs measures it)
   const xs = await page.evaluate(() => {
@@ -193,7 +226,7 @@ await page.waitForFunction(n =>
   });
   ok(new Set(Object.values(xs)).size === 1 && !Object.values(xs).includes(null),
      'the notebook\'s Analysis bands share one left edge: ' + JSON.stringify(xs));
-}
+});
 ok(await page.$$eval('.pane .nb .field .field', es => es.length === 0),
    '...and nothing in the notebook is inset twice by a field inside a field');
 // The fourth log. Nothing writes it (it is the difference between one scan
@@ -243,11 +276,9 @@ await page.evaluate(() => railGo('sessions'));
 await page.evaluate(() => { if (!tabs.some(t => sessionOf(t.arg) === 'shell-9'))
   openTab({kind:"term", arg: argForSession('shell-9'), label:'shell-9'}); });
 await page.evaluate(() => focusTab(tabs.find(t => sessionOf(t.arg) === 'shell-9').id));
-ok(await page.$eval('#linux [data-m]', b => !b.disabled), 'macros live on a shell tab');
-// no tabs at all → grayed too
+// Every tab put away, then shell-9 alone, for what follows.
 await page.evaluate(() => { const keep = tabs.slice(); keep.forEach(t => dropTab(t.id)); });
-ok(await page.$eval('#linux [data-m]', b => b.disabled),
-   'macros grayed with no tab open');
+ok(await page.evaluate(() => !tabs.some(t => t.kind === 'term')), 'every terminal can be put away');
 await page.evaluate(() => openTab({kind:"term", arg: argForSession('shell-9'), label:'shell-9'}));
 await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'shell-9'));
 
@@ -265,12 +296,12 @@ await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.pgrid .pcard[data-row="ep.silon"] [data-c]', { timeout: 15000 });
 ok(await page.$eval('.pgrid .pcard[data-row="ep.silon"] [data-c]', b => b.textContent.trim() === 'Manage agent' && b.classList.contains('primary')),
    'dotted space: the agent button knows the session is running (Manage agent, green)');
-{
+await section("and one with no session of yours says Start agent, not green", async () => {
   const idle = await page.evaluate(() => [...document.querySelectorAll('.pgrid .pcard [data-c]')]
     .filter(b => !liveSessions().has(myClaude(b.dataset.c))).map(b => [b.textContent.trim(), b.classList.contains('primary')]));
   ok(idle.length > 0 && idle.every(([t, green]) => t === 'Start agent' && !green),
      `...and one with no session of yours says Start agent, not green (${JSON.stringify(idle.slice(0, 3))})`);
-}
+});
 await page.evaluate(() => railGo('sessions'));
 await page.click('.sesstbl [data-go="claude-ep_silon"]');
 await page.waitForFunction(() => tabs.some(t => t.arg === 'claude:ep.silon'));
@@ -303,7 +334,7 @@ const lockAnswer = page.waitForResponse(r => r.url().includes('/api/lock'), { ti
 await page.click('.pgrid .pcard[data-row="ep.silon"] [data-lock]');         // lock: asks, then the server ends the others' sessions
 const lockSaidBack = await lockAnswer;
 // The question is the page's modal, answered a moment after the press.
-for (let i = 0; i < 40 && page.dialogs.length <= ndx; i++) await sleep(100);
+await until(() => page.dialogs.length > ndx, 4000, 100);
 const gone = n => { for (let i = 0; i < 20; i++){ try { execFileSync('tmux', ['has-session', '-t', '=' + n], { stdio: 'ignore' }); } catch { return true; } execFileSync('sleep', ['0.25']); } return false; };
 const lockGone = [gone(`${lockUid}~claude-ep_silon`), gone('claude-ep_silon')];
 ok(lockSaid === 'Lock' && page.dialogs.length === ndx + 1 && /Every session here but yours ends now/.test(page.dialogs[ndx]) && /Lock ep\.silon\?/.test(page.dialogs[ndx])
@@ -332,6 +363,9 @@ await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'sh:5:alpha').id));
 // A terminal in front again, for what follows.
 await page.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) focusTab(t.id); });
 const nd2 = page.dialogs.length;
+// The dock's line is drawn a moment after the focus: waited for, not read
+// at once (B825's second sighting).
+await page.waitForSelector('#pane1 .dtab.on', { timeout: 10000 });
 const tb = await (await page.$('#pane1 .dtab.on')).boundingBox();
 await page.mouse.click(tb.x + 20, tb.y + 12, { button: 'middle' });
 await page.waitForFunction(() => !state.sessions.some(s => s.name === 'shell-9'), { timeout: 15000 });
@@ -351,10 +385,10 @@ await phone.waitForFunction(() => typeof state !== 'undefined' && state && Array
 // layout landing between the two took the tab away again and the bar with it.
 const mob = await phone.waitForFunction(() => {
   if (!tabs.some(t => t.kind === 'term')) openTab({kind: 'term', arg: argForSession('shell-alpha'), label: 'shell-alpha'});
-  const k = document.getElementById('mKeys');
-  const bw = [...document.querySelectorAll('#mobar button')].filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width));
+  const k = document.getElementById('mLinks');
+  const bw = [...document.querySelectorAll('#mobar > button')].filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width));
   window.__seen = { tabs: tabs.map(t => t.kind), keys: !!k && !k.hidden && k.offsetParent !== null, widths: bw,
-                    whole: [...document.querySelectorAll('#mobar button')].every(b => b.scrollWidth <= b.clientWidth),
+                    whole: [...document.querySelectorAll('#mobar > button')].every(b => b.scrollWidth <= b.clientWidth),
                     display: getComputedStyle(document.getElementById('mobar')).display,
                     bKeys: !!document.getElementById('bKeys'), w: innerWidth };
   return window.__seen.keys && window.__seen;
@@ -362,8 +396,29 @@ const mob = await phone.waitForFunction(() => {
   .catch(async () => (await phone.evaluate(() => window.__seen)) || {});
 ok(mob.display === 'flex' && !mob.bKeys,
    `the phone bar carries the keys, and the strip has no ⌨ anywhere to hide (${JSON.stringify(mob)})`);
-ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
-   `...its two buttons share the bar in equal halves, each word whole (${JSON.stringify(mob.widths)})`);
+// On a phone the band at the terminal's foot is the hot bar (the operator,
+// 12 Nov): the keys of the terminal in front in a line that scrolls, Links
+// standing still at its end, and nothing floating over the terminal.
+await section("On a phone the band at the terminal's foot is the hot bar", async () => {
+  const band = await phone.evaluate(() => { const h = document.getElementById('mHot'), bar = document.getElementById('mobar');
+    const ends = [...bar.querySelectorAll(':scope > button')].filter(b => b.offsetParent !== null);
+    return { keys: [...h.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.textContent.trim()).join(' '), shown: !h.hidden && h.offsetParent !== null,
+             ends: ends.map(b => b.id), words: ends.map(b => b.querySelector('.mw') ? getComputedStyle(b.querySelector('.mw')).display : 'none'), labels: ends.map(b => b.getAttribute('aria-label') || ''),
+             chain: !!document.querySelector('#mLinks svg'),
+             tall: [...bar.querySelectorAll('button')].filter(b => b.offsetParent !== null).every(b => b.getBoundingClientRect().height >= 30 && b.getBoundingClientRect().width >= 30),
+             inBar: ends.every(b => b.getBoundingClientRect().right <= innerWidth + 1), scrolls: h.scrollWidth > h.clientWidth,
+             // ...as the dock's line reads: its end faded with the arrow where more keys lie past it, the two presses still, to the arrow's right.
+             arrow: h.classList.contains('hscroll') && h.classList.contains('chr') && !h.classList.contains('chl') && getComputedStyle(h, '::after').content.includes('\u203a'),
+             faded: getComputedStyle(h).maskImage !== 'none' || getComputedStyle(h).webkitMaskImage !== 'none',
+             after: ends.every(b => b.getBoundingClientRect().left >= h.getBoundingClientRect().right - 1),
+             overlay: [...document.querySelectorAll('.slot.ownterm .xhot')].filter(x => getComputedStyle(x).display !== 'none').length }; });
+  ok(band.shown && band.keys.startsWith('Esc Tab ↑ ↓ ^C ^D PgUp PgDn ') && / \^Z /.test(band.keys) && / \| /.test(band.keys) && band.ends.join() === 'mLinks' && band.chain
+     && band.words.every(d => d === 'none') && band.labels.every(Boolean)
+     && band.tall && band.inBar && band.overlay === 0 && (!band.scrolls || (band.arrow && band.faded)) && band.after,
+     `phone: the band at a shell's foot is its hot bar, a line of its keys (the hot ones, then the rest of the key table) that reads as the dock's line does, a faded end and its arrow where more lie past it, Links with the chain's picture still at the arrow's right, with no Commands press beside it, and nothing floats over the terminal (${JSON.stringify(band)})`);
+});
+ok((mob.widths || []).length === 1 && mob.whole && !(await phone.$('#mMacros')) && !(await phone.$('#macpanel')),
+   `...Links is the one press at its end, not cut, and there is no Commands panel (${JSON.stringify(mob.widths)})`);
 // A truncated version string answers nothing, so where it will not fit the
 // About control carries the word instead, and exactly one of the two, never
 // both: showing the label on a desktop as well stacked it under the version
@@ -374,58 +429,23 @@ ok(await phone.$eval('#bAbout .alab', el => getComputedStyle(el).display !== 'no
 ok(await page.$eval('#bAbout .alab', el => getComputedStyle(el).display === 'none')
    && await page.$eval('#bAbout #build', el => getComputedStyle(el).display !== 'none'),
    '...and a wide one shows the version, with no second label under it');
-// Measure the terminal before, mid-slide and after: it must hold still
-// through the slide (the panel is an overlay then) and shrink once at the end.
-//
-// Both heights are read in ONE evaluate, either side of a synchronous click,
-// and that is the whole point rather than a shortcut. The button's handler is
-// mobPanel -> render -> drawKeys -> slidePanel with nothing awaited, so when
-// .click() returns the panel is already absolute and its animation started.
-// No frame, no poll and no other animation can land between the two reads.
-// Sampling the baseline in an earlier round trip is what CI kept failing on,
-// four runs running, while an idle box passed: the panel assertion above it
-// passed in the same breath, so the panel was still absolute and cannot have
-// been what moved the terminal; the baseline was simply stale. The mover was
-// the phone's view switch, a 220ms slide that held overflow-x on <main> for
-// its duration (the switch went with R218 step 3). One task keeps anything from
-// landing BETWEEN the two reads and does nothing about a baseline taken while
-// that slide is still running; what had been holding THAT off was the round
-// trips of the assertion above, which is not a thing to depend on and stopped
-// being true the moment that assertion needed one fewer of them. So wait for
-// the page to stop moving, which is what the baseline actually wants.
-await phone.waitForFunction(
-  () => !document.getAnimations().some(a => a.playState === 'running'),
-  { timeout: 10000 });
-const mid = await phone.evaluate(() => {
-  const panes = document.getElementById('panes');
-  const before = panes.offsetHeight;
-  document.getElementById('mMacros').click();
-  const el = document.getElementById('macpanel');
-  return { before, after: panes.offsetHeight,
-    show: el.classList.contains('show'), anim: el.getAnimations().length > 0,
-    overlay: el.classList.contains('sliding') && getComputedStyle(el).position === 'absolute' };
-});
-ok(mid.show && mid.anim && mid.overlay, 'Commands opens its panel with a slide, as an overlay');
-ok(mid.after === mid.before,
-   `the terminal holds still while the panel slides (${mid.after} vs ${mid.before}px)`);
-const paneH0 = mid.before;
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('sliding'));
-ok(await phone.$eval('#panes', el => el.offsetHeight) < paneH0, 'then the terminal snaps to make room');
-ok(await phone.$eval('#linux', el => el.parentElement.id === 'macpanel' && el.querySelectorAll('[data-m]').length > 0), 'the command lists live in the panel');
-// Commands wants a shell under it now, and the tab that was open got ended
-// above, so put one there, or this measures the guard instead of the swap.
+// Links wants a terminal under it, and the tab that was open got ended
+// above, so put a shell there.
 await phone.evaluate(() => {
   const shell = t => t.kind === 'term' && !t.arg.startsWith('claude:');
   if (!tabs.some(shell)) newShell();
   dockPlace(tabs.find(shell));      // a shell in the dock, in front (R218 step 4); dockShow
   render();                         // would put it down if it already was
 });
-await phone.click('#mKeys');
-// the close is a slide now: the class drops when the tween lands
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('show'));
-ok(await phone.$eval('#keys', el => el.classList.contains('show')), 'Keys closes Commands and opens the keys row: one panel at a time');
-await phone.click('#mKeys');
-await phone.waitForFunction(() => !document.getElementById('keys').classList.contains('show'));
+// Links, always there (the operator, 12 Nov): its list opens over the band,
+// saying so where the terminal shows none, and the next press puts it away.
+await phone.click('#mLinks');
+const lk = await phone.evaluate(() => { const b = document.getElementById('mLinksBox'), bar = document.getElementById('mobar');
+  return { shown: !b.hidden, text: b.textContent.replace(/\s+/g, ' ').trim().slice(0, 80), over: b.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top + 1,
+           inside: b.getBoundingClientRect().left >= 0 && b.getBoundingClientRect().right <= innerWidth + 1, said: document.getElementById('mLinks').getAttribute('aria-expanded') }; });
+ok(lk.shown && /^Links on this terminal/.test(lk.text) && lk.over && lk.inside && lk.said === 'true', `phone: Links lists what the terminal shows over the band, or that it shows none (${JSON.stringify(lk)})`);
+await phone.click('#mLinks');
+ok(await phone.$eval('#mLinksBox', b => b.hidden), '...and the next press puts the list away');
 // Claude on a project with a transcript opens the Resume/New chooser, which
 // must be visible on a phone (it once shared the hidden pin menu's class).
 // A Claude session runs on a NODE (R47), so the chooser is what the press
@@ -434,8 +454,7 @@ await phone.waitForFunction(() => !document.getElementById('keys').classList.con
 // session half good enough to take one, for as long as this block needs it.
 const bapi = async (path, body, hdrs) => (await fetch(URL.replace(/\/$/, '') + path, {
   method: body ? 'POST' : 'GET',
-  headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-             'Content-Type': 'application/json', ...(hdrs || {}) },
+  headers: { ...OWNER, ...(hdrs || {}) },
   ...(body ? { body: JSON.stringify(body) } : {}) })).json();
 const deskbox = await bapi('/api/v1/nodes', { action: 'enroll', name: 'deskbox' });
 const deskAgent = await bapi('/api/v1/agent/enroll', { user: 'bb', version: 'harness', census: {
@@ -453,12 +472,12 @@ await bapi('/api/prefs', { project: 'alpha', node: deskbox.id });
 // ...with the tester signed in to Claude there, as that node would have
 // reported it: a Claude press on a node with no sign-in offers the sign-in
 // instead of Resume and New conversation, which is signin.mjs's to show.
-{
+await section("with the tester signed in to Claude there, as that node would have", async () => {
   const rec = `${DIR}/home/.claude/.bb-grant.json`;
   const d = JSON.parse(readFileSync(rec, 'utf8'));
   d.nodes[deskbox.id] = { email: 'tester@example.com', plan: 'max', at: 1 };
   writeFileSync(rec, JSON.stringify(d));
-}
+});
 // Under a full run this wait has crashed the file more than once (B124): a
 // node is live for LIVE_S after its hello, and a slow box can spend that
 // before the poll reads deskbox back. So the hello is repeated between
@@ -529,6 +548,15 @@ await phone.waitForFunction(() => {
 }, null, { timeout: 20000 }).catch(async () => {
   console.log('[diag] chooser precondition never held:', JSON.stringify(await chooserReady()));
 });
+// One of them given a label and a note first (R236), for the pulldown to
+// name it by and say under it.
+const named = await phone.evaluate(async () => {
+  const r = ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || []).find(x => x.first && (x.agent || 'claude') === 'claude');
+  if (!r) return '';
+  for (const [action, text] of [['label', 'The phone walk'], ['note', 'left off at the dock']])
+    await postJSON('/api/transcripts', { project: 'alpha', id: r.id, action, text });
+  return r.id;
+});
 await pressAlpha();
 // The press can land on a row the poll is replacing under load, and then
 // opens nothing; a press that opened nothing is pressed again, and one
@@ -538,22 +566,36 @@ await phone.waitForSelector('.resumemenu', { timeout: 5000 }).catch(async () => 
   await phone.waitForSelector('.resumemenu', { timeout: 10000 });
 });
 // Its Resume band reads your conversations as it opens (R143).
-await phone.waitForFunction(() => document.querySelector('.resumemenu .rmconvs'), null, { timeout: 10000 }).catch(() => {});
+await phone.waitForFunction(() => document.querySelector('.resumemenu #rmConvSel'), null, { timeout: 10000 }).catch(() => {});
+// One pulldown of them and one press (R236), not a row and a button each.
 const chooser = await phone.$eval('.resumemenu', el => ({ shown: getComputedStyle(el).display !== 'none',
   start: [...el.querySelectorAll('.rmline:not(.rmconv) button')].map(b => b.textContent.trim()),
+  picks: el.querySelectorAll('#rmConvSel option').length,
   resume: [...el.querySelectorAll('.rmconv button')].map(b => b.textContent.trim()), text: el.textContent.trim().slice(0, 120) }));
-ok(chooser.shown && chooser.start.join() === 'New' && chooser.resume.length >= 1 && chooser.resume.every(b => b === 'Resume'),
-   `phone: Claude on a space with history shows New, and its conversations to resume under it (${chooser.start.join(' | ')}; ${chooser.resume.length} to resume; ${chooser.text})`);
-// ...where it can be seen. The sidebar scrolls, the chooser is placed inside
-// the card, and pressing Claude on a project whose session has ended opens
-// this and NOTHING ELSE, so one drawn below the fold is a press with no
-// visible result, which is what bug #65 was reported as.
+ok(chooser.shown && chooser.start.join() === 'New' && chooser.picks >= 1 && chooser.resume.join() === 'Resume',
+   `phone: Claude on a space with history shows New, and its conversations to resume in one pulldown with one press (${chooser.start.join(' | ')}; ${chooser.picks} to pick from; ${chooser.resume.join(' | ')}; ${chooser.text})`);
+// ...each said by its label, or its first words, its agent and when; the
+// picked one's note under it, and the way to all of them.
+if (named){
+  await phone.selectOption('.resumemenu #rmConvSel', named);
+  await phone.waitForFunction(() => /left off at the dock/.test(document.querySelector('.resumemenu .rmnote')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+  const pick = await phone.evaluate(() => { const m = document.querySelector('.resumemenu'), s = m?.querySelector('#rmConvSel');
+    return { picked: s?.selectedOptions[0]?.textContent || '', note: m?.querySelector('.rmnote')?.textContent || '', cv: m?.querySelector('[data-cv]')?.dataset.cv || '',
+             all: m?.querySelector('[data-rmall]')?.textContent.trim() || '', wide: m ? m.scrollWidth > m.clientWidth + 1 : null }; });
+  ok(/^The phone walk · Claude · /.test(pick.picked) && /left off at the dock/.test(pick.note) && pick.cv === named && /^(All \d+ conversations|Your conversation here)$/.test(pick.all) && pick.wide === false,
+     `phone: a labeled conversation is picked by its label with its agent and when, its note under it, Resume pointed at it, and a link to all of them (${JSON.stringify(pick)})`);
+}
+// ...where it can be seen. Pressing Claude on a project whose session has
+// ended opens this and NOTHING ELSE, so one drawn out of sight is a press
+// with no visible result, which is what bug #65 was reported as. It is a
+// dialog over the page, so wherever the page under it is scrolled it is on
+// the screen.
 //
 // Set up properly or this asserts nothing: the row has to be at the bottom
 // edge before the press, and the press has to be dispatched rather than
 // clicked, because Playwright scrolls a target into view for you and would
 // undo the very thing being reproduced.
-await phone.click('.pgrid .pcard[data-row="alpha"] [data-c]');          // put it away again
+await phone.click('.resumemenu [data-rmclose]');          // put it away again
 await phone.waitForFunction(() => !document.querySelector('.resumemenu'));
 // A window short enough that the row is at the bottom edge, which is the
 // only shape in which the chooser has nowhere to be drawn; on a tall one it
@@ -573,21 +615,17 @@ await phone.evaluate(() => {
 });
 await phone.evaluate(() => document.querySelector('.pgrid .pcard[data-row="alpha"] [data-c]').click());
 await phone.waitForSelector('.resumemenu', { timeout: 10000 });
-// Where it rests, not where it is mid-entrance: menuIn slides the chooser
-// down 5px over 140ms, and how far along that is when a round trip lands is
-// a fact about the box. Where it stops is what the operator sees (B77).
-await phone.waitForFunction(() => document.querySelector('.resumemenu')
-  ?.getAnimations().every(a => a.playState !== 'running'), null, { timeout: 10000 });
-const rest = await phone.$eval('.resumemenu', el => {
-  const m = el.getBoundingClientRect(), pane = el.closest('.pane').getBoundingClientRect();
-  const a = el._anchor, ap = a?.closest?.('.pane'), rb = document.querySelector('.railbar')?.getBoundingClientRect();
-  return { top: Math.round(m.top), bottom: Math.round(m.bottom), paneTop: Math.round(pane.top),
-           paneBottom: Math.round(pane.bottom), inner: innerHeight, cls: el.className,
-           anchor: a ? { on: a.isConnected, samePane: ap === el.closest('.pane'), paneBottom: ap && Math.round(ap.getBoundingClientRect().bottom) } : null,
-           railTop: rb && Math.round(rb.top), styleTop: el.style.top,
-           in: m.top >= pane.top - 1 && m.bottom <= Math.min(pane.bottom, innerHeight) + 1 };
-});
-ok(rest.in, `...brought into the scrolled page, not left below its fold (${JSON.stringify(rest)})`);
+// Where it rests, not where it is mid-entrance: a dialog's box grows into
+// place, and where it stops is what the operator sees (B77).
+// Waited for and measured in one look: in two, a redraw between them
+// swapped the box (rmPut) and the measure read the old one, detached, 0 by
+// 0 and outside #rmModal (B974).
+const rest = await (await phone.waitForFunction(() => { const el = document.querySelector('#rmModal:not([hidden]) .resumemenu');
+  if (!el || !el.isConnected || el.getAnimations().some(a => a.playState === 'running')) return null;
+  const m = el.getBoundingClientRect();
+  return { top: Math.round(m.top), bottom: Math.round(m.bottom), inner: innerHeight, dialog: !!el.closest('#rmModal'),
+           in: m.top >= 0 && m.bottom <= innerHeight + 1 }; }, null, { timeout: 10000 })).jsonValue();
+ok(rest.in && rest.dialog, `...a dialog over the page, wholly on the screen however the page under it is scrolled (${JSON.stringify(rest)})`);
 await phone.setViewportSize({ width: 400, height: 800 });
 await phone.click('.resumemenu [data-n]');
 // New conversation turns the menu to the model and effort it starts on
@@ -604,56 +642,11 @@ ok(await phone.evaluate(() => !document.getElementById('tabbar'))
    && await phone.$eval('#pane1 .dockline', el => getComputedStyle(el).display !== 'none'),
    "on a phone the terminals are the dock's line, as at a desk (R218 step 4)");
 
-// Swapping one flyout for another: the outgoing one stays under the incoming
-// slide and the terminal changes size once, when the new one lands. Commands
-// needs a shell under it, so make sure the pane is showing one.
-await phone.evaluate(() => {
-  const shell = t => t.kind === 'term' && !t.arg.startsWith('claude:');
-  if (!tabs.some(shell)) newShell();
-  dockPlace(tabs.find(shell));
-  render();
-});
-await phone.waitForFunction(() => document.querySelector('.col.term').getAnimations().length === 0);
-await phone.evaluate(() => mobPanel('keys'));
-await phone.waitForFunction(() => document.getElementById('keys').classList.contains('show') && !document.getElementById('keys').classList.contains('sliding'));
-const hSess = await phone.$eval('#panes', el => el.offsetHeight);
-await phone.click('#mMacros');
-const swap = await phone.evaluate(() => ({
-  oldShown: document.getElementById('keys').classList.contains('show') && !document.getElementById('keys').classList.contains('sliding'),
-  newSliding: document.getElementById('macpanel').classList.contains('sliding'),
-  paneH: document.getElementById('panes').offsetHeight }));
-ok(swap.oldShown && swap.newSliding && swap.paneH === hSess, 'a flyout swap slides the new one over the old, terminal untouched');
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('sliding'));
-ok(await phone.$eval('#keys', el => !el.classList.contains('show')) && await phone.$eval('#macpanel', el => el.classList.contains('show')),
-   '...and the old one is gone when the new one lands');
-// A second tap mid-slide reverses from where the panel is, not from full height.
-const hFull = await phone.$eval('#macpanel', el => el.offsetHeight);   // landed, in the flow
-// The whole gesture inside one evaluate, and the wait measured against the
-// animation's OWN clock rather than a sleep. Three round trips around a 200ms
-// tween is a race: on a loaded box the close lands before the second tap, so
-// there is no mid-slide left to reverse from and the test fails for a reason
-// that is about the box. Waiting on currentTime is exactly the condition the
-// assertion cares about: that the panel really is part-way down.
-const from = await phone.evaluate(async () => {
-  const el = document.getElementById("macpanel");
-  document.getElementById("mMacros").click();          // closing (slides)
-  const a = el.getAnimations()[0];
-  if (a) await new Promise(res => {
-    const tick = () => (a.playState !== "running" || a.currentTime >= 90)
-      ? res() : requestAnimationFrame(tick);
-    tick();
-  });
-  document.getElementById("mMacros").click();          // reopen mid-slide
-  return parseFloat(el.getAnimations()[0]?.effect.getKeyframes()[0].height);
-});
-ok(from > 0 && from < hFull, `re-tap mid-slide resumes from the current height (${from} of ${hFull}px)`);
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('sliding'));
-
 // Picking a session on the phone's Sessions page opens its terminal in the
 // dock, up over the page (R250 step 1). (The desktop half ended both
 // fixture sessions above, so make one to pick.)
 tmuxNew('shell-7');
-await phone.evaluate(() => { if (showMacros) mobPanel('macros'); railGo('sessions'); refresh(); });
+await phone.evaluate(() => { railGo('sessions'); refresh(); });
 await phone.waitForFunction(() => document.querySelector('.sesstbl [data-go="shell-7"]'), { timeout: 15000 });
 await phone.click('.sesstbl [data-go="shell-7"]');
 await phone.waitForFunction(() => sessionOf(tabOf(panes[1])?.arg || '') === 'shell-7' && dockUp, { timeout: 10000 }).catch(() => {});
@@ -664,9 +657,8 @@ ok(await phone.evaluate(() => sessionOf(tabOf(panes[1])?.arg || '') === 'shell-7
 // the room (B460).
 await phone.evaluate(() => openNotebook('alpha'));
 await phone.waitForFunction(() => tabOf(panes[active])?.kind === 'notebook');
-ok(await phone.$eval('#mKeys', b => b.hidden && getComputedStyle(b).display === 'none'), 'Keys leaves the bar over a document tab');
-ok(await phone.$eval('#mMacros', b => b.hidden), '...and so does Commands');
-ok(await phone.$$eval('#mobar button', bs => bs.filter(b => b.offsetWidth).every(b => b.scrollWidth <= b.clientWidth + 1)),
+ok(await phone.$eval('#mLinks', b => b.hidden && getComputedStyle(b).display === 'none') && await phone.$eval('#mHot', b => b.hidden), 'the keys and Links leave the bar over a document tab');
+ok(await phone.$$eval('#mobar > button', bs => bs.filter(b => b.offsetWidth).every(b => b.scrollWidth <= b.clientWidth + 1)),
    '...and what is left is not cut short');
 // A Claude tab is a terminal, but not one to type keys or macros into: they
 // go to a conversation with its own idea of what a keystroke means.
@@ -675,9 +667,9 @@ await phone.evaluate(() => {
   if (t) { dockPlace(t); render(); }
 });
 ok(await phone.evaluate(() => !tabs.some(t => t.arg.startsWith('claude:')))
-   || (await phone.$eval('#mKeys', b => b.hidden)
-       && await phone.$eval('#mMacros', b => b.hidden)),
-   '...and both leave it over a Claude tab');
+   || (await phone.$eval('#mLinks', b => !b.hidden)
+       && /^Esc ⇧Tab ↑ ↓ ⏎ \^C PgUp PgDn$/.test(await phone.$eval('#mHot', h => [...h.querySelectorAll('button')].map(b => b.textContent.trim()).join(' ')))),
+   '...and over a Claude tab the line has a coding agent\'s keys, and Links stays');
 
 // With many open, the dock's line holds them all, scrolling along, and the
 // one in front is marked; a − on one takes it off the line.
@@ -698,24 +690,6 @@ await phone.waitForFunction(() => typeof state !== 'undefined' && state
 ok(true, 'a phone reload comes back with a page and the dock\'s terminals');
 ok(phone.errors.length === 0, `phone: zero console errors${phone.errors.length ? ': ' + phone.errors.join(' | ') : ''}`);
 await closePage(phone);
-
-// A phone held sideways: a flyout must not push the bottom bar off the
-// screen; it gives way, and the terminal keeps a strip.
-const land = await newPage(browser, { viewport: { width: 844, height: 390 } });
-await land.goto(URL);
-await land.waitForFunction(() => state !== null, { timeout: 30000 });
-// A terminal in front first: Commands opens only over a shell, and since
-// R131 a fresh browser starts on the front tab as of the strip's last
-// change, which may be a document (B494).
-await land.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) focusTab(t.id); mobPanel('macros'); });
-await land.waitForFunction(() => document.getElementById('macpanel').classList.contains('show') && !document.getElementById('macpanel').classList.contains('sliding'));
-const fit = await land.evaluate(() => ({ bar: document.getElementById('mobar').getBoundingClientRect().bottom, panes: document.getElementById('panes').offsetHeight }));
-ok(fit.bar <= 390 && fit.panes >= 90, `landscape: the bar stays on screen with a flyout open (bar bottom ${Math.round(fit.bar)}px, terminal ${fit.panes}px)`);
-await land.evaluate(() => mobPanel('keys'));
-await land.waitForFunction(() => document.getElementById('keys').classList.contains('show') && !document.getElementById('keys').classList.contains('sliding'));
-const fit2 = await land.evaluate(() => ({ bar: document.getElementById('mobar').getBoundingClientRect().bottom, panes: document.getElementById('panes').offsetHeight }));
-ok(fit2.bar <= 390 && fit2.panes >= 90, `landscape: same with the keys (bar bottom ${Math.round(fit2.bar)}px, terminal ${fit2.panes}px)`);
-await closePage(land);
 
 // ---- a tab that outlived its container ---------------------------------
 // A browser left open across a restart still holds its Claude tabs, and a
@@ -812,7 +786,7 @@ await page.evaluate(() => {
 // code it had: the operator met the old Global rules dialog under the new
 // version's notes. It reloads now, before the changelog, so the page is the
 // new run's code and the changelog is opened by that page.
-{
+await section("a new run of the container reloads the page", async () => {
   await page.evaluate(() => { window.__before = 1; });
   const nav = page.waitForNavigation({ timeout: 20000 }).then(() => true).catch(() => false);
   await page.evaluate(async () => {
@@ -824,6 +798,6 @@ await page.evaluate(() => {
   await ready(page);
   ok(reloaded && await page.evaluate(() => window.__before === undefined),
      `a restart the status poll notices reloads the page (${reloaded ? 'reloaded' : 'did not'})`);
-}
+});
 
 await done(browser);

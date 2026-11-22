@@ -35,8 +35,10 @@ cloudflared's config as one way to write it.
 Stdlib only; nodes.py hands in the provisioner's bytes.
 """
 import base64
+import os
 import ipaddress
 import re
+import sys
 import time
 import urllib.parse
 
@@ -52,6 +54,77 @@ DOORS = ("cloudflared", "tailscale")
 # route more than the controller.
 _DROP = re.compile(r"^\s*(DNS|PreUp|PostUp|PreDown|PostDown|SaveConfig|Table)\s*=", re.I)
 _NAME = re.compile(r"[^A-Za-z0-9._-]")
+
+
+RELEASE_PUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "aerieos-release.pub")
+# The file's one reader (scripts/lib, which the image carries beside this
+# directory): the build's signer and aerie lint read it there too.
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+import releasepub  # noqa: E402
+
+
+def release_keys():
+    """AerieOS's release keys as this build names them (config/aerieos-release.pub:
+    a line of 64 hex characters for the key the builds sign with, and a
+    second for its spare, R232), the first one first; [] while it names
+    none, and for a file that does not parse, which release_keys_why says
+    and aerie lint fails on."""
+    return releasepub.read(RELEASE_PUB)[0]
+
+
+def release_keys_why():
+    """Why this build names no release key, or "" when it names one."""
+    return releasepub.read(RELEASE_PUB)[1]
+
+
+def release_key():
+    """The key the builds sign with, or "" while the build names none."""
+    return (release_keys() or [""])[0]
+
+
+def pins(agent=None):
+    """What an enrollment carries so the node's first agent is not taken on
+    the word of whatever answers it: the provisioner's arguments, as a list
+    of words. --release-key is AerieOS's release key, with its spare after a
+    comma (R232), so the key the builds sign with can be replaced by the
+    spare and this node still take its updates: the node pins them as it
+    enrolls and takes only agent updates the release signed after that.
+    --agent-digest is the agent this controller ships now (`agent`:
+    nodes.agent_file()'s digest), which the provisioner holds the agent
+    that arrives to before any of it runs, where it had only the digest the
+    same answer named. --agent-sig is the release's signature over that
+    digest, where this controller's build made one (nodes.agent_sig()) and
+    there is a key to check it under: the provisioner verifies it before
+    the agent runs. A build with no signature (one made outside the
+    release's build) carries the digest alone, and the provisioner says so.
+    The Enroll script, the Nodes page's token-only commands and the
+    controller's own node all carry these, from here."""
+    out = []
+    keys = release_keys()
+    if keys:
+        out += ["--release-key", ",".join(keys)]
+    digest = str((agent or {}).get("digest") or "")
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+        out += ["--agent-digest", digest]
+        sig = str((agent or {}).get("sig") or "")
+        if keys and re.fullmatch(r"[0-9a-f]{128}", sig):
+            out += ["--agent-sig", sig]
+    return out
+
+
+def reach_words(url, pin):
+    """What each of the Nodes page's token-only commands carries for an
+    https controller held to `pin` (tls.node_reach's: the controller's own
+    key, or `ca`), as the Enroll script carries it: `url` the address to
+    name, `curl` the options its fetch takes, `provisioner` and `agent` the
+    words that follow the command's own. A key's pin is of base64's
+    characters, so each word stands unquoted in a shell."""
+    if not pin or not re.fullmatch(r"ca|sha256//[A-Za-z0-9+/]{43}=", pin):
+        return {"url": url, "curl": "", "provisioner": "", "agent": ""}
+    return {"url": url, "curl": f"-k --pinnedpubkey {pin}" if pin != "ca" else "",
+            "provisioner": f"--controller-pin {pin}", "agent": f"--pin {pin}"}
 
 
 def controller_host(url):
@@ -248,7 +321,7 @@ def filename(name, nid=""):
 STORE_FLAGS = ("data", "toolchains", "cache", "artifacts", "appdata")
 
 
-def build(ans, *, name, user, token, expires, provisioner, family=b"", again=False, machine="", stores=None):
+def build(ans, *, name, user, token, expires, provisioner, family=b"", again=False, machine="", stores=None, agent=None):
     """The script, as text. `ans` is check()'s answer. With `again` (R177)
     the secrets are the node's own (its WireGuard config installed from
     /etc/wireguard, its door left as it is), and `machine` binds the
@@ -256,8 +329,15 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
     to run elsewhere, and the controller refuses the enrollment too.
     `stores` ({role: path}, the node's own as it reports them) rides as
     the provisioner's store flags, so a node enrolled again keeps its
-    stores where they are rather than coming back on the defaults."""
+    stores where they are rather than coming back on the defaults.
+    `agent` ({digest, sig}: the agent this controller ships and the
+    release's signature over it) rides as what the provisioner holds the
+    agent it fetches to (pins). `ans["controller_pin"]`, where the caller
+    found one for the address (tls.node_reach), is what the controller's
+    https is held to: the provisioner fetches under it and the node pins it."""
     flags = [f"--controller {_q(ans['controller'])}", f"--token {_q(token)}"]
+    if ans.get("controller_pin"):
+        flags.append(f"--controller-pin {_q(ans['controller_pin'])}")
     if machine:
         flags.append(f"--machine {_q(machine)}")
     if user and user != "bb":
@@ -270,6 +350,11 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
         flags.append("--session-user none")
     if ans["reach"] == "public":
         flags.append("--reach public")
+    # The release key the node pins, and what its first agent is held to
+    # before it runs: the digest this controller ships and the release's
+    # signature over it (pins).
+    words = pins(agent)
+    flags += [f"{words[i]} {words[i + 1]}" for i in range(0, len(words), 2)]
     if ans.get("door"):
         flags.append(f"--door {_q(ans['door'])}")
         if ans.get("door_host"):

@@ -68,17 +68,17 @@ class TheAgent(unittest.TestCase):
             f.write("BOOT_IMAGE=/vmlinuz aerieslot=a aerietoram=1\n")
         with mock.patch.dict(os.environ, {"BB_CMDLINE": cmd}):
             stick = self.am.render_snapraid(REC)
-        self.assertNotIn("content /var/lib/builderbot/snapraid.content", stick)
+        self.assertNotIn(f"content {self.am.CONTENT}", stick)
         self.assertIn("content /mnt/disks/d1/.snapraid.content\n", stick)
         self.assertNotIn("2-parity", conf)
-        self.assertIn("content /var/lib/builderbot/snapraid.content\n", conf)
+        self.assertIn(f"content {self.am.CONTENT}\n", conf)
         self.assertIn("content /mnt/disks/d1/.snapraid.content\n", conf)
         self.assertIn("data d2 /mnt/disks/d2/\n", conf)
         two = self.am.render_snapraid({**REC, "parity": REC["parity"] + [{"slot": 2, "id": "x", "uuid": "4", "fs": "xfs"}]})
         self.assertIn("2-parity /mnt/parity/p2/snapraid.2-parity\n", two)
         fstab = self.am.render_fstab(REC)
-        self.assertIn("UUID=1111 /mnt/disks/d1 xfs defaults,nofail,noatime 0 0 # builderbot-array\n", fstab)
-        self.assertIn("UUID=3333 /mnt/parity/p1 xfs defaults,nofail,noatime 0 0 # builderbot-array\n", fstab)
+        self.assertIn("UUID=1111 /mnt/disks/d1 xfs defaults,nofail,noatime,nosuid,nodev 0 0 # builderbot-array\n", fstab)
+        self.assertIn("UUID=3333 /mnt/parity/p1 xfs defaults,nofail,noatime,nosuid,nodev 0 0 # builderbot-array\n", fstab)
         merged = [ln for ln in fstab.splitlines() if "fuse.mergerfs" in ln][0]
         self.assertTrue(merged.startswith("/mnt/disks/d* /mnt/array fuse.mergerfs "))
         self.assertIn("category.create=epmfs", merged)
@@ -589,9 +589,9 @@ class TheController(unittest.TestCase):
                 nodes.node_storage_array("user:t", "n1", {"array": "takeover", "dry": True})
             self.assertEqual(add.call_args[0][3]["config"]["moves"], [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}])
             # Later, one share at a time, from an agent that has it.
-            n["reported"]["array"] = {"data": [{"slot": 1}], "adopted": True, "moves": 3}
-            self.assertIn("from before", nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": mv[:1]})["error"])
-            n["reported"]["array"]["moves"] = []
+            # Every agent in this window says its places, as none or not:
+            # no word on the agent's age.
+            n["reported"]["array"] = {"data": [{"slot": 1}], "adopted": True}
             r = nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": mv[1:]})
             self.assertEqual(add.call_args[0][3]["config"], {"array": "moves", "moves": mv[1:]}, r)
             self.assertIn("no share's places", nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": []})["error"])
@@ -621,8 +621,9 @@ class TheController(unittest.TestCase):
             self.assertIn("typed again", nodes.node_storage_array("user:t", "n1", {"array": "destroy"})["error"])
             r = nodes.node_storage_array("user:t", "n1", {"array": "check"})
             self.assertEqual(add.call_args[0][3]["timeout"], 900)
-            self.assertIn("from before Check parity", nodes.node_storage_array("user:t", "n1", {"array": "verify"})["error"])
-            n["reported"]["array"]["verify"] = {}
+            # Every agent in this window has Check parity, its last result
+            # in the census or not: no word on the agent's age.
+            self.assertNotIn("verify", n["reported"]["array"])
             r = nodes.node_storage_array("user:t", "n1", {"array": "verify", "correct": True})
             self.assertTrue(r.get("ok"), r)
             self.assertEqual((add.call_args[0][3]["config"], add.call_args[0][3]["timeout"]), ({"array": "verify", "correct": True}, 172800))

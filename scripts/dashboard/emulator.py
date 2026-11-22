@@ -193,7 +193,8 @@ def _job(nid):
     the shape the tab draws."""
     if not nodes:
         return {"running": False}
-    for j in nodes.jobs_for(node_id=nid, type="image", active=True, n=1):
+    cur, behind = toolchains.current_of(nodes.jobs_for(node_id=nid, type="image", active=True, n=50))
+    for j in [cur] if cur else []:
         sp = j.get("spec") or {}
         return {"running": True, "action": sp.get("action", ""), "image": sp.get("image", ""),
                 "images": sp.get("images") or [sp.get("image", "")], "current": j.get("step") or "",
@@ -307,7 +308,5 @@ def node_job(principal, nid, action, image_id):
                              f"free and this needs about {toolchains.human_kb(int(need_kb * 1.2))}: "
                              "point the store somewhere bigger first"}
     busy = toolchains.store_busy(nid)
-    if busy:
-        return {"error": busy}
-    return nodes.job_add(principal, {"node": nid}, "image",
-                         {"action": action, "image": ids[0], "images": ids, "step_timeout": 3600, "timeout": 3600 * len(ids) + 600})
+    return toolchains.queued_behind(nodes.job_add(principal, {"node": nid}, "image",
+                         {"action": action, "image": ids[0], "images": ids, "step_timeout": 3600, "timeout": 3600 * len(ids) + 600}), busy)

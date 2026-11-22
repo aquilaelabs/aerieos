@@ -16,24 +16,82 @@
 // What the controller offers and holds of its companions (apps.view), for
 // the Apps section here and the Library's Companions cards (the Apps page's
 // read until R170).
-let devApps = null, devAppsRev = 0;
-async function loadApps(){
+let devApps = null;
+function loadApps(){
   // Switched off on this install (R81): the route refuses, so it is not asked.
-  if (featureOff("apps")){ devAppsRev++; return; }
-  try{
-    const r = await bootFetch("/api/apps");
-    const j = await r.json();
+  if (featureOff("apps")){ readMoved("apps"); return Promise.resolve(); }
+  return reading("apps", async () => {
+    const j = await getJSON("/api/apps");
+    // ...and one that could not be read leaves the section saying so.
     if (!j.error) devApps = j;
-  }catch(e){ /* the section says it could not read them */ }
-  devAppsRev++;
-  if (tabs.some(t => t.kind === "settings")) drawPanes();
+  });
 }
 
 // Revert on a section puts its fields back to what is saved: the draft for
 // them dropped and the tab repainted, which the live key has to notice.
-let settingsRev = 0;
 function settingsLive(){
-  return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, settingsRev, devAppsRev, state?.checks]);
+  return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, readRev("settings"), readRev("apps"), state?.checks,
+    state?.doctor?.when, state?.doctor?.running]);
+}
+
+// The controller at a glance, the page's first section (Perch): what would
+// stop it if it ran out, as facts, a space running low in the warning's
+// color; and the doctor's checks, problems first with their whole
+// explanation and the way to fix each, the passing ones as chips, with Run
+// again. No hardware graphs: those are a node's. The facts are measures
+// that move on their own between reads (free space, the database's size,
+// the nodes and sessions counted), so they are not in the page's live key:
+// settingsPaintFacts writes them in place on every status read, marked
+// .meas, and the page is not drawn again for them.
+function settingsFacts(){
+  const c = state?.controller || {};
+  const low = r => r && r.total && r.free / r.total < 0.1;
+  const room = r => r && r.total ? `${humanBytes(r.free)} free of ${humanBytes(r.total)}` : "";
+  const n = c.nodes;
+  return [
+    ["Under /config", room(c.config), low(c.config) ? {cls: "warn"} : null],
+    ["The spaces' share", room(c.spaces), low(c.spaces) ? {cls: "warn"} : null],
+    ["Database", c.db ? humanBytes(c.db) : ""],
+    ["Nodes", n ? `${n.online} online of ${n.enrolled} enrolled` : "", n && n.online < n.enrolled ? {cls: "warn"} : null],
+    ["Sessions open", state ? String((state.sessions || []).length) : ""],
+  ];
+}
+// The section's status: the doctor's verdict, and its level for the heading.
+function settingsCardSaid(){
+  const d = state?.doctor;
+  if (!d?.when) return {said: d?.running ? "running" : "", cls: ""};
+  const {level, probs, fine} = doctorChecks(d);
+  return {said: probs.length ? `${probs.length} to look at` : `all ${fine.length} ok`, cls: level === "ok" ? "" : level};
+}
+function settingsCard(){
+  const d = state?.doctor;
+  return `<div class="field ctlcard"><div class="ctlfactbox" data-own>${factGrid(settingsFacts(), "ctlfacts meas")}</div>
+    <div class="ctlchecks doctor">${settingsChecks()}</div>
+    <div class="actbar sectbar"><span class="state ago">${esc(settingsDocWhen())}</span><span class="sp"></span>
+      <button type="button" id="setDocRun"${d?.running ? " disabled" : ""}>Run again</button></div></div>`;
+}
+const settingsDocWhen = () => state?.doctor?.running ? "running…" : state?.doctor?.when ? `the doctor ran ${ago(state.doctor.when)}` : "";
+function settingsChecks(){
+  const d = state?.doctor;
+  return d?.when ? doctorChecks(d).html : `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`;
+}
+// ...and painted in place whenever the doctor's verdict is (drawDoctor: each
+// status read, and a run from here or the panel), so the card says what the
+// dot says without waiting for the page's own redraw.
+function settingsPaintDoctor(){
+  const c = document.querySelector(".settingstab .ctlcard");
+  if (!c) return;
+  const checks = c.querySelector(":scope > .ctlchecks"), when = c.querySelector(":scope > .sectbar > .state");
+  if (checks) patch(checks, settingsChecks());
+  setText(when, settingsDocWhen());
+  const sst = c.closest("details.sect")?.querySelector(":scope > summary > .sst"), said = settingsCardSaid();
+  if (sst){ setText(sst, said.said); setClass(sst, "sst" + (said.cls ? " " + said.cls : "")); }
+}
+
+// ...painted in place after each status read, while the page is drawn.
+function settingsPaintFacts(){
+  const box = document.querySelector(".settingstab .ctlfactbox");
+  if (box) patch(box, factGrid(settingsFacts(), "ctlfacts meas"));
 }
 
 // Typed and not yet applied, by control id, across the tab's redraws: one
@@ -58,7 +116,7 @@ function settingsKeep(el){
     };
     i.oninput = on; i.onchange = on;
   });
-  el.querySelectorAll("[data-clear]").forEach(i => { i.addEventListener("change", () => settingsWake(el)); });
+  el.querySelectorAll("[data-clear]").forEach(i => { i.onchange = () => settingsWake(el); });
   settingsWake(el);
 }
 // A section's Apply and Revert awake only while one of its fields differs
@@ -83,6 +141,7 @@ function openSettingsTab(){
 
 // Each section's line on the list beside it: what is in it.
 const SETTINGS_SAYS = {
+  controller: "the doctor's checks, the space left, the nodes",
   logs: "days kept, following, downloads", reports: "what was reported about AerieOS, and the diagnostics",
   idle: "when an idle session is ended", paths: "the shares and disks this controller uses",
   tunnel: "a hostname that reaches it from outside",
@@ -124,11 +183,11 @@ function renderSettingsInto(i){
   // section it will have, shimmering, rather than the few that need no
   // state and then the rest. Drawn whole again when the settings arrive.
   if (!state?.settings){
-    const titles = [["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
+    const titles = [["controller", "Controller"], ["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
       ...SETTING_GROUPS.filter(g => !g.debug && !g.bare && !NETWORK_GROUPS.includes(g.key)).map(g => [g.key, g.title]),
       ["copies", "Backup copies"], ["move", "Move this controller"], ["reset", "Reset AerieOS"]];
-    d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
-      ${titles.map(([k, t]) => sect(k, t, "", `<div class="field loading">${skRows(2)}</div>`)).join("")}`;
+    drawHTML(d.list, `${head}<div class="sectjump" data-sects></div>
+      ${titles.map(([k, t]) => sect(k, t, "", `<div class="field loading">${skRows(2)}</div>`)).join("")}`);
     sectJump(d.list.querySelector("[data-sects]"));
     return;
   }
@@ -138,7 +197,9 @@ function renderSettingsInto(i){
   // The logs are an administrator's: a poll that has landed without them
   // means this account has no Logs section, not one still on its way (B38).
   const logs = logSection();
-  d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
+  const card = settingsCardSaid();
+  patch(d.list, `${head}<div class="sectjump" data-sects></div>
+    ${sect("controller", "Controller", card.said, settingsCard(), {cls: card.cls})}
     ${logs || !state ? sect("logs", "Logs", "", `<div class="row stack2" data-group="Logs"><div class="grow">${withRevert(logs, "logs")
         || `<div class="sub">log settings arrive with the first poll…</div>`}</div></div>`) : ""}
     ${sect("reports", "AerieOS bug reports", reportsCount() === null ? "" : reportsCount() ? `${reportsCount()} report${reportsCount() === 1 ? "" : "s"}` : "none", reportsSection())}
@@ -146,7 +207,6 @@ function renderSettingsInto(i){
            `<div class="row stack2" data-group="Idle sessions"><div class="grow">${withRevert(idleSection(), "idle")}</div></div>`)}
     ${pathsSection() ? sect("paths", "Storage on this controller", `${paths.length} path${paths.length === 1 ? "" : "s"}`, withRevert(pathsSection(), "paths")) : ""}
     ${state?.release?.running !== undefined ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : ""}
-    ${state?.bare_metal && state?.own_node && state?.can?.admin ? sect("power", "Power", "", powerSection()) : ""}
     ${groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})
         // The copies made go right under the Backup group that makes them.
         + (g.key === "backup" ? sect("copies", "Backup copies", backupData?.made_at ? `last ${ago(backupData.made_at)}` : backupData?.on === false ? "off" : "", backupSection()) : "")).join("")}
@@ -157,17 +217,21 @@ function renderSettingsInto(i){
     sect("reset", "Reset AerieOS", "", `<div class="field" data-group="Reset">
       <div class="hint">Start over at the setup page, un-enrolling the nodes first if you choose. Everything but space files is moved aside, not deleted.</div>
       <div class="actbar"><span class="sp"></span><button type="button" class="danger" id="setReset">Reset AerieOS</button></div>
-    </div>`)}`;
+    </div>`)}`);
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
+  const run = d.el.querySelector("#setDocRun");
+  if (run) run.onclick = () => runDoctor();
   // A page of settings (page-docs.js splitSects): the sections a list beside
   // the one picked, as a project's Settings are.
   splitSects(d.list, "settings", {says: SETTINGS_SAYS, back: "Controller settings"});
   d.el.querySelectorAll("[data-srevert]").forEach(b => b.onclick = () => {
     const sec = b.closest("details.sect");
     sec?.querySelectorAll("input, select").forEach(i => { if (i.id) delete settingsDraft[i.id]; });
-    settingsRev++;
+    readMoved("settings");
     drawPanes();
+    fieldsBack(sec);
+    if (sec?.isConnected) settingsWake(d.el);
   });
   wireLogSection(d.el);
   wireIdleSection(d.el);
@@ -180,10 +244,8 @@ function renderSettingsInto(i){
   const ac = d.el.querySelector("#setAppsCheck");
   if (ac) ac.onclick = async () => {
     busy(ac, "Looking");
-    try{
-      const j = await (await postJSON("/api/apps", {action: "check"})).json();
-      if (j.error) notify(j.error, true);
-    }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
+    const j = await postJSON("/api/apps", {action: "check"});
+    if (j.error) notify(j.error, true);
     // The look runs in the background; read again once it has had a moment.
     setTimeout(loadApps, 4000);
     await loadApps();
@@ -211,14 +273,13 @@ function withRevert(html, key){
 // Whoever reads Controller settings reads them; only a session reading them
 // is debug's. Read when the page draws it and after a delete, not on the poll.
 let reportsList = null;
-async function loadReports(){
-  try{
-    const j = await (await postJSON("/api/reports", {action: "list"})).json();
+function loadReports(){
+  return reading("settings.reports", async () => {
+    const j = await postJSON("/api/reports", {action: "list"});
     if (j.error) return;
     reportsList = j.reports || [];
-  }catch{ return; }
-  settingsRev++;
-  drawPanes();
+    readMoved("settings");
+  });
 }
 const reportsCount = () => reportsList === null ? null : reportsList.length;
 // A bare-metal install's updates (R90 step 5): the release running, the
@@ -272,11 +333,13 @@ function updatesSection(){
 // Back up now writes a copy to every folder where they go; the list is what
 // is there, newest first, each under the state downloadable (sealed).
 let backupData = null, backupAsked = false;
-async function loadBackup(){
+function loadBackup(){
   backupAsked = true;
-  try{ backupData = await (await fetch("/api/backup")).json(); }
-  catch(e){ backupData = {error: "backup: " + failWords(e)}; }
-  settingsRev++; drawPanes();
+  return reading("settings.backup", async () => {
+    backupData = await getJSON("/api/backup");
+    if (backupData.error) backupData = {error: "backup: " + backupData.error};
+    readMoved("settings");
+  });
 }
 function backupSection(){
   if (backupData === null){ if (!backupAsked) loadBackup(); return `<div class="field">${skRows(2)}</div>`; }
@@ -284,14 +347,14 @@ function backupSection(){
   if (b.error) return `<div class="hint bad">${esc(b.error)}</div>`;
   const owner = !!b.owner;
   const rows = (b.copies || []).map(c => `<div class="row"><div class="grow"><div class="name">${esc(c.name)}</div>
-      <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}</div></div>
+      <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}${c.carries_key ? "" : " · without the install key"}</div></div>
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
   return `<div class="row stack2" data-group="Backup copies"><div class="grow">
       <div class="sub">${b.on ? `Copies go to ${(b.where || []).map(esc).join(", ")}${b.made_at ? `; the last was written ${esc(ago(b.made_at))} (${esc(humanBytes(b.size || 0))})` : "; none written yet"}.` : "No backup password set: nothing is copied until one is, under Backup."}${(b.failed || []).length ? ` <span class="bad">Not written: ${esc(b.failed.join("; "))}.</span>` : ""}</div>
       ${(b.other || []).length ? `<div class="field">${lbl("", "Also copied to", "a disk or share under Other disks and shares on the Storage page, so a copy is off this machine; one mounted read-only cannot take one")}
         ${(b.other || []).map(o => `<label class="ndcap"><input type="checkbox" data-backupalso="${esc(o.id)}"${o.on ? " checked" : ""}${o.ro || !owner ? " disabled" : ""}> ${esc(o.name)} <span class="sub">${esc(o.kind === "smb" ? "SMB share" : o.kind === "nfs" ? "NFS export" : "disk")}${o.ro ? ", read-only" : ""}</span></label>`).join("")}
         <div class="actbar"><span class="sp"></span><button type="button" data-backupalsosave${owner ? "" : " disabled"}>Save</button></div></div>` : ""}
-      <div class="hint">These copies are the controller: its accounts, the spaces' notebooks and settings, its nodes and keys. The files on your pools are not in them; the Storage page's snapshots and Backups keep those.</div>
+      <div class="hint">These copies are the controller: its accounts, the spaces' notebooks and settings, its nodes and keys, with the install key inside, so the backup password alone restores one whole. The files on your pools are not in them; the Storage page's snapshots and Backups keep those.${(b.copies || []).some(c => !c.carries_key) ? " A copy marked without the install key was written before copies carried it: restored, its sign-ins and tokens stay locked until the key is given under Controller, Keys." : ""}</div>
       ${rows ? `<div class="rows">${rows}</div>` : ""}
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-backupnow${b.on && owner ? "" : " disabled"}>Back up now</button></div>
     </div></div>`;
@@ -300,13 +363,13 @@ function wireBackup(root){
   root.querySelectorAll("[data-backupalsosave]").forEach(b => b.onclick = () => pressing(b, async () => {
     const ids = [...root.querySelectorAll("[data-backupalso]:checked")].map(x => x.dataset.backupalso);
     busy(b, "Saving");
-    const j = await (await postJSON("/api/settings", {set: {backup_also: ids.join(" ")}})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/settings", {set: {backup_also: ids.join(" ")}});
     notify(j.error || (ids.length ? `the next copy also goes to ${ids.length} disk${ids.length === 1 ? "" : "s"} or share${ids.length === 1 ? "" : "s"} off this machine` : "copies stay on this machine's pools"), !!j.error);
     await loadBackup();
   }));
   root.querySelectorAll("[data-backupnow]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Writing");
-    const j = await (await postJSON("/api/backup", {action: "now"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/backup", {action: "now"});
     notify(j.error || `written: ${j.name} to ${(j.where || []).length} place${(j.where || []).length === 1 ? "" : "s"}`, !!j.error);
     await loadBackup();
   }));
@@ -320,19 +383,23 @@ function wireBackup(root){
 // it went, and the controller marks itself so when the new one tells it or
 // answers its asking. The moved band is page-shell.js's (drawMovedBand).
 let moveData = null, moveAsked = false, moveToken = null;
-async function loadMove(){
+function loadMove(){
   moveAsked = true;
-  const was = JSON.stringify(moveData);
-  try{ moveData = await (await fetch("/api/move?pieces=1")).json(); }
-  catch(e){ moveData = {error: "move: " + failWords(e)}; }
-  // Drawn once it has landed, as the backup copies are (B645: the section
-  // stayed its two shimmer rows after a reload, and Forget it drew nothing).
-  if (JSON.stringify(moveData) !== was){ settingsRev++; if (tabs.some(t => t.kind === "settings")) drawPanes(); }
-  // ...and read again every poll while a move is armed (B646): how many
-  // nodes have heard it, the last packing and the ask's answer move on
-  // their own, while the page is open and only then.
-  clearTimeout(moveTimer); moveTimer = null;
-  if (moveData?.prepared && tabs.some(t => t.kind === "settings")) moveTimer = setTimeout(loadMove, 15000);
+  return reading("settings.move", async () => {
+    const was = JSON.stringify(moveData);
+    moveData = await getJSON("/api/move?pieces=1");
+    if (moveData.error) moveData = {error: "move: " + moveData.error};
+    // Drawn once it has landed, as the backup copies are (B645: the section
+    // stayed its two shimmer rows after a reload, and Forget it drew nothing).
+    if (JSON.stringify(moveData) !== was) readMoved("settings");
+    // ...and read again every poll while a move is armed (B646): how many
+    // nodes have heard it, the last packing and the ask's answer move on
+    // their own, while the page is on show and only then (R228 step 10: a
+    // page left kept its tab, and this went on for good); shown again, its
+    // open reads it at once.
+    clearTimeout(moveTimer); moveTimer = null;
+    if (moveData?.prepared && shown("settings")) moveTimer = setTimeout(loadMove, 15000);
+  });
 }
 let moveTimer = null;
 function moveStatus(){
@@ -347,7 +414,9 @@ function moveSection(){
   const howWord = {pressed: "marked so here", told: "told by the new controller", asked: "learned by asking the new controller"}[m.how] || "";
   if (m.moved) return `<div class="row stack2" data-group="Move"><div class="grow">
       ${factGrid([["Moved to", m.to], ["When", m.at ? ago(m.at) : ""], ["How", howWord], ["Bundle landed", m.landed_at ? ago(m.landed_at) : ""]])}
-      <div class="sub bad">This controller is read-only now; its nodes have followed, and one that comes back late is told where to knock.</div></div></div>`;
+      <div class="sub bad">This controller is read-only now; its nodes have followed, and one that comes back late is told where to knock.</div>
+      <div class="sub">Should the new home be lost, its bundle still downloads here, packed fresh, and lands on a fresh install with the move token.</div>
+      <div class="actbar"><span class="sp"></span><button type="button" data-movebundle>Download the bundle</button></div></div></div>`;
   // The state arrived by a move: what the old controller was told, as facts.
   const ar = m.arrived || {};
   const arrived = ar.restored_at ? `${factGrid([["Arrived by a move", ago(ar.restored_at)], ["From", ar.from || "no address named"],
@@ -377,7 +446,8 @@ function moveSection(){
   const armed = m.prepared ? `${factGrid([["New home", m.to || "not named yet"], ["Armed", ago(m.made_at)],
       ["Nodes that heard it", `${m.heard} of ${m.nodes}`], ["Last packed", m.packed_at ? `${ago(m.packed_at)}, ${sizeMb}` : "not yet: Download packs it"],
       ["In the bundle", inside], ["Asked whether it landed", m.asked_at ? `${ago(m.asked_at)}: ${m.asked_error || "not yet"}` : ""]])}
-      <div class="sub">Every node follows by itself once the new home answers, however long that takes; Mark as moved makes this controller read-only now.</div>` : "";
+      <div class="sub">Every node follows by itself once the new home answers, however long that takes; Mark as moved makes this controller read-only now.</div>
+      ${m.far ? `<div class="sub warn">${esc(m.far)}.</div>` : ""}` : "";
   return `<div class="row stack2" data-group="Move"><div class="grow">
       ${land}
       ${arrived}
@@ -395,23 +465,44 @@ function moveSection(){
 // and the first-run walk's last step.
 // In the walk the card around it says what it is, and says it waits while the
 // step before is not done: only a hold the walk has not explained is said here.
-function moveLandBox(ld, inWalk = false, heldSaid = false){
-  return `<div class="field" data-movelandbox>
+function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
+  const off = ld.held ? " disabled" : "";
+  // The token given on the first page is kept for this (the operator, 10 Nov:
+  // asked twice), and where the old controller ran on this machine its
+  // address cannot answer, so the bundle is the one way.
+  const tok = ld.token_kept ? "" : `<label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${off}></label>`;
+  const from = bundleOnly ? "" : `<label class="pick"><span class="pickw">${ld.token_kept ? "Old controller, while it runs" : "Old controller"}</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${off}></label>`;
+  const file = `<label class="pick fwide"><span class="pickw">${bundleOnly ? "The bundle" : "Or the bundle"}</span><input type="file" id="landFile" accept=".aeriemove"${off}></label>`;
+  return `<div class="field" data-movelandbox${ld.token_kept ? " data-tokkept" : ""}>
       ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
           ld.stick ? " On this stick the bundle lands on the machine's disks, in the spaces' folder, never on the stick." : ""}`)}</div>
 `}
       ${ld.held && !heldSaid ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
-      <div class="fgrid"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick fwide"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".aeriemove,.bbmove"${ld.held ? " disabled" : ""}></label></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>`;
+      ${ld.token_kept ? `<div class="sub dim">The move token is the one you gave on the first page.</div>` : ""}
+      <div class="fgrid">${tok}${from}${file}</div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${off}>Land it here</button></div></div>`;
+}
+// When a bundle was packed, in words ("3 hours ago, 18 Nov 14:02"), from its
+// plain header line; "" for a file that is not one.
+async function moveBundleAge(file){
+  try{
+    const head = (await file.slice(0, 16384).text()).split("\n");
+    const m = JSON.parse(head[1] || "{}");
+    const at = Number(m.packed_at || m.made_at || 0);
+    return at ? `${ago(at)} (${new Date(at * 1000).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"})})` : "";
+  }catch(e){ return ""; }
 }
 function wireMove(root){
   root.querySelectorAll("[data-moveland]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tok = ($("landTok")?.value || "").trim(), from = ($("landFrom")?.value || "").trim(), file = $("landFile")?.files?.[0];
-    if (!tok || !(file || from)) return notify("the move token is needed, with the old controller's address or the bundle", true);
-    if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.` : `The bundle is pulled from ${from}.`}`,
+    const kept = !!b.closest("[data-movelandbox]")?.hasAttribute("data-tokkept");
+    if (!tok && !kept) return notify("the move token is needed, with the old controller's address or the bundle", true);
+    if (!(file || from)) return notify($("landFrom") ? "pick the bundle, or give the old controller's address" : "pick the bundle first", true);
+    // When it was packed, read off its plain first lines (B957): anything
+    // done on the old controller after that moment does not come.
+    const packed = file ? await moveBundleAge(file) : "";
+    if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.${packed ? ` It was packed ${packed}: what changed on the old controller since then does not come, so download it again if the old one has been used since.` : ""}` : `The bundle is pulled from ${from}, packed at that moment.`}`,
         {title: "Land the move?", verb: "Land it", danger: true})) return;
     busy(b, file ? "Sending" : "Landing");
     const fd = new FormData();
@@ -424,12 +515,12 @@ function wireMove(root){
     const box = b.closest("[data-movelandbox]"), prog = document.createElement("div");
     prog.className = "field landprog";
     if (box) box.append(prog);
-    const draw = (sent, total) => { prog.innerHTML = `<div class="sub">Sending the bundle: ${moveSize(sent)} of ${moveSize(total)}</div>${pctBar(total ? sent / total * 100 : 0, "bundle sent")}`; };
+    const draw = (sent, total) => { drawHTML(prog, `<div class="sub">Sending the bundle: ${moveSize(sent)} of ${moveSize(total)}</div>${pctBar(total ? sent / total * 100 : 0, "bundle sent")}`); };
     const j = await new Promise(resolve => {
       const x = new XMLHttpRequest();
       x.open("POST", "/api/move-land");
       if (file) x.upload.onprogress = e => { if (e.lengthComputable) draw(e.loaded, e.total); };
-      x.upload.onload = () => { prog.innerHTML = `<div class="sub">Sent. Landing it: unpacking, then the swap<span class="dots"></span></div>`; busy(b, "Landing"); };
+      x.upload.onload = () => { drawHTML(prog, `<div class="sub">Sent. Landing it: unpacking, then the swap<span class="dots"></span></div>`); busy(b, "Landing"); };
       x.onload = () => { let r = {}; try{ r = JSON.parse(x.responseText); }catch(e){ r = {error: x.status === 200 ? "no answer" : `HTTP ${x.status}`}; } resolve(r); };
       x.onerror = () => resolve({error: "the landing stopped: the connection dropped"});
       x.send(fd);
@@ -444,8 +535,9 @@ function wireMove(root){
     busy(b, "Preparing");
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
     const stores = [...root.querySelectorAll('[data-movepiece^="store:"]')].filter(x => x.checked).map(x => x.dataset.movepiece.slice(6));
-    const j = await (await postJSON("/api/move", {action: "prepare", to: $("moveTo")?.value || "", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "prepare", to: $("moveTo")?.value || "", repos: on("repos"), carry_key: on("install_key"), stores});
     if (j.error){ notify(j.error, true); unbusy(b, "Prepare to move"); return; }
+    if ((j.said || []).length) notify(j.said.join(". "), true);
     moveToken = j.token;
     await loadMove();
   }));
@@ -455,7 +547,7 @@ function wireMove(root){
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
     const stores = [...root.querySelectorAll('[data-movepiece^="store:"]')].filter(x => x.checked).map(x => x.dataset.movepiece.slice(6));
     busy(b, "Packing");
-    const j = await (await postJSON("/api/move", {action: "backup", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "backup", repos: on("repos"), carry_key: on("install_key"), stores});
     unbusy(b, "Download a backup");
     if (j.error){ notify(j.error, true); return; }
     const typed = await askText(`The backup's token, shown once and never kept here:\n\n${j.token}\n\nRecord it: the backup opens only under it, on a new controller's first setup, and whoever holds the file and the token holds this controller's data${on("install_key") ? " and its install key" : ""}. Nothing is armed, so no node hears of it. It is the controller and what was ticked, not the files on your pools: the Storage page's snapshots and Backups keep those.\n\nType the token's last four characters to download the file.`,
@@ -472,7 +564,7 @@ function wireMove(root){
   // failure came back as a page of JSON).
   root.querySelectorAll("[data-movebundle]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Packing");
-    const j = await (await postJSON("/api/move", {action: "pack"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "pack"});
     unbusy(b, "Download the bundle");
     if (j.error){ notify(j.error, true); return; }
     const a = document.createElement("a");
@@ -482,14 +574,14 @@ function wireMove(root){
   }));
   root.querySelectorAll("[data-moveforget]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Forget this move?\n\nThe key is gone from here, so no node will follow a controller restored from its bundle, and the nodes hear of it no more. A bundle already downloaded still opens under its token, as a backup does.", {title: "Forget the move?", verb: "Forget it", danger: true})) return;
-    const j = await (await postJSON("/api/move", {action: "forget"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "forget"});
     if (j.error) notify(j.error, true);
     moveToken = null;
     await loadMove();
   }));
   root.querySelectorAll("[data-moveask]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Asking");
-    const j = await (await postJSON("/api/move", {action: "ask"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "ask"});
     if (j.error) notify(j.error, true);
     else notify(j.moved ? "it landed: this controller is marked moved" : `not landed there yet${j.asked_error ? `: ${j.asked_error}` : ""}`);
     await loadMove();
@@ -497,53 +589,17 @@ function wireMove(root){
   }));
   root.querySelectorAll("[data-movedone]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Mark this controller as moved?\n\nFrom now on it is read-only and tells its nodes where it went; press this once the new home is up and answering, or let it learn so by itself.", {title: "Moved?", verb: "Mark as moved", danger: true})) return;
-    const j = await (await postJSON("/api/move", {action: "moved"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "moved"});
     if (j.error) notify(j.error, true);
     await loadMove();
     await refresh();
   }));
 }
 
-// Power (R175, the operator, 28 Oct): the machine this controller runs on,
-// restarted or shut down from here on a bare-metal install and the OS,
-// the same verbs This machine's Advanced section has; the container
-// edition has no machine of its own here.
-function powerSection(){
-  const n = typeof ownMachine === "function" ? ownMachine() : null;
-  const live = !!n?.live;
-  const busyWith = (n?.jobs || []).find(j => j.type === "system" && !["reboot", "poweroff"].includes(j.apply));
-  const inflight = w => (n?.jobs || []).some(j => j.apply === w);
-  const why = !n ? "This install's own machine is not enrolled as a node yet." : !live ? "Its agent is not dialing in: power the machine from its console." : busyWith ? "A system job is running on it; wait for it to finish." : "";
-  return `<div class="row stack2" data-group="Power"><div class="grow">
-      <div class="sub">Restart ends every session on this machine, everybody's, each closed first, and the machine comes back on its own with the dashboard. Shut down does the same and the machine stays off until somebody switches it on.</div>
-      ${why ? `<div class="sub warn">${esc(why)}</div>` : ""}
-      <div class="actbar">${typeof holdNextBox === "function" ? holdNextBox() : ""}<span class="sp"></span>
-        <button type="button" class="danger" data-power="reboot"${why || inflight("reboot") ? " disabled" : ""}>${inflight("reboot") ? "Restarting…" : "Restart"}</button>
-        <button type="button" class="danger" data-power="poweroff"${why || inflight("poweroff") ? " disabled" : ""}>${inflight("poweroff") ? "Shutting down…" : "Shut down"}</button></div>
-    </div></div>`;
-}
-function wirePower(root){
-  if (typeof wireHoldNext === "function") wireHoldNext(root);
-  root.querySelectorAll("[data-power]").forEach(b => b.onclick = () => pressing(b, async () => {
-    const act = b.dataset.power, id = state?.own_node || "";
-    const here = (state?.sessions || []).filter(x => x.node_id === id);
-    const open = here.length ? `It ends the ${here.length} session${here.length === 1 ? "" : "s"} open here, everybody's, each closed before the machine goes; transcripts are kept. ` : "";
-    if (!await askYes(act === "reboot"
-          ? `Restart this machine?\n\n${open}Whatever is running here stops; the dashboard is back once the machine is.`
-          : `Shut this machine down?\n\n${open}It does not come back on its own: switch it on from its console.`,
-        {title: act === "reboot" ? "Restart?" : "Shut down?", verb: act === "reboot" ? "Restart" : "Shut down", danger: true})) return;
-    busy(b, act === "reboot" ? "Restarting" : "Shutting down");
-    const j = await (await postJSON("/api/v1/nodes", {action: act, id})).json().catch(() => ({error: "no answer"}));
-    if (j.error){ notify(j.error, true); unbusy(b, act === "reboot" ? "Restart" : "Shut down"); return; }
-    notify(act === "reboot" ? "restarting: the page comes back with the machine" : "shutting down");
-    if (typeof loadNodes === "function") await loadNodes();
-  }));
-}
-
 function wireUpdates(root){
   // The channel's pick (R179): saved, then the newest asked for again.
   root.querySelectorAll("[data-relchannel]").forEach(s => s.onchange = async () => {
-    const j = await (await postJSON("/api/settings", {set: {release_channel: s.value}})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/settings", {set: {release_channel: s.value}});
     if (j.error){ notify(j.error, true); return; }
     await postJSON("/api/v1/nodes", {action: "release-check"}).catch(() => {});
     await refresh();
@@ -551,50 +607,40 @@ function wireUpdates(root){
   root.querySelectorAll("[data-hostupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     const reboot = !!$("hostReboot")?.checked;
     if (!await askYes(`Update the system's own packages?\n\napt brings every package to its newest with the configuration files kept as they are${reboot ? ", and the machine restarts after if the update asks for it" : "; a restart, if one is needed, is yours to press after"}. The log is on the Jobs page.`, {title: "Apply updates?", verb: "Update"})) return;
-    busy(b, "Updating");
-    const j = await (await postJSON("/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "updating: the job runs on this machine; its log is on the Jobs page", !!j.error);
+    await sayPost(b, "Updating", "/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot},
+      "updating: the job runs on this machine; its log is on the Jobs page");
   }));
   root.querySelectorAll("[data-hostreboot]").forEach(b => b.onclick = () => pressing(b, async () => {
-    if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart", danger: true})) return;
-    busy(b, "Restarting");
-    const j = await (await postJSON("/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "restarting: the page comes back when the machine does", !!j.error);
+    if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart"})) return;
+    await sayPost(b, "Restarting", "/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot}, "restarting: the page comes back when the machine does");
   }));
   root.querySelectorAll("[data-relcheck]").forEach(b => b.onclick = () => pressing(b, async () => {
-    busy(b, "Checking");
-    const j = await (await postJSON("/api/v1/nodes", {action: "release-check"})).json().catch(() => ({error: "no answer"}));
-    if (j.error) notify(j.error, true);
-    await refresh();
+    await sayPost(b, "Checking", "/api/v1/nodes", {action: "release-check"}, "", () => refresh());
   }));
   root.querySelectorAll("[data-osfrom]").forEach(b => b.onclick = () => pressing(b, async () => {
     const from = ($("osFrom")?.value || "").trim();
     if (!from){ notify("name the folder on this machine that holds the release's ISO with its .sha256 and .attestation.jsonl", true); return; }
     if (!await askYes(`Write the ISO in ${from} into the other slot?\n\nThe ISO is checked against the sha256 beside it; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
-    busy(b, "Updating");
-    const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
+    await sayPost(b, "Updating", "/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from},
+      "updating: the job writes the other slot; restart from the Nodes page when it is done");
   }));
   root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tag = $("relPick")?.value;
     if (!tag || !await askYes(`Install ${tag} on this machine?\n\nIt is fetched and checked as any update is. An older build may refuse this machine's state, and a dev build may not come up.`, {title: "Install this version?", verb: "Install"})) return;
-    busy(b, "Installing");
-    const j = await (await postJSON("/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || j.said || `installing ${tag}: its job is on the Jobs page`, !!j.error);
+    await sayPost(b, "Installing", "/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag},
+      j => j.said || `installing ${tag}: its job is on the Jobs page`);
     unbusy(b, "Install this version");
   }));
   root.querySelectorAll("[data-relupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (b.dataset.os){
-      if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
-      busy(b, "Updating");
-      const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || j.said || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
+      if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from the Nodes page, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
+      await sayPost(b, "Updating", "/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer},
+        j => j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done");
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
-    busy(b, "Updating");
-    const j = await (await postJSON("/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "updating: the job runs on this machine's node; the page comes back on the new release", !!j.error);
+    await sayPost(b, "Updating", "/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate},
+      "updating: the job runs on this machine's node; the page comes back on the new release");
   }));
 }
 function reportsSection(){
@@ -617,11 +663,9 @@ function reportsSection(){
 async function deleteReport(btn){
   const id = Number(btn.dataset.repdel);
   busy(btn, "");
-  try{
-    const j = await (await postJSON("/api/reports", {action: "delete", id})).json();
-    if (j.error){ notify(j.error, true); unbusy(btn, ""); return; }
-    notify(`report #${id} deleted`);
-  }catch{ notify("could not delete the report", true); unbusy(btn, ""); return; }
+  const j = await postJSON("/api/reports", {action: "delete", id});
+  if (j.error){ notify(j.error, true); unbusy(btn, ""); return; }
+  notify(`report #${id} deleted`);
   await loadReports();
 }
 
@@ -633,11 +677,9 @@ async function clearReports(btn){
   const s = n === 1 ? "" : "s";
   if (!await askYes(`Delete all ${n} report${s} about AerieOS?`)) return;
   busy(btn, "Clearing");
-  try{
-    const j = await (await postJSON("/api/reports", {action: "clear"})).json();
-    if (j.error) notify(j.error, true);
-    else notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
-  }catch{ notify("could not clear the reports", true); }
+  const j = await postJSON("/api/reports", {action: "clear"});
+  if (j.error) notify(j.error, true);
+  else notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
   unbusy(btn, "Clear reports");
   loadReports();
 }
@@ -651,8 +693,6 @@ async function clearReports(btn){
 const CHECK_KINDS = [
   ["release", "A newer AerieOS", "Asks the releases for a newer version than this install runs, on a bare-metal install; the Update window applies it."],
   ["images", "Container images", "Asks each space container's registry for a newer image."],
-  ["nginx", "nginx", "Asks the registry for a newer nginx image for the nodes that serve hostnames."],
-  ["scanners", "Scanners", "Asks for newer versions of the scanners the nodes run over spaces."],
   ["catalog", "Library", "Asks upstream for the toolchains' and coding agents' newest versions, and the vetted catalog for its index. A node's own check of what it holds is on its page."]];
 const SETTING_GROUPS = [
   // The apps this controller offers its people (R272 step 3, apps.py): each
@@ -674,7 +714,9 @@ const SETTING_GROUPS = [
   {key: "catalog", title: "Vetted catalog", intro: catalogIntro, status: catalogStatus,
    heading: s => `${/aquilaelabs\/(aerieos|builderbot)-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
    fields: [{key: "catalog_url", label: "Address", type: "text", placeholder: "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/",
-     hint: "where the Library reads the catalog's index.json and index.sig, checked against the maintainers' key this install ships"}]},
+     hint: "where the Library reads the catalog's index.json and index.sig, checked against the maintainers' key this install ships"},
+    {key: "sideload_agents", label: "Offer coding agents from packs added here", type: "bool",
+     hint: "A pack you added yourself may bring a coding agent. Off, its program installs and its agent is not offered: an agent's adapter decides what runs in every session of it, and nobody vetted this one. On, for trying an agent of your own before you submit it to the catalog."}]},
   {key: "apps", title: "Apps", off: "apps", intro: appsIntro, status: appsStatus,
    heading: s => `${["apps_android", ...(s?.settings?.offer_unvetted?.value ? ["apps_vscode", "apps_companion"] : [])]
      .filter(k => s?.settings?.[k]?.value).length} offered`,
@@ -719,7 +761,9 @@ const SETTING_GROUPS = [
     {key: "tls_host", label: "Hostname", type: "text", placeholder: "bb.example.com",
      hint: "The controller's own public name, which the certificate is for. Leave it empty on a LAN with no name: the install's own certificate then names the addresses the page is reached at."},
     {key: "tls_email", label: "Email (Let's Encrypt)", type: "text", placeholder: "you@example.com",
-     hint: "Where Let's Encrypt writes about the certificate. Optional."}]},
+     hint: "Where Let's Encrypt writes about the certificate. Optional."},
+    {key: "trusted_proxies", label: "Reverse proxy in front", type: "text", placeholder: "192.168.1.20",
+     hint: "Only if another machine's proxy stands in front of this page: its address, or several and networks parted by spaces. Wrong passwords are then counted against each visitor's own address, where without this the proxy is the one address everybody shares, and a hundred wrong passwords from anyone hold them all. The tunnel under Reach from outside needs no entry."}]},
   // The mail server the bell's rows go out through (R149, reach.py): each
   // person picks where the bell reaches them on their Profile; email needs
   // this server.
@@ -762,7 +806,7 @@ const SETTING_GROUPS = [
    heading: s => s?.settings?.backup_password?.set ? "on" : "off",
    fields: [
     {key: "backup_password", label: "Backup password", type: "secret",
-     hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, spaces, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
+     hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, spaces, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. A copy carries the install key, so whoever holds a copy and this password holds everything the controller keeps: keep the password where you keep the owner's. A copy without it is a sealed file."}]},
   // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
   // token that may read AerieOS's repository, with which the dev channel and
   // the version picker see the drafts not published yet.
@@ -806,7 +850,7 @@ async function maintAsk(rows){
     ? `Everybody else is kept out until it is off, and these ${rows.length} session${rows.length === 1 ? "" : "s"} and terminal${
         rows.length === 1 ? "" : "s"} of theirs end now${busyN ? `, ${busyN} of them in the middle of work` : ""}:\n\n${rows.map(line).join("\n")}`
     : "Everybody else is kept out until it is off. Nobody else has a session or a terminal open.";
-  return askYes(text, {title: "Turn maintenance mode on?", verb: rows.length ? "End them and turn it on" : "Turn it on", danger: rows.length > 0});
+  return askYes(text, {title: "Turn maintenance mode on?", verb: rows.length ? "End them and turn it on" : "Turn it on", caution: rows.length > 0});
 }
 
 // The Connection section's lines (R158 step 2): what is in force, the
@@ -830,7 +874,7 @@ function connectionStatus(s){
 
 // What the Apps section holds, over its switches, and Check for updates.
 // The clocks alone (the operator, 3 Nov): Check for updates is on each
-// thing's own page (Containers, nginx, Scanners, the Library, Updates), so
+// thing's own page (Containers, the Library, Updates), so
 // this section says when each last looked and sets how often.
 function checksIntro(){
   const c = state?.checks || {};
@@ -846,18 +890,24 @@ function checksStatus(){
 function wireChecks(root){
   root.querySelectorAll("[data-checknow]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Checking");
-    const j = await (await postJSON("/api/checks", {kind: b.dataset.checknow})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/checks", {kind: b.dataset.checknow});
     notify(j.error || "checking: the answer is here in a moment", !!j.error);
     setTimeout(() => refresh(), 4000);
   }));
 }
 
 // The mirror's line and its two presses: Import takes an archive that
-// tools/catalog-mirror.py made on a machine with the network.
-function catalogIntro(s){
-  const m = s?.catalog_mirror;
+// tools/catalog-mirror.py made on a machine with the network. The mirror and
+// the index in use are the status read's own keys, beside its settings part,
+// which is what the groups are handed.
+function catalogIntro(){
+  const m = state?.catalog_mirror, i = state?.catalog_index;
+  // When the index in use was made: an address that keeps answering an
+  // old one shows here, where nothing else would say it.
+  const made = i ? `The index in use was made ${esc(i.made || "at an unknown time")}${i.read ? `, read ${esc(ago(i.read))}` : ""}.` : "No index has been read yet.";
   return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the signed index at this address${
     helpIcon("Another address can only mirror the same files: index.json and index.sig are checked against the maintainers' key this install ships, so no other catalog passes as vetted. A controller that cannot reach the address imports a mirror instead: tools/catalog-mirror.py makes one on a machine with the network, and the Library installs from it with nothing fetched.")}</div>
+    <div class="sub" data-catalogmade>${made}</div>
     <div class="field">${m
       ? `<div class="row stack2"><div class="grow"><span class="name">Mirror</span> <span class="sub">${m.packs} entr${m.packs === 1 ? "y" : "ies"} from ${m.repos} repositor${m.repos === 1 ? "y" : "ies"}, made ${esc(m.generated || "at an unknown time")}, imported ${esc(ago(m.imported_at))}</span></div>
           <button type="button" data-mirrorforget>Forget</button></div>`
@@ -865,34 +915,37 @@ function catalogIntro(s){
     <div class="addbar ctlrow"><input id="mirrorFile" type="file" hidden accept=".tar,.tgz,.tar.gz,application/gzip,application/x-tar">
       <button type="button" data-mirrorimport>${m ? "Import a newer mirror" : "Import a mirror"}</button></div>`;
 }
-function catalogStatus(s){
-  return s?.catalog_mirror ? `a mirror made ${s.catalog_mirror.generated || "earlier"} answers when the catalog does not · applies at once` : "applies at once";
+function catalogStatus(){
+  const m = state?.catalog_mirror;
+  return m ? `a mirror made ${m.generated || "earlier"} answers when the catalog does not · applies at once` : "applies at once";
 }
 function wireCatalogMirror(root){
   const file = root.querySelector("#mirrorFile");
-  root.querySelector("[data-mirrorimport]")?.addEventListener("click", () => file?.click());
+  // Set, not added: the page is patched and keeps these buttons (R244).
+  const imp = root.querySelector("[data-mirrorimport]");
+  if (imp) imp.onclick = () => file?.click();
   if (file) file.onchange = async () => {
     const f = file.files[0];
     if (!f) return;
     const b = root.querySelector("[data-mirrorimport]");
     if (b) busy(b, "Importing");
-    const u = await fetch("/api/upload-archive?name=" + encodeURIComponent(f.name), {method: "POST", body: f});
-    const uj = await u.json().catch(() => ({}));
-    const j = !u.ok || uj.error ? {error: uj.error || `the upload failed (HTTP ${u.status})`}
-      : await (await postJSON("/api/catalog-mirror", {action: "import", archive: uj.id})).json().catch(() => ({error: "no answer"}));
+    const uj = await postFile("/api/upload-archive?name=" + encodeURIComponent(f.name), f);
+    const j = uj.error ? {error: `the upload failed: ${uj.error}`}
+      : await postJSON("/api/catalog-mirror", {action: "import", archive: uj.id});
     notify(j.error || `the mirror is imported: ${j.packs} entries, made ${j.generated}`, !!j.error);
     if (state && !j.error) state.catalog_mirror = j.mirror;
-    settingsRev++; drawPanes(); refresh();
+    readMoved("settings"); drawPanes(); refresh();
   };
-  root.querySelector("[data-mirrorforget]")?.addEventListener("click", async e => {
+  const fg = root.querySelector("[data-mirrorforget]");
+  if (fg) fg.onclick = async e => {
     const b = e.currentTarget;
     if (!await askYes("Forget the catalog's mirror? The Library reads the catalog's address alone again; packs kept from the mirror stay.")) return;
     busy(b, "Forgetting");
-    const j = await (await postJSON("/api/catalog-mirror", {action: "forget"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/catalog-mirror", {action: "forget"});
     notify(j.error || "the mirror is forgotten", !!j.error);
     if (state && !j.error) state.catalog_mirror = null;
-    settingsRev++; drawPanes();
-  });
+    readMoved("settings"); drawPanes();
+  };
 }
 
 function appsIntro(){
@@ -943,7 +996,7 @@ function tunnelStatus(s){
 // each node's (chosen in Enroll node, kept on its record), and this is the
 // one place the controller's side of it is set.
 function tunnelNodes(){
-  if (nodesList === null){ loadNodes(); return ""; }
+  if (nodesList === null){ nodesKnown(); return ""; }
   const via = (nodesList || []).filter(n => n.config?.tunnel?.kind === "public").map(n => n.name);
   return via.length ? `; ${via.join(", ")} come${via.length === 1 ? "s" : ""} in through it` : "; no node comes in through it yet";
 }
@@ -971,9 +1024,9 @@ async function askReset(){
   const modal = $("resetmodal"), body = $("resetBody");
   if (!modal || !body) return;
   try { await loadNodes(); } catch {}
-  const list = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const list = liveAgents();
   const shut = () => { modal.hidden = true; body.innerHTML = ""; };
-  body.innerHTML = `<div class="field">
+  drawHTML(body, `<div class="field">
       <div class="hint bad">Accounts, nodes, space settings, tokens, the notebook, memories and logs move into a dated
         directory under the controller's config. Space files stay. The next page is the setup page.</div>
     </div>
@@ -983,7 +1036,7 @@ async function askReset(){
       ${unenrollWhat(true)}
       ${list.map(n => { const busy = resetBusy(n), clean = !!(n.live && n.reported?.sandbox); return `
         <label class="ndcap"><input type="checkbox" data-rsnode="${esc(n.id)}"${busy ? " disabled" : " checked"}> ${esc(n.name)}: ${
-          clean ? "uninstall AerieOS from it" : "remove it here; the machine keeps AerieOS until <code>sudo bb-sandbox uninstall</code> there"}${
+          clean ? "uninstall AerieOS from it" : "remove it here only; the machine keeps AerieOS until it is uninstalled there"}${
           busy ? `<div class="hint bad">${esc(busy)}: end and bring them down first, or it stays enrolled</div>` : ""}</label>`; }).join("")}
       <label class="ndcap"><input type="checkbox" id="resetStores"> Also delete the stores on their disks: the toolchains, the caches, the artifacts</label>
     </div>` : ""}
@@ -993,8 +1046,8 @@ async function askReset(){
       <div class="hint bad" id="resetWhy" hidden></div>
     </div>
     <div class="foot"><span class="sp"></span>
-      <button type="button" id="resetKeep">Keep it</button>
-      <button type="button" class="danger" id="resetGo" disabled>Reset</button></div>`;
+      <button type="button" id="resetKeep" data-way-out>Keep it</button>
+      <button type="button" class="danger" id="resetGo" disabled>Reset</button></div>`);
   modal.hidden = false;
   const word = $("resetWord"), go = $("resetGo"), why = $("resetWhy");
   word.oninput = () => { go.disabled = word.value.trim() !== "reset"; };
@@ -1002,11 +1055,8 @@ async function askReset(){
   const send = async (ids) => {
     busy(go, ids.length ? "Un-enrolling" : "Resetting");
     why.hidden = true;
-    let j;
-    try{
-      j = await (await postJSON("/api/reset", {confirm: word.value.trim(), unenroll: ids,
-        stores: !!$("resetStores")?.checked})).json();
-    }catch(e){ j = {error: "no answer from the dashboard: " + e}; }
+    const j = await postJSON("/api/reset", {confirm: word.value.trim(), unenroll: ids,
+      stores: !!$("resetStores")?.checked});
     if (j.error){ unbusy(go, "Reset"); why.textContent = j.error; why.hidden = false; return; }
     if (j.unenrolling) return resetFollow(body, ids, send);
     resetGone(body, j.moved_to);
@@ -1019,7 +1069,7 @@ async function askReset(){
 // stops it; then Reset anyway, which leaves the rest enrolled.
 function resetFollow(body, ids, send){
   const draw = j => {
-    body.innerHTML = `<div class="field">
+    drawHTML(body, `<div class="field">
         <div class="hint">Un-enrolling, then the reset. A machine reports its uninstall when it is done; this can take a few minutes.</div>
         ${(j.nodes || []).map(x => `<div class="ndcap">${esc(x.name)}: ${
           x.error ? `<span class="bad">${esc(x.error)}</span>` : x.done ? "done" : x.how === "uninstall" ? "uninstalling…" : "removing…"}</div>`).join("")}
@@ -1027,13 +1077,11 @@ function resetFollow(body, ids, send){
       </div>
       <div class="foot"><span class="sp"></span>${j.error ? `
         <button type="button" id="resetShut">Close</button>
-        <button type="button" class="danger" id="resetAnyway">Reset anyway</button>` : ""}</div>`;
+        <button type="button" class="danger" id="resetAnyway">Reset anyway</button>` : ""}</div>`);
     if (j.error){
       $("resetShut").onclick = () => { $("resetmodal").hidden = true; body.innerHTML = ""; };
       $("resetAnyway").onclick = async () => {
-        let r;
-        try{ r = await (await postJSON("/api/reset", {confirm: "reset"})).json(); }
-        catch(e){ r = {error: "no answer from the dashboard: " + e}; }
+        const r = await postJSON("/api/reset", {confirm: "reset"});
         if (r.error){ $("resetWhy").textContent = r.error; $("resetWhy").hidden = false; return; }
         resetGone(body, r.moved_to);
       };
@@ -1041,7 +1089,7 @@ function resetFollow(body, ids, send){
   };
   const tick = async () => {
     let j;
-    try{ j = await (await fetch("/api/reset")).json(); }
+    try{ j = await getJSON("/api/reset"); }
     catch{ return resetGone(body, ""); }       // the controller is starting over
     draw(j);
     if (j.moved_to) return resetGone(body, j.moved_to);
@@ -1051,8 +1099,8 @@ function resetFollow(body, ids, send){
 }
 
 function resetGone(body, moved){
-  body.innerHTML = `<div class="field"><div class="hint">Reset: the dashboard is starting over${
-    moved ? `; the old state is in ${esc(moved)}` : ""}. The setup page follows.</div></div>`;
+  drawHTML(body, `<div class="field"><div class="hint">Reset: the dashboard is starting over${
+    moved ? `; the old state is in ${esc(moved)}` : ""}. The setup page follows.</div></div>`);
   setTimeout(() => { location.href = "/login"; }, 2500);
 }
 
@@ -1134,16 +1182,9 @@ function wireSettingsSections(el){
   wireUpdates(el);
   wireBackup(el);
   wireMove(el);
-  wirePower(el);
   // Ask Let's Encrypt now (R158 step 2): the Connection section's own press.
   el.querySelectorAll("[data-tlsissue]").forEach(b => b.onclick = async () => {
-    busy(b, "Asking");
-    try{
-      const j = await (await postJSON("/api/tls", {action: "issue"})).json();
-      if (j.error) notify(j.error, true);
-      else notify("asking Let's Encrypt: the Connection section says how it goes");
-    }catch(e){ notify("could not ask: " + failWords(e), true); }
-    refresh();
+    await sayPost(b, "Asking", "/api/tls", {action: "issue"}, "asking Let's Encrypt: the Connection section says how it goes", () => { refresh(); });
   });
   el.querySelectorAll('[data-group]').forEach(box => {
     const btn = box.querySelector(".setApply");
@@ -1158,14 +1199,13 @@ function wireSettingsSections(el){
       box.querySelectorAll("[data-clear]:checked").forEach(i => { set[i.dataset.clear] = ""; });
       busy(btn, "Applying");
       try{
-        const post = extra => fetch("/api/settings", {method: "POST",
-          headers: {"Content-Type": "application/json"}, body: JSON.stringify({set, ...extra})});
-        let j = await (await post({})).json();
+        const post = extra => postJSON("/api/settings", {set, ...extra});
+        let j = await post({});
         // Maintenance mode asks first, with every other account's sessions
         // and what each is doing, since turning it on ends them.
         if (j.confirm === "maintenance"){
           if (!await maintAsk(j.sessions || [])) return;
-          j = await (await post({confirmed: true})).json();
+          j = await post({confirmed: true});
         }
         if (j.error) return notify(j.error, true);
         box.querySelectorAll("[data-set]").forEach(i => { delete settingsDraft[i.id]; });
@@ -1219,17 +1259,13 @@ function wireIdleSection(el){
     const btn = el.querySelector("#idleApply");
     if (btn) busy(btn, "Applying");
     try{
-      const r = await fetch("/api/idle", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({minutes})});
-      const j = await r.json();
+      const j = await postJSON("/api/idle", {minutes});
       if (j.error) return notify(j.error, true);
       delete settingsDraft.idleMin;
       notify(j.minutes ? `every agent's session ends after ${j.minutes} idle minute(s), here and on every node`
                        : "no session is ended for being idle");
       refresh();
-    }catch(e){ notify("idle: " + failWords(e), true); }
-    finally{ if (btn && btn.isConnected){ btn.disabled = false; btn.textContent = "Apply"; } }
+    }finally{ if (btn && btn.isConnected){ btn.disabled = false; btn.textContent = "Apply"; } }
   };
   el.querySelector("#idleApply").onclick = apply;
   inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); apply(); } };
@@ -1284,17 +1320,14 @@ function wirePathsSection(el){
     busy(btn, "Applying");
     try{
       for (const i of changed){
-        const r = await fetch("/api/paths", {method: "POST", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({name: i.dataset.path, path: i.value.trim()})});
-        const j = await r.json();
+        const j = await postJSON("/api/paths", {name: i.dataset.path, path: i.value.trim()});
         if (j.error) return notify(`${i.dataset.path}: ${j.error}`, true);
         delete settingsDraft[i.id];
         notify(j.moving ? `${i.dataset.path}: moving what is there; it switches once it has arrived`
                         : `${i.dataset.path} is kept at ${i.value.trim() || "its default"}`);
       }
       refresh();
-    }catch(e){ notify("storage: " + failWords(e), true); }
-    finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
+    }finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
   };
   btn.onclick = apply;
   el.querySelectorAll("input[data-path]").forEach(i => {

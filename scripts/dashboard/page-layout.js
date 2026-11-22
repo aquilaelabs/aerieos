@@ -5,8 +5,8 @@
 // 5 Oct); and render(), the one draw of the page every change ends in.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -23,9 +23,7 @@ function render(){ shellBoot(); if (state) dockSettle(); drawPanes(); drawKeys()
                    // ground: from here a pane is a terminal's black or a
                    // tab's panel, and the loading line has been replaced.
                    if (state) document.body.classList.toggle("booting", false);
-                   if (state){ drawCard("linux", drawLinux);
-                               drawCard("commands", drawCommands); drawCard("git", drawGit);
-                               drawCard("custom", drawCustom); } }
+                   }
 
 // ---- layout, shared between browsers ---------------------------------
 
@@ -91,9 +89,7 @@ async function pushLayout(){
   const body = lastSaved;
   let ok = false;
   try{
-    const r = await fetch("/api/layout", {method:"POST",
-      headers:{"Content-Type":"application/json"}, body});
-    const j = await r.json();
+    const j = await postJSON("/api/layout", JSON.parse(body));
     if (typeof j.rev === "number"){ myRev = j.rev; ok = true; }
   }catch(e){ /* below */ }
   pushing = false;

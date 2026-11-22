@@ -1,8 +1,8 @@
 """A held start (R56 step 9): on a controller installed bare metal, the
-dashboard, its agent and the network come up, and nothing else runs (no
-agent session starts; the pools, shares, apps, VMs and containers the
-installed OS adds are held by their own modules reading this) until a
-person presses Start on This machine. Not by default: held only after an
+dashboard, its agent and the network come up, and no agent session starts
+until a person presses Start on This controller; the pools, shares, apps,
+VMs and containers set up before come up as they were (B949: none of them
+reads this yet, and the page says so). Not by default: held only after an
 unclean shutdown (a clean-shutdown marker written on the way down and
 missing on the way up), or when the next start was asked to hold (This
 hold the next start checkbox beside Restart and Shut down, that one boot). Safe mode at the boot menu
@@ -17,9 +17,11 @@ stick's prepared configuration asked its first start to hold).
 """
 import json
 import threading
-import os
+import sys
 import time
 from pathlib import Path
+
+import seams
 
 STATE = Path("/config")
 _lock = threading.Lock()
@@ -61,7 +63,7 @@ def _safe_mode():
     """Safe mode on AerieOS (R161 step 2): aeriesafe=1 on the kernel's
     command line, which GRUB's Safe mode entry adds."""
     try:
-        with open(os.environ.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
+        with open(seams.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
             return "aeriesafe=1" in f.read().split()
     except OSError:
         return False
@@ -87,11 +89,16 @@ def boot():
         why.append("the last shutdown was not clean")
     with _lock:
         _marker("clean-shutdown").unlink(missing_ok=True)
+        # Unwritten, the next start could not tell a shutdown that was not
+        # clean: said, on the record and in the log, rather than let go.
+        unwritten = ""
         try:
             _marker("booted").touch()
-        except OSError:
-            pass
+        except OSError as e:
+            unwritten = f"the boot marker could not be written ({e}), so the next start cannot tell whether this one ended cleanly"
+            print(f"dashboard: held: {unwritten}", file=sys.stderr, flush=True)
         d = _load()
+        d["unwritten"] = unwritten
         if why:
             d.update(held=True, why=why, since=int(time.time()))
         else:
@@ -107,8 +114,10 @@ def shutdown_clean():
     with _lock:
         try:
             _marker("clean-shutdown").touch()
-        except OSError:
-            pass
+        except OSError as e:
+            # The next start will read this shutdown as not clean, and hold.
+            print(f"dashboard: held: the clean-shutdown marker could not be written ({e}): "
+                  "the next start will take this shutdown for one that was not clean", file=sys.stderr, flush=True)
 
 
 def is_held():
@@ -119,7 +128,7 @@ def said():
     """The sentence a refusal carries while the start is held."""
     d = _load()
     return ("the start is held" + (f" ({'; '.join(d.get('why') or [])})" if d.get("why") else "")
-            + ": press Start on This machine, and sessions run again")
+            + ": press Start on This controller, and sessions run again")
 
 
 def status():
@@ -129,7 +138,7 @@ def status():
         return {"held": False, "why": [], "since": 0, "armed": False}
     d = _load()
     return {"held": bool(d.get("held")), "why": list(d.get("why") or []), "since": int(d.get("since") or 0),
-            "armed": _marker("hold-next").exists()}
+            "armed": _marker("hold-next").exists(), "unwritten": str(d.get("unwritten") or "")}
 
 
 def start(principal=""):

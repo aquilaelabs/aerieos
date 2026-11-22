@@ -5,9 +5,18 @@
 // says so and this skips rather than failing for a tool it never had.
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { ok, done, DIR } from './lib.mjs';
+import { ok, done, until, DIR, section, REPO } from './lib.mjs';
+import { createServer } from 'node:net';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
+// A port the machine says is free, for a small server of a check's own, not
+// a number drawn between 30000 and 50000: beside seven other suites'
+// servers and browsers the draw landed on one in use, the server never came
+// up and every shot said the page did not answer (the gate of 14 Nov).
+const freePort = () => new Promise(res => {
+  const s = createServer();
+  s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
+});
+
 const S = `${DIR}/reel`;
 mkdirSync(S, { recursive: true });
 // dist/ and the scratch apart (R96): the sheet and frames.json land under
@@ -152,7 +161,7 @@ if (ff.status !== 0){
 // or deep screen a session had just driven into place was gone from the
 // shot. adb is stood in for by a script that answers get-state, the window
 // dump from a file, and screencap with one fixed picture, and logs a launch.
-{
+await section("emu PKG launches the package only when it is not already on the screen", async () => {
   const A = `${S}/adb`; mkdirSync(A, { recursive: true });
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kAAAAABJRU5ErkJggg==', 'base64');
   writeFileSync(`${A}/frame.png`, png);
@@ -181,14 +190,14 @@ exit 0
   const away = shot('away', '  Window #8 Window{2d u0 com.other/.Main}\n  mCurrentFocus=Window{2d u0 com.other/com.other.Main}\n');
   ok(away.r.status === 0 && /^monkey dev\.x/.test(away.launched),
      `...and one that is not on the screen is launched first (${away.launched})`);
-}
+});
 
 // A timed touch (R101): touch.py finds the panel and the screen through adb
 // and sends the whole gesture as one shell of sendevent lines with sleeps,
 // in the panel's own range, turned with the screen. The same stand-in adb,
 // answering getevent -p, wm size and dumpsys input from files, and logging
 // the shell it is handed.
-{
+await section("A timed touch", async () => {
   const A = `${S}/adb2`; mkdirSync(A, { recursive: true });
   writeFileSync(`${A}/adb`, `#!/bin/sh
 case "$1 $2 $3" in
@@ -253,7 +262,7 @@ exit 0
   ok(bad.r.status !== 0 && /a glide needs at least two points/.test(bad.r.stderr), 'a glide of one point is refused in words');
   const noms = touch('hold', '1', '2');
   ok(noms.r.status !== 0 && /hold takes --ms N/.test(noms.r.stderr), '...and a hold without its time');
-}
+});
 
 // The sources refuse in their own words when the node lacks what they need.
 // An emulator another session holds (30 Sep): the AVD is the account's,
@@ -261,7 +270,7 @@ exit 0
 // emulator's lock on the AVD says it is running; status, start and stop
 // name it rather than saying none is running or waiting for one that
 // refuses to run twice.
-{
+await section("The sources refuse in their own words when the node lacks what they need", async () => {
   const home = `${S}/avdhome`;
   mkdirSync(`${home}/builderbot-36.avd`, { recursive: true });
   mkdirSync(`${home}/running`, { recursive: true });
@@ -273,11 +282,16 @@ exit 0
   mkdirSync(bin, { recursive: true });
   writeFileSync(`${bin}/adb`, '#!/bin/sh\n[ "$1" = devices ] && echo "List of devices attached"; exit 0\n', { mode: 0o755 });
   writeFileSync(`${bin}/emulator`, '#!/bin/sh\necho "emulator ran" >&2; exit 1\n', { mode: 0o755 });
+  // An SDK of its own: the node's real store is not this check's to read
+  // (one gone stale under the session answered for it, and start said that).
+  mkdirSync(`${S}/emusdk/system-images`, { recursive: true });
   const emu = (...a) => spawnSync('bash', [`${REPO}/scripts/aerie`, 'emu', ...a], { encoding: 'utf8',
     env: { ...process.env, ANDROID_AVD_HOME: home, ANDROID_AVD_NAME: 'builderbot-36', PATH: `${bin}:${process.env.PATH}`,
-           BUILDERBOT_ROLE: 'node', HOME: `${S}/emuhome` } });
+           ANDROID_HOME: `${S}/emusdk`, BUILDERBOT_ROLE: 'node', HOME: `${S}/emuhome` } });
   const holder = spawn('flock', [`${home}/builderbot-36.avd/multiinstance.lock`, 'sleep', '600'], { detached: true, stdio: 'ignore' });
-  await new Promise(r => setTimeout(r, 400));
+  // The lock as aerie emu asks after it: taken when a try for it is refused.
+  const free = () => spawnSync('flock', ['-n', `${home}/builderbot-36.avd/multiinstance.lock`, 'true']).status === 0;
+  await until(() => !free(), 10000);
   const t0 = Date.now();
   const st = emu('status'), start = emu('start'), stop = emu('stop');
   // Its whole group: flock's sleep holds the lock too.
@@ -288,9 +302,9 @@ exit 0
   ok(start.status !== 0 && /running in another of your sessions/.test(start.stderr) && !/emulator ran/.test(start.stderr),
      `...bb emu start refuses at once, starting nothing (${start.stderr.trim().split('\n').pop().slice(0, 80)})`);
   ok(/running in another of your sessions/.test(stop.stderr), '...and aerie emu stop says whose it is to stop');
-  await new Promise(r => setTimeout(r, 200));
+  await until(free, 10000);
   ok(/no emulator is running/.test(emu('status').stdout), '...and with the lock let go, none is running');
-}
+});
 const noSrc = reel('--name', 'x');
 ok(noSrc.status !== 0 && /one source: --video FILE, --url URL, --emu \[PKG\] or --display :N/.test(noSrc.stderr || ''),
    `no source is refused naming the four (${(noSrc.stderr || '').trim().slice(0, 70)})`);
@@ -307,7 +321,7 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
 // carries none. The heading lands inside the second aerie capture shot waits
 // for; a page that changes later than that is one it cannot know about,
 // and --wait is for it.
-{
+await section("aerie capture shot at rest", async () => {
   const { spawn } = await import('node:child_process');
   const web = `${S}/web`; mkdirSync(web, { recursive: true });
   // Two pages (B392). The settled shots take the one whose heading lands
@@ -318,7 +332,7 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
     + `<script>setTimeout(() => { document.body.innerHTML = "<h1 style='font:48px sans-serif'>late</h1>"; }, ${ms})</script></body>`;
   writeFileSync(`${web}/index.html`, late(700));
   writeFileSync(`${web}/slow.html`, late(20000));
-  const port = 30000 + Math.floor(Math.random() * 20000);
+  const port = await freePort();
   const srv = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: web, stdio: 'ignore' });
   // Until it answers rather than a fixed 1.2 s, which a loaded box can miss.
   for (let i = 0; i < 150; i++){
@@ -339,12 +353,58 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
   const gone = shot('', `${S}/gone.png`, '--now');
   ok(gone.status === 3 && !existsSync(`${S}/gone.png`) && /did not answer/.test(gone.stderr || ''),
      `...and a page that does not answer is no picture and exit 3, saying so (${gone.status}; ${(gone.stderr || '').trim().slice(0, 80)})`);
-}
+});
+// A page in any browser installed here, as any device Playwright knows
+// (R263): neither is a list of aerie's own, so the checks ask what is there
+// and hold the verbs to it. A machine with Chromium alone passes as one
+// with three does.
+await section("a page in every browser installed, as any device", async () => {
+  const web = `${S}/web-any`; mkdirSync(web, { recursive: true });
+  writeFileSync(`${web}/index.html`, '<!doctype html><meta name="viewport" content="width=device-width"><style>body{margin:0;background:#fff}'
+    + '@media (prefers-color-scheme: dark){body{background:#000}}</style><body><h1 style="font:32px sans-serif">any</h1></body>');
+  const port = await freePort();
+  const srv = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: web, stdio: 'ignore' });
+  for (let i = 0; i < 150; i++){
+    try { if ((await fetch(`http://127.0.0.1:${port}/`)).ok) break; } catch {}
+    await new Promise(r => setTimeout(r, 100));
+  }
+  const aerie = (...args) => spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', ...args], { encoding: 'utf8', env: { ...process.env, DASHBOARD_PORT: '1' } });
+  const shot = (file, ...flags) => aerie('shot', `http://127.0.0.1:${port}/`, file, '--now', ...flags);
+  const wide = f => existsSync(f) ? readFileSync(f).readUInt32BE(16) : 0;
+  const here = (aerie('browsers').stdout || '').trim().split('\n').filter(Boolean);
+  ok(here.length >= 1 && here.every(n => /^[a-z]+$/.test(n)), `aerie capture browsers names the browsers installed here (${here.join(', ')})`);
+  const all = shot(`${S}/any.png`, '--browser', 'all');
+  const files = here.length > 1 ? here.map(n => `${S}/any-${n}.png`) : [`${S}/any.png`];
+  ok(all.status === 0 && files.every(f => wide(f) === 1280) && (all.stdout || '').trim().split('\n').length === files.length,
+     `--browser all is one picture in each, named for its browser where there are several (${all.status}; ${files.map(f => `${f.split('/').pop()} ${wide(f)}`).join(', ')}; ${(all.stderr || '').trim().slice(0, 80)})`);
+  const none = shot(`${S}/none.png`, '--browser', 'nosuchbrowser');
+  ok(none.status === 2 && !existsSync(`${S}/none.png`) && here.every(n => (none.stderr || '').includes(n)),
+     `a browser that is not here is refused naming those that are (${none.status}; ${(none.stderr || '').trim().slice(0, 90)})`);
+  const devices = (aerie('devices', 'pixel', '7').stdout || '').trim().split('\n').map(l => l.split('\t'));
+  const [name, about] = devices.find(d => d[0] === 'Pixel 7') || devices[0] || [];
+  const m = /^(\d+)x\d+ at ([\d.]+)/.exec(about || '');
+  const dev = m ? shot(`${S}/dev.png`, '--device', name) : null;
+  ok(m && dev.status === 0 && Math.abs(wide(`${S}/dev.png`) - (+m[1]) * (+m[2])) <= 2,
+     `--device takes a device Playwright knows by its name, with its own size and density (${name}: ${about}; the picture ${wide(`${S}/dev.png`)} wide)`);
+  const nodev = shot(`${S}/nodev.png`, '--device', 'No Such Phone');
+  ok(nodev.status === 2 && /aerie capture devices/.test(nodev.stderr || ''), `...and one it does not know is refused, saying where they are listed (${nodev.status})`);
+  const light = shot(`${S}/light.png`, '--scheme', 'light'), dark = shot(`${S}/dark.png`, '--scheme', 'dark');
+  const loc = shot(`${S}/loc.png`, '--set', 'colorScheme=dark');
+  const bytes = f => existsSync(f) ? readFileSync(f) : Buffer.alloc(0);
+  ok(light.status === 0 && dark.status === 0 && loc.status === 0 && !bytes(`${S}/light.png`).equals(bytes(`${S}/dark.png`))
+     && bytes(`${S}/dark.png`).equals(bytes(`${S}/loc.png`)),
+     `--scheme reaches the page, and --set hands the browser's context anything else by its own name (${[light, dark, loc].map(r => r.status).join('/')})`);
+  const reel = aerie('reel', '--url', `http://127.0.0.1:${port}/`, '--seconds', '2', '--name', 'any-reel', '--browser', here[here.length - 1], '--size', '393x851');
+  ok(reel.status === 0 && /frames/.test(reel.stderr + reel.stdout), `a reel takes the same: a page recorded in the browser named, at the size asked (${reel.status}; ${(reel.stderr || '').trim().slice(-90)})`);
+  const many = here.length > 1 ? aerie('reel', '--url', `http://127.0.0.1:${port}/`, '--seconds', '1', '--browser', 'all') : null;
+  ok(!many || (many.status !== 0 && here.every(n => (many.stderr || '').includes(n))), `...one browser a recording, said with their names when all is asked (${many ? many.status : 'one browser here'})`);
+  srv.kill();
+});
 // B143: this session's own token goes to the controller's origin alone. A
 // page on another host (here the same loopback under another port, as a dev
 // instance on bb-sandbox:7680 was beside the controller's :7680) is shot
 // and recorded without it; the controller itself is shot with it.
-{
+await section("B143: this session's own token goes to the controller's origin alone", async () => {
   const { spawn } = await import('node:child_process');
   const web = `${S}/heard`; mkdirSync(web, { recursive: true });
   const log = `${web}/auth.log`;
@@ -357,7 +417,7 @@ class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 `);
-  const port = 30000 + Math.floor(Math.random() * 20000);
+  const port = await freePort();
   const srv = spawn('python3', [`${web}/srv.py`, String(port), log], { stdio: 'ignore' });
   for (let i = 0; i < 150; i++){
     try { if ((await fetch(`http://127.0.0.1:${port}/`)).ok) break; } catch {}
@@ -379,10 +439,25 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
       { encoding: 'utf8', env: as('http://127.0.0.2:7680'), cwd: S });
     reelHeard = heard();
   }
+  // The controller's own dashboard is a person's page (R227 step 4): a
+  // session's token is sent to no page, and a shot or a reel of the
+  // controller's own address says so and asks nothing of it.
+  let homeReel = { status: 2, stderr: 'skipped' }, homeReelHeard = '';
+  if (reelHeard !== 'skipped') {
+    homeReel = spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', 'reel', '--url', url, '--seconds', '1'],
+      { encoding: 'utf8', env: as(`http://127.0.0.1:${port}`), cwd: S });
+    homeReelHeard = heard();
+  }
   srv.kill();
-  ok(away.status === 0 && awayHeard.length > 0 && !/bbs_/.test(awayHeard) && !/bbs_/.test(reelHeard)
-     && home.status === 0 && /Bearer bbs_dGVzdA/.test(homeHeard),
-     `this session's token goes to the controller alone: a page elsewhere on its port is shot and recorded without it, the controller with it (${
-       JSON.stringify({ away: awayHeard.trim().split('\n')[0], home: homeHeard.trim().split('\n')[0], reel: reelHeard.trim().split('\n')[0] })})`);
-}
+  ok(away.status === 0 && awayHeard.length > 0 && !/bbs_/.test(awayHeard) && !/bbs_/.test(reelHeard),
+     `this session's token goes to no page: one elsewhere on the controller's port is shot and recorded without it (${
+       JSON.stringify({ away: awayHeard.trim().split('\n')[0], reel: reelHeard.trim().split('\n')[0] })})`);
+  const said = (home.stderr || '') + (home.stdout || '');
+  ok(home.status !== 0 && homeHeard === '' && !existsSync(`${S}/heard-home.png`)
+     && /is the controller's own dashboard, which is a person's page: a session's token opens none of it/.test(said)
+     && /dev instance/.test(said) && /--emu/.test(said),
+     `...and a shot of the controller's own dashboard is refused in words, with what a session photographs instead, nothing asked of the page (${home.status}: ${said.trim().slice(0, 90)})`);
+  ok(reelHeard === 'skipped' || (homeReel.status !== 0 && homeReelHeard === '' && /a person's page/.test((homeReel.stderr || '') + (homeReel.stdout || ''))),
+     `...a reel of it too (${homeReel.status}: ${String(homeReel.stderr || '').trim().slice(0, 70)})`);
+});
 await done();

@@ -1,5 +1,6 @@
 {
  "about": "Node.js and npm, for a project built with npm and for anything that drives a browser with Playwright.",
+ "framework": "2.1",
  "label": "Node.js",
  "layout": {
   "bin": [
@@ -8,6 +9,7 @@
   "env": {},
   "tool": "bin/node"
  },
+ "maker": "OpenJS Foundation",
  "name": "node",
  "platforms": [
   "linux/amd64",
@@ -18,6 +20,7 @@
  "shipped": {
   "probe": "node",
   "reports": "node",
+  "rev": 2,
   "source": {
    "checksum": {
     "from": "file",
@@ -25,7 +28,8 @@
      "keys": "node.asc",
      "sig": "{base}/SHASUMS256.txt.sig"
     },
-    "url": "{base}/SHASUMS256.txt"
+    "url": "{base}/SHASUMS256.txt",
+    "version": "v26.13.1"
    },
    "fresh_only": true,
    "kind": "tarball",
@@ -33,7 +37,6 @@
    "url": {
     "darwin/amd64": "https://nodejs.org/dist/{version}/node-{version}-darwin-x64.tar.gz",
     "darwin/arm64": "https://nodejs.org/dist/{version}/node-{version}-darwin-arm64.tar.gz",
-    "linux-musl/amd64": "https://unofficial-builds.nodejs.org/download/release/{version}/node-{version}-linux-x64-musl.tar.xz",
     "linux/amd64": "https://nodejs.org/dist/{version}/node-{version}-linux-x64.tar.xz",
     "linux/arm64": "https://nodejs.org/dist/{version}/node-{version}-linux-arm64.tar.xz"
    },

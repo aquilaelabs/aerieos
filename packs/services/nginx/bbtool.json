@@ -1,0 +1,27 @@
+{
+ "about": "nginx on this node in front of its containers: a hostname routed to a container's port, with a certificate of your own or one from Let's Encrypt kept renewed. Its routes and certificates are on its own page, opened from Installed.",
+ "config": [],
+ "credits": [
+  {
+   "maker": "F5",
+   "name": "nginx"
+  }
+ ],
+ "format": 5,
+ "framework": "5.1",
+ "images": {
+  "nginx": "nginx:1.31-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7"
+ },
+ "label": "nginx",
+ "maker": "AerieOS",
+ "name": "nginx",
+ "platforms": [
+  "linux/amd64",
+  "linux/arm64"
+ ],
+ "service": {
+  "kind": "nginx"
+ },
+ "terms": [],
+ "tier": "official"
+}

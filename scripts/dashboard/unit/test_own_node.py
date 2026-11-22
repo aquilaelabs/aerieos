@@ -1,6 +1,6 @@
 """The controller's own machine as a node of itself (R90 step 6): minted from
 a shell on a controller installed bare metal (aerie nodes enroll-token --own),
-an ordinary agent row that builds and runs sessions and runs no containers,
+an ordinary agent row that builds and runs sessions, its containers the root agent's,
 with each session in a network of its own from the first hello; there is
 one such row, its session network cannot be switched off, and docker-host
 cannot be given to it. The provisioner run for it keeps the job account out
@@ -61,12 +61,10 @@ class OwnRow(unittest.TestCase):
     def test_its_session_network_stays_on_and_it_hosts_no_containers(self):
         mint(self.state, "nas", "--own")
         n = self.row("nas")
-        # The switch went in 0.9.0 (R146): its sessions' own network is a fact.
-        r = self.nodes.node_session_net("user:t", n["id"], False)
-        self.assertIn("went in 0.9.0", r.get("error", ""))
+        # Its sessions' own network is a fact (R146), with no switch.
         self.assertTrue(self.nodes.session_net_on(n["id"]))
         r = self.nodes.node_update("user:t", n["id"], {"capabilities": ["package-build", "docker-host"]})
-        self.assertIn("runs no containers", r.get("error", ""))
+        self.assertIn("root agent", r.get("error", ""))
         self.assertEqual(self.row("nas")["capabilities"], ["package-build"])
 
     def test_it_may_be_a_vm_host_through_the_root_agent(self):

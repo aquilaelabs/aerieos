@@ -1,10 +1,15 @@
 """The node's stores: where data, cache, artifacts and the toolchains live, the rules for a store's path, and node.json."""
 import contextlib
+import fcntl
 import json
 import os
 import re
 import subprocess
-from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, _run, log
+import tempfile
+import threading
+from . import names
+from . import release
+from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, StatTimeout, _run, log, statvfs_within
 
 
 def _can_chown(path):
@@ -32,19 +37,36 @@ def _can_chown(path):
             os.remove(probe)
 
 
-def store_path_ok(path, what="a store"):
+# A store's path, the one shape a new one is taken in and the only one
+# written where a shell reads it (/etc/profile.d): letters, digits and
+# . _ / + @ -, with no .. part. Nothing a shell reads as more than a word.
+STORE_PATH = re.compile(r"/[A-Za-z0-9._/+@-]+")
+
+
+def path_plain(path):
+    """Whether `path` is of a store's one shape (STORE_PATH)."""
+    p = str(path or "")
+    return bool(STORE_PATH.fullmatch(p)) and ".." not in p.split("/")
+
+
+def store_path_ok(path, what="a store", shape=True):
     """"" if this is a safe place for a store, else why not. A bare
     top-level directory is refused as well as a system one: /mnt is where
     mounts live, not a store, and putting one there scatters directories
-    across the mount root."""
+    across the mount root. A path is held to a store's one shape
+    (path_plain) unless `shape` is off, which is for the path a node's own
+    record already holds: a store enrolled before the shape was held stays
+    where it is, and is only left out of what a shell reads."""
     p = str(path or "").rstrip("/") or "/"
     if not p.startswith("/"):
         return f"{path!r} is not an absolute path"
     if " " in p or ".." in p.split("/"):
         return f"{path!r} must be a plain absolute path, with no spaces or .."
+    if shape and not path_plain(p):
+        return f"{path!r} must be a plain absolute path: letters, digits and . _ / + @ - alone"
     if p in STORE_DENY_EXACT:
         return (f"{p} is a system directory (or the root of the mounts): "
-                f"{what} is a directory of its own, like /var/lib/builderbot/x "
+                f"{what} is a directory of its own, like /var/lib/aerieos/x "
                 "or /mnt/<share>/<dir>")
     for bad in STORE_DENY_UNDER:
         if (p + "/").startswith(bad):
@@ -53,7 +75,7 @@ def store_path_ok(path, what="a store"):
     # points at /etc passed as text, and root then copied a store's tree
     # into /etc. A link to somewhere a store may be (macOS's /tmp) is fine.
     real = os.path.realpath(p)
-    if real != p and (why := store_path_ok(real, what)):
+    if real != p and (why := store_path_ok(real, what, shape)):
         return f"{p} is a link to {real}, and {why}"
     return ""
 def make_store(path):
@@ -243,12 +265,19 @@ def _stores(stores, used=False):
     out = {}
     for role, path in (stores or {}).items():
         try:
-            st = os.statvfs(path)
+            # Within seconds or not at all: a store on a share that stopped
+            # answering blocked statvfs, and with it every turn of the
+            # agent's loop, which samples the stores (B980).
+            st = statvfs_within(path)
             out[role] = {"path": path, "id": store_id(path),
                          "free_mb": st.f_bavail * st.f_frsize // (1024 * 1024),
                          "total_mb": st.f_blocks * st.f_frsize // (1024 * 1024)}
             if role == "toolchains":
                 out[role]["scope"] = tc_scope()      # where THIS machine's toolchains are, under path
+        except StatTimeout:
+            # Not answering: null as missing is, and said so on the row.
+            out[role] = {"path": path, "free_mb": None, "total_mb": None, "stuck": True}
+            continue
         except OSError:
             # Not there is a different fact from full: reported as null so
             # the row says "missing" rather than "0MB free".
@@ -420,22 +449,238 @@ def store_dirs(state):
 # ---------------------------------------------------------------------------
 # node.json
 
+# The record in memory is changed by the agent's loop, its job threads and
+# the configuration plane, and saved by each of them. Every change takes
+# STATE_LOCK (State takes it for each of its own), and save_state holds it
+# while it reads the console's keys into the record, dumps it and writes it:
+# a dump never walks a record another thread is changing, and a change and
+# the save that follows it are one step where the caller holds it around
+# both. Reentrant for that. Taken before _save_lock, never after it.
+STATE_LOCK = threading.RLock()
+
+
+class State(dict):
+    """node.json as the running agent holds it: a dict whose every change
+    takes STATE_LOCK, and whose copy is taken under it."""
+
+    def __setitem__(self, k, v):
+        with STATE_LOCK:
+            super().__setitem__(k, v)
+
+    def __delitem__(self, k):
+        with STATE_LOCK:
+            super().__delitem__(k)
+
+    def __ior__(self, other):
+        with STATE_LOCK:
+            return super().__ior__(other)
+
+    def pop(self, *a):
+        with STATE_LOCK:
+            return super().pop(*a)
+
+    def popitem(self):
+        with STATE_LOCK:
+            return super().popitem()
+
+    def setdefault(self, *a):
+        with STATE_LOCK:
+            return super().setdefault(*a)
+
+    def update(self, *a, **kw):
+        with STATE_LOCK:
+            super().update(*a, **kw)
+
+    def clear(self):
+        with STATE_LOCK:
+            super().clear()
+
+    def copy(self):
+        with STATE_LOCK:
+            return dict(self)
+
+
 def load_state():
     try:
         with open(NODE_JSON) as f:
-            return json.load(f)
+            got = json.load(f)
+        return State(got) if isinstance(got, dict) else got
     except OSError as e:
         raise SystemExit(f"{NODE_JSON} is missing; enroll this node first: "
-                         "builderbot-agent enroll --controller URL --token …") from e
+                         f"{names.command()} enroll --controller URL --token …") from e
     except ValueError as e:
         raise SystemExit(f"{NODE_JSON} is not JSON ({e}); enroll again") from e
 
 
-def save_state(state):
+# What this machine's console alone decides: the release key pinned here,
+# the keys added beside it, whether an unsigned agent is taken, whether an
+# older one may be put back and whether a person chose to pin no key
+# (release.py), and whether a root
+# command the controller sends is run at all (root_off, R227 step 2). A running agent holds
+# node.json in memory and writes it whole at every token it is handed, so
+# what the console wrote is read back from the file and kept, never the
+# agent's older copy of it.
+CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "release_unpinned", "unsigned_ok", "older_ok", "root_off")
+
+
+# What the provisioner writes into the record on a run after the enrollment
+# (the session account it made, the tunnel it brought up), through
+# record_set and the console's own lock. Like the console's keys, a running
+# agent takes them from the file at every save and never from its own
+# older copy, so a save between the provisioner's write and the restart it
+# asks for does not take the change back.
+RECORD_KEYS = ("session_user", "tunnel")
+
+
+def record_set(key, value):
+    """One of RECORD_KEYS set in node.json, or taken out with nothing, under
+    the save's lock and through its whole-file write: read from the file,
+    changed, and written as the console's own save writes. Whether it
+    changed; an error where the record could not be read or written, which
+    leaves it as it was."""
+    if key not in RECORD_KEYS:
+        raise ValueError(f"{key} is not the provisioner's to set")
+    d = os.path.dirname(NODE_JSON)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            raise ValueError(f"{NODE_JSON} does not hold a node's record")
+        if (cur.get(key) or None) == (value or None):
+            return False
+        if value:
+            cur[key] = value
+        else:
+            cur.pop(key, None)
+        _save(cur, True, d)
+    return True
+
+
+def console_said():
+    """The console's keys as node.json has them now, {} when it has none."""
+    try:
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return {k: cur[k] for k in CONSOLE_KEYS if isinstance(cur, dict) and k in cur}
+
+
+# One save at a time (B982): node.json is saved by the agent's loop, its job
+# threads and the configuration plane (a new token at every hello among
+# them), and by the console's own commands in another process. Two saves
+# through one fixed .tmp could interleave into a file that is not JSON,
+# after which no start reads it and the node has to be enrolled again at its
+# console. The thread lock orders this process's saves of a copy read from
+# the file (record_set, pin_release, pin_spare); the file lock, on a file
+# beside node.json, orders them against the console's.
+_save_lock = threading.Lock()
+
+
+def save_state(state, console=False):
+    """node.json written whole, under STATE_LOCK: nothing changes `state`
+    while the console's keys are read into it, it is dumped and it is
+    written. `console` is a person at the machine saying what it trusts
+    (enroll, release-key, unsigned): only then are the console's keys taken
+    from `state`; otherwise the file's own are kept."""
     d = os.path.dirname(NODE_JSON)
     os.makedirs(d, mode=0o700, exist_ok=True)
-    tmp = NODE_JSON + ".tmp"
-    with open(tmp, "w") as f:
-        os.fchmod(f.fileno(), 0o600)
-        json.dump(state, f, indent=2)
-    os.replace(tmp, NODE_JSON)
+    with STATE_LOCK, _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        _save(state, console, d)
+
+
+def pin_release(keys):
+    """AerieOS's release key pinned by the agent itself, at the one moment
+    it may (release.first_pin: a node that trusts no key, installing its
+    first update a release signed): the key, set in
+    node.json as the console's own save would write it, under the same
+    lock and through the same whole-file write. The record is read here,
+    under the lock, and not taken from the agent's copy: a key a person
+    pinned or added at the console in the meantime stands, as does their
+    choice to pin none (release-key none), and nothing is written. Whether
+    these were pinned; an error where the record could not be read or
+    written, which leaves it as it was."""
+    keys = release.clean_keys(",".join(keys))
+    d = os.path.dirname(NODE_JSON)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            raise ValueError(f"{NODE_JSON} does not hold a node's record")
+        if not keys or release.trusted(cur) or release.unpinned(cur):
+            return False
+        cur["release_key"] = keys[0]
+        cur.pop("release_spare", None)
+        if len(keys) > 1:
+            cur["release_spare"] = keys[1]
+        _save(cur, True, d)
+    return True
+
+
+def pin_spare(first, key):
+    """The release key's spare pinned by the agent itself, on the release
+    key's own signed word for it (release.spare_pin): set in node.json
+    beside the key, under the lock and through the whole-file write the
+    console's own save uses. The record is read here, under the lock: it is
+    written only while it still holds `first` as its release key and no
+    spare, and no choice to pin none, so what a person did at the console
+    in the meantime stands. Whether the spare was pinned; an error where
+    the record could not be read or written, which leaves it as it was."""
+    first, key = release.clean_key(first), release.clean_key(key)
+    d = os.path.dirname(NODE_JSON)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            raise ValueError(f"{NODE_JSON} does not hold a node's record")
+        if not first or not key or key == first or release.pinned(cur) != first or release.spare(cur) or release.unpinned(cur):
+            return False
+        cur["release_spare"] = key
+        _save(cur, True, d)
+    return True
+
+
+def _save(state, console, d):
+    if not console:
+        try:
+            with open(NODE_JSON) as f:
+                cur = json.load(f)
+        except (OSError, ValueError):
+            cur = None
+        if isinstance(cur, dict):
+            for k in CONSOLE_KEYS + RECORD_KEYS:
+                if k in cur:
+                    state[k] = cur[k]
+                else:
+                    state.pop(k, None)
+    text = json.dumps(state, indent=2)
+    fd, tmp = tempfile.mkstemp(prefix=".node.json.", dir=d)
+    try:
+        with os.fdopen(fd, "w") as f:
+            os.fchmod(f.fileno(), 0o600)
+            f.write(text)
+            # On the disk before its name points at it: a power cut after a
+            # new token was used could bring back the one before, which the
+            # controller had retired and reads as a stolen copy.
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        os.replace(tmp, NODE_JSON)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+    try:
+        fd = os.open(d, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass

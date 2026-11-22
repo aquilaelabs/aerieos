@@ -38,6 +38,7 @@ aerie lint                       # shellcheck, hadolint, ruff, actionlint, compo
 aerie tests unit                 # the python unit tier, scripts/dashboard/unit, under a minute
 aerie tests run                  # the dashboard's Playwright suite; aerie dashboard test FILE for one file
 aerie tests preflight            # what the branch changed, the suites that reach it, lint, voice, design: before a push
+aerie tests root                 # the root tier, as root in a throwaway container; aerie devapp test root-tier in the dev instance
 aerie tests lab                  # the lab suites, against the lab's own stack (lab/compose.yml)
 ```
 
@@ -68,15 +69,21 @@ ci-log` reads either.
   `.bb-map/coverage.json`; `aerie map covered NAME`, `aerie map uncovered [FILE]`
   and `aerie map unused` read it. A whole run refreshes it, and preflight picks
   suites by it (`aerie map affected`).
+- **Before and after:** `aerie dashboard test SUITE --at REF` (and `aerie tests
+  run --at REF`) runs it on a commit, copied with `git archive` rather than
+  from the working tree, so nothing is stashed; `aerie tests bisect SUITE GOOD
+  BAD` finds the first commit where it fails.
 - **Before a push:** `aerie tests preflight`; `--dry` prints the plan,
-  `--files F...` names the files, `--base HEAD` measures the working tree.
+  `--files F...` names the files, `--base HEAD` measures the working tree. A
+  suite that fails in its run and passes run again is flaky: recorded
+  (`aerie tests flakes` counts them), and the gate fails on one it ran.
 - **What other projects' sessions report:** `aerie diag reports` lists what
   sessions elsewhere said with `aerie report`; one worth fixing is added here
   with `aerie bug add`. Nothing goes back to the reporter.
 
 ## Finding your way
 
-`aerie map find NAME`, `aerie map who-calls NAME`, `aerie map draws ID` and `aerie map
+`aerie map find NAME`, `aerie map show NAME` (the definition whole), `aerie map who-calls NAME`, `aerie map draws ID` and `aerie map
 suites FILE` answer "where would I look" from `scripts/lib/codemap.py`'s
 index, with the function's own comment; `aerie map sections FILE` reads a file
 by its `// ---- name ----` headers, `aerie map state [FILE]` lists a page
@@ -99,20 +106,24 @@ against `docs/reference.md` (written by `tools/bb-ref.sh`), the settings
 across compose, `.env.example`, the Unraid template and the reference,
 `docs/api.md` against the routes, `docs/layout.md` against `git ls-files`,
 the agent's version against its file, and the instruction channels (this
-file, the briefing, the shipped rules). CI runs on the pull request's merge
-ref and nowhere else; `aerie ci-log` reads a run's output.
+file, the briefing, the shipped rules). CI runs `aerie lint` itself, with
+nothing skipped (`BB_LINT_STRICT=1`), the unit tier and the root tier, on the pull
+request's merge ref and on a release's tag, where it and the browser suites
+pass before anything is published; `aerie ci-log` reads a run's output.
 
 ## Layout and conventions
 
 - **The agent's compatibility window.** `AGENT_VERSION` in
-  `scripts/agent/aerieos_agent/__init__.py` is `WINDOW.BUILD`: inside a
-  window nothing is held; across one the controller ends the sessions on a
-  project whose node's agent is from the old window until it is updated
-  (`server.compat_holds`). BUILD never resets; the minor moves only for a
+  `scripts/agent/aerieos_agent/__init__.py` is `WINDOW.BUILD`. A node
+  whose agent is behind is sent nothing but its own update
+  (`nodes.agent_stale`): inside a window its sessions run on and the
+  controller sends that update by itself once the node is idle; across one
+  the controller ends the sessions on a project whose node's agent is from
+  the old window until a person updates it (`server.compat_holds`). BUILD never resets; the minor moves only for a
   break, in the same change as the removal of what it supersedes.
   `test/version.mjs` holds both WINDOWs to the VERSION file.
 - **Three numbers.** `aerie version` moves per commit; a file two builds may
-  read carries a format it checks (`.bb-map/map3.json`,
+  read carries a format it checks (`.bb-map/map5.json`,
   `.bb-map/coverage.json`); `AGENT_VERSION` moves by hand with any change to
   the agent, and `aerie lint` fails when it did not.
 - **/config's state.** `scripts/dashboard/stateversion.py` stamps
@@ -127,12 +138,13 @@ ref and nowhere else; `aerie ci-log` reads a run's output.
   the routes, the transport and the gates; each handler checks who may ask
   and makes one call into the feature's module beside it, which answers
   `(payload, status)` and is handed what it needs by `configure()`.
-  `index.html` is the markup, the stylesheet and the wiring that runs at
-  load; `tab-*.js` one per document tab, `nb-*.js` one per notebook view
-  (`nb-core.js` the notebook), `page-*.js` one per part of the page that is
-  neither; all pure declarations, all `"use strict"`, served only by name
-  from the page's own script tags (`server.page_scripts`). A tab kind
-  declares `multi`, `live` and `open`.
+  `index.html` is the markup; `page-*.css` the stylesheet, a file a cascade
+  layer (skin, components, surfaces, overrides); `tab-*.js` one per document
+  tab, `nb-*.js` one per notebook view (`nb-core.js` the notebook),
+  `page-*.js` one per part of the page that is neither, `page-boot.js` what
+  runs at load; all pure declarations, all `"use strict"`, served only by
+  name from the page's own tags (`server.page_scripts`, `page_styles`). A
+  tab kind declares `multi`, `live` and `open`.
 - **The design language** is `docs/design-language.md`, written by this
   project's own Design view (`aerie design file > docs/design-language.md`,
   or `--from FILE` with the branch's own record, committed with the

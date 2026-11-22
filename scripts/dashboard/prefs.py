@@ -27,7 +27,6 @@ respawned onto the same transcript.
 import contextlib
 import json
 import re
-import threading
 import os
 import sys
 from pathlib import Path
@@ -125,7 +124,10 @@ REPORT_MODES = ("auto", "deny")
 # "" is no color, which is the default and leaves nothing on the file.
 COLORS = ("red", "orange", "yellow", "green", "teal", "blue", "violet", "pink")
 
-_lock = threading.Lock()
+import statefile  # noqa: E402
+# Against the other processes that write the settings too (aerie's verbs),
+# not this one's threads alone.
+_lock = statefile.FileLock(lambda: FILE)
 
 
 def _register():
@@ -348,9 +350,6 @@ def regrant(key, members):
 # look is the person's alone, on their Profile.
 TERM_SCHEMES = ("default", "amber", "blue", "dashboard", "green", "light", "red")
 USER_CHOICES = {"model": MODELS, "effort": EFFORTS, "reply": ("minimal",),
-                # ...and this person's terminal colors on this project,
-                # over their Profile's, for their own tabs alone.
-                "term_scheme": TERM_SCHEMES,
                 "asks": ("more", "fewer", "rarely"),
                 # Each other agent's model and effort, this person's on this
                 # project, from that agent's own lists (R95 step 9): what
@@ -433,11 +432,9 @@ def _load():
     on every project that exists at the time, so nothing changes underfoot for
     an install that had one.
     """
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-    except (OSError, ValueError):
-        return {"projects": {}, "users": {}}
+    # Read once while it is the same file (statefile.read_json, R228 step 1):
+    # every space's row asks; its own copy each, as the shaping below edits it.
+    d = statefile.read_json(FILE)
     if not isinstance(d, dict):
         return {"projects": {}, "users": {}}
     p = d.get("projects")
@@ -607,9 +604,13 @@ def _clean(rec):
             # be reading a reel the other made. 0 keeps them.
             "capture_days": _capture_days(rec.get("capture_days")),
             "snapshot_days": _snapshot_days(rec.get("snapshot_days")),
-            # Whether a snapshot is taken each day (R105): on unless switched
-            # off; off takes none, and what is kept ages out by the days.
-            "snapshots_on": rec.get("snapshots_on") is not False,
+            # Releases (R255): whether a fixed bug with no changelog line and
+            # no reason refuses a release or goes out with it said, and the
+            # table of what each of a release's files is for, put over its
+            # notes unless switched off.
+            "release_gate": "warn" if rec.get("release_gate") == "warn" else "refuse",
+            "files_table": rec.get("files_table") is not False,
+            "files": _files(rec.get("files")),
             # How many dev builds of each kind the Artifacts tab keeps in
             # dist/ before it removes the older (R105); 0 keeps them all.
             "dev_keep": _dev_keep(rec.get("dev_keep")),
@@ -659,6 +660,23 @@ def _dev_keep(v):
     except (TypeError, ValueError):
         return DEV_KEEP
     return n if 0 <= n <= 99 else DEV_KEEP
+
+
+FILES_MOST = 40
+
+
+def _files(v):
+    """A release's files described (R255): [{name, what}], a name being a
+    file's name with @VER@ for the version or * for any run of characters."""
+    out = []
+    for r in v if isinstance(v, list) else []:
+        if not isinstance(r, dict):
+            continue
+        name = " ".join(str(r.get("name") or "").split())[:160]
+        what = " ".join(str(r.get("what") or "").split())[:400]
+        if name and not any(o["name"] == name for o in out):
+            out.append({"name": name, "what": what})
+    return out[:FILES_MOST]
 
 
 def _snapshot_days(v):
@@ -1012,7 +1030,7 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
               outputs=None, gate=None, gitpol=None, forgepol=None,
               devbuild=None, tests_in=None, test_node=None, report=None, color=None, workspace=None, sign=None, keys=None,
               test_change=None, capture_days=None, reads=None, sees=None, gpu=None, dev_keep=None,
-              snapshot_days=None, snapshots_on=None,
+              snapshot_days=None, release_gate=None, files_table=None, files=None,
               release=None, log_from=None, diag=None, build_local=None, reaches=None, hosts=None,
               pc=None, tc_off=None, packs_on=None, makevms=None, vm_caps=None, installpacks=None, agents_off=None,
               agent_default=None, agent_slots=None, overrides=None):
@@ -1234,8 +1252,18 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
             if not 0 <= n <= 3650:
                 return {"error": f"snapshots kept is a number of days, 0 to 3650, not {snapshot_days}"}
             cur["snapshot_days"] = n
-        if snapshots_on is not None:
-            cur["snapshots_on"] = snapshots_on not in (False, "false", "off", "0", 0)
+        if release_gate is not None:
+            if release_gate not in ("refuse", "warn"):
+                return {"error": f"a release's owed lines refuse or warn, not {release_gate}"}
+            cur["release_gate"] = release_gate
+        if files_table is not None:
+            cur["files_table"] = bool(files_table)
+        if files is not None:
+            if not isinstance(files, list):
+                return {"error": "a release's files are a list of {name, what}"}
+            if len(files) > FILES_MOST:
+                return {"error": f"at most {FILES_MOST} files are described"}
+            cur["files"] = _files(files)
         if dev_keep is not None:
             try:
                 n = int(dev_keep)
@@ -1267,7 +1295,8 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                 or cur["devbuild"] != "deny" or cur["tests_in"] != "node" or cur["test_node"]
                 or cur["test_change"] != "wait" or cur["gpu"] != "on"
                 or cur["report"] != "auto" or cur["capture_days"] != CAPTURE_DAYS
-                or cur["snapshot_days"] != SNAPSHOT_DAYS or not cur["snapshots_on"]
+                or cur["snapshot_days"] != SNAPSHOT_DAYS
+                or cur["release_gate"] != "refuse" or not cur["files_table"] or cur["files"]
                 or cur["sign"] != "ask" or cur["keys"] != "ask" or cur["release"] != "ask"
                 or cur["pc"] != "deny" or cur["installpacks"] != "ask"
                 or cur["dev_keep"] != DEV_KEEP
@@ -1313,8 +1342,12 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                 rec.pop("capture_days", None)
             if cur["snapshot_days"] == SNAPSHOT_DAYS:
                 rec.pop("snapshot_days", None)
-            if cur["snapshots_on"]:
-                rec.pop("snapshots_on", None)
+            if cur["release_gate"] == "refuse":
+                rec.pop("release_gate", None)
+            if cur["files_table"]:
+                rec.pop("files_table", None)
+            if not cur["files"]:
+                rec.pop("files", None)
             if cur["dev_keep"] == DEV_KEEP:
                 rec.pop("dev_keep", None)
             if cur["build_local"]:
@@ -1413,7 +1446,7 @@ def configure_dialog(**parts):
 
 # The dialog's fields that are the asking account's own on the project, not
 # the project's: anybody on it sets these for themselves.
-YOURS = ("model", "effort", "git_name", "git_email", "reply", "asks", "term_scheme",
+YOURS = ("model", "effort", "git_name", "git_email", "reply", "asks",
          *(f"{a}_{k}" for a in agents.MODELS for k in ("model", "effort")), "open_model")
 
 
@@ -1474,7 +1507,10 @@ def dialog_save(name, req, uid):
                   tests_in=req.get("tests_in"), test_node=req.get("test_node"),
                   test_change=req.get("test_change"), gpu=req.get("gpu"),
                   report=req.get("report"), capture_days=req.get("capture_days"),
-                  snapshot_days=req.get("snapshot_days"), snapshots_on=req.get("snapshots_on"),
+                  snapshot_days=req.get("snapshot_days"),
+                  release_gate=req.get("release_gate"),
+                  files_table=req.get("files_table") if isinstance(req.get("files_table"), bool) else None,
+                  files=req.get("files"),
                   dev_keep=req.get("dev_keep"), sign=req.get("sign"), keys=req.get("keys"),
                   release=req.get("release"), pc=req.get("pc"),
                   color=req.get("color"), reads=req.get("reads"), sees=req.get("sees"),

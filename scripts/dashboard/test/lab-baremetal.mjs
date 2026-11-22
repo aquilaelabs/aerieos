@@ -23,7 +23,7 @@
 //
 // Skipped in one line without them, like every lab suite. Slow by nature:
 // an install is the image's packages and tools, ten to twenty minutes.
-import { ok, done, sleep } from './lib.mjs';
+import { ok, done, sleep, record } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -203,4 +203,6 @@ for (const os of SYSTEMS){
     if (process.env.BB_LAB_KEEP !== '1') await api('/api/vms', { action: 'remove', project: PROJECT, name });
   }
 }
+// Walked whole: a line for the lab's record, under the ref it installed.
+record('lab-baremetal', 'controller', `a controller installed bare metal from ${process.env.BB_LAB_REF || 'a ref'}`);
 await done(null);

@@ -1,13 +1,16 @@
-"""The two seal formats side by side (R158 step 3): a 0.9 node seals with
-X25519 and ChaCha20-Poly1305, a 0.8.x node the way before, and the
-controller opens either and moves the old one to the new at the next
-terminal its person opens; the install key's seal the same way."""
+"""The two seal formats side by side (R158 step 3): a node seals with
+X25519 and ChaCha20-Poly1305 and with nothing else, and the controller
+opens a seal of either kind, one made the way before among them, and moves
+the old one to the new at the next terminal its person opens; the install
+key's seal the same way."""
 import importlib.util
 import os
 import sys
 import unittest
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import agentpkg  # noqa: E402
 import signing  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
@@ -41,17 +44,37 @@ class NodeSeals(unittest.TestCase):
         with self.assertRaises(ts.Refused):
             ts.key_for(a, "0" * 64)
 
-    def test_the_old_seal_is_still_opened(self):
+    def test_the_old_seal_is_opened_and_never_made(self):
         a1 = ts.secret1(KEY, "n_1", "u_1")
         pub1 = ts.public(a1)
         self.assertEqual(len(pub1) > 64, True)
-        blob = ts.seal(pub1, b"old", {"agent": "codex"})
+        with self.assertRaises(ts.Refused):
+            ts.seal(pub1, b"old", {"agent": "codex"})
+        blob = agentpkg.seal_the_way_before(ts, pub1, b"old", {"agent": "codex"})
         self.assertTrue(blob.startswith(ts.MAGIC1))
         R = ts.header(blob)["R"]
         self.assertFalse(ts.is_v2(R))
         self.assertEqual(ts.open_with(ts.key_for(a1, R), blob), b"old")
         with self.assertRaises(ts.Refused):
             ts.key_for(ts.secret(KEY, "n_1", "u_1"), R)
+
+    def test_with_no_library_nothing_is_sealed(self):
+        pub = ts.public(ts.secret(KEY, "n_1", "u_1"))
+        was = ts.HAVE
+        self.addCleanup(setattr, ts, "HAVE", was)
+        ts.HAVE = False
+        for p in (pub, ts.public(ts.secret1(KEY, "n_1", "u_1"))):
+            with self.assertRaises(ts.Refused) as e:
+                ts.seal(p, b"secret")
+            self.assertEqual(str(e.exception), ts.NO_LIBRARY)
+        # Its boot key is the old group's, so a seal held from before still
+        # reaches it wrapped.
+        e = ts.boot_secret()
+        self.assertIsInstance(e, int)
+        ts.HAVE = was
+        C, blob = ts.wrap(ts.public(e), {"r1": b"k" * 32})
+        ts.HAVE = False
+        self.assertEqual(ts.unwrap(e, C, blob), {"r1": b"k" * 32})
 
     def test_a_wrap_of_each_kind(self):
         for e in (ts.boot_secret(), ts.secret1(KEY, "boot", "x")):
@@ -85,6 +108,14 @@ class ControllerSeals(unittest.TestCase):
         bad = bytearray(new); bad[-1] ^= 1
         with self.assertRaises(signing.Locked):
             signing.unseal(bytes(bad))
+
+    def test_with_no_vetted_cipher_nothing_is_sealed(self):
+        # It fell back to a cipher built here from HMAC, silently (R243).
+        from unittest import mock
+        with mock.patch.object(signing, "_have_aead", lambda: False):
+            with self.assertRaises(signing.NoCipher) as e:
+                signing.seal(b"secret")
+        self.assertIn("nothing can be sealed", str(e.exception))
 
     def test_the_format_is_told_by_its_magic(self):
         self.assertTrue(signing.old_format(signing.MAGIC1 + b"x" * 60))

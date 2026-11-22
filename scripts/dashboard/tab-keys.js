@@ -13,30 +13,21 @@
 
 let keysData = null;             // {install, kept}, or null before the first read
 let keysErr = "";
-let keysRev = 0;
 let keysShown = "";              // the key, while an administrator has it shown
 
 function openKeysTab(){
   openTab({kind: "keys", arg: "__keys", label: "Keys"});
 }
 
-async function postKeys(body){
-  try{
-    const j = await (await postJSON("/api/keys", body)).json();
-    if (j.error) notify(j.error, true);
-    return j;
-  }catch(e){
-    notify("keys: " + failWords(e), true);
-    return {error: String(e)};
-  }
-}
+// Everything this page asks: a refusal said, the answer back.
+function postKeys(body){ return poster("/api/keys")(body); }
 
-async function loadKeys(){
-  const j = await postKeys({action: "status"});
-  keysErr = j.error || "";
-  keysData = j.error ? keysData : j;
-  keysRev++;
-  if (tabs.some(t => t.kind === "keys")) drawPanes();
+function loadKeys(){
+  return reading("keys", async () => {
+    const j = await postKeys({action: "status"});
+    keysErr = j.error || "";
+    keysData = j.error ? keysData : j;
+  });
 }
 
 // Where the key is kept, in a person's words.
@@ -99,21 +90,21 @@ function renderKeysInto(i){
   if (!d) return;
   if (keysData === null){
     d.setBar("");
-    d.list.innerHTML = keysErr ? `<div class="field"><div class="notice bad">${esc(keysErr)}</div></div>`
+    drawHTML(d.list, keysErr ? `<div class="field"><div class="notice bad">${esc(keysErr)}</div></div>`
       : skTpl(pageHead({facts: [["Install key", GHOST], ["Kept in", GHOST], ["Saved", GHOST]]})
-        + docSection("keys", "install", "Install key", "", skRows(1)) + docSection("keys", "kept", "Kept under it", "", skRows(3)));
+        + docSection("keys", "install", "Install key", "", skRows(1)) + docSection("keys", "kept", "Kept under it", "", skRows(3))));
     if (!keysErr) loadKeys();
     return;
   }
   const k = keysData.install || {}, rows = keysData.kept || [];
   d.setBar("");
-  d.list.innerHTML = pageHead({facts: k.where ? [
+  patch(d.list, pageHead({facts: k.where ? [
       ["Install key", k.fingerprint, {cls: "keyfp"}], ["Kept in", KEYS_WHERE[k.where]],
       ["Made", KEYS_WHEN(k.made)], ["Changed", k.changed && k.changed !== k.made ? KEYS_WHEN(k.changed) : ""],
       ["Saved", k.changeable ? (k.saved ? "yes" : "not yet") : ""]] : [["Install key", "none"]]})
     + docSection("keys", "install", "Install key", k.where ? k.fingerprint : "none", keysInstallBody(k),
                  {cls: k.where && (k.where === "state" || (k.changeable && !k.saved)) ? "warn" : ""})
-    + docSection("keys", "kept", "Kept under it", String(rows.length), keysKeptBody(rows));
+    + docSection("keys", "kept", "Kept under it", String(rows.length), keysKeptBody(rows)));
   wireKeys(d.el);
 }
 
@@ -154,10 +145,10 @@ function wireKeys(root){
     busy(b, "Showing");
     const j = await postKeys({action: "show"});
     keysShown = j.key || "";
-    keysRev++;
+    readMoved("keys");
     drawPanes();
   });
-  on("bKeyHide", () => { keysShown = ""; keysRev++; drawPanes(); });
+  on("bKeyHide", () => { keysShown = ""; readMoved("keys"); drawPanes(); });
   on("bKeyCopy", async () => {
     try{ await navigator.clipboard.writeText(keysShown); notify("install key copied"); }
     catch(e){ notify("copy: " + failWords(e), true); }
@@ -198,16 +189,15 @@ function wireKeys(root){
 // yourself moves the store under a passkey's PRF secret or a key they keep,
 // which the controller never holds, so it opens only while they unlock it.
 let keyMine = null;
-let keyMineRev = 0;
 let keyMineAsked = false;
 let keyMineUses = null;
 
-async function loadKeyMine(){
-  keyMineAsked = true;
-  keyMine = await postKeys({action: "mine"});
-  keyMineUses = (await postKeys({action: "uses"})).uses || [];
-  keyMineRev++;
-  drawPanes();
+function loadKeyMine(){
+  return reading("keymine", async () => {
+    keyMineAsked = true;
+    keyMine = await postKeys({action: "mine"});
+    keyMineUses = (await postKeys({action: "uses"})).uses || [];
+  });
 }
 
 const KS_FORGE_COLS = [{label: "Token"}, {label: "Signed in as", w: "minmax(0,.7fr)"}, {label: "Used by"}, {act: true, w: "6.5rem"}];

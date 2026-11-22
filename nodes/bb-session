@@ -15,7 +15,8 @@ mount, PID and IPC namespace in which:
   * /tmp, /var/tmp and /dev/shm are the session's own, made new with every
     start, but for what Claude Code keeps there between the turns of one
     conversation (/tmp/claude-<uid>), which is kept in the project's cache
-    folder and outlives a restart of the session;
+    folder and outlives a restart of the session; /run/user is an empty
+    folder, so no user manager's bus or socket of the host's is reached;
   * the agent's stores show only what a session reads: its own CI logs and
     artifacts, and the emulator's logs; jobs, compose files, the runner's
     checkouts and the terminal log are gone, and so is everything else in
@@ -141,8 +142,9 @@ def conf():
          "DATA_STORE": "/var/lib/builderbot/data", "ARTIFACTS_STORE": "/var/lib/builderbot/artifacts",
          "RUNNER_DIR": "/var/lib/builderbot/runner", "HIDE": "/devdata",
          # The agent's own directory: in the view it holds the stores above
-         # and nothing else of what the agent keeps there.
-         "STATE_DIR": "/var/lib/builderbot",
+         # and nothing else of what the agent keeps there. Under whichever
+         # of its two names is there (below), unless the layout file says.
+         "STATE_DIR": "",
          # The scoped toolchain store, whose .bb bundle is the bb and bb-tty a
          # session and the agent run. Empty until the agent writes it, and then
          # the bundle is read-only in the view (B157).
@@ -159,6 +161,7 @@ def conf():
     # run by the suite: `enter` is root through sudo, which resets the
     # environment, and root reads the machine's own file whatever it says.
     path = os.environ.get("BB_SESSION_CONF", CONF) if os.geteuid() != 0 else CONF
+    said = set()
     try:
         st = os.stat(path)
         if (st.st_uid == 0 or path != CONF) and not st.st_mode & 0o022:
@@ -167,8 +170,15 @@ def conf():
                     key, sep, value = line.strip().partition("=")
                     if sep and key in c and not line.startswith("#"):
                         c[key] = value.strip()
+                        said.add(key)
     except OSError:
         pass
+    # The agent's folder has two names (R204): /var/lib/aerieos, and
+    # /var/lib/builderbot on a machine provisioned before that, one of them
+    # a link to the other or not there at all. Whichever answers; plan reads
+    # every such path by where it really is.
+    if "STATE_DIR" not in said:
+        c["STATE_DIR"] = next((d for d in AGENT_DIRS if os.path.isdir(d)), AGENT_DIRS[0])
     if not c["HOME_ROOT"]:
         try:
             c["HOME_ROOT"] = pwd.getpwnam(c["SESSION_USER"]).pw_dir
@@ -190,6 +200,21 @@ def _repo_name(tree):
     name = re.split(r"[/:]", m.group(1).rstrip("/"))[-1]
     name = name[:-4] if name.endswith(".git") else name
     return name if re.fullmatch(r"[A-Za-z0-9._-]{1,100}", name) and not name.startswith(".") else ""
+
+
+AGENT_DIRS = ("/var/lib/aerieos", "/var/lib/builderbot")
+
+
+def _real(path):
+    """A path of the layout by where it really is, "" for none. The agent's
+    folder answers to two names, one a link to the other (R204), and the
+    layout names its stores under one and its runner under the other: read
+    as written, the cover over the folder went on under one name and the
+    runner's folder was then looked for under the other, where the cover had
+    just put nothing, so no session started; and on a machine where the old
+    name is the link, the folder was not covered at all."""
+    path = (path or "").rstrip("/")
+    return os.path.realpath(path) if path else ""
 
 
 def _real_dir(path):
@@ -553,17 +578,24 @@ def plan(c, a, uid, wall=None):
         if os.path.lexists(path) and not _real_dir(path):
             raise Refused(f"bb-session: {path} is not a directory, so the view could not leave other spaces out of it")
         if _real_dir(path):
-            caches.setdefault(os.path.realpath(path), set()).update(keep)
+            # Where it really is, which is one of the two places it can be:
+            # the home's own .cache, or the base home's that an account's
+            # .cache links to. A .cache the account pointed anywhere else
+            # chose what the view binds from (R247 step 5).
+            real = os.path.realpath(path)
+            if real not in {f"{os.path.realpath(x)}/.cache/builderbot" for x in (home, home_root) if x}:
+                raise Refused(f"bb-session: {path} leads to {real}, not to a home's own cache")
+            caches.setdefault(real, set()).update(keep)
     caches = sorted(caches.items())
-    data, art = c["DATA_STORE"].rstrip("/"), c["ARTIFACTS_STORE"].rstrip("/")
-    store = c["TOOLCHAINS_STORE"].rstrip("/") if c.get("TOOLCHAINS_STORE") else ""
+    data, art = _real(c["DATA_STORE"]), _real(c["ARTIFACTS_STORE"])
+    store = _real(c.get("TOOLCHAINS_STORE"))
     # What every scope of the toolchain store keeps once, beside them: the
     # Android system images, which the scoped store links to by a relative
     # path, so the view holds it wherever it holds the store.
     beside = f"{os.path.dirname(store)}/shared" if store and _real_dir(store) else ""
     if not _real_dir(beside):
         beside = ""
-    state = c["STATE_DIR"].rstrip("/") if c.get("STATE_DIR") else ""
+    state = _real(c.get("STATE_DIR"))
     top = _top()
 
     # The places on the node this project is set to see (its settings, the
@@ -767,21 +799,19 @@ def plan(c, a, uid, wall=None):
     # session account under a read-only store: a clean Android build and a
     # Playwright Chromium launch both work.
     #
-    # Flutter is the exception, because it writes under its own tree on every
-    # run (the lock and the update stamps in bin/cache, the version check in
-    # .git). So its tree stays writable except bin/, which is what PATH holds:
-    # nothing can be planted there under a command's name, and bin/cache, which
-    # only flutter itself runs from, is given back. What is left is a session
-    # changing what a flutter command runs, on a node that has flutter.
+    # Flutter writes under its own tree on every run (the lock and the update
+    # stamps in bin/cache, the version check in .git), so a session is given
+    # a layer of its own over it (below, once /tmp is the session's): what it
+    # writes is its own and goes with it. The tree itself stays read-only: it
+    # was writable but for bin/, and a session that changed bin/cache's dart
+    # had other spaces' sessions and the jobs run it (B888, R247 step 5).
+    flutter = ""
     if store and _real_dir(store):
         steps.append(("bindro", store_from, store))
         if beside:
             steps.append(("bindro", beside_from, beside))
-        flutter = f"{store}/flutter"
-        if _real_dir(f"{flutter}/bin/cache"):
-            steps.append(("bindrw", flutter, flutter))
-            steps.append(("bindro", f"{flutter}/bin", f"{flutter}/bin"))
-            steps.append(("bindrw", f"{flutter}/bin/cache", f"{flutter}/bin/cache"))
+        if _real_dir(f"{store}/flutter/bin/cache"):
+            flutter = f"{store}/flutter"
     # ...and the claude every account's session runs, for the same reason and
     # the other half of B157. `.local` is one of the shared dotfiles, so every
     # account's ~/.local is a link to the base home's: one session could
@@ -825,9 +855,9 @@ def plan(c, a, uid, wall=None):
         steps.append(("bindro", real, real))
     # What the layout names to hide, where it is not out of sight already:
     # under a cover it is not there to mount on.
-    for hidden in [c["RUNNER_DIR"]] + [x for x in c["HIDE"].split(":") if x]:
-        if _real_dir(hidden.rstrip("/")) and not _inside(hidden.rstrip("/"), out_of_sight):
-            steps.append(("hide", hidden.rstrip("/")))
+    for hidden in [_real(x) for x in [c["RUNNER_DIR"]] + c["HIDE"].split(":") if x]:
+        if _real_dir(hidden) and not _inside(hidden, out_of_sight):
+            steps.append(("hide", hidden))
     # ...and, on the controller's own machine (R90), everything the wall
     # names: the controller's state, env file, secrets and agent socket.
     # Under /var, /etc and /run, which are the system's own and stay in the
@@ -851,6 +881,15 @@ def plan(c, a, uid, wall=None):
     for t in ("/tmp", "/var/tmp", "/dev/shm"):
         if _real_dir(t):
             steps.append(("tmpfs", t, "mode=1777"))
+    # Not over a flutter this space switched off: its cover stays as it is.
+    if flutter and "flutter" not in off:
+        steps.append(("overlay", flutter, "/tmp/.bb-flutter"))
+    # The host's per-user runtime folders: a user manager's bus there runs
+    # a command as the session account outside every view (systemd-run
+    # --user), and podman's and an ssh agent's sockets are there too (R247
+    # step 5). Covered; nothing in a session uses them.
+    if _real_dir("/run/user"):
+        steps.append(("tmpfs", "/run/user", "mode=0755"))
     # The container daemons' sockets (B308): the daemon is the node's and
     # its group keeps a session out today, and the briefing says a session
     # has no socket at all, which was not so. One usermod or chmod on the
@@ -1028,6 +1067,44 @@ def _bind_idmapped(src, target, userns):
 
 # The mapping's namespace for this session's view, made by main() before
 # the view's own namespaces when a bindmap step asks for it.
+AT_RECURSIVE = 0x8000
+
+
+def _src_fd(path):
+    """`path` opened a part at a time, each through no link, as an O_PATH
+    descriptor; OSError at a link or a .. along it."""
+    fd = os.open("/", os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        for part in [x for x in path.split("/") if x]:
+            if part in (".", ".."):
+                raise OSError(errno.EINVAL, f"{path} climbs with {part}")
+            nfd = os.open(part, os.O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
+            os.close(fd)
+            fd = nfd
+            if stat.S_ISLNK(os.fstat(fd).st_mode):
+                raise OSError(errno.ELOOP, f"{path} has a link along it, at {part}")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _bind_nofollow(src, target):
+    """src bound onto target (with what is mounted under it) from a
+    descriptor opened through no link: never re-resolved by its name."""
+    sfd = _src_fd(src)
+    try:
+        tfd = _sys(SYS_OPEN_TREE, ctypes.c_int(sfd), b"",
+                   ctypes.c_uint(OPEN_TREE_CLONE | OPEN_TREE_CLOEXEC | AT_EMPTY_PATH | AT_RECURSIVE))
+        try:
+            _sys(SYS_MOVE_MOUNT, ctypes.c_int(tfd), b"", ctypes.c_int(AT_FDCWD), target.encode(),
+                 ctypes.c_uint(MOVE_MOUNT_F_EMPTY_PATH))
+        finally:
+            os.close(tfd)
+    finally:
+        os.close(sfd)
+
+
 _USERNS = None
 
 
@@ -1046,113 +1123,147 @@ def _mkdirs(path, uid, gid):
 
 
 def apply(steps, uid, gid):
+    """The plan's steps, made. One that fails says which it was: a mount's
+    own error names no path, and "No such file or directory" alone left
+    nobody knowing which of the view's forty mounts it was."""
     for step in steps:
-        kind, target = step[0], step[-1] if step[0] in ("bind", "bindmap", "bindmine", "bindro", "bindrw", "bindfile") else step[1]
-        if kind == "private":
-            _mount(None, "/", None, MS_REC | MS_PRIVATE)
-        elif kind == "proc":
-            _mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC)
-        elif kind == "tmpfs":
-            opts = step[2]
-            if opts.endswith(",owned"):
-                opts = opts[: -len(",owned")] + f",uid={uid},gid={gid}"
-            os.makedirs(target, exist_ok=True)
-            _mount("tmpfs", target, "tmpfs", MS_NOSUID | MS_NODEV, opts)
-        elif kind == "bind":
-            src = step[1]
-            if not os.path.isdir(target):
-                _mkdirs(target, uid, gid)
+        try:
+            _apply(step, uid, gid)
+        except OSError as e:
+            raise Refused(f"bb-session: the view's step '{' '.join(str(x) for x in step)}' failed: "
+                          f"{e.strerror or e}") from None
+
+
+def _apply(step, uid, gid):
+    kind, target = step[0], step[-1] if step[0] in ("bind", "bindmap", "bindmine", "bindro", "bindrw", "bindfile") else step[1]
+    if kind == "private":
+        _mount(None, "/", None, MS_REC | MS_PRIVATE)
+    elif kind == "proc":
+        _mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC)
+    elif kind == "tmpfs":
+        opts = step[2]
+        if opts.endswith(",owned"):
+            opts = opts[: -len(",owned")] + f",uid={uid},gid={gid}"
+        os.makedirs(target, exist_ok=True)
+        _mount("tmpfs", target, "tmpfs", MS_NOSUID | MS_NODEV, opts)
+    elif kind == "bind":
+        src = step[1]
+        if not os.path.isdir(target):
+            _mkdirs(target, uid, gid)
+        if src.startswith(STAGE + "/"):
+            # From the staged host, through folders the account owns: a
+            # link it left along the path led the bind to another account's
+            # token and session (R247 step 5). Opened a part at a time
+            # through no link, and bound from what was opened.
+            _bind_nofollow(src, target)
+        else:
             _mount(src, target, None, MS_BIND | MS_REC)
-        elif kind == "bindmap":
-            # A tree of the session's project, its worktrees and its works,
-            # with their owner read as the account's own user and written as
-            # the owner (R125 step 7, B356): a session that runs as its own
-            # user can write its tree and its git reads it as its own. A plain
-            # bind where the filesystem will not map one (a share squashes
-            # every writer to one owner already).
-            src = step[1]
-            if not os.path.isdir(target):
-                _mkdirs(target, uid, gid)
-            if _USERNS is None or not _bind_idmapped(src, target, _USERNS):
-                _mount(src, target, None, MS_BIND | MS_REC)
-        elif kind == "bindro":
-            # A read-only bind of a directory onto itself: bind first, then
-            # remount read-only, which is the only way the flag takes on a bind.
-            # The view's root is private, so this is read-only here and nowhere
-            # else, and the agent still writes the bundle from outside the view.
-            src = step[1]
-            # Onto a place the view has yet to make, when it is a project
-            # this one reads under the fresh /workspace: the writable bind
-            # makes its target, and this one did not, so the first session
-            # with a read project met "mount: No such file or directory".
-            # Only where nothing is: a read-only bind lands on files too (the
-            # claude binary's link), and making a directory there is EEXIST.
-            #
-            # A file put back into a new home has a file to land on made
-            # for it, in the folder made for that.
-            if not os.path.lexists(target):
-                if os.path.isdir(src):
-                    _mkdirs(target, uid, gid)
-                else:
-                    _mkdirs(os.path.dirname(target), uid, gid)
-                    with open(target, "x"):
-                        pass
+    elif kind == "bindmap":
+        # A tree of the session's project, its worktrees and its works,
+        # with their owner read as the account's own user and written as
+        # the owner (R125 step 7, B356): a session that runs as its own
+        # user can write its tree and its git reads it as its own. A plain
+        # bind where the filesystem will not map one (a share squashes
+        # every writer to one owner already).
+        src = step[1]
+        if not os.path.isdir(target):
+            _mkdirs(target, uid, gid)
+        if _USERNS is None or not _bind_idmapped(src, target, _USERNS):
             _mount(src, target, None, MS_BIND | MS_REC)
-            _mount(src, target, None, MS_BIND | MS_REMOUNT | MS_RDONLY)
-        elif kind == "bindrw":
-            # A writable bind INSIDE a read-only one. A bind copies the flags
-            # of the mount it is taken from, read-only included (measured on
-            # bb-dev-sandbox: a plain bind of flutter under the read-only store
-            # came out read-only), so the flag is cleared with a remount of its
-            # own. The file system underneath is writable; only this mount was not.
-            src = step[1]
-            _mount(src, target, None, MS_BIND | MS_REC)
-            _mount(src, target, None, MS_BIND | MS_REMOUNT)
-        elif kind == "hide":
-            _mount("tmpfs", target, "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0500")
-        elif kind == "make":
-            # A folder made on the disk, before a cover goes over its parent,
-            # so the bind that puts it back has something to bind (B379). Made
-            # as the session account, the way Claude Code would have made it:
-            # root's mkdir and chown are refused on a share that squashes root.
-            pid = os.fork()
-            if pid == 0:
-                try:
-                    os.setgid(gid)
-                    os.setuid(uid)
-                    os.makedirs(target, 0o755, exist_ok=True)
-                    os._exit(0)
-                except OSError:
-                    os._exit(1)
-            if os.waitpid(pid, 0)[1] != 0:
-                print(f"bb-session: could not make {target}; a conversation started here is not kept", file=sys.stderr)
-        elif kind == "bindmine":
-            # This project's own transcripts put back over the cover; where
-            # the folder could not be made there is nothing to bind, and the
-            # session still starts. A folder itself, never a link: root's
-            # bind followed one into a folder the account could not reach
-            # (B518).
-            if _real_dir(step[1]):
+    elif kind == "bindro":
+        # A read-only bind of a directory onto itself: bind first, then
+        # remount read-only, which is the only way the flag takes on a bind.
+        # The view's root is private, so this is read-only here and nowhere
+        # else, and the agent still writes the bundle from outside the view.
+        src = step[1]
+        # Onto a place the view has yet to make, when it is a project
+        # this one reads under the fresh /workspace: the writable bind
+        # makes its target, and this one did not, so the first session
+        # with a read project met "mount: No such file or directory".
+        # Only where nothing is: a read-only bind lands on files too (the
+        # claude binary's link), and making a directory there is EEXIST.
+        #
+        # A file put back into a new home has a file to land on made
+        # for it, in the folder made for that.
+        if not os.path.lexists(target):
+            if os.path.isdir(src):
                 _mkdirs(target, uid, gid)
-                _mount(step[1], target, None, MS_BIND | MS_REC)
-        elif kind == "hidefile":
-            _mount("/dev/null", target, None, MS_BIND)
-        elif kind == "bindfile":
-            # One file over another. A link at the target is followed, so a
-            # resolv.conf that is systemd-resolved's link is covered where it
-            # points, in this view only.
-            _mount(step[1], target, None, MS_BIND)
-        elif kind == "detach":
-            _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
-        elif kind == "letgo":
-            # A mount of the node's that is not the view's. One that went
-            # between the plan and now, or with the one it was inside, is
-            # gone already, which is what was asked.
+            else:
+                _mkdirs(os.path.dirname(target), uid, gid)
+                with open(target, "x"):
+                    pass
+        _mount(src, target, None, MS_BIND | MS_REC)
+        _mount(src, target, None, MS_BIND | MS_REMOUNT | MS_RDONLY)
+    elif kind == "bindrw":
+        # A writable bind INSIDE a read-only one. A bind copies the flags
+        # of the mount it is taken from, read-only included (measured on
+        # bb-dev-sandbox: a plain bind of flutter under the read-only store
+        # came out read-only), so the flag is cleared with a remount of its
+        # own. The file system underneath is writable; only this mount was not.
+        src = step[1]
+        _mount(src, target, None, MS_BIND | MS_REC)
+        _mount(src, target, None, MS_BIND | MS_REMOUNT)
+    elif kind == "overlay":
+        # The session's own layer over a read-only tree (flutter, B888): its
+        # upper and work folders in the session's own /tmp, root's, which the
+        # overlay writes as its mounter. A filesystem that will not have it
+        # leaves the tree read-only, said, never writable.
+        over = step[2]
+        try:
+            for d in (over, f"{over}/upper", f"{over}/work"):
+                os.makedirs(d, mode=0o700, exist_ok=True)
+                os.chown(d, 0, 0)
+                os.chmod(d, 0o700)
+            _mount("overlay", target, "overlay", MS_NOSUID | MS_NODEV,
+                   f"lowerdir={target},upperdir={over}/upper,workdir={over}/work")
+        except OSError as e:
+            print(f"bb-session: {target} is read-only in this session ({e.strerror or e}): "
+                  "a flutter command that writes its lock will say so", file=sys.stderr)
+    elif kind == "hide":
+        _mount("tmpfs", target, "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0500")
+    elif kind == "make":
+        # A folder made on the disk, before a cover goes over its parent,
+        # so the bind that puts it back has something to bind (B379). Made
+        # as the session account, the way Claude Code would have made it:
+        # root's mkdir and chown are refused on a share that squashes root.
+        pid = os.fork()
+        if pid == 0:
             try:
-                _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
-            except OSError as e:
-                if e.errno not in (errno.EINVAL, errno.ENOENT):
-                    raise
+                os.setgid(gid)
+                os.setuid(uid)
+                os.makedirs(target, 0o755, exist_ok=True)
+                os._exit(0)
+            except OSError:
+                os._exit(1)
+        if os.waitpid(pid, 0)[1] != 0:
+            print(f"bb-session: could not make {target}; a conversation started here is not kept", file=sys.stderr)
+    elif kind == "bindmine":
+        # This project's own transcripts put back over the cover; where
+        # the folder could not be made there is nothing to bind, and the
+        # session still starts. A folder itself, never a link: root's
+        # bind followed one into a folder the account could not reach
+        # (B518).
+        if _real_dir(step[1]):
+            _mkdirs(target, uid, gid)
+            _mount(step[1], target, None, MS_BIND | MS_REC)
+    elif kind == "hidefile":
+        _mount("/dev/null", target, None, MS_BIND)
+    elif kind == "bindfile":
+        # One file over another. A link at the target is followed, so a
+        # resolv.conf that is systemd-resolved's link is covered where it
+        # points, in this view only.
+        _mount(step[1], target, None, MS_BIND)
+    elif kind == "detach":
+        _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
+    elif kind == "letgo":
+        # A mount of the node's that is not the view's. One that went
+        # between the plan and now, or with the one it was inside, is
+        # gone already, which is what was asked.
+        try:
+            _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
+        except OSError as e:
+            if e.errno not in (errno.EINVAL, errno.ENOENT):
+                raise
 
 
 def _ipbin():
@@ -1402,7 +1513,34 @@ def caller(c, account=""):
 
 PROJECT_DIR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 AGENT_IDS = ("claude", "codex", "copilot", "grok", "open")
-BRANCH = re.compile(r"(?:claude|codex|copilot|grok|open)/[A-Za-z0-9][A-Za-z0-9._@-]{0,79}")
+PACK_AGENT = re.compile(r"[a-z][a-z0-9]{1,15}")
+BRANCH_TAIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]{0,79}")
+
+
+def pack_agents(c):
+    """The coding agents vetted packs bring (R169 step 10): the rows of the
+    node's own bundle's config/toolpacks.json that carry an adapter, read
+    from the bundle root keeps (BUNDLE in /etc/bb-session.conf), never from
+    anything the caller names. Never a shipped agent's id."""
+    path = os.path.join(c.get("BUNDLE") or "/nonexistent", "config", "toolpacks.json")
+    try:
+        # As root, only a file nobody else can write says who an agent is.
+        if os.geteuid() == 0 and not _root_owned(path):
+            return ()
+        with open(path, encoding="utf-8") as f:
+            rows = json.load(f).get("toolchains") or []
+    except (OSError, ValueError, AttributeError):
+        return ()
+    return tuple(sorted(r["name"] for r in rows if isinstance(r, dict) and isinstance(r.get("agent"), dict)
+                        and PACK_AGENT.fullmatch(str(r.get("name") or "")) and r["name"] not in AGENT_IDS))
+
+
+def agent_branch(c, agent, branch):
+    """Whether `agent` is a coding agent here, shipped or a pack's, and
+    `branch` a branch of its own: AGENT/NAME."""
+    if agent not in AGENT_IDS and agent not in pack_agents(c):
+        return False
+    return branch.startswith(agent + "/") and bool(BRANCH_TAIL.fullmatch(branch[len(agent) + 1:]))
 
 
 def worktree(c, argv):
@@ -1424,8 +1562,7 @@ def worktree(c, argv):
     if len(argv) != 4:
         raise Refused("bb-session worktree PROJECT AGENT SLOT BRANCH")
     project, agent, slot, branch = argv
-    if not PROJECT_DIR.fullmatch(project) or agent not in AGENT_IDS or slot not in "123456789" or len(slot) != 1 \
-            or not BRANCH.fullmatch(branch) or not branch.startswith(agent + "/"):
+    if not PROJECT_DIR.fullmatch(project) or slot not in "123456789" or len(slot) != 1 or not agent_branch(c, agent, branch):
         raise Refused("bb-session worktree: not a space, an agent, a slot and a branch")
     ws = c["WORKSPACE"].rstrip("/")
     src = f"{ws}/{project}"
@@ -1451,7 +1588,14 @@ def worktree(c, argv):
                 off = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"]
                 has = subprocess.run(["git", *off, "-C", src, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
                                      env=env, check=False).returncode == 0
-                add = ["git", *off, "-C", src, "worktree", "add"] + ([wt, branch] if has else ["-b", branch, wt])
+                # With no checkout: laying the files out runs what the
+                # repository's own configuration names (a filter for a path
+                # its .gitattributes marks, a hook), and a session of the
+                # space can write that configuration. Switching two keys off
+                # left the rest (the audit of 13 Nov). The files are laid out
+                # by the session that first enters it, inside its view
+                # (enter, worktree_unfilled).
+                add = ["git", *off, "-C", src, "worktree", "add", "--no-checkout"] + ([wt, branch] if has else ["-b", branch, wt])
                 os._exit(subprocess.run(add, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                         check=False).returncode)
             except Exception:                                  # noqa: BLE001 (the child says only how it ended)
@@ -1462,10 +1606,91 @@ def worktree(c, argv):
     print(wt)
 
 
+def worktree_unfilled(wt):
+    """Whether `wt` is a git worktree made with no checkout: its .git a file
+    naming the folder git keeps for it, which has no index yet."""
+    try:
+        with open(os.path.join(wt, ".git"), encoding="utf-8") as f:
+            line = f.readline().strip()
+    except (OSError, UnicodeDecodeError):
+        return False                     # a repository's own folder, or no repository
+    if not line.startswith("gitdir: "):
+        return False
+    admin = line[len("gitdir: "):]
+    if not os.path.isabs(admin):
+        admin = os.path.normpath(os.path.join(wt, admin))
+    return os.path.isdir(admin) and not os.path.exists(os.path.join(admin, "index"))
+
+
+# What the controller granted each account on this node, kept by root where
+# only root writes: tty() writes it from the controller's answer, enter()
+# holds an account's own user to it. Under /run, so a restart of the machine,
+# which ends every session, ends every grant with them.
+GRANTS = os.environ.get("BUILDERBOT_SESSION_GRANTS", "/run/bb-session/grants")
+
+
+def _names(v):
+    return sorted({str(x) for x in v if isinstance(x, str)}) if isinstance(v, list) else []
+
+
+def grants_of(account):
+    """{space: {"reads", "works", "sees"}} the controller granted `account` here."""
+    try:
+        with open(os.path.join(GRANTS, account + ".json"), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def grant_keep(account, got):
+    """The controller's answer for a terminal kept as what `account` may
+    enter: the space it is for and what that space reads, works in and sees.
+    What it was granted before for the same space widens, never narrows
+    here, since a session of the earlier grant may still be running."""
+    project = str(got.get("project") or "")
+    if not ACCOUNT.fullmatch(account or "") or not PROJECT_DIR.fullmatch(project):
+        return
+    os.makedirs(GRANTS, mode=0o700, exist_ok=True)
+    os.chmod(GRANTS, 0o700)
+    all_ = grants_of(account)
+    was = all_.get(project) if isinstance(all_.get(project), dict) else {}
+    all_[project] = {k: sorted(set(_names(was.get(k))) | set(_names(got.get(k)))) for k in ("reads", "works", "sees")}
+    all_[project]["at"] = int(time.time())
+    path = os.path.join(GRANTS, account + ".json")
+    fd = os.open(path + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(all_, f)
+    os.replace(path + ".new", path)
+
+
+def grant_hold(account, a):
+    """An account's own user enters the spaces the controller granted it a
+    terminal on, with what they read, work in and see, and no other: it was
+    held to being its own account and to nothing about the space, so
+    anything running as that user outside a view (its terminal server reads
+    a file its sessions write) could enter any space on the node (the audit
+    of 13 Nov)."""
+    project = a.get("project", "")
+    g = grants_of(account).get(project)
+    if not isinstance(g, dict):
+        raise Refused(f"bb-session: the controller has granted {account} no terminal on {project or 'that space'} on this "
+                      "machine since it started: open the space's terminal from the dashboard")
+    for k, word in (("reads", "read"), ("works", "work in"), ("sees", "see")):
+        extra = sorted(set(a.get(k) or []) - set(_names(g.get(k))))
+        if extra:
+            raise Refused(f"bb-session: {project}'s sessions were not granted to {word} {', '.join(extra)}: "
+                          "open the space's terminal again, or restart the session")
+
+
 def enter(c, a, command):
     name, uid, gid = caller(c, a.get("account", ""))
     if not command:
         raise Refused("bb-session: nothing to run")
+    # An account's own user (not the session account, which is the node's
+    # own): only what the controller granted it.
+    if c.get("ACCOUNT_USERS") == "on" and name != c.get("SESSION_USER"):
+        grant_hold(a.get("account", ""), a)
     envfile = a.get("env", "")
     project, home = a.get("project", ""), a.get("home", "").rstrip("/")
     account = a.get("account", "")
@@ -1519,7 +1744,9 @@ def enter(c, a, command):
                     slot = net_attach(net, init, a["project"], dfd)
                     os.write(addr_w, f"{slot['addr']} {slot['host']}\n".encode())
                 except (OSError, Refused, subprocess.SubprocessError) as e:
-                    sys.stderr.write(f"{e}\nthe session did not start: this node could not give it a "
+                    # A line left empty above it: tmux scrolls the pane one
+                    # row to say it ended, and the first row is what goes.
+                    sys.stderr.write(f"\n{e}\nthe session did not start: this node could not give it a "
                                      "network of its own\n")
                     with contextlib.suppress(OSError):
                         os.write(addr_w, b"x\n")
@@ -1563,7 +1790,8 @@ def enter(c, a, command):
         _drop(name, uid, gid)
         env = _read_env(envfile, uid)
     except (OSError, Refused, subprocess.SubprocessError) as e:
-        sys.stderr.write(f"{e}\nthe session did not start: this node could not build its view\n")
+        # (An empty line first, as above: the reason is not the row tmux scrolls away.)
+        sys.stderr.write(f"\n{e}\nthe session did not start: this node could not build its view\n")
         sys.exit(70)
     env.update(pane)
     env["HOME"] = home
@@ -1573,6 +1801,15 @@ def enter(c, a, command):
         try:
             _default_signals()
             os.chdir(a["cwd"])
+            # A worktree this helper made with no files in it (worktree):
+            # laid out here, as the account and inside its view, where
+            # whatever the repository's configuration runs is the session's own.
+            if worktree_unfilled(a["cwd"]):
+                r = subprocess.run(["git", "-C", a["cwd"], "checkout", "-q", "-f", "HEAD"], env=env,
+                                   stdin=subprocess.DEVNULL, check=False)
+                if r.returncode:
+                    sys.stderr.write("this worktree's files were not laid out (git checkout ended with "
+                                     f"{r.returncode}): run git checkout -f HEAD in it\n")
             os.execvpe(command[0], command, env)
         except OSError as e:
             sys.stderr.write(f"bb-session: could not run {command[0]}: {e}\n")
@@ -1641,6 +1878,52 @@ def check_net(c):
 # change: the check is this file's own, and bb-tty runs from the root-owned
 # copy the agent keeps.
 TOKEN = re.compile(r"bbs_[A-Za-z0-9_-]{8,200}")
+# A pin of the controller's key, as the node agent reads it (its
+# controller.py, which says why): this, then the base64 of the sha256 of
+# the certificate's SubjectPublicKeyInfo. The agent writes this form into
+# the layout file only where this file reads it (it looks for this line).
+KEY_PIN = "sha256//"
+
+
+def _tlv(buf, at):
+    """(tag, where its value starts, where it ends) of the DER element at `at`."""
+    tag, n = buf[at], buf[at + 1]
+    at += 2
+    if n & 0x80:
+        k = n & 0x7F
+        if not 1 <= k <= 4:
+            raise ValueError("not a DER length")
+        n = int.from_bytes(buf[at:at + k], "big")
+        at += k
+    if at + n > len(buf):
+        raise ValueError("a DER element runs past its buffer")
+    return tag, at, at + n
+
+
+def key_pin_of(der):
+    """The pin of the key a DER certificate carries, or "": its
+    SubjectPublicKeyInfo found by stepping over the fields before it, as
+    the agent finds it. This file's own, like the rest of the check."""
+    import base64
+    import hashlib
+    try:
+        tag, at, end = _tlv(der, 0)
+        if tag != 0x30:
+            return ""
+        tag, at, end = _tlv(der, at)
+        if tag != 0x30:
+            return ""
+        tag, _, after = _tlv(der, at)
+        if tag == 0xA0:
+            at = after
+        for _ in range(5):
+            _, _, at = _tlv(der, at)
+        tag, _, after = _tlv(der, at)
+        if tag != 0x30 or after > end:
+            return ""
+    except (IndexError, ValueError, TypeError):
+        return ""
+    return KEY_PIN + base64.b64encode(hashlib.sha256(bytes(der[at:after])).digest()).decode()
 
 
 def _grant(c, target, tok, ro):
@@ -1655,14 +1938,37 @@ def _grant(c, target, tok, ro):
     port = u.port or (443 if u.scheme == "https" else 80)
     if u.scheme == "https":
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
-        conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
-        conn.connect()
-        seen = "sha256:" + hashlib.sha256(conn.sock.getpeercert(True)).hexdigest()
-        if c.get("CONTROLLER_PIN") and seen != c["CONTROLLER_PIN"]:
-            conn.close()
-            raise Refused("bb-session: the controller's certificate is not the one this node pinned")
+        if c.get("CONTROLLER_PIN") == "ca":
+            # Enrolled by a public hostname: the name's own certificate by
+            # the system's CAs, nothing pinned, as the agent's client and
+            # bbapi's read this pin (R243: compared to a digest it was
+            # refused, and no terminal opened on such a node).
+            conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
+        else:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
+            pin = c.get("CONTROLLER_PIN") or ""
+
+            class Unnamed(http.client.HTTPSConnection):
+                """A TLS connection that sends no server name, as the
+                agent's and bbapi's do under a key's pin: the controller
+                answers a handshake that names its hostname with that
+                name's certificate, which is another key's, and every
+                other with the install's own, the one this node pinned."""
+
+                def connect(self):
+                    http.client.HTTPConnection.connect(self)
+                    self.sock = self._context.wrap_socket(self.sock, server_hostname=None)
+            conn = (Unnamed if pin.startswith(KEY_PIN) else http.client.HTTPSConnection)(u.hostname, port, timeout=20, context=ctx)
+            conn.connect()
+            der = conn.sock.getpeercert(True)
+            # The controller's key where that is what this node pinned (any
+            # certificate over it passes), else the certificate itself.
+            seen = key_pin_of(der) if pin.startswith(KEY_PIN) else "sha256:" + hashlib.sha256(der).hexdigest()
+            if pin and seen != pin:
+                conn.close()
+                raise Refused("bb-session: the controller's " + ("key" if pin.startswith(KEY_PIN) else "certificate")
+                              + " is not the one this node pinned")
     else:
         conn = http.client.HTTPConnection(u.hostname, port, timeout=20)
     body = json.dumps({"arg": target, "ro": ro}).encode()
@@ -1760,6 +2066,8 @@ def tty(c, argv, ro=False):
         raise Refused(f"{home} belongs to neither this account's user nor the session account")
     # SHELL too: tmux runs every pane's command through it, and an account
     # user's login shell is nologin, which ran nothing (B277).
+    # What it may enter from here on, kept where only root writes (enter holds it).
+    grant_keep(account, got)
     env.update(HOME=home, USER=pw.pw_name, LOGNAME=pw.pw_name, SHELL="/bin/bash", BB_TTY_GRANT=json.dumps(got))
     if ro:
         env["BB_TTY_RO"] = "1"

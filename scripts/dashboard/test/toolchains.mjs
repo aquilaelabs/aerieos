@@ -8,7 +8,7 @@
 // answers a toolchain job at once, failing it), the Installed page's rows,
 // and the tool pack dialog the Library's Add your own and a card's Edit
 // open. Then the shell libraries a session on a node reads its store with.
-import { launch, newPage, ok, done, ready, sectSave, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue, section, libraryShow, REPO } from './lib.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -32,10 +32,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const local = () => api('/api/toolchains');
 const waitLocal = async (until, timeout = 30000) => {
   let t = {};
-  for (const end = Date.now() + timeout; Date.now() < end; await sleep(300)){
-    t = await local();
-    if (until(t)) return t;
-  }
+  await untilTrue(async () => { t = await local(); return until(t); }, timeout, 300);
   return t;
 };
 const item = (t, n) => (t.items || []).find(i => i.name === n);
@@ -51,10 +48,13 @@ const tcInstall = async (names, node) => {
 };
 
 const sb = (await api('/api/v1/nodes')).nodes.find(n => n.name === 'sandbox');
-const toLibrary = async () => {
+// The Library on the sandbox node, narrowed to one kind's every card (R256:
+// it opens on shelves of eight), the toolchains unless a section says.
+const toLibrary = async (kind = 'toolchain') => {
   await page.evaluate(id => openLibraryOn(id), sb.id);
   await page.waitForFunction(id => libNode === id && lib && Array.isArray(lib.rows)
     && !!document.querySelector(`.pane .doc.on .librarytab [data-libnode="${id}"]`), sb.id, { timeout: 20000 });
+  await libraryShow(page, { kind });
 };
 await toLibrary();
 
@@ -75,7 +75,7 @@ ok(String(tc.root || '').includes(`${DIR}/sdk`), `the store says which root thin
 // NODE_PATH pointing at it, and the tools aerie lint runs.
 const pw = catalog.toolchains.find(p => p.name === 'playwright');
 const lt = catalog.toolchains.find(p => p.name === 'lint-tools');
-ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.source?.run?.join(' '))
+ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm ci --offline/.test(pw?.source?.run?.join(' '))
    // ...and its command on PATH (B534): which playwright found nothing, and
    // a session hard-coded the module's path into its own scripts.
    && pw?.layout?.bin?.includes('node_modules/.bin')
@@ -90,7 +90,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
 // two recipes claim one, and neither that case nor the dispatch carries a
 // duplicate label, since a bash case takes the first match and hides a
 // second in silence.
-{
+await section("A recipe that gives a session commands says under which name", async () => {
   const bb = readFileSync(`${import.meta.dirname}/../../aerie`, 'utf8');
   const labels = [...bb.matchAll(/^    ([a-z][a-z0-9|-]*)\)\s+(?:shift; )?cmd_/gm)]
     .flatMap(m => m[1].split('|'));
@@ -109,14 +109,14 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
     claimed.set(t.tool, t.name);
   }
   ok(missing.length === 0, `every tool a recipe declares is in bb's tool case, and one recipe's only (${missing.join('; ') || 'all agree'})`);
-}
+});
 
 // ---- the Library's toolchain cards, on the sandbox node --------------------
 // A card's Details says which tool installing it adds to a session, and
 // what installing it is under: an agreement Install accepts (Google's
 // Android SDK terms, linked: the acceptance is the operator's, not a
 // script's), else the licenses (the operator, 7 Oct).
-{
+await section("the Library's toolchain cards, on the sandbox node", async () => {
   const said = await page.evaluate(() => {
     const keys = lib.rows.filter(r => r.kind === 'toolchain' && !r.machine && !r.wrong_platform).map(r => `toolchain:${r.name}`);
     // What each entry's page says (R183), from the same libDetail.
@@ -139,7 +139,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
   const bare = said.filter(s => !s.terms);
   ok(said.length > android.length && !bare.length,
      `...and every other toolchain card names its terms (${bare.map(s => s.name).join(', ') || 'none without'})`);
-}
+});
 
 // What a card says of where it stands, planted on a row and put back in the
 // same evaluate: the page re-reads on the toolchains and nodes revisions,
@@ -147,7 +147,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
 const card = (name, patch) => page.evaluate(([n, p]) => {
   const r = lib.rows.find(x => x.kind === 'toolchain' && x.name === n);
   const was = { ...r };
-  Object.assign(r, p); libRev++; drawPanes();
+  Object.assign(r, p); readMoved('library'); drawPanes();
   const c = document.querySelector(`.doc .librarytab .lcard[data-lrow="toolchain:${n}"]`);
   const st = c?.querySelector('.pcacts .state');
   const out = { state: st?.textContent.trim() || '', cls: st?.className || '', dots: !!st?.querySelector('.dots'),
@@ -155,10 +155,10 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
                 acts: [...(c?.querySelectorAll('[data-libact]') || [])].map(b => b.textContent.trim()),
                 pills: [...(c?.querySelectorAll('.lcmeta .pill') || [])].map(x => x.textContent.trim()) };
   for (const k of Object.keys(p)) delete r[k];
-  Object.assign(r, was); libRev++; drawPanes();
+  Object.assign(r, was); readMoved('library'); drawPanes();
   return out;
 }, [name, patch]);
-{
+await section("One word and an ellipsis for the whole of a job", async () => {
   // One word and an ellipsis for the whole of a job: no percentage read out
   // of the output (every recipe meters differently, several mislead), no bar,
   // and no verb on the card while it is being written.
@@ -171,8 +171,8 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   ok(d.state === 'installed' && /\bok\b/.test(d.cls) && !d.acts.includes('Install') && !d.pills.some(p => /is out/.test(p)),
      `installed and current: it says installed, offers no Install, and claims no update (${d.state}; ${d.acts.join(', ') || 'no verb'})`);
   d = await card('flutter', { installed: true, unknown: false, version: '3.0', update: true, latest: '3.1' });
-  ok(d.state === 'update available' && /\bwarn\b/.test(d.cls) && d.acts.includes('Update') && d.pills.includes('3.1 is out'),
-     `an update out says update available in amber, with Update and what is out (${d.state}; ${d.pills.join(', ')})`);
+  ok(d.state === 'software update available' && /\bwarn\b/.test(d.cls) && d.acts.includes('Software update') && d.pills.includes('3.1 is out'),
+     `an update out says software update available in amber, with Software update and what is out (${d.state}; ${d.pills.join(', ')})`);
   d = await card('flutter', { installed: false, unknown: false, update: false, latest: '' });
   ok(d.state === '' && d.acts.includes('Install') && !d.pills.some(p => /warn/.test(p)),
      '...and one not installed offers Install and says nothing amber');
@@ -184,64 +184,65 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   const dots = await page.evaluate(async () => {
     const r = lib.rows.find(x => x.kind === 'toolchain' && x.name === 'flutter');
     const was = { running: r.running, doing: r.doing };
-    Object.assign(r, { running: true, doing: 'install' }); libRev++; drawPanes();
+    Object.assign(r, { running: true, doing: 'install' }); readMoved('library'); drawPanes();
     const read = () => document.querySelector('.doc .librarytab .lcard[data-lrow="toolchain:flutter"] .dots')?.textContent ?? null;
     const first = read();
-    await new Promise(res => setTimeout(res, 900));
-    const later = read();
-    libRev++; drawPanes();                      // a redraw, mid-animation
+    // Until the page's timer has ticked them, ten seconds at most.
+    let later = first;
+    for (const end = Date.now() + 10000; (later = read()) === first && Date.now() < end;) await new Promise(res => setTimeout(res, 50));
+    readMoved('library'); drawPanes();                      // a redraw, mid-animation
     const after = read();
-    Object.assign(r, was); libRev++; drawPanes();
+    Object.assign(r, was); readMoved('library'); drawPanes();
     return { first, later, after };
   });
   ok(dots.later !== null && dots.later !== dots.first && dots.after === dots.later,
      `...and the card's ellipsis animates, and a redraw does not reset it (${JSON.stringify(dots)})`);
-}
+});
 // What a job said failed, under the card it failed on and no other.
-{
+await section("What a job said failed, under the card it failed on and no other", async () => {
   const bad = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: false, errors: { flutter: 'could not download file · install failed (exit 1)' } };
-    libRev++; drawPanes();
+    readMoved('library'); drawPanes();
     const out = { text: document.querySelector('.doc .librarytab .lcard[data-lrow="toolchain:flutter"] .sub.bad')?.textContent || '',
                   n: document.querySelectorAll('.doc .librarytab .lcard .sub.bad').length };
-    lib.job = was; libRev++; drawPanes();
+    lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(/could not download file/.test(bad.text) && bad.n === 1,
      `a failure is said under the card that failed, and no other card wears it (${bad.text})`);
-}
+});
 // One operation at a time (the server answers a second with a 409), so the
 // verbs go dead while one runs rather than letting a press earn an error.
 // Abort is the one control that has to work while a job runs.
-{
+await section("One operation at a time", async () => {
   const g = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: true, action: 'install', current: 'swift' };
-    libRev++; drawPanes();
+    readMoved('library'); drawPanes();
     const all = sel => [...document.querySelectorAll(sel)];
     const installs = all('.doc .librarytab [data-libact="install"][data-libkind="toolchain"]');
     const out = {
-      check: !!document.querySelector('.doc .librarytab [data-libcheck]')?.disabled,
+      check: !document.querySelector('.doc .librarytab [data-libcheck]')?.disabled,
       abort: all('.doc .librarytab [data-libabort]').length === 1 && !document.querySelector('.doc .librarytab [data-libabort]').disabled,
-      install: installs.length > 0 && installs.every(b => b.disabled),
+      install: installs.length > 0 && installs.every(b => !b.disabled),
     };
-    lib.job = was; libRev++; drawPanes();
+    lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(g.check && g.abort && g.install,
-     `while a job runs, Check for updates and every card's Install are dead and Abort is live (${
+     `while a job runs, Check for updates and every card's Install stay live, a press queueing behind it, and Abort is there (${
        Object.entries(g).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'all'})`);
   // A check the operator did not start still has to reach the page, and the
   // button says which job is in the way; the head keeps to the store (B31).
   const c = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: true, action: 'check' };
-    libRev++; drawPanes();
+    readMoved('library'); drawPanes();
     const b = document.querySelector('.doc .librarytab [data-libcheck]');
     const out = { t: b?.textContent || '', dots: !!b?.querySelector('.dots'),
                   head: document.querySelector('.doc .librarytab .pghead')?.textContent || '' };
-    lib.job = was; libRev++; drawPanes();
+    lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(/^Checking for updates/.test(c.t) && c.dots && !/Checking/.test(c.head),
@@ -252,28 +253,28 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   const when = await page.evaluate(() => {
     const was = lib.store;
     const read = () => /Versions checked/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '');
-    lib.store = { ...(was || {}), checked: 0 }; libRev++; drawPanes();
+    lib.store = { ...(was || {}), checked: 0 }; readMoved('library'); drawPanes();
     const none = read();
-    lib.store = { ...(was || {}), checked: Math.floor(Date.now() / 1000) - 3600 }; libRev++; drawPanes();
+    lib.store = { ...(was || {}), checked: Math.floor(Date.now() / 1000) - 3600 }; readMoved('library'); drawPanes();
     const some = read();
-    lib.store = was; libRev++; drawPanes();
+    lib.store = was; readMoved('library'); drawPanes();
     return { none, some };
   });
   ok(!when.none && when.some, 'the head says when versions were last checked, and nothing while they never were');
-}
+});
 // A retired node's directory on the store is offered with Remove (R196).
-{
+await section("A retired node's directory on the store is offered with Remove", async () => {
   const seen = await page.evaluate(() => {
     const was = lib.cleanable;
-    lib.cleanable = [{ dir: 'n_0ldd0ne1', what: "gone's, a node since retired" }]; libRev++; drawPanes();
+    lib.cleanable = [{ dir: 'n_0ldd0ne1', what: "gone's, a node since retired" }]; readMoved('library'); drawPanes();
     const out = { head: (document.querySelector('.doc .librarytab .pghead')?.textContent || '').replace(/\s+/g, ' '),
                   rm: !!document.querySelector('.pane [data-libclean].danger') };
-    lib.cleanable = was; libRev++; drawPanes();
+    lib.cleanable = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(/Remove takes\W*n_0ldd0ne1 \(gone's, a node since retired\)/.test(seen.head) && seen.rm,
      `a retired node's directory on the store is in the head's Remove takes, with Remove in the bar (R196) (${seen.head.slice(-70)})`);
-}
+});
 
 // ---- install two on the controller's store, watch them land ----------------
 // More than two land: android:emulator is installed BY sdkmanager, which
@@ -333,12 +334,11 @@ ok(stored.local && typeof stored.local.key === 'string' && stored.local.key,
 ok(stored.catalog && stored.local.key.startsWith(stored.catalog),
    `...and the catalog's digest is in that key, so editing a recipe drops it (${
       stored.catalog})`);
-{
+await section("The module's own view of it, which is where the decision is made", async () => {
   // The module's own view of it, which is where the decision is made: an
   // answer stored against a different catalog is not an answer any more, and
   // zeroing the date is what sends the weekly loop looking again.
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const ask = extra => execFileSync('python3', ['-c', `
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location("pk", "${REPO}/scripts/dashboard/toolchains.py")
@@ -356,7 +356,7 @@ print(json.dumps({"at": m._tc_checked, "local": bool(m._tc_local.get("versions")
     + 'm._tc_checked = v[1]'));
   ok(moved.at === 0,
      '...and an edited catalog resets it, because the answers describe recipes');
-}
+});
 // Update runs like an install: a job, on what is already installed.
 await tcInstall(['flutter']);
 tc = await waitLocal(t => t.job?.action === 'install' && !t.job.running && (t.job.done || []).includes('flutter'));
@@ -364,11 +364,11 @@ ok((tc.job.done || []).includes('flutter') && !(tc.job.failed || []).length,
    'Install on a toolchain that is already installed updates it');
 // The catalog says which recipes update in place (bug #43), not a list in
 // the server: a tarball recipe is removed and installed again instead.
-{
+await section("The catalog says which recipes update in place", async () => {
   const seen = tc.items.filter(i => i.updatable).map(i => i.name).sort();
   ok(seen.includes('flutter') && seen.includes('playwright') && !seen.includes('go') && !seen.includes('jdk'),
      `the catalog says which recipes update in place (${seen.join(', ')})`);
-}
+});
 
 // ---- a long job, through the real path ---------------------------------
 // The stub's `go` install draws a carriage-return progress bar over several
@@ -379,7 +379,7 @@ const samples = [];
 for (let i = 0; i < 20; i++){
   const t = await local();
   if (t.job?.running) samples.push({ current: t.job.current, action: t.job.action });
-  await sleep(250);
+  await sleep(250);     // the sampling's own period: the job is read all through its run
 }
 ok(samples.length > 1 && samples.every(s => s.current === 'go' && s.action === 'install'),
    `a running install says which toolchain it is on and that it is installing, all through (${samples.length} samples)`);
@@ -418,9 +418,7 @@ const post = async body => (await api('/api/toolchains', body)).status;
 ok(await post({ action: 'install', names: ['flutter; rm -rf /'] }) === 400,
    'a name that is not in the catalog is refused');
 ok(await post({ action: 'install', names: [] }) === 400, 'an empty selection is refused');
-// A second job is refused while one runs. The message names which one: the
-// version check that runs by itself once a day says so, rather than claiming
-// an install nobody started.
+// A second job pressed while one runs is queued behind it, never refused.
 const clash = await page.evaluate(async () => {
   const go = b => fetch('/api/toolchains', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
@@ -429,16 +427,16 @@ const clash = await page.evaluate(async () => {
   const j = await r.json().catch(() => ({}));
   return { status: r.status, error: j.error || '' };
 });
-ok(clash.status === 409 && /already running/.test(clash.error),
-   `...and a second job while one runs is refused (${clash.error})`);
-await waitLocal(t => t.job && !t.job.running);
+ok(clash.status === 200 && !clash.error,
+   `...and a second job while one runs is queued behind it (${clash.status} ${clash.error})`);
+await waitLocal(t => t.job && !t.job.running && !(t.job.waiting || []).length, 60000);
 ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown action is refused');
 
 // ---- what needs what --------------------------------------------------------
 // A toolchain that needs another says so, and so does the one that is
 // needed: the Library's card says what comes with it, the Installed page's
 // row what needs it.
-{
+await section("what needs what", async () => {
   const ndk = item(tc, 'android:ndk'), jdk = item(tc, 'jdk');
   ok(ndk?.needs?.includes('android-tools') && jdk?.needed_by?.includes('android-tools'),
      `the store says what each toolchain needs and what needs it (${ndk?.needs} | ${jdk?.needed_by})`);
@@ -449,21 +447,17 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(/Needs android-tools, installed with it/.test(said.lib),
      `a toolchain's card says what it needs, installed with it (${ndk?.label})`);
   ok(/Needed by android-tools/.test(said.inst), `...and the one it needs says on its Installed row what needs it (${jdk?.label})`);
-}
+});
 
 // ---- Remove on the Installed page --------------------------------------------
 // The sandbox's store is what its census says it holds; a toolchain there is
 // an Installed row with Remove, which asks first by the name its row shows
 // (B65), runs the job on the node, and says under the row what the job said
 // failed (the stub fails every toolchain job).
-{
+await section("Remove on the Installed page", async () => {
   const { writeFileSync, rmSync } = await import('node:fs');
   writeFileSync(`${DIR}/sandboxdata/census-extra.json`, JSON.stringify({ store_dirs: { top: ['flutter'], android: [] } }));
-  let held = false;
-  for (let i = 0; i < 60 && !held; i++){
-    held = !!item(await api(`/api/toolchains?node=${sb.id}`), 'flutter')?.installed;
-    if (!held) await sleep(500);
-  }
+  const held = await untilTrue(async () => !!item(await api(`/api/toolchains?node=${sb.id}`), 'flutter')?.installed, 30000, 500);
   ok(held, 'the sandbox node reports flutter in its store');
   const ROW = `.installedtab [data-instnode="${sb.id}"] .irow[data-irow="toolchain:flutter"]`;
   await page.evaluate(id => { instNode = ''; inst = null; openInstalledOn(id); }, sb.id);
@@ -471,12 +465,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   const label = await page.evaluate(() => inst.rows.find(r => r.kind === 'toolchain' && r.name === 'flutter')?.label || '');
   const nd = page.dialogs.length;
   await page.click(`${ROW} [data-instact="remove"]`);
-  let ran = false;
-  for (let i = 0; i < 60 && !ran; i++){
-    await sleep(500);
-    ran = await page.evaluate(() => { const ok = inst?.job?.action === 'remove' && !inst.job.running && (inst.job.failed || []).includes('flutter');
-      if (!ok) loadInstalled(); return ok; });
-  }
+  const ran = await untilTrue(() => page.evaluate(() => { const ok = inst?.job?.action === 'remove' && !inst.job.running && (inst.job.failed || []).includes('flutter');
+    if (!ok) loadInstalled(); return ok; }), 30000, 500);
   ok(page.dialogs.length === nd + 1 && !!label && page.dialogs[nd].startsWith(`Uninstall ${label} from sandbox?`),
      `Remove on an Installed row asks first, naming it as its row does (${page.dialogs.slice(nd).join(' | ') || 'nothing asked'})`);
   await page.waitForSelector(`${ROW} .sub.bad`, { timeout: 15000 }).catch(() => {});
@@ -484,7 +474,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(ran && /remove failed on the node/.test(why),
      `...runs the remove job on the node, and says under the row what failed (${why || 'nothing said'})`);
   rmSync(`${DIR}/sandboxdata/census-extra.json`, { force: true });
-}
+});
 
 // ---- the two meanings of SDK_ROOT (B89) ----------------------------------
 // On the controller SDK_ROOT is the STORE and bb appends this machine's
@@ -495,7 +485,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
 // does not exist) and every toolchain on that node read as not installed
 // while it sat there. Shell-level, because that is where the answer is
 // decided and where both machines ask for it.
-{
+await section("the two meanings of SDK_ROOT", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdtempSync, mkdirSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
@@ -582,14 +572,14 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
      `...and whether a container there can be given the card, by the container toolkit's own tool (${nokit.slice(0, 20)} | ${haskit.slice(0, 14)})`);
   wf(`${devd}/vendor`, '0x1234\n');
   ok(nv('', '', '') === '' && kit() === '', '...and nothing at all on a machine with no NVIDIA card');
-}
+});
 
 // ---- the versions a project pins are cards on its node's Library (B712) ------
 // A store remade at the newest versions only stranded a project pinning
 // NDK 29 and build-tools 36: nothing to install. The pins are read off the
 // project's Gradle files, each a row named for the project, the store's own
 // listing saying whether it is held.
-{
+await section("the versions a project pins are cards on its node's Library", async () => {
   const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
   await api('/api/prefs', { project: 'alpha', node: sb.id });
   mkdirSync(`${DIR}/ws/alpha/app`, { recursive: true });
@@ -599,11 +589,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     top: [], android: ['ndk', 'build-tools', 'platforms'],
     versions: { ndk: ['30.0.16248370'], 'build-tools': ['37.0.0'], platforms: ['android-37.0'] } } }));
   let got = {};
-  for (let i = 0; i < 60; i++){
-    got = await api(`/api/toolchains?node=${sb.id}`);
-    if ((got.items || []).some(r => r.name === 'android:ndk;29.0.14206865')) break;
-    await sleep(500);
-  }
+  await untilTrue(async () => { got = await api(`/api/toolchains?node=${sb.id}`);
+    return (got.items || []).some(r => r.name === 'android:ndk;29.0.14206865'); }, 30000, 500);
   const by = Object.fromEntries((got.items || []).map(r => [r.name, r]));
   const ndk = by['android:ndk;29.0.14206865'], bt = by['android:build-tools;36.0.0'], plat = by['android:platforms;android-37'];
   ok(ndk && !ndk.installed && /^Needed by alpha \(app\/build\.gradle\.kts\)/.test(ndk.about) && /lacks it/.test(ndk.about)
@@ -637,7 +624,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true });
   rmSync(`${DIR}/sandboxdata/census-extra.json`, { force: true });
   await api('/api/prefs', { project: 'alpha', node: '' });
-}
+});
 
 // ---- tool packs (R77) ------------------------------------------------------
 // An administrator looks at a pack by its repository, reads what it would
@@ -645,7 +632,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
 // cards as sideloaded, and removes it. The repository is on disk, which the
 // harness lets the server fetch (BB_TOOLPACKS_FILE_URLS). The dialog opens
 // from the Library's Add your own and from a pack card's Edit.
-{
+await section("tool packs (R77)", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const repo = `${DIR}/packrepo`;
@@ -671,7 +658,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     await page.waitForSelector('#tpmodal:not([hidden]) [data-tpwhat="pack"]', { timeout: 15000 });
     await page.click('#tpmodal [data-tpwhat="pack"]');
   };
-  await toLibrary();
+  await toLibrary('pack');
   await addYourOwn();
   await page.fill('#tpmodal #tpUrl', `file://${repo}`);
   await page.click('#tpmodal [data-tplook]');
@@ -718,7 +705,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
              strings: { about: 'Its strings.', usage: 'FILE', run: ['{dir}/bin/hexkit', 'strings', '{args}'] } } }));
   g('commit', '-qam', 'later');
   const newer = g('rev-parse', 'HEAD');
-  await toLibrary();
+  await toLibrary('pack');
   await packCard('hexkit');
   await page.click(EDIT('hexkit'));
   await page.waitForSelector('#tpmodal:not([hidden]) .tpseen', { timeout: 20000 });
@@ -730,7 +717,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(true, '...and Update keeps the pack at the newer commit');
   // From the vetted catalog (R169 step 4): a pack kept at the index's pin
   // wears vetted, a sha256 the index does not pin is refused (B440), and
-  // when the index pins a newer commit the card offers Catalog update: the
+  // when the index pins a newer commit the card offers Manifest update, in the look of any update: the
   // dialog on that pin with what it changes marked, Update keeping it there
   // with its tier (B442). The catalog's address is a dead one here, so each
   // read falls back to the index kept in the state.
@@ -754,20 +741,60 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     const next = g('rev-parse', 'HEAD');
     pin(next);
     const REPIN = `.doc.on .librarytab .lcard[data-lrow="pack:hexkit"] [data-libact="repin"]`;
-    await page.evaluate(() => { loadToolchains(); loadLibrary(); });
+    // As a person meets it: the Library read, and the Toolchains page's own
+    // rows never, which the Library stands in for with the job alone. Taken
+    // for the rows, the dialog sent no address and its Add was refused.
+    await page.evaluate(() => { toolchains = null; loadLibrary(); });
     await page.waitForSelector(REPIN, { timeout: 20000 });
     const vcard = await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .lcard[data-lrow="pack:hexkit"] .lcmeta .pill')].map(p => p.textContent.trim()));
     ok(vcard.includes('vetted'), `the kept pack's card wears vetted (${vcard.join(', ')})`);
+    // A newer pin is an update, drawn as every other and named apart from a
+    // program's (the operator, 13 Nov): Manifest update in the accent, the
+    // card's one verb, its state in the warning voice saying which update
+    // it is, and counted under Updates.
+    const offer = await page.evaluate(sel => { const b = document.querySelector(sel), c = b.closest('.lcard');
+      return { word: b.textContent.trim(), accent: b.classList.contains('primary'), verbs: [...c.querySelectorAll('[data-libact]')].map(x => x.dataset.libact).join(),
+               state: c.querySelector('.state')?.textContent.trim() || '', warn: /warn/.test(c.querySelector('.state')?.className || ''),
+               counted: (lib.rows || []).filter(LIB_STANDS.update).some(r => r.name === 'hexkit') }; }, REPIN);
+    ok(offer.word === 'Manifest update' && offer.accent && offer.verbs === 'repin' && offer.state === 'manifest update available' && offer.warn && offer.counted,
+       `the catalog's newer pin is offered as Manifest update, in the accent, the card saying a manifest update is available (${JSON.stringify(offer)})`);
     await page.click(REPIN);
     await page.waitForSelector('#tpmodal:not([hidden]) .tpseen', { timeout: 20000 });
     const upd = await page.$eval('#tpmodal', e => e.textContent.replace(/\s+/g, ' '));
     ok(/strings -a \{args\} changed was \{dir\}\/bin\/hexkit strings \{args\}/.test(upd) && /the vetted catalog's newer pin/.test(upd)
        && upd.includes(next.slice(0, 12)),
-       `Catalog update opens the dialog on the index's newer pin, what it changes marked (${upd.slice(0, 240)})`);
+       `Manifest update opens the dialog on the index's newer pin, what it changes marked (${upd.slice(0, 240)})`);
     await page.click('#tpmodal [data-tpadd]');
     await page.waitForFunction(c => (toolchains?.items || []).find(i => i.name === 'hexkit')?.pack?.commit === c, next, { timeout: 20000 });
     const after = await page.evaluate(() => (toolchains.items || []).find(i => i.name === 'hexkit').pack.tier);
     ok(after === 'vetted', `...and Update keeps it at that pin, still vetted (${after})`);
+    // ...and the Updates chip counts one fewer, as the card leaves it.
+    await page.waitForFunction(() => !(lib?.rows || []).find(r => r.name === 'hexkit')?.repin, null, { timeout: 20000 }).catch(() => {});
+    const left = await page.evaluate(() => ({ counted: (lib?.rows || []).filter(LIB_STANDS.update).some(r => r.name === 'hexkit'),
+      state: document.querySelector('.doc.on .librarytab .lcard[data-lrow="pack:hexkit"] .state')?.textContent.trim() || '' }));
+    ok(!left.counted && !/manifest update available/.test(left.state),
+       `...and it is no longer counted under Updates (${JSON.stringify(left)})`);
+    // Kept from the catalog, its card has no Edit, which is for what a
+    // person added themselves: the source line of its Details page opens
+    // the same dialog, with its Remove.
+    {
+      const HEX = '.doc.on .librarytab .lcard[data-lrow="pack:hexkit"]';
+      await page.evaluate(() => loadLibrary());
+      await page.waitForFunction(() => (lib?.rows || []).find(r => r.kind === 'pack' && r.name === 'hexkit')?.tier === 'vetted'
+        && !document.querySelector('#tpmodal:not([hidden])'), null, { timeout: 20000 });
+      await page.waitForSelector(HEX, { timeout: 20000 });
+      ok(!await page.$(EDIT('hexkit')), 'a pack kept from the catalog has no Edit on its card');
+      await page.click(`${HEX} [data-libmore]`);
+      const KEPT = '.pane .doc.on [data-libact="edit"][data-libname="hexkit"]';
+      await page.waitForSelector(KEPT, { timeout: 20000 });
+      const words = await page.$eval(KEPT, b => b.textContent);
+      await page.click(KEPT);
+      await page.waitForSelector('#tpmodal:not([hidden]) [data-tprm="hexkit"]', { timeout: 15000 });
+      ok(/newer pin, or remove it/.test(words), `...its Details page's source line opens its dialog, Remove in it (${words})`);
+      await page.waitForFunction(() => !tpForm.busy, null, { timeout: 20000 });
+      await page.click('#tpmodal [data-tpcancel]');
+      await toLibrary('pack');
+    }
     // Its own icon (R182): named in its manifest, read at the commit it is
     // kept at, drawn on its card as an image, and served as one alone: an SVG
     // that carries a script is still a picture, its address sandboxed.
@@ -791,6 +818,35 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     ok(served.src.includes(iconAt.slice(0, 12)) && served.w > 0 && served.type === 'image/svg+xml' && /sandbox/.test(served.csp)
        && /default-src 'none'/.test(served.csp) && served.sniff === 'nosniff' && !served.ran,
        `its card draws the icon from the pack's own address at its pin, served as an image with no script run (${JSON.stringify(served)})`);
+    // An entry this AerieOS does not take is not shown at all (the operator,
+    // 12 Nov): one written in a pack format this build has not met (R234),
+    // and one whose manifest names other release lines than this one. The
+    // page's head counts them, and Add refuses the first without fetching it.
+    writeFileSync(`${DIR}/state/catalog-index.json`, JSON.stringify({ fetched_at: 0, formats: { 99: '9.9.0' }, packs: [
+      { name: 'later', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '', format: 99,
+        about: 'Written for an AerieOS not out yet.', platforms: ['linux/amd64'] },
+      { name: 'otherline', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '', works_with: ['99.1'],
+        about: 'For another release line.', platforms: ['linux/amd64'] },
+      { name: 'forall', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '',
+        about: 'Names no release line.', platforms: ['linux/amd64'] }] }));
+    await page.evaluate(() => { loadToolchains(); loadLibrary(); });
+    await page.waitForSelector(`.doc.on .librarytab .lcard[data-lrow="pack:forall"]`, { timeout: 20000 });
+    const later = await page.evaluate(() => ({
+      cards: ['later', 'otherline', 'forall'].map(n => !!document.querySelector(`.doc.on .librarytab .lcard[data-lrow="pack:${n}"]`)),
+      rows: null,
+      head: [...document.querySelectorAll('.doc.on .librarytab .pghead dt, .doc.on .librarytab .facts dt')].map(d => `${d.textContent.trim()}=${d.nextElementSibling?.textContent.trim()}`)
+        .find(x => /^Not for this AerieOS/.test(x)) || '' }));
+    // An entry this build does not take never reaches a look at the Library
+    // (R256): the whole list says which.
+    later.rows = (await page.evaluate(async () => (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || []))
+      .filter(r => r.too_new).map(r => r.name).sort().join();
+    // (A build with no version, as the suite's is, judges no entry by its release lines: only the format counts here.)
+    const want = later.rows === 'later,otherline' ? [false, false, true] : [false, true, true];
+    ok(JSON.stringify(later.cards) === JSON.stringify(want) && /^Not for this AerieOS=\d+ in the catalog$/.test(later.head),
+       `an entry this AerieOS does not take is not drawn, and the head counts what is left out (${JSON.stringify(later)})`);
+    const past = await api('/api/toolpacks', { action: 'add', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt) });
+    ok(/later needs AerieOS 9\.9\.0 or newer \(it is written in pack format 99, and this AerieOS reads up to \d+\)/.test(past.error || ''),
+       `...and adding it is refused in the same words, nothing fetched (${past.error || 'it was added'})`);
     await api('/api/settings', { set: { catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/' } });
     rmSync(`${DIR}/state/catalog-index.json`, { force: true });
   }
@@ -802,14 +858,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   // installed.
   await api('/api/prefs', { project: 'alpha', packs_on: 'hexkit' });
   writeFileSync(`${DIR}/sandboxdata/census-extra.json`, JSON.stringify({ store_dirs: { top: ['hexkit'], android: [] } }));
-  const heldBy = async want => {
-    for (let i = 0; i < 60; i++){
-      const t = await api(`/api/toolchains?node=${sb.id}`);
-      if (!!item(t, 'hexkit')?.installed === want) return true;
-      await sleep(500);
-    }
-    return false;
-  };
+  const heldBy = want => untilTrue(async () => !!item(await api(`/api/toolchains?node=${sb.id}`), 'hexkit')?.installed === want, 30000, 500);
   ok(await heldBy(true), 'the sandbox node reports the pack in its store');
   page.dialogs = [];
   await packCard('hexkit');
@@ -852,10 +901,13 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   const pasted = { name: 'wordy', label: 'Wordy', about: 'Counts words.', platforms: ['linux/amd64', 'linux/arm64'],
     install: { steps: [['sh', '-c', 'mkdir -p "$1/bin"', 'x', '{dir}']] },
     verbs: { count: { about: 'Words in a file.', usage: 'FILE', run: ['{dir}/bin/wordy', '{args}'] } } };
-  await toLibrary();
+  await toLibrary('pack');
   await addYourOwn();
   const tpH = () => page.$eval('#tpmodal .box', b => Math.round(b.getBoundingClientRect().height));
-  await page.waitForTimeout(500);              // the dialog's own opening scale
+  // The dialog's own opening scale is over: the box is measured at rest.
+  await page.waitForFunction(() => { const m = document.getElementById('tpmodal'), b = m?.querySelector('.box');
+    return !!b && b.getBoundingClientRect().height > 0 && !m.getAnimations({ subtree: true }).some(a => a.playState === 'running'
+      && Number.isFinite(a.effect?.getComputedTiming().endTime)); }, null, { timeout: 10000 }).catch(() => {});
   const repoH = await tpH();
   await page.click('#tpmodal [data-tpfrom="paste"]');
   ok(Math.abs(await tpH() - repoH) <= 1, `the tool pack dialog keeps its size from A repository to Paste (${repoH} then ${await tpH()})`);
@@ -885,7 +937,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await page.fill('#tpText', JSON.stringify({ ...pasted, label: 'Wordy two' }));
   await page.click('#tpmodal [data-tplook]');
   await page.waitForSelector('#tpmodal [data-tpadd]', { timeout: 20000 });
-  ok(await page.$eval('#tpmodal [data-tpadd]', e => e.textContent) === 'Update',
+  ok(await page.$eval('#tpmodal [data-tpadd]', e => e.textContent) === 'Manifest update',
      '...the card\'s Edit opens on its bbtool.json, and a changed one is offered as an Update');
   await page.click('#tpmodal [data-tpadd]');
   await page.waitForFunction(c => { const p = (toolchains?.items || []).find(i => i.name === 'wordy');
@@ -919,7 +971,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     await page.waitForFunction(x => !(toolchains?.items || []).some(i => i.name === x), n, { timeout: 20000 });
   }
   ok(true, 'a pack made here is removed from its card\'s Edit like any other');
-}
+});
 
 // 400s and 409s are asked for on purpose above; the browser logs a failed
 // fetch either way.

@@ -103,13 +103,21 @@ release APK on a node's runner: the JDK and the Android SDK come from the
 node's toolchain store, the same environment every `aerie` job gets, on a push
 to `main` that touches `apps/android/`, names it by `aerie version --file`, drops it
 into AerieOS's `dist/` where the runner's machine mounts the spaces
-share. For a release it is handed to the controller as the artifact
+share. A tag's own run builds it on a hosted runner instead, and so does a
+release rehearsal (the workflow's `hosted` input), so the first tag is not
+the first hosted build. For a release it is handed to the controller as the artifact
 `bb-release-apk-TAG`, which the controller has signed on AerieOS's node
 with its own sideload key and attaches to the release (docs/building.md, "A
 release's APK is signed on the space's node"); no key or password is a
 GitHub secret.
 Nothing else is kept as a workflow artifact: one artifact per push filled
-the account's Actions storage in a month (B669). Locally, `cd android && ./gradlew
+the account's Actions storage in a month (B669). Every file the build
+resolves is held to its sha256 by `gradle/verification-metadata.xml`, and
+Gradle refuses one that is not those bytes; a change that adds or moves a
+dependency writes the file again, from a clean Gradle home so every file
+a hosted runner fetches is in it: `./gradlew --write-verification-metadata
+sha256 --refresh-dependencies help assembleRelease assembleDebug` in
+`apps/android`, with `GRADLE_USER_HOME` pointed at an empty folder. Locally, `cd android && ./gradlew
 assembleDebug` with `JAVA_HOME` and `ANDROID_HOME` pointed at a node's store.
 On a node the build writes under the node's own disk rather than the
 spaces share (a job's cache folder, or the account's `~/.cache/builderbot/gradle`),

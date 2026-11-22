@@ -5,16 +5,18 @@ it in the diagnostics. Nothing comes back: there is no answer to follow up.
 
 Arguments: the words of the report and its --area, --repro and --reproduces, or for
 `conversation` the report's number. BB_R_SUB is the subcommand bb chose (add,
-conversation), BB_R_AUTH the auth header, BB_R_PROJECT the project.
+conversation) and BB_PROJECT the project. The auth header is bbapi's own
+(BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
 
 import bbapi
+from say import need
 
 
-auth, proj, sub, args = os.environ["BB_R_AUTH"], os.environ.get("BB_R_PROJECT", ""), os.environ["BB_R_SUB"], sys.argv[1:]
-post = lambda b: bbapi.call("/api/reports", b, auth=auth, timeout=60)  # noqa: E731
+proj, sub, args = os.environ.get("BB_PROJECT", ""), os.environ["BB_R_SUB"], sys.argv[1:]
+post = lambda b: bbapi.call("/api/reports", b, timeout=60)  # noqa: E731
 
 
 def flags(names):
@@ -35,11 +37,6 @@ def flags(names):
     return words, got
 
 
-def fail(d):
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
-
-
 if sub == "add":
     words, got = flags(("area", "repro", "reproduces"))
     # Steps given say how often they showed it (R124): a repro reads as a
@@ -50,12 +47,12 @@ if sub == "add":
     d = post({"action": "add", "project": proj, "text": " ".join(words),
               "area": got.get("area", ""), "repro": got.get("repro", ""),
               "reproduces": got.get("reproduces", "")})
-    fail(d)
+    need(d)
     print(f"[builderbot] reported #{d['id']}: it is in AerieOS's diagnostics now, not this "
           "space's tracker, and nothing more is needed from this session")
 else:
     if not args:
         sys.exit("usage: aerie report conversation N")
     d = post({"action": "conversation", "id": args[0]})
-    fail(d)
+    need(d)
     sys.stdout.write(d.get("text") or "")

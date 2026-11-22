@@ -1,11 +1,11 @@
 // Desktop mouse: tab drag reorders in place with a slide, the click ending a
 // drag does not switch tabs, a plain click does, tab enter/exit animations.
-import { launch, newPage, ok, done, ready, layoutSettled, URL, animatedDuring } from './lib.mjs';
+import { launch, newPage, ok, done, ready, layoutSettled, URL, animatedDuring, settled, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
 await page.goto(URL);
-await page.waitForFunction(() => document.querySelectorAll('#linux [data-m]').length > 0, { timeout: 40000 });
+await page.waitForFunction(() => typeof state !== 'undefined' && !!state && Array.isArray(state.projects), { timeout: 40000 });
 // The dock (R218 step 4): three shells on its line, the workspace's and two
 // more; a press on one brings it forward, its − puts it away.
 await page.evaluate(() => { newShell(''); newShell(''); });
@@ -21,38 +21,52 @@ await page.waitForFunction(id => !tabs.some(t => t.id === id), ids0[1], { timeou
 ok(await page.evaluate(() => tabOf(panes[1])?.kind === 'term'), '...and its − puts it away, the next terminal taking the dock');
 // More terminals than the line holds: the one in front is brought into view
 // on it, at either end (B740).
-{
+await section("More terminals than the line holds", async () => {
   const before = await page.evaluate(() => tabs.map(t => t.id));
   await page.evaluate(() => { for (let i = 0; i < 9; i++) newShell(''); });
   await page.waitForFunction(n => document.querySelectorAll('#pane1 .dtab[data-id]').length >= n, before.length + 7, { timeout: 15000 });
-  await page.waitForTimeout(300);
+  // The line drawn with them all and scrolled to the one in front, which is what is read next.
+  await page.waitForFunction(() => { const line = document.querySelector('#pane1 .dockline'), on = line?.querySelector('.dtab.on');
+    if (!on || on.dataset.id !== panes[1]) return false;
+    const a = line.getBoundingClientRect(), b = on.getBoundingClientRect();
+    return b.left >= a.left - 1 && b.right <= a.right + 1 && line.scrollWidth > line.clientWidth; }, null, { timeout: 10000 }).catch(() => {});
   const seen = () => page.evaluate(() => { const line = document.querySelector('#pane1 .dockline'), on = line.querySelector('.dtab.on');
     const a = line.getBoundingClientRect(), b = on.getBoundingClientRect();
     return { fits: b.left >= a.left - 1 && b.right <= a.right + 1, scrolls: line.scrollWidth > line.clientWidth }; });
   const last = await seen();
   await page.evaluate(() => dockShow(tabs.filter(t => t.kind === 'term')[0].id));
-  await page.waitForTimeout(200);
+  // The first one in front on the line, and the line come to it.
+  await page.waitForFunction(() => { const line = document.querySelector('#pane1 .dockline'), on = line?.querySelector('.dtab.on');
+    if (!on || on.dataset.id !== panes[1] || panes[1] !== tabs.filter(t => t.kind === 'term')[0].id) return false;
+    const a = line.getBoundingClientRect(), b = on.getBoundingClientRect();
+    return b.left >= a.left - 1 && b.right <= a.right + 1; }, null, { timeout: 10000 }).catch(() => {});
   const first = await seen();
   ok(last.scrolls && last.fits && first.fits,
      `with more terminals than the line holds, the one in front is on it, the newest and then the first (${JSON.stringify({ last, first })})`);
   await page.evaluate(was => { tabs.filter(t => !was.includes(t.id)).forEach(t => hideTab(t.id)); }, before);
   await page.waitForFunction(n => tabs.length === n, before.length, { timeout: 10000 });
-}
+});
 await page.evaluate(() => dockToggle(true));
 await page.waitForSelector('#pane1 .slot.on.ownterm', { timeout: 10000 });
 // The dock keeps its height between a shell, whose Commands bar sits under
 // the panes, and Chat, which has none (the operator, 26 Oct).
-{
+await section("The dock keeps its height between a shell, whose Commands bar sits under", async () => {
   const look = () => page.evaluate(() => ({ h: Math.round($('pane1').getBoundingClientRect().height), kind: tabOf(panes[1])?.kind }));
   const press = re => page.evaluate(src => [...document.querySelectorAll('#pane1 .dtab > button')].find(b => new RegExp(src).test(b.textContent.trim()))?.click(), re);
+  // The dock on that kind and at rest: nothing in it still moving, what it asked for answered.
+  const shows = async kind => {
+    await page.waitForFunction(k => tabOf(panes[1])?.kind === k && !$('pane1').getAnimations({ subtree: true })
+      .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)), kind, { timeout: 10000 }).catch(() => {});
+    await settled(page);
+  };
   const shell = await look();
-  await press('^Chat'); await page.waitForTimeout(500);
+  await press('^Chat'); await shows('chat');
   const chat = await look();
-  await press('^sh'); await page.waitForTimeout(500);
+  await press('^sh'); await shows('term');
   const back = await look();
   ok(shell.kind === 'term' && chat.kind === 'chat' && back.kind === 'term' && shell.h === chat.h && back.h === shell.h,
      `the dock is one height on a shell and on Chat (${JSON.stringify({ shell, chat, back })})`);
-}
+});
 // The slot carries the terminal's own color, so there is no white between
 // a tab switch and xterm's first paint.
 ok(await page.$eval('#pane1 .slot.on.ownterm', el => {
@@ -62,7 +76,7 @@ ok(await page.$eval('#pane1 .slot.on.ownterm', el => {
 // A desktop has a keyboard, so it has no on-screen one: the bar hides the
 // one it keeps for phones.
 ok(!await page.$('#bKeys')
-   && await page.$eval('#mKeys', el => getComputedStyle(el).display === 'none'),
+   && !await page.$('#mKeys') && await page.$eval('#mLinks', el => getComputedStyle(el).display === 'none'),
    'no on-screen keys control on a desktop, from either place it used to be');
 
 // A poll that changes nothing rebuilds nothing: the same elements stay put
@@ -72,8 +86,13 @@ await page.evaluate(() => { document.querySelector('#pane1 .dtab[data-id]').data
 await page.evaluate(() => refresh());
 ok(await page.$eval('#pane1 .dtab[data-id]', el => el.dataset.mark === 'kept'),
    'an unchanged poll leaves the dock\'s line alone');
-await page.evaluate(() => newShell(''));
-ok(await page.$eval('#pane1 .dtab[data-id]', el => el.dataset.mark !== 'kept'), '...while a real change repaints');
+// ...and a real change lands in the line while the tabs already on it stay
+// the elements they were (R244: the line is patched, each tab kept by its id).
+const tabsBefore = await page.$$eval('#pane1 .dtab[data-id]', ts => ts.length);
+await page.evaluate(() => { window.__dtab = document.querySelector('#pane1 .dtab[data-id]'); newShell(''); });
+const landed = await page.waitForFunction(n => document.querySelectorAll('#pane1 .dtab[data-id]').length > n, tabsBefore, { timeout: 5000 }).then(() => true, () => false);
+const dockKept = await page.evaluate(() => ({ same: window.__dtab.isConnected && window.__dtab.dataset.mark === 'kept', tabs: document.querySelectorAll('#pane1 .dtab[data-id]').length }));
+ok(landed && dockKept.same, `...while a real change lands, the new terminal's tab drawn and the ones already there kept (${JSON.stringify({ before: tabsBefore, ...dockKept })})`);
 
 // Focus landing in the dock's terminal gives the dock the keyboard; a press
 // on the page gives it back; shut, the dock keeps its terminal.

@@ -1,5 +1,17 @@
 {
  "about": "uv and a Python 3.12 with pip and venv, for a project's own dependencies: uv venv, then uv pip install -r requirements.txt. The node's own python3 has neither.",
+ "credits": [
+  {
+   "maker": "Astral",
+   "name": "uv"
+  },
+  {
+   "maker": "Python Software Foundation",
+   "name": "Python"
+  }
+ ],
+ "format": 5,
+ "framework": "5.1",
  "label": "Python (uv)",
  "layout": {
   "bin": [
@@ -8,6 +20,7 @@
   "env": {},
   "tool": "bin/uv"
  },
+ "maker": "AerieOS",
  "name": "python",
  "platforms": [
   "linux/amd64"
@@ -15,9 +28,15 @@
  "shipped": {
   "probe": "python",
   "reports": "uv",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "github-asset"
+    },
+    "from": "pin",
+    "sha256": "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5",
+    "version": "0.13.9"
    },
    "download": {
     "bytes": 90000000,
@@ -25,6 +44,7 @@
    },
    "fresh_only": true,
    "kind": "script",
+   "online": "uv downloads the Python 3.12 interpreter from GitHub and checks it against the sha256 uv carries for it",
    "run": [
     "sh",
     "-ec",
@@ -33,12 +53,16 @@
     "{script}",
     "{dir}"
    ],
-   "url": "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz",
+   "url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-x86_64-unknown-linux-gnu.tar.gz",
    "verify": [
     "{dir}/bin/python3.12",
     "-c",
     "import venv, ensurepip"
-   ]
+   ],
+   "version": {
+    "repo": "astral-sh/uv",
+    "resolver": "github-release"
+   }
   },
   "updatable": true
  },

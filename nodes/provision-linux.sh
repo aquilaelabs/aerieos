@@ -10,12 +10,19 @@
 # to make its own machine a node); this box is only ever a Docker host, and
 # keeping it only that is what makes it disposable.
 #
-# Run it inside the VM, once:
+# Run it inside the VM, once, as the Nodes page's Enroll node hands it: the
+# one file that page gives carries this script whole, as the controller's
+# own build ships it, with the controller's address, a token minted for
+# this one enrollment, the pin of the controller's key and the release key
+# the agent is held to, and runs it with them. Nothing is fetched from a
+# branch: the script a node runs is the one its controller's release
+# carries.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/aquilaelabs/aerieos/main/nodes/provision-linux.sh
-#   sudo bash provision-linux.sh --key "ssh-ed25519 AAAA..."
+#   sudo bash THE-FILE-ENROLL-NODE-GAVE
 #
-# With --controller URL --token bbe_… (the Nodes tab mints the token) it also
+# By hand, from a copy of this file out of a release, it sets a machine up
+# as a Docker host alone (--key "ssh-ed25519 AAAA..."), and with
+# --controller URL --token bbe_… (the Nodes tab mints the token) it also
 # enrolls the machine as a node: the agent is fetched from the controller and
 # left running under systemd, dialing out.
 #
@@ -45,14 +52,34 @@ SESSION_GID=100
 SSH_KEY=""
 CONTROLLER=""
 TOKEN=""
-STORE_DATA=/var/lib/builderbot/data
-STORE_TOOLCHAINS=/var/lib/builderbot/toolchains
-STORE_CACHE=/var/lib/builderbot/cache
-STORE_ARTIFACTS=/var/lib/builderbot/artifacts
+# AerieOS's release key, as the Enroll script carries it: pinned by the agent
+# at enrollment, after which the node takes only agent updates signed by it.
+RELEASE_KEY=""
+# What the controller's https is held to, as the Enroll script carries it:
+# the pin of the controller's own key (sha256// and base64, curl's
+# --pinnedpubkey form), or `ca` for a hostname whose certificate the
+# system's authorities vouch for. CTL_KEY is the first kind alone: every
+# fetch from the controller below is made under it (-k leaves the
+# authorities out, which a certificate the controller made itself would
+# fail, and the pinned key is still held), and the agent pins the same.
+CONTROLLER_PIN=""
+CTL_KEY=""
+# What the agent that arrives is held to before any of it runs, as the Enroll
+# script carries them too: the digest of the agent the controller shipped
+# when the script was made, and the release's signature over that digest
+# where the controller's build has one (agent_proved, below).
+AGENT_DIGEST=""; AGENT_SIG=""
+# A release key, or the key and its spare after a comma: in a variable, since
+# the bash a Mac ships reads a pattern with parentheses only from one.
+RELEASE_KEYS_RE='^[0-9a-f]{64}(,[0-9a-f]{64})?$'
+STORE_DATA=/var/lib/aerieos/data
+STORE_TOOLCHAINS=/var/lib/aerieos/toolchains
+STORE_CACHE=/var/lib/aerieos/cache
+STORE_ARTIFACTS=/var/lib/aerieos/artifacts
 # What a dev instance KEEPS on this node: its databases, its uploads, the
 # caches its containers write. A store like the other four (R17 step 2), so
 # the node reports its headroom and the Storage section edits it here.
-STORE_APPDATA=/var/lib/builderbot/appdata
+STORE_APPDATA=/var/lib/aerieos/appdata
 # --remove and its --yes, off unless asked; read before the checks run.
 REMOVE=0; YES=""
 declare -a SHARES=() NFS=()
@@ -160,6 +187,23 @@ it, which is a paste rather than a questionnaire.
                        opened for it. It runs jobs as the docker account
                        (--user, bb), never as root. Re-run with a fresh token to enroll again; a
                        re-run without either leaves the enrollment alone.
+  --release-key KEY[,SPARE]   AerieOS's release key, and its spare after a
+                       comma, 64 hex characters each: the node pins them as it
+                       enrolls, and from then on takes only an agent update a
+                       release signed, or as its own console allows.
+  --agent-digest sha256:…   what the agent that arrives is held to before any
+  --agent-sig HEX      of it runs: the digest of the agent the controller
+                       shipped when the script or the command was made, and
+                       the release's signature over it, checked under
+                       --release-key. Enroll node puts all three in; without
+                       them the agent is held to the digest the controller
+                       sends with it, and this says what was not checked.
+  --controller-pin PIN   what an https controller is held to: the pin of its
+                       own key (sha256// and base64, as Enroll node gives
+                       it), under which everything here is fetched from it
+                       and which the node pins as it enrolls; or `ca`, for a
+                       hostname whose certificate the system's authorities
+                       vouch for.
   --wg-conf FILE       reach the controller through WireGuard: the config
                        (from the Nodes page's enroll script, which carries
                        it) goes in as wg-quick@bb before anything else, the
@@ -189,7 +233,12 @@ it, which is a paste rather than a questionnaire.
                        ssh), with no public name. --door-close22 drops
                        port 22 from anywhere but the loopback afterwards:
                        off unless asked, since the person running this is
-                       usually on that port.
+                       usually on that port. Either program is installed by
+                       this machine's package manager from a source it
+                       verifies (the vendor's signed repository, or the
+                       distribution's own package), one already installed
+                       is left as it is, and a system with no such source
+                       is told so.
   --firewall           for a hosting-only node (--session-user none): drop
                        everything coming in but 80 and 443, a container's
                        published port included (Docker's ports pass the
@@ -211,7 +260,7 @@ it, which is a paste rather than a questionnaire.
                        and its Features section on the Nodes page installs
                        and removes it later.
   --data PATH          the four stores, all defaulting under
-  --toolchains PATH      /var/lib/builderbot/: a job's working tree and AVDs,
+  --toolchains PATH      /var/lib/aerieos/: a job's working tree and AVDs,
   --cache PATH         the toolchains installed on this node, the build
   --artifacts PATH     caches, and this node's copy of what spaces built
                        (per space underneath, so one VM can be several
@@ -275,6 +324,10 @@ while [ $# -gt 0 ]; do
         --nfs)   NFS+=("$2"); shift 2 ;;
         --controller) CONTROLLER="$2"; shift 2 ;;
         --token) TOKEN="$2"; shift 2 ;;
+        --release-key) RELEASE_KEY="$2"; shift 2 ;;
+        --agent-digest) AGENT_DIGEST="$2"; shift 2 ;;
+        --agent-sig) AGENT_SIG="$2"; shift 2 ;;
+        --controller-pin) CONTROLLER_PIN="$2"; shift 2 ;;
         --wg-conf) WG_CONF="$2"; shift 2 ;;
         --reach) REACH="$2"; shift 2 ;;
         --door) DOOR="$2"; shift 2 ;;
@@ -357,10 +410,345 @@ case "$TOKEN" in
     ""|bbe_*) ;;
     *) echo "that is not an enrollment token (they start bbe_); mint one on the Nodes tab" >&2; exit 1 ;;
 esac
+# What the agent is held to, when given at all: a digest or a signature cut
+# short by a paste is said now, not after an hour of packages.
+if [ -n "$AGENT_DIGEST" ] && ! [[ "$AGENT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "--agent-digest takes sha256: and 64 hex characters, as the Nodes page's Enroll node gives it" >&2; exit 1
+fi
+if [ -n "$AGENT_SIG" ] && ! [[ "$AGENT_SIG" =~ ^[0-9a-f]{128}$ ]]; then
+    echo "--agent-sig takes 128 hex characters, as the Nodes page's Enroll node gives it" >&2; exit 1
+fi
+if [ -n "$RELEASE_KEY" ] && ! [[ "$RELEASE_KEY" =~ $RELEASE_KEYS_RE ]]; then
+    echo "--release-key takes the release key as 64 hex characters, and its spare after a comma" >&2; exit 1
+fi
+# The controller's pin: a key's, or the word for the system's authorities;
+# either way of an https controller, since plain http has nothing to hold.
+if [ -n "$CONTROLLER_PIN" ]; then
+    case "$CONTROLLER" in https://*) ;; *) echo "--controller-pin is what an https controller is held to, and --controller is ${CONTROLLER:-not given}" >&2; exit 1 ;; esac
+    if [[ "$CONTROLLER_PIN" =~ ^sha256//[A-Za-z0-9+/]{43}=$ ]]; then CTL_KEY="$CONTROLLER_PIN"
+    elif [ "$CONTROLLER_PIN" != ca ]; then
+        echo "--controller-pin takes the controller's key as sha256// and 44 base64 characters, as the Nodes page's Enroll node gives it, or ca" >&2; exit 1
+    fi
+fi
 fi   # the options, when run rather than sourced
 
 say() { printf '\n== %s\n' "$*"; }
 warn() { printf '\n!! %s\n' "$*" >&2; }
+
+# ---- the agent, checked before it runs --------------------------------------
+#
+# The agent is fetched from the controller and, on a managed node, run as
+# root. What it is held to comes with the Enroll script, which a person
+# signed in to the dashboard made, and never from the answer that carries
+# the agent: --agent-digest is the agent the controller shipped when the
+# script was made, --agent-sig the release's signature over that digest, and
+# --release-key the key the signature is checked under, which the node then
+# pins. A digest read from the same answer as the file says only that the
+# file arrived whole.
+#
+# The signature is Ed25519 over the line "aerieos agent v1" and the digest
+# as sha256: and 64 hex characters (the agent's release.py, tools/
+# sign-agent.py). It is checked with Python's cryptography library, which
+# the agent's own check of its updates uses and a managed node has by the
+# time the agent is fetched (pkg_names pycrypto, installed just before);
+# else with OpenSSL 3's pkeyutl, for a guest whose Python lacks the
+# library. A signature nothing here can check is a refusal, never a pass.
+#
+# All of it is in this file: the Enroll script carries this script alone.
+
+# hex_bytes HEX: those bytes, on stdout. printf's own \xHH, since xxd is
+# vim's and a fresh machine may not have it.
+hex_bytes() {
+    # shellcheck disable=SC2059
+    printf "$(printf '%s' "$1" | sed 's/../\\x&/g')"
+}
+
+# The check with Python's library, as release.verify makes it: KEYS (one, or
+# two after a comma), SIG and DIGEST are its arguments, and it prints ok and
+# the key that signed, bad, or nolib where the library is not there.
+RELEASE_VERIFY_PY='import sys
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:
+    print("nolib")
+    sys.exit(0)
+keys, sig, digest = sys.argv[1:4]
+for key in keys.split(","):
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), b"aerieos agent v1\n" + digest.encode())
+    except (InvalidSignature, ValueError):
+        continue
+    print("ok " + key)
+    break
+else:
+    print("bad")
+'
+
+# release_sig_ok KEYS SIG DIGEST: 0 when SIG is the signature of one of KEYS
+# (the release key, its spare after a comma) over the agent whose digest is
+# DIGEST, and SIG_SAID is the key that signed; 1 when it is not; 2 when
+# nothing on this machine can check one, and SIG_SAID is why.
+SIG_SAID=""
+release_sig_ok() {
+    local keys="$1" sig="$2" digest="$3" out="" key said d
+    SIG_SAID=""
+    [[ "$keys" =~ $RELEASE_KEYS_RE ]] \
+        || { SIG_SAID="the release key is not 64 hex characters, with its spare after a comma"; return 2; }
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { SIG_SAID="there is no digest to check it over"; return 2; }
+    [[ "$sig" =~ ^[0-9a-f]{128}$ ]] || return 1
+    if command -v python3 >/dev/null 2>&1; then
+        # From /, so that nothing in the folder this was run from is imported
+        # in the library's place.
+        out="$(cd / && python3 -c "$RELEASE_VERIFY_PY" "$keys" "$sig" "$digest" 2>/dev/null || true)"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    if command -v openssl >/dev/null 2>&1 && command -v base64 >/dev/null 2>&1; then
+        d="$(mktemp -d)"
+        printf 'aerieos agent v1\n%s' "$digest" > "$d/msg"
+        hex_bytes "$sig" > "$d/sig"
+        out=""
+        for key in ${keys//,/ }; do
+            # The key as OpenSSL reads one: Ed25519's fixed twelve bytes of
+            # SubjectPublicKeyInfo, then the key's own thirty-two.
+            { printf -- '-----BEGIN PUBLIC KEY-----\n'
+              hex_bytes "302a300506032b6570032100${key}" | base64
+              printf -- '-----END PUBLIC KEY-----\n'; } > "$d/pub"
+            said="$(openssl pkeyutl -verify -pubin -inkey "$d/pub" -rawin -in "$d/msg" -sigfile "$d/sig" 2>&1 || true)"
+            case "$said" in
+                *"Signature Verified Successfully"*) out="ok $key"; break ;;
+                *"Signature Verification Failure"*) out=bad ;;
+            esac
+        done
+        rm -rf "$d"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    SIG_SAID="its python3 has no cryptography library, and it has no OpenSSL 3 to check one with either"
+    return 2
+}
+
+# pinned_at URL PIN: where a fetch from the controller dials. Held to its
+# key (PIN), it sends no server name, as the node's agent does: a name the
+# controller holds a public certificate for (Let's Encrypt) is answered with
+# that certificate, whose key is not the one pinned. So the URL's host name
+# is replaced by its address (PIN_URL) and said as the Host header instead
+# (PIN_HOST, curl's words for it); with no pin, or a URL that names an
+# address already, PIN_URL is URL and PIN_HOST is empty.
+pinned_at() {
+    local url="$1" pin="$2" scheme rest hostport host port path addr
+    PIN_URL="$url"; PIN_HOST=()
+    [ -n "$pin" ] || return 0
+    scheme="${url%%://*}"; rest="${url#*://}"
+    hostport="${rest%%/*}"; path="${rest#"$hostport"}"
+    host="${hostport%:*}"; port="${hostport#"$host"}"
+    [ "$host" != "$hostport" ] || port=""
+    case "$host" in ""|\[*|*[!A-Za-z0-9.-]*) return 0 ;; esac
+    [[ "$host" =~ ^[0-9.]+$ ]] && return 0
+    addr="$(getent ahosts "$host" 2>/dev/null | awk 'NR == 1 { print $1 }')" || addr=""
+    [ -n "$addr" ] || return 0
+    case "$addr" in *:*) addr="[$addr]" ;; esac
+    PIN_URL="${scheme}://${addr}${port}${path}"
+    PIN_HOST=(-H "Host: ${hostport}")
+}
+
+# agent_sent HEADERS NAME: what the controller's answer says under NAME
+# (x-agent-digest, x-agent-sig), from the headers curl kept; nothing for none.
+agent_sent() {
+    tr -d '\r' < "$1" | awk -v n="$2:" 'tolower($1) == n { v = $2 } END { print v }'
+}
+
+# agent_proved FILE SENT: whether the agent that arrived in FILE is the one
+# to run, said either way. SENT is the digest the controller's answer names.
+# Held to the digest the script carries where it carries one, and to SENT
+# otherwise, with that said: an Enroll script from an older controller, and
+# a command somebody saved, carry none. No digest at all, and nothing
+# arriving, is a refusal: an empty file ran as an empty script, said
+# nothing, exited 0, and the node never enrolled (11 Oct). Then the
+# signature, where one came: under the release key, before any of the agent
+# runs, and refused when it is not that key's or cannot be checked here.
+agent_proved() {
+    local file="$1" sent="$2" got want rc=0
+    got="sha256:$(sha256sum "$file" | cut -d' ' -f1)"
+    want="${AGENT_DIGEST:-$sent}"
+    if [ -z "$want" ] || [ ! -s "$file" ]; then
+        warn "what ${CONTROLLER} sent for the agent is not AerieOS's ($(stat -c %s "$file" 2>/dev/null || echo 0) bytes, ${want:-no digest}): the address does not reach the controller's agent API"
+        return 1
+    fi
+    if [ "$got" != "$want" ] && [ -n "$AGENT_DIGEST" ]; then
+        warn "the agent that arrived (${got}) is not the one this enrollment was made for (${AGENT_DIGEST}), so none of it was run. Either the controller was updated after the script or the command was made, or something other than the controller answered: make a new one on the Nodes page (Enroll node)"
+        return 1
+    elif [ "$got" != "$want" ]; then
+        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
+        return 1
+    fi
+    if [ -n "$AGENT_SIG" ]; then
+        if [ -z "$RELEASE_KEY" ]; then
+            warn "a signature for the agent came (--agent-sig) with no release key to check it under (--release-key), so none of the agent was run: use the script or the command as the Nodes page gave it"
+            return 1
+        fi
+        release_sig_ok "$RELEASE_KEY" "$AGENT_SIG" "$got" || rc=$?
+        case "$rc" in
+            0) printf '   the agent is %s, the one this enrollment was made for, signed by %s (%s…)\n' "${got:7:12}" \
+                   "$([ "$SIG_SAID" = "${RELEASE_KEY%%,*}" ] && echo "AerieOS's release key" || echo "the spare of AerieOS's release key")" "${SIG_SAID:0:16}" ;;
+            1) warn "the signature that came for the agent is not the release key's (${RELEASE_KEY:0:16}…), so none of the agent was run: nothing says an AerieOS release built it. Make a new script on the Nodes page (Enroll node)"
+               return 1 ;;
+            *) warn "a release signature came for the agent and this machine cannot check one (${SIG_SAID}), so none of the agent was run"
+               return 1 ;;
+        esac
+    elif [ -n "$AGENT_DIGEST" ]; then
+        printf '   the agent is %s, the one this enrollment was made for. No release signature came with it: the build this controller runs carries none (one made outside the release build, from a branch), so nothing says an AerieOS release built this agent.\n' "${got:7:12}"
+        [ -z "$RELEASE_KEY" ] || printf '   The node pins the release key all the same: it takes a later agent update only when a release signed it, or when its own console allows unsigned ones (the agent, with: unsigned on).\n'
+    else
+        printf '   the agent is %s, by the digest the controller sent with it and nothing else: this script or command carries no digest and no signature for it (an older controller made it, or it was saved from one). A new one from the Nodes page carries both.\n' "${got:7:12}"
+    fi
+    [ -n "$RELEASE_KEY" ] || printf '   No release key came with this enrollment, so the node pins none it did not hold already, and takes agent updates on the word of its controller.\n'
+    return 0
+}
+
+# The node's own record, which its agent keeps: what it enrolled as, and what
+# it pinned at its console.
+NODE_RECORD=/etc/aerieos/node.json
+
+# agent_pinned: every key this node trusts, commas between: the release key
+# it pinned, its spare, and the keys added at its console (the agent's
+# release.trusted); "none" for a node that trusts none, and nothing at all
+# where that cannot be read, which is not the same thing and is not taken
+# for it. Asked of the installed agent, with the verb its console shows
+# them by (release-key), and read from the record it keeps where no agent
+# is left to ask: a node that trusts only a key added at its console is a
+# node that pinned one.
+agent_pinned() {
+    local said keys
+    if [ -x "$AGENT" ] && said="$("$AGENT" release-key 2>/dev/null)"; then
+        keys="$(printf '%s\n' "$said" | sed -n -E 's/^(release key|spare key|added here):[[:space:]]+([0-9a-f]{64})$/\2/p' | paste -sd, -)"
+        if [ -n "$keys" ]; then printf '%s\n' "$keys"; return 0; fi
+        case "$said" in "release key: none pinned"*) printf 'none\n'; return 0 ;; esac
+    fi
+    python3 -c 'import json, re, sys
+d = json.load(open(sys.argv[1]))
+also = d.get("release_also") if isinstance(d.get("release_also"), list) else []
+keys = [str(k or "").strip().lower() for k in [d.get("release_key"), d.get("release_spare"), *also]]
+keys = list(dict.fromkeys(k for k in keys if re.fullmatch("[0-9a-f]{64}", k)))
+print(",".join(keys) or "none")' "$NODE_RECORD" 2>/dev/null || true
+}
+
+# node_record_set KEY VALUE: one thing this script writes into an enrolled
+# node's record on a later run, session-user NAME or tunnel ADDR, written
+# the way the agent saves the record: by the agent's own verb (record),
+# under its lock and in one step, and kept by a running agent's next save.
+# An agent from before the verb is not asked: the record is then written
+# here under the same lock, beside itself and renamed. It prints "changed"
+# when the record moved.
+node_record_set() {
+    if [ -x "$AGENT" ] && "$AGENT" record "$1" "$2" 2>/dev/null; then return 0; fi
+    python3 - "$NODE_RECORD" "$1" "$2" <<'PY'
+import fcntl, json, os, sys, tempfile
+path, what, value = sys.argv[1:4]
+key = {"session-user": "session_user", "tunnel": "tunnel"}[what]
+want = ({"kind": "wireguard", "iface": "bb", "addr": value} if what == "tunnel" else value) or None
+d = os.path.dirname(path)
+with open(os.path.join(d, ".node.json.lock"), "a") as held:
+    fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+    with open(path) as f:
+        cur = json.load(f)
+    if (cur.get(key) or None) != want:
+        if want:
+            cur[key] = want
+        else:
+            cur.pop(key, None)
+        fd, tmp = tempfile.mkstemp(prefix=".node.json.", dir=d)
+        with os.fdopen(fd, "w") as f:
+            os.fchmod(f.fileno(), 0o600)
+            json.dump(cur, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        print("changed")
+PY
+}
+
+# agent_swap NEW SENT SIG: a newer agent, fetched on a run after the
+# enrollment, put in the installed one's place or left out of it, and said
+# either way. NEW is the file, SENT the digest and SIG the release's
+# signature as the controller's answer named them.
+#
+# The node pinned its release key so that an update is not the controller's
+# word, and this is an update: the installed agent is asked, with the verb
+# it answers at the console (check-update FILE [SIG]: why, and 0 when this
+# node may install it, 77 when it refuses, nothing changed either way), and
+# on 77 the installed agent stays, with its words. Swapping the file in on
+# the digest alone was a way around the pin for anyone the controller's
+# answer could be made by.
+#
+# Any other answer is no answer: an agent from before the verb says unknown
+# command and exits 64, and a machine that lost its agent and kept its
+# record has none to ask (B669). Then the node's record says what it
+# pinned. With no key pinned the agent goes in on the digest, as it always
+# did. With one pinned, this script makes the check itself, the signature
+# under the pinned key (release_sig_ok), and the agent goes in only when
+# that passes: a node that pinned a key is never handed an agent nothing
+# checked. What its console allows of unsigned builds is the agent's own to
+# weigh, so here such a node keeps the agent it has and is told the two
+# ways on: Update agent on its row, which the running agent decides, and
+# Enroll script on its row where no agent is left.
+agent_swap() {
+    local new="$1" sent="$2" sig="$3" got have said="" rc=0 pinned="" why=""
+    got="sha256:$(sha256sum "$new" | cut -d' ' -f1)"
+    have="sha256:$( { sha256sum "$AGENT" 2>/dev/null || echo none; } | cut -d' ' -f1)"
+    if [ -z "$sent" ] || [ ! -s "$new" ]; then
+        warn "what the controller sent for the agent is not AerieOS's ($(stat -c %s "$new" 2>/dev/null || echo 0) bytes, no digest); leaving the installed one"
+        rm -f "$new"; return 0
+    elif [ "$sent" != "$got" ]; then
+        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${sent}); leaving the installed one"
+        rm -f "$new"; return 0
+    elif [ "$got" = "$have" ]; then
+        say "agent: already current (${got:7:12})"
+        rm -f "$new"; return 0
+    fi
+    [[ "$sig" =~ ^[0-9a-f]{128}$ ]] || sig=""
+    if [ -x "$AGENT" ]; then
+        said="$("$AGENT" check-update "$new" ${sig:+"$sig"} 2>&1)" || rc=$?
+    else
+        rc=127
+    fi
+    case "$rc" in
+        0) ;;
+        77) warn "agent: this node refuses the newer agent (${got:7:12}) and keeps the one it has (${have:7:12}). ${said}"
+            rm -f "$new"; return 0 ;;
+        *)  pinned="$(agent_pinned)"
+            if [ "$pinned" = none ]; then
+                said="no release key is pinned on this node, so it was taken on the digest the controller sent"
+            else
+                rc=0
+                if [ -z "$pinned" ]; then
+                    rc=2; SIG_SAID="${NODE_RECORD} could not be read for what this node pinned"
+                else
+                    release_sig_ok "$pinned" "$sig" "$got" || rc=$?
+                fi
+                case "$rc" in
+                    0) said="signed by the release key this node pinned (${SIG_SAID:0:16}…); checked by this script, since the installed agent could not be asked" ;;
+                    1) [ -n "$sig" ] && why="the signature the controller sent with it is not the pinned key's (${pinned:0:16}…)" \
+                           || why="the controller sent no release signature with it (its build carries none)" ;;
+                    *) why="this machine cannot check a signature: ${SIG_SAID}" ;;
+                esac
+                if [ -n "$why" ]; then
+                    warn "agent: the newer agent (${got:7:12}) is left out, and the one installed (${have:7:12}) stays. The installed agent could not be asked whether this node takes it (it is from before it could answer, or it is not there), and this node pinned a release key, so this script checked instead: ${why}. Update agent on the node's row asks the running agent, which decides as this machine's console allows; where no agent is left here, Enroll script on its row enrolls the machine again"
+                    rm -f "$new"; return 0
+                fi
+            fi ;;
+    esac
+    chmod 755 "$new"; mv -f "$new" "$AGENT"
+    svc_restart aerieos-agent 2>/dev/null || true
+    say "agent: updated ${have:7:12} -> ${got:7:12} and restarted"
+    [ -z "$said" ] || printf '   %s\n' "$said"
+    return 0
+}
 
 # ---- a GUEST node: somebody's own machine (roadmap R23) ---------------------
 #
@@ -430,12 +818,12 @@ guest_run() {
     say "the footprint: $foot"
     mkdir -p "$foot/bin" "$foot/log" "$foot/runner"
     chmod 700 "$foot"
-    # The four store paths default to /var/lib/builderbot for the MANAGED
+    # The four store paths default to /var/lib/aerieos for the MANAGED
     # shape, which a guest has no root to make and no business making. So a
     # guest keeps them in the footprint unless a flag actually named one,
     # which is what the _SET vars are for: `${STORE_X:-...}` never falls back
     # here, because the default is not empty. Found by running this for real,
-    # where the agent said it could not create /var/lib/builderbot/artifacts.
+    # where the agent said it could not create /var/lib/aerieos/artifacts.
     local s_data s_cache s_art s_app
     s_data="${STORE_DATA_SET:+$STORE_DATA}";           s_data="${s_data:-$foot/data}"
     s_cache="${STORE_CACHE_SET:+$STORE_CACHE}";        s_cache="${s_cache:-$foot/cache}"
@@ -447,19 +835,20 @@ guest_run() {
     node_json="$foot/node.json"
 
     say "the agent, from ${CONTROLLER}"
-    local hdr want got
+    local hdr want
     hdr="$(mktemp)"
-    curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
-         "${CONTROLLER%/}/api/v1/agent/download" -o "${agent}.new" \
+    # Tried again on a transient answer: a stick's first boot asks its own
+    # dashboard the moment it answers at all, and once got a 500 (B747).
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+         "${PIN_URL%/}/api/v1/agent/download" -o "${agent}.new" \
         || { warn "could not download the agent from ${CONTROLLER}: is that the dashboard's address, and is the token unused?"
              rm -f "$hdr" "${agent}.new"; exit 1; }
-    want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-    got="sha256:$(sha256sum "${agent}.new" | cut -d' ' -f1)"
+    # Held to what the script carries before any of it runs (agent_proved);
+    # an answer with no digest was taken as it came here, and is refused.
+    want="$(agent_sent "$hdr" x-agent-digest)"
     rm -f "$hdr"
-    if [ -n "$want" ] && [ "$want" != "$got" ]; then
-        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
-        rm -f "${agent}.new"; exit 1
-    fi
+    agent_proved "${agent}.new" "$want" || { rm -f "${agent}.new"; exit 1; }
     chmod 755 "${agent}.new"; mv -f "${agent}.new" "$agent"
 
     # Enrolled as this account, with every store under the footprint unless a
@@ -469,6 +858,7 @@ guest_run() {
     systemctl --user stop "$GUEST_UNIT_NAME" 2>/dev/null || true
     BUILDERBOT_NODE_JSON="$node_json" python3 "$agent" enroll \
         --controller "$CONTROLLER" --token "$TOKEN" --user "$(id -un)" \
+        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} ${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"} \
         --store "data=$s_data" --store "toolchains=$toolchains" \
         --store "cache=$s_cache" --store "artifacts=$s_art" \
         --store "appdata=$s_app" \
@@ -758,6 +1148,82 @@ EOF
     esac
 }
 
+# --- AerieOS's own names on a machine provisioned before it had them (R204) --
+# /etc/builderbot, /var/lib/builderbot and the builderbot-agent service
+# become /etc/aerieos, /var/lib/aerieos and aerieos-agent here, by a person
+# running this script on the machine, and nowhere else: an agent whose
+# node.json moved from under it cannot be reached to be told where it went,
+# so nothing moves on an agent's own update (its names.py only adds links).
+#
+# Each folder is renamed in place and the old name left as a link to it, so
+# every path a record still holds under the old name (a store in node.json,
+# a container's bind, a session's environment) goes on resolving, and what
+# is running keeps the files it has open. A folder that will not move (a
+# mount of its own, something mounted inside it) stays, with the new name a
+# link to it: both names answer either way, and the run goes on.
+names_move() {
+    local new old
+    for pair in /etc/aerieos:/etc/builderbot /var/lib/aerieos:/var/lib/builderbot; do
+        new="${pair%%:*}" old="${pair##*:}"
+        [ -d "$old" ] && [ ! -L "$old" ] || continue
+        # The link an agent or the tool added so the new name answers.
+        if [ -L "$new" ]; then rm -f "$new"; fi
+        if [ -e "$new" ]; then
+            warn "$new and $old are both here: left as they are, $new is used"
+            continue
+        fi
+        # Where VMs keep their disks under it, the folder stays: libvirt and
+        # its confinement hold each disk by the path it was defined with.
+        if [ "$old" = /var/lib/builderbot ] && [ -n "$(ls -A "$old/vms/disks" 2>/dev/null)" ]; then
+            ln -s "$old" "$new"
+            say "$old holds VMs' disks, defined by that path, so it stays; $new is a link to it"
+            continue
+        fi
+        if mv -T "$old" "$new" 2>/dev/null; then
+            ln -s "$new" "$old"
+            say "$old is $new now (the old name is a link to it)"
+        else
+            ln -s "$old" "$new"
+            warn "$old could not be renamed (a mount of its own, or one inside it): it stays, and $new is a link to it"
+        fi
+    done
+}
+
+# The service and the command under the old name, once the new ones are in
+# place: the old unit stopped and taken off, what was dropped in beside it
+# carried over, and builderbot-agent left as a command that runs the agent.
+names_old_service() {
+    local old=builderbot-agent new=aerieos-agent u
+    [ -e "/etc/systemd/system/${old}.service" ] || [ -e "/etc/init.d/${old}" ] || [ -d "/etc/sv/${old}" ] \
+        || [ -e /etc/systemd/system/builderbot-session-ports.service ] || [ -e /etc/local.d/builderbot-session-ports.start ] \
+        || [ -e "/usr/local/sbin/${old}" ] || return 0
+    case "$INIT" in
+        systemd)
+            if [ -d "/etc/systemd/system/${old}.service.d" ] && [ ! -e "/etc/systemd/system/${new}.service.d" ]; then
+                mv "/etc/systemd/system/${old}.service.d" "/etc/systemd/system/${new}.service.d"
+            fi
+            for u in "$old" builderbot-session-ports; do
+                [ -e "/etc/systemd/system/${u}.service" ] || continue
+                systemctl disable --now "$u" >/dev/null 2>&1 || true
+                rm -f "/etc/systemd/system/${u}.service"
+            done
+            systemctl daemon-reload ;;
+        openrc)
+            rc-service "$old" stop >/dev/null 2>&1 || true
+            rc-update del "$old" default >/dev/null 2>&1 || true
+            [ -e "/etc/conf.d/${old}" ] && [ ! -e "/etc/conf.d/${new}" ] && mv "/etc/conf.d/${old}" "/etc/conf.d/${new}"
+            rm -f "/etc/init.d/${old}" /etc/local.d/builderbot-session-ports.start ;;
+        runit)
+            sv stop "$old" >/dev/null 2>&1 || true
+            rm -f "/var/service/${old}"; rm -rf "/etc/sv/${old}" ;;
+    esac
+    # The old command, for whoever types it and for what still names it.
+    if [ -e "/usr/local/sbin/${new}" ] && { [ ! -e "/usr/local/sbin/${old}" ] || ! grep -q "exec /usr/local/sbin/${new}" "/usr/local/sbin/${old}" 2>/dev/null; }; then
+        printf '#!/bin/sh\n# The agent under the name it had before: aerieos-agent, as installed.\nexec /usr/local/sbin/%s "$@"\n' "$new" > "/usr/local/sbin/${old}"
+        chmod 0755 "/usr/local/sbin/${old}"
+    fi
+}
+
 # pkg_refresh, pkg and pkg_names are the family's (nodes/families/*.sh),
 # sourced below once the machine's family is known.
 
@@ -864,10 +1330,11 @@ if command -v curl >/dev/null 2>&1; then
         # closed port 22 for a door and then could not enroll, and the
         # person came back in through the KVM. Nothing below is worth doing
         # when the controller cannot be reached.
-        if curl -fsk --max-time 10 -o /dev/null "${CONTROLLER%/}/api/v1/agent/download" 2>/dev/null \
-           || curl -sk --max-time 10 -o /dev/null -w '%{http_code}' "${CONTROLLER%/}/" 2>/dev/null | grep -q '^[234]'; then
+        pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+        if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --max-time 10 -o /dev/null "${PIN_URL%/}/api/v1/agent/download" 2>/dev/null \
+           || curl -sk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --max-time 10 -o /dev/null -w '%{http_code}' "${PIN_URL%/}/" 2>/dev/null | grep -q '^[234]'; then
             chk ok "controller: ${CONTROLLER} answers"
-        else chk fail "controller ${CONTROLLER} does not answer from here, so enrollment would fail: check the address and that the dashboard is up"; fi
+        else chk fail "controller ${CONTROLLER} does not answer from here${CTL_KEY:+ under the key this enrollment carries}, so enrollment would fail: check the address and that the dashboard is up"; fi
     fi
 else
     chk warn "no curl yet; it is installed below, and the network is untested until then"
@@ -891,6 +1358,126 @@ case "$VETTED_FAMILIES" in
             exit 1
         fi ;;
 esac
+}
+
+# docker_key KIND: the key Docker signs its packages with, armored, as this
+# file carries it: `deb` for its apt repositories (Debian's and Ubuntu's are
+# signed with one key), `rpm` for its rpm ones (CentOS's, Fedora's and RHEL's
+# with another). A family that adds Docker's own source (docker_install, in
+# the family's file) hands the package manager this copy and never one
+# fetched while installing: a key that arrives with the packages it is to
+# check holds them to nothing. Docker changing a key is a change to this
+# file. Each as Docker served it over https on 20 Nov 2026, at the address
+# its install instructions name, with the fingerprint those instructions
+# state:
+#   deb  Docker Release (CE deb) <docker@docker.com>
+#        9DC8 5822 9FC7 DD38 854A  E2D8 8D81 803C 0EBF CD88
+#        https://download.docker.com/linux/ubuntu/gpg, the same bytes as
+#        https://download.docker.com/linux/debian/gpg
+#   rpm  Docker Release (CE rpm) <docker@docker.com>
+#        060A 61C5 1B55 8A7F 742B  77AA C52F EB6B 621E 9F35
+#        https://download.docker.com/linux/centos/gpg, the same bytes as
+#        the fedora and rhel ones
+docker_key() {
+    case "$1" in
+        deb) cat <<'DOCKERKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+YT90qFF93M3v01BbxP+EIY2/9tiIPbrd
+=0YYh
+-----END PGP PUBLIC KEY BLOCK-----
+DOCKERKEY
+            ;;
+        rpm) cat <<'DOCKERKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBFit5IEBEADDt86QpYKz5flnCsOyZ/fk3WwBKxfDjwHf/GIflo+4GWAXS7wJ
+1PSzPsvSDATV10J44i5WQzh99q+lZvFCVRFiNhRmlmcXG+rk1QmDh3fsCCj9Q/yP
+w8jn3Hx0zDtz8PIB/18ReftYJzUo34COLiHn8WiY20uGCF2pjdPgfxE+K454c4G7
+gKFqVUFYgPug2CS0quaBB5b0rpFUdzTeI5RCStd27nHCpuSDCvRYAfdv+4Y1yiVh
+KKdoe3Smj+RnXeVMgDxtH9FJibZ3DK7WnMN2yeob6VqXox+FvKYJCCLkbQgQmE50
+uVK0uN71A1mQDcTRKQ2q3fFGlMTqJbbzr3LwnCBE6hV0a36t+DABtZTmz5O69xdJ
+WGdBeePCnWVqtDb/BdEYz7hPKskcZBarygCCe2Xi7sZieoFZuq6ltPoCsdfEdfbO
++VBVKJnExqNZCcFUTEnbH4CldWROOzMS8BGUlkGpa59Sl1t0QcmWlw1EbkeMQNrN
+spdR8lobcdNS9bpAJQqSHRZh3cAM9mA3Yq/bssUS/P2quRXLjJ9mIv3dky9C3udM
++q2unvnbNpPtIUly76FJ3s8g8sHeOnmYcKqNGqHq2Q3kMdA2eIbI0MqfOIo2+Xk0
+rNt3ctq3g+cQiorcN3rdHPsTRSAcp+NCz1QF9TwXYtH1XV24A6QMO0+CZwARAQAB
+tCtEb2NrZXIgUmVsZWFzZSAoQ0UgcnBtKSA8ZG9ja2VyQGRvY2tlci5jb20+iQI3
+BBMBCgAhBQJYrep4AhsvBQsJCAcDBRUKCQgLBRYCAwEAAh4BAheAAAoJEMUv62ti
+Hp816C0P/iP+1uhSa6Qq3TIc5sIFE5JHxOO6y0R97cUdAmCbEqBiJHUPNQDQaaRG
+VYBm0K013Q1gcJeUJvS32gthmIvhkstw7KTodwOM8Kl11CCqZ07NPFef1b2SaJ7l
+TYpyUsT9+e343ph+O4C1oUQw6flaAJe+8ATCmI/4KxfhIjD2a/Q1voR5tUIxfexC
+/LZTx05gyf2mAgEWlRm/cGTStNfqDN1uoKMlV+WFuB1j2oTUuO1/dr8mL+FgZAM3
+ntWFo9gQCllNV9ahYOON2gkoZoNuPUnHsf4Bj6BQJnIXbAhMk9H2sZzwUi9bgObZ
+XO8+OrP4D4B9kCAKqqaQqA+O46LzO2vhN74lm/Fy6PumHuviqDBdN+HgtRPMUuao
+xnuVJSvBu9sPdgT/pR1N9u/KnfAnnLtR6g+fx4mWz+ts/riB/KRHzXd+44jGKZra
+IhTMfniguMJNsyEOO0AN8Tqcl0eRBxcOArcri7xu8HFvvl+e+ILymu4buusbYEVL
+GBkYP5YMmScfKn+jnDVN4mWoN1Bq2yMhMGx6PA3hOvzPNsUoYy2BwDxNZyflzuAi
+g59mgJm2NXtzNbSRJbMamKpQ69mzLWGdFNsRd4aH7PT7uPAURaf7B5BVp3UyjERW
+5alSGnBqsZmvlRnVH5BDUhYsWZMPRQS9rRr4iGW0l+TH+O2VJ8aQ
+=0Zqq
+-----END PGP PUBLIC KEY BLOCK-----
+DOCKERKEY
+            ;;
+        *) return 2 ;;
+    esac
 }
 
 # docker_suite: which suite of Docker's repository to ask for. Normally this
@@ -921,6 +1508,9 @@ if [ "${BB_PROVISION_LIB:-0}" = 1 ]; then
 fi
 
 preflight
+if [ "$CHECK_ONLY" != 1 ] && [ "$(id -u)" = 0 ]; then
+    names_move
+fi
 if [ "$CHECK_ONLY" = 1 ]; then
     printf '\n   %s can be provisioned by this script' "${PRETTY_NAME:-$ID}"
     [ "${#WARNINGS[@]}" -eq 0 ] && printf '.\n' || printf ', with %d warning(s) above.\n' "${#WARNINGS[@]}"
@@ -969,8 +1559,9 @@ if [ -n "$WG_CONF" ]; then
     # Through the tunnel or not at all: any HTTP answer is the controller
     # answering. A handshake can take a few seconds after the interface.
     reached=""
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
     for _ in $(seq 1 15); do
-        code="$(curl -s -o /dev/null -m 4 -w '%{http_code}' "${CONTROLLER%/}/api/v1/agent/download" || true)"
+        code="$(curl -s ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} -o /dev/null -m 4 -w '%{http_code}' "${PIN_URL%/}/api/v1/agent/download" || true)"
         case "$code" in 000|"") sleep 2 ;; *) reached=1; break ;; esac
     done
     if [ -z "$reached" ]; then
@@ -1019,16 +1610,163 @@ fi
 # never into node.json; a re-run without the secret file leaves a door that
 # is already installed as it is.
 door_secret() { [ -n "$DOOR_SECRET" ] && [ -r "$DOOR_SECRET" ] && tr -d '\r\n' < "$DOOR_SECRET"; }
+# door_key NAME: the key a door's vendor signs its packages with, armored, as
+# this file carries it. A family that installs a door from its vendor's own
+# repository (door_install, in the family's file) hands the package manager
+# this copy and never one fetched while installing: a key that arrives with
+# the packages it is to check holds them to nothing. A vendor that changes
+# its key is a change to this file. Each as its vendor served it over https
+# on 20 Nov 2026:
+#   cloudflared  CloudFlare Software Packaging 2025 <help@cloudflare.com>
+#                CC94 B39C 77AE 7342 A68B  8962 8A68 2D30 8D4E 5E73
+#                https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg, the
+#                armored form of the cloudflare-public-v2.gpg its apt
+#                instructions name
+#   tailscale    Tailscale Inc. (Package repository signing key) <info@tailscale.com>
+#                2596 A99E AAB3 3821 893C  0A79 458C A832 957F 5868
+#                https://pkgs.tailscale.com/stable/fedora/repo.gpg, the file
+#                its repositories for every distribution name
+door_key() {
+    case "$1" in
+        cloudflared) cat <<'DOORKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+K7vjJOTAR+ty9S7V8cnajnIWAlcTDg4=
+=Gm8h
+-----END PGP PUBLIC KEY BLOCK-----
+DOORKEY
+            ;;
+        tailscale) cat <<'DOORKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBF5UmbgBEADAA5mxC8EoWEf53RVdlhQJbNnQW7fctUA5yNcGUbGGGTk6XFqO
+nlek0Us0FAl5KVBgcS0Bj+VSwKVI/wx91tnAWI36CHeMyPTawdT4FTcS2jZMHbcN
+UMqM1mcGs3wEQmKz795lfy2cQdVktc886aAF8hy1GmZDSs2zcGMvq5KCNPuX3DD5
+INPumZqRTjwSwlGptUZrJpKWH4KvuGr5PSy/NzC8uSCuhLbFJc1Q6dQGKlQxwh+q
+AF4uQ1+bdy92GHiFsCMi7q43hiBg5J9r55M/skboXkNBlS6kFviP+PADHNZe5Vw0
+0ERtD/HzYb3cH5YneZuYXvnJq2/XjaN6OwkQXuqQpusB5fhIyLXE5ZqNlwBzX71S
+779tIyjShpPXf1HEVxNO8TdVncx/7Zx/FSdwUJm4PMYQmnwBIyKlYWlV2AGgfxFk
+mt2VexyS5s4YA1POuyiwW0iH1Ppp9X14KtOfNimBa0yEzgW3CHTEg55MNZup6k2Q
+mRGtRjeqM5cjrq/Ix15hISmgbZogPRkhz/tcalK38WWAR4h3N8eIoPasLr9i9OVe
+8aqsyXefCrziaiJczA0kCqhoryUUtceMgvaHl+lIPwyW0XWwj+0q45qzjLvKet+V
+Q8oKLT1nMr/whgeSJi99f/jE4sWIbHZ0wwR02ZCikKnS05arl3v+hiBKPQARAQAB
+tERUYWlsc2NhbGUgSW5jLiAoUGFja2FnZSByZXBvc2l0b3J5IHNpZ25pbmcga2V5
+KSA8aW5mb0B0YWlsc2NhbGUuY29tPokCTgQTAQgAOBYhBCWWqZ6qszghiTwKeUWM
+qDKVf1hoBQJeVJm4AhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEEWMqDKV
+f1hoWHEP/1DYd9WZrodyV5zy1izvj0FXtUReJi374gDn3cHrG6uYtXcE9HWZhxQD
+6nDgYuey5sBhLvPQiE/sl5GYXNw/O95XVk8HS54BHCCYq1GeYkZaiCGLGFBA08JK
+7PZItGsfdJHwHfhSMtGPS7Cpmylje9gh8ic56NAhC7c5tGTlD69Y8zGHjnRQC6Hg
+wF34jdp8JTQpSctpmiOxOXN+eH8N59zb0k30CUym1Am438AR0PI6RBTnubBH+Xsc
+eQhLJnmJ1bM6GP4agXw5T1G/qp95gjIddHXzOkEvrpVfJFCtp91VIlBwycspKYVp
+1IKAdPM6CVf/YoDkawwm4y4OcmvNarA5dhWBG0Xqse4v1dlYbiHIFcDzXuMyrHYs
+D2Wg8Hx8TD64uBHY0fp24nweCLnaZCckVUsnYjb0A494lgwveswbZeZ6JC5SbDKH
+Tc2SE4jq+fsEEJsqsdHIC04d+pMXI95HinJHU1SLBTeKLvEF8Zuk7RTJyaUTjs7h
+Ne+xWDmRjjR/D/GXBxNrM9mEq6Jvp/ilYTdWwAyrSmTdotHb+NWjAGpJWj5AZCH9
+HeBr2mtVhvTu3KtCQmGpRiR18zMbmemRXUh+IX5hpWGzynhtnSt7vXOvhJdqqc1D
+VennRMQZMb09wJjPcvLIApUMl69r29XmyB59NM3UggK/UCJrpYfmuQINBF5UmbgB
+EADTSKKyeF3XWDxm3x67MOv1Zm3ocoe5xGDRApPkgqEMA+7/mjVlahNXqA8btmwM
+z1BH5+trjOUoohFqhr9FPPLuKaS/pE7BBP38KzeA4KcTiEq5FQ4JzZAIRGyhsAr+
+6bxcKV/tZirqOBQFC7bH2UAHH7uIKHDUbBIDFHjnmdIzJ5MBPMgqvSPZvcKWm40g
+W+LWMGoSMH1Uxd+BvW74509eezL8p3ts42txVNvWMSKDkpiCRMBhfcf5c+YFXWbu
+r5qus2mnVw0hIyYTUdRZIkOcYBalBjewVmGuSIISnUv76vHz133i0zh4JcXHUDqc
+yLBUgVWckqci32ahy3jc4MdilPeAnjJQcpJVBtMUNTZ4KM7UxLmOa5hYwvooliFJ
+wUFPB+1ZwN8d+Ly12gRKf8qA/iL8M5H4nQrML2dRJ8NKzP2U73Fw+n6S1ngrDX8k
+TPhQBq4EDjDyX7SW3Liemj5BCuWJAo53/2cL9P9I5Nu3i2pLJOHzjBSXxWaMMmti
+kopArlSMWMdsGgb0xYX+aSV7xW+tefYZJY1AFJ1x2ZgfIc+4zyuXnHYA2jVYLAfF
+pApqwwn8JaTJWNhny/OtAss7XV/WuTEOMWXaTO9nyNmHla9KjxlBkDJG9sCcgYMg
+aCAnoLRUABCWatxPly9ZlVbIPPzBAr8VN/TEUbceAH0nIwARAQABiQI2BBgBCAAg
+FiEEJZapnqqzOCGJPAp5RYyoMpV/WGgFAl5UmbgCGwwACgkQRYyoMpV/WGji9w/8
+Di9yLnnudvRnGLXGDDF2DbQUiwlNeJtHPHH4B9kKRKJDH1Rt5426Lw8vAumDpBlR
+EeuT6/YQU+LSapWoDzNcmDLzoFP7RSQaB9aL/nJXv+VjlsVH/crpSTTgGDs8qGsL
+O3Y2U1Gjo5uMBoOfXwS8o1VWO/5eUwS0KH7hpbOuZcf9U9l1VD2YpGfnMwX1rnre
+INJqseQAUL3oyNl76gRzyuyQ4AIA06r40hZDgybH0ADN1JtfVk8z4ofo/GcfoXqm
+hifWJa2SwwHeijhdN1T/kG0FZFHs1DBuBYJG3iJ3/bMeL15j1OjncIYIYccdoEUd
+uHnp4+ZYj5kND0DFziTvOC4WyPpv3BlBVariPzEnEqnhjx5RYwMabtTXoYJwUkxX
+2gAjKqh2tXissChdwDGRNASSDrChHLkQewx+SxT5kDaOhB84ZDnp+urn9A+clLkN
+lZMsMQUObaRW68uybSbZSmIWFVM1GovRMgrPG3T6PAykQhFyE/kMFrv5KpPh7jDj
+5JwzQkxLkFMcZDdS43VymKEggxqtM6scIRU55i059fLPAVXJG5in1WhMNsmt49lb
+KqB6je3plIWOLSPuCJ/kR9xdFp7Qk88GCXEd0+4z/vFn4hoOr85NXFtxhS8k9GfJ
+mM/ZfUq7YmHR+Rswe0zrrCwTDdePjGMo9cHpd39jCvc=
+=AIVM
+-----END PGP PUBLIC KEY BLOCK-----
+DOORKEY
+            ;;
+        *) return 1 ;;
+    esac
+}
+# door_fetch NAME: a door's program, from a source this machine's package
+# manager verifies. Which source is the family's to say (door_install, in
+# its file): the vendor's own repository held to door_key, or the
+# distribution's own package. A system with neither is told so and nothing
+# is downloaded: there is no unchecked copy to fall back to, and a door a
+# person installed themselves is left as it is by the callers below.
+door_fetch() {
+    local rc=0
+    DOOR_WHY=""
+    door_install "$1" || rc=$?
+    [ "$rc" != 0 ] || return 0
+    if [ "$rc" = 2 ]; then
+        warn "this system has no verified source for ${1}${DOOR_WHY:+ (${DOOR_WHY})}: install ${1} yourself and run this script again, which leaves an installed door as it is"
+    else
+        warn "${1} did not install from the package source this system verifies it by; what the package manager said is above"
+    fi
+    exit 1
+}
 if [ "$DOOR" = cloudflared ]; then
     say "door: cloudflared, publishing port 22 at ${DOOR_HOST}"
     [ "$INIT" = systemd ] || { warn "cloudflared's service is systemd's, and this machine runs ${INIT:-no init this knows}"; exit 1; }
+    # Installed by the package manager, which is what moves it from here on,
+    # when the machine's packages are updated: the client's own update is
+    # off (--no-autoupdate, below), so no copy sits where nothing moves it.
     if ! command -v cloudflared >/dev/null 2>&1 && [ ! -x /usr/local/bin/cloudflared ]; then
-        case "$(uname -m)" in x86_64) cfarch=amd64 ;; aarch64|arm64) cfarch=arm64 ;; armv7l) cfarch=arm ;; *) warn "no cloudflared build for $(uname -m)"; exit 1 ;; esac
-        # Cloudflare's own release, the latest: the client updates itself
-        # from there too, so pinning here would be the one copy left behind.
-        curl -fsSL -o /usr/local/bin/cloudflared.new "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${cfarch}" \
-            || { warn "could not download cloudflared from its release"; rm -f /usr/local/bin/cloudflared.new; exit 1; }
-        chmod 755 /usr/local/bin/cloudflared.new; mv -f /usr/local/bin/cloudflared.new /usr/local/bin/cloudflared
+        door_fetch cloudflared
     fi
     cfbin="$(command -v cloudflared || echo /usr/local/bin/cloudflared)"
     install -d -m 0700 /etc/cloudflared
@@ -1052,7 +1790,7 @@ if [ "$DOOR" = cloudflared ]; then
 elif [ "$DOOR" = tailscale ]; then
     say "door: Tailscale, this machine on your tailnet with ssh"
     if ! command -v tailscale >/dev/null 2>&1; then
-        curl -fsSL https://tailscale.com/install.sh | sh || { warn "Tailscale did not install"; exit 1; }
+        door_fetch tailscale
     fi
     if [ -n "$(door_secret)" ]; then
         tailscale up --ssh --auth-key="$(door_secret)" || { warn "tailscale up did not join the tailnet: is the auth key still valid?"; exit 1; }
@@ -1166,7 +1904,7 @@ START
             "/etc/local.d/${FENCE}.start"
             # The agent's own cgroup, held to the same number by OpenRC.
             install -d -m 0755 /etc/conf.d
-            printf 'rc_cgroup_settings="memory.max %s"\n' "$max" > /etc/conf.d/builderbot-agent ;;
+            printf 'rc_cgroup_settings="memory.max %s"\n' "$max" > /etc/conf.d/aerieos-agent ;;
         *)
             warn "${INIT} has no cgroups of its own: AerieOS's work is not fenced from the system's memory here"
             return 1 ;;
@@ -1268,16 +2006,16 @@ authorize() {
 say "user ${USER_NAME}"
 # An account here before AerieOS is somebody's own: noted, so Uninstall
 # leaves it and its home where it found them.
-KEPT_ACCOUNTS=/etc/builderbot/kept-accounts
+KEPT_ACCOUNTS=/etc/aerieos/kept-accounts
 keep_account() {
-    install -d -m 0755 /etc/builderbot
+    install -d -m 0755 /etc/aerieos
     grep -qx "$1" "$KEPT_ACCOUNTS" 2>/dev/null || echo "$1" >> "$KEPT_ACCOUNTS"
 }
 # ...and each one this script makes, the moment it makes it: what Uninstall
 # deletes is this list, never a name it guessed (B516).
-MADE_ACCOUNTS=/etc/builderbot/made-accounts
+MADE_ACCOUNTS=/etc/aerieos/made-accounts
 made_account() {
-    install -d -m 0755 /etc/builderbot
+    install -d -m 0755 /etc/aerieos
     grep -qx "$1" "$MADE_ACCOUNTS" 2>/dev/null || echo "$1" >> "$MADE_ACCOUNTS"
 }
 # Never one that is already here and not AerieOS's: an account is
@@ -1285,7 +2023,7 @@ made_account() {
 # ours to do, whatever it is called. A machine already enrolled has made its
 # own, which a run again keeps using.
 if id -u "$USER_NAME" >/dev/null 2>&1; then
-    if [ ! -f /etc/builderbot/node.json ]; then
+    if [ ! -f /etc/aerieos/node.json ]; then
         keep_account "$USER_NAME"
         warn "${USER_NAME} is already an account on this machine, and not one AerieOS made: run again with --user NAME, a name that is not taken (bbjobs, say)"; exit 1
     fi
@@ -1364,7 +2102,7 @@ elif [ "$SESSION_NAME" = "$USER_NAME" ]; then
     warn "--session-user ${SESSION_NAME} is the docker account: a session must not be it"
     printf '   pick a different --session-user, or none\n'
     SESSION_NAME=""
-elif id -u "$SESSION_NAME" >/dev/null 2>&1 && [ ! -f /etc/builderbot/node.json ]; then
+elif id -u "$SESSION_NAME" >/dev/null 2>&1 && [ ! -f /etc/aerieos/node.json ]; then
     # Already an account here, and not one AerieOS made: somebody's, and
     # maybe one that can sudo, which a session never may (a cloud image's own
     # account, R97's walk). Left as it is; sessions wait for another name.
@@ -1427,19 +2165,26 @@ else
     # current under the toolchain store. That is what makes proving the node
     # by hand (ssh in, run bb-tty, run aerie roadmap) the same path the
     # dashboard takes, rather than a second one.
-    cat > /etc/profile.d/builderbot-session.sh <<EOF
-# Written by AerieOS's provision-linux.sh. A session on this node, at a console.
-case "\$(id -un)" in
-    ${SESSION_NAME})
-        export BUILDERBOT_ROLE=node WORKSPACE=/workspace
-        export BB_NODE="\$(hostname)"
-        ${CONTROLLER:+export BB_CONTROLLER="${CONTROLLER%/}"}
-        [ -d "${STORE_TOOLCHAINS}/.bb/current/scripts" ] \\
-            && PATH="${STORE_TOOLCHAINS}/.bb/current/scripts:\$PATH"
-        PATH="\$HOME/.local/bin:\$PATH"
-        ;;
-esac
-EOF
+    # A login shell reads the file, so each value goes into it as one word in
+    # single quotes, and only in its plain shape: an address that is
+    # http(s)://host[:port] alone, a store's path of letters, digits and
+    # . _ / + @ - with no .. part. One of another shape is left out.
+    prof_ctl="${CONTROLLER%/}"; prof_store="$STORE_TOOLCHAINS"
+    [[ "$prof_ctl" =~ ^https?://(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9][A-Za-z0-9.-]*)(:[0-9]{1,5})?$ ]] || prof_ctl=""
+    [[ "$prof_store" =~ ^/[A-Za-z0-9._/+@-]+$ && "/$prof_store/" != */../* ]] || prof_store=""
+    if [[ "$SESSION_NAME" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]]; then
+        # shellcheck disable=SC2016
+        {
+            printf '%s\n' "# Written by AerieOS's provision-linux.sh. A session on this node, at a console." \
+                'case "$(id -un)" in' "    ${SESSION_NAME})" \
+                '        export BUILDERBOT_ROLE=node WORKSPACE=/workspace' \
+                '        export BB_NODE="$(hostname)"'
+            [ -z "$prof_ctl" ] || printf "        export BB_CONTROLLER='%s'\n" "$prof_ctl"
+            [ -z "$prof_ctl" ] || [ -z "$CTL_KEY" ] || printf "        export BB_CONTROLLER_PIN='%s'\n" "$CTL_KEY"
+            [ -z "$prof_store" ] || printf '        [ -d '\''%s/.bb/current/scripts'\'' ] \\\n            && PATH='\''%s/.bb/current/scripts'\'':"$PATH"\n' "$prof_store" "$prof_store"
+            printf '%s\n' '        PATH="$HOME/.local/bin:$PATH"' '        ;;' 'esac'
+        } > /etc/profile.d/builderbot-session.sh
+    fi
 fi
 
 say "bb-sandbox"
@@ -1486,6 +2231,16 @@ cat > "$BBSANDBOX_TMP" <<'BBSANDBOX'
 # `gpu` installs the NVIDIA driver and a headless X server on the card, so
 # an emulator here renders on it (R20); `gpu-display` is that server's unit.
 set -euo pipefail
+
+# AerieOS's own names (R204), made to answer on a machine that still has the
+# folders under the name before: a link for each, added, nothing moved (the
+# Enroll script is what makes them the folders themselves).
+for pair in /etc/aerieos:/etc/builderbot /var/lib/aerieos:/var/lib/builderbot; do
+    new="${pair%%:*}" old="${pair##*:}"
+    if [ "$(id -u)" = 0 ] && [ -d "$old" ] && [ ! -L "$old" ] && [ ! -e "$new" ] && [ ! -L "$new" ]; then
+        ln -s "$old" "$new" 2>/dev/null || true
+    fi
+done
 
 CONF=/etc/bb-sandbox.conf
 # shellcheck source=/dev/null
@@ -1545,7 +2300,7 @@ fstab_line() {
 # list of where the stores are (the agent's node.json), and this reads it
 # rather than keeping a copy. A store repointed from the dashboard is
 # visible here on the next command, with nothing to keep in step.
-NODE_JSON=/etc/builderbot/node.json
+NODE_JSON=/etc/aerieos/node.json
 stores_under() {
     [ -r "$NODE_JSON" ] || return 0
     python3 - "$NODE_JSON" "$1" <<'PY' 2>/dev/null || true
@@ -2059,7 +2814,7 @@ EOF
 # What goes is in three rings (the operator, 11 Oct), the first always and
 # the other two asked for: --stores takes the stores on this disk (the
 # toolchains, the caches, the artifacts, a dev instance's data, the synced
-# project copies) and /var/lib/builderbot; --configured undoes what was set
+# project copies) and /var/lib/aerieos; --configured undoes what was set
 # up from the dashboard after enrolling (the mounts and their fstab lines,
 # the runners' units, the GPU display); --doors shuts what a hosting node
 # was given (cloudflared and its token, Tailscale's login, the port 22
@@ -2081,8 +2836,8 @@ cmd_uninstall() {
     # The session account node.json names; an older node.json that names
     # none had builder, while one enrolled with --session-user none has
     # none at all, and its machine's own builder is not ours (B516).
-    session_user="$(python3 -c 'import json; d = json.load(open("/etc/builderbot/node.json")); print(d["session_user"] if "session_user" in d else "builder")' 2>/dev/null || true)"
-    store_dirs="$(python3 -c 'import json; print(" ".join(sorted(set(str(v) for v in (json.load(open("/etc/builderbot/node.json")).get("stores") or {}).values() if str(v).startswith("/")))))' 2>/dev/null || true)"
+    session_user="$(python3 -c 'import json; d = json.load(open("/etc/aerieos/node.json")); print(d["session_user"] if "session_user" in d else "builder")' 2>/dev/null || true)"
+    store_dirs="$(python3 -c 'import json; print(" ".join(sorted(set(str(v) for v in (json.load(open("/etc/aerieos/node.json")).get("stores") or {}).values() if str(v).startswith("/")))))' 2>/dev/null || true)"
     for p in $(ours); do
         case "$p" in
             /workspace) mounts="$mounts $p" ;;
@@ -2091,9 +2846,9 @@ cmd_uninstall() {
     done
     say "uninstall AerieOS from this machine"
     printf '   goes:  the agent and its unit, the session firewall rules and the sessions'"'"' own networks,\n'
-    printf '          the account%s %s with their homes (those AerieOS made), /etc/builderbot, and this tool\n' \
+    printf '          the account%s %s with their homes (those AerieOS made), /etc/aerieos, and this tool\n' \
         "${session_user:+s}" "${DOCKER_USER}${session_user:+ and ${session_user}}"
-    [ "$stores" = 1 ] && printf '   also:  the stores on this disk (%s), /workspace, /var/lib/builderbot\n' "${store_dirs:- none}"
+    [ "$stores" = 1 ] && printf '   also:  the stores on this disk (%s), /workspace, /var/lib/aerieos\n' "${store_dirs:- none}"
     [ "$configured" = 1 ] && printf '   also:  the mounts AerieOS used (%s), the runners, the GPU display\n' "${mounts:- none}"
     [ "$doors" = 1 ] && printf '   also:  cloudflared and its token, Tailscale'"'"'s login, the port 22 rule, the hosting firewall, the nginx container\n'
     printf '   stays: docker, nfs-common, python3, tmux, jq, curl, the empty mountpoints,\n'
@@ -2108,7 +2863,9 @@ cmd_uninstall() {
     say "stopping the agent and the session port's rule"
     # The GPU display's unit too (B394): left enabled, a machine AerieOS
     # had left still started an Xorg on the card at every boot.
-    local units="builderbot-agent builderbot-session-ports"
+    # Under both names (R204): a node not yet met by the Enroll script since
+    # the rename still runs the ones before.
+    local units="aerieos-agent aerieos-session-ports builderbot-agent builderbot-session-ports"
     [ "$configured" = 1 ] && units="$units builderbot-gpu-display builderbot-gpu-nodes"
     for u in $units; do
         if have systemctl; then
@@ -2119,7 +2876,7 @@ cmd_uninstall() {
         [ -d "/etc/sv/$u" ] && { rm -f "/var/service/$u"; rm -rf "/etc/sv/$u"; }
     done
     if [ "$configured" = 1 ]; then
-        for f in /var/lib/builderbot/runner/*/.service /var/lib/builderbot/runner/.service; do
+        for f in /var/lib/aerieos/runner/*/.service /var/lib/aerieos/runner/.service; do
             [ -f "$f" ] || continue
             u="$(cat "$f")"
             have systemctl && { systemctl disable --now "$u" >/dev/null 2>&1 || true; rm -f "/etc/systemd/system/$u"; }
@@ -2138,14 +2895,17 @@ cmd_uninstall() {
         say "shutting the doors and the proxy"
         have systemctl && { systemctl disable --now cloudflared >/dev/null 2>&1 || true; rm -f /etc/systemd/system/cloudflared.service; }
         rm -rf /etc/cloudflared
-        [ -x /usr/local/bin/cloudflared ] && rm -f /usr/local/bin/cloudflared
+        # The copy a build before the doors came from packages downloaded
+        # there. A package's cloudflared stays the package manager's, as
+        # Tailscale's does: a link at that path is the package's own.
+        [ -f /usr/local/bin/cloudflared ] && [ ! -L /usr/local/bin/cloudflared ] && rm -f /usr/local/bin/cloudflared
         have tailscale && tailscale logout >/dev/null 2>&1 || true
         have systemctl && { systemctl disable --now builderbot-door-22 >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-door-22.service; }
         have nft && nft delete table inet builderbot_door >/dev/null 2>&1 || true
-        rm -f /etc/builderbot/door-22.nft
+        rm -f /etc/aerieos/door-22.nft
         have systemctl && { systemctl disable --now builderbot-hosting-fw >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-hosting-fw.service; }
         have nft && nft delete table inet builderbot_hosting >/dev/null 2>&1 || true
-        rm -f /etc/builderbot/hosting-fw.nft
+        rm -f /etc/aerieos/hosting-fw.nft
         if have docker; then
             for a in $(docker ps -aq --filter "label=com.docker.compose.project" --format '{{.ID}} {{.Label "com.docker.compose.project"}}' 2>/dev/null | awk '$2 ~ /^nginx-/ {print $1}'); do
                 docker rm -f "$a" >/dev/null 2>&1 || true
@@ -2197,7 +2957,7 @@ cmd_uninstall() {
         fi
         rm -f "$f"
     fi
-    rm -f /etc/systemd/system/builderbot.slice /etc/local.d/builderbot.slice.start /etc/conf.d/builderbot-agent
+    rm -f /etc/systemd/system/builderbot.slice /etc/local.d/builderbot.slice.start /etc/conf.d/aerieos-agent /etc/conf.d/builderbot-agent
     have systemctl && systemctl daemon-reload >/dev/null 2>&1 || true
     say "removing the accounts and their homes"
     for u in "$session_user" "$DOCKER_USER"; do
@@ -2205,13 +2965,13 @@ cmd_uninstall() {
         [ "$(id -u "$u")" != 0 ] || continue
         # One that was here before AerieOS is somebody's own: left, home
         # and all (it took the session account's name on a cloud image).
-        if grep -qx "$u" /etc/builderbot/kept-accounts 2>/dev/null; then
+        if grep -qx "$u" /etc/aerieos/kept-accounts 2>/dev/null; then
             say "kept ${u}: it was an account here before AerieOS"
             continue
         fi
         # Only one this script made, where it has kept that list; a node
         # provisioned before the list keeps the old reading (B516).
-        if [ -f /etc/builderbot/made-accounts ] && ! grep -qx "$u" /etc/builderbot/made-accounts; then
+        if [ -f /etc/aerieos/made-accounts ] && ! grep -qx "$u" /etc/aerieos/made-accounts; then
             say "kept ${u}: AerieOS did not make it"
             continue
         fi
@@ -2224,6 +2984,8 @@ cmd_uninstall() {
     # The session account's sudo rule first: it is the one grant here that
     # reaches root, and it must not outlive the helper it names (R35).
     rm -f /etc/sudoers.d/builderbot-session /etc/bb-session.conf /usr/local/sbin/bb-session
+    # ...and the job account's, for a tool pack's install steps (R234).
+    rm -f /etc/sudoers.d/builderbot-netcut /usr/local/sbin/bb-netcut
     [ "$configured" = 1 ] && rm -f /etc/X11/builderbot-gpu.conf /run/builderbot-gpu-display
     if [ "$stores" = 1 ]; then
         say "removing the stores on this disk"
@@ -2239,11 +3001,15 @@ cmd_uninstall() {
             esac
             rm -rf --one-file-system "$p"
         done
-        rm -rf --one-file-system /var/lib/builderbot
+        # The folder itself, whichever name is the link to it (R204), then both names.
+        rm -rf --one-file-system "$(readlink -f /var/lib/aerieos 2>/dev/null || echo /var/lib/aerieos)"
+        rm -rf --one-file-system /var/lib/aerieos /var/lib/builderbot
     else
-        rm -rf /var/lib/builderbot/agent /var/lib/builderbot/runner
+        rm -rf /var/lib/aerieos/agent /var/lib/aerieos/runner
     fi
-    rm -rf /etc/builderbot /etc/bb-sandbox.conf /etc/profile.d/builderbot-session.sh /usr/local/sbin/builderbot-agent
+    rm -rf "$(readlink -f /etc/aerieos 2>/dev/null || echo /etc/aerieos)"
+    rm -rf /etc/aerieos /etc/builderbot /etc/bb-sandbox.conf /etc/profile.d/builderbot-session.sh /usr/local/sbin/aerieos-agent \
+        /usr/local/sbin/builderbot-agent /usr/local/sbin/aerie-sandbox
     # A ttyd binary an earlier provisioner fetched into /usr/local/bin, on a
     # node provisioned before the agent opened its own terminals; a package's
     # copy is the distribution's and stays.
@@ -2715,6 +3481,70 @@ NVCT_LIST=/etc/apt/sources.list.d/nvidia-container-toolkit.list
 # does not carry (the dev node, 30 Sep).
 NVCT_KEY=/usr/share/keyrings/nvidia-container-toolkit-keyring.asc
 NVCT_URL=https://nvidia.github.io/libnvidia-container
+# nvct_key: that key, as this file carries it, and never one fetched while
+# installing: a key that arrives with the packages it is to check holds
+# them to nothing. NVIDIA changing its key is a change to this file.
+#   NVIDIA CORPORATION (Open Source Projects) <cudatools@nvidia.com>
+#   C95B 321B 61E8 8C18 09C4  F759 DDCA E044 F796 ECB0
+#   as https://nvidia.github.io/libnvidia-container/gpgkey served it over
+#   https on 20 Nov 2026, and the same bytes the AerieOS image's build
+#   holds that source to (image/mkosi.sandbox/etc/apt/keyrings)
+nvct_key() {
+    cat <<'NVCTKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+X7sqI6cXUDG4BjpS70ZRWF2x51ZTiq7DLTV/gGw2okfVjoWjzQY0ebrLd4IoNs80
+lIHmXxa+JdwB6WupCUzKCKLcPsX/yPAmswPNGAuIMAv+PWhUUSMVtzOZldnlogGM
+hbJ9UD2txFGGh9WoYc2vgX9KAaKryXcC6QMabv7JJU24HEJJDgbJEvtFM5PS8QMF
+bXIZsYgICWpQXVChBbduXo9sD2TUDWYAniNaaw4LKxPRG+Ix4HAqkh1oNOLojO30
+DO3r1/62FKE5/ykg3iSMTDR0iOES/leXCCIO9fRJT8+eucxyOQoY5ti7tjt1wm3H
+nTB+Rz3E/E2qeLs2PN82aseccm1G06pmsMCUiWtmSV6HjdO2XufYprrGLSu0RrT3
+sz5WHGUOY2iO40xHhSiXg3TcLZRpv30DQzxoUrx9Ff//rXLFznh+MksuvVD2roUR
+BGz/en31FxAcBoex9nNraeOekbFen5b7Xrq9wnzM5xZvJN2QYB3vS0khz/ZgFyy5
+444ALa9gwb29FZCfA4m59S2QoB8uPQGM+8gnusE6J8y4fvI59ugafidIkt86dZ3m
+FsEME5XNmBGdNEo2flRVFfpG1IWds2Ba3IsdbYd9nzmbBW7/n0InVRDrIg==
+=9QWY
+-----END PGP PUBLIC KEY BLOCK-----
+NVCTKEY
+}
 NVCT_DOCKER=/etc/docker/daemon.json
 # Docker's note of the nvidia runtime, taken out of its configuration here
 # rather than by the toolkit's own tool: `nvidia-ctk runtime configure
@@ -2757,17 +3587,16 @@ cmd_gpu_container() {
             have apt-get || die "the container toolkit is installed from here on Debian and Ubuntu only: on this family, from NVIDIA's repository for it"
             have docker || die "no docker on this machine, so there is no container to hand the card to"
             [ -n "$(gpu_driver_version)" ] || die "the NVIDIA driver is not installed on this machine: install it from the Library with this node picked first; the toolkit hands its libraries to a container"
-            have curl || die "curl is not on this machine, and the package source is fetched with it"
             say "adding NVIDIA's package source for the container toolkit"
-            curl -fsSL "$NVCT_URL/gpgkey" > "$NVCT_KEY" \
-                || { rm -f "$NVCT_KEY"; die "could not fetch the package source's signing key from $NVCT_URL"; }
-            grep -q 'BEGIN PGP PUBLIC KEY BLOCK' "$NVCT_KEY" \
-                || { rm -f "$NVCT_KEY"; die "what $NVCT_URL answered with is not a signing key"; }
+            # The key this file carries and the one line NVIDIA's own list
+            # holds for its stable packages (apt fills in the architecture):
+            # nothing is fetched until apt reads the source, and what it
+            # reads there it holds to the key.
+            nvct_key > "$NVCT_KEY" || { rm -f "$NVCT_KEY"; die "could not write the package source's signing key to $NVCT_KEY"; }
             chmod 0644 "$NVCT_KEY"
-            curl -fsSL "$NVCT_URL/stable/deb/nvidia-container-toolkit.list" \
-                | sed "s#deb https://#deb [signed-by=$NVCT_KEY] https://#g" > "$NVCT_LIST" \
-                || { rm -f "$NVCT_LIST" "$NVCT_KEY"; die "could not fetch the package source's list from $NVCT_URL"; }
-            grep -q '^deb ' "$NVCT_LIST" || { rm -f "$NVCT_LIST" "$NVCT_KEY"; die "the package source's list came back empty from $NVCT_URL"; }
+            # shellcheck disable=SC2016  # $(ARCH) is apt's to fill in
+            printf 'deb [signed-by=%s] %s/stable/deb/$(ARCH) /\n' "$NVCT_KEY" "$NVCT_URL" > "$NVCT_LIST" \
+                || { rm -f "$NVCT_LIST" "$NVCT_KEY"; die "could not write the package source's list to $NVCT_LIST"; }
             export DEBIAN_FRONTEND=noninteractive
             apt_get update -qq
             say "installing the NVIDIA container toolkit with apt"
@@ -2816,10 +3645,10 @@ cmd_gpu_container() {
 # What a node has beyond the base, each an install and a remove, run by the
 # provisioner's flag at enrollment and by the agent's `feature` system job
 # from the Nodes page: one copy, so the two ways cannot drift. A marker
-# under /etc/builderbot/features says AerieOS put it there, and lists the
+# under /etc/aerieos/features says AerieOS put it there, and lists the
 # packages it added, so a remove takes those and leaves what the machine
 # had before.
-FEATURES_DIR=/etc/builderbot/features
+FEATURES_DIR=/etc/aerieos/features
 os_family() {
     local ids
     ids="$(. /etc/os-release 2>/dev/null; printf ' %s %s ' "${ID:-}" "${ID_LIKE:-}")"
@@ -2911,8 +3740,19 @@ for a in "$@"; do
     prev="$a"
 done
 [ -n "$dir" ] || exec "$real" "$@"
-u=$(stat -c %u "$dir") g=$(stat -c %g "$dir")
-exec "$real" "$@" \
+# Checked at every start, not only when the folder was picked: the agent
+# gave the domain the folder's real path, so a link put anywhere along it
+# since (the space's tree is its account's) would have virtiofsd serve where
+# it leads, / included. And never a folder of root's, whose files the guest
+# would write as root.
+here=$(realpath -e -- "$dir" 2>/dev/null) || { echo "builderbot-virtiofsd: $dir is not there" >&2; exit 1; }
+[ "$here" = "$dir" ] || { echo "builderbot-virtiofsd: $dir now leads to $here: not shared" >&2; exit 1; }
+u=$(stat -c %u -- "$dir") g=$(stat -c %g -- "$dir")
+[ "$u" != 0 ] || { echo "builderbot-virtiofsd: $dir is root's: not shared" >&2; exit 1; }
+# Without the capabilities that let a guest chmod or set the setuid bit on a
+# file it does not own, or make a device node: a root-owned file left in the
+# folder would otherwise become a setuid program here.
+exec "$real" "$@" --modcaps=-fowner:-fsetid:-setfcap:-mknod \
     --translate-uid "squash-guest:0:$u:4294967295" --translate-gid "squash-guest:0:$g:4294967295" \
     --translate-uid "squash-host:0:2000:4294967295" --translate-gid "squash-host:0:2000:4294967295"
 WRAP
@@ -2972,7 +3812,7 @@ feature_vmhost() {
             # root write over the file it named (B552).
             vmown="$DOCKER_USER"
             { [ "$BESIDE_CONTROLLER" = 1 ] || [ -s /etc/bb-session.wall ]; } && vmown=root
-            install -d -m 0755 -o "$vmown" /var/lib/builderbot/vms /var/lib/builderbot/vms/images /var/lib/builderbot/vms/disks
+            install -d -m 0755 -o "$vmown" /var/lib/aerieos/vms /var/lib/aerieos/vms/images /var/lib/aerieos/vms/disks
             vmhost_virtiofsd
             # Run again on a machine that has it (a package the feature has
             # gained since, UEFI's firmware), what it added before is kept.
@@ -2986,9 +3826,9 @@ feature_vmhost() {
             if have virsh; then
                 n="$(virsh -c qemu:///system list --all --name 2>/dev/null | grep -c . || true)"
                 [ "${n:-0}" -eq 0 ] || die "${n} VM(s) are on this machine: remove them first, then VM host"
-            elif [ -n "$(ls -A /var/lib/builderbot/vms/disks 2>/dev/null)" ]; then
+            elif [ -n "$(ls -A /var/lib/aerieos/vms/disks 2>/dev/null)" ]; then
                 # No virsh to ask: disks still here are VMs' until shown otherwise.
-                die "virsh is not here to say which VMs are defined, and /var/lib/builderbot/vms/disks holds disks: nothing removed"
+                die "virsh is not here to say which VMs are defined, and /var/lib/aerieos/vms/disks holds disks: nothing removed"
             fi
             say "taking VM host off"
             rm -f "$VIRTIOFSD_WRAP"
@@ -2997,7 +3837,7 @@ feature_vmhost() {
                 [ -f "/etc/apparmor.d/local/$prof" ] && sed -i "\#$VIRTIOFSD_WRAP#d" "/etc/apparmor.d/local/$prof"
             done
             getent group libvirt >/dev/null 2>&1 && gpasswd -d "$DOCKER_USER" libvirt >/dev/null 2>&1 || true
-            rm -rf /var/lib/builderbot/vms
+            rm -rf /var/lib/aerieos/vms
             added="$(sed -n 's/^packages=//p' "$FEATURES_DIR/vmhost")"
             # shellcheck disable=SC2086
             [ -z "${added// /}" ] || pkgs_drop "$fam" $added || warn "the packages did not all come off; the output above says why"
@@ -3014,9 +3854,9 @@ feature_vmhost() {
 feature_firewall() {
     local ssh_rule su
     case "$1" in
-        state) [ -f /etc/builderbot/hosting-fw.nft ] && echo installed || echo absent ;;
+        state) [ -f /etc/aerieos/hosting-fw.nft ] && echo installed || echo absent ;;
         install)
-            su="$(python3 -c 'import json; print(json.load(open("/etc/builderbot/node.json")).get("session_user", ""))' 2>/dev/null || true)"
+            su="$(python3 -c 'import json; print(json.load(open("/etc/aerieos/node.json")).get("session_user", ""))' 2>/dev/null || true)"
             [ -z "$su" ] || die "the firewall is for a hosting-only node: it would shut the session port the controller reaches ${su}'s sessions on"
             have nft || pkgs_add "$(os_family)" nftables || true
             have nft || die "nft is not here and could not be installed"
@@ -3028,8 +3868,8 @@ feature_firewall() {
             else
                 printf '   port 22: open, as no door closed it\n'
             fi
-            install -d -m 0755 /etc/builderbot
-            cat > /etc/builderbot/hosting-fw.nft <<NFT
+            install -d -m 0755 /etc/aerieos
+            cat > /etc/aerieos/hosting-fw.nft <<NFT
 # Written by bb-sandbox feature install firewall: 80 and 443 in, and port 22 as the door left it.
 table inet builderbot_hosting
 delete table inet builderbot_hosting
@@ -3061,7 +3901,7 @@ table inet builderbot_hosting {
     }
 }
 NFT
-            nft -f /etc/builderbot/hosting-fw.nft || { rm -f /etc/builderbot/hosting-fw.nft; die "nft could not apply the firewall, so this box takes in what it did before"; }
+            nft -f /etc/aerieos/hosting-fw.nft || { rm -f /etc/aerieos/hosting-fw.nft; die "nft could not apply the firewall, so this box takes in what it did before"; }
             if have systemctl; then
                 cat > /etc/systemd/system/builderbot-hosting-fw.service <<UNIT
 [Unit]
@@ -3070,7 +3910,7 @@ After=network-pre.target
 Before=docker.service
 [Service]
 Type=oneshot
-ExecStart=$(command -v nft) -f /etc/builderbot/hosting-fw.nft
+ExecStart=$(command -v nft) -f /etc/aerieos/hosting-fw.nft
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
@@ -3082,7 +3922,7 @@ UNIT
         remove)
             have systemctl && { systemctl disable --now builderbot-hosting-fw >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-hosting-fw.service; systemctl daemon-reload >/dev/null 2>&1 || true; }
             have nft && nft delete table inet builderbot_hosting >/dev/null 2>&1 || true
-            rm -f /etc/builderbot/hosting-fw.nft
+            rm -f /etc/aerieos/hosting-fw.nft
             say "firewall off: this box takes in what its other rules allow" ;;
     esac
 }
@@ -3358,6 +4198,10 @@ BBSANDBOX
 install -d -m 0755 /usr/local/sbin
 install -m 0750 "$BBSANDBOX_TMP" /usr/local/sbin/bb-sandbox
 rm -f "$BBSANDBOX_TMP"
+# ...and under AerieOS's own name (R204): aerie-sandbox runs it, with the
+# same arguments. The file stays where the units and the agent look for it.
+printf '#!/bin/sh\n# AerieOS'"'"'s tool for this machine, under its own name: bb-sandbox, as installed.\nexec /usr/local/sbin/bb-sandbox "$@"\n' > /usr/local/sbin/aerie-sandbox
+chmod 0750 /usr/local/sbin/aerie-sandbox
 # Root's, and nobody else's: 0750 root:root. Anyone the operator has given
 # sudo reaches it as `sudo bb-sandbox`, which is how it is meant to be run;
 # it refuses to run as anyone but root anyway. The docker account cannot read
@@ -3438,9 +4282,9 @@ fi
 # so nothing else has to be published or kept in step, and it runs under
 # systemd as root ONLY so that it can drop to ${USER_NAME} for every job it
 # runs, and so that phase 5's system jobs (mounts, network) have somewhere to
-# run. The credential it ends up holding (/etc/builderbot/node.json, 0600)
+# run. The credential it ends up holding (/etc/aerieos/node.json, 0600)
 # opens that node's own row and nothing else.
-AGENT=/usr/local/sbin/builderbot-agent
+AGENT=/usr/local/sbin/aerieos-agent
 # THE SESSIONS ARE NOT THIS UNIT'S TO KILL. systemd's default KillMode is
 # control-group: a stop takes every process in the cgroup with it, and the
 # agent's cgroup holds the terminals it opens, the tmux servers under them and
@@ -3468,45 +4312,38 @@ if [ -n "$CONTROLLER" ]; then
     # shellcheck disable=SC2046
     pkg $(pkg_names pycrypto)
     hdr="$(mktemp)"
-    curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
-         "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
+    # Tried again on a transient answer (B747), as the own node's download is.
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+         "${PIN_URL%/}/api/v1/agent/download" -o "${AGENT}.new" \
         || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
-    # The digest the controller says it served, against what arrived. The
-    # same check the agent makes of its own updates, made once by hand here.
-    want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-    got="sha256:$(sha256sum "${AGENT}.new" | cut -d' ' -f1)"
+    # Held to what the Enroll script carries, before any of it runs as root
+    # (agent_proved): the script's digest, and the release's signature under
+    # the release key, checked with the cryptography library installed just
+    # above. The digest the controller sends with the file stands in only
+    # for a script that carries none.
+    want="$(agent_sent "$hdr" x-agent-digest)"
     rm -f "$hdr"
-    if [ -n "$want" ] && [ "$want" != "$got" ]; then
-        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
-        rm -f "${AGENT}.new"; exit 1
-    fi
-    # Nothing, or no digest to check it by, is not the controller's agent:
-    # an empty file ran as an empty script, said nothing, exited 0, and the
-    # node never enrolled (11 Oct).
-    if [ -z "$want" ] || [ ! -s "${AGENT}.new" ]; then
-        warn "what ${CONTROLLER} sent for the agent is not AerieOS's ($(stat -c %s "${AGENT}.new" 2>/dev/null || echo 0) bytes, ${want:-no digest}): the address does not reach the controller's agent API"
-        rm -f "${AGENT}.new"; exit 1
-    fi
+    agent_proved "${AGENT}.new" "$want" || { rm -f "${AGENT}.new"; exit 1; }
     chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
+    svc_stop aerieos-agent
+    # ...and under the name it had before (R204): never two agents on one
+    # node.json, each handing the controller the other's replaced token.
     svc_stop builderbot-agent
     "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" --user "$USER_NAME" \
         ${SESSION_NAME:+--session-user "$SESSION_NAME"} ${REACH:+--reach "$REACH"} \
         ${DOOR:+--door "$DOOR"} ${DOOR_HOST:+--door-host "$DOOR_HOST"} \
+        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} ${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"} \
         --store "data=${STORE_DATA}" --store "toolchains=${STORE_TOOLCHAINS}" \
         --store "cache=${STORE_CACHE}" --store "artifacts=${STORE_ARTIFACTS}" \
         --store "appdata=${STORE_APPDATA}"
     # The tunnel into the node's own record (R161): the agent binds the
     # screen relay to its address there, and reports it.
     if [ -n "$WG_ADDR" ]; then
-        python3 - "$WG_ADDR" <<'PY'
-import json, sys
-p = "/etc/builderbot/node.json"
-d = json.load(open(p))
-d["tunnel"] = {"kind": "wireguard", "iface": "bb", "addr": sys.argv[1]}
-json.dump(d, open(p, "w"), indent=2)
-PY
+        node_record_set tunnel "$WG_ADDR" >/dev/null
     fi
-    svc_install builderbot-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    svc_install aerieos-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    names_old_service
 # Public port 22 shut only now, with the node enrolled and the door's client
 # up: a run that closed it first and then could not enroll left the person
 # coming back in through the KVM (11 Oct). The loopback (cloudflared's
@@ -3525,8 +4362,8 @@ if [ -n "$DOOR" ] && [ "$DOOR_CLOSE22" = 1 ] && [ -n "$door_up" ]; then
     printf '   a connection already open on it, this one included, stays up; a new one comes through the door\n'
     # shellcheck disable=SC2046
     command -v nft >/dev/null 2>&1 || pkg $(pkg_names nft) >/dev/null 2>&1 || true
-    install -d -m 0755 /etc/builderbot
-    cat > /etc/builderbot/door-22.nft <<'NFT'
+    install -d -m 0755 /etc/aerieos
+    cat > /etc/aerieos/door-22.nft <<'NFT'
 # Written by AerieOS's provision-linux.sh: port 22 from the loopback and the tailnet only.
 table inet builderbot_door
 delete table inet builderbot_door
@@ -3540,7 +4377,7 @@ table inet builderbot_door {
     }
 }
 NFT
-    if nft -f /etc/builderbot/door-22.nft 2>/dev/null; then
+    if nft -f /etc/aerieos/door-22.nft 2>/dev/null; then
         if [ "$INIT" = systemd ]; then
             cat > /etc/systemd/system/builderbot-door-22.service <<UNIT
 [Unit]
@@ -3548,7 +4385,7 @@ Description=AerieOS: port 22 reachable through the door only
 After=network-pre.target
 [Service]
 Type=oneshot
-ExecStart=$(command -v nft) -f /etc/builderbot/door-22.nft
+ExecStart=$(command -v nft) -f /etc/aerieos/door-22.nft
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
@@ -3559,16 +4396,16 @@ UNIT
         warn "nft could not apply the port 22 rule, so port 22 stays as it was"
     fi
 fi
-elif [ -f /etc/builderbot/node.json ]; then
+elif [ -f /etc/aerieos/node.json ]; then
     # Enrolled on an earlier run. A machine that lost the agent itself keeps its
     # identity and takes it back here, as an AerieOS root from before /usr/local
     # lasted did at every boot (B669). The agent does NOT keep itself current
     # (the dashboard's Update button queues that as a job, and nothing runs
     # it unasked), so a re-run here is the console path to the same thing:
-    # fetch what the controller ships with this node's own token, check it
-    # against the digest the controller sends, and swap it in only when it
-    # differs. The token never leaves this shell; the same check the agent
-    # makes of its own updates, made here by hand.
+    # fetch what the controller ships with this node's own token, and the
+    # release's signature beside it, and put it in only where the node would
+    # take it as an update: the installed agent is asked (agent_swap). The
+    # token never leaves this shell.
     # The accounts' homes too: a machine that lost them with the old root keeps
     # the accounts in /etc, and a session or an install has nowhere to write.
     for who in "${USER_NAME:-}" "${SESSION_NAME:-}"; do
@@ -3584,33 +4421,31 @@ elif [ -f /etc/builderbot/node.json ]; then
         esac
     done
     say "agent: already enrolled; checking the controller for a newer agent"
-    ctl=""; tok=""
-    read -r ctl tok < <(python3 -c 'import json; d = json.load(open("/etc/builderbot/node.json")); print(d.get("controller", ""), d.get("token", ""))' 2>/dev/null || true)
-    if [ -n "$ctl" ] && [ -n "$tok" ]; then
+    # ...and under what the node holds its controller to, as its record
+    # says it: the controller's key (curl's --pinnedpubkey, with -k leaving
+    # the authorities out, as the first enrollment fetches), the system's
+    # authorities for a public hostname, or nothing on plain http. A node
+    # that pinned a certificate from before keys were pinned has no form
+    # curl takes: its token is sent to nobody, and Update agent on its row
+    # is the way on.
+    ctl=""; tok=""; pin=""; held=""
+    read -r ctl tok pin < <(python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("controller", ""), d.get("token", ""), d.get("pin") or "-")' "$NODE_RECORD" 2>/dev/null || true)
+    if [[ "$pin" =~ ^sha256//[A-Za-z0-9+/]{43}=$ ]]; then held="$pin"; fi
+    if [ -n "$ctl" ] && [ -n "$tok" ] && [[ "$pin" == sha256:* ]]; then
+        warn "this node holds its controller to a certificate, which this script cannot check a fetch against: the installed agent is left as it is. Update agent on the node's row updates it"
+    elif [ -n "$ctl" ] && [ -n "$tok" ]; then
         hdr="$(mktemp)"
-        if curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
-                "${ctl%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
-            want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-            got="sha256:$(sha256sum "${AGENT}.new" | cut -d' ' -f1)"
-            have="sha256:$( { sha256sum "$AGENT" 2>/dev/null || echo none; } | cut -d' ' -f1)"
-            if [ -n "$want" ] && [ "$want" != "$got" ]; then
-                warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want}); leaving the installed one"
-                rm -f "${AGENT}.new"
-            elif [ "$got" = "$have" ]; then
-                say "agent: already current (${got:7:12})"
-                rm -f "${AGENT}.new"
-            else
-                chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
-                svc_restart builderbot-agent 2>/dev/null || true
-                say "agent: updated ${have:7:12} -> ${got:7:12} and restarted"
-            fi
+        pinned_at "$ctl" "$held"
+        if curl -fsSL ${held:+-k --pinnedpubkey "$held"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
+                "${PIN_URL%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
+            agent_swap "${AGENT}.new" "$(agent_sent "$hdr" x-agent-digest)" "$(agent_sent "$hdr" x-agent-sig)"
         else
             warn "could not fetch the agent from ${ctl}. Is the controller up? The installed agent is left as it is"
             rm -f "${AGENT}.new"
         fi
         rm -f "$hdr"
     else
-        warn "/etc/builderbot/node.json carries no controller or token; re-enroll with a fresh token to update"
+        warn "/etc/aerieos/node.json carries no controller or token; re-enroll with a fresh token to update"
     fi
     # The session account is part of the enrollment record, and a node
     # enrolled before there was one carries none, so a re-run that made
@@ -3618,21 +4453,20 @@ elif [ -f /etc/builderbot/node.json ]; then
     # reporting "no session account" and the dashboard keeps the button
     # dead. Written here rather than by re-enrolling: a re-enrollment is a
     # NEW node row, and every project bound to the old one would lose it.
-    if [ -n "$(python3 - "${SESSION_NAME:-}" <<'PY'
-import json, sys
-p = "/etc/builderbot/node.json"
-d = json.load(open(p))
-want = sys.argv[1]
-if d.get("session_user", "") != want:
-    d["session_user"] = want
-    json.dump(d, open(p, "w"), indent=2)
-    print("changed")
-PY
-    )" ]; then
+    if [ -n "$(node_record_set session-user "${SESSION_NAME:-}")" ]; then
         say "agent: sessions now run as ${SESSION_NAME:-nobody}; restarting the agent"
-        svc_restart builderbot-agent 2>/dev/null || true
+        svc_restart aerieos-agent 2>/dev/null || true
     fi
-    svc_active builderbot-agent || svc_install builderbot-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    # A node still running under the name before (R204), met by a re-run
+    # with no token: the same agent, the same record, under the new service.
+    # The old one is stopped first; where the controller could not be asked
+    # for the agent just now, the one installed is what the new name runs.
+    if [ -e /usr/local/sbin/builderbot-agent ] && ! grep -q 'exec /usr/local/sbin/aerieos-agent' /usr/local/sbin/builderbot-agent 2>/dev/null; then
+        svc_stop builderbot-agent
+        [ -s "$AGENT" ] || cp -p /usr/local/sbin/builderbot-agent "$AGENT"
+    fi
+    svc_active aerieos-agent || svc_install aerieos-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    names_old_service
 fi
 
 # --- the features asked for (R91) -------------------------------------------
@@ -3656,7 +4490,7 @@ done
 # filters alone. Re-applied at boot by a unit, and rewritten here on every
 # run, so a controller that moved is one re-run away.
 ctl_url="$CONTROLLER"
-[ -n "$ctl_url" ] || ctl_url="$(python3 -c 'import json; print(json.load(open("/etc/builderbot/node.json")).get("controller", ""))' 2>/dev/null || true)"
+[ -n "$ctl_url" ] || ctl_url="$(python3 -c 'import json; print(json.load(open("/etc/aerieos/node.json")).get("controller", ""))' 2>/dev/null || true)"
 if [ -n "$SESSION_NAME" ] && [ -n "$ctl_url" ]; then
     say "session port: 7684 (the screen relay: terminals and VMs' screens) open to the controller only"
     ctl_host="${ctl_url#*://}"; ctl_host="${ctl_host%%/*}"; ctl_host="${ctl_host%%:*}"
@@ -3682,8 +4516,8 @@ if [ -n "$SESSION_NAME" ] && [ -n "$ctl_url" ]; then
         # shellcheck disable=SC2046
         command -v nft >/dev/null 2>&1 || pkg $(pkg_names nft) >/dev/null 2>&1 || true
         case "$ctl_ip" in *:*) fam=ip6 ;; *) fam=ip ;; esac
-        install -d -m 0755 /etc/builderbot
-        cat > /etc/builderbot/session-ports.nft <<EOF
+        install -d -m 0755 /etc/aerieos
+        cat > /etc/aerieos/session-ports.nft <<EOF
 # Written by AerieOS's provision-linux.sh: the agent's screen relay, reachable from the
 # controller (${ctl_host}) and the loopback, and from nowhere else.
 table inet builderbot_session
@@ -3697,18 +4531,18 @@ table inet builderbot_session {
     }
 }
 EOF
-        if nft -f /etc/builderbot/session-ports.nft 2>/dev/null; then
+        if nft -f /etc/aerieos/session-ports.nft 2>/dev/null; then
             # ...and again at every boot, the way this init runs a one-shot:
             # a unit, an OpenRC local.d script, or a line in rc.local.
-            nft_cmd="$(command -v nft) -f /etc/builderbot/session-ports.nft"
+            nft_cmd="$(command -v nft) -f /etc/aerieos/session-ports.nft"
             case "$INIT" in
                 systemd)
-                    cat > /etc/systemd/system/builderbot-session-ports.service <<EOF
+                    cat > /etc/systemd/system/aerieos-session-ports.service <<EOF
 [Unit]
 Description=AerieOS: the session port open to the controller only
 After=network-pre.target
 Wants=network-pre.target
-Before=network.target builderbot-agent.service
+Before=network.target aerieos-agent.service
 
 [Service]
 Type=oneshot
@@ -3719,12 +4553,12 @@ ExecStart=${nft_cmd}
 WantedBy=multi-user.target
 EOF
                     systemctl daemon-reload
-                    systemctl enable builderbot-session-ports >/dev/null 2>&1 || true ;;
+                    systemctl enable aerieos-session-ports >/dev/null 2>&1 || true ;;
                 openrc)
                     install -d -m 0755 /etc/local.d
                     printf '#!/bin/sh\n# AerieOS: the session port open to the controller only\n%s\n' "$nft_cmd" \
-                        > /etc/local.d/builderbot-session-ports.start
-                    chmod 0755 /etc/local.d/builderbot-session-ports.start
+                        > /etc/local.d/aerieos-session-ports.start
+                    chmod 0755 /etc/local.d/aerieos-session-ports.start
                     rc-update add local default >/dev/null 2>&1 || true ;;
                 runit)
                     touch /etc/rc.local; chmod 0755 /etc/rc.local
@@ -3737,6 +4571,13 @@ EOF
     fi
 fi
 
+# This machine's own address for the closing lines, as the tool above finds
+# its own (that copy is the tool's, written into another file).
+my_ip() {
+    hostname -I 2>/dev/null | awk '{print $1}' | grep . \
+        || ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -1 \
+        || true
+}
 ip="$(my_ip || true)"
 if [ "${#WARNINGS[@]}" -gt 0 ]; then
     say "the pre-flight warned about ${#WARNINGS[@]} thing(s), still true:"
@@ -3763,14 +4604,14 @@ EOF
 # this whole design turns on.
 /usr/local/sbin/bb-sandbox list || true
 
-if [ -f /etc/builderbot/node.json ]; then
+if [ -f /etc/aerieos/node.json ]; then
     cat <<EOF
 
-As a node: the agent is running ($(case "$INIT" in systemd) echo "systemctl status builderbot-agent" ;; openrc) echo "rc-service builderbot-agent status" ;; runit) echo "sv status builderbot-agent" ;; esac)) and the
+As a node: the agent is running ($(case "$INIT" in systemd) echo "systemctl status aerieos-agent" ;; openrc) echo "rc-service aerieos-agent status" ;; runit) echo "sv status aerieos-agent" ;; esac)) and the
 Nodes page should show this machine live within a minute. It dials out, so
 nothing was opened here for it. Jobs run as ${USER_NAME}.
 
-  sudo builderbot-agent status    what this node is, and does the controller answer
+  sudo aerieos-agent status    what this node is, and does the controller answer
 EOF
     if [ -n "$SESSION_NAME" ]; then
         cat <<EOF

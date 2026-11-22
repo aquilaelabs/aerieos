@@ -59,6 +59,17 @@ SUDOERS="$P/etc/sudoers.d/aerieos-controller"
 BB_BIN="$P/usr/local/bin/aerie"
 SERVICE=aerieos-controller
 REPO=aquilaelabs/aerieos
+# Who may sign a release (R199): the copy in the tree this script is in,
+# the release that runs here, so a key is trusted because this install
+# already held it and never because a download names it. Another file only
+# under the unit tests' prefix.
+SIGNERS="$TREE/config/release-signers"
+[ -z "$P" ] || SIGNERS="${BB_RELEASE_SIGNERS:-$SIGNERS}"
+# Who may have built a bundle an update takes: the release workflow,
+# build-image.yml, run on a version's tag, as the OS updater pins it
+# (osimage.signer_identity). The repository alone passed any workflow on any
+# branch that attested one.
+SIGNER_IDENTITY="^https://github\\.com/${REPO}/\\.github/workflows/build-image\\.yml@refs/tags/v"
 # How many releases are kept beside the one in use: the one before is what
 # an update that does not come up goes back to by itself.
 KEEP_RELEASES=3
@@ -175,12 +186,6 @@ tree_stamp() {
     printf '%s %s' "${target:-unstamped}" "${rev:-unstamped}"
 }
 
-# dockerfile_arg NAME [TREE]: an ARG's default in the tree's Dockerfile, the
-# one place the image's pins are kept (noVNC and its checksum).
-dockerfile_arg() {
-    sed -n "s/^ARG $1=//p" "${2:-$TREE}/Dockerfile" | head -1
-}
-
 # ---- the release, laid out as the image lays it out -------------------------
 # copy_as_copy TREE SRC DEST: one Dockerfile COPY line, done here: a folder
 # (SRC/) is its contents into DEST/, a glob each file into DEST/, a file to
@@ -210,7 +215,7 @@ copy_as_copy() {
 # the image's RUN lines add there (noVNC, the scripts made executable) and
 # the stamp the image carries in its ENV (build.env).
 lay_out() {
-    local t="$1" dir="$2" ver="$3" rev="$4" src dest n=0 nv sha
+    local t="$1" dir="$2" ver="$3" rev="$4" src dest n=0 nv
     rm -rf "$dir.partial"
     install -d -m 0755 "$dir.partial"
     while read -r src dest; do
@@ -221,24 +226,34 @@ lay_out() {
     [ "$n" -gt 5 ] || die "the Dockerfile in $t names nothing to lay out ($n COPY lines)"
     # ...and what a machine of its own needs that the image does not: the
     # installer itself (for --update and --remove from here), its
-    # env file's template and the Dockerfile's pins.
+    # env file's template and the Dockerfile, whose COPY lines the next
+    # layout is read from.
     install -m 0755 "$t/nodes/install-controller.sh" "$dir.partial/nodes/install-controller.sh"
     install -m 0644 "$t/config/controller.env" "$dir.partial/config/controller.env"
     install -m 0644 "$t/Dockerfile" "$dir.partial/Dockerfile"
     chmod -R a+rX "$dir.partial"
     chmod -R +x "$dir.partial/scripts"
-    # noVNC: a VM's screen in the dock (R99), the image's pinned release,
-    # checked by the image's digest.
+    # The scripts' bytecode, as the image makes it (R228 step 8): nothing at
+    # run time writes any, so without it each start and each relayed verb
+    # compiles again. Made here by this machine's python3, never carried
+    # from the tree laid out, whose may be another python's or stale; a
+    # machine with no python3 yet has nothing to run it.
+    find "$dir.partial" -name __pycache__ -type d -prune -exec rm -rf {} +
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -m compileall -q "$dir.partial/scripts" >/dev/null 2>&1 \
+            || warn "the scripts did not all compile ahead of time: they run, and compile as they load"
+    fi
+    # noVNC: a VM's screen in the dock (R99), the release the tree's
+    # config/image-tools.json pins, held to the pinned sha256 (pin-fetch)
+    # as the image takes it.
     if [ "${NO_FETCH:-0}" != 1 ]; then
-        nv="$(dockerfile_arg NOVNC_VERSION "$t")"; sha="$(dockerfile_arg NOVNC_SHA256 "$t")"
-        if [ -n "$nv" ] && curl -fsSL -o "$dir.partial/novnc.tar.gz" \
-                "https://github.com/novnc/noVNC/archive/refs/tags/v${nv}.tar.gz" \
-           && echo "${sha}  $dir.partial/novnc.tar.gz" | sha256sum -c - >/dev/null 2>&1; then
+        if nv="$(bash "$t/scripts/lib/pin-fetch" "$t/config/image-tools.json" novnc linux/amd64 "$dir.partial/novnc.tar.gz" 2>/dev/null)" \
+                && [ -n "$nv" ]; then
             install -d -m 0755 "$dir.partial/novnc"
             tar xzf "$dir.partial/novnc.tar.gz" -C "$dir.partial/novnc" --strip-components=1 \
                 "noVNC-${nv}/core" "noVNC-${nv}/vendor" "noVNC-${nv}/vnc_lite.html" "noVNC-${nv}/LICENSE.txt"
         else
-            warn "noVNC ${nv:-?} did not download or did not match its checksum: a VM's screen will not draw until an update brings it"
+            warn "noVNC did not download or was not its pinned file: a VM's screen will not draw until an update brings it"
         fi
         rm -f "$dir.partial/novnc.tar.gz"
     fi
@@ -345,46 +360,72 @@ pick_python() {
     printf '%s' "$best"
 }
 
+# npm_program TREE NAME: one of the image's npm programs (Playwright,
+# web-ext) as the image installs it: by the lock the tree carries
+# (config/image-npm/NAME, every package's tarball and integrity), with
+# `npm ci --ignore-scripts`, so exactly the lock's set lands, each tarball
+# held to its integrity, and nobody's install script runs as root. It goes
+# into a prefix of its own and is linked into npm's global modules, where
+# NODE_PATH finds it, and onto the PATH.
+NPM_PREFIX="$P/usr/local/lib/aerieos-npm"
+npm_program() {
+    local t="$1" name="$2" src d root
+    src="$t/config/image-npm/$name"
+    d="$NPM_PREFIX/$name"
+    [ -f "$src/package-lock.json" ] || return 1
+    install -d -m 0755 "$d"
+    install -m 0644 "$src/package.json" "$src/package-lock.json" "$d/"
+    npm ci --ignore-scripts --no-audit --no-fund --prefix "$d" >/dev/null 2>&1 || return 1
+    root="$(npm root -g 2>/dev/null)" || return 1
+    install -d -m 0755 "$root" "$P/usr/local/bin"
+    # A copy an earlier install put there by name, at whatever version was
+    # newest that day, goes: the link would land inside its folder.
+    if [ -e "$root/$name" ] && [ ! -L "$root/$name" ]; then
+        npm uninstall -g "$name" >/dev/null 2>&1 || true
+        rm -rf "${root:?}/$name"
+    fi
+    ln -sfn "$d/node_modules/$name" "$root/$name"
+    ln -sfn "$d/node_modules/.bin/$name" "$P/usr/local/bin/$name"
+}
+
 # extras: what the image fetches from each vendor beside the packages, the
 # same way and as best it can: the linters `aerie lint` runs, uv and mise,
-# Playwright and web-ext through npm, the home tunnel's cloudflared. Each
+# Playwright and web-ext by their locks, the home tunnel's cloudflared. Each
 # one that does not land is said, and nothing waits on it. The terminals
 # need none of them: each is a pty of the dashboard's own.
 extras() {
     local arch miss=() bin
     arch="$(uname -m)"
     say "the image's other tools"
-    # Each from its vendor's GitHub release, held to the digest GitHub
-    # states for it (gh-fetch, B335), never taken on trust.
-    local ghf="$TREE/scripts/lib/gh-fetch" t
+    # Each from its vendor's GitHub release as the image takes it: the
+    # version config/image-tools.json pins, held to the pinned sha256
+    # (pin-fetch), never taken on trust and never whatever is newest.
+    local pf="$TREE/scripts/lib/pin-fetch" pins="$TREE/config/image-tools.json" plat t
+    plat="linux/$([ "$arch" = x86_64 ] && echo amd64 || echo arm64)"
     t="$(mktemp -d)"
     if [ "$arch" = x86_64 ]; then
-        bash "$ghf" hadolint/hadolint latest 'hadolint-linux-x86_64' /usr/local/bin/hadolint >/dev/null \
+        bash "$pf" "$pins" hadolint "$plat" /usr/local/bin/hadolint >/dev/null \
             && chmod +x /usr/local/bin/hadolint || miss+=(hadolint)
-        bash "$ghf" mikefarah/yq latest 'yq_linux_amd64' /usr/local/bin/yq >/dev/null \
+        bash "$pf" "$pins" yq "$plat" /usr/local/bin/yq >/dev/null \
             && chmod +x /usr/local/bin/yq || miss+=(yq)
-        { bash "$ghf" rhysd/actionlint latest 'actionlint_*_linux_amd64.tar.gz' "$t/actionlint.tar.gz" >/dev/null \
+        { bash "$pf" "$pins" actionlint "$plat" "$t/actionlint.tar.gz" >/dev/null \
             && tar -xzf "$t/actionlint.tar.gz" -C /usr/local/bin actionlint; } || miss+=(actionlint)
+        { bash "$pf" "$pins" ruff "$plat" "$t/ruff.tar.gz" >/dev/null \
+            && tar -xzf "$t/ruff.tar.gz" -C /usr/local/bin --strip-components=1 ruff-x86_64-unknown-linux-gnu/ruff; } || miss+=(ruff)
     else
-        miss+=(hadolint yq actionlint)
+        miss+=(hadolint yq actionlint ruff)
     fi
-    if command -v pipx >/dev/null 2>&1; then
-        PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install ruff >/dev/null 2>&1 \
-            || command -v ruff >/dev/null 2>&1 || miss+=(ruff)
-    else
-        miss+=(ruff)
-    fi
-    local uvarch misearch
-    uvarch="$([ "$arch" = x86_64 ] && echo x86_64 || echo aarch64)"; misearch="$([ "$arch" = x86_64 ] && echo x64 || echo arm64)"
-    command -v uv >/dev/null 2>&1 || { bash "$ghf" astral-sh/uv latest "uv-${uvarch}-unknown-linux-gnu.tar.gz" "$t/uv.tar.gz" >/dev/null \
+    local uvarch
+    uvarch="$([ "$arch" = x86_64 ] && echo x86_64 || echo aarch64)"
+    command -v uv >/dev/null 2>&1 || { bash "$pf" "$pins" uv "$plat" "$t/uv.tar.gz" >/dev/null \
         && tar -xzf "$t/uv.tar.gz" -C /usr/local/bin --strip-components=1 "uv-${uvarch}-unknown-linux-gnu/uv" "uv-${uvarch}-unknown-linux-gnu/uvx"; } || true
     command -v uv >/dev/null 2>&1 || miss+=(uv)
-    command -v mise >/dev/null 2>&1 || { bash "$ghf" jdx/mise latest "mise-v*-linux-${misearch}" /usr/local/bin/mise >/dev/null \
+    command -v mise >/dev/null 2>&1 || { bash "$pf" "$pins" mise "$plat" /usr/local/bin/mise >/dev/null \
         && chmod +x /usr/local/bin/mise; } || true
     command -v mise >/dev/null 2>&1 || miss+=(mise)
     if command -v npm >/dev/null 2>&1; then
         for bin in playwright web-ext; do
-            command -v "$bin" >/dev/null 2>&1 || npm install -g --foreground-scripts "$bin" >/dev/null 2>&1 || miss+=("$bin")
+            npm_program "$TREE" "$bin" || miss+=("$bin")
         done
         command -v corepack >/dev/null 2>&1 && corepack enable >/dev/null 2>&1 || true
         # Playwright's system libraries are an apt list of its own; the
@@ -399,8 +440,8 @@ extras() {
     case "$arch" in
         x86_64|aarch64)
             command -v cloudflared >/dev/null 2>&1 || {
-                bash "$ghf" cloudflare/cloudflared latest "cloudflared-linux-$( [ "$arch" = x86_64 ] && echo amd64 || echo arm64)" \
-                    /usr/local/bin/cloudflared >/dev/null && chmod +x /usr/local/bin/cloudflared; } || miss+=(cloudflared) ;;
+                bash "$pf" "$pins" cloudflared "$plat" /usr/local/bin/cloudflared >/dev/null \
+                    && chmod +x /usr/local/bin/cloudflared; } || miss+=(cloudflared) ;;
         *) miss+=(cloudflared) ;;
     esac
     rm -rf "$t"
@@ -523,16 +564,17 @@ export HOME="\$BUILDER_HOME" USER="${ACCOUNT}"
 exec /opt/aerieos/scripts/aerie "\$@"
 EOF
     chmod 0755 "$BB_BIN"
-    # The old name, while anything still calls it.
-    rm -f "$(dirname "$BB_BIN")/bb"   # the command's old name, on a machine that had it
 }
 
-# sudoers: the two root helpers the account may run, the image's rule.
+# sudoers: the root helpers the account may run: the image's two, and on a
+# machine of its own the one that carries the secrets folder across a move,
+# which is root's here and the account can neither read nor write.
 sudoers() {
     install -d -m 0750 "$(dirname "$SUDOERS")"
-    printf '%s\n' "# Written by AerieOS's install-controller.sh: the two root helpers, as in the image." \
+    printf '%s\n' "# Written by AerieOS's install-controller.sh: the image's two root helpers, and the secrets' carrier." \
         "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/mint-runner-token" \
-        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key" > "$SUDOERS.new"
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key" \
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/secrets-carry" > "$SUDOERS.new"
     chmod 0440 "$SUDOERS.new"
     if command -v visudo >/dev/null 2>&1 && ! visudo -cf "$SUDOERS.new" >/dev/null 2>&1; then
         rm -f "$SUDOERS.new"; die "the sudo rule did not check out (visudo -c), so it was not put in place"
@@ -704,36 +746,91 @@ cmd_firstboot() {
         [ "${#OS_FEATURES[@]}" -eq 0 ] || printf '   features asked for at install: %s\n' "$(tr '\n' ' ' < "$OS_FEATURES_FILE")"
     fi
     own_node || die "this machine did not become its controller's node (above): the unit runs again at the next boot"
+    # Said on the console as the failure is, so whatever watches a first
+    # boot (the image's boot test) stops on it rather than waiting it out.
+    say "first boot: this machine is its controller's node"
 }
 
 # ---- updates: the release fetched and put in place as an image pull is -----
-# fetch_tree [TAG]: the release's tree, unpacked in a folder of its own,
-# printed. The newest release when no tag is named, read from the releases
-# page's redirect the way the Dockerfile reads its tools' (no API budget).
+# release_signed TAG FILE NAME DIR: FILE, which the release TAG carries as
+# NAME, is the file the release's signed list names (R199): SHA256SUMS and
+# its signature are fetched into DIR, the signature is verified against
+# this install's signers, and FILE's own sha256 is the one the list gives
+# NAME. The tag says who may have signed: the namespace a signer is named
+# for is the channel, a pre-release (vX.Y.Z-dev.N, -rc.N, any name) takes a
+# list signed in either, and a stable release (vX.Y.Z) takes aerieos-release
+# alone, so the key the release build holds, which signs dev builds as they
+# publish themselves, can never sign a stable release. A list that is
+# unsigned, signed by nobody this install names or by somebody the tag may
+# not have, or one that does not name the file, stops the update with the
+# reason, and so does an install that names no signer at all: every tree
+# ships config/release-signers, so one without it is not a tree a release
+# made. The rule the OS updater (osimage.py), the stick maker
+# (tools/aerieos-stick.py) and the Library's downloads (apps.py) follow;
+# test_release_signing.py holds the four to one table of cases.
+release_signed() {
+    local tag="$1" file="$2" name="$3" d="$4" keys may ns="" want have rel who
+    keys="$(grep -v '^[[:space:]]*#' "$SIGNERS" 2>/dev/null | grep -c . || true)"
+    if [ "${keys:-0}" -eq 0 ]; then
+        die "this install names no release signer (its config/release-signers is missing or empty), so ${tag}'s signature cannot be checked: not taken"
+    fi
+    if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        may="aerieos-release"
+    elif [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[a-z][a-z0-9]*\.[0-9]+$ ]]; then
+        may="aerieos-release aerieos-dev"
+    else
+        die "${tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told: not taken"
+    fi
+    if [ "$may" = aerieos-release ] && ! grep -v '^[[:space:]]*#' "$SIGNERS" | grep -q '^[[:space:]]*aerieos-release[[:space:]]'; then
+        die "${tag} is a stable release and no stable signer is named yet: this install names only the key dev builds are signed with, and a stable release is signed by its own key's holder; not taken"
+    fi
+    command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is not here to check the release's signature: not taken"
+    rel="https://github.com/${REPO}/releases/download/${tag}"
+    if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" 2>/dev/null || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig" 2>/dev/null; then
+        die "${tag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig): it was made before releases were signed, or its key's holder has not signed it yet; not taken"
+    fi
+    # Each signer is asked for in the one namespace it is named for.
+    for want in aerieos-release aerieos-dev; do
+        if ssh-keygen -Y verify -f "$SIGNERS" -I "$want" -n "$want" -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1; then
+            ns="$want"; break
+        fi
+    done
+    [ -n "$ns" ] || die "${tag}'s list of files is signed by no key this install names: not taken"
+    case " $may " in
+        *" $ns "*) ;;
+        *) die "${tag} is a stable release and its list is signed by the key dev builds are signed with: a stable release takes its own key's signature alone; not taken" ;;
+    esac
+    # The file's own bytes against the list, whatever the sha256 beside it says.
+    want="$(awk -v n="$name" 'NF == 2 { f = $2; sub(/^\*/, "", f); if (f == n) { print tolower($1); exit } }' "$d/SHA256SUMS")"
+    [ -n "$want" ] || die "${name} is not in the list of files ${tag} signed: not taken"
+    have="$(sha256sum "$file" | awk '{print $1}')"
+    [ "$want" = "$have" ] || die "${name} is not the file ${tag} signed: its bytes are not the ones the signed list names; not taken"
+    who="AerieOS's release key"
+    [ "$ns" = aerieos-release ] || who="the key AerieOS's dev builds are signed with"
+    printf '   %s is the file %s'"'"'s list names, signed by %s\n' "$name" "$tag" "$who" >&2
+}
+
 # fetch_tree [TAG]: the release's controller bundle (R90 step 5), which the
 # release workflow publishes as aerieos-controller-X.Y.Z.tar.gz with its
 # sha256 beside it and a build attestation from GitHub: the archive checked
-# against the sha256, and against the attestation where gh is here to ask;
-# a release from before the bundle falls back to the tag's source archive,
-# said as such. The tree's directory is printed.
+# against the sha256, against the attestation where gh is here to ask, and
+# against the release's signed list of its files (release_signed). A release
+# that carries no bundle is not taken: the oldest release an install can come
+# from carries one (stateversion.SUPPORTED_FROM, and a release moves forward
+# only), and a tag's source archive is signed by nobody. The newest stable
+# release when no tag is named, read from the releases page's redirect the
+# way the Dockerfile reads its tools' (no API budget), else the newest
+# published release. The tree's directory is printed.
 fetch_tree() {
-    local tag="${1:-}" d url base ver sum
+    local tag="${1:-}" d base ver sum
     if [ -z "$tag" ]; then
         tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
         tag="${tag##*/}"
-        # No stable release yet: the newest dev build that carries the
-        # controller bundle, which is where AerieOS is. A build from before
-        # the name has a bundle named for the old product, so the newest
-        # release is not always the one (2 Nov, dev.4750 and before).
+        # No stable release yet: the newest published release, a dev build.
         case "$tag" in
             v[0-9]*) ;;
-            *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null \
-                      | python3 -c '
-import json, sys
-for r in json.load(sys.stdin):
-    t = str(r.get("tag_name") or "")
-    if t.startswith("v") and not r.get("draft") and any(a.get("name") == "aerieos-controller-%s.tar.gz" % t[1:] for a in r.get("assets") or []):
-        print(t); break' 2>/dev/null || true)" ;;
+            *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=1" 2>/dev/null \
+                      | python3 -c 'import json, sys; print(str((json.load(sys.stdin) or [{}])[0].get("tag_name") or ""))' 2>/dev/null || true)" ;;
         esac
         case "$tag" in v[0-9]*) ;; *) die "could not tell which release is the newest (https://github.com/${REPO}/releases/latest)" ;; esac
     fi
@@ -761,7 +858,8 @@ for r in json.load(sys.stdin):
                         "$d/att.json" "$d/att.jsonl" 2>/dev/null; then
                 att=(--bundle "$d/att.jsonl")
             fi
-            if gh attestation verify "$d/release.tar.gz" "${att[@]}" --repo "$REPO" >/dev/null 2>&1; then
+            if gh attestation verify "$d/release.tar.gz" "${att[@]}" --repo "$REPO" \
+                    --cert-identity-regex "$SIGNER_IDENTITY" >/dev/null 2>&1; then
                 printf '   build attestation: verified by gh\n' >&2
             else
                 die "gh attestation verify refused the bundle: not taken (a build not made by the release workflow, or a gh that wants a sign-in: gh auth login)"
@@ -769,35 +867,15 @@ for r in json.load(sys.stdin):
         else
             printf '   build attestation: gh is not here to check it; the sha256 is what held\n' >&2
         fi
-        # ...and signed by a release key this install already holds (R199):
-        # this tree's config/release-signers, never the download's, so who
-        # changes the repository can build and attest a bundle, not sign it.
-        local signers keys
-        signers="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/config/release-signers"
-        keys="$(grep -v '^[[:space:]]*#' "$signers" 2>/dev/null | grep -c . || true)"
-        if [ "${keys:-0}" -gt 0 ]; then
-            command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is not here to check the release's signature: not taken"
-            local rel="https://github.com/${REPO}/releases/download/${tag}"
-            if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig"; then
-                die "${tag} carries no signature yet: it is taken once its key's holder has signed it"
-            fi
-            ssh-keygen -Y verify -f "$signers" -I aerieos-release -n aerieos-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
-                || die "${tag}'s signature does not verify against this install's release key: not taken"
-            grep -q "^${sum}  \*\?aerieos-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
-                || die "the bundle is not the one ${tag} signed: not taken"
-            printf '   signed by AerieOS'"'"'s release key\n' >&2
-        else
-            printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
-        fi
-    elif [ "$http" = 404 ] && [ "$(printf '%s\n%s\n' "${ver%%-*}" 0.9.0 | sort -V | head -1)" != 0.9.0 ]; then
-        # Only a release from before the bundle, said not to have one, falls
-        # back to its source archive: any other failure to fetch the bundle
-        # (a server error, an asset taken off) is refused, never taken
-        # unverified.
-        url="https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz"
-        printf '   %s publishes no controller bundle (a release from before 0.9.0); its source archive is taken instead, unverified\n' "$tag" >&2
-        curl -fsSL -o "$d/release.tar.gz" "$url" || die "could not download ${url}"
+        # ...and the file the release's signed list names, by a key this
+        # install already holds (R199): who changes the repository can
+        # build and attest a bundle and put a sha256 beside it, not sign
+        # the list.
+        release_signed "$tag" "$d/release.tar.gz" "aerieos-controller-${ver}.tar.gz" "$d"
     else
+        # A bundle that cannot be fetched (a release that carries none, a
+        # server error, an asset taken off) is refused, never replaced by
+        # something unverified.
         die "the controller bundle could not be fetched (${base}: HTTP ${http:-no answer}): not taken"
     fi
     tar -xzf "$d/release.tar.gz" -C "$d"
@@ -926,7 +1004,7 @@ cmd_remove() {
     load_core
     [ "$(id -u)" -eq 0 ] || die "run this as root: sudo bash $0 --remove"
     what="the ${SERVICE} service, ${OPT} and ${RELEASES}, ${BB_BIN}, the sudo rule and the wall"
-    [ -f /etc/builderbot/node.json ] && [ -f "$ETC/own-node" ] && what="${what}, and this machine's node (provision-linux.sh --remove)"
+    { [ -f /etc/aerieos/node.json ] || [ -f /etc/builderbot/node.json ]; } && [ -f "$ETC/own-node" ] && what="${what}, and this machine's node (provision-linux.sh --remove)"
     if [ "$PURGE" = 1 ]; then
         # What --purge removes is the installer's own folders; a state the env
         # file moved elsewhere is named as staying, not as gone.
@@ -939,7 +1017,7 @@ cmd_remove() {
         read -r -p "Go ahead? [y/N] " ans
         case "$ans" in y|Y|yes) ;; *) echo "nothing was changed"; exit 0 ;; esac
     fi
-    if [ -f /etc/builderbot/node.json ] && [ -f "$ETC/own-node" ]; then
+    if { [ -f /etc/aerieos/node.json ] || [ -f /etc/builderbot/node.json ]; } && [ -f "$ETC/own-node" ]; then
         say "this machine's node"
         bash "$OPT/nodes/provision-linux.sh" --remove --yes || warn "the node's own uninstall did not finish: sudo bb-sandbox uninstall"
     fi
@@ -952,7 +1030,7 @@ cmd_remove() {
         runit)   rm -f "/var/service/${SERVICE}"; rm -rf "/etc/sv/${SERVICE}" ;;
     esac
     wall_remove
-    rm -f "$BB_BIN" "$(dirname "$BB_BIN")/bb" "$SUDOERS"
+    rm -f "$BB_BIN" "$SUDOERS"
     rm -rf "$RELEASES" "$SHIM"
     rm -f "$OPT"
     if [ "$PURGE" = 1 ]; then
@@ -979,7 +1057,10 @@ cmd_remove() {
 # own_node: this machine as an ordinary agent node of its own controller,
 # made the way any node is: a token minted from a shell on the controller
 # (aerie nodes enroll-token --own), then provision-linux.sh run as it is, from
-# the release, with --beside-controller. It dials the controller at the
+# the release, with --beside-controller, and with what an Enroll script
+# carries (--pins): the release key, which this node pins as any other does
+# and then takes its agent updates only signed, and the digest and the
+# signature the agent it fetches is held to. It dials the controller at the
 # address a remote node would (this machine's own on its network), so a
 # session there reaches it by that address and port and by nothing else.
 # A machine that is a node already is left as it is: of this controller,
@@ -990,14 +1071,14 @@ OWN_MARK="$ETC/own-node"
 OS_FEATURES_FILE="$P/var/lib/aerieos-os/features"
 declare -a OS_FEATURES=()
 own_node() {
-    local ip name tok ctl prov="$OPT/nodes/provision-linux.sh"
-    local -a dev=()
+    local ip name tok minted ctl prov="$OPT/nodes/provision-linux.sh"
+    local -a dev=() pins=()
     [ "$DEV" = 1 ] && dev=(--dev)
     say "this machine as a node of its own controller"
     ip="$(lan_ip)" || true
     [ -n "$ip" ] || { warn "this machine has no address on a network, so it cannot be a node of itself: --install again once it has one"; return 1; }
     ctl="http://${ip}:${PORT}"
-    if [ -f /etc/builderbot/node.json ]; then
+    if { [ -f /etc/aerieos/node.json ] || [ -f /etc/builderbot/node.json ]; }; then
         if [ -f "$OWN_MARK" ]; then
             bash "$prov" --session-user "$SESSION_USER" --user "$JOBS_USER" --beside-controller "${dev[@]}" \
                 || warn "provisioning this machine's node again did not finish (above)"
@@ -1007,10 +1088,17 @@ own_node() {
         return 0
     fi
     name="$(hostname -s 2>/dev/null || hostname)"
-    tok="$("$BB_BIN" nodes enroll-token "$name" --user "$JOBS_USER" --own)" \
+    minted="$("$BB_BIN" nodes enroll-token "$name" --user "$JOBS_USER" --own --pins)" \
         || { warn "the controller would not mint this machine a token (above)"; return 1; }
+    # The token on the first line, then the provisioner's words a line each.
+    tok="${minted%%$'\n'*}"
+    mapfile -t pins < <(printf '%s\n' "$minted" | sed 1d)
+    case " ${pins[*]} " in
+        *" --release-key "*) ;;
+        *) warn "the controller named no release key for this machine to pin (its config/aerieos-release.pub): this machine's node takes agent updates on the controller's word" ;;
+    esac
     bash "$prov" --controller "$ctl" --token "$tok" --user "$JOBS_USER" --session-user "$SESSION_USER" \
-        --beside-controller "${dev[@]}" "${OS_FEATURES[@]}" || { warn "this machine did not enroll as a node (above); --install again tries again"; return 1; }
+        "${pins[@]}" --beside-controller "${dev[@]}" "${OS_FEATURES[@]}" || { warn "this machine did not enroll as a node (above); --install again tries again"; return 1; }
     printf '%s\n' "$ctl" > "$OWN_MARK"
     printf '   enrolled as %s, at %s\n' "$name" "$ctl"
     printf '   Give this machine a fixed address: the node reaches its controller at %s.\n' "$ip"
@@ -1077,7 +1165,7 @@ boot_oneshot() {
 Description=${desc}
 After=network-pre.target
 Wants=network-pre.target
-Before=network.target ${SERVICE}.service builderbot-agent.service
+Before=network.target ${SERVICE}.service aerieos-agent.service builderbot-agent.service
 
 [Service]
 Type=oneshot

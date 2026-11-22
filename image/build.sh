@@ -4,14 +4,14 @@
 # two root slots, GRUB for UEFI and BIOS, and a data partition. Root, since
 # mkosi installs packages and the disk is assembled on a loop device.
 #
-#   sudo image/build.sh [--out DIR] [--tree-only] [--from-tree DIR]
+#   sudo image/build.sh [--out DIR] [--tree-only] [--from-tree DIR] [--all-disks]
 #
 # What comes out, under DIR (image/out by default), each with its .sha256:
-#   aerieos-os-VERSION.raw.xz         the whole disk, for an installed machine or a VM
-#   aerieos-os-VERSION.stick.raw.xz   the same disk with GRUB loading the slot into memory: the USB edition
+#   aerieos-os-VERSION.stick.raw.xz   the disk with GRUB loading the slot into memory: the USB edition
 #   aerieos-os-VERSION.iso            the installer: boots the same root live, lays a disk out with lay-disk
-#   aerieos-os-VERSION.qcow2          the same disk for Proxmox, libvirt and other QEMU hosts
-#   aerieos-os-VERSION.ova            the same disk for VMware and VirtualBox (a stream-optimized VMDK with its descriptor)
+#   aerieos-os-VERSION.qcow2          the same disk for Proxmox, libvirt and other QEMU hosts, which the boot test runs
+#   aerieos-os-VERSION.raw.xz         with --all-disks: the whole disk, for an installed machine or a VM
+#   aerieos-os-VERSION.ova            with --all-disks: the same disk for VMware and VirtualBox (a stream-optimized VMDK with its descriptor)
 #   aerieos-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot (R160 step 4)
 #   aerieos-os-VERSION.vmlinuz        the slot's kernel and initrd, kept on the ESP beside it
 #   aerieos-os-VERSION.initrd
@@ -21,9 +21,12 @@
 # appliance-publish); an update takes the slot out of the ISO.
 #
 # --tree-only stops after mkosi (the tree under DIR/mkosi/tree, for a look);
-# --from-tree DIR assembles the disk from a tree built before. The disk is
-# image/lay-disk's, its numbers image/partitions.sh's, and docs/image.md
-# says why each is so.
+# --from-tree DIR assembles the disk from a tree built before; --all-disks
+# makes the raw.xz and the OVA too, which no release carries and a tag's
+# build no longer spends its time on (R228 step 21). MKOSI_PACKAGE_CACHE
+# names a folder for mkosi's package cache, which the image workflow keeps
+# between runs. The disk is image/lay-disk's, its numbers
+# image/partitions.sh's, and docs/image.md says why each is so.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TREE_SRC="$(cd "$HERE/.." && pwd)"
@@ -32,6 +35,7 @@ TREE_SRC="$(cd "$HERE/.." && pwd)"
 OUT="$HERE/out"
 TREE_ONLY=0
 FROM_TREE=""
+ALL_DISKS=0
 MKOSI_PIN="${MKOSI_PIN:-25.3}"
 # The gh an OS update verifies the next image's build attestation with: a
 # pinned release checked against its sha256, since Debian's (2.46) predates
@@ -40,7 +44,7 @@ MKOSI_PIN="${MKOSI_PIN:-25.3}"
 GH_PIN=2.102.0
 GH_SHA256=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
 
-usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "build.sh: $*" >&2; exit 1; }
 say() { printf '\n== %s\n' "$*"; }
 
@@ -49,6 +53,7 @@ while [ $# -gt 0 ]; do
         --out) OUT="$(realpath -m "${2:?--out needs a directory}")"; shift 2 ;;
         --tree-only) TREE_ONLY=1; shift ;;
         --from-tree) FROM_TREE="$(realpath "${2:?--from-tree needs a directory}")"; shift 2 ;;
+        --all-disks) ALL_DISKS=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; exit 1 ;;
     esac
@@ -94,8 +99,13 @@ if [ -z "$TREE" ]; then
     } > "$OUT/controller-packages.conf"
     rm -rf "$OUT/mkosi"
     mkdir -p "$OUT/mkosi"
+    pkgcache=()
+    if [ -n "${MKOSI_PACKAGE_CACHE:-}" ]; then
+        mkdir -p "$MKOSI_PACKAGE_CACHE"
+        pkgcache=(--package-cache-dir "$MKOSI_PACKAGE_CACHE")
+    fi
     mkosi --directory "$HERE" --output-directory "$OUT/mkosi" --mirror "$MIRROR" \
-          --include "$OUT/controller-packages.conf" \
+          --include "$OUT/controller-packages.conf" "${pkgcache[@]}" \
           --environment "BUILDERBOT_OS_VERSION=$VERSION" --environment "BUILDERBOT_OS_REV=$(git -C "$TREE_SRC" rev-parse HEAD 2>/dev/null || echo unstamped)" \
           --force build
     TREE="$OUT/mkosi/tree"
@@ -208,12 +218,15 @@ fi
 rm -rf "$ISO"
 
 # ---- the same disk for a hypervisor (R160 step 3) ---------------------------
-# qcow2 for Proxmox, libvirt and other QEMU hosts; an OVA (a stream-optimized VMDK with
-# its descriptor and manifest) for VMware and VirtualBox. Converted from the
-# raw disk, never laid out again, so the three cannot drift.
+# qcow2 for Proxmox, libvirt and other QEMU hosts; with --all-disks an OVA (a
+# stream-optimized VMDK with its descriptor and manifest) for VMware and
+# VirtualBox. Converted from the raw disk, never laid out again, so they
+# cannot drift.
 say "the VM disks"
 need qemu-img "qemu-utils"
+rm -f "$OUT/$NAME.ova" "$OUT/$NAME.ova.sha256" "$OUT/$NAME.raw.xz.sha256"
 qemu-img convert -O qcow2 -c "$RAW" "$OUT/$NAME.qcow2"
+[ "$ALL_DISKS" = 1 ] && {
 OVA="$(mktemp -d)"
 qemu-img convert -O vmdk -o subformat=streamOptimized "$RAW" "$OVA/$NAME-disk1.vmdk"
 sed -e "s|@NAME@|$NAME|g" -e "s|@VMDK@|$NAME-disk1.vmdk|g" \
@@ -223,6 +236,7 @@ sed -e "s|@NAME@|$NAME|g" -e "s|@VMDK@|$NAME-disk1.vmdk|g" \
                  printf 'SHA256(%s)= %s\n' "$NAME-disk1.vmdk" "$(sha256sum "$NAME-disk1.vmdk" | cut -d' ' -f1)"; } > "$NAME.mf" \
   && tar -cf "$OUT/$NAME.ova" --owner=0 --group=0 --mtime="@$SOURCE_DATE_EPOCH" "$NAME.ovf" "$NAME.mf" "$NAME-disk1.vmdk" )
 rm -rf "$OVA"
+}
 # The USB edition (R161 steps 1 and 5): the same disk with aerie_toram=1 in
 # GRUB's environment, so a stick written from it runs from memory; the
 # stick maker (tools/aerieos-stick.py) writes this one.
@@ -239,10 +253,11 @@ losetup -d "$LOOP"; trap - EXIT
 say "compressing"
 # xz rather than zstd: a stick maker with nothing but Python's own library
 # opens it on Windows, a Mac and Linux alike (lzma is in the standard library).
-xz -q -T0 -6 "$RAW"
+if [ "$ALL_DISKS" = 1 ]; then xz -q -T0 -6 "$RAW"; else rm -f "$RAW"; fi
 xz -q -T0 -6 "$STICK"
 
 # ---- the stamps -------------------------------------------------------------
-( cd "$OUT" && for f in "$NAME.raw.xz" "$NAME.stick.raw.xz" "$NAME.iso" "$NAME.qcow2" "$NAME.ova" "$NAME.root.squashfs" "$NAME.vmlinuz" "$NAME.initrd" "$NAME.release" "$NAME.packages"; do sha256sum "$f" > "$f.sha256"; done )
+( cd "$OUT" && for f in "$NAME.raw.xz" "$NAME.stick.raw.xz" "$NAME.iso" "$NAME.qcow2" "$NAME.ova" "$NAME.root.squashfs" "$NAME.vmlinuz" "$NAME.initrd" "$NAME.release" "$NAME.packages"; do
+    [ ! -f "$f" ] || sha256sum "$f" > "$f.sha256"; done )
 say "done"
 for f in "$OUT/$NAME".*; do printf '   %s  %s\n' "$(stat -c %s "$f")" "$(basename "$f")"; done

@@ -4,12 +4,11 @@
 // this repository's own code makes, a definition's file and line, the ids a
 // suite names. Run over this copy of the tree, so the index it writes lands
 // beside the copy and never in the checkout.
-import { ok, done, DIR } from './lib.mjs';
+import { ok, done, DIR, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const map = (...args) => execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', REPO, ...args],
                                       { encoding: 'utf8' }).trim();
 
@@ -24,14 +23,14 @@ const def = map('find', 'openDocker');
 // on its line 30, and the answer to where a page variable lives was a
 // grep (B299). It names the file, the line and the kind, and points a
 // let at aerie map state for where it is assigned.
-{
+await section("A page-level let, var or const that is not a function is a definition", async () => {
   const at = (name, re) => re.test(map('find', name));
   ok(at('active', /^scripts\/dashboard\/page-state\.js:\d+  page-level let; aerie map state page-state\.js says where it is assigned$/m)
      && at('refreshBusy', /page-poll\.js:\d+  page-level let/) && at('popWins', /page-state\.js:\d+  page-level const$/m)
      && /nothing defines/.test(map('find', 'noSuchNameAnywhere')),
      `find answers for a page-level let or const with its file, line and kind, and still says when nothing defines a name (${
         map('find', 'active').trim().slice(0, 80)})`);
-}
+});
 ok(/^scripts\/dashboard\/tab-docker\.js:\d+ to \d+  function$/m.test(def),
    `find names a function's file, line and span (${def.split('\n')[0]})`);
 
@@ -94,8 +93,7 @@ ok(names.includes('toolchains') && !names.some(n => n.startsWith('lab-')),
 
 // aerie tests preflight: the plan from named files (the copy this runs in has
 // no .git, so the branch half is not asked here).
-const pre = (...files) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'tests', 'preflight', '--dry', '--files', ...files],
-                                       { encoding: 'utf8', env: { ...process.env, BB_TREE: REPO } });
+const pre = (...files) => aerie(['tests', 'preflight', '--dry', '--files', ...files], { env: { BB_TREE: REPO } });
 const plan = pre('scripts/dashboard/tab-docker.js');
 ok(/suites:.*\bdevapp\b/.test(plan),
    `a dashboard script change plans the suites that reach it (${plan.match(/suites:.*/)?.[0].slice(0, 60)})`);
@@ -105,6 +103,12 @@ ok(/suites:.*\bdevapp\b/.test(plan),
 ok(/checks:\s+lint voice design/.test(pre('scripts/dashboard/index.html'))
    && /checks:\s+lint voice design/.test(pre('docs/design-language.md')),
    'a change to the stylesheet or the design language plans the design check');
+// ...a stylesheet alone too (page-*.css, out of index.html since 16 Nov),
+// which planned no suite at all; and the check is uniform's three parts,
+// run among the suites, where it had been part a alone after them (B987).
+const css = pre('scripts/dashboard/page-surfaces.css');
+ok(/checks:\s+lint voice design/.test(css) && /suites:\s+uniform uniform-b uniform-c\s*$/m.test(css),
+   `a change to a stylesheet alone plans the design check as uniform's three parts (${css.match(/suites:.*/)?.[0]})`);
 ok(/suites:\s+ALL/.test(pre('scripts/dashboard/server.py')), 'a change to server.py is the whole suite, said as such');
 ok(/suites:\s+none/.test(pre('README.md')) && /checks:\s+lint voice$/m.test(pre('README.md')),
    'a change with no suite still gets the lint and voice checks');
@@ -121,11 +125,11 @@ ok(/suites:.*\bphone\b/.test(pre('scripts/dashboard/page-bell.js')),
 // root helper, which test_sandbox_gpu.py runs as the bash it is) is placed
 // by that unit file, since the unit tier is the first thing a preflight
 // runs: before this a change there could never come out clean.
-{
+await section("A file no browser suite reaches but a unit file runs", async () => {
   const prov = pre('nodes/provision-linux.sh');
   ok(/unit:\s+nodes\/provision-linux\.sh is run by .*test_sandbox_gpu\.py/.test(prov) && !/no suite reaches/.test(prov),
      `a change only the unit tier runs is placed by the unit file that names it (${prov.match(/unit:.*/)?.[0].slice(0, 80)})`);
-}
+});
 
 // The other C-shaped languages: the companion app's Kotlin. `fun` opens a
 // definition, a trailing lambda (Row(...) { ... }) is a call and not a
@@ -140,7 +144,7 @@ ok(/ProjectScreen\.kt:\d+  from Roadmap\b/.test(pill) && /Screens\.kt:\d+  from 
 // nothing passes by name. A handler handed to onclick without a call is a
 // use; only a function no token anywhere names is unused. Proved on a file
 // written into this copy, since the tree's own page has none.
-{
+await section("Dead code by measurement", async () => {
   const dead = `${REPO}/scripts/dashboard/zz-probe-dead.js`;
   writeFileSync(dead, 'function neverUsedAnywhere(){ return 1; }\nfunction handedOver(){ return 2; }\nconst pick = handedOver;\n');
   const un = map('unused', 'scripts/dashboard/zz-probe-dead.js');
@@ -155,7 +159,7 @@ ok(/ProjectScreen\.kt:\d+  from Roadmap\b/.test(pill) && /Screens\.kt:\d+  from 
   ok(/nothing calls neverUsedAnywhere, and nothing passes it by name/.test(map('who-calls', 'neverUsedAnywhere')),
      '...and says both halves when neither happens');
   execFileSync('rm', ['-f', dead]);
-}
+});
 
 // ...and in python (B227): devactions.py hands its compose job runner to the
 // jobs module by name, which read as nothing passing it.
@@ -165,7 +169,7 @@ ok(/devactions\.py:\d+  passed by name in configure  \| .*runner\.register\("com
 // A plan keeps its words and its addresses move under it (item 7 of the
 // 23 Sep list): `file ~line` in the roadmap's details is checked against
 // where the name beside it is now, and a name that is nowhere is said.
-{
+await section("A plan keeps its words and its addresses move under it", async () => {
   const txt = `${REPO}/.bb-map/probe-addresses.txt`;
   const at = map('find', 'openDocker').match(/:(\d+)/)[1];      // a true address, wherever it is today
   writeFileSync(txt, ['  R2  a plan', '       details: The picker is hideTab() in scripts/dashboard/page-tabs.js (~4634), and',
@@ -178,21 +182,22 @@ ok(/devactions\.py:\d+  passed by name in configure  \| .*runner\.register\("com
   ok(/^1 address still inside the name beside it, 0 with no name/m.test(adr),
      '...and one that still holds is counted, not listed');
   execFileSync('rm', ['-f', txt]);
-}
+});
 
 // An arrow with an expression body is a function too (B224): `const
-// drawLinux = () => drawShellCard(...)` was in no answer at all, so a
-// refactor read it as nothing. Found, and seen passed by name.
-ok(/^scripts\/dashboard\/page-commands\.js:\d+  arrow$/m.test(map('find', 'drawLinux')),
+// isPhone = () => window.matchMedia(...)` was in no answer at all, so a
+// refactor read it as nothing. Found; and a function handed over by its
+// name is seen passed by name.
+ok(/^scripts\/dashboard\/page-tabs\.js:\d+  arrow$/m.test(map('find', 'isPhone')),
    'an expression-bodied arrow is a definition');
-ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("linux", drawLinux\)/.test(map('who-calls', 'drawLinux')),
-   '...and who-calls sees it handed to the card draw');
+ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("doctor", drawDoctor\)/.test(map('who-calls', 'drawDoctor')),
+   '...and who-calls sees a function handed to the card draw');
 
 // The page's mutable state (B223): every page-level `let`, where it is
 // assigned and from what. A binding fed from `state` is a copy of the poll
 // kept by hand, which is how B213 and B215 happened; the view puts those
 // first so a sweep starts there. Proved on a file written into this copy.
-{
+await section("The page's mutable state", async () => {
   const st = `${REPO}/scripts/dashboard/zz-probe-state.js`;
   writeFileSync(st, ['let mirror = null, timer = null;', 'let cache = null;', 'let count = 0;',
                      'function refresh(){ mirror = state.thing; }',
@@ -210,19 +215,19 @@ ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("linux", drawLi
      '...a timer and a counter read as local, the second on its first line and ++ counted as an assignment');
   ok(at('mirror') < at('cache') && at('cache') < at('timer'), 'state first, then fetches, then the local ones');
   execFileSync('rm', ['-f', st]);
-}
+});
 
 // Coverage (R76 steps 2 to 4): the instrumenter puts a counter at the head
 // of every function body it knows the position of, and a merged count file
 // answers which suites reached a function.
-{
+await section("Coverage (R76 steps 2 to 4)", async () => {
   const dir = `${REPO}/.bb-map/probe-dash`;
   execFileSync('rm', ['-rf', dir]); execFileSync('mkdir', ['-p', dir]);
   for (const f of ['tab-docker.js', 'index.html', 'nb-roadmap.js'])
     execFileSync('cp', [`${REPO}/scripts/dashboard/${f}`, `${dir}/${f}`]);
   const said = execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, 'instrument', dir], { encoding: 'utf8' });
   const inst = readFileSync(`${dir}/tab-docker.js`, 'utf8');
-  ok(/instrumented \d+ functions in 3 files/.test(said) && /async function loadDocker\(\)\{__bbcov\("scripts\/dashboard\/tab-docker\.js:loadDocker#1"\);/.test(inst),
+  ok(/instrumented \d+ functions in 3 files/.test(said) && /function loadDocker\(\)\{__bbcov\("scripts\/dashboard\/tab-docker\.js:loadDocker#1"\);/.test(inst),
      `the instrumenter counts a function body at its opening brace, keyed by name and ordinal so a line shift keeps the count (${said.trim()})`);
   ok(/<script>var __bbcovc/.test(readFileSync(`${dir}/index.html`, 'utf8')), '...and defines the counter at the head of the page');
   execFileSync('node', ['--check', `${dir}/tab-docker.js`]); execFileSync('node', ['--check', `${dir}/nb-roadmap.js`]);
@@ -236,7 +241,7 @@ ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("linux", drawLi
      'covered NAME names the suite that ran it and how often');
   // ...and a change measured by it (the operator, 29 Sep): the lines a
   // change touched, the function they fall in, the suites that reached it.
-  const ldLine = readFileSync(`${REPO}/scripts/dashboard/tab-docker.js`, 'utf8').split('\n').findIndex(l => /^async function loadDocker\(/.test(l)) + 2;
+  const ldLine = readFileSync(`${REPO}/scripts/dashboard/tab-docker.js`, 'utf8').split('\n').findIndex(l => /^function loadDocker\(/.test(l)) + 2;
   const aff = map('affected', '--ranges', `scripts/dashboard/tab-docker.js:${ldLine}-${ldLine}`);
   ok(/^by coverage \(last covered run .*\): \d+ suites?/.test(aff) && /  probe-suite  \(loadDocker\(\)\)/.test(aff),
      `affected names the suite the covered run says reached the changed function (${aff.split('\n').slice(0, 2).join(' | ').slice(0, 120)})`);
@@ -248,25 +253,43 @@ ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("linux", drawLi
   ok(!/\bloadDocker\b/.test(unc), '...and not the one the ingested counts reached');
   execFileSync('rm', ['-rf', dir]);
   if (before === null) execFileSync('rm', ['-f', `${REPO}/.bb-map/coverage.json`]); else writeFileSync(`${REPO}/.bb-map/coverage.json`, before);
-}
+});
 
 // A file by its sections: the unit a cleanup moves, with what reaches in
 // from outside and what runs at load, which is what decides whether a
-// section can leave the page whole.
-const sec = map('sections', 'scripts/dashboard/index.html');
-ok(/^scripts\/dashboard\/index\.html: \d+ sections, \d+ top-level definitions$/m.test(sec)
-   && /^\s+\d+  the welcome panel: the guide, and the changelog: \d+ functions, \d+ callers? from outside/m.test(sec)
+// section can leave the page whole. What runs at load is page-boot.js's,
+// a section a part (R9 step 5).
+const sec = map('sections', 'scripts/dashboard/page-boot.js');
+ok(/^scripts\/dashboard\/page-boot\.js: \d+ sections, \d+ top-level definitions$/m.test(sec)
+   && /^\s+\d+  the welcome panel: the guide, and the changelog: \d+ functions?, \d+ callers? from outside/m.test(sec)
    && /^\s+\d+  tabs: \d+ functions?, \d+ callers? from outside/m.test(sec),
    'sections lists a file by its headers with each section\'s functions and outside callers');
 
 // Nested definitions are shown under their parent.
-const defs = map('defs', 'scripts/dashboard/nb-roadmap.js');
-ok(/^\d+-\d+  function nbRoadmapView$/m.test(defs) && /^  \d+-\d+  function drawRoadmap  \(in nbRoadmapView\)$/m.test(defs)
-   && /^  \d+-\d+  arrow onclick  \(in drawRoadmap\)/m.test(defs),
+const defs = map('defs', 'scripts/dashboard/nb-bugs.js');
+ok(/^\d+-\d+  function nbBugsView$/m.test(defs) && /^  \d+-\d+  function drawBugs  \(in nbBugsView\)$/m.test(defs)
+   && /^  \d+-\d+  arrow onclick  \(in drawBugs\)/m.test(defs),
    'defs lists a file top down, a function under the closure it lives in and a callback under its function');
 
+// The index is two files (R228 step 16): what each file calls and passes by
+// name, most of its bytes, beside the rest, and a definition is found with
+// the calls file out of reach; several names are one ask.
+await section("A definition is found without the calls, and several names are one ask", async () => {
+  const dir = `${REPO}/.bb-map`;
+  const core = statSync(`${dir}/map5.json`).size, calls = statSync(`${dir}/map5-calls.json`).size;
+  ok(calls > core, `the calls are a file of their own, the larger (${core} and ${calls} bytes)`);
+  renameSync(`${dir}/map5-calls.json`, `${dir}/map5-calls.json.away`);
+  let found = '';
+  try { found = map('find', 'openDocker'); } finally { renameSync(`${dir}/map5-calls.json.away`, `${dir}/map5-calls.json`); }
+  ok(/tab-docker\.js:\d+ to \d+  function/.test(found), `...and a definition is found without them (${found.split('\n')[0]})`);
+  ok(/tab-docker\.js/.test(map('who-calls', 'openDocker')), '...while who-calls reads them');
+  const two = map('find', 'openDocker', 'tmux_sessions');
+  ok(/^\$ aerie map find openDocker\n[^$]*tab-docker\.js[\s\S]*^\$ aerie map find tmux_sessions\n[^$]*server\.py/m.test(two),
+     `several names are one ask, each answer under its own line (${two.split('\n').length} lines)`);
+});
+
 // It rebuilds itself when a source is newer, and not otherwise.
-const stamp = () => readFileSync(`${REPO}/.bb-map/map4.json`, 'utf8').match(/"built": ([\d.]+)/)[1];
+const stamp = () => readFileSync(`${REPO}/.bb-map/map5.json`, 'utf8').match(/"built": ([\d.]+)/)[1];
 const before = stamp();
 map('find', 'openDocker');
 ok(stamp() === before, 'a query on an unchanged tree does not rebuild');
@@ -277,14 +300,14 @@ ok(/\(1 file scanned\)/.test(map()), '...rescanning that file alone and keeping 
 
 // An index of another format is rebuilt, never read: the first map crashed
 // with a KeyError on every question when it met a newer index on the tree.
-{
-  const f = `${REPO}/.bb-map/map4.json`;
+await section("An index of another format is rebuilt, never read", async () => {
+  const f = `${REPO}/.bb-map/map5.json`;
   const good = readFileSync(f, 'utf8');
   writeFileSync(f, JSON.stringify({ built: 1, files: { 'scripts/aerie': { mtime: 1, lang: 'sh' } }, defs: [], calls: [], draws: [] }));
   ok(/^scripts\/dashboard\/tab-docker\.js:\d+ to \d+  function$/m.test(map('find', 'openDocker')),
      'an index of another format is rebuilt and the question answered');
   writeFileSync(f, good);
-}
+});
 
 // Refusals say what to type.
 let said = '';
@@ -294,7 +317,7 @@ ok(/no verb called nope; aerie map -h lists them/.test(said), 'an unknown verb i
 // A tree the map cannot write into (a project this session only reads,
 // bound read-only into its view) still answers: the map is built in
 // memory and nothing is left behind.
-{
+await section("A tree the map cannot write into", async () => {
   const ro = join(DIR, 'ro-tree');
   mkdirSync(ro, { recursive: true });
   writeFileSync(join(ro, 'thing.py'), 'def only_here_fn():\n    return 1\n');
@@ -305,7 +328,7 @@ ok(/no verb called nope; aerie map -h lists them/.test(said), 'an unknown verb i
   chmodSync(ro, 0o755);
   ok(/thing\.py:1/.test(out) && !err && !existsSync(join(ro, '.bb-map')),
      `a tree the map cannot write into is answered from a map built in memory, with nothing written (${(out || err).trim().slice(0, 60)})`);
-}
+});
 ok(/nothing defines noSuchFunctionAnywhere/.test(map('find', 'noSuchFunctionAnywhere')),
    'an unknown name gets a sentence, not an empty screen');
 
@@ -315,7 +338,7 @@ ok(/nothing defines noSuchFunctionAnywhere/.test(map('find', 'noSuchFunctionAnyw
 // any project the dashboard did not create, and a worktree of one. It used
 // to be written only when the dashboard created the project, and a session's
 // `git add -A` elsewhere took a multi-megabyte index into a commit.
-{
+await section("the index stays out of git", async () => {
   const { mkdtempSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const env = { ...process.env, GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@x.invalid',
@@ -323,7 +346,7 @@ ok(/nothing defines noSuchFunctionAnywhere/.test(map('find', 'noSuchFunctionAnyw
   const g = (cwd, ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8', env }).trim();
   const build = root => execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', root, 'build'],
                                      { encoding: 'utf8' });
-  const ignored = root => { try { g(root, 'check-ignore', '-q', '.bb-map/map4.json'); return true; }
+  const ignored = root => { try { g(root, 'check-ignore', '-q', '.bb-map/map5.json'); return true; }
                             catch { return false; } };
   const t = mkdtempSync(`${tmpdir()}/bbmap-`);
   g(t, 'init', '-q', '-b', 'main');
@@ -346,10 +369,10 @@ ok(/nothing defines noSuchFunctionAnywhere/.test(map('find', 'noSuchFunctionAnyw
   try { execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', plain, 'exclude'],
                      { encoding: 'utf8', stdio: 'pipe' }); }
   catch (e) { why = String(e.stderr || ''); }
-  ok(existsSync(`${plain}/.bb-map/map4.json`) && /not in a git repository/.test(why),
+  ok(existsSync(`${plain}/.bb-map/map5.json`) && /not in a git repository/.test(why),
      '...while a tree with no repository still gets its map, and aerie map exclude says why it wrote nothing');
   g(t, 'worktree', 'remove', '--force', `${t}-wt`);
   for (const d of [t, plain]) rmSync(d, { recursive: true, force: true });
-}
+});
 
 await done(null);

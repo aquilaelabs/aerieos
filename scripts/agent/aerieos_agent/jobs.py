@@ -1,4 +1,5 @@
 """A job: one piece of work the controller sent, run on its own thread."""
+import collections
 import contextlib
 import json
 import os
@@ -13,7 +14,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, NotHeld, fs_holds, log, pack_signins, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -56,6 +57,86 @@ def pump(job, stream, keep_blank=True):
     return t
 
 
+# How long a job's output is still waited on once its process and everything
+# left in its group have ended (B983).
+TAIL_S = 10
+
+
+def _group_alive(pgid):
+    """Whether any process is left in the group a job's process led (each is
+    started with start_new_session, so its pid is its group's id)."""
+    try:
+        os.killpg(pgid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True                   # there, and not ours to signal
+
+
+def watched(job, p, timeout, keep_blank=True, late="timed out after {n}s, killing it"):
+    """A job's child, started, seen to its end; answers (its exit code,
+    whether it was killed at its deadline, whether the job was stopped).
+
+    The one loop every runner of a child uses (the job's command, a system
+    step, a command as root, an agent's installer), which each wrote out and
+    which were mended four at a time: its output is read on a thread of its
+    own (pump) while this one posts the log on a clock, so a child that
+    prints a line and then works in silence has the line posted and a cancel
+    sent on the log's reply can arrive; at `timeout` seconds it says `late`
+    and its whole group is killed; and a child that has exited while
+    something it started still holds its output is not waited on for good
+    (left_holding). `job` may be a stand-in that cannot post, be canceled or
+    hold a process (a check's, a test's): what it lacks is skipped."""
+    flush = getattr(job, "flush", None) or (lambda: True)
+    stopped = lambda: bool(getattr(job, "canceled", False))  # noqa: E731
+    with contextlib.suppress(AttributeError):
+        job.proc = p
+    if stopped():                         # asked to stop while it was starting
+        Job._kill(p)
+    reader = pump(job, p.stdout, keep_blank=keep_blank)
+    deadline, killed, emptied = time.monotonic() + timeout, False, [None]
+    while reader.is_alive():
+        reader.join(0.5)
+        if getattr(job, "pending", None):
+            flush()
+        if time.monotonic() > deadline and not killed:
+            job.say(late.format(n=int(timeout)) + "\n")
+            Job._kill(p)
+            killed = True
+        if left_holding(job, p, emptied):
+            break
+    code = p.wait()
+    with contextlib.suppress(OSError):
+        p.stdout.close()
+    with contextlib.suppress(AttributeError):
+        job.proc = None
+    return code, killed, stopped()
+
+
+def left_holding(job, p, since):
+    """Whether to stop waiting for a job's output (B983). The loops that run
+    a job wait for its pipe to close, which a process that left the job's
+    group (setsid) can hold for ever after the job's own process and the
+    rest of its group have ended, or been killed at the timeout: the job
+    stayed running and held every update of this agent as busy. True once
+    the process has ended, nothing is left in its group, and TAIL_S has
+    passed with the pipe still open, said in the job's log. `since` is the
+    caller's one-item list, the moment the group was first found empty.
+    A group with anything still in it is the job's own work, waited for as
+    before, up to the job's timeout."""
+    if p.poll() is None or _group_alive(p.pid):
+        since[0] = None
+        return False
+    if since[0] is None:
+        since[0] = time.monotonic()
+        return False
+    if time.monotonic() - since[0] < TAIL_S:
+        return False
+    job.say("its output is still held open by a process that left its group; not waited for\n")
+    return True
+
+
 def _last_frame(line):
     """A line a progress meter redrew in place (frames joined by carriage
     returns) as the frame it ended on. Every frame used to go into the log:
@@ -81,7 +162,11 @@ class Job(threading.Thread):
     def __init__(self, agent, job):
         super().__init__(daemon=True, name=job["id"])
         self.agent, self.job = agent, job
-        self.pending, self.seq = [], 0
+        # The lines not yet sent, oldest first, and how many bytes they are:
+        # counted as they come and go. Summed again on every line, a job that
+        # printed faster than it could send took seconds a line, with the
+        # lock held against the heartbeat (20,000 unsent lines: 7.6 s).
+        self.pending, self.seq, self.held = collections.deque(), 0, 0
         self.lock = threading.Lock()
         # A cancel is a fact about the job on the controller's row, and it
         # reaches here two ways: named in a work reply, or as `cancel: true`
@@ -129,19 +214,21 @@ class Job(threading.Thread):
             for i in range(0, len(text), 32 * 1024):
                 self.seq += 1
                 self.pending.append({"seq": self.seq, "chunk": text[i:i + 32 * 1024]})
-            held = sum(len(c["chunk"]) for c in self.pending)
-            if held > self.PENDING_CAP:
+            self.held += len(text)
+            if self.held > self.PENDING_CAP:
                 dropped, at = 0, None
-                while self.pending and held > self.PENDING_CAP // 2:
-                    gone = self.pending.pop(0)
+                while self.pending and self.held > self.PENDING_CAP // 2:
+                    gone = self.pending.popleft()
                     at = gone["seq"] if at is None else at
                     dropped += len(gone["chunk"])
-                    held -= len(gone["chunk"])
+                    self.held -= len(gone["chunk"])
                 # At the seq of the first chunk that went, which the
                 # controller orders by: with a new one it read as after the
                 # chunks that were kept, not where the gap is.
-                self.pending.insert(0, {"seq": at, "chunk": f"[{dropped} bytes of output dropped here: "
-                                        "the controller was unreachable and this job kept talking]\n"})
+                note = (f"[{dropped} bytes of output dropped here: "
+                        "the controller was unreachable and this job kept talking]\n")
+                self.pending.appendleft({"seq": at, "chunk": note})
+                self.held += len(note)
 
     BATCH = 40 * 1024      # under the controller's 64KB body cap, with headroom
     # How long a job's end may be refused by a controller that is answering
@@ -167,7 +254,8 @@ class Job(threading.Thread):
                     more = len(json.dumps(self.pending[0]["chunk"]))
                     if batch and size + more > self.BATCH:
                         break
-                    batch.append(self.pending.pop(0))
+                    batch.append(self.pending.popleft())
+                    self.held -= len(batch[-1]["chunk"])
                     size += more
             if not batch:
                 with self.lock:
@@ -194,12 +282,14 @@ class Job(threading.Thread):
             if st in (400, 401, 403, 404, 413):
                 with self.lock:
                     left = len(self.pending)
-                    self.pending = []
+                    self.pending.clear()
+                    self.held = 0
                 log(f"{self.job['id']}: log refused ({st}); dropping {len(batch) + left} chunk(s)")
                 return True
             if st != 200:
                 with self.lock:
-                    self.pending = batch + self.pending
+                    self.pending.extendleft(reversed(batch))
+                    self.held += sum(len(c["chunk"]) for c in batch)
                 self.refused = st
                 return False
             self._answered(r)
@@ -216,6 +306,28 @@ class Job(threading.Thread):
             with contextlib.suppress(OSError):
                 os.write(self.tty, (str(r["input"]) + "\n").encode())
 
+    # The job types whose whole run is one call into the agent, by the name
+    # of the method: each is handed the job and its spec, and what it
+    # answers is the job's state and exit. A type that does more than call
+    # (compose, toolchain, the sign-ins) is spelled out in run(), and a type
+    # in neither place is a command.
+    RUNNERS = {
+        "self-update": "self_update",
+        "system": "system",
+        # The node's own scanners over its projects (R145, scan.py).
+        "scan": "scan",
+        "vm": "vm",
+        "image": "image",
+        "sign": "sign",
+        "sign-key": "sign_key",
+        "cache-clear": "cache_clear",
+        "storage": "storage_measure",
+        "avd-remove": "avd_remove",
+        "phones-idle": "phones_idle",
+        "claude-update": "claude_update",
+        "tell": "tell",
+    }
+
     def run(self):
         spec = self.job.get("spec") or {}
         error = ""
@@ -231,20 +343,15 @@ class Job(threading.Thread):
         # while it ran (B250).
         self.flush()
         try:
-            if self.job.get("type") == "self-update":
-                state, code = self.agent.self_update(self, spec)
-            elif self.job.get("type") == "system":
-                state, code = self.agent.system(self, spec)
-            elif self.job.get("type") == "compose":
+            kind = self.job.get("type")
+            runner = self.RUNNERS.get(kind) if isinstance(kind, str) else None
+            if runner:
+                state, code = getattr(self.agent, runner)(self, spec)
+            elif kind == "compose":
                 # Port 80 let go while containers start (R202).
                 with http80.paused():
                     state, code = self.agent.compose(self, spec)
-            elif self.job.get("type") == "scan":
-                # The node's own scanners over its projects (R145, scan.py).
-                state, code = self.agent.scan(self, spec)
-            elif self.job.get("type") == "vm":
-                state, code = self.agent.vm(self, spec)
-            elif self.job.get("type") == "toolchain":
+            elif kind == "toolchain":
                 state, code = self.agent.toolchain(self, spec)
                 # A recipe landed or left: the session environment is built
                 # from the store's layout when the session half is set up,
@@ -260,39 +367,41 @@ class Job(threading.Thread):
                     # just landed read as failed until the next hello (the
                     # operator, 12 Oct: Build-Tools, installed, said failed).
                     self.agent.hello()
-            elif self.job.get("type") == "image":
-                state, code = self.agent.image(self, spec)
-            elif self.job.get("type") == "sign":
-                state, code = self.agent.sign(self, spec)
-            elif self.job.get("type") == "sign-key":
-                state, code = self.agent.sign_key(self, spec)
-            elif self.job.get("type") == "cache-clear":
-                state, code = self.agent.cache_clear(self, spec)
-            elif self.job.get("type") == "storage":
-                state, code = self.agent.storage_measure(self, spec)
-            elif self.job.get("type") == "avd-remove":
-                state, code = self.agent.avd_remove(self, spec)
-            elif self.job.get("type") == "phones-idle":
-                state, code = self.agent.phones_idle(self, spec)
-            elif self.job.get("type") in ("claude-login", *AGENT_LOGINS):
+            elif kind in ("claude-login", *AGENT_LOGINS):
                 # Claude's, or another coding agent's (R95 step 3): the same
                 # pty and the same channel, `aerie login --flow` told which.
-                state, code = self.claude_login(spec, AGENT_LOGINS.get(self.job.get("type"), ""))
+                state, code = self.claude_login(spec, AGENT_LOGINS.get(kind, ""))
                 # Said on the next heartbeat rather than in five minutes:
                 # the row that asked is waiting to read who signed in.
                 self.agent._logins_at = 0
-            elif self.job.get("type") in ("claude-logout", *AGENT_LOGOUTS):
-                state, code = self.claude_logout(spec, AGENT_LOGOUTS.get(self.job.get("type"), ""))
+            elif kind in ("claude-logout", *AGENT_LOGOUTS):
+                state, code = self.claude_logout(spec, AGENT_LOGOUTS.get(kind, ""))
                 self.agent._logins_at = 0
-            elif self.job.get("type") == "claude-update":
-                state, code = self.agent.claude_update(self, spec)
-            elif self.job.get("type") in AGENT_INSTALLS:
+            elif kind in ("agent-login", "agent-logout"):
+                # A pack's coding agent's (R233 step 6): one pair of jobs
+                # for all of them, the spec naming which, and only one this
+                # node's bundle carries with a sign-in its pack describes.
+                # The same pty and channel; `aerie login` drives its screens
+                # from the pack's words (scripts/lib/login-flow.py).
+                which = str(spec.get("agent") or "")
+                if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", which) or which in ("claude", *AGENT_LOGINS.values()):
+                    self.say("refused: a pack's agent's sign-in names the agent it is for\n")
+                    state, code = "failed", 64
+                elif kind == "agent-login":
+                    state, code = self.claude_login(spec, which, pack=True)
+                else:
+                    state, code = self.claude_logout(spec, which, pack=True)
+                self.agent._logins_at = 0
+            elif kind in AGENT_INSTALLS:
                 # The other coding agents' installs (R95 step 2).
                 state, code = self.agent.agent_update(self, spec)
-            elif self.job.get("type") == "tell":
-                state, code = self.agent.tell(self, spec)
             else:
                 state, code = self.exec(spec)
+        except NotHeld as e:
+            # Work in the account's folder this machine does not do as the
+            # account (base.fs_holds): the row says that, and nothing ran as root.
+            self.say(f"{e}\n")
+            state, code, error = "failed", 70, str(e)
         except Exception as e:                       # noqa: BLE001 (reported, not raised)
             # Broad because a runner's bug is this job's failure, not the
             # agent's: the row carries the sentence, the journal the traceback.
@@ -360,7 +469,24 @@ class Job(threading.Thread):
             time.sleep(delay)
             delay = min(delay * 2, 60)
 
-    def claude_login(self, spec, agent=""):
+    def pack_bundle(self, agent, into, who, rooted):
+        """The bundle a pack's agent's sign-in runs from: the controller's,
+        fetched now, since what the pack says of its sign-in is in the
+        controller's bundle the moment the pack is added or updated and in
+        the copy kept here only once something fetches it (a sign-in ran a
+        flow from before its pack's update, met on the dev pair); `into`,
+        the copy here, when the controller's cannot be had. '' with the
+        refusal said when neither carries the agent's sign-in."""
+        fresh = self.agent.bundle(self, who)
+        if fresh and rooted:
+            fresh = os.path.realpath(os.path.join(ROOT_BUNDLE_DIR, "current"))
+        for at in (fresh, into):
+            if at and agent in pack_signins(at):
+                return at
+        self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
+        return ""
+
+    def claude_login(self, spec, agent="", pack=False):
         """`claude auth login` on this machine, under a pty, as the SESSION
         account (roadmap R47).
 
@@ -398,6 +524,10 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
+        if pack:
+            into = self.pack_bundle(agent, into, who, bool(root_bb))
+            if not into:
+                return "failed", 64
         # The AerieOS account, so the bundle's own user_home resolves the
         # same per-account home bb-tty gives a session here. Resolved there
         # rather than here: one implementation of "where does this account
@@ -491,7 +621,7 @@ class Job(threading.Thread):
         code = self.proc.wait()
         return ("succeeded" if code == 0 else "failed"), code
 
-    def claude_logout(self, spec, agent=""):
+    def claude_logout(self, spec, agent="", pack=False):
         """`claude auth logout` on this machine for one AerieOS account,
         as its own user or the SESSION account, in that account's home here: the other
         half of claude_login. The login is this machine's, so this machine
@@ -520,6 +650,10 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
+        if pack:
+            into = self.pack_bundle(agent, into, who, bool(root_bb))
+            if not into:
+                return "failed", 64
         # The session account's home, which is this process's own where the
         # agent is not root and as_user changed nothing.
         env.setdefault("HOME", os.path.expanduser("~"))
@@ -565,7 +699,21 @@ class Job(threading.Thread):
         env = dict(sdk_env(self.agent.state))
         env.update({"BUILDERBOT_NODE": self.agent.state.get("node_id", ""),
                     "BUILDERBOT_JOB": self.job["id"]})
-        who = self.agent.drop_privileges(env)
+        # Docker work on the controller's own machine runs from the root
+        # agent (docker_by_root), on the system's programs alone; on any
+        # other node the mark means nothing and the job drops as ever.
+        by_root = bool(spec.get("docker")) and self.agent.docker_by_root()
+        # ...and docker alone, held here and not only by what the controller
+        # queues: the mark turned any argv into root's on this machine, and
+        # a job's env could point PATH at another docker.
+        if by_root and (argv[:1] != ["docker"] or spec.get("bb")):
+            self.say("refused: a job run by the root agent here is docker itself, nothing else\n")
+            return "failed", 77
+        if by_root:
+            env = root_docker_env()
+            env.update({"BUILDERBOT_NODE": self.agent.state.get("node_id", ""),
+                        "BUILDERBOT_JOB": self.job["id"]})
+        who = {} if by_root else self.agent.drop_privileges(env)
         bbv = [str(a) for a in (spec.get("bb") or [])]
         if bbv:
             # A bb verb, run from the bundle this controller ships with the
@@ -586,6 +734,8 @@ class Job(threading.Thread):
         if not os.path.isdir(cwd):
             cwd = "/tmp"
         for k, v in (spec.get("env") or {}).items():
+            if by_root and (str(k) == "PATH" or str(k).startswith("LD_")):
+                continue
             env[str(k)] = str(v)
         # Inputs: files from the project's dist/, fetched into the working
         # directory by name: an APK for the emulator to install.
@@ -602,14 +752,14 @@ class Job(threading.Thread):
             if keep and os.path.isfile(dest) and want and os.path.getsize(dest) == want:
                 self.say(f"{f} is already on this node ({want} bytes)\n")
             else:
-                st, _ = self.agent.ctl.fetch(
-                    f"file?job={self.job['id']}&path={urllib.parse.quote(str(f))}", dest)
+                # Into the job account's folder as that account, so the file
+                # is its own and a link left at the name leads nowhere new.
+                with fs_holds(who):
+                    st, _ = self.agent.ctl.fetch(
+                        f"file?job={self.job['id']}&path={urllib.parse.quote(str(f))}", dest)
                 if st != 200:
                     self.say(f"could not fetch {f} from the controller ({st})\n")
                     return "failed", 69
-                if who:
-                    with contextlib.suppress(OSError):
-                        os.chown(dest, who["user"], who["group"])
                 self.say(f"fetched {f} ({os.path.getsize(dest)} bytes)"
                          + (f" into {keep}" if keep else "") + "\n")
             if keep and os.path.dirname(dest) != cwd:
@@ -665,34 +815,14 @@ class Job(threading.Thread):
         except OSError as e:
             self.say(f"could not start {argv[0]}: {e}\n")
             return "failed", 126
-        self.proc = p
-        if self.canceled:                 # asked to stop while it was starting
-            self._kill(p)
-        # The pipe is read on its own thread, and this one posts on a clock.
-        # Reading and posting on one thread meant a job that printed a line
-        # and then worked in silence never posted the line (readline blocked
-        # until the next one), so the row sat at "assigned" with nothing in
-        # its log, and a cancel sent on the log reply could not arrive.
-        reader = pump(self, p.stdout)
-        deadline = time.monotonic() + timeout
-        killed = False
-        while reader.is_alive():
-            reader.join(0.5)
-            if self.pending:
-                self.flush()
-            if time.monotonic() > deadline and not killed:
-                self.say(f"timed out after {int(timeout)}s, killing it\n")
-                self._kill(p)
-                killed = True
-        p.wait()
-        self.proc = None
-        if self.canceled:
+        rc, killed, stopped = watched(self, p, timeout)
+        if stopped:
             self.say("stopped\n")
             state, code = "canceled", 130
         elif killed:
             state, code = "failed", 124
         else:
-            state, code = ("succeeded" if p.returncode == 0 else "failed"), p.returncode
+            state, code = ("succeeded" if rc == 0 else "failed"), rc
         if ws is not None:
             self.agent.finish_workspace(self, ws, spec, state)
         elif state == "succeeded" and spec.get("outputs"):

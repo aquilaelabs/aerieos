@@ -64,18 +64,24 @@ function nbHistoryView({$, nb, project}){
 
   function drawHistory(){
     if (!nb.roadmapLog){
-      $("roadmapHist").innerHTML = `${skel("rows")}`;
+      drawHTML($("roadmapHist"), `${skel("rows")}`);
       return;
     }
     if (!nb.roadmapLog.length){
       const narrowed = $("histFind").value.trim() || $("histWhen").value !== "0";
-      $("roadmapHist").innerHTML = `<div class="hint">${narrowed
+      drawHTML($("roadmapHist"), `<div class="hint">${narrowed
         ? "Nothing in the log matches that. Widen the window, or clear the search."
         : `Nothing has happened to this list yet. Every add, reword, send, shelve
-         and drop lands here from now on.`}</div>`;
+         and drop lands here from now on.`}</div>`);
       return;
     }
-    $("roadmapHist").innerHTML = nb.roadmapLog.map((e, k, all) => {
+    // Only the entries on show are built, a page at a time (pageLimit, R228
+    // step 13); each day's heading reads the one before it, so a page is the
+    // log's first rows and not a slice from its middle.
+    const lim = pageLimit($("roadmapHist"), "roadmapHist", nb.roadmapLog.length);
+    const logAll = nb.roadmapLog;
+    patch($("roadmapHist"), logAll.slice(0, lim).map((e, k) => {
+      const all = logAll;
       const [word, tone] = ACT[e.act] || [e.act || "changed", ""];
       // R on the number, as everywhere an item is named (ids.py): a log line
       // is exactly where a bare number could be read against the bug tracker.
@@ -99,7 +105,7 @@ function nbHistoryView({$, nb, project}){
                 nb.nbUnsaved() ? ` disabled title="${esc(`save or revert first: ${nb.nbUnsaved()} not on disk yet`)}"` : ""
               }>Put back</button>` : ""}</span>
     </div>`;
-    }).join("");
+    }).join(""));
     $("roadmapHist").querySelectorAll(".hput").forEach(b => b.onclick = async () => {
       busy(b, "Putting back");
       const j = await nb.postRoadmap({action: "restore", id: Number(b.dataset.id), at: Number(b.dataset.at)});
@@ -107,7 +113,8 @@ function nbHistoryView({$, nb, project}){
     });
     wireIds($("roadmapHist"));
     // Paged like the other three, now that it has a pane to page.
-    paginate($("roadmapHist"), ":scope > .hist", {key: "roadmapHist", noun: "entries"});
+    paginate($("roadmapHist"), ":scope > .hist", {key: "roadmapHist", noun: "entries", total: logAll.length,
+                                                  more: () => drawHistory()});
   }
   const onList = id => nb.roadmapItems.some(r => String(r.id) === String(id));
 
@@ -122,22 +129,24 @@ function nbHistoryView({$, nb, project}){
   }
 
   nb.histTimer = null;
-  async function loadHistory(){
-    nb.roadmapLog = null;
-    nb.redrawRoadmap();
-    // quiet, because the answer is not a list payload and drawRoadmap must not be
-    // handed one that has no items in it.
-    const j = await nb.postRoadmap(histQuery(), true);
-    nb.roadmapLog = j?.history || [];
-    nb.redrawRoadmap();
+  function loadHistory(){
+    return reading(`${project}:history`, async () => {
+      nb.roadmapLog = null;
+      nb.redrawRoadmap();
+      // quiet, because the answer is not a list payload and nbRmDraw must not be
+      // handed one that has no items in it.
+      const j = await nb.postRoadmap(histQuery(), true);
+      nb.roadmapLog = j?.history || [];
+      nb.redrawRoadmap();
+    });
   }
 
   // Typing searches, but not on every keystroke: each one is a round trip, and
   // a thumb types faster than a fetch comes back.
-  $("histFind").oninput = () => {
+  onTyping($("histFind"), () => {
     clearTimeout(nb.histTimer);
     nb.histTimer = setTimeout(loadHistory, 250);
-  };
+  });
   $("histFind").onkeydown = e => {
     if (e.key === "Enter"){ e.preventDefault(); clearTimeout(nb.histTimer); loadHistory(); }
     if (e.key === "Escape" && e.target.value){
@@ -179,24 +188,26 @@ function nbHistoryView({$, nb, project}){
     const btn = $(btnId), bar = $(barId), pane = $(paneId);
     let on = false, timer = null;
     const draw = rows => {
-      pane.innerHTML = rows === null
+      drawHTML(pane, rows === null
         ? `${skel("rows")}`
         : !rows.length
         ? `<div class="hint">${bar.querySelector("input").value.trim()
              || bar.querySelector(".hwhen").value !== "0"
              ? "Nothing in the log matches that. Widen the window, or clear the search."
              : emptyText || "Nothing has happened here through the notebook yet."}</div>`
-        : rows.map((e, k) => `<div class="hist">${dayHead(e, rows[k - 1], releases())}
+        : rows.slice(0, pageLimit(pane, paneId, rows.length)).map((e, k) => `<div class="hist">${dayHead(e, rows[k - 1], releases())}
             <span class="when">${esc(stamp(e.at || 0))}</span>
             <span class="tag act ${LOG_ACTS[e.act] || ""}">${esc(LOG_WORDS[e.act] || e.act || "changed")}</span>
             <span class="what">${e.id != null ? `${letter ? idLink(letter + e.id) : esc(String(e.id))} · ` : ""}${esc(e.text || "")}
               <span class="who${e.by === "you" ? " you" : ""}">${esc(whoSays(e))}${
               e.approved ? ", approved by you" : ""}</span>${
               e.note ? `<span class="note">${esc(e.note)}</span>` : ""}</span>
-          </div>`).join("");
+          </div>`).join(""));
       if (rows) wireIds(pane);
-      // Every history through one pane means one place to page them.
-      paginate(pane, ":scope > .hist", {key: paneId, noun: "entries"});
+      // Every history through one pane means one place to page them, built
+      // a page at a time (R228 step 13).
+      paginate(pane, ":scope > .hist", rows ? {key: paneId, noun: "entries", total: rows.length, more: () => draw(rows)}
+                                            : {key: paneId, noun: "entries"});
     };
     const load = async () => {
       draw(null);
@@ -240,8 +251,7 @@ function nbHistoryView({$, nb, project}){
            emptyText: "Nothing has changed between scans yet. Changes show "
              + "from the second scan on.",
            fetchLog: async q => {
-             const r = await postJSON("/api/findings", {project, action: "history", ...q});
-             const j = await r.json();
+             const j = await postJSON("/api/findings", {project, action: "history", ...q});
              return j.error ? (notify(j.error, true), {history: []}) : j;
            }});
 

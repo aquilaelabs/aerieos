@@ -6,8 +6,9 @@ with the jobs and the working Claude sessions there; the load right now is
 read here as well, from /proc/loadavg, which a session's view shares with
 the whole machine, because a heartbeat is up to 25 s old.
 
-Arguments: the verb (busy or wait-quiet), then its options. BB_BUSY_AUTH,
-BB_BUSY_PROJECT and BB_BUSY_NODE come from bb."""
+Arguments: the verb (busy or wait-quiet), then its options. BB_PROJECT and
+BB_BUSY_NODE come from bb. The auth header is bbapi's own (BB_AUTH_HEADER,
+from aerie)."""
 import json
 import os
 import sys
@@ -15,9 +16,9 @@ import time
 import urllib.parse
 
 import bbapi
+from say import need
 
-auth = os.environ["BB_BUSY_AUTH"]
-project = os.environ.get("BB_BUSY_PROJECT", "")
+project = os.environ.get("BB_PROJECT", "")
 node = os.environ.get("BB_BUSY_NODE", "")
 RANK = {"quiet": 0, "busy": 1, "saturated": 2, "unknown": 3}
 
@@ -32,9 +33,8 @@ def now_load():
 
 def ask():
     q = urllib.parse.urlencode({"project": project, "node": node})
-    d = bbapi.call(f"/api/node-busy?{q}", auth=auth)
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    d = bbapi.call(f"/api/node-busy?{q}")
+    need(d)
     # The load now, from here, where it is fresher than the heartbeat:
     # a machine that filled up since says so at once.
     load = now_load()

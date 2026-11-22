@@ -6,7 +6,7 @@
 // browser would never send (wrong types, missing fields, absurd numbers),
 // because the checks are written against each field being the thing it is
 // supposed to be.
-import { launch, newPage, ok, done, ready, sleep, patience, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, patience, URL, OWNER as H, section } from './lib.mjs';
 
 // ---- the app's own files carry a validator --------------------------------
 // index.html IS the application, and it went out with no ETag and no cache
@@ -20,7 +20,6 @@ import { launch, newPage, ok, done, ready, sleep, patience, URL } from './lib.mj
 // crashed this file in whole runs and then on every run once the page's body
 // was read to its end. node:http has no such path.
 import http from 'node:http';
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
 const get = (path, extra = {}) => new Promise((resolve, reject) => {
   const u = new globalThis.URL(URL.replace(/\/$/, '') + path);
   http.get({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { ...H, ...extra } }, res => {
@@ -31,7 +30,7 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
       text: Buffer.concat(chunks).toString('utf8') }));
   }).on('error', reject);
 });
-{
+await section("and an unchanged", async () => {
   for (const path of ['/', '/tab-nodes.js']){
     const r = await get(path);
     ok(r.status === 200 && !!r.tag && /no-cache/.test(r.cache),
@@ -39,12 +38,12 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
     const again = await get(path, { 'If-None-Match': r.tag });
     ok(again.status === 304, `...and an unchanged ${path} comes back 304 (${again.status})`);
   }
-}
+});
 // The page names each of its scripts with that script's version, and its
 // own tag covers them: a phone left on the page across an update reloaded
 // into the old Global rules dialog, and a URL that moves with the file
 // cannot be answered from a copy made before it.
-{
+await section("The page names each of its scripts with that script's version, and its", async () => {
   const g0 = await get('/');
   // ...and names its integrity after the version (R158 step 4).
   const v = g0.text.match(/<script data-cfasync="false" src="nb-history\.js\?v=([0-9a-f]+-[0-9a-f]+)" integrity="sha384-[A-Za-z0-9+/=]+">/);
@@ -65,7 +64,18 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
   const js = await get('/nb-history.js?v=' + (v1 ? v1[1] : ''));
   ok(js.status === 200 && /javascript/.test(js.type),
      `...which the server answers under that name (${js.status})`);
-}
+  // Under its own version a script is this file as it is now and nothing
+  // else, so the browser keeps it without asking; under one the file has
+  // moved past, or none, it asks first as before.
+  ok(/immutable/.test(js.cache) && /max-age=31536000/.test(js.cache) && /private/.test(js.cache),
+     `...and says to keep for good, with no question on the next load (${js.cache})`);
+  const stale = await get('/nb-history.js?v=' + (v ? v[1] : ''));
+  ok(stale.status === 200 && /no-cache/.test(stale.cache) && !/immutable/.test(stale.cache),
+     `...while the version it has moved past is still asked about (${stale.cache})`);
+  const held = await get('/nb-history.js?v=' + (v1 ? v1[1] : ''), { 'If-None-Match': js.tag });
+  ok(held.status === 304 && /immutable/.test(held.cache), `...and an unchanged one comes back 304 (${held.status})`);
+  ok(!/immutable/.test(g1.cache) && /no-cache/.test(g1.cache), `the page itself is always asked about (${g1.cache})`);
+});
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -144,7 +154,7 @@ ok(badGet.length === 0,
 // the harness's patience as every wait does.
 const bar = patience(6000), tries = [];
 for (let i = 0; i < 3; i++){
-  if (i) await sleep(3000);
+  if (i) await sleep(3000);     // the gap between two timings is the point: a busy moment passes in it
   const t0 = Date.now();
   await page.evaluate(async () => {
     await Promise.all(Array.from({length: 8}, () => fetch('/api/status')));
@@ -171,8 +181,11 @@ await page.route('**/api/status*', r => r.abort());
 // the checks above just made it slow), and while it is, refresh() only queues
 // and returns at once, so forty asks spent themselves in milliseconds and the
 // late poll then landed and cleared the light (B176, 19 Sep).
+// A page that had been reading treats reads that stop landing as a restart
+// for the time one takes (home.mjs holds that calm state); this is past it,
+// where the red line with its reason is said.
 for (const until = Date.now() + 20000; Date.now() < until
-     && await page.evaluate(async () => { await refresh(); return pollFails; }) < 2;) await sleep(100);
+     && await page.evaluate(async () => { await refresh(); if (awaySince) awaySince = Date.now() - 91000; return pollFails; }) < 2;) await sleep(100);     // the loop's own period
 const dead = await page.evaluate(() => ({
   red: !!document.getElementById('dot')?.classList.contains('off'),
   title: document.getElementById('dot')?.getAttribute('aria-label') || '',
@@ -197,7 +210,8 @@ ok(waiting.shapes > 0 && waiting.words.length === 0 && waiting.said === 'loading
    `before the first snapshot the page waits with shapes, not words, and still says loading to a screen reader (${JSON.stringify(waiting)})`);
 await page.evaluate(() => refresh());
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => { const l = [...document.querySelectorAll('main .loading')];
+  return l.length > 0 && l.every(e => /not reaching the container/.test(e.textContent)); }, null, { timeout: 10000 }).catch(() => {});
 const cold = await page.evaluate(() =>
   [...document.querySelectorAll('main .loading')].map(e => e.textContent));
 ok(cold.length > 0 && cold.every(t => /not reaching the container/.test(t)),
@@ -208,7 +222,10 @@ const coldShape = await page.evaluate(() => [...document.querySelectorAll('main 
 ok(coldShape === 0, `...a line of words where the shapes stood, nothing of them left (${coldShape} still shaped)`);
 await page.unroute('**/api/status*');
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => !document.getElementById('dot').classList.contains('off')
+                                 && !document.getElementById('dot').getAttribute('aria-label')
+                                 && document.getElementById('pollWhy').hidden
+                                 && pollFails === 0, null, { timeout: 10000 }).catch(() => {});
 ok(await page.evaluate(() => !document.getElementById('dot').classList.contains('off')
                              && !document.getElementById('dot').getAttribute('aria-label')
                              && document.getElementById('pollWhy').hidden
@@ -221,7 +238,7 @@ ok(await page.evaluate(() => !document.getElementById('dot').classList.contains(
 // its list beside the picked account's settings, their labels drawn and the
 // values shimmering, inert so nothing is typed into a form the real one
 // replaces.
-{
+await section("a page waits as itself", async () => {
   await page.evaluate(() => { location.hash = '#/people/users'; });
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'users' && document.querySelector('.doc.on .userstab [data-upick]'), null, { timeout: 15000 });
   await page.route('**/api/users*', () => {});
@@ -236,7 +253,7 @@ ok(await page.evaluate(() => !document.getElementById('dot').classList.contains(
   await page.evaluate(() => { usersList = null; loadUsers(); });
   await page.waitForFunction(() => !document.querySelector('.doc.on .skt') && document.querySelector('.doc.on .userstab [data-upick]'), null, { timeout: 15000 });
   ok(true, '...and the real page replaces it once they land');
-}
+});
 
 // ---- one part's draw failing must not strand the rest (bug #44) ----
 // The other shape of the same report: the container answered, one draw threw
@@ -248,34 +265,40 @@ await page.evaluate(() => {
   drawDoctor = () => { throw new Error('doctor draw boom'); };
 });
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => /not drawn/.test(document.getElementById('doctor').textContent)
+                                 && !document.querySelector('.pgrid .loading'), null, { timeout: 10000 }).catch(() => {});
+// The draw's error is thrown again on a timer of the page's and reaches this side after it.
+await until(() => page.errors.some(t => /doctor draw boom/.test(t)), 10000);
 const partial = await page.evaluate(() => ({
   doctor: document.getElementById('doctor').textContent.trim(),
   projectsWaiting: !!document.querySelector('.pgrid .loading'),
-  commandsWaiting: !!document.querySelector('#commands .loading'),
   red: document.getElementById('dot').classList.contains('off'),
 }));
 ok(/not drawn/.test(partial.doctor) && /doctor draw boom/.test(partial.doctor),
    `a part whose draw threw says so in its own body (${JSON.stringify(partial.doctor.slice(0, 60))})`);
-ok(!partial.projectsWaiting && !partial.commandsWaiting && !partial.red,
+ok(!partial.projectsWaiting && !partial.red,
    `...and the parts after it still draw, under a light that stays on (${JSON.stringify(partial)})`);
 ok(page.errors.some(t => /doctor draw boom/.test(t)),
    '...while the error itself still reaches the console');
 page.errors = [];
 await page.evaluate(() => { drawDoctor = window.__drawDoctor; });
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => !/not drawn/.test(document.getElementById('doctor').textContent), null, { timeout: 10000 }).catch(() => {});
 ok(await page.evaluate(() => !/not drawn/.test(document.getElementById('doctor').textContent)),
    '...and the part recovers on the next poll that draws');
 // ...and when the page trips BEFORE the draws (on the payload, not on the
 // fetch), the light and the placeholders blame this page, not the network.
-// The status answer is held for half a second so the stub is in place
-// before the page's own first poll comes back: the placeholders have to be
-// on screen for the words on them to matter.
+// The status answer is held until the stub is in place, so the page's own
+// first poll comes back to it: the placeholders have to be on screen for the
+// words on them to matter. A fixed half second was shorter than the reload
+// under a whole run's load, and the poll drew the page first (B837).
+let stubIn;
+const stubbed = new Promise(r => { stubIn = r; });
 await page.route('**/api/status*', async r => {
-  await new Promise(res => setTimeout(res, 500)); await r.continue(); });
+  await stubbed; await r.continue(); });
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.evaluate(() => { adoptLayout = () => { throw new Error('layout boom'); }; });
+stubIn();
 await page.evaluate(() => refresh());
 await page.evaluate(() => refresh());
 await page.waitForFunction(() => pollFails >= 2, null, { timeout: 5000 });
@@ -287,7 +310,8 @@ const tripped = await page.evaluate(() => ({
 ok(/fails on its answer/.test(tripped.title) && /layout boom/.test(tripped.title)
    && tripped.loading.length > 0 && tripped.loading.every(t => /could not read the server's answer/.test(t)),
    `a page that fails on the container's answer says that, not "not reaching the container" (${
-     tripped.title.slice(0, 70)})`);
+     tripped.title.slice(0, 160)}; ${tripped.loading.length} placeholders${
+     tripped.loading.length ? ': ' + JSON.stringify(tripped.loading.slice(0, 2).map(t => t.slice(0, 60))) : ''})`);
 page.errors = [];
 
 await done(browser);

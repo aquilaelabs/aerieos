@@ -51,8 +51,9 @@ class Install(unittest.TestCase):
         with open(os.path.join(pack, "bin", "hexkit"), "w") as f:
             f.write("#!/bin/sh\necho unapproved\n")
         git("commit", "-qam", "later", cwd=pack)
-        os.environ["BB_TOOLPACKS_FILE_URLS"] = "1"
-        self.addCleanup(os.environ.pop, "BB_TOOLPACKS_FILE_URLS", None)
+        for seam in ("BB_TOOLPACKS_FILE_URLS",):
+            os.environ[seam] = "1"
+            self.addCleanup(os.environ.pop, seam, None)
         toolpacks.configure(state=t, write_json=statefile.write_json)
         r = toolpacks.add("file://" + pack, self.commit, "operator")
         self.assertTrue(r.get("ok"), r)
@@ -60,7 +61,6 @@ class Install(unittest.TestCase):
         self.b = os.path.join(t, "bundle")
         shutil.copytree(os.path.join(REPO, "scripts", "lib"), os.path.join(self.b, "scripts", "lib"))
         shutil.copy(os.path.join(REPO, "scripts", "aerie"), os.path.join(self.b, "scripts", "aerie"))
-        shutil.copy(os.path.join(REPO, "scripts", "bb"), os.path.join(self.b, "scripts", "bb"))
         os.makedirs(os.path.join(self.b, "config"))
         shutil.copy(os.path.join(REPO, "config", "toolchains.json"), os.path.join(self.b, "config"))
         with open(os.path.join(self.b, "config", "toolpacks.json"), "w") as f:
@@ -152,7 +152,6 @@ class MadeHere(unittest.TestCase):
         self.assertTrue(r.get("ok"), r)
         b = os.path.join(t, "bundle")
         shutil.copytree(os.path.join(REPO, "scripts", "lib"), os.path.join(b, "scripts", "lib"))
-        shutil.copy(os.path.join(REPO, "scripts", "bb"), os.path.join(b, "scripts", "bb"))
         shutil.copy(os.path.join(REPO, "scripts", "aerie"), os.path.join(b, "scripts", "aerie"))
         os.makedirs(os.path.join(b, "config"))
         shutil.copy(os.path.join(REPO, "config", "toolchains.json"), os.path.join(b, "config"))

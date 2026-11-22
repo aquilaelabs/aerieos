@@ -3,8 +3,9 @@ itself for the census, and the update that writes the next image into the
 slot not in use. The disk is image/partitions.sh's: two root slots found by
 fixed partition UUIDs, each slot's kernel and initrd under /aerieos/SLOT
 on the ESP, and GRUB booting the slot its environment names (the slot
-tool). An update fetches the release's ISO, checks it against the sha256
-the release carries and against its build attestation where gh is here,
+tool). An update reads the release's list of its files, signed by a key
+this install holds, fetches the release's ISO, checks it against the sha256
+the release carries, against its build attestation and against that list,
 takes the slot, its kernel, its initrd and its release stamp out of the
 ISO's live/ folder, writes the other slot, puts its kernel beside it, names
 it for the next boot, and asks for a restart; nothing running changes until
@@ -19,6 +20,11 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+from .base import env_or, write_atomic
+from .stores import path_plain
+
+# Every BB_* read here (env_or) is the agent's own seam: a test's stand-in in
+# the agent's environment, its unit's and root's alone, read wherever it runs.
 
 RELEASE_FILE = "/usr/lib/aerieos-os/release"
 SLOT_TOOL = "/usr/lib/aerieos-os/slot"
@@ -36,34 +42,85 @@ REPO = "aquilaelabs/aerieos"
 # beside the ISO and verifies it against the trusted root this image was
 # built with, with no network.
 ATTEST_URL = "https://api.github.com/repos/{repo}/attestations/sha256:{digest}"
+# Who may have built an image an update takes (B729): the release workflow,
+# build-image.yml, run on a version's tag, as a published release's
+# attestation names it (read off v0.9.0-dev.5341's ISO, 16 Nov: its
+# certificate's identity is .../build-image.yml@refs/tags/v0.9.0-dev.5341).
+# The repository alone passed any workflow on any branch that attested one.
+
+
+def signer_identity(repo):
+    return rf"^https://github\.com/{re.escape(repo)}/\.github/workflows/build-image\.yml@refs/tags/v"
+
+
 TRUSTED_ROOT = "/usr/lib/aerieos-os/trusted-root.jsonl"
 # Who may sign a release (R199): the running controller's own copy of
 # config/release-signers, so a key is trusted because this install already
 # held it, never because the release names it.
 SIGNERS = "/opt/aerieos/config/release-signers"
-SIG_NS = "aerieos-release"
+# The namespace a signer is named for says the channel, and a release's tag
+# says which it may be signed in: a pre-release (vX.Y.Z-dev.N, -rc.N, any
+# name) in either, a stable release (vX.Y.Z) in aerieos-release alone, so
+# the key the release build holds, which signs dev builds as they publish
+# themselves, can never sign a stable release. The same rule, in its own
+# words, in the installer (nodes/install-controller.sh), the stick maker
+# (tools/aerieos-stick.py) and the Library's downloads (apps.py);
+# test_release_signing.py holds the four to one table of cases.
+SIG_RELEASE, SIG_DEV = "aerieos-release", "aerieos-dev"
+STABLE_TAG = re.compile(r"v\d+\.\d+\.\d+")
+PRE_TAG = re.compile(r"v\d+\.\d+\.\d+-[a-z][a-z0-9]*\.\d+")
+SIGNED_BY = {SIG_RELEASE: "AerieOS's release key", SIG_DEV: "the key AerieOS's dev builds are signed with"}
 
 
 def signers():
     try:
-        with open(_env("BB_RELEASE_SIGNERS", SIGNERS), encoding="utf-8") as f:
+        with open(env_or("BB_RELEASE_SIGNERS", SIGNERS), encoding="utf-8") as f:
             return [ln.strip() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
     except OSError:
         return []
 
 
-def sums_verify(sums, sig, keys, run=subprocess.run):
-    """{file: sha256} of a SHA256SUMS whose signature verifies against
-    `keys`, or None."""
+def tag_namespaces(tag):
+    """The namespaces the list of release `tag` may be signed in, by the
+    tag's shape; none for what is no release's tag."""
+    if STABLE_TAG.fullmatch(tag):
+        return (SIG_RELEASE,)
+    if PRE_TAG.fullmatch(tag):
+        return (SIG_RELEASE, SIG_DEV)
+    return ()
+
+
+def unsignable(tag, keys):
+    """Why no signature would have release `tag` taken by an install that
+    names `keys`, or "": asked before anything is fetched."""
+    may = tag_namespaces(tag)
+    if not may:
+        return f"{tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told"
+    if SIG_DEV not in may and not any(k.split(None, 1)[0] == SIG_RELEASE for k in keys):
+        return (f"{tag} is a stable release and no stable signer is named yet: this install names only the key dev builds "
+                "are signed with, and a stable release is signed by its own key's holder")
+    return ""
+
+
+def sig_namespace(sums, sig, keys, run=subprocess.run):
+    """The namespace in which the signature `sig` over the file `sums`
+    verifies against `keys`, or "": each signer is asked for in the one
+    namespace it is named for."""
     with tempfile.TemporaryDirectory() as d:
         allowed = os.path.join(d, "signers")
         with open(allowed, "w", encoding="utf-8") as f:
             f.write("\n".join(keys) + "\n")
-        with open(sums, "rb") as fh:
-            r = run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", SIG_NS, "-n", SIG_NS, "-s", sig],
-                    stdin=fh, capture_output=True, check=False)
-    if r.returncode != 0:
-        return None
+        for ns in (SIG_RELEASE, SIG_DEV):
+            with open(sums, "rb") as fh:
+                r = run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", ns, "-n", ns, "-s", sig],
+                        stdin=fh, capture_output=True, check=False)
+            if r.returncode == 0:
+                return ns
+    return ""
+
+
+def sums_read(sums):
+    """{file: sha256} of a SHA256SUMS."""
     out = {}
     with open(sums, encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -71,21 +128,56 @@ def sums_verify(sums, sig, keys, run=subprocess.run):
             if len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0].lower()):
                 out[parts[1].lstrip("*")] = parts[0].lower()
     return out
+
+
+def signed_list(tag, sums, sig, keys, run=subprocess.run):
+    """({file: sha256}, who signed it, "") for release `tag`'s SHA256SUMS
+    when its signature is one the tag may carry, by a key in `keys`; else
+    (None, "", why not)."""
+    why = unsignable(tag, keys)
+    if why:
+        return None, "", why
+    try:
+        ns = sig_namespace(sums, sig, keys, run)
+    except OSError as e:
+        return None, "", f"ssh-keygen is not here to check {tag}'s signature with ({e})"
+    if not ns:
+        return None, "", f"{tag}'s list of files is signed by no key this install names"
+    if ns not in tag_namespaces(tag):
+        return None, "", (f"{tag} is a stable release and its list is signed by the key dev builds are signed with: "
+                          "a stable release takes its own key's signature alone")
+    return sums_read(sums), SIGNED_BY[ns], ""
+
+
+def unlisted(listed, name, digest, tag):
+    """Why the file `name` with sha256 `digest` is not release `tag`'s by its
+    signed list, or "": the list is what the key signed, where the sha256
+    beside a file is the release's word for itself."""
+    if name not in listed:
+        return f"{name} is not in the list of files {tag} signed"
+    if listed[name] != digest:
+        return f"{name} is not the file {tag} signed: its bytes are not the ones the signed list names"
+    return ""
+
+
 # Each piece of a slot, and where image/build.sh puts it on the ISO.
 PIECES = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
           "initrd": "live/initrd", "release": "live/release"}
 VER_RE = re.compile(r"v?(\d+\.\d+\.\d+(?:-dev\.\d+)?)")  # a release, or a dev build (B589)
 
 
-def _env(name, default):
-    return os.environ.get(name) or default
+def os_work():
+    """The folder AerieOS keeps its own in on the data partition: the
+    configuration copied before each update, the older versions kept, an
+    update's download, /etc's overlay."""
+    return env_or("BB_OS_WORK", "/var/lib/aerieos-os")
 
 
 def os_release():
     """{version, snapshot, built, slot, next} on an AerieOS disk, {}
     anywhere else: the release file the image carries, and the slot tool's
     reading of this boot and the next."""
-    path = _env("BB_OS_RELEASE", RELEASE_FILE)
+    path = env_or("BB_OS_RELEASE", RELEASE_FILE)
     if not os.path.isfile(path):
         return {}
     out = {}
@@ -101,7 +193,7 @@ def os_release():
                     out["built"] = v[:24]
     except OSError:
         return {}
-    tool = _env("BB_OS_SLOT", SLOT_TOOL)
+    tool = env_or("BB_OS_SLOT", SLOT_TOOL)
     for key, verb in (("slot", "current"), ("next", "next")):
         try:
             r = subprocess.run(["bash", tool, verb], capture_output=True, text=True, timeout=10, check=False)
@@ -117,7 +209,7 @@ def os_release():
         out["trial"] = "\ntrial:" in "\n" + st
     except (OSError, subprocess.SubprocessError):
         out["trial"] = False
-    fb = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "fell-back")
+    fb = os.path.join(os_work(), "fell-back")
     try:
         with open(fb, encoding="utf-8", errors="replace") as f:
             out["fell_back"] = f.read().strip()[:200]
@@ -130,11 +222,11 @@ def keep_state_before(say, running):
     """The controller's configuration as it is before an update (R160 step
     4, R161 step 2): a copy beside the old slot, so going back to that slot
     boots the configuration it had, and the two newest copies kept."""
-    src = _env("BB_OS_STATE", "/var/lib/aerieos-controller/config")
+    src = env_or("BB_OS_STATE", "/var/lib/aerieos-controller/config")
     if not os.path.isdir(src):
         say("no controller configuration here to copy before the update\n")
         return True
-    keep = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "before")
+    keep = os.path.join(os_work(), "before")
     os.makedirs(keep, mode=0o700, exist_ok=True)
     dest = os.path.join(keep, f"{running or 'unknown'}.tar.gz")
     r = subprocess.run(["tar", "-czf", dest + ".new", "-C", os.path.dirname(src), "--exclude=logs", "--exclude=jobs", "--exclude=os-draft", "--exclude=.moved-*", "--exclude=.move-*",
@@ -165,13 +257,13 @@ KEEP_DEFAULT = 3
 
 
 def kept_dir():
-    return os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "kept")
+    return os.path.join(os_work(), "kept")
 
 
 def kept_boot():
     """The kept version this boot came from, or ""."""
     try:
-        with open(_env("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8", errors="replace") as f:
+        with open(env_or("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8", errors="replace") as f:
             for w in f.read().split():
                 if w.startswith("aeriekept="):
                     return w[len("aeriekept="):][:60]
@@ -201,7 +293,7 @@ def write_kept_menu(esp=None):
     """GRUB's Older versions, from what is kept: grub.cfg sources this file
     (nothing kept, an empty one). The root is on the same disk's data
     partition, the fifth, never another AerieOS disk's."""
-    grub = os.path.join(esp or _env("BB_OS_ESP", ESP), "grub")
+    grub = os.path.join(esp or env_or("BB_OS_ESP", ESP), "grub")
     if not os.path.isdir(grub):
         return
     rows = kept_list()
@@ -233,7 +325,7 @@ def _unname_kept(ver, say):
     named it (slot kept-next, aerie_kept_next in grubenv): GRUB with a default
     its menu no longer has boots its first entry, slot A, whichever slot is in
     use (B620). Read from the environment block itself, cleared by the tool."""
-    envf = os.path.join(_env("BB_OS_ESP", ESP), "grub", "grubenv")
+    envf = os.path.join(env_or("BB_OS_ESP", ESP), "grub", "grubenv")
     try:
         with open(envf, encoding="utf-8", errors="replace") as f:
             named = f"aerie_kept_next={ver}" in (ln.strip() for ln in f)
@@ -242,7 +334,7 @@ def _unname_kept(ver, say):
     if not named:
         return
     try:
-        subprocess.run(["bash", _env("BB_OS_SLOT", SLOT_TOOL), "kept-next"], capture_output=True, timeout=30, check=False)
+        subprocess.run(["bash", env_or("BB_OS_SLOT", SLOT_TOOL), "kept-next"], capture_output=True, timeout=30, check=False)
     except (OSError, subprocess.SubprocessError):
         return
     say(f"{ver} was to boot next, once; it is not kept any more, so the next boot is this version's slot\n")
@@ -310,7 +402,7 @@ def _keep_slot(say, dev, where, keep):
                 return
             used = int.from_bytes(head[40:48], "little")
             _prune_kept(keep - 1, say, spare=ver)
-            st = os.statvfs(kept_dir() if os.path.isdir(kept_dir()) else _env("BB_OS_WORK", "/var/lib/aerieos-os"))
+            st = os.statvfs(kept_dir() if os.path.isdir(kept_dir()) else os_work())
             if st.f_bavail * st.f_frsize < used + (1 << 30):
                 say(f"{ver} is not kept: the data partition has too little room beside its {used >> 20} MB\n")
                 return
@@ -327,7 +419,7 @@ def _keep_slot(say, dev, where, keep):
                     left -= len(chunk)
         for piece in ("vmlinuz", "initrd", "release"):
             shutil.copyfile(os.path.join(where, piece), os.path.join(new, piece))
-        state = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "before", f"{ver}.tar.gz")
+        state = os.path.join(os_work(), "before", f"{ver}.tar.gz")
         if os.path.isfile(state):
             shutil.copyfile(state, os.path.join(new, "state.tar.gz"))
         shutil.rmtree(d, ignore_errors=True)
@@ -336,6 +428,23 @@ def _keep_slot(say, dev, where, keep):
     except OSError as e:
         shutil.rmtree(new, ignore_errors=True)
         say(f"{ver} was not kept as an older version: {e}\n")
+
+
+def pin_hostid():
+    """This machine's host id written through /etc's overlay, so it is kept on
+    the data partition. Each image carries its own /etc/hostid, ZFS holds a
+    pool to the host id that last had it, and every update otherwise looked
+    to its own pools like another machine. Once only: the copy kept is what
+    every later image shows."""
+    kept = os.path.join(os_work(), "etc", "upper", "hostid")
+    hostid = env_or("BB_HOSTID", "/etc/hostid")
+    if not os.path.isdir(os.path.dirname(kept)) or os.path.exists(kept):
+        return
+    with contextlib.suppress(OSError):
+        with open(hostid, "rb") as f:
+            raw = f.read()
+        if len(raw) == 4:
+            write_atomic(hostid, raw)
 
 
 def _sha256(path):
@@ -402,7 +511,7 @@ def stick_status():
     """A stick boot's state (R161 step 10, the system-pool tool's status):
     {stick, pool, ready, on_stick, written_kb, boot_written_kb}, or {} where
     the tool is not here (no AerieOS)."""
-    tool = _env("BB_OS_POOL", POOL_TOOL)
+    tool = env_or("BB_OS_POOL", POOL_TOOL)
     if not os.path.isfile(tool):
         return {}
     try:
@@ -415,7 +524,7 @@ def stick_status():
     # The stick's own partition (/var): how much room it has, since what
     # fills it takes the controller down (the operator, 8 Nov).
     try:
-        du = shutil.disk_usage(_env("BB_SP_VAR", "/var"))
+        du = shutil.disk_usage(env_or("BB_SP_VAR", "/var"))
         room = {"var_total_mb": du.total >> 20, "var_free_mb": du.free >> 20}
     except OSError:
         room = {}
@@ -426,17 +535,45 @@ def stick_status():
             "projects": str(d.get("projects") or "")[:300], "projects_bound": d.get("projects_bound") is True,
             "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else "",
             # The pools holding another install's folder, which a pick there sets aside.
-            "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16]}
+            "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16],
+            # The id its system pool is marked with, for the controller's
+            # state to carry into a backup (B939).
+            "install_id": str(d.get("install_id") or "") if re.fullmatch(r"[0-9a-f]{32,64}", str(d.get("install_id") or "")) else "",
+            # ...and the id each other install's pool is marked with.
+            "other_marks": {str(k)[:200]: str(v) for k, v in list((d.get("other_marks") or {}).items())[:16]
+                            if isinstance(k, str) and k.startswith("/") and re.fullmatch(r"[0-9a-f]{32,64}", str(v))}
+                           if isinstance(d.get("other_marks"), dict) else {}}
+
+
+# Where this machine's pools, its array and the disks it adopted are mounted
+# (pools.MOUNT_ROOT, array.MOUNT and its neighbors): the one place a system
+# pool or a folder of spaces is named in.
+DISKS_ROOT = "/mnt"
+
+
+def on_disks(path):
+    """Whether `path` names a place on this machine's disks: a plain path
+    (stores.path_plain) whose real place is under DISKS_ROOT. What the tool
+    is handed moves the machine's own folders there or gives the folder to
+    the controller's account, so it is never a folder of the system's."""
+    if not path_plain(path):
+        return False
+    real = os.path.realpath(path)
+    return real.startswith(DISKS_ROOT + "/")
 
 
 class OsImageMixin:
+    def hostid_pass(self):
+        """Once a minute, and nothing once it is done (pin_hostid)."""
+        pin_hostid()
+
     """Agent's AerieOS update: one of the parts class Agent (agent.py)
     is made of."""
 
     def _apply_os_kept(self, job, cfg):
         """An older version kept (R201): `next` boots it once, `remove` takes
         it away; then a hello."""
-        tool = _env("BB_OS_SLOT", SLOT_TOOL)
+        tool = env_or("BB_OS_SLOT", SLOT_TOOL)
         verb, ver = str(cfg.get("verb") or ""), str(cfg.get("version") or "")
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS\n")
@@ -478,12 +615,12 @@ class OsImageMixin:
         if not gh:
             say("refused: no gh here to verify the image's build attestation with: nothing written\n")
             return False
-        repo = _env("BB_OS_REPO", REPO)
+        repo = env_or("BB_OS_REPO", REPO)
         bundle = os.path.join(work, "attestation.jsonl")
         extra = []
         if src:
             have = os.path.join(src, f"{name}.attestation.jsonl")
-            root = _env("BB_OS_TRUSTED_ROOT", TRUSTED_ROOT)
+            root = env_or("BB_OS_TRUSTED_ROOT", TRUSTED_ROOT)
             if not os.path.isfile(have):
                 say(f"refused: {src} holds no {name}.attestation.jsonl, the release's proof of who built the image; "
                     "bring it beside the ISO: nothing written\n")
@@ -495,7 +632,7 @@ class OsImageMixin:
             shutil.copyfile(have, bundle)
             extra = ["--custom-trusted-root", root]
         else:
-            url = _env("BB_OS_ATTEST_URL", ATTEST_URL).format(repo=repo, digest=digest)
+            url = env_or("BB_OS_ATTEST_URL", ATTEST_URL).format(repo=repo, digest=digest)
             try:
                 req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
                                                            "User-Agent": "AerieOS"})
@@ -511,7 +648,8 @@ class OsImageMixin:
                 return False
             with open(bundle, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n")
-        rc = self._sh(job, [gh, "attestation", "verify", iso, "--bundle", bundle, "--repo", repo, *extra], timeout=120)
+        rc = self._sh(job, [gh, "attestation", "verify", iso, "--bundle", bundle, "--repo", repo,
+                            "--cert-identity-regex", signer_identity(repo), *extra], timeout=120)
         if rc != 0:
             say("the image's build attestation did not verify: nothing written\n")
             return False
@@ -553,17 +691,20 @@ class OsImageMixin:
         containerd and libvirt, moves what the stick holds of theirs, of the
         toolchains and of the projects to the pool, keeps the name and binds
         them there at every boot; then a hello says where things are."""
-        tool = _env("BB_OS_POOL", POOL_TOOL)
+        tool = env_or("BB_OS_POOL", POOL_TOOL)
         path = str(cfg.get("path") or "")
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS, so it has no stick\n")
             return "failed", 77
-        if not path.startswith("/") or ".." in path.split("/"):
+        if not on_disks(path):
             job.say("refused: a pool is named by its mount point\n")
             return "failed", 64
         # Another install's folder there is set aside only when asked (the
-        # operator, 8 Nov); the tool refuses it otherwise.
-        rc = self._sh(job, ["bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
+        # operator, 8 Nov); the tool refuses it otherwise, but for the one
+        # this controller's restored configuration names as its own (B939).
+        adopt = str(cfg.get("adopt_id") or "")
+        pre = ["env", f"BB_SP_ADOPT_ID={adopt}"] if re.fullmatch(r"[0-9a-f]{32,64}", adopt) else []
+        rc = self._sh(job, [*pre, "bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
         self.hello_again("the system pool was set")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
@@ -573,7 +714,7 @@ class OsImageMixin:
         projects where they are), or let go (`release`): the tool checks it,
         says which of `names` it holds, hands it to the controller's account,
         binds it and restarts the controller on it; then a hello."""
-        tool = _env("BB_OS_POOL", POOL_TOOL)
+        tool = env_or("BB_OS_POOL", POOL_TOOL)
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS, so it has no stick\n")
             return "failed", 77
@@ -581,7 +722,7 @@ class OsImageMixin:
             rc = self._sh(job, ["bash", tool, "projects", "--release"], timeout=600)
         else:
             path = str(cfg.get("path") or "")
-            if not path.startswith("/") or ".." in path.split("/"):
+            if not on_disks(path):
                 job.say("refused: a spaces folder is named by its path\n")
                 return "failed", 64
             names = [str(n) for n in (cfg.get("names") or []) if isinstance(n, str) and n and "/" not in n and not n.startswith(".")][:500]
@@ -596,7 +737,7 @@ class OsImageMixin:
         over a share); the sha256 files beside them are read either way.
         What it fetched and took out of the ISO is gone again however it
         ends: a failed update left gigabytes on the data partition (B470)."""
-        work = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "update")
+        work = os.path.join(os_work(), "update")
         try:
             return self._os_update(job, cfg, work)
         finally:
@@ -605,7 +746,7 @@ class OsImageMixin:
     def _os_update(self, job, cfg, work):
         say = job.say
         rel = os_release()
-        tool = _env("BB_OS_SLOT", SLOT_TOOL)
+        tool = env_or("BB_OS_SLOT", SLOT_TOOL)
         if not rel or not os.path.isfile(tool):
             say("refused: this machine does not run AerieOS (no image release here), so there is no slot to write\n")
             return "failed", 77
@@ -651,6 +792,43 @@ class OsImageMixin:
         say(f"os update: {name}, into slot {other} (slot {cur} runs now)\n")
         fn = f"{name}.iso"
         iso = os.path.join(work, fn)
+        # The release's list of its files, signed by a key this install
+        # already holds (R199), before the image is fetched: who changes the
+        # repository or a release can build and attest an image and put a
+        # sha256 beside it, not sign the list. The tag says who may have
+        # signed (tag_namespaces); a list that is unsigned, or signed by
+        # somebody the tag may not have, is refused, and so is every
+        # release on an install that names no signer at all: every build
+        # ships the file that names them, so one without it has lost it.
+        rtag = (tag if tag.startswith("v") else "v" + tag) if tag else "v" + ver
+        at = f"{env_or('BB_OS_RELEASE_URL', RELEASE_URL)}/{rtag}"
+        keys, listed, who = signers(), None, ""
+        if not keys:
+            say("refused: this install names no release signer: nothing written\n")
+            return "failed", 69
+        if keys:
+            if why := unsignable(rtag, keys):
+                say(f"refused: {why}: nothing written\n")
+                return "failed", 69
+            sums, sig = os.path.join(work, "SHA256SUMS"), os.path.join(work, "SHA256SUMS.sig")
+            try:
+                if src:
+                    shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
+                    shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
+                else:
+                    _fetch(f"{at}/SHA256SUMS", sums, say)
+                    _fetch(f"{at}/SHA256SUMS.sig", sig, say)
+            except OSError as e:
+                say(f"refused: {rtag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig: {e}): it was made "
+                    "before releases were signed, or its key's holder has not signed it yet; nothing written\n")
+                return "failed", 69
+            listed, who, why = signed_list(rtag, sums, sig, keys)
+            if listed is None:
+                say(f"refused: {why}: nothing written\n")
+                return "failed", 69
+            if fn not in listed:
+                say(f"refused: {unlisted(listed, fn, '', rtag)}: nothing written\n")
+                return "failed", 69
         try:
             if src:
                 if why := _room(work, os.path.getsize(os.path.join(src, fn))):
@@ -658,10 +836,9 @@ class OsImageMixin:
                 shutil.copyfile(os.path.join(src, fn), iso)
                 shutil.copyfile(os.path.join(src, fn + ".sha256"), iso + ".sha256")
             else:
-                base = _env("BB_OS_RELEASE_URL", RELEASE_URL)
                 job.step(f"fetching {fn}")
-                _fetch(f"{base}/{tag if tag.startswith('v') else 'v' + tag}/{fn}", iso, say)
-                _fetch(f"{base}/{tag if tag.startswith('v') else 'v' + tag}/{fn}.sha256", iso + ".sha256", say)
+                _fetch(f"{at}/{fn}", iso, say)
+                _fetch(f"{at}/{fn}.sha256", iso + ".sha256", say)
         except OSError as e:
             say(f"{fn}: not got: {e}\n")
             return "failed", 66
@@ -680,32 +857,13 @@ class OsImageMixin:
         # step 1).
         if not self._attested(job, iso, have, name, src, work):
             return "failed", 68
-        # ...and signed by a release key this install already holds (R199):
-        # who changes the repository can build and attest, not sign.
-        keys = signers()
-        if keys:
-            sums, sig = os.path.join(work, "SHA256SUMS"), os.path.join(work, "SHA256SUMS.sig")
-            try:
-                if src:
-                    shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
-                    shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
-                else:
-                    at = f"{_env('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
-                    _fetch(f"{at}/SHA256SUMS", sums, say)
-                    _fetch(f"{at}/SHA256SUMS.sig", sig, say)
-            except OSError as e:
-                say(f"the release carries no signature yet ({e}): it is taken once its key's holder has signed it; nothing written\n")
+        # ...and the image's own bytes are the ones the signed list names,
+        # whatever the sha256 beside it says.
+        if listed is not None:
+            if why := unlisted(listed, fn, have, rtag):
+                say(f"refused: {why}: nothing written\n")
                 return "failed", 69
-            listed = sums_verify(sums, sig, keys)
-            if listed is None:
-                say("the release's signature does not verify against this install's release key: nothing written\n")
-                return "failed", 69
-            if listed.get(fn) != have:
-                say(f"{fn} is not the image the release signed: nothing written\n")
-                return "failed", 69
-            say(f"{fn} is signed by AerieOS's release key\n")
-        else:
-            say("this install holds no release key yet, so the release's signature is not checked\n")
+            say(f"{fn} is the image {rtag}'s list names, signed by {who}\n")
         job.step("reading the image")
         files = self._iso_pieces(job, iso, work)
         if not files:
@@ -715,13 +873,13 @@ class OsImageMixin:
         if size > SLOT_MIB * 1048576:
             say(f"the root image is {size >> 20} MB and a slot holds {SLOT_MIB}: nothing written\n")
             return "failed", 69
-        dev = _env(f"BB_OS_DEV_{other.upper()}", SLOT_DEV[other])
+        dev = env_or(f"BB_OS_DEV_{other.upper()}", SLOT_DEV[other])
         if not os.path.exists(dev):
             say(f"slot {other}'s partition is not here ({dev}): nothing written\n")
             return "failed", 70
         # Every AerieOS disk shares its partitions' UUIDs, so with a second
         # one in the machine (a stick) the name could be either (B470).
-        if not _env(f"BB_OS_DEV_{other.upper()}", ""):
+        if not env_or(f"BB_OS_DEV_{other.upper()}", ""):
             uuid = os.path.basename(SLOT_DEV[other])
             r = subprocess.run(["blkid", "-t", f"PARTUUID={uuid}", "-o", "device"], capture_output=True, text=True,
                                timeout=30, check=False)
@@ -741,13 +899,13 @@ class OsImageMixin:
             return "failed", 74
         # What the slot holds goes on the boot menu before it is overwritten.
         job.step(f"keeping what slot {other} holds")
-        keep_slot(say, dev, os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other), cfg.get("keep", KEEP_DEFAULT))
+        keep_slot(say, dev, os.path.join(env_or("BB_OS_ESP", ESP), "aerieos", other), cfg.get("keep", KEEP_DEFAULT))
         # The slot's old release named off it before its root is written: a
         # write cut short leaves a slot that reads as empty, never as the
         # old version, which the next update's keep would have taken and
         # put in place of the good copy kept before it.
         try:
-            stale = os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other, "release")
+            stale = os.path.join(env_or("BB_OS_ESP", ESP), "aerieos", other, "release")
             if os.path.exists(stale):
                 os.unlink(stale)
                 fd = os.open(os.path.dirname(stale), os.O_RDONLY)
@@ -767,7 +925,7 @@ class OsImageMixin:
         except OSError as e:
             say(f"slot {other} did not take the image: {e}\n")
             return "failed", 71
-        esp = _env("BB_OS_ESP", ESP)
+        esp = env_or("BB_OS_ESP", ESP)
         where = os.path.join(esp, "aerieos", other)
         try:
             os.makedirs(where, exist_ok=True)
@@ -787,13 +945,14 @@ class OsImageMixin:
         # slot running now. Not set, it is said, and the next boot stays here
         # (B470: a next without its trial booted the new slot with no way
         # back, and was reported a success).
+        pin_hostid()
         if self._sh(job, ["bash", tool, "switch", other, cur, ver], timeout=30) != 0:
             self._sh(job, ["bash", tool, "hold"], timeout=30)
             say(f"GRUB was not told to boot slot {other} on trial: the slot is written and the next boot stays on slot {cur}\n")
             return "failed", 73
         with contextlib.suppress(OSError):
-            os.unlink(os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "fell-back"))
-        say(f"slot {other} holds AerieOS {ver}, and the next boot starts it: restart this machine to finish (Reboot under This machine's Advanced). "
+            os.unlink(os.path.join(os_work(), "fell-back"))
+        say(f"slot {other} holds AerieOS {ver}, and the next boot starts it: restart this machine to finish (Reboot under Advanced on the Nodes page). "
             f"Slot {cur} keeps {rel.get('version') or 'the image running now'} to fall back to.\n")
         self.hello_again(f"AerieOS {ver} written to slot {other}")
         return "succeeded", 0

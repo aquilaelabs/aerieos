@@ -17,8 +17,8 @@ a briefed session reads:
     it is a fresh install, stamped current with nothing to run.
   * At start, before anything writes, gate() refuses a /config NEWER than
     this build (a downgrade: restore the copy taken before the upgrade) and
-    one OLDER than SUPPORTED_FROM (go through the release named for it
-    first), each in one sentence, and the controller does not start. The
+    one OLDER than SUPPORTED_FROM (nothing updates from it: install fresh),
+    each in one sentence, and the controller does not start. The
     entrypoint asks the same question (`stateversion.py check`) before its
     hooks run, so a refused container writes nothing at all.
   * When the state is to move, the copy of /config is taken first
@@ -28,8 +28,9 @@ a briefed session reads:
 
 A migration is statemigrations/NNNN_name.py with run(ctx): idempotent, so a
 start cut short runs it again safely, and never edited once a release has
-shipped it (`aerie lint` holds every one present at the newest v* tag
-byte-for-byte). Adding one moves CURRENT, since CURRENT is the newest file.
+shipped it (`aerie lint` holds every one above SUPPORTED_FROM that the
+newest v* tag carries, byte-for-byte). Adding one moves CURRENT, since
+CURRENT is the newest file.
 Stdlib only, and importable on its own: the entrypoint runs it as a script.
 """
 import contextlib
@@ -48,11 +49,10 @@ FILE = "state.json"
 BACKUPS = "backups"
 KEEP = 3
 
-# The oldest state this build reads: AerieOS starts here, and nothing upgrades
-# from the releases before it (the operator, 1 Nov: 0.6, 0.7 and 0.8 have no
-# path, and the migrations below this number are gone from the tree). A move
-# from a controller already at this state still lands.
-SUPPORTED_FROM = 19
+# The oldest state this build reads, and the state the first migration in
+# the tree runs from: a /config under it is refused, and one at it runs every
+# migration there is. A move from a controller at this state lands.
+SUPPORTED_FROM = 27
 
 # What the copy before a migration leaves out: what grows and is not state
 # (each kind paths.py lets the Settings page move: logs, the trees jobs ran
@@ -64,14 +64,47 @@ SUPPORTED_FROM = 19
 # runner-tokens is a Docker volume of its own, root-only by design and kept
 # across an update by Docker, which this copy (made as the dashboard's
 # account) could not read anyway (B109).
+# The install key, where an install with no secrets folder keeps it beside
+# the state: it unseals every secret the copy holds, so a copy that carried
+# it was the secrets in the clear for whoever read the copy. It is no
+# version's (an update never changes it), and a copy put back leaves what
+# is skipped where it is, so the key in place still opens what comes back.
 SKIP = {BACKUPS, "logs", "snapshots", "project-snapshots", "images", "gitrelay",
-        "gitview", "apps", "ci-logs", "runner-tokens", "state-held"}
+        "gitview", "apps", "ci-logs", "runner-tokens", "state-held", ".install-key",
+        # What a start says about itself, no version's state: the note of an
+        # update that did not land, and the running server's pid.
+        "update-did-not-land.txt", ".server.pid"}
 SKIP_GLOBS = (".reset-*", "*.lock", "*.tmp")
 
 # Why this start migrates nothing, when the copy before it failed; written
 # to /config/state-held too, which aerie doctor says in red (B109).
 HELD = ""
 HELD_FILE = "state-held"
+
+
+# An update whose migration failed: /config was put back as it was and the
+# start refused (the operator, 13 Nov). This file, in /config, says which
+# build and why. The same build does not try again by itself while it is
+# there (each try would copy the whole state and move another aside), and a
+# start that migrates clean takes it away.
+FAILED_FILE = "update-did-not-land.txt"
+# In a copy whose update landed: every migration it was taken for ran. A
+# build of the same name that migrates again (a dev build made twice from
+# one commit, each with a migration more) takes a copy of its own, where it
+# reused this one and a failure put back the state from before the first.
+LANDED = ".landed"
+# The version this start's copy was taken for (gate), which is how migrate
+# finds the copy to put back.
+_COPY = {"version": ""}
+
+
+def failed_before(state, version):
+    """What FAILED_FILE says when it is about this build, else ""."""
+    try:
+        lines = (Path(state) / FAILED_FILE).read_text().splitlines()
+    except OSError:
+        return ""
+    return "\n".join(lines[1:]).strip() if lines and lines[0].strip() == f"build {version}" else ""
 
 
 def _held(state, why):
@@ -160,10 +193,27 @@ def refusal(state, version=None):
                 f"AerieOS {by or 'a newer build'}, and this build reads state {cur} and older. "
                 f"Downgrades are not supported: start {by or 'the newer build'} again, or {where}.")
     if n < SUPPORTED_FROM:
-        return (f"AerieOS {version} will not start: this /config is at state {n}"
-                f"{f', written by {by}' if by else ''}, and this build reads state "
-                f"{SUPPORTED_FROM} on. Nothing upgrades from a build before it: install fresh, "
-                f"with a new /config (docs/install.md#upgrading).")
+        return (f"AerieOS {version} will not start: this /config is from "
+                f"{f'AerieOS {by}' if by else 'an older build'}, which nothing updates from, "
+                f"so install fresh with a new /config.")
+    return ""
+
+
+def wont_start(state, version=None):
+    """Why this build does not start on `state`, or "": a state it may not
+    read (refusal), or one this same build already failed to migrate and put
+    back, which is said again with nothing touched until somebody takes the
+    note away. What the boot asks before it writes anything (`check`), the
+    supervisor before it starts the dashboard again, and gate()."""
+    why = refusal(state, version)
+    if why:
+        return why
+    version = version or build_version()
+    again = failed_before(state, version)
+    if again:
+        return (f"AerieOS {version} will not start: {again}\n"
+                f"It is not tried again by itself. Start the release this /config ran before, or, with the cause "
+                f"fixed, remove {Path(state) / FAILED_FILE} and start this one again.")
     return ""
 
 
@@ -172,10 +222,12 @@ def gate(state, version=None):
     /config, or, where the state is to move, take the copy before the
     migrations do (migrate() runs them once every module is configured).
     Exits the process on a refusal. Returns the state found."""
-    why = refusal(state, version)
+    why = wont_start(state, version)
     if why:
         print(why, file=sys.stderr, flush=True)
         sys.exit(78)              # EX_CONFIG: nothing to retry until /config changes
+    version = version or build_version()
+    _COPY["version"] = version
     n, _ = read(state)
     if n is None and not used(state):
         with contextlib.suppress(OSError):
@@ -210,7 +262,11 @@ def backup(state, version=None):
     root = state / BACKUPS
     dest = root / name
     if dest.exists():
-        return dest
+        if not (dest / LANDED).exists():
+            return dest
+        # The copy from an update that landed: kept under a name of its own,
+        # and this migration gets the state as it is now.
+        os.replace(dest, root / f"{name}~{time.strftime('%Y%m%d-%H%M%S')}")
     tmp = root / f".{name}.partial"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
@@ -278,10 +334,14 @@ def _newest_backup(state):
 
 def migrate(state, ctx, version=None):
     """Run every migration past the stamp, in order, and stamp each as it
-    lands, so a failure part-way leaves the stamp at the last one that ran
-    and the next start begins at the one that failed. A failure is said
-    and does not stop the start (a migration never kept the dashboard from
-    starting); it is retried at the next. The numbers that ran."""
+    lands. One that fails stops the start (the operator, 13 Nov): /config
+    is put back from the copy gate() took before any of them ran, a note in
+    it says which migration and why (FAILED_FILE), and the process exits,
+    so the release from before starts on a /config that is as it left it.
+    It went on before, with a line in the log, and the new build ran on
+    state half changed. Where there is no copy to put back (none could be
+    taken, which gate() said), nothing ran and nothing runs. The numbers
+    that ran."""
     if HELD:
         return []
     n, _ = read(state)
@@ -292,16 +352,45 @@ def migrate(state, ctx, version=None):
             continue
         try:
             _load(path).run(ctx)
-        except Exception as e:                                 # noqa: BLE001
-            print(f"dashboard: state migration {path.name} failed, and runs again at the next "
-                  f"start: {type(e).__name__}: {e}", flush=True)
-            break
+        except Exception as e:                                 # noqa: BLE001 (whatever a migration raises)
+            _did_not_land(state, version or _COPY["version"] or build_version(), path.name, e, ran)
+            break                                              # only where nothing could be put back
         stamp(state, num, version)
         ran.append(num)
     if ran:
         print(f"dashboard: /config migrated to state {ran[-1]} ({', '.join(f'{x:04d}' for x in ran)})",
               flush=True)
+    # Clean: the copy taken for these is marked as one whose update landed,
+    # and whatever an earlier try left to say is over.
+    if ran:
+        name = "before-" + re.sub(r"[^A-Za-z0-9._+-]", "_", version or _COPY["version"] or build_version())
+        with contextlib.suppress(OSError):
+            (Path(state) / BACKUPS / name / LANDED).touch()
+    with contextlib.suppress(OSError):
+        (Path(state) / FAILED_FILE).unlink(missing_ok=True)
     return ran
+
+
+def _did_not_land(state, version, name, err, ran):
+    """A migration failed: /config back as it was, the note written, and
+    the process ended. Returns only when there was no copy to put back."""
+    why = f"its migration {name} failed ({type(err).__name__}: {err})"
+    try:
+        aside = restore(state, version)
+    except (ValueError, OSError) as e:
+        print(f"dashboard: state migration {name} failed ({type(err).__name__}: {err}) and /config could not be put "
+              f"back as it was ({e}): this build runs on it as it is, and tries the migration again at the next start",
+              file=sys.stderr, flush=True)
+        _held(state, f"migration {name} failed and /config could not be put back: {type(err).__name__}: {err}")
+        return
+    said = (f"the update to AerieOS {version} did not land: {why}. /config is as it was before the update"
+            + (f" (the {len(ran)} migration(s) before it were undone with it)" if ran else "")
+            + f"; what the failed start left is in {aside}.")
+    with contextlib.suppress(OSError):
+        (Path(state) / FAILED_FILE).write_text(f"build {version}\n{said}\n")
+    print(f"AerieOS {version} will not start: {said}\nStart the release this /config ran before. With the cause "
+          f"fixed, remove {Path(state) / FAILED_FILE} and start this one again.", file=sys.stderr, flush=True)
+    sys.exit(78)
 
 
 def restore(state, version):
@@ -333,7 +422,7 @@ def restore(state, version):
             os.replace(p, aside / p.name)
             done.append((aside / p.name, p))
         for p in sorted(src.iterdir()):
-            if p.name == "NOT-COPIED.txt":
+            if p.name in ("NOT-COPIED.txt", LANDED):
                 continue
             os.replace(p, state / p.name)
             done.append((state / p.name, p))
@@ -405,7 +494,7 @@ def main(argv):
     if argv[:1] != ["check"]:
         print("usage: stateversion.py check [STATE] | policy | restore STATE VERSION", file=sys.stderr)
         return 2
-    why = refusal(argv[1] if len(argv) > 1 else os.environ.get("DASHBOARD_STATE", "/config"))
+    why = wont_start(argv[1] if len(argv) > 1 else os.environ.get("DASHBOARD_STATE", "/config"))
     if why:
         print(why, file=sys.stderr)
         return 78

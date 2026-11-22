@@ -11,19 +11,16 @@ The one-way doors this module owns were paid when the store first landed
   * ids are minted, never addresses, never reused (door 1);
   * every mutation is attributed and audited from the first day there is a
     table to write it in (door 2);
-  * the SQL runs on two engines behind numbered migrations from 0001:
-    parameters go through _q(), JSON is TEXT, ids and times are app-side
-    (door 6);
+  * the schema moves only by numbered migrations from 0001: JSON is TEXT,
+    ids and times are app-side (door 6);
   * nothing in the schema assumes one operator: pools, token kinds and
     principals are data, not booleans (door 8).
 
-Storage is /config/builderbot.db unless DATABASE_URL says otherwise. SQLite
-is the homelab default; a postgres:// URL is the enterprise seam (E1) and is
-refused loudly until that phase is built, which beats accepting it and
-half-working. The notebook's JSON files are NOT this module's business: they
+Storage is /config/builderbot.db, SQLite. The notebook's JSON files are NOT this module's business: they
 are small, human-edited and read whole, and they stay where they are.
 """
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -41,8 +38,7 @@ MIGRATIONS = HERE / "migrations"
 STATE = None
 _db = None
 # One connection, one lock. sqlite3 serializes on its own, but a lock makes
-# read-modify-write sequences whole, and it is the shape the postgres
-# implementation will keep, so callers never learn a difference.
+# read-modify-write sequences whole.
 _lock = threading.RLock()
 
 
@@ -67,24 +63,11 @@ def open_readonly(state):
 
 
 # ---------------------------------------------------------------------------
-# the engine seam
-
-def _url():
-    return (os.environ.get("DATABASE_URL") or "").strip()
-
+# the engine
 
 def _open():
     global _db
-    url = _url()
-    if url and not url.startswith("sqlite:"):
-        # The seam exists so this becomes a config change (docs/nodes.md §5);
-        # accepting the URL before the engine is built would half-work, which
-        # is worse than refusing with the phase that fixes it named.
-        raise RuntimeError(
-            f"DATABASE_URL={url.split('://')[0]}://… is not supported yet: "
-            "SQLite is the built engine; Postgres is enterprise track E1")
-    path = url[len("sqlite:"):].lstrip("/") if url else ""
-    dbfile = Path("/" + path) if path else STATE / "builderbot.db"
+    dbfile = STATE / "builderbot.db"
     dbfile.parent.mkdir(parents=True, exist_ok=True)
     _db = sqlite3.connect(dbfile, check_same_thread=False)
     _db.row_factory = sqlite3.Row
@@ -95,26 +78,48 @@ def _open():
     _db.execute("PRAGMA synchronous=NORMAL")
 
 
-def _q(sql):
-    """The paramstyle seam: written as `?`, translated per engine.
-
-    SQLite wants qmark and postgres wants format. Trivial today, and the whole
-    point is that it stays trivial: every statement goes through here, so the
-    day E1 lands, this function and _open() are the diff rather than a hunt.
-    """
-    return sql
-
-
 def _exec(sql, args=()):
     with _lock:
-        cur = _db.execute(_q(sql), args)
-        _db.commit()
+        cur = _db.execute(sql, args)
+        if not (_held and _held_by == threading.get_ident()):
+            _db.commit()
         return cur
+
+
+# How deep a thread is in transaction(), and which thread: moved under
+# _lock alone. Nothing that waits on the store's condition belongs inside
+# one, since the wait lets go of the lock with the transaction still open.
+_held = 0
+_held_by = 0
+
+
+@contextlib.contextmanager
+def transaction():
+    """What is read and what is then written, as one: the store's lock held
+    from the first statement to the last and one commit when the outermost
+    leaves, so no other thread's statement lands between a row read and the
+    write decided by it, and a stop half-way leaves none of it (R227 step
+    14). Whatever raises out of the outermost takes all of it back. One
+    inside another is the same transaction."""
+    global _held, _held_by
+    with _lock:
+        _held += 1
+        _held_by = threading.get_ident()
+        try:
+            yield
+        except BaseException:
+            _held -= 1
+            if not _held:
+                _db.rollback()
+            raise
+        _held -= 1
+        if not _held:
+            _db.commit()
 
 
 def _rows(sql, args=()):
     with _lock:
-        return [dict(r) for r in _db.execute(_q(sql), args).fetchall()]
+        return [dict(r) for r in _db.execute(sql, args).fetchall()]
 
 
 # ---------------------------------------------------------------------------
@@ -175,8 +180,28 @@ def fold():
     if _db is None:
         return (0, 0, 0)
     with _lock:
+        if _held and _held_by == threading.get_ident():
+            # Inside this thread's own transaction the log cannot be folded
+            # (SQLite refuses with the table locked), and what it holds is
+            # not committed yet: the next fold takes it.
+            return (1, 0, 0)
         row = _db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
     return tuple(row) if row else (0, 0, 0)
+
+
+def through():
+    """What was just committed, in the database file before anybody is told
+    of it (R227 step 7): a token handed to a node, at its enrollment and at
+    each rotation. The store commits to its log and syncs that at a fold
+    (the synchronous setting is NORMAL: FULL would sync on every heartbeat,
+    which on a FUSE /config is the page waiting on the disk all day), so the
+    last minute's commits are what a power cut can take; the few that must
+    not go that way are folded as they are made. A job is not one of them:
+    every listing read from a node is a job too, and one lost in its first
+    minute is seen to be gone and pressed again, where a token lost is a
+    node locked out. Never raises: the minute's fold is still coming."""
+    with contextlib.suppress(sqlite3.Error):
+        fold()
 
 
 def start_folding(every=FOLD_S):
@@ -218,6 +243,23 @@ def mint(prefix):
     table this size, and never derived from anything (door 1: an id that
     encodes a fact goes stale when the fact does)."""
     return f"{prefix}_{secrets.token_hex(4)}"
+
+
+def minted(prefix, insert, tries=6):
+    """A row put in under a new id: insert(id) runs the INSERT, and is run
+    again with another id when the table holds that one already. The id it
+    went in under. An id is 32 bits, so in a table of some hundred thousand
+    rows about one insert in twenty thousand meets one that is there, and
+    that row was lost with a line in the log: an audit row, a job."""
+    for left in range(tries - 1, -1, -1):
+        rid = mint(prefix)
+        try:
+            insert(rid)
+            return rid
+        except sqlite3.IntegrityError as e:
+            if not left or "UNIQUE" not in str(e).upper():
+                raise
+    return None
 
 
 
@@ -264,10 +306,11 @@ def audit(principal, action, target, params):
     digest = (f"mac:{hmac.new(_audit_mac_key(), blob.encode(), hashlib.sha256).hexdigest()[:12]}"
               f"·{len(blob)}b" if blob else "")
     try:
-        _exec("INSERT INTO audit (id, at, principal, action, target, params) "
-              "VALUES (?, ?, ?, ?, ?, ?)",
-              (mint("a"), int(time.time()), str(principal), str(action)[:200],
-               str(target)[:200], digest))
+        minted("a", lambda rid: _exec(
+            "INSERT INTO audit (id, at, principal, action, target, params) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (rid, int(time.time()), str(principal), str(action)[:200],
+             str(target)[:200], digest)))
     except sqlite3.Error as e:
         # Bookkeeping must never break the mutation it records: a full disk
         # mid-flight costs the row and says so, not the operator's action.

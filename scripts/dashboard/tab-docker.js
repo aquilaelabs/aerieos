@@ -73,7 +73,7 @@ function gateDocker(root, why){
     b.disabled = true;
     // Kept for a screen reader (untitle); what the page says is the
     // tab's own line that the daemon is not answering.
-    b.title = why;
+    setTitle(b, why);
   });
 }
 
@@ -83,7 +83,6 @@ function gateDocker(root, why){
 // exactly what you open a list like this to find out about, and a listing
 // that showed half would be lying by omission.
 let dockerList = null;                   // the picked node's last answer
-let dockerRev = 0;                       // bumped when it changes, so a pane
                                          // showing the same tab still repaints
 // Which node the manager is looking at ("" = the default), and
 // the last-known answer per node id: switching back to an offline node shows
@@ -108,7 +107,17 @@ function dockerTab(){ return tabs.find(t => t.kind === "docker"); }
 function dmNodesKey(){
   if (nodesList === null) return "?";
   return nodesList.filter(n => n.kind !== "local")
-    .map(n => [n.id, n.name, n.kind, n.state].join(",")).join(";");
+    .map(n => [n.id, n.name, n.kind, n.state].join(",")).join(";") + dmOldAppsKey();
+}
+// ...and, on the controller's own machine, what the old system's section
+// draws from: the disks, what was read, the VMs defined, the containers'
+// rows and the VM picks, so a read landing or a tick redraws it.
+function dmOldAppsKey(){
+  const own = ownMachine();
+  if (!own || dockerNode !== own.id) return "";
+  const ad = own.reported?.adopted || {};
+  return "|" + JSON.stringify([(ad.mounts || []).length, ad.apps || null, own.reported?.vms_other || null, !!oldAppsFrom(own),
+                               adoptPlan === null ? null : adoptPlan, adoptNets, [...adoptSkip]]);
 }
 
 function openDocker(){
@@ -118,7 +127,7 @@ function openDocker(){
   // Opening is a look: a tab already on screen is read again. Not while an
   // answer is on its way, which is the case the tab's own open hook just
   // made when the list was empty.
-  if (!dockerFetching) loadDocker();
+  if (!readBusy("docker")) loadDocker();
 }
 
 // ...on one node: the one a container was just made on, or the one a bell
@@ -132,11 +141,11 @@ function openDockerOn(node){
   if (moved){
     dockerNode = node;
     dockerList = dockerSeen[node] || null;
-    dockerRev++;
+    readMoved("docker");
   }
   openDocker();
   dockerNodeKeep();
-  if (moved && dockerFetching) loadDocker();
+  if (moved && readBusy("docker")) loadDocker();
 }
 
 // ...and remembered when it changes, which is the only moment it can be
@@ -169,63 +178,51 @@ function dmBootLoad(u){
 let dockerWarmAt = 0;
 function dockerWarm(){
   const node = dockerNode || "";
-  if (dockerSeen[node] || dockerFetching || Date.now() - dockerWarmAt < 10000) return;
+  if (dockerSeen[node] || readBusy("docker") || Date.now() - dockerWarmAt < 10000) return;
   dockerWarmAt = Date.now();
-  fetch("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""))
-    .then(r => r.ok ? r.json() : null)
+  getJSON("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""))
     .then(got => { if (got && !got.error){ const k = got.node || node; if (!dockerSeen[k]) dockerSeen[k] = got; if (!node && !dockerSeen[""]) dockerSeen[""] = got; } })
     .catch(() => {});
 }
 
-let dockerAsk = 0;                       // which ask is newest, so an older
-                                         // answer landing late cannot win
-let dockerFetching = false;        // an answer is on its way: the tab says so
-// ...but only said once it has been slow. A fetch here is one per revision
-// while a job runs, which is one per log line, and a word that appeared for
-// each of them blinked at the foot of the tab through every build. Under this
-// long, nothing is said: an answer that arrives at once needs no announcing.
+// A read on its way is said only once it has been slow. A read here is one
+// per revision while a job runs, which is one per log line, and a word that
+// appeared for each of them blinked at the foot of the tab through every
+// build. Under this long, nothing is said: an answer that arrives at once
+// needs no announcing.
 const DM_SLOW_MS = 600;
 // What a chip or Cards and List redraws: the groups' cards, or the list.
 const DM_PARTS = ".pane .doc.on .dmtab .dmcard, .pane .doc.on .dmtab > .tbl";
 let dmSlowTimer = null, dmSlow = false;
-async function loadDocker(){
-  const asked = dockerNode;
-  const ask = ++dockerAsk;
-  dockerFetching = true;
-  clearTimeout(dmSlowTimer);
-  dmSlowTimer = setTimeout(() => {
-    if (ask === dockerAsk && dockerFetching){ dmSlow = true; dockerRev++; drawPanes(); }
-  }, DM_SLOW_MS);
-  let got;
-  try{
-    got = await (await bootFetch("/api/docker"
-      + (asked ? "?node=" + encodeURIComponent(asked) : ""))).json();
-  }catch(e){ got = {error: String(e), containers: []}; }
-  // An answer for a node the operator has already picked away from must not
-  // repaint the view it no longer belongs to; it lands in that node's cache
-  // and nothing else.
-  // (an answer a newer ask has overtaken does not write over that node's
-  // cache either: the page falls back to the cache when it has no list, and
-  // drew the older answer again, B853)
-  if (ask === dockerAsk || asked !== dockerNode) dockerSeen[got.node || asked || ""] = got;
-  if (ask === dockerAsk){ dockerFetching = false; dmSlow = false; clearTimeout(dmSlowTimer); }
-  if (asked !== dockerNode) return;
-  // A newer ask is in flight or has landed: one revision's reload under
-  // another's. This answer is about an earlier moment, and a
-  // daemon that came back between the two would be painted as gone again
-  // (B69).
-  if (ask !== dockerAsk) return;
-  // First answer resolves "" to the default node's real id, so the picker
-  // and the cache speak one language.
-  if (!dockerNode && got.node) dockerNode = got.node;
-  // ...and kept in this browser for the next reload's early read (dmBootLoad).
-  if (dockerNode && !got.error) try{ localStorage.setItem("bb.dmnode", dockerNode); }catch(e){ /* private */ }
-  dockerList = got;
-  dockerRev++;
-  // drawPanes rather than reaching into a pane by index: which pane holds this
-  // tab is the layout's business, and toolchains already refreshes this way.
-  drawPanes();
-  loadDockerStats(got);
+function loadDocker(){
+  return reading("docker", async overtaken => {
+    const asked = dockerNode;
+    clearTimeout(dmSlowTimer);
+    dmSlowTimer = setTimeout(() => {
+      if (readBusy("docker")){ dmSlow = true; readMoved("docker"); drawPanes(); }
+    }, DM_SLOW_MS);
+    const got = await getJSON("/api/docker" + (asked ? "?node=" + encodeURIComponent(asked) : ""));
+    if (got.error && !got.containers) got.containers = [];
+    // Every answer is that node's in the cache, the page falling back to it
+    // while it has no list; reading() lands them in the order asked, so an
+    // older one cannot write over a newer one (B853).
+    // ...unless a newer ask has overtaken it: one revision's reload under
+    // another's, about an earlier moment, and a daemon that came back
+    // between the two would be painted as gone again (B69).
+    if (overtaken()) return false;
+    dockerSeen[got.node || asked || ""] = got;
+    dmSlow = false; clearTimeout(dmSlowTimer);
+    // An answer for a node the person has already picked away from must not
+    // repaint the view it no longer belongs to.
+    if (asked !== dockerNode) return;
+    // First answer resolves "" to the default node's real id, so the picker
+    // and the cache speak one language.
+    if (!dockerNode && got.node) dockerNode = got.node;
+    // ...and kept in this browser for the next reload's early read (dmBootLoad).
+    if (dockerNode && !got.error) try{ localStorage.setItem("bb.dmnode", dockerNode); }catch(e){ /* private */ }
+    dockerList = got;
+    loadDockerStats(got);
+  });
 }
 
 // ---- the jump bar's containers ----
@@ -238,7 +235,7 @@ function dmJumpLoad(){
   if (!nodesList || Date.now() - dmJumpAsked < 60000) return Promise.resolve();
   dmJumpAsked = Date.now();
   const ids = nodesList.filter(n => n.kind !== "local" && n.state !== "retired" && !dockerSeen[n.id]).map(n => n.id);
-  return Promise.all(ids.map(id => fetch("/api/docker?node=" + encodeURIComponent(id)).then(r => r.json())
+  return Promise.all(ids.map(id => getJSON("/api/docker?node=" + encodeURIComponent(id))
     .then(got => { const k = got.node || id; if (!dockerSeen[k]) dockerSeen[k] = got; }).catch(() => {})));
 }
 // [{name, node, where}]: each container with the node it is on, by name.
@@ -258,7 +255,7 @@ function dmJumpTo(nid, name){
   dmSearch = name; dmChip = "";
   railGo("containers", "docker");
   dockerNodeKeep();
-  dockerRev++; drawPanes();
+  readMoved("docker"); drawPanes();
 }
 
 // What each container is using now (R216): asked once the list has landed
@@ -269,13 +266,13 @@ let dockerStats = {};
 // ...and each container's last hour, where its node's agent samples it
 // once a minute (R218 step 9): {name: [[at, cpu %, memory %], ...]}.
 let dockerSpark = {};
-async function loadDockerStats(list){
+function loadDockerStats(list){
   const node = list?.node || dockerNode || "";
-  if (!list || list.blind || list.on === false || list.error || !(list.instances || []).some(d => d.running)) return;
-  let got;
-  try{
-    got = await (await fetch("/api/docker/stats" + (node ? "?node=" + encodeURIComponent(node) : ""))).json();
-  }catch(e){ return; }
+  if (!list || list.blind || list.on === false || list.error || !(list.instances || []).some(d => d.running)) return Promise.resolve();
+  return reading("docker.stats", () => dockerStatsRead(node));
+}
+async function dockerStatsRead(node){
+  const got = await getJSON("/api/docker/stats" + (node ? "?node=" + encodeURIComponent(node) : ""));
   if (!got || got.error || !got.stats) return;
   dockerStats[node] = got.stats;
   dockerSpark[node] = got.spark || {};
@@ -296,7 +293,8 @@ function dmStatsPatch(){
     const t = document.createElement("template");
     t.innerHTML = dmStatStrip(d);
     const fresh = t.content.firstElementChild;
-    if (fresh && fresh.outerHTML !== el.outerHTML) el.replaceWith(fresh);
+    // Recorded as markup, so the page's next patch takes it for its own.
+    if (fresh && fresh.outerHTML !== el.outerHTML){ patchRecord(fresh); el.replaceWith(fresh); drawn(fresh); }
   }
   for (const el of document.querySelectorAll("[data-dmcpu]")){
     const st = all[el.dataset.dmcpu];
@@ -479,14 +477,12 @@ function openSendToDocker(project, sendAs, have, compose){
   // nothing to fill.
   const refs = dockerList?.refs?.[project] || [];
   $("dnRefField").hidden = !refs.length;
-  $("dnRef").innerHTML = optionList([["", "whatever the space is on"], ...refs]);
+  drawHTML($("dnRef"), optionList([["", "whatever the space is on"], ...refs]));
   $("dnmodal").hidden = false;
   // Fetched per open, and only shown when the project actually declares an
   // example: a blank Environment box on a project with nothing to fill in is
   // a question with no answer.
-  fetch("/api/devapp", {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({project, action:"starter", compose: dnCompose})})
-    .then(r => r.json()).then(j => {
+  postJSON("/api/devapp", {project, action:"starter", compose: dnCompose}).then(j => {
       if (dnFor !== project || !(j.text || "").trim()) return;
       $("dnEnv").value = j.text;
       $("dnEnvHint").textContent =
@@ -517,16 +513,13 @@ const dockerSlug = (s) => (s || "").toLowerCase()
 function fillNodeSelect(sel, wrap, prefer, again, allow){
   // Every node when nothing narrows: a node does everything for the
   // projects bound to it (docs/nodes.md §13).
-  // ...but the controller's own machine, installed bare metal (R90), whose
-  // job account is out of the docker group behind the wall: it runs no
-  // containers as a node.
   const dnodes = (nodesList || []).filter(n =>
-    n.kind !== "local" && n.state !== "retired" && n.state !== "disabled" && !n.config?.own
+    n.kind !== "local" && n.state !== "retired" && n.state !== "disabled"
     && (!allow || allow.includes(n.id)));
   // ...and drawn again when they land: loadNodes repaints only a Nodes tab,
   // so a draw here during a node-list reload lost the picker until something
-  // else moved dockerRev (B69's nodes.mjs sibling).
-  if (nodesList === null || nodesStale) loadNodes().then(() => { dockerRev++; drawPanes(); if (again) again(); });
+  // else moved the containers' revision (B69's nodes.mjs sibling).
+  if (nodesList === null || nodesStale) nodesKnown().then(() => { readMoved("docker"); drawPanes(); if (again) again(); });
   const known = dnodes.some(n => n.id === prefer);
   wrap.hidden = allow ? dnodes.length < 1 : dnodes.length < 2;
   sel.disabled = dnodes.length < 2;
@@ -534,13 +527,13 @@ function fillNodeSelect(sel, wrap, prefer, again, allow){
   // An agent node carries its heartbeat's numbers, and this is the picker
   // the design says they belong beside (docs/nodes.md §9): the choice of
   // where to run a container is made on how busy the machine is.
-  sel.innerHTML = dnodes.map(n => {
+  drawHTML(sel, dnodes.map(n => {
     const s = n.kind === "agent" && n.live && n.reported?.sample;
     const nums = s ? ` · cpu ${s.cpu_pct}% · ${Math.round(s.mem_used_mb / 1024 * 10) / 10}/${
         Math.round(s.mem_mb / 1024)}GB` : n.kind === "agent" ? " · quiet" : "";
     return `<option value="${esc(n.id)}"${n.id === want ? " selected" : ""}>${
       esc(n.name)}: ${esc(n.state)}${nums}</option>`;
-  }).join("");
+  }).join(""));
 }
 
 // The project's own nodes first and named as such, the rest after them
@@ -594,9 +587,7 @@ function openRelocate(project, instance){
   $("rlEnv").value = "";
   $("rlEnvHint").textContent = "reading its env…";
   $("rlmodal").hidden = false;
-  fetch("/api/devapp", {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({project, instance, action: "env-get"})})
-    .then(r => r.json()).then(j => {
+  postJSON("/api/devapp", {project, instance, action: "env-get"}).then(j => {
       if (!rlFor || rlFor.instance !== instance) return;
       $("rlEnv").value = j.text || "";
       rlFor.envWas = j.text || "";
@@ -652,17 +643,16 @@ async function rlSubmit(){
   $("rlGo").disabled = true;
   $("rlGo").textContent = mode === "move" ? "Moving…" : "Copying…";
   try{
-    const j = await (await fetch("/api/devapp", {method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({project, instance, action: "relocate", mode, node: $("rlNode").value, name,
+    const j = await postJSON("/api/devapp", {project, instance, action: "relocate", mode, node: $("rlNode").value, name,
                             data: document.querySelector('input[name="rlData"]:checked')?.value || "unpack",
                             // Its env as it stands goes with it anyway; sent
                             // only when there is something of the person's in it.
                             ...(rlFor.envWas === undefined || (rlFor.seeded && $("rlEnv").value === rlFor.envWas)
-                                ? {} : {text: $("rlEnv").value})})})).json();
+                                ? {} : {text: $("rlEnv").value})});
     if (j.error){ $("rlGo").disabled = false; rlSay(); return fail(j.error); }
     closeRelocate();
     notify(mode === "move" ? `moving ${j.name}: its row says each step` : `copying it as ${j.name}: its row says each step`);
-    dockerList = null; dockerRev++;
+    dockerList = null; readMoved("docker");
     loadDocker();
   }catch(e){ $("rlGo").disabled = false; rlSay(); fail(String(e)); }
 }
@@ -687,17 +677,14 @@ async function dnSubmit(){
   if ($("dnGo").disabled) return;
   busy($("dnGo"), "Creating");
   try{
-    const r = await fetch("/api/devapp", {method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({project, action:"new", instance:name,
+    const j = await postJSON("/api/devapp", {project, action:"new", instance:name,
                             owner: $("dnUnder").value,
                             node: $("dnNodeField").hidden ? "" : $("dnNode").value,
                             ship: !$("dnNodeField").hidden && !!$("dnNode").value
                               && !((state?.projects?.find(p => p.name === ($("dnUnder").value || project))?.prefs?.nodes) || []).includes($("dnNode").value),
                             ref: $("dnRefField").hidden ? "" : $("dnRef").value,
                             compose: dnCompose,
-                            text: $("dnEnvField").hidden ? "" : $("dnEnv").value})});
-    const j = await r.json();
+                            text: $("dnEnvField").hidden ? "" : $("dnEnv").value});
     if (j.error){ unbusy($("dnGo"), "Create");
                   return fail(j.error); }
     // Where it went: the node picked, else its project's primary, which is
@@ -727,9 +714,9 @@ async function dnSubmit(){
 async function openDevEnv(project, instance){
   let j;
   try{
-    const r = await postJSON("/api/devapp", {project, instance, action: "env-get"});
-    j = await r.json();
-  }catch(e){ notify("env: " + failWords(e), true); return; }
+    j = await postJSON("/api/devapp", {project, instance, action: "env-get"});
+  }catch(e){ j = {error: failWords(e)}; }
+  if (j.error){ notify("env: " + j.error, true); return; }
   const m = document.getElementById("devEnvModal");
   m.querySelector("textarea").value = j.text || "";
   // Both halves: whether this is a draft off the example, and what the STORED
@@ -743,15 +730,12 @@ async function openDevEnv(project, instance){
   m.hidden = false;
   m.querySelector(".primary").onclick = async () => {
     try{
-      const r = await fetch("/api/devapp", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({project, instance, action: "env-set",
-                              text: m.querySelector("textarea").value})});
-      const k = await r.json();
+      const k = await postJSON("/api/devapp", {project, instance, action: "env-set",
+                              text: m.querySelector("textarea").value});
       if (k.error){ notify(k.error, true); return; }
       m.hidden = true;
       notify("env saved");
-      dockerList = null; dockerRev++; loadDocker();
+      dockerList = null; readMoved("docker"); loadDocker();
     }catch(e){ notify("env: " + failWords(e), true); }
   };
 }
@@ -929,7 +913,7 @@ function dmSetGrid(cells, key, {cancel = false, bare = false} = {}){
   if (!body) return "";
   // ...or the grid alone, for a dialog whose foot carries the buttons.
   if (bare) return `<div class="setgrid dmsettings">${body.replace("<!--APPLY-->", "")}</div>`;
-  const settable = /data-(dmown|dmmove|dmref|dmov|dmgpu|dmboot|dmlan|route)=/.test(body);
+  const settable = DM_STAGED.some(s => body.includes(`data-${s.attr}=`));
   // ...with Cancel before it where Edit settings opened them: it drops what
   // was staged and puts the fields away (rows-you-open).
   const apply = `${cancel ? `<button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button>` : ""}<button type="button" class="primary" data-dmapply="${esc(key)}"${
@@ -946,7 +930,7 @@ function dmSetGrid(cells, key, {cancel = false, bare = false} = {}){
 // A row's settings in a dialog (the operator, 17 Oct): a native dialog in
 // the page's top layer, drawn inside its row so the row's wiring reaches its
 // controls, shown by dmWireRows after each draw; its title, the settings
-// grid, and Cancel and the one filled Apply at its foot. Escape is Cancel.
+// grid, and the one filled Apply and Cancel at its foot. Escape is Cancel.
 function dmSetDialog(name, key, cells){
   const grid = dmSetGrid(cells, key, {bare: true});
   if (!grid) return "";
@@ -954,30 +938,35 @@ function dmSetDialog(name, key, cells){
     <div class="box wide"><h3>Settings: ${esc(name)}</h3>
       <div class="field">${grid}</div>
       <div class="foot"><span class="sp"></span>
-        <button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button>
         <button type="button" class="primary" data-dmapply="${esc(key)}"${dmRowDirty(key) ? "" : " disabled"}
-          title="save what was changed">Apply</button></div>
+          title="save what was changed">Apply</button>
+        <button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button></div>
     </div></dialog>`;
 }
 
-// What a row has staged, dropped (Cancel): every draft its key names.
-function dmDropDrafts(key){
+// The three keys a row's drafts are kept under, from the key its Apply
+// carries: that key itself (`inst:project|instance` or `ctr:name`), the
+// instance's `project|instance`, empty for a container AerieOS did not
+// start, and the container's name, which for an instance is read from
+// `list` and is none while the listing does not hold it.
+function dmRowKeys(key, list = dockerList){
   const inst = key.startsWith("inst:") ? key.slice(5) : "";
-  const name = inst ? (dockerList?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
-  delete dmOwnDraft[key];
-  if (inst){ delete dmMoveDraft[inst]; delete dmRefDraft[inst]; delete dmOvDraft[inst]; delete dmGpuDraft[inst]; delete dmRouteDraft[inst]; delete dmNginxDraft[inst]; }
-  if (name){ delete dmBootDraft[name]; delete dmLanDraft[name]; }
+  const name = inst ? (list?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
+  return {row: key, inst, name};
+}
+// What a row has staged, dropped (Cancel): every draft its key names, and
+// with them what was typed on its nginx line, which is no setting of the
+// Apply's (Add route writes it) and so is not in DM_STAGED.
+function dmDropDrafts(key){
+  const keys = dmRowKeys(key);
+  for (const s of DM_STAGED) if (keys[s.key]) delete s.draft[keys[s.key]];
+  if (keys.inst) delete dmNginxDraft[keys.inst];
 }
 // Whether a row has a setting staged and not yet applied: the drafts each
 // setting keeps, read by the row's key.
 function dmRowDirty(key){
-  const inst = key.startsWith("inst:") ? key.slice(5) : "";
-  const name = key.startsWith("ctr:") ? key.slice(4) : "";
-  const rowName = inst ? (dockerList?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : name;
-  return dmOwnDraft[key] !== undefined
-    || (inst && (dmMoveDraft[inst] !== undefined || dmRefDraft[inst] !== undefined || dmOvDraft[inst] !== undefined || dmGpuDraft[inst] !== undefined
-                 || dmRouteDraft[inst] !== undefined))
-    || (rowName && (dmBootDraft[rowName] !== undefined || dmLanDraft[rowName] !== undefined));
+  const keys = dmRowKeys(key);
+  return DM_STAGED.some(s => keys[s.key] && s.draft[keys[s.key]] !== undefined);
 }
 // Which project a row belongs to: its group on this tab, the notebook that
 // lists it, and whose Claude sessions may see it and work on it (the
@@ -1037,6 +1026,18 @@ function dmTestSaid(d){
 // as pills until Edit settings swaps the fields in; Apply and Cancel put them
 // away; a row with a setting staged stays open whatever this says.
 const dmEditing = new Set();
+// A container's settings hold Back as every dialog does (backHold): Back
+// puts them away as Cancel does.
+const dmBack = new Map();
+function dmBackHold(key){
+  if (dmBack.has(key)) return;
+  dmBack.set(key, backHold(() => { dmBack.delete(key); dmDropDrafts(key); dmEditing.delete(key); readMoved("docker"); drawPanes(); }));
+}
+function dmBackLet(key){
+  const t = dmBack.get(key);
+  dmBack.delete(key);
+  if (t) backRelease(t);
+}
 // Edit settings is the first thing behind the row's ⋯ (the operator, 17
 // Oct): the pills say every setting, so the press that changes them can
 // wait in the menu.
@@ -1088,11 +1089,11 @@ async function dmJobSettle(){
   const j = dockerList?.job;
   if (!j?.running || !j.id) return;
   let got;
-  try{ got = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(j.id)}`)).json(); }catch(e){ return; }
+  try{ got = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(j.id)}`); }catch(e){ return; }
   if (!got || got.id !== j.id || !j.running || !["succeeded", "failed", "canceled"].includes(got.state)) return;
   Object.assign(j, {running: false, state: got.state, step: "", aborting: false,
                     error: got.state === "succeeded" ? "" : (got.error || got.state)});
-  dockerRev++; drawPanes();
+  readMoved("docker"); drawPanes();
 }
 
 // What a confirm or a notice calls a container: the name its row shows,
@@ -1126,30 +1127,29 @@ async function dmAction(project, instance, act, btn){
       await postJSON("/api/devapp", {project, instance, action: "abort"});
     }
     catch(e){ notify("could not stop it: " + failWords(e), true); }
-    dockerRev++; drawPanes(); loadDocker();
+    readMoved("docker"); drawPanes(); loadDocker();
     return;
   }
   // A node's nginx behind the newest line (R192): the nginx tab's verb,
   // from the row it is about.
   if (act === "nginx-update"){
     const d = (dockerList?.instances || []).find(i => i.project === project && i.instance === instance);
-    if (!await askYes(`Update nginx on this node to nginx:${d?.nginx_to || "the newest line"}?\n\nIt is rebuilt with the new image, so its sites are down while the node pulls it.`)) return;
+    if (!await askYes(`Update nginx on this node to ${d?.nginx_to || "the newest line"}?\n\nIt is rebuilt with the new image, so its sites are down while the node pulls it.`)) return;
     if (btn) busy(btn, "Updating");
     try{
-      const j = await (await postJSON("/api/nginx", {action: "update", node: dockerList?.node || dockerNode})).json();
+      const j = await postJSON("/api/nginx", {action: "update", node: dockerList?.node || dockerNode});
       if (j.error) notify(j.error, true);
       else if (j.note) notify(j.note, true);
       else notify(`updating nginx to ${j.to}: this row has the build`);
     }
     catch(e){ notify("could not update it: " + failWords(e), true); }
-    dockerRev++; drawPanes(); loadDocker();
+    readMoved("docker"); drawPanes(); loadDocker();
     return;
   }
-  if (act === "update"){
-    const d = (dockerList?.instances || []).find(i => i.project === project && i.instance === instance);
-    if (!await askYes(`Update ${d?.name || project}?\n\nThe newer ${(d?.images_behind || []).join(", ")} is pulled and it starts again on it, so it is down for a moment.`)) return;
-  }
-  if (act === "down" && !await askYes(`Take ${dmCalled(project, instance)} down?`)) return;
+  // Up, Down, Rebuild and an image's update lose nothing and ask nothing
+  // (R265, the operator, 19 Nov): the row says what the press started.
+  // nginx's update above keeps its question, since every space's sites on
+  // the node are down while it pulls.
   if (act === "remove" && !await askYes(
       `Remove ${dmCalled(project, instance)}?\n\n`
       // Which of the two halves is actually going to happen. A row whose
@@ -1167,8 +1167,9 @@ async function dmAction(project, instance, act, btn){
     // config parse each, and the manager lists them all.
     let st;
     try{
-      const r = await postJSON("/api/devapp", {project, instance, action:"state"});
-      st = (await r.json()).state || {};
+      const j = await postJSON("/api/devapp", {project, instance, action:"state"});
+      if (j.error) throw new Error(j.error);
+      st = j.state || {};
     }catch(e){ notify("could not read its state: " + failWords(e), true); return; }
     if ((st.problems || []).length){
       notify(`${dmCalled(project, instance)} will not work as written: `
@@ -1187,36 +1188,35 @@ async function dmAction(project, instance, act, btn){
       notify(`the env is missing ${st.missing_env.join(", ")}: press Env`, true);
       return;
     }
-    if (act === "rebuild" && !await askYes(
-        (st.built_rev ? `Rebuild ${dmCalled(project, instance)}?\n\nBuilds the image, then down and up. `
-                      : `Build ${dmCalled(project, instance)}?\n\nBuilds the first image and brings it up. `)
-        + "New env settings stop it before up; the Env editor keeps your old values in comments.")) return;
-    if (!st.risks_ack){
-      if (!await askYes("This compose file asks for more than its own directory:"
-          + "\n\n" + (st.risks || []).map(x => "\u2022 " + x).join("\n")
-          + "\n\nStart it anyway?")) return;
-      ack = st.risks_digest || "";
-    }
-    // What it would ship beside the app that its last build did not (the
-    // operator, 17 Oct: the person knows what is actually being shipped):
-    // named, and a yes is this press's; a no leaves it unbuilt.
-    if ((st.beside_new || []).length){
-      if (!await askYes(`${projLabel(project)}'s compose now runs ${st.beside_new.join(", ")} beside the app, which its last build did not ship.`
-          + "\n\nShip it with the app? If it is not part of the app, cancel and give it a container of its own with New container.")) return;
-      beside = st.beside_digest || "";
+    // What this press needs a person's yes for, found now and asked once
+    // (R265: it was a question for the rebuild itself, another for what the
+    // compose reaches and a third for what it ships new, each a screen):
+    // what the compose file asks for past its own directory, until that
+    // list is acknowledged, and what it would run beside the app that its
+    // last build did not ship (the operator, 17 Oct: the person knows what
+    // is actually being shipped). With neither, the press runs; a no leaves
+    // it as it was.
+    const reach = st.risks_ack ? [] : st.risks || [], fresh = st.beside_new || [];
+    if (reach.length || fresh.length){
+      const verb = act === "up" ? "Start" : st.built_rev ? "Rebuild" : "Build";
+      if (!await askYes(fresh.length ? "If a new one is not part of the app, cancel and give it a container of its own with New container." : "", {
+        title: `${verb} ${dmCalled(project, instance)}?`, verb,
+        parts: [{head: "Its compose file asks for more than its own directory", lines: reach},
+                {head: "New beside the app, which its last build did not ship", lines: fresh}]})) return;
+      if (reach.length) ack = st.risks_digest || "";
+      if (fresh.length) beside = st.beside_digest || "";
     }
   }
   if (btn) btn.disabled = true;
   try{
-    const r = await postJSON("/api/devapp", {project, instance, action:act, ack, beside});
-    const j = await r.json();
+    const j = await postJSON("/api/devapp", {project, instance, action:act, ack, beside});
     if (j.error) notify(j.error, true);
     // What was done instead of what was asked: a remove whose daemon could
     // not be reached took the record and nothing else. Said, because the row
     // vanishing looks identical either way.
     else if (j.note) notify(j.note);
   }catch(e){ notify(`${act} failed: ` + e, true); }
-  dockerList = null; dockerRev++; loadDocker();
+  dockerList = null; readMoved("docker"); loadDocker();
 }
 
 // Where a container's published port actually answers.
@@ -1246,15 +1246,20 @@ function daemonHost(){
 // What each instance's Ports and mounts last said, by "project|instance",
 // drawn at once into a fold a redraw brought back open (B827).
 const dmWireSeen = {};
-async function loadWire(d){
+function loadWire(d){
   d.dataset.done = "1";
+  const inst = d.closest("[data-inst]")?.dataset.inst || "";
+  return reading("docker.wire:" + inst, () => wireRead(d));
+}
+async function wireRead(d){
   const [project, instance] = d.closest("[data-inst]").dataset.inst.split("|");
   const box = d.querySelector(".wire");
   let html;
   const key = `${project}|${instance}`;
   try{
-    const r = await postJSON("/api/devapp", {project, instance, action:"state"});
-    const st = (await r.json()).state || {};
+    const j = await postJSON("/api/devapp", {project, instance, action:"state"});
+    if (j.error) throw new Error(j.error);
+    const st = j.state || {};
     // An answer that could not read the compose (the daemon or compose not
     // answering in time, as under a loaded gate) says nothing about the
     // wiring: what was read before stays, and with nothing read before it
@@ -1301,12 +1306,12 @@ async function loadWire(d){
       `:is(.dmtab, .dkview) .row[data-inst="${CSS.escape(inst)}"] details.sect`);
     if (!nd || nd.dataset.done) return;
     nd.dataset.done = "1";
-    nd.querySelector(".wire").innerHTML = html;
+    drawHTML(nd.querySelector(".wire"), html);
     if (d.open) nd.open = true;
     return;
   }
   const before = d.offsetHeight;
-  box.innerHTML = html;
+  drawHTML(box, html);
   const after = d.offsetHeight;
   if (d.open && before !== after && !noMotion()) foldHeight(d, before, after, () => {});
 }
@@ -1322,8 +1327,13 @@ function cLock(running){
   $("cGo").disabled = running;
 }
 
+// What the editor says of a container AerieOS deploys itself.
+const C_MANAGED = "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page).";
 async function openEditContainer(name){
   cEditing = name;
+  cAppCur = null; cAppHand = false;
+  $("cAppField").hidden = true;
+  cAppOwns(false);
   $("cTabForm").hidden = false;
   $("cEnvHint").hidden = true;
   $("cTitle").textContent = "Edit " + name;
@@ -1339,9 +1349,13 @@ async function openEditContainer(name){
   // AerieOS's own (System) is managed: for reading, whatever its state
   // (the operator, 11 Oct).
   const managed = row?.owner === "System";
-  $("cName").disabled = !down || managed;
+  // ...nor while a job runs on it: its name is the job's compose project.
+  const jb = dockerJob(), jobOn = !!(jb?.running && jb.project === name && jb.instance === "main");
+  $("cName").disabled = !down || managed || jobOn;
   $("cNameHint").textContent = managed
-    ? "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page)."
+    ? C_MANAGED
+    : jobOn && down
+    ? "A job is running on it: its name can change once that has ended."
     : down
     ? "Change the name while it is down: its volumes and data directory follow it on the node, then Build it again."
     : "It is running, so this is for reading: Down it to change its name, compose file or env.";
@@ -1355,11 +1369,33 @@ async function openEditContainer(name){
   $("cmodal").hidden = false;
   cHold();
   try{
-    const r = await postJSON("/api/container", {action:"read", name});
-    const j = await r.json();
+    const j = await postJSON("/api/container", {action:"read", name});
     if (cEditing !== name) return;          // reopened on another one meanwhile
     $("cYml").value = j.compose || "";
     $("cEnv").value = j.env || "";
+    // Made from an app (R238 step 3): Configure on its panel, each value
+    // read back from its environment, the other variables alone below.
+    if (j.app && !j.managed && !managed){
+      $("cTitle").textContent = "Configure " + name;
+      await loadNasApps();
+      if (cEditing !== name) return;
+      cAppDraw({...j.app, env: j.env || ""}, j.app.values || {});
+      $("cTabForm").hidden = true;
+      $("cEnv").value = j.app.extra || "";
+      cAppOwns(true);
+      cAppNewerSay(j.app);
+      const locked = $("cGo").disabled;
+      $("cAppFields").querySelectorAll("input,select").forEach(e => { e.disabled = locked; });
+      $("cByHand").disabled = locked;
+      cHold();
+    }
+    // Opened while the list was put away, it had no row to say AerieOS
+    // manages it: the read says so (B810), and it is for reading.
+    if (j.managed && !managed){
+      $("cName").disabled = true;
+      $("cNameHint").textContent = C_MANAGED;
+      cLock(true);
+    }
   }catch(e){ $("cErr").textContent = "could not read it: " + e;
              $("cErrWrap").hidden = false; }
 }
@@ -1371,6 +1407,9 @@ async function openEditContainer(name){
 async function openEditInstance(project, instance){
   const key = {project, instance};
   cEditing = key;
+  cAppCur = null; cAppHand = false;
+  $("cAppField").hidden = true;
+  cAppOwns(false);
   $("cTitle").textContent = "Edit " + projLabel(project) + (instance === "main" ? "" : ` (${instance})`);
   // Its own name, whatever its owner calls it (the operator, 11 Oct: not
   // tied to the project, since a project sends several), changed while it
@@ -1396,8 +1435,8 @@ async function openEditInstance(project, instance){
   cHold();
   try{
     const [c, e] = await Promise.all([
-      postJSON("/api/devapp", {project, instance, action: "compose-get"}).then(r => r.json()),
-      postJSON("/api/devapp", {project, instance, action: "env-get"}).then(r => r.json())]);
+      postJSON("/api/devapp", {project, instance, action: "compose-get"}),
+      postJSON("/api/devapp", {project, instance, action: "env-get"})]);
     if (cEditing !== key) return;           // reopened on another one meanwhile
     if (c.error || e.error) throw new Error(c.error || e.error);
     $("cYml").value = c.text || "";
@@ -1418,7 +1457,7 @@ async function cSaveInstance(key){
   const fail = m => ($("cErr").textContent = m, $("cErrWrap").hidden = false);
   const {project, instance} = key, compose = $("cYml").value, env = $("cEnv").value;
   busy($("cGo"), "Saving");
-  const send = body => postJSON("/api/devapp", {project, instance, ...body}).then(r => r.json());
+  const send = body => postJSON("/api/devapp", {project, instance, ...body});
   try{
     // The compose file first: compose reads it before it is kept, and a file
     // it refuses stops here with its words, before the env is touched.
@@ -1433,7 +1472,7 @@ async function cSaveInstance(key){
     $("cmodal").hidden = true;
     notify(n.job ? `renaming ${key.name} to ${n.name}: its row says when it is done`
            : c.ok || e.ok ? "saved: rebuild it to bring the change up" : "nothing changed");
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
   }catch(err){ unbusy($("cGo"), "Save"); fail("could not save: " + err); }
 }
 
@@ -1453,7 +1492,7 @@ function myProjectNames(keep){
 
 function fillUnderSelect(sel, picked){
   const names = myProjectNames(picked);
-  sel.innerHTML = optionList([["", "no space"], ...names.map(n => [n, projLabel(n)])], picked);
+  drawHTML(sel, optionList([["", "no space"], ...names.map(n => [n, projLabel(n)])], picked));
 }
 
 // The node follows the project picked: a container of a project belongs on
@@ -1480,65 +1519,269 @@ function cUnderPicked(){
   $("cGo").disabled = false;
 }
 
-// Apps a NAS runs (R164 step 2): the catalog the dialog offers, read once,
-// and the pick that fills the name, the compose file and the environment.
+// Apps a NAS runs (R164 step 2, R238): the apps the Library holds, read
+// once an open, and the panel New container draws for the one picked (the
+// design's app-panel rule). The panel owns what the app declares: the
+// Compose tab is its file as the catalog wrote it, read-only, and the
+// Environment tab holds only the other variables.
 let cApps = null;
-let cAppWant = "";       // the app the Library asked New container to open on (R170)
-// The Library's Install on an app (R170): New container with that app
-// picked and its blanks shown, as if the person had chosen it in the list.
+let cAppRoots = [];       // the node's pools and shares a folder field suggests
+let cAppRootsAt = null;   // ...read for this node
+let cAppRouters = [];     // the model routers a router field can be given a key at (R238 step 7)
+let cAppWant = "";        // the app the Library asked New container to open on (R170)
+let cAppCur = null;       // the app on the panel: the Library's, or a container's own copy on Configure
+let cAppHand = false;     // its definition was edited by hand, so its panel no longer applies
+let cAppTaken = {names: [], ports: [], apps: []};  // every container's name, and the ports and apps those made from an app hold on the node read
+// The Library's Install on an app (R170): New container with that app on
+// its panel, as if the person had chosen it in a list.
 function openNewContainerApp(id, node = ""){
   cAppWant = id;
   // ...on the Library's node when it runs Docker (R170 step 7).
   if (node) dockerNode = node;
   openNewContainer();
 }
-async function loadNasApps(){
-  if (cApps) return cApps;
-  try{ cApps = (await (await fetch("/api/nasapps")).json()).apps || []; }
-  catch(e){ cApps = []; }
+// `fresh` reads it again on the same node: a container made since holds a
+// name and ports the next one is not offered.
+async function loadNasApps(node = "", fresh = false){
+  if (fresh || !cApps || cAppRootsAt !== node) await reading("nasapps", async () => {
+    const j = await getJSON("/api/nasapps" + (node ? "?node=" + encodeURIComponent(node) : ""));
+    cApps = j.apps || []; cAppRoots = j.roots || []; cAppRootsAt = node; cAppRouters = j.routers || [];
+    cAppTaken = j.taken || {names: [], ports: [], apps: []};
+  });
   return cApps;
 }
-async function cAppPicked(){
-  const id = $("cApp").value, a = (cApps || []).find(x => x.id === id);
-  $("cAppFields").hidden = !a;
-  $("cAppWhat").textContent = a ? a.what : "";
-  if (!a) return;
-  $("cAppMediaField").hidden = !a.media;
-  $("cAppPort").value = a.port;
-  if (!$("cAppTz").value) $("cAppTz").value = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  if (!$("cName").value) $("cName").value = id;
+// Another of the same app is a container of its own (the Library's rule:
+// each press makes another): the app's id as its name, or id-2, id-3, the
+// first no container has.
+function cAppFreeName(id){
+  const taken = new Set(cAppTaken.names || []);
+  for (let n = 1; ; n++){ const x = n === 1 ? id : `${id}-${n}`; if (!taken.has(x)) return x; }
 }
-async function cAppFill(){
-  const id = $("cApp").value, a = (cApps || []).find(x => x.id === id);
-  if (!a) return;
-  const b = $("cAppFill");
-  busy(b, "Filling in");
-  try{
-    const j = await (await postJSON("/api/nasapps", {app: id, data: $("cAppData").value.trim(), media: $("cAppMedia").value.trim(), ids: $("cAppIds").value.trim(),
-                                                      tz: $("cAppTz").value.trim(), port: parseInt($("cAppPort").value, 10)})).json();
-    if (j.error){ $("cErr").textContent = j.error; $("cErrWrap").hidden = false; return; }
-    $("cErrWrap").hidden = true;
-    $("cYml").value = j.compose; $("cEnv").value = j.env; cYmlTouched = true;
-    if (!$("cName").value) $("cName").value = id;
-    $("cEnvHint").hidden = false;
-    $("cEnvHint").textContent = `${a.name}'s choices: the folders, the user, the time zone and the port${a.secrets?.length ? `, and ${a.secrets.join(" and ")} made for it` : ""}. Saved with the container when you press Create.`;
-    cSeg("yml");
-  }catch(e){ $("cErr").textContent = "the catalog: " + failWords(e); $("cErrWrap").hidden = false; }
-  finally{ unbusy(b, "Fill the definition in"); }
+// ...and ports of its own: each the app's, or the first after it that no
+// container made from an app on the node holds and no other field here
+// was given. `given` is the ports handed out on this panel so far.
+function cAppFreePort(p, given){
+  let n = Number(p) || 0;
+  if (!n) return "";
+  const taken = new Set((cAppTaken.ports || []).map(Number));
+  while ((taken.has(n) || given.has(n)) && n < 65535) n++;
+  given.add(n);
+  return String(n);
 }
+
+// Where a folder field suggests putting it: each of the node's places with
+// the app's own folder under it (apps/immich), as the forms rule draws a
+// path, a field with suggestions.
+// The app's own folder is named for the container, so another of the same
+// app has its own (apps/immich-2): the segment of the default that is the
+// app's id is the container's name, as the name field holds it.
+const cAppUnder = () => ($("cName").value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || cAppCur?.id || "";
+const cAppFolders = (f, as = cAppUnder()) => [...new Set(cAppRoots.map(r => {
+  const d = (f.default || "").split("/").map(x => x === cAppCur?.id ? as : x).join("/");
+  return d ? `${r.path}/${d}` : r.path;
+}))];
+
+// One field of the panel, as its kind's answer is drawn (the forms rule): a
+// folder a path with suggestions, a port a number, a choice a pulldown, a
+// switch a tick, a secret a masked field made for it when left empty.
+function cAppFieldHtml(f, v, i){
+  const id = `cAppF${i}`, at = `data-avar="${esc(f.var)}"`;
+  const plain = `autocomplete="off" spellcheck="false"`;
+  if (f.kind === "switch") return `<div class="setrow col ctlrow fwide"><label class="ndcap"><input type="checkbox" id="${id}" ${at}${
+    String(v) === "true" ? " checked" : ""}> ${esc(f.label)}${helpIcon(f.help)}</label></div>`;
+  // A model router (R238 step 7): the node whose router it uses, a key of
+  // the container's own made there; dead, with why, where none is deployed.
+  if (f.kind === "router"){
+    const none = !cAppRouters.length;
+    return `<div class="setrow col ctlrow">${lbl(id, f.label, f.help)}<select id="${id}" ${at}${none ? " disabled" : ""}>${optionList(
+      [...(f.required && !none ? [] : [["", "none"]]), ...cAppRouters.map(r => [r.node, `the router on ${r.name}`])], String(v))}</select>${
+      none ? `<div class="hint">No model router is deployed: deploy one from a node's Installed page, and this app gets a key of its own there.</div>` : ""}</div>`;
+  }
+  const ctl = f.kind === "folder"
+    ? `<input id="${id}" ${at} ${plain} list="${id}L" value="${esc(v)}" placeholder="${esc(f.example || "/mnt/…/" + (f.default || ""))}"><datalist id="${id}L">${
+        cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`
+    : f.kind === "port" ? `<input id="${id}" ${at} type="number" min="1" max="65535" value="${esc(v)}">`
+    : f.kind === "choice" ? `<select id="${id}" ${at}>${optionList((f.choices || []).map(c => [c.value, c.label]), String(v))}</select>`
+    : f.kind === "secret" ? `<input id="${id}" ${at} type="password" autocomplete="new-password" value="${esc(v)}" placeholder="made for it when left empty">`
+    : `<input id="${id}" ${at} ${plain} value="${esc(v)}" placeholder="${esc(f.example || "")}">`;
+  return `<div class="setrow col ctlrow${f.kind === "port" ? " fshort" : ""}">${lbl(id, f.label, f.help)}${ctl}</div>`;
+}
+
+// The panel for app `a`: its head as its Library card's, its own fields in
+// its manifest's order, then AerieOS's own its compose reads. `vals` are a
+// container's values on Configure; a new one starts each field at its
+// default and a folder at the first place the node offers.
+function cAppDraw(a, vals = null){
+  cAppCur = a; cAppHand = false;
+  const v = vals || {}, own = a.own || [];
+  const fresh = !vals;
+  const row = {...a, kind: "app", label: a.name};
+  drawHTML($("cAppHead"), `${libIcon(row)}<div class="aptitle"><b>${esc(a.name)}</b><span class="apby">${libPills(row)}</span></div>`);
+  wireLibrary($("cAppHead"));
+  $("cAppWhat").textContent = a.what || "";
+  cAppNetSay(a, fresh);
+  $("cAppGoing").hidden = !a.going;
+  $("cAppGoing").textContent = a.going || "";
+  // A folder with a default of its own (apps/immich) starts at the first
+  // place the node offers; one with none (a library, a share's files) is
+  // the person's to pick from the suggestions.
+  // A port starts at the app's own, or the next free one where another
+  // container holds it.
+  const given = new Set();
+  const start = f => !fresh ? (v[f.var] ?? (f.kind === "folder" ? "" : f.default ?? ""))
+    : f.kind === "folder" ? (f.default && cAppFolders(f)[0] || "") : f.kind === "router" ? (cAppRouters[0]?.node || "")
+    : f.kind === "port" ? cAppFreePort(f.default, given) : f.default ?? "";
+  const ids = v.PUID !== undefined ? `${v.PUID}:${v.PGID ?? v.PUID}` : "1000:1000";
+  const tz = v.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  drawHTML($("cAppFields"), (a.fields || []).map((f, i) => cAppFieldHtml(f, start(f), i)).join("")
+    + (own.includes("PUID") || own.includes("PGID") ? `<div class="setrow col ctlrow">${lbl("cAppIds", "Runs as", "uid:gid, the user that owns its folders: a share's files are written as it")}<input id="cAppIds" value="${esc(ids)}" autocomplete="off" spellcheck="false"></div>` : "")
+    + (own.includes("TZ") ? `<div class="setrow col ctlrow">${lbl("cAppTz", "Time zone")}<select id="cAppTz">${tzOptions(tz)}</select></div>` : "")
+    + (own.includes("PORT") ? `<div class="setrow col ctlrow fshort">${lbl("cAppPort", "Its port", "what it answers on, on the node; a hostname and a certificate for it are the node's nginx page")}<input id="cAppPort" type="number" min="1" max="65535" value="${esc(v.PORT || (fresh ? cAppFreePort(a.port, given) : a.port))}"></div>` : ""));
+  // What a new one was offered, so a node or a name picked after moves
+  // only what the person has not changed.
+  if (fresh) $("cAppFields").querySelectorAll('input[data-avar], #cAppPort').forEach(e => { e.dataset.auto = e.value; });
+  $("cAppField").hidden = false;
+  $("cAppPanel").hidden = false;
+  $("cAppLeft").hidden = true;
+  $("cAppNewer").hidden = true;
+}
+
+// Another node picked for a new one: its places suggested in each folder
+// field, and a folder still at the first place the last node offered moved
+// to the first this one offers.
+async function cAppNodePicked(){
+  if (!cAppCur || cEditing !== null || cAppHand) return;
+  await loadNasApps($("cNode").value);
+  cAppFollow();
+  cAppNetSay(cAppCur, true);
+}
+// An app on the machine's own network answers on its own port, not picked
+// here; a new one where another of it already runs has nothing to answer
+// on, which is said before Create refuses it.
+function cAppNetSay(a, fresh){
+  const host = a.network === "host";
+  $("cAppNet").hidden = !host;
+  $("cAppNet").textContent = !host ? "" : `On the machine's own network: it answers on port ${a.port} there, which is not picked here.${
+    fresh && (cAppTaken.apps || []).includes(a.id) ? ` Another ${a.name} on this node already does, so make this one on another node.` : ""}`;
+}
+// The name typed on a new one: its folders follow it.
+function cAppNameTyped(){
+  if (cAppCur && cEditing === null && !cAppHand) cAppFollow();
+}
+// What a new one was offered and the person has not changed, offered again
+// for the node and the name as they are now: each folder at the first place
+// under the name, each port the first free one there.
+function cAppFollow(){
+  const given = new Set();
+  (cAppCur.fields || []).forEach((f, i) => {
+    const inp = $(`cAppF${i}`), list = $(`cAppF${i}L`);
+    if (!inp) return;
+    const mine = inp.dataset.auto !== undefined && inp.value === inp.dataset.auto;
+    if (f.kind === "folder" && list){
+      drawHTML(list, cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join(""));
+      if (mine && f.default) inp.value = inp.dataset.auto = cAppFolders(f)[0] || "";
+    } else if (f.kind === "port" && mine) inp.value = inp.dataset.auto = cAppFreePort(f.default, given);
+  });
+  const p = $("cAppPort");
+  if (p && p.dataset.auto !== undefined && p.value === p.dataset.auto) p.value = p.dataset.auto = cAppFreePort(cAppCur.port, given);
+}
+
+// A newer definition of the app in the Library than the one a container
+// was made with (a Manifest update kept since): said on the panel, with the
+// press that takes it on Save, any field it adds shown at its default.
+function cAppNewerSay(a){
+  const n = a.newer, box = $("cAppNewer");
+  box.hidden = !n;
+  if (!n) return;
+  drawHTML(box, `The Library holds a newer ${esc(a.name)}${n.commit ? ` (${esc(n.commit.slice(0, 12))})` : ""} than this container was made with.
+    <button type="button" class="link" id="cAppTake">Take it on Save</button>`);
+  $("cAppTake").onclick = () => {
+    const vals = {...(a.values || {}), ...cAppSent().values};
+    cAppDraw({...a, fields: n.fields, own: n.own, take: true, newer: null}, vals);
+    $("cYml").value = n.compose || $("cYml").value;
+    cAppOwns(true);
+    $("cAppNewer").hidden = false;
+    drawHTML($("cAppNewer"), `Save moves it to ${esc(a.name)}'s newer definition; a field it adds starts at its default.`);
+  };
+}
+
+// What the panel holds: {values, ids, tz, port}, as /api/container takes it.
+function cAppSent(){
+  const values = {};
+  $("cAppFields").querySelectorAll("[data-avar]").forEach(e => { values[e.dataset.avar] = e.type === "checkbox" ? e.checked : e.value.trim(); });
+  return {values, ids: $("cAppIds")?.value.trim() || "", tz: $("cAppTz")?.value || "", port: $("cAppPort") ? parseInt($("cAppPort").value, 10) || "" : ""};
+}
+
+// The Compose and Environment tabs while an app owns them: its file
+// read-only with the one press that leaves it, and only the other
+// variables to type.
+function cAppOwns(on){
+  const name = cAppCur?.name || "the app";
+  $("cYml").readOnly = on || $("cGo").disabled;
+  $("cByHandBar").hidden = !on;
+  $("cImport").closest(".actbar").hidden = on;
+  $("cByHandSaid").textContent = on ? `${name}'s file as the catalog wrote it. Its fields above fill it in.` : "";
+  $("cEnv").placeholder = on ? "OTHER=value, one a line: what its fields above do not set" : "PUID=99\nPGID=100\nTZ=America/New_York";
+  $("cEnvHint").hidden = !on;
+  if (on) $("cEnvHint").textContent = `The other variables for ${name}. Its fields above set the rest, and one of theirs typed here is refused by name.`;
+}
+
+// Edit the definition by hand (R238 step 3): one way, said first. The
+// panel folds to a line and the compose file and environment become plain
+// text with the values as they stood.
+async function cAppByHand(){
+  const a = cAppCur;
+  if (!a) return;
+  if (!await askYes(`Edit ${a.name}'s definition by hand? Its fields no longer apply: the compose file and the environment become plain text with the values as they stand now, and only Start over from the Library puts the fields back.`)) return;
+  const sent = cAppSent();
+  // A router field's address and key are the container's own as it has
+  // them (Configure), or empty to fill by hand on a new one.
+  const was = Object.fromEntries((a.env || "").split("\n").filter(l => l.includes("=")).map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+  const lines = [...(a.fields || []).flatMap(f => f.kind === "router" ? [`${f.var}=${was[f.var] ?? ""}`, `${f.key}=${was[f.key] ?? ""}`]
+    : [`${f.var}=${sent.values[f.var] === true ? "true" : sent.values[f.var] === false ? "false" : sent.values[f.var] ?? ""}`]),
+    ...(a.own || []).includes("PUID") ? [`PUID=${sent.ids.split(":")[0] || ""}`, `PGID=${sent.ids.split(":")[1] || ""}`] : [],
+    ...(a.own || []).includes("TZ") ? [`TZ=${sent.tz}`] : [], ...(a.own || []).includes("PORT") ? [`PORT=${sent.port}`] : []];
+  // A secret left empty on a new one is made here, so the text holds a value.
+  const made = (a.fields || []).filter(f => f.kind === "secret" && !sent.values[f.var]).map(f => f.var);
+  const env = lines.map(ln => made.includes(ln.split("=")[0]) ? `${ln}${cMakeSecret()}` : ln).join("\n") + "\n" + $("cEnv").value.trim();
+  cAppHand = true;
+  $("cEnv").value = env.trim() + "\n";
+  $("cAppPanel").hidden = true;
+  $("cAppLeft").hidden = false;
+  drawHTML($("cAppLeft"), `Edited by hand: ${esc(a.name)}'s fields no longer apply. Start over from the Library puts them back.`);
+  cAppOwns(false);
+  $("cEnvHint").hidden = true;
+  cSwitch("yml");
+}
+function cMakeSecret(){
+  const b = new Uint8Array(18);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 function openNewContainer(){
   cLock(false);
   cEditing = null;
-  $("cApp").value = ""; $("cAppFields").hidden = true; $("cAppWhat").textContent = "";
-  for (const id of ["cAppData", "cAppMedia", "cAppTz", "cAppPort"]) $(id).value = "";
-  loadNasApps().then(apps => {
-    if ($("cmodal").hidden) return;
-    $("cApp").innerHTML = `<option value="">none: an image, or a compose file of your own</option>` + apps.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");
-    if (cAppWant && apps.some(a => a.id === cAppWant)){ $("cApp").value = cAppWant; cAppPicked(); }
-    cAppWant = "";
+  cAppCur = null; cAppHand = false;
+  $("cAppField").hidden = true;
+  cAppOwns(false);
+  // Only the app the Library opened this on: the catalog is browsed there.
+  const want = cAppWant;
+  cAppWant = "";
+  if (want) loadNasApps(dockerNode, true).then(apps => {
+    const a = apps.find(x => x.id === want);
+    if ($("cmodal").hidden || !a || cEditing !== null) return;
+    // Its name first: its folders are named for it.
+    if (!$("cName").value) $("cName").value = cAppFreeName(a.id);
+    cAppDraw(a);
+    // Its file is the catalog's and its fields are above: no From an image.
+    $("cTabForm").hidden = true;
+    $("cYml").value = a.compose || "";
+    cYmlTouched = true;
+    cAppOwns(true);
+    cSeg("yml");
+    cHold();
   });
-  $("cApp").onchange = cAppPicked;
-  $("cAppFill").onclick = cAppFill;
   $("cTabForm").hidden = false;
   $("cEnvHint").hidden = true;
   $("cName").disabled = false;
@@ -1568,6 +1811,26 @@ function openNewContainer(){
     "A name no other container has.";
   $("cmodal").hidden = false;
   cHold();
+}
+
+// A compose file from the person's disk (the operator, 10 Nov: the old
+// system's containers come as a zip of them): its text in the Compose pane,
+// and the name its file has when none is typed.
+async function cImportPicked(){
+  const inp = $("cImportFile"), f = inp.files?.[0];
+  inp.value = "";
+  if (!f) return;
+  const fail = m => { $("cErr").textContent = m; $("cErrWrap").hidden = false; };
+  if (/\.zip$/i.test(f.name)) return fail(`${f.name} is a zip: unzip it and import one of its files`);
+  if (f.size > 200000) return fail(`${f.name} is over 200 kB, more than a compose file holds`);
+  const text = await f.text().catch(() => null);
+  if (text === null) return fail(`${f.name} could not be read`);
+  $("cErrWrap").hidden = true;
+  $("cYml").value = text;
+  cYmlTouched = true;
+  const base = f.name.replace(/\.(ya?ml|json|txt)$/i, "");
+  if (!$("cName").disabled && !$("cName").value.trim() && !/^(docker-)?compose([.-]override)?$/i.test(base)) $("cName").value = base.slice(0, 60);
+  cSwitch("yml");
 }
 
 let cTab = "yml";                 // which pane the segment is showing
@@ -1641,22 +1904,24 @@ async function cSubmit(){
   if (!$("cName").value.trim()) return fail("a name is needed");
   busy($("cGo"), editing ? "Saving" : "Creating");
   try{
-    const r = await fetch("/api/container", {method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({action: editing ? "save" : "create",
+    // An app's panel sends its values, and its file stays the catalog's
+    // (R238 step 3); edited by hand, what was typed is the container.
+    const app = cAppCur && !cAppHand ? {app: cAppCur.id, ...cAppSent(), ...(cAppCur.take ? {newer: true} : {})}
+      : cAppCur && editing ? {by_hand: true} : {};
+    const j = await postJSON("/api/container", {action: editing ? "save" : "create",
                             name: editing || $("cName").value,
                             ...(editing && $("cName").value.trim() && $("cName").value.trim() !== editing
                                 ? {rename: $("cName").value.trim()} : {}),
                             node: editing ? "" : ($("cNodeField").hidden
                               ? (dockerNode || "") : $("cNode").value),
                             owner: editing ? "" : $("cUnder").value,
-                            compose: $("cYml").value, env: $("cEnv").value})});
-    const j = await r.json();
+                            compose: $("cYml").value, env: $("cEnv").value, ...app});
     if (j.error){
       unbusy($("cGo"), verb);
       // Compose's own complaint, which names the line: shown on the tab the
-      // text is on, since that is where it has to be fixed.
-      cSeg("yml");
+      // text is on, since that is where it has to be fixed. An app's panel
+      // says its own above, where its fields are.
+      if (!app.app) cSeg("yml");
       return fail(j.error);
     }
     $("cmodal").hidden = true;
@@ -1666,12 +1931,12 @@ async function cSubmit(){
       // off the one on screen (B62).
       const made = $("cNodeField").hidden ? "" : $("cNode").value;
       if (made && made !== dockerNode){ openDockerOn(made); return; }
-      dockerList = null; dockerRev++; loadDocker();
+      dockerList = null; readMoved("docker"); loadDocker();
       return;
     }
     if (j.job && j.name && j.name !== editing){
       notify(`renaming ${editing} to ${j.name}: its row says each step, then Build it`);
-      dockerList = null; dockerRev++; loadDocker();
+      dockerList = null; readMoved("docker"); loadDocker();
       return;
     }
     // Saved. If it has been built, the change is on disk and not in the
@@ -1682,7 +1947,7 @@ async function cSubmit(){
     // to start on somebody's behalf because they pressed Save.
     const row = (dockerList?.instances || []).find(
       d => d.project === editing && d.instance === "main");
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
     if (row?.built_rev && await askYes(
           `${editing} is saved. Rebuild it now so the change takes effect?\n\n`
           + `Cancel keeps the change on disk for a later Rebuild.`)){
@@ -1766,10 +2031,11 @@ function dmUnrouted(d){
 
 // A hosting-only node runs no terminal, so its containers draw no Shell, and
 // the page says so once on its status line rather than under every row: it
-// is the node's policy, not a fault (the operator, 22 Oct).
+// is the node's policy, not a fault (the operator, 22 Oct). The controller's
+// own machine is the same, its container terminal being the job account's.
 function dmHostOnly(){
   const n = (nodesList || []).find(x => x.id === (dockerList?.node || dockerNode));
-  return n?.config?.host_only ? n : null;
+  return n?.config?.host_only || n?.config?.own ? n : null;
 }
 // A shell inside one of the instance's running containers, in the dock
 // (R218 step 4): why it cannot open here, or "" when it can, said under the
@@ -1852,7 +2118,7 @@ function dmRowsHtml(ins, job, blind){
             !blind && d.running && st[1] === "ok" ? " live" : ""}">${
             esc(st[0])}${dockerList?.stale && !blind ? ", as last seen" : ""}</span>${
             meta ? `<span class="dmmeta state">${esc(meta)}</span>` : ""}</div>
-        ${origin ? `<div class="sub dmorigin">${origin}</div>` : ""}
+        ${origin ? `<div class="sub data dmorigin">${origin}</div>` : ""}
         ${said ? `<div class="sub dmstate state${
           // A job that failed is said in the bad tone even while the old
           // container still runs (B96: a failed Rebuild read in green).
@@ -1862,7 +2128,7 @@ function dmRowsHtml(ins, job, blind){
         ${open}
         ${dmConfigureBtn(d)}
         ${!mayDocker() ? "" : `${d.running ? "" : `<button type="button" class="primary" data-dm="up" ${
-          busy || (d.missing_env || []).length ? "disabled" : ""}
+          (d.missing_env || []).length ? "disabled" : ""}
           title="${(d.missing_env || []).length
             ? "the env is missing " + esc(d.missing_env.join(", "))
             : !d.built_rev
@@ -1870,17 +2136,17 @@ function dmRowsHtml(ins, job, blind){
               : "Start it: docker compose up -d"}">Up</button>`}
         ${shellAt ? `<button type="button" data-dmshell="${esc(shellAt[0].name)}"${shellWhy ? " disabled" : ""}
           title="a shell inside ${esc(shellAt[0].service || shellAt[0].name)}, in the dock">Shell</button>` : ""}
-        ${(d.images_behind || []).length && !busy ? `<button type="button" data-dm="update"
+        ${(d.images_behind || []).length ? `<button type="button" data-dm="update"
           title="pull the newer images and start it again: docker compose pull, then up -d">Update</button>` : ""}
-        ${d.nginx_to && !busy ? `<button type="button" data-dm="nginx-update"
-          title="pin nginx-${esc(d.nginx_to)}'s digest on the nginx page's record and rebuild with it">Update</button>` : ""}
+        ${d.nginx_to ? `<button type="button" data-dm="nginx-update"
+          title="pin the image's digest on the nginx page's record and rebuild with it">Update</button>` : ""}
         `}
         ${busy ? abortBtn('data-dm="abort"', job.aborting, "stop this build; what is already built is kept") : ""}
         ${managed || !mayDocker() ? "" : `<button type="button" data-dm="rebuild" ${
           // A button that refuses is not information: a rebuild when nothing
           // moved is a cached build and a restart, behind a confirm that
-          // says so.
-          busy ? "disabled" : ""}
+          // says so; one pressed while a job runs queues behind it.
+          ""}
           title="${!d.built_rev
             ? "build the first image, then bring it up"
             : d.changed
@@ -1889,7 +2155,7 @@ function dmRowsHtml(ins, job, blind){
                 ? "run it again: the last attempt did not finish"
                 : "the last build is current; this builds it again anyway"}">${
           d.built_rev ? "Rebuild" : "Build"}</button>`}
-        ${!mayDocker() ? "" : `<button type="button" data-dm="down" ${!d.exists || busy ? "disabled" : ""}
+        ${!mayDocker() ? "" : `<button type="button" data-dm="down" ${!d.exists ? "disabled" : ""}
           title="Stop it and remove its containers: docker compose down">Down</button>`}
         ${
         // Open, Shell, the build and Down are what a row is for; the rest
@@ -1903,9 +2169,11 @@ function dmRowsHtml(ins, job, blind){
               many ? `Log of ${esc(c.service || c.name)}` : "Log"}</button>`) : []),
           ...(shellAt && !shellWhy ? shellAt.slice(1).map(c => `<button type="button" data-dmshell="${esc(c.name)}"
             title="a shell inside ${esc(c.service || c.name)}, in the dock">Shell in ${esc(c.service || c.name)}</button>`) : []),
+          // One made from an app is configured on that app's panel (R238).
           managed || !mayDocker() ? "" : `<button type="button" data-dm="edit" data-src="${d.source === "file" ? "file" : "project"}"
-            title="${d.source === "file" ? "edit this container's compose file and env"
-                    : "edit the space's compose file and this container's env"}">Compose and env</button>`,
+            title="${d.app ? `${esc(d.app)}'s fields, as its panel asks for them, with its compose file and env`
+                    : d.source === "file" ? "edit this container's compose file and env"
+                    : "edit the space's compose file and this container's env"}">${d.app ? "Configure" : "Compose and env"}</button>`,
           !mayDocker() || managed ? "" : `<button type="button" data-dmrel ${busy || d.relocating?.busy ? "disabled" : ""}
             title="to another node, its data with it: a copy beside it, or this one moved">Copy or move…</button>`,
           !mayDocker() ? "" : `<button type="button" class="danger" data-dm="remove" ${
@@ -1927,7 +2195,7 @@ function dmRowsHtml(ins, job, blind){
           esc(d.astray)}, which does not host its containers. Tick this node under the space's Also works on, or Remove it and send it again.</div>` : ""}
         ${d.await_env ? `<div class="sub warn">built: fill in the env, then Up</div>`
           : (d.missing_env || []).length ? `<div class="sub warn dmenv">the env is missing ${esc(d.missing_env.join(", "))}: press Env</div>` : ""}
-        ${d.nginx_to ? `<div class="sub warn dmnginx">nginx:${esc(d.nginx_to)} is out: Update pins it and rebuilds</div>` : ""}
+        ${d.nginx_to ? `<div class="sub warn dmnginx">${esc(d.nginx_to)} is out: Update pins it and rebuilds</div>` : ""}
         ${shellWhy ? `<div class="sub warn dmshellwhy">No shell here: ${esc(shellWhy)}</div>` : ""}
         ${dockerList?.ports_local && (d.open_ports || []).length ? `<div class="sub bad dmopen">${esc(d.open_ports.join(", "))} ${
           d.open_ports.length === 1 ? "is" : "are"} published on every address of this node, so the internet reaches ${
@@ -1935,6 +2203,7 @@ function dmRowsHtml(ins, job, blind){
           : dockerList?.ports_local && d.open_from && !d.exists ? `<div class="sub warn dmopen">${dmOpenSoon(d)}</div>` : ""}
         ${dmUnrouted(d)}
         ${(d.images_behind || []).length ? `<div class="sub warn dmimages">a newer ${esc(d.images_behind.join(", "))} is out: Update pulls it and starts it again</div>` : ""}
+        ${(d.images_said || []).map(s => `<div class="sub warn" data-imagesaid>${esc(s)}</div>`).join("")}
         ${
         // Its settings, read as pills; Edit settings, behind ⋯, opens them
         // in a dialog with Cancel and Apply (the operator, 17 Oct); a row
@@ -1946,7 +2215,7 @@ function dmRowsHtml(ins, job, blind){
       </div>
       ${docSection("docker", `wire:${d.project}|${d.instance}`,
                    "Ports and mounts", dmPortsSaid(d),
-                   `<div class="wire">${skel("rows", 2, "reading…")}</div>`, {open: false})}
+                   `<div class="wire" data-own>${skel("rows", 2, "reading…")}</div>`, {open: false})}
 `;
     return dmRowWrap(d, st, inner, blind);
   }).join("");
@@ -2049,32 +2318,30 @@ const dmRouteLink = r => {
 // A fold's loader fills whichever element holds its key when the answer
 // lands: the list redraws on every revision, and the fold a read was
 // started in is often not the fold on the page by the time it ends.
-const dmLoading = new Set();
 const DM_IMG_COLS = [{label: "Image"}, {label: "State", w: "6.5rem"}, {label: "ID", w: "8rem"},
                      {label: "Size", w: "6rem", num: true}, {label: "Created", w: "minmax(0,.6fr)"}];
 const DM_VOL_COLS = [{label: "Volume"}, {label: "Driver", w: "8rem"}];
 const dmFoldNow = key => document.querySelector(`:is(.dmtab, .dkview) details[data-sect="${CSS.escape(key)}"]`);
-async function loadDockerImages(det){
+function loadDockerImages(det){
   const key = det.dataset.sect;
-  if (!key || dmLoading.has(key)) return;
-  dmLoading.add(key);
+  if (!key) return Promise.resolve();
+  return reading("docker.images:" + key, () => dockerImagesRead(key));
+}
+async function dockerImagesRead(key){
   const node = dockerList?.node || dockerNode || "";
-  let j;
-  try{ j = await (await fetch("/api/docker/images" + (node ? "?node=" + encodeURIComponent(node) : ""))).json(); }
-  catch(e){ j = {error: String(e)}; }
-  finally{ dmLoading.delete(key); }
-  det = dmFoldNow(key);
+  const j = await getJSON("/api/docker/images" + (node ? "?node=" + encodeURIComponent(node) : ""));
+  const det = dmFoldNow(key);
   const box = det?.querySelector(".dmimgbox");
   if (!det || !box) return;
-  if (j.error){ box.innerHTML = `<div class="hint bad">${esc(j.error)}</div>`; return; }
+  if (j.error){ drawHTML(box, `<div class="hint bad">${esc(j.error)}</div>`); return; }
   const df = k => (j.df || []).find(x => x.kind === k) || {};
   const unused = (j.images || []).filter(i => !i.used).length;
   const dang = (j.images || []).filter(i => i.dangling).length;
   // The section's status, once there is one: docSection draws none for "".
   let st = det.querySelector(":scope > summary .sst");
-  if (!st){ st = document.createElement("span"); st.className = "sst"; det.querySelector(":scope > summary")?.appendChild(st); }
+  if (!st){ st = document.createElement("span"); st.className = "sst"; st.setAttribute("data-own", ""); det.querySelector(":scope > summary")?.appendChild(st); }
   st.textContent = `${(j.images || []).length} image${(j.images || []).length === 1 ? "" : "s"}, ${(j.volumes || []).length} volume${(j.volumes || []).length === 1 ? "" : "s"}`;
-  box.innerHTML = statTiles([
+  drawHTML(box, statTiles([
     {label: "images", value: (j.images || []).length, sub: humanBytes(df("Images").size || (j.images || []).reduce((n, i) => n + i.size, 0))},
     {label: "not in use", value: unused, sub: `${dang} dangling`, tone: dang ? "warn" : ""},
     {label: "volumes", value: (j.volumes || []).length, sub: df("Local Volumes").size ? humanBytes(df("Local Volumes").size) : ""},
@@ -2110,7 +2377,7 @@ async function loadDockerImages(det){
   + ((j.volumes || []).length ? tblWrap(DM_VOL_COLS, j.volumes.map(v => `
       <div class="row dmvol">${tblLine(DM_VOL_COLS, [esc(v.name), esc(v.driver)])}</div>`).join(""), "dmvols")
       : `<div class="hint">no volumes on this daemon</div>`)
-;
+);
   box.querySelectorAll("[data-dmprune]").forEach(b => b.onclick = async () => {
     if (await dockerPrune(b.dataset.dmprune, node, dockerList?.name, b)) loadDockerImages(det);
   });
@@ -2127,7 +2394,7 @@ async function dockerPrune(kind, node, nodeName, b){
   if (!await askYes(`Prune ${kind === "cache" ? "the build cache" : kind === "unused" ? "unused images" : kind} on ${nodeName || "this node"}?\n\n${DOCKER_PRUNE_SAID[kind]}`,
                     {verb: "Prune", danger: kind === "unused" || kind === "volumes"})) return false;
   busy(b, "Pruning");
-  const r = await (await postJSON("/api/dockerctl", {action: "prune", container: kind, node})).json().catch(() => ({error: "no answer"}));
+  const r = await postJSON("/api/dockerctl", {action: "prune", container: kind, node});
   if (r.error) notify(r.error, true);
   else notify(`pruned ${kind}: ${(r.out || "").split("\n").filter(l => /reclaimed/i.test(l)).join(" ") || "nothing to remove"}`);
   return !r.error;
@@ -2163,7 +2430,7 @@ function dmSyncDialogs(el){
     }catch(e){ /* detached mid-draw */ }
     dlg.oncancel = e => {
       e.preventDefault();
-      dmDropDrafts(dlg.dataset.dmdlg); dmEditing.delete(dlg.dataset.dmdlg); dockerRev++; drawPanes();
+      dmBackLet(dlg.dataset.dmdlg); dmDropDrafts(dlg.dataset.dmdlg); dmEditing.delete(dlg.dataset.dmdlg); readMoved("docker"); drawPanes();
     };
   });
 }
@@ -2180,10 +2447,12 @@ function dmWireRows(el, list = dockerList){
     if (!sum) return;
     sum.onclick = (e) => {
       e.preventDefault();
-      const willOpen = !d.open;
+      const willOpen = !foldOpen(d);
       slideDetails(d, willOpen);
       if (willOpen && d.querySelector(".dmimgbox")) loadDockerImages(d);
-      else if (willOpen && !d.dataset.done) loadWire(d);
+      // Read on every opening: the page keeps the fold across its redraws
+      // (R244), so it shows what was read last while it reads again.
+      else if (willOpen) loadWire(d);
     };
     // A fold left open across a redraw is drawn back as "reading…": its
     // read is started again, unless one is already on its way to it.
@@ -2192,7 +2461,7 @@ function dmWireRows(el, list = dockerList){
     // behind it, since the stats and every job step redraw the list.
     else if (d.open && d.querySelector(".wire") && !d.dataset.done){
       const inst = d.closest("[data-inst]")?.dataset.inst;
-      if (inst && dmWireSeen[inst]) d.querySelector(".wire").innerHTML = dmWireSeen[inst];
+      if (inst && dmWireSeen[inst]) drawHTML(d.querySelector(".wire"), dmWireSeen[inst]);
       loadWire(d);
     }
   });
@@ -2214,10 +2483,10 @@ function dmWireRows(el, list = dockerList){
     e.preventDefault();
     const [project, instance] = a.closest("[data-inst]").dataset.inst.split("|");
     if (!await askYes("Unpack its data into its volumes? It stops, the archive is written in over anything already in them, and it starts again.")) return;
-    const j = await (await postJSON("/api/devapp", {project, instance, action: "unpack"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/devapp", {project, instance, action: "unpack"});
     if (j.error) return notify(j.error, true);
     notify(`unpacking ${j.name}: its row says when it is done`);
-    dockerList = null; dockerRev++;
+    dockerList = null; readMoved("docker");
     loadDocker();
   });
   // Whose Rebuild it is. Written at once, like the row's other controls, and
@@ -2245,71 +2514,14 @@ function dmWireRows(el, list = dockerList){
     const host = el.querySelector(`[data-dmnghost="${CSS.escape(key)}"]`)?.value.trim() || "";
     const port = el.querySelector(`[data-dmngport="${CSS.escape(key)}"]`)?.value || "";
     busy(b, "Adding");
-    const j = await (await postJSON("/api/nginx", {action: "route-add", node: dockerList?.node || dockerNode || "", cert, host, port})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/nginx", {action: "route-add", node: dockerList?.node || dockerNode || "", cert, host, port});
     if (j.error) notify(j.error, true);
     else { delete dmNginxDraft[key]; notify(`routed ${j.route?.host || "*"} to ${port} on this node's nginx${j.deployed === false ? " (applied once it is deployed)" : ""}`); }
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
   });
   // Every setting on a row is staged by its control and written by the
-  // grid's one Apply (R210): a pick wakes the button when something differs
-  // from what is saved, and the Apply runs each staged setting in turn.
-  const wake = row => {
-    const b = row?.querySelector("[data-dmapply]");
-    if (b && !b.getAttribute("aria-busy")) b.disabled = !dmRowDirty(b.dataset.dmapply);
-  };
-  el.querySelectorAll("[data-dmref]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmref;
-    const saved = (list?.instances || []).find(
-      x => `${x.project}|${x.instance}` === key)?.ref || "";
-    if (sel.value === saved) delete dmRefDraft[key];
-    else dmRefDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  el.querySelectorAll("[data-dmov]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmov;
-    const saved = (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.override || "";
-    if (sel.value === saved) delete dmOvDraft[key];
-    else dmOvDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  el.querySelectorAll("[data-dmgpu]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmgpu;
-    const saved = (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.gpu || "";
-    if (sel.value === saved) delete dmGpuDraft[key];
-    else dmGpuDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  const applyGpu = async key => {
-    const [project, instance] = key.split("|");
-    const kind = dmGpuDraft[key];
-    if (kind === undefined) return;
-    const j = await (await postJSON("/api/devapp", {project, instance, action: "gpu", kind})).json().catch(() => ({error: "no answer"}));
-    if (j.error){ notify(j.error, true); return; }
-    delete dmGpuDraft[key];
-    notify(kind ? `${dmCalled(project, instance)} gets the ${kind === "nvidia" ? "NVIDIA card" : "AMD card"} from the next build`
-                : `${dmCalled(project, instance)} gets no GPU from the next build`);
-  };
-  const applyOverride = async key => {
-    const [project, instance] = key.split("|");
-    const file = dmOvDraft[key];
-    if (file === undefined) return;
-    const j = await (await postJSON("/api/devapp", {project, instance, action: "override", file})).json().catch(() => ({error: "no answer"}));
-    if (j.error){ notify(j.error, true); return; }
-    delete dmOvDraft[key];
-    notify(file ? `${dmCalled(project, instance)} lays ${file} over its compose file from the next build`
-                : `${dmCalled(project, instance)} has no override from the next build`);
-  };
-  const applyRef = async key => {
-    const [project, instance] = key.split("|");
-    const ref = dmRefDraft[key];
-    if (ref === undefined) return;
-    const r = await postJSON("/api/devapp", {project, instance, action: "ref", ref});
-    const j = await r.json();
-    if (j.error){ notify(j.error, true); return; }
-    delete dmRefDraft[key];
-    notify(ref ? `${dmCalled(project, instance)} builds from ${ref} now`
-               : `${dmCalled(project, instance)} builds from the space's own checkout again`);
-  };
+  // grid's one Apply (R210): DM_STAGED says which, and how each is written.
+  dmWireStaged(el, list);
   // Start, stop, restart and the log, on any container the daemon reported,
   // including the ones AerieOS did not create (R68 steps 1 and 2). The
   // name goes back to the server, which looks it up in a fresh listing
@@ -2319,11 +2531,9 @@ function dmWireRows(el, list = dockerList){
   const node = list?.node || dockerNode;
   el.querySelectorAll("[data-ctl]").forEach(b => b.onclick = async () => {
     const what = b.dataset.ctl, ctr = b.dataset.ctr;
-    if (what === "stop" && !await askYes(`Stop ${ctr}?`)) return;
     busy(b, {start: "Starting", stop: "Stopping", restart: "Restarting"}[what]);
     try{
-      const r = await postJSON("/api/dockerctl", {action: what, container: ctr, node});
-      const j = await r.json();
+      const j = await postJSON("/api/dockerctl", {action: what, container: ctr, node});
       if (j.error) notify(j.error, true); else notify(j.out || `${what} sent`);
     }catch(e){ notify(`${what} ${ctr}: ` + e, true); }
     dockerList = null; loadDocker();
@@ -2338,83 +2548,6 @@ function dmWireRows(el, list = dockerList){
     openLogTab(row && b.dataset.running === "1" ? `log:ctr:${project}:${instance}:${name}`
                  : `log:dm:${list?.node || dockerNode || ""}:${name}`, `Log: ${name}`);
   });
-  // Start on boot: the tick is a draft, Apply writes it (R122).
-  el.querySelectorAll("[data-dmboot]").forEach(cb => cb.onchange = () => {
-    const name = cb.dataset.dmboot, was = cb.dataset.was === "1";
-    if (cb.checked === was) delete dmBootDraft[name]; else dmBootDraft[name] = cb.checked;
-    wake(cb.closest(".row"));
-  });
-  const applyBoot = async name => {
-    const on = dmBootDraft[name];
-    if (on === undefined) return;
-    const j = await (await postJSON("/api/dockerctl", {action: on ? "boot-on" : "boot-off", container: name, node})).json();
-    if (j.error){ notify(j.error, true); return; }
-    delete dmBootDraft[name];
-    notify(j.out || (on ? `${name} starts on boot` : `${name} no longer starts on boot`));
-  };
-  // Reaches the LAN (R178): the same draft and Apply, an administrator's.
-  el.querySelectorAll("[data-dmlan]").forEach(cb => cb.onchange = () => {
-    const name = cb.dataset.dmlan, was = cb.dataset.was === "1";
-    if (cb.checked === was) delete dmLanDraft[name]; else dmLanDraft[name] = cb.checked;
-    wake(cb.closest(".row"));
-  });
-  const applyLan = async name => {
-    const on = dmLanDraft[name];
-    if (on === undefined) return;
-    const j = await (await postJSON("/api/dockerctl", {action: on ? "lan-on" : "lan-off", container: name, node})).json();
-    if (j.error){ notify(j.error, true); return; }
-    delete dmLanDraft[name];
-    notify(j.out || (on ? `${name} reaches the network around its node` : `${name} no longer reaches the network around its node`));
-  };
-  // Which project a row belongs to: staged on the pick, written by Apply.
-  const ownSaved = key => (key.startsWith("ctr:")
-    ? (list?.containers || []).find(c => (c.name || c.id) === key.slice(4))
-    : (list?.instances || []).find(x => `inst:${x.project}|${x.instance}` === key))?.owner || "";
-  el.querySelectorAll("[data-dmown]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmown;
-    if (sel.value === ownSaved(key)) delete dmOwnDraft[key];
-    else dmOwnDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  const applyOwner = async key => {
-    const owner = dmOwnDraft[key];
-    if (owner === undefined) return;
-    const other = key.startsWith("ctr:");
-    const [project, instance] = other ? [] : key.slice(5).split("|");
-    const what = other ? key.slice(4) : (list?.instances || []).find(
-      x => x.project === project && x.instance === instance)?.name || project;
-    const r = await postJSON(other ? "/api/dockerctl" : "/api/devapp", other
-      ? {action: "owner", container: key.slice(4), owner, node}
-      : {action: "owner", project, instance, owner});
-    const j = await r.json();
-    if (j.error){ notify(j.error, true); return; }
-    delete dmOwnDraft[key];
-    notify(owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no space now`);
-  };
-
-  // Built from: staged on the pick, moved by Apply, asked first since what it
-  // builds from changes.
-  el.querySelectorAll("[data-dmmove]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmmove, from = key.split("|")[0];
-    if (sel.value === from) delete dmMoveDraft[key]; else dmMoveDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  const applyMove = async key => {
-    const to = dmMoveDraft[key];
-    if (!to) return;
-    const [project, instance] = key.split("|");
-    const what = (list?.instances || []).find(
-      x => x.project === project && x.instance === instance)?.name || project;
-    if (!await askYes(`Move ${what} to ${projLabel(to)}? It keeps its name, env and data, and builds from ${
-        projLabel(to)}'s tree from its next rebuild.`)){ delete dmMoveDraft[key]; return; }
-    const r = await postJSON("/api/devapp", {action: "move", project, instance, to});
-    const j = await r.json();
-    if (j.error){ notify(j.error, true); return; }
-    delete dmMoveDraft[key];
-    notify(`${what} is ${projLabel(to)}'s now` + (j.dropped_ref
-      ? `; it built from ${j.dropped_ref}, which was ${projLabel(project)}'s branch, and now builds from ${projLabel(to)}'s checkout` : ""));
-  };
-
   // The words on the row are a way in to where the setting lives now.
   el.querySelectorAll("[data-dmtestgo]").forEach(a => a.onclick = e => {
     e.preventDefault();
@@ -2422,31 +2555,6 @@ function dmWireRows(el, list = dockerList){
     // this clicked the row's settings button, which went with it.
     openProjectSettings(a.dataset.dmtestgo);
   });
-  // The route is saved on Apply, not on the pick (docs/design-language.md,
-  // Settings): a pick wakes the button when it differs from what is saved.
-  el.querySelectorAll("[data-route]").forEach(sel => sel.onchange = () => {
-    const row = sel.closest("[data-inst]");
-    const d = dmRouteDraft[row.dataset.inst] || (dmRouteDraft[row.dataset.inst] = {});
-    d[sel.dataset.route] = sel.value;
-    const dirty = [...row.querySelectorAll("[data-route]")].some(x => x.value !== x.dataset.was);
-    if (!dirty) delete dmRouteDraft[row.dataset.inst];
-    wake(row);
-  });
-  const applyRoute = async row => {
-    const [project, instance] = row.dataset.inst.split("|");
-    if (!dmRouteDraft[row.dataset.inst]) return;
-    const sel = row.querySelector('[data-route="mode"]');
-    const mode = sel?.value || "lan";
-    const port = row.querySelector('[data-route="port"]')?.value || "";
-    if (mode === "funnel" && sel.dataset.was !== "funnel" && !await askYes(
-        `Open ${dmCalled(project, instance)} to the internet?\n\nAnyone with the link can reach the port until the route goes back to lan.`)){
-          row.querySelectorAll("[data-route]").forEach(x => { x.value = x.dataset.was; });
-          delete dmRouteDraft[row.dataset.inst]; return; }
-    delete dmRouteDraft[row.dataset.inst];
-    const r = await postJSON("/api/devapp", {project, instance, action:"route", mode, port});
-    const j = await r.json();
-    if (j.error) notify(j.error, true);
-  };
   // The grid's one Apply: every staged setting on the row, in turn, then
   // one redraw. A setting that fails says so and the rest still go.
   // A row's settings dialog, drawn open: shown in the top layer, again after
@@ -2457,24 +2565,19 @@ function dmWireRows(el, list = dockerList){
   // into it going nowhere (B852).
   dmSyncDialogs(el);
   el.querySelectorAll("[data-dmedit]").forEach(b => b.onclick = () => {
-    closeMore(); dmEditing.add(b.dataset.dmedit); dockerRev++; drawPanes();
+    closeMore(); dmEditing.add(b.dataset.dmedit); dmBackHold(b.dataset.dmedit); readMoved("docker"); drawPanes();
   });
   el.querySelectorAll("[data-dmcancel]").forEach(b => b.onclick = () => {
-    dmDropDrafts(b.dataset.dmcancel); dmEditing.delete(b.dataset.dmcancel); dockerRev++; drawPanes();
+    dmBackLet(b.dataset.dmcancel); dmDropDrafts(b.dataset.dmcancel); dmEditing.delete(b.dataset.dmcancel); readMoved("docker"); drawPanes();
   });
   el.querySelectorAll("[data-dmapply]").forEach(btn => btn.onclick = async () => {
     const key = btn.dataset.dmapply, row = btn.closest(".row");
-    dmEditing.delete(key);
-    const inst = key.startsWith("inst:") ? key.slice(5) : "";
-    const name = inst ? (list?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
+    dmBackLet(key); dmEditing.delete(key);
     busy(btn, "Applying");
-    try{
-      await applyOwner(key);
-      if (inst){ await applyMove(inst); await applyRef(inst); await applyOverride(inst); await applyGpu(inst); if (row?.dataset.inst) await applyRoute(row); }
-      if (name){ await applyBoot(name); await applyLan(name); }
-    }catch(e){ notify("apply: " + failWords(e), true); }
+    try{ await dmApplyStaged(key, row, {list, node}); }
+    catch(e){ notify("apply: " + failWords(e), true); }
     finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
   });
   wireMore(el);
 }
@@ -2488,8 +2591,7 @@ function dmWireRows(el, list = dockerList){
 // The search (R216): what was typed, where the caret was when the redraw
 // took the box, and whether a redraw since was the search's own (only
 // then is the focus put back, so a redraw for a revision does not steal it).
-let dmSearch = "", dmSearchCaret = null, dmSearchTimer = null, dmSearchAt = 0;
-const dmSearchTouched = () => Date.now() - dmSearchAt < 1500;
+let dmSearch = "", dmSearchTimer = null;
 function dmMatch(r){
   const q = dmSearch.trim().toLowerCase();
   if (!q) return true;
@@ -2504,7 +2606,10 @@ function dmMatch(r){
 // ("" is All, "none" the containers of no project): a view, never saved.
 let dmChip = "";
 
-function dmGroupsHtml(ins, cs, job, blind, only = ""){
+// `on` is the node these are on, {id, name}, where a space's containers are
+// drawn a node at a time (the notebook's Docker view): its card is marked
+// with the node, and its heading says which when a name is given.
+function dmGroupsHtml(ins, cs, job, blind, only = "", on = null){
   // A project's heading wears its own color when it has one; `null` is
   // the No project heading, which wears none.
   const head = (t, sub, tone) => `<div class="field dmgroup${tone === null ? " none" : ""}"${
@@ -2536,7 +2641,7 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
   // System is AerieOS's own (R180): what it deploys itself, the nginx
   // container today, set by that deployment and by no picker.
   // Each group a card at a desk (R262): its heading and its rows together.
-  const card = (html, cls = "") => `<section class="dmcard${cls}">${html}</section>`;
+  const card = (html, cls = "") => `<section class="dmcard${cls}"${on ? ` data-node="${esc(on.id)}"` : ""}>${html}</section>`;
   return owners.map(o => gone(o)
       ? card(head(`${gonesName(o)} (deleted)`, "restore it from the trash, or Move these to another space", null) + group(o))
       : o === "System"
@@ -2545,7 +2650,7 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
           ? card(head(projLabel(o), "", colorTone(projectColor(o)))
               + `<div class="sub bad dmwhy">${esc(projLabel(o))} is not on your list of spaces: add it to your own list on ${
                   pageLink("users", "the Users page")} to work on these</div>` + group(o), " notmine")
-          : card(head(projLabel(o), "", colorTone(projectColor(o))) + group(o))).join("")
+          : card(head(projLabel(o), on?.name ? `on ${on.name}` : "", colorTone(projectColor(o))) + group(o))).join("")
     + (loose ? card(head("No space", "no session sees these", null) + group("")) : "");
 }
 
@@ -2568,7 +2673,7 @@ function dmChipGroups(ins, cs){
 // Start on boot (R122): a switch on a row, a draft until its Apply, as every
 // setting here is. `name` is what the server acts on (a container, or an
 // instance meaning all its containers), `on` what the daemon says now.
-let dmBootDraft = {};
+const dmBootDraft = {};
 function dmBootLine(name, on){
   if (!mayDocker()) return "";
   const want = name in dmBootDraft ? dmBootDraft[name] : on;
@@ -2582,7 +2687,7 @@ function dmBootLine(name, on){
 // private ranges, which a container that talks to a machine on the network
 // (a controller to its nodes, an app to a device) cannot work behind. An
 // administrator lets one through; what no role gives is not drawn.
-let dmLanDraft = {};
+const dmLanDraft = {};
 function dmLanLine(name, on){
   if (!state?.can?.admin) return "";
   const want = name in dmLanDraft ? dmLanDraft[name] : on;
@@ -2590,12 +2695,160 @@ function dmLanLine(name, on){
       data-was="${on ? "1" : ""}"${want ? " checked" : ""}> Reaches the LAN</label></div></div>`;
 }
 
+// What an instance has saved under one field of its listing, as the saved
+// half of a setting kept under `project|instance`.
+const dmInstSaved = field => (key, list) =>
+  (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.[field] || "";
+// What a notice calls an instance: its row's name in the listing the row
+// was drawn from, else its project.
+const dmInstNamed = ({list, project, instance}) =>
+  (list?.instances || []).find(x => x.project === project && x.instance === instance)?.name || project;
+
+// The settings a row stages and its one Apply writes (R210), in the order
+// the Apply writes them. Whether the grid has an Apply (dmSetGrid), what
+// Cancel drops (dmDropDrafts), whether a row is dirty (dmRowDirty), the
+// controls' wiring (dmWireStaged) and the Apply itself (dmApplyStaged) are
+// all read from here, so a new setting is its draft, the line that draws
+// its control and one entry. Declared after the last draft it names.
+//   attr   the control's data attribute, whose value is the draft's key
+//   key    which of the row's keys that is (dmRowKeys): row, inst or name
+//   draft  what is staged, by that key; the setting's line reads the same
+//          object by its own name to draw what was picked
+//   tick   a checkbox, staged as true or false; the rest are selects
+//   saved  what is saved now: a control put back to it stages nothing
+//   skip   a staged value the Apply passes over, where that is not just
+//          `undefined`
+//   post   the path and the body that write it
+//   said   the words once it is written, `j` being the server's answer
+// `ctx` is the listing the rows were drawn from, its node, and the row's
+// project and instance. An entry with `stage` and `apply` does both itself.
+const DM_STAGED = [
+  // Which space the row belongs to, on an instance's row and on a
+  // container's alike: the one draft kept under the row's own key.
+  {name: "owner", attr: "dmown", key: "row", draft: dmOwnDraft,
+   saved: (key, list) => (key.startsWith("ctr:")
+     ? (list?.containers || []).find(c => (c.name || c.id) === key.slice(4))
+     : (list?.instances || []).find(x => `inst:${x.project}|${x.instance}` === key))?.owner || "",
+   post: (key, owner, {node, project, instance}) => key.startsWith("ctr:")
+     ? ["/api/dockerctl", {action: "owner", container: key.slice(4), owner, node}]
+     : ["/api/devapp", {action: "owner", project, instance, owner}],
+   said: (key, owner, j, ctx) => {
+     const what = key.startsWith("ctr:") ? key.slice(4) : dmInstNamed(ctx);
+     return owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no space now`;
+   }},
+  // Built from: the project in the key is what is saved, and an empty pick
+  // moves nothing. The row's Apply is the only yes it takes.
+  {name: "move", attr: "dmmove", key: "inst", draft: dmMoveDraft,
+   saved: key => key.split("|")[0],
+   skip: to => !to,
+   post: (key, to, {project, instance}) => ["/api/devapp", {action: "move", project, instance, to}],
+   said: (key, to, j, ctx) => `${dmInstNamed(ctx)} is ${projLabel(to)}'s now` + (j.dropped_ref
+     ? `; it built from ${j.dropped_ref}, which was ${projLabel(ctx.project)}'s branch, and now builds from ${projLabel(to)}'s checkout` : "")},
+  {name: "ref", attr: "dmref", key: "inst", draft: dmRefDraft,
+   saved: dmInstSaved("ref"),
+   post: (key, ref, {project, instance}) => ["/api/devapp", {project, instance, action: "ref", ref}],
+   said: (key, ref, j, {project, instance}) => ref ? `${dmCalled(project, instance)} builds from ${ref} now`
+     : `${dmCalled(project, instance)} builds from the space's own checkout again`},
+  {name: "override", attr: "dmov", key: "inst", draft: dmOvDraft,
+   saved: dmInstSaved("override"),
+   post: (key, file, {project, instance}) => ["/api/devapp", {project, instance, action: "override", file}],
+   said: (key, file, j, {project, instance}) => file ? `${dmCalled(project, instance)} lays ${file} over its compose file from the next build`
+     : `${dmCalled(project, instance)} has no override from the next build`},
+  {name: "gpu", attr: "dmgpu", key: "inst", draft: dmGpuDraft,
+   saved: dmInstSaved("gpu"),
+   post: (key, kind, {project, instance}) => ["/api/devapp", {project, instance, action: "gpu", kind}],
+   said: (key, kind, j, {project, instance}) => kind
+     ? `${dmCalled(project, instance)} gets the ${kind === "nvidia" ? "NVIDIA card" : "AMD card"} from the next build`
+     : `${dmCalled(project, instance)} gets no GPU from the next build`},
+  // The route does both itself: its draft is two controls' picks (how it is
+  // reached, and through which port), dropped when both are back at what is
+  // saved; the Apply reads the two from the row, and a public link is asked
+  // about first, a no putting the controls back. Its redrawn line is what
+  // says it was written.
+  {name: "route", attr: "route", key: "inst", draft: dmRouteDraft,
+   stage(sel){
+     const row = sel.closest("[data-inst]");
+     const d = dmRouteDraft[row.dataset.inst] || (dmRouteDraft[row.dataset.inst] = {});
+     d[sel.dataset.route] = sel.value;
+     const dirty = [...row.querySelectorAll("[data-route]")].some(x => x.value !== x.dataset.was);
+     if (!dirty) delete dmRouteDraft[row.dataset.inst];
+     return row;
+   },
+   async apply(row){
+     if (!row?.dataset.inst) return;
+     const [project, instance] = row.dataset.inst.split("|");
+     if (!dmRouteDraft[row.dataset.inst]) return;
+     const sel = row.querySelector('[data-route="mode"]');
+     const mode = sel?.value || "lan";
+     const port = row.querySelector('[data-route="port"]')?.value || "";
+     if (mode === "funnel" && sel.dataset.was !== "funnel" && !await askYes(
+         `Open ${dmCalled(project, instance)} to the internet?\n\nAnyone with the link can reach the port until the route goes back to lan.`)){
+           row.querySelectorAll("[data-route]").forEach(x => { x.value = x.dataset.was; });
+           delete dmRouteDraft[row.dataset.inst]; return; }
+     delete dmRouteDraft[row.dataset.inst];
+     const j = await postJSON("/api/devapp", {project, instance, action:"route", mode, port});
+     if (j.error) notify(j.error, true);
+   }},
+  // Start on boot (R122) and Reaches the LAN (R178), an administrator's: a
+  // tick each, kept under the container's name, saved as the tick was drawn.
+  {name: "boot", attr: "dmboot", key: "name", draft: dmBootDraft, tick: true,
+   saved: (name, list, box) => box.dataset.was === "1",
+   post: (name, on, {node}) => ["/api/dockerctl", {action: on ? "boot-on" : "boot-off", container: name, node}],
+   said: (name, on, j) => j.out || (on ? `${name} starts on boot` : `${name} no longer starts on boot`)},
+  {name: "lan", attr: "dmlan", key: "name", draft: dmLanDraft, tick: true,
+   saved: (name, list, box) => box.dataset.was === "1",
+   post: (name, on, {node}) => ["/api/dockerctl", {action: on ? "lan-on" : "lan-off", container: name, node}],
+   said: (name, on, j) => j.out || (on ? `${name} reaches the network around its node` : `${name} no longer reaches the network around its node`)},
+];
+
+// Each staged control wired: a pick or a tick that differs from what is
+// saved is its draft, one put back is none, and either wakes the row's Apply
+// while something is staged. `list` is the listing the rows were drawn from.
+function dmWireStaged(el, list){
+  const wake = row => {
+    const b = row?.querySelector("[data-dmapply]");
+    if (b && !b.getAttribute("aria-busy")) b.disabled = !dmRowDirty(b.dataset.dmapply);
+  };
+  for (const s of DM_STAGED)
+    el.querySelectorAll(`[data-${s.attr}]`).forEach(c => c.onchange = () => {
+      if (s.stage){ wake(s.stage(c)); return; }
+      const key = c.dataset[s.attr], v = s.tick ? c.checked : c.value;
+      if (v === s.saved(key, list, c)) delete s.draft[key];
+      else s.draft[key] = v;
+      wake(c.closest(".row"));
+    });
+}
+
+// A row's Apply: every setting it has staged, written in the table's order.
+// One the server refuses says why and keeps its draft, and the rest still
+// go. `key` is the key the Apply carries, `row` its row, `list` the listing
+// the row was drawn from and `node` that listing's node.
+async function dmApplyStaged(key, row, {list, node}){
+  const keys = dmRowKeys(key, list);
+  const [project, instance] = keys.inst.split("|");
+  const ctx = {list, node, project, instance};
+  for (const s of DM_STAGED){
+    const k = keys[s.key];
+    if (!k) continue;
+    if (s.apply){ await s.apply(row); continue; }
+    const v = s.draft[k];
+    if (s.skip ? s.skip(v) : v === undefined) continue;
+    const [path, body] = s.post(k, v, ctx);
+    const j = await postJSON(path, body);
+    if (j.error){ notify(j.error, true); continue; }
+    delete s.draft[k];
+    notify(s.said(k, v, j, ctx));
+  }
+}
+
 // A system container's own page (R181): nginx's routes and certificates,
 // the scanners' schedule, the router's settings on the Installed page.
 // Its row is any container's row with this one press more.
 const DM_CONFIGURE = {
-  nginx: {page: "nginx", go: nid => { if (nid) NODE_SET.nginx(nid); railGo("containers", "nginx"); }},
-  scanners: {page: "scanners", go: () => railGo("containers", "scanners")},
+  // Each a service's own page, beside Installed (R264), in whichever group
+  // the rail lists it.
+  nginx: {page: "nginx", go: nid => { if (nid) NODE_SET.nginx(nid); railGo(groupOf("nginx").key, "nginx"); }},
+  scanners: {page: "scanners", go: () => railGo(groupOf("scanners").key, "scanners")},
   router: {page: "installed", go: nid => openInstalledOn(nid, "", "service:model-router")},
 };
 function dmConfigureBtn(r){
@@ -2697,7 +2950,7 @@ function dmViewWire(el, redraw){
 async function dmCheck(btn, node, after){
   busy(btn, "Checking");
   try{
-    const j = await (await postJSON("/api/images", {action: "check", node})).json();
+    const j = await postJSON("/api/images", {action: "check", node});
     if (j.error) notify(j.error, true);
     else notify(j.behind ? `${j.behind} container${j.behind === 1 ? " has" : "s have"} a newer image: Update on ${j.behind === 1 ? "its row" : "their rows"}`
                          : `checked ${j.checked}: every registry image is current`);
@@ -2724,7 +2977,7 @@ function dmTiles(t){
 // container uses.
 function dmImagesSection(){
   return state?.can?.admin ? docSection("docker", "images", "Images and volumes", "",
-    `<div class="dmimgbox">${skel("rows", 3, "reading…")}</div>`, {open: false, fold: true}) : "";
+    `<div class="dmimgbox" data-own>${skel("rows", 3, "reading…")}</div>`, {open: false, fold: true}) : "";
 }
 // ...and the page's head under them: when the images were checked.
 function dmStatus(d){
@@ -2738,9 +2991,16 @@ function dmStatus(d){
   // where a shell in one opens.
   return pageHead({cls: "dmimgbar", facts: [
     ["Images checked", !d ? GHOST : d.images_at ? ago(d.images_at) : "not yet"],
-    ["Shells", host && mayShell() ? `from a node that runs sessions: ${host.name} hosts containers only` : ""]]});
+    ["Shells", host && mayShell() ? (host.config?.own ? "none on this machine: it is the controller's own" : `from a node that runs sessions: ${host.name} hosts containers only`) : ""]]});
 }
 
+// The old system's containers and VMs on the controller's own machine
+// (tab-machine.js adoptAppsSection), above the rows: where a person looks for
+// them after a move off another NAS.
+function dmOldApps(){
+  const own = ownMachine();
+  return own && dockerNode === own.id && state?.can?.admin ? adoptAppsSection(own) : "";
+}
 // The rows' settings dialogs open before a redraw, by key: shown again after
 // it without their opening animation (the operator, 26 Oct: each redraw
 // played it again, a flicker under the pointer).
@@ -2766,12 +3026,15 @@ function renderDockerInto(i){
     // builders given nothing (the operator, 18 Oct: a template written
     // beside the page fell behind it): the bar, the tiles, the status line,
     // then the rows.
-    el.__dmHtml = "";
-    el.innerHTML = `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}
+    // The old system's containers and VMs need nothing of the daemon's
+    // answer, so they are drawn while it is on its way.
+    const old = dmOldApps();
+    drawHTML(el, `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}`)}${old}${skTpl(`
       ${dmView === "list" ? skTable(DM_COLS, 4)
         // ...the rows in a project group's card, as they land (R262).
         : `<section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(3)}</section>`}
-      ${dmImagesSection()}`)}</div>`;
+      ${dmImagesSection()}`)}</div>`);
+    if (old) wireAdoptApps(el);
     return;
   }
   // The daemon did not answer; it is off, it is not a sandbox VM, or the VM
@@ -2850,12 +3113,12 @@ function renderDockerInto(i){
           ? `<br><span class="dim">${esc((src.strays || []).join(", "))} ${
               src.strays.length > 1 ? "are" : "is"} mapped but not mounted here</span>` : ""}</div>`
     : "";
-  // Slow, not merely in flight: dockerFetching alone is true for the whole
+  // Slow, not merely in flight: readBusy("docker") alone is true for the whole
   // of every fetch, and the timer in loadDocker is what decides it is worth
   // saying. A listing the server itself marked stale wears the same class
   // without the word: it is the last answer, and nothing is on its way that
   // the next revision will not bring.
-  const slow = dockerFetching && dmSlow;
+  const slow = readBusy("docker") && dmSlow;
   // The picker: every node, online or not: an offline node's view is its
   // last-known list in the ghosted state the blind path draws.
   // One tab, re-rendered per pick (docs/nodes.md §13), never a tab per node.
@@ -2865,7 +3128,7 @@ function renderDockerInto(i){
   // whose daemon it is. No Refresh: the page follows its node's containers
   // by the fingerprint each heartbeat carries (the operator, 17 Oct).
   const dnodes = (nodesList || []).filter(n => n.kind !== "local");
-  if (nodesList === null || nodesStale) loadNodes();
+  if (nodesList === null || nodesStale) nodesKnown();
   const picker = dmBar({nodes: dnodes, blind});
   const status = blind ? "" : dmStatus(dockerList);
   // What a session is waiting on, above everything else: somebody is blocked
@@ -2894,7 +3157,7 @@ function renderDockerInto(i){
   const html = `<div class="doctab dmtab${slow || dockerList?.stale ? " dmstale" : ""}">${picker}${tiles}${
     // The page's own boxes under the tiles and the chips, never between
     // them (the operator, 26 Oct): what every page has comes first.
-    chipBar(chips, dmChip, "data-dmchip")}${status}${askRows}${note
+    chipBar(chips, dmChip, "data-dmchip")}${status}${askRows}${dmOldApps()}${note
       ? `<div class="field"><div class="notice warn dmnote">${esc(note)}</div></div>` : srcLine}${
     // Blind, the list is what is on record here rather than what is on the
     // daemon, and "nothing on this daemon yet" would be a claim about a
@@ -2915,11 +3178,13 @@ function renderDockerInto(i){
   // Written only when it says something new (the operator, 26 Oct: the page
   // was written again on every read, its open folds read again, the pointer's
   // place lost): a read that brings the same list leaves the page alone.
-  if (el.__dmHtml === html && el.querySelector(":scope > .dmtab")){ dmSyncDialogs(el); return; }
+  // ...and one that does is patched into what is there (R244): a person's
+  // typing in the search or a row's settings, an open fold and what was read
+  // into it, and an open dialog all stay where they were.
+  if (!patch(el, html) && el.querySelector(":scope > .dmtab")){ dmSyncDialogs(el); return; }
   dmNoteOpen(el);
-  el.innerHTML = html;
-  el.__dmHtml = html;
   gateDocker(el, off);
+  wireAdoptApps(el);
   // The asks answer through the phone's endpoint, which holds the one list of
   // them; phFetch redraws this tab when the answer comes back.
   el.querySelectorAll("[data-rallow]").forEach(b => b.onclick = () => {
@@ -2929,7 +3194,7 @@ function renderDockerInto(i){
   el.querySelectorAll("[data-rdeny]").forEach(b => b.onclick = () =>
     phFetch({action: "deny", id: Number(b.dataset.rdeny)}));
   const ck = el.querySelector("#bDockerCheck");
-  if (ck) ck.onclick = () => dmCheck(ck, dockerList?.node || dockerNode || "", () => { dockerRev++; loadDocker(); });
+  if (ck) ck.onclick = () => dmCheck(ck, dockerList?.node || dockerNode || "", () => { readMoved("docker"); loadDocker(); });
   const nb = el.querySelector("#bDockerNew");
   if (nb) nb.onclick = openNewContainer;
   // A chip narrows the list to one project's group (the chips rule): a
@@ -2937,23 +3202,19 @@ function renderDockerInto(i){
   el.querySelectorAll("[data-dmchip]").forEach(c => c.onclick = () =>
     // ...the groups it leaves fading through, as a page does (fadeThrough).
     chipMove(() => document.querySelector(".pane .doc.on .dmtab"), ".dmcard, .tbl > .row, .tbl .rows > .row",
-             () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
-  dmViewWire(el, () => fadeThrough(DM_PARTS, () => { dockerRev++; drawPanes(); }));
-  // The search redraws as it is typed, and keeps its focus and its caret
-  // across the redraw, which replaces the box.
+             () => { dmChip = c.dataset.dmchip; readMoved("docker"); drawPanes(); }));
+  dmViewWire(el, () => fadeThrough(DM_PARTS, () => { readMoved("docker"); drawPanes(); }));
+  // The search redraws as it is typed; the patch keeps the box, its focus
+  // and its caret.
   const sb = el.querySelector("#dmSearch");
   if (sb){
-    sb.oninput = () => {
-      dmSearch = sb.value; dmSearchCaret = sb.selectionStart; dmSearchAt = Date.now();
+    // A word an input method is still composing is filtered on once it is
+    // chosen (R244 step 4).
+    onTyping(sb, () => {
+      dmSearch = sb.value;
       clearTimeout(dmSearchTimer);
-      dmSearchTimer = setTimeout(() => { dockerRev++; drawPanes(); }, 120);
-    };
-    // ...never from under an open dialog: a redraw just after typing took
-    // the focus back from the one New container had opened (B872).
-    if (dmSearchCaret !== null && document.activeElement !== sb && dmSearchTouched()
-        && !document.querySelector(".modal:not([hidden])")){
-      sb.focus(); try{ sb.setSelectionRange(dmSearchCaret, dmSearchCaret); }catch(e){ /* a type that cannot */ }
-    }
+      dmSearchTimer = setTimeout(() => { readMoved("docker"); drawPanes(); }, 120);
+    });
   }
   // The wiring, fetched when the fold is opened and not before. It needs the
   // compose file parsed, which is the one thing overview() refuses to do for

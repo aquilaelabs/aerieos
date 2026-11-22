@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import catalogindex  # noqa: E402
 import catalogmirror  # noqa: E402
+import packformat  # noqa: E402
 import statefile  # noqa: E402
 import toolpacks  # noqa: E402
 
@@ -55,8 +56,9 @@ class Mirror(unittest.TestCase):
         was = catalogindex.PUB_FILE
         catalogindex.PUB_FILE = pubfile
         self.addCleanup(setattr, catalogindex, "PUB_FILE", was)
-        os.environ["BB_TOOLPACKS_FILE_URLS"] = "1"
-        self.addCleanup(os.environ.pop, "BB_TOOLPACKS_FILE_URLS", None)
+        for seam in ("BB_TOOLPACKS_FILE_URLS",):
+            os.environ[seam] = "1"
+            self.addCleanup(os.environ.pop, seam, None)
         self.state = os.path.join(self.d, "state")
         os.makedirs(self.state)
         catalogindex.configure(state=self.state)
@@ -88,11 +90,13 @@ class Mirror(unittest.TestCase):
             t.extractall(dest, filter="data")
         return {"files": 1}
 
-    def catalog(self, generated, sign_with=None):
-        """A catalog checkout: index.json pinning the pack, index.sig over it."""
+    def catalog(self, generated, sign_with=None, **more):
+        """A catalog checkout: index.json pinning the pack, index.sig over it.
+        `more` is what else the entry says."""
         c = tempfile.mkdtemp(dir=self.d)
         data = json.dumps({"version": 1, "generated": generated, "packs": [
-            {"name": "hexkit", "url": self.url, "commit": self.commit, "sha256": self.sha, "tier": "vetted", "about": "x", "platforms": ["linux/amd64"]}]}).encode()
+            {"name": "hexkit", "url": self.url, "commit": self.commit, "sha256": self.sha, "tier": "vetted", "about": "x", "platforms": ["linux/amd64"],
+             **more}]}).encode()
         with open(os.path.join(c, "index.json"), "wb") as f:
             f.write(data)
         with open(os.path.join(c, "index.sig"), "w") as f:
@@ -134,6 +138,32 @@ class Mirror(unittest.TestCase):
         self.assertTrue(r["index"]["mirror"])
         self.assertEqual([p["name"] for p in r["index"]["packs"]], ["hexkit"])
 
+    def test_a_mirror_holds_every_pin_an_entry_keeps(self):
+        # An entry that moved to a newer pack format keeps the pin of the
+        # one before: the mirror holds both commits, so it serves a build
+        # that reads the newer format and one that reads only the older.
+        with open(os.path.join(self.repo, "bbtool.json"), "w") as f:
+            json.dump({**PACK, "about": "Looks inside binaries, more closely."}, f)
+        git("commit", "-qam", "the pack, again", cwd=self.repo)
+        newer = git("rev-parse", "HEAD", cwd=self.repo)
+        tar = subprocess.run(["git", "archive", "--format=tar", newer], cwd=self.repo, capture_output=True, check=True).stdout
+        past = packformat.FORMAT + 1
+        arc = self.make(self.catalog("2026-10-29T10:00:00Z", commit=newer, sha256=hashlib.sha256(tar).hexdigest(), format=past,
+                                     older=[{"format": 1, "commit": self.commit, "sha256": self.sha, "platforms": ["linux/amd64"]}]))
+        with tarfile.open(arc) as t:
+            t.extractall(os.path.join(self.d, "look"), filter="data")
+        heads = catalogmirror._heads(os.path.join(self.d, "look", "catalog-mirror", "repos", f"{catalogmirror.key(self.url)}.bundle"))
+        self.assertEqual(heads, {self.commit, newer})
+        # This build reads the older pin alone, and installs it from the mirror.
+        self.assertTrue(catalogmirror.take(arc, 1000).get("ok"))
+        os.rename(self.repo, self.repo + ".gone")
+        e = catalogindex.named(catalogmirror.index(), "hexkit")
+        self.assertEqual(e["commit"], self.commit)
+        self.assertNotIn("error", toolpacks.fetch(self.url, e["commit"], sha256=e["sha256"]))
+        with mock.patch.object(packformat, "FORMAT", past):
+            self.assertEqual(catalogindex.named(catalogmirror.index(), "hexkit")["commit"], newer)
+            self.assertIsNotNone(catalogmirror.bundle(self.url, newer))
+
     def test_an_import_is_refused_unsigned_incomplete_or_older(self):
         other = ed25519.Ed25519PrivateKey.generate()
         self.assertIn("does not match", catalogmirror.take(self.make_unsigned(other), 1).get("error", ""))
@@ -150,6 +180,24 @@ class Mirror(unittest.TestCase):
         self.assertEqual(catalogmirror.held()["generated"], "2026-10-29T10:00:00Z", "the one held stands")
         self.assertEqual(catalogmirror.forget(), {"ok": True})
         self.assertIsNone(catalogmirror.held())
+
+    def test_an_import_is_measured_as_the_catalog_s_own_answer_is(self):
+        # One rule for two signed indexes (catalogindex.older), here and on
+        # the network: a mirror that does not say when it was made is not a
+        # way past the one held, one of the same moment is taken, and a
+        # word in the date's place does not hold every later mirror off.
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("2026-10-29T10:00:00Z")), 1).get("ok"))
+        for odd in ("x", "", "2026-10-30"):
+            self.assertEqual(catalogmirror.take(self.make(self.catalog(odd)), 2).get("error"),
+                             "not imported: it does not say when it was made, and the mirror held here was made 2026-10-29T10:00:00Z", repr(odd))
+        self.assertEqual(catalogmirror.take(self.make(self.catalog("2026-10-29T09:59:59Z")), 3).get("error"),
+                         "not imported: it was made 2026-10-29T09:59:59Z, before the mirror held here (2026-10-29T10:00:00Z)")
+        self.assertEqual(catalogmirror.held()["imported_at"], 1, "the one held stands")
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("2026-10-29T10:00:00Z")), 4).get("ok"), "the same moment is taken")
+        self.assertEqual(catalogmirror.forget(), {"ok": True})
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("zzzz")), 5).get("ok"), "with none held, a mirror with no date is taken")
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("2026-10-30T10:00:00Z")), 6).get("ok"), "and gives way to a dated one")
+        self.assertEqual(catalogmirror.held()["generated"], "2026-10-30T10:00:00Z")
 
     def test_an_archive_on_disk_is_taken_once_per_mirror(self):
         arc = self.make(self.catalog("2026-10-29T10:00:00Z"))

@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import agents
+import statefile
 
 # How many tabs the page will open. Each terminal tab is an iframe running a
 # full xterm.js with its own websocket, so this is a real ceiling on browser
@@ -63,10 +64,9 @@ def _layouts():
     last saved and handed to everybody else is fine for one operator and
     wrong the moment there are two.
     """
-    try:
-        v = json.loads(TABS_FILE.read_text())
-    except (OSError, ValueError):
-        v = {}
+    # Read once while it stays the same file (statefile.read_json, R228): the
+    # status poll asks every few seconds and the file moves on a layout save.
+    v = statefile.read_json(TABS_FILE, {}) if TABS_FILE is not None else {}
     if not isinstance(v, dict):
         v = {}
     if not isinstance(v.get("users"), dict):

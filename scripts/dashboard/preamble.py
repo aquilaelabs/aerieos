@@ -537,15 +537,18 @@ def _packs_on(project):
 
 def packs_line(project):
     """The tool packs a session here may use, said where it learns its
-    project, and the way to ask for one from the vetted catalog (R169 step
-    5) as the project's Install a tool pack dial says."""
+    project, and the way to ask for a tool on its node (R169 step 5), a
+    toolchain AerieOS ships or a pack of the vetted catalog, as the
+    project's Install a tool pack dial says."""
     on = _packs_on(project)
     try:
         mode = (prefs_mod.get(project) or {}).get("installpacks") or "ask" if prefs_mod and project else "ask"
     except Exception:                                                # noqa: BLE001
         mode = "ask"
-    ask = (f"`aerie tool search WORDS` looks through the vetted catalog's packs, and `aerie tool install NAME --why \"...\"` "
-           f"asks for one ({'refused here' if mode == 'deny' else 'added at once' if mode == 'auto' else 'a person answers on the bell'}: "
+    how = ("refused here" if mode == "deny" else "installed at once" if mode == "auto"
+           else "a person answers on the bell, and their Allow installs it")
+    ask = (f"`aerie tool search WORDS` looks through the vetted catalog, and `aerie tool install NAME --why \"...\"` "
+           f"asks for a toolchain AerieOS ships, or a pack of the catalog, on this session's node ({how}: "
            f"Install a tool pack is {mode}); a session never installs a pack on a node itself.")
     if not on:
         return ask

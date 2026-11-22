@@ -34,7 +34,8 @@ import tarfile
 import threading
 import time
 import urllib.parse
-from .base import hello_again, SHARE, log, log_once
+from .base import NotHeld, as_root, fs_holds, hello_again, SHARE, log, log_once, write_json
+from .names import VAR
 
 # What is not synced, the same set as the controller's (wssync.SKIP_DIRS
 # there; the unit tier holds the two equal).
@@ -46,12 +47,14 @@ SKIP_DIRS = {"node_modules", ".gradle", "__pycache__", ".venv", "venv", ".next",
 SKIP_UNDER = (".claude/worktrees",)
 TMP = ".bbsync-"
 MAX_FILE = 512 * 1024 * 1024
+GONE_EACH = 500                  # removals a call, under the controller's GONE_MAX
 TICK = 1.0
 # The fallback only: a project that moved on the controller is said in the
 # held work request and pulled at once. Every ten seconds per project was
 # 87 posts a minute at 0.44s each on a controller with two synced nodes,
 # most of its time (B643, 11 Oct), to learn nothing had changed.
 PULL_EVERY = 120.0
+CLAIM_EVERY = 600           # what root left in a tree is made its owner's at most this often
 ASK_EVERY = 30.0
 WALK_EVERY = 60.0        # a whole walk even with the watcher, for what it cannot see
 MOUNTED = ("something is mounted at /workspace, where this node's synced copy goes; "
@@ -269,6 +272,8 @@ class Project:
         self.error = ""
         self.watch = None         # its Watcher, once there is a tree to watch
         self.walked_at = 0.0
+        self.denied = False       # a change this tick was refused as the tree's owner
+        self.claimed_at = 0.0     # when what root left in the tree was last made its owner's
         try:
             with open(path) as f:
                 d = json.load(f)
@@ -278,10 +283,10 @@ class Project:
             pass
 
     def save(self):
-        tmp = self.path + ".new"
-        with open(tmp, "w") as f:
-            json.dump({"rev": self.rev, "ready": self.ready, "files": self.files}, f)
-        os.replace(tmp, self.path)
+        # The agent's own record, kept where only root writes: root's file
+        # identity for it, in the middle of work done as the tree's owner.
+        with as_root():
+            write_json(self.path, {"rev": self.rev, "ready": self.ready, "files": self.files})
 
 
 class WorkspaceSync:
@@ -365,7 +370,7 @@ class WorkspaceSync:
         return out
 
     def record_dir(self):
-        data = ((self.agent.state.get("stores") or {}).get("data")) or "/var/lib/builderbot/data"
+        data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
         d = os.path.join(data, "sync")
         os.makedirs(d, exist_ok=True)
         return d
@@ -468,7 +473,7 @@ class WorkspaceSync:
         return self.cleaned or None
 
     def cleaned_path(self):
-        data = ((self.agent.state.get("stores") or {}).get("data")) or "/var/lib/builderbot/data"
+        data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
         return os.path.join(data, "sync-cleaned.json")
 
     def clean(self, token):
@@ -505,9 +510,7 @@ class WorkspaceSync:
                         os.remove(rec)
         self.cleaned = {"token": token, "freed": freed, "error": err}
         with contextlib.suppress(OSError):
-            with open(self.cleaned_path() + ".new", "w") as f:
-                json.dump(self.cleaned, f)
-            os.replace(self.cleaned_path() + ".new", self.cleaned_path())
+            write_json(self.cleaned_path(), self.cleaned)
         log(f"sync: /workspace cleaned up, {freed // (1024 * 1024)} MB freed" if not err
             else f"sync: /workspace not cleaned up whole ({freed // (1024 * 1024)} MB freed): {err}")
         hello_again(self.agent, "/workspace was cleaned up")
@@ -519,6 +522,56 @@ class WorkspaceSync:
         return os.path.join(self.root, name)
 
     def one(self, p):
+        """One project brought in step, its file work done as the tree's
+        owner and not as root (base.acting_as): a session writes this tree,
+        and root opening a path in it followed whatever the session had put
+        there, a link at .bbsync-NAME.part above all (the audit of 13 Nov).
+        Where this machine does not do that as the owner, nothing is done
+        and the project says why (fs_holds)."""
+        try:
+            held = fs_holds(self.owner())
+        except NotHeld as ex:
+            p.error = str(ex)[:200]
+            return
+        with held:
+            self._one(p)
+            # Refused as the owner: something in the tree is root's (a
+            # container wrote it, or this agent did before it worked as the
+            # owner). Made the owner's, at most every ten minutes, and the
+            # change is tried again on the next tick.
+            if p.denied:
+                p.denied = False
+                if time.monotonic() - p.claimed_at > CLAIM_EVERY:
+                    p.claimed_at = time.monotonic()
+                    with as_root():
+                        took = self.claim(self.top(p.name))
+                    if took:
+                        log(f"sync: {p.name}: {took} entries in its tree were root's and are its owner's now")
+                        p.hinted = True
+
+    def claim(self, top):
+        """What root left in this tree made the tree owner's, so its owner
+        can change it: only what is root's, each by its folder's descriptor
+        and never through a link, so nothing outside the tree can be named.
+        How many it took."""
+        own = self.owner()
+        if not own or not os.path.isdir(top) or os.path.islink(top):
+            return 0
+        took = 0
+        try:
+            for _d, dirs, files, dfd in os.fwalk(top, follow_symlinks=False):
+                for name in (".", *dirs, *files) if _d == top else (*dirs, *files):
+                    try:
+                        if os.stat(name, dir_fd=dfd, follow_symlinks=False).st_uid == 0:
+                            os.chown(name, own[0], own[1], dir_fd=dfd, follow_symlinks=False)
+                            took += 1
+                    except OSError:
+                        continue
+        except OSError:
+            pass
+        return took
+
+    def _one(self, p):
         top = self.top(p.name)
         started = time.time()
         if not p.ready:
@@ -568,15 +621,23 @@ class WorkspaceSync:
             # Each folder made on the way the tree owner's, not the top's
             # alone: a worktree's unit made .worktrees/PROJECT as root, and an
             # account's own user, its tree mapped to it, could make no
-            # worktree beside it (B356).
-            made, up = [], cur
-            while up and not os.path.isdir(up) and up.startswith(self.root.rstrip("/") + "/"):
-                made.append(up)
-                up = os.path.dirname(up)
-            os.makedirs(cur, exist_ok=True)
-            if own:
-                for d in made:
-                    os.lchown(d, *own)
+            # worktree beside it (B356). Root's to make, since the folder
+            # they go in may be root's, and so held to real folders all the
+            # way down from the root: a link on the way is refused.
+            with as_root():
+                made, up = [], cur
+                while up and not os.path.isdir(up) and up.startswith(self.root.rstrip("/") + "/"):
+                    made.append(up)
+                    up = os.path.dirname(up)
+                walked = self.root.rstrip("/")
+                for part in [x for x in os.path.relpath(up, walked).split("/") if x and x != "."]:
+                    walked = os.path.join(walked, part)
+                    if os.path.islink(walked):
+                        raise OSError(f"{walked} is a link, so nothing is made under it")
+                os.makedirs(cur, exist_ok=True)
+                if own:
+                    for d in made:
+                        os.lchown(d, *own)
         for part in [x for x in rel_dir.split("/") if x]:
             cur = os.path.join(cur, part)
             if not os.path.isdir(cur):
@@ -590,12 +651,20 @@ class WorkspaceSync:
         d, _, name = rel.rpartition("/")
         self.mkdirs(top, d)
         tmp = os.path.join(top, d, f"{TMP}{name}")
+        # The file the download is written to, opened here first: a folder
+        # this tree's owner may not write (a container left it root's), or a
+        # link left at the name, is refused by name and as what it is. The
+        # download swallowed it and this said "the controller answered 0",
+        # so nothing knew to hand the folder to the tree's owner.
+        with open(tmp + ".part", "wb"):
+            pass
         q = urllib.parse.urlencode({"project": p.name, "path": rel})
-        code, _ = self.agent.ctl.fetch(f"sync-file?{q}", tmp, timeout=600)
+        code, why = self.agent.ctl.fetch(f"sync-file?{q}", tmp, timeout=600)
         if code != 200:
-            with contextlib.suppress(OSError):
-                os.remove(tmp)
-            raise OSError(f"{rel}: the controller answered {code}")
+            for x in (tmp, tmp + ".part"):
+                with contextlib.suppress(OSError):
+                    os.remove(x)
+            raise OSError(f"{rel}: the controller answered {code}" if code else f"{rel} was not fetched: {why}")
         got = sha_file(tmp)
         os.chmod(tmp, mode or 0o644)
         own = self.owner()
@@ -689,6 +758,7 @@ class WorkspaceSync:
                     self.agree(p, top, rel, got)
             except OSError as ex:
                 p.error = str(ex)[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
                 return
             p.copying -= 1
         p.rev, p.ready, p.error, p.copying = int(r.get("rev") or 0), True, "", 0
@@ -701,15 +771,20 @@ class WorkspaceSync:
         owned by the session account. Paths that would leave the tree, and
         anything but files, directories and links inside it, are refused."""
         # A worktree's name has slashes in it: its file sits beside its record.
-        tmp = os.path.join(self.record_dir(), "." + p.name.replace("/", "%") + ".tar")
+        # The download is kept where only root writes, and opened as root;
+        # what it holds is then laid out as the tree's owner.
+        with as_root():
+            tmp = os.path.join(self.record_dir(), "." + p.name.replace("/", "%") + ".tar")
         q = urllib.parse.urlencode({"project": p.name})
         try:
-            code, _ = self.agent.ctl.fetch(f"sync-tar?{q}", tmp, timeout=3600)
-            if code != 200:
-                raise OSError(f"the controller answered {code}")
+            with as_root():
+                code, _ = self.agent.ctl.fetch(f"sync-tar?{q}", tmp, timeout=3600)
+                if code != 200:
+                    raise OSError(f"the controller answered {code}")
+                opened = tarfile.open(tmp)                     # noqa: SIM115 (closed by the with below)
             self.mkdirs(top, "")
             own = self.owner()
-            with tarfile.open(tmp) as tar:
+            with opened as tar:
                 for m in tar:
                     name = m.name
                     if name.startswith("/") or ".." in name.split("/") or skipped(name):
@@ -741,7 +816,7 @@ class WorkspaceSync:
                     if own:
                         os.lchown(dest, *own)
         finally:
-            with contextlib.suppress(OSError):
+            with as_root(), contextlib.suppress(OSError):
                 os.remove(tmp)
 
     def pull(self, p, top):
@@ -785,6 +860,7 @@ class WorkspaceSync:
                     self.agree(p, top, rel, got)
             except OSError as ex:
                 p.error = str(ex)[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
                 held.append(rel)
         if not held:
             moved |= p.rev != int(r.get("rev") or p.rev)
@@ -834,6 +910,19 @@ class WorkspaceSync:
         ready = {k: v for k, v in moved.items() if k in p.moving and p.moving[k] == v}
         p.moving = {k: v for k, v in moved.items() if k not in ready}
         changed = False
+        # Removals go up together when there are several (B789): after a
+        # git gc packs the loose objects a tick holds thousands, and one
+        # request each kept every relayed verb waiting for many minutes.
+        gone = [(rel, e) for rel, e in sorted(ready.items()) if e is None and rel in p.files]
+        if len(gone) > 1:
+            try:
+                changed = self.put_gone(p, top, gone)
+            except Exception as ex:                  # noqa: BLE001 (as one path's failure, B806)
+                p.error = f"removals: {type(ex).__name__}: {ex}"[:200]
+                for rel, e in gone:
+                    p.moving[rel] = e
+            sent = {rel for rel, _ in gone}
+            ready = {k: v for k, v in ready.items() if k not in sent}
         for rel, e in sorted(ready.items()):
             rec = p.files.get(rel)
             base = rec[0] if rec else ""
@@ -851,11 +940,23 @@ class WorkspaceSync:
                 p.files[rel] = [sha, *e]          # touched, not changed
                 changed = True
                 continue
-            if self.put(p, top, rel, e, base, sha):
+            try:
+                sent = self.put(p, top, rel, e, base, sha)
+            except Exception as ex:                  # noqa: BLE001 (one path never stops the rest)
+                # One path that cannot be sent is that path's: said as the
+                # project's error, counted as pending, and the pass goes on
+                # to the paths after it. Raised out of here, it ended the
+                # pass with nothing counted, so every change sorted after it
+                # waited unsaid and the state said nothing pending (B806).
+                p.error = f"{rel}: {type(ex).__name__}: {ex}"[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
+                log_once(f"sync-put-{p.name}-{rel}", f"sync: {p.name}: {p.error}")
+                sent = False
+            if sent:
                 changed = True
             else:
-                # Not sent (the controller away, a refusal): still waiting,
-                # tried again next tick and counted as pending meanwhile.
+                # Not sent (the controller away, a refusal, a failure here):
+                # still waiting, tried again next tick and counted as pending.
                 p.moving[rel] = e
         if changed:
             p.save()
@@ -871,11 +972,54 @@ class WorkspaceSync:
             q["mode"] = str(e[2])
         url = "sync-put?" + urllib.parse.urlencode(q)
         if e is None or e[3]:
-            empty = os.path.join(self.record_dir(), ".empty")
-            open(empty, "wb").close()
-            code, r = self.agent.ctl.upload(url, empty, timeout=60)
+            # A removal or a link carries no bytes: what goes up is an empty
+            # file of the agent's own, beside its records, written and read
+            # as root. As the tree's owner it was refused there, so a file
+            # removed on a node, or a link changed, never reached the
+            # controller, and stopped every change sorted after it.
+            with as_root():
+                empty = os.path.join(self.record_dir(), ".empty")
+                open(empty, "wb").close()
+                code, r = self.agent.ctl.upload(url, empty, timeout=60)
         else:
             code, r = self.agent.ctl.upload(url, path, timeout=600)
+        return self.took(p, top, rel, e, sha, code, r)
+
+    def put_gone(self, p, top, gone):
+        """Several removals in one call each GONE_EACH (the controller's
+        sync action gone), each answer taken as a single put's is. A
+        controller without the action is sent them one at a time. Whether
+        any was taken."""
+        changed = False
+        for i in range(0, len(gone), GONE_EACH):
+            chunk = gone[i:i + GONE_EACH]
+            code, r = self.agent.ctl.call("sync", {"action": "gone", "project": p.name,
+                                                   "paths": [[rel, p.files[rel][0]] for rel, _ in chunk]}, timeout=300)
+            res = r.get("results") if code == 200 and isinstance(r, dict) else None
+            if isinstance(res, list) and len(res) == len(chunk):
+                pairs = [(rel, e, int(x.get("code") or 0) if isinstance(x, dict) else 0, x if isinstance(x, dict) else {})
+                         for (rel, e), x in zip(chunk, res, strict=True)]
+            elif code in (200, 400):
+                # No such action there: one at a time, as before.
+                for rel, e in chunk:
+                    if self.put(p, top, rel, e, p.files[rel][0], ""):
+                        changed = True
+                    else:
+                        p.moving[rel] = e
+                continue
+            else:
+                pairs = [(rel, e, code, r if isinstance(r, dict) else {}) for rel, e in chunk]
+            for rel, e, c, x in pairs:
+                if self.took(p, top, rel, e, "", c, x):
+                    changed = True
+                else:
+                    p.moving[rel] = e
+        return changed
+
+    def took(self, p, top, rel, e, sha, code, r):
+        """The controller's answer to one change sent up, taken: the record
+        moved on, a conflict taken in, or the error kept. Whether it went."""
+        path = os.path.join(top, rel)
         if code != 200:
             p.error = f"{rel}: {r.get('error') or code}"[:200]
             return False
@@ -897,6 +1041,7 @@ class WorkspaceSync:
                     self.agree(p, top, rel, got)
             except OSError as ex:
                 p.error = str(ex)[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
             p.hinted = True
             return True
         if e is None:
@@ -904,4 +1049,16 @@ class WorkspaceSync:
         else:
             p.files[rel] = [sha, *e]
         p.error = ""
+        # The revision the controller is at now that it has this change. One
+        # past ours means this change and nothing else, so this copy is at
+        # it too; further means something else landed between, read on this
+        # same tick. Left for the next ask (half a minute apart), a verb that
+        # acts on the tree waited that long for this node's own change to
+        # come back to it: aerie git push after a commit, up to 28 seconds.
+        rev = r.get("rev")
+        if isinstance(rev, int) and not isinstance(rev, bool):
+            if rev == p.rev + 1:
+                p.rev = rev
+            elif rev > p.rev:
+                p.hinted = True
         return True

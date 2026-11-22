@@ -6,35 +6,26 @@
 // operator's window on all of it. Every assertion here goes through the queue
 // end to end (a job queued, placed, run, logged, ended), because the queue is
 // what this phase exists to prove.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet, OWNER, api, section, REPO, jobEnd } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+const auth = OWNER;
 const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined
-    ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
-const OVER = ['succeeded', 'failed', 'canceled'];
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
-  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }
+  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }   // the loop's own period
   return null;
 };
-const job = id => api(`/api/v1/jobs?id=${id}`);
+const job =id => api(`/api/v1/jobs?id=${id}`);
 // The store outlives a suite within one run, so the tab can carry another
 // suite's rows: an agent's, on a node with another name. The row checks
 // below are about the jobs THIS file queued.
 const mine = new Set();
 const exec = async body => { const q = await api('/api/v1/nodes', { action: 'exec', ...body }); if (q.job) mine.add(q.job); return q; };
-const settled = id => until(async () => { const j = await job(id); return OVER.includes(j.state) ? j : null; });
+const settled = id => jobEnd(id, { ms: 20000, step: 200 });
 
 // ---- a job on the local node, run by the controller itself ----------------
-{
+await section("a job on the local node, run by the controller itself", async () => {
   const q = await exec({ id: 'local',
     argv: ['sh', '-c', 'echo hi from $BUILDERBOT_NODE; echo err >&2; exit 0'] });
   ok(q.ok && /^j_/.test(q.job), `exec on local queues a job (${q.job})`);
@@ -45,19 +36,19 @@ const settled = id => until(async () => { const j = await job(id); return OVER.i
      'stdout and stderr both reach the log, with the node id in the env');
   ok(j && j.started && j.ended && j.ended >= j.started && j.error === '',
      'a job that succeeded carries its timings and no error');
-}
+});
 
 // ---- a failing one says why, in one line -----------------------------------
-{
+await section("a failing one says why, in one line", async () => {
   const q = await exec({ id: 'local',
     argv: ['sh', '-c', 'echo about to fail; exit 7'] });
   const j = await settled(q.job);
   ok(j && j.state === 'failed' && j.exit_code === 7 && j.error === 'exit 7',
      `a non-zero exit is failed, with the code as the reason (${j?.error})`);
-}
+});
 
 // ---- placement by selector: refused up front when nothing fits --------------
-{
+await section("placement by selector", async () => {
   const q = await exec({ argv: ['true'],
     select: { arch: 'riscv64' } });
   ok(q.error && /no node fits/.test(q.error) && /arch=riscv64/.test(q.error),
@@ -79,17 +70,17 @@ const settled = id => until(async () => { const j = await job(id); return OVER.i
         j && j.node}, ${j && j.state})`);
   ok(j && j.placement && j.placement.select && j.placement.select.arch === arch,
      'the row keeps the selector it was placed by, not only the answer');
-}
+});
 
 // ---- cancel: a running job is stopped, a queued one never starts ------------
-{
+await section("cancel: a running job is stopped, a queued one never starts", async () => {
   // local runs one at a time (concurrency 1): the second waits behind the first.
   const a = await exec({ id: 'local',
     argv: ['sh', '-c', 'echo started; sleep 60'] });
   const running = await until(async () => { const j = await job(a.job); return j.state === 'running' ? j : null; });
   ok(running !== null, 'a long job reaches running');
   const b = await exec({ id: 'local', argv: ['true'] });
-  await sleep(600);
+  await quiet(600);     // a start that must not come: time in which it could have
   const waiting = await job(b.job);
   ok(waiting.state === 'queued', 'a second job on the same node waits: concurrency is counted from the rows');
   const hz = await (await fetch(base + '/api/v1/healthz')).json();
@@ -108,10 +99,10 @@ const settled = id => until(async () => { const j = await job(id); return OVER.i
      `...and the row moves to canceled when the runner reports it stopped (${aj?.state})`);
   ok(aj && aj.ended - aj.started < 30,
      'the sleep was killed rather than waited out');
-}
+});
 
 // ---- /metrics: authenticated, prometheus text --------------------------------
-{
+await section("/metrics: authenticated, prometheus text", async () => {
   const anon = await fetch(base + '/metrics');
   ok(anon.status === 401, '/metrics wants the dashboard credential');
   const r = await fetch(base + '/metrics', { headers: auth });
@@ -121,24 +112,24 @@ const settled = id => until(async () => { const j = await job(id); return OVER.i
      && /builderbot_jobs\{state="canceled"\} [1-9]/.test(text)
      && /builderbot_nodes\{state="online"\}/.test(text),
      'it counts jobs by state and nodes by state, in the exposition format');
-}
+});
 
 // ---- the list, and its filters ----------------------------------------------
-{
+await section("the list, and its filters", async () => {
   const all = await api('/api/v1/jobs?n=50');
   ok(all.jobs.length >= 5 && all.nodes.local === 'controller'
      && all.jobs.every((j, i) => i === 0 || j.queued <= all.jobs[i - 1].queued),
      'the list is newest first and names the nodes');
   const act = await api('/api/v1/jobs?active=1');
   ok(act.jobs.length === 0, '...and active=1 is empty once everything has ended');
-}
+});
 
 // ---- the tab ----------------------------------------------------------------
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
-{
+await section("The tab at a glance", async () => {
   await page.evaluate(() => { const c = document.getElementById('cardTools');
     if (c?.classList.contains('closed')) c.querySelector('h2').click(); });
   await page.evaluate(() => openJobsTab());
@@ -242,21 +233,26 @@ await ready(page);
   ok(true, '#/jobs/failed opens the page narrowed to the failed jobs');
   // B113: Home's "N failed today" opens on what it counted, not on every
   // failure: a failure from yesterday is under Failed and not here.
-  await page.evaluate(() => {
+  await page.evaluate(() => { location.hash = '#/jobs/failed-today'; });
+  await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
+  // Put in once a read of the list already out has landed, then drawn and
+  // read in the same task: a read landing after it took it out again, and
+  // Failed counted one fewer (B739).
+  const today = await page.evaluate(async () => {
+    await readingOf('jobs').busy;
     const y = { id: 'j_yesterday', type: 'exec', state: 'failed', queued: jobsToday() - 7200, ended: jobsToday() - 3600, spec: {} };
     if (!jobsList.some(j => j.id === y.id)) jobsList.push(y);
-    jobsRev++;
-    location.hash = '#/jobs/failed-today';
+    readMoved('jobs');
+    drawPanes();
+    return {
+      rows: [...document.querySelectorAll('.jobstab .jbrow:not(.fghost)')].map(r => [r.dataset.job, r.dataset.state]),
+      chip: document.querySelector('.jobstab [data-jbshow="failed-today"] .pill')?.textContent,
+      failed: document.querySelector('.jobstab [data-jbshow="failed"] .pill')?.textContent };
   });
-  await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
-  const today = await page.evaluate(() => ({
-    rows: [...document.querySelectorAll('.jobstab .jbrow:not(.fghost)')].map(r => [r.dataset.job, r.dataset.state]),
-    chip: document.querySelector('.jobstab [data-jbshow="failed-today"] .pill')?.textContent,
-    failed: document.querySelector('.jobstab [data-jbshow="failed"] .pill')?.textContent }));
   ok(today.rows.length && today.rows.every(([id, s]) => s === 'failed' && id !== 'j_yesterday')
      && Number(today.chip) === today.rows.length && Number(today.failed) === today.rows.length + 1,
      `#/jobs/failed-today lists today's failures alone, under a chip whose count is the rows shown (${JSON.stringify(today)})`);
-  await page.evaluate(() => { jobsList = jobsList.filter(j => j.id !== 'j_yesterday'); jobsRev++; jobsShowSet(''); drawPanes(); shellSync(); });
+  await page.evaluate(() => { jobsList = jobsList.filter(j => j.id !== 'j_yesterday'); readMoved('jobs'); jobsShowSet(''); drawPanes(); shellSync(); });
 
   // A kind with no command of its own says what it did, where a storage
   // walk read as a bare "exec" (B70).
@@ -301,14 +297,14 @@ await ready(page);
   });
   ok(/^since \d{1,2}:\d\d/.test(when[0]) && /^queued \d{1,2}:\d\d/.test(when[1]) && when[2] === 'just now',
      `a running or waiting job says the time it began, an ended one how long ago (${when.join(' | ')})`);
-}
+});
 
 // aerie jobs reads the same listing the tab does, through the API as the
 // caller: an administrator sees every job, and a session its own project's
 // and no other, by name or by id (B317: it read the store directly, which
 // on the machine holding the controller's state showed a session every
 // project's jobs).
-{
+await section("aerie jobs reads the same listing the tab does, through the API as the", async () => {
   const admin = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_AUTH: 'test:test',
                   BB_CONTROLLER: base, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
   const bbj = (...a) => execFileSync('bash', ['scripts/aerie', 'jobs', ...a], { encoding: 'utf8', cwd: REPO, env: admin });
@@ -331,7 +327,7 @@ await ready(page);
   ok(/no such job/.test(missing), '...and an id that is not there says so rather than listing everything');
   // As a session of alpha: its project's jobs only, and another project's
   // job by id is "no such job", the same answer a typo gets.
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const H = OWNER;
   // One of beta's, so there is something to keep out of alpha's view.
   await exec({ id: 'local', project: 'beta', argv: ['true'] });
   const all = (await (await fetch(base + '/api/v1/jobs?n=100', { headers: H })).json()).jobs || [];
@@ -368,9 +364,9 @@ await ready(page);
   const two = bbs('-n', '2').trim().split('\n').filter(l => /^\s*j_/.test(l));
   ok(two.length === 2 && two.some(l => l.includes(box.job)) && two.some(l => l.includes(own.job)),
      `aerie jobs -n 2 is the session's own last two, whatever else the node ran since (${two.map(l => l.trim().slice(0, 12)).join(', ')})`);
-}
+});
 
-{
+await section("An address set by hand while a draw runs before its hashchange", async () => {
   // An address set by hand while a draw runs before its hashchange (a poll
   // landing between them) still opens its page, not the one being left
   // (B303: #/jobs opened Build > Phone on the dev pair).
@@ -380,7 +376,7 @@ await ready(page);
     const at = await page.evaluate(() => [location.hash, routeOf(tabOf(panes[0]))]);
     ok(at[0] === to && at[1] === to, `${to} set by hand with a draw before its hashchange opens ${to} (${at.join(' | ')})`);
   }
-}
+});
 
 ok(page.errors.length === 0,
    `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);

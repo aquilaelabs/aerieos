@@ -25,8 +25,9 @@ Where they differ is how each takes those, in its own form:
   account's hooks file for it, every one running the same list. Codex's
   are trusted for each launch by the hashes Codex reports for them.
 - **The conversations**: each agent keeps its own transcripts, listed on a
-  space's Sessions view with the agent named, and Start agent's menu
-  offers each agent's last one to resume.
+  space's Sessions view with the agent named, where each can be given a
+  label and a note and be kept past its agent's own cleanup; Start agent's
+  menu offers them all in one pulldown to resume.
 - **The sign-in**: each agent's, per account and per node, on the Agents
   page (see [below](#the-agents-on-a-node-and-their-sign-in)).
 
@@ -103,7 +104,7 @@ runs against the latest the controller knows, asked on the toolchains' own
 clock (weekly, when a node starts, and on **Check for updates**). Until it
 is installed no Claude session starts there: the space's Start agent
 is ghosted with the reason, and the terminal refuses with the same
-sentence. Press **Install** or **Update** there to install or update it:
+sentence. Press **Install** or **Software update** there to install or update it:
 that ends every Claude session on the node first, then the agent runs the
 installer as the session account and, on a managed node, pins the binary
 where the account cannot write it, so `claude update` typed in a session
@@ -118,7 +119,8 @@ signed in there, with a button to the Installed page.
 
 **ChatGPT's Codex CLI and Copilot CLI are installed the same way**, each
 from its own card on the Library and its row on the Installed page: Install, Update and Remove run the
-vendor's installer as the session account and pin the binary on a managed
+agent's install recipe as the session account, what it downloads held to
+a sha256 the recipe carries, and pin the binary on a managed
 node, and an agent's update holds its starts there until it ends. A space
 whose agent is missing on its node offers Install for that agent in place
 of Start agent.
@@ -214,6 +216,32 @@ root-owned managed policy file outranks it.
 into the wrong tree by mistake, which is the common failure, and Bash is not
 under it.
 
+**Nothing a session wrote runs outside its view, and an account enters only
+what it was granted.** The view is entered by a launcher that runs as the
+account's own user outside it, with the account's home, which the
+account's sessions write. Three things keep that from being a way out:
+
+- *The terminal server reads AerieOS's settings alone.* An account's tmux
+  server on a node starts on the settings AerieOS ships and does not read
+  `~/.tmux.conf`, and the launcher's own git calls read no global
+  configuration. Inside a session both are the account's as ever.
+- *A worktree is made empty and filled inside the view.* `bb-session
+  worktree` runs git as the tree's owner outside every view, and laying a
+  worktree's files out runs whatever the repository's own configuration
+  names (a filter, a hook), which a session of the space can write. So it
+  makes the worktree with no files, and the session that first enters it
+  lays them out, where what runs is the session's own.
+- *Entering is held to the controller's grant.* Every terminal on a node
+  starts with the controller's grant for it: the account, the space, and
+  what that space reads, works in and sees. The root helper keeps each
+  grant where only root writes (`/run/bb-session/grants`, gone at a
+  restart with the sessions), and an account's own user enters a space
+  only with one, asking for no more than it names.
+
+Inside one space the members share a repository, so one member can still
+have git run something as another member inside that space. The boundary
+here is the view and the space, not the members of one space.
+
 **The hard boundary is the session's view (roadmap R35).** Every session on a
 node runs as one account and the node holds every space bound to it, so file
 permissions cannot keep spaces apart. On a Linux node provisioned as a
@@ -238,7 +266,7 @@ out: a directory that holds one of the view's own places (the toolchain
 store under `/mnt`, say) is covered and that place put back inside it, and
 one that holds none is hidden whole, with the mounts inside either let go so
 the mount table names no export. The agent's own directory
-(`/var/lib/builderbot`) is covered the same way, so other spaces' build
+(`/var/lib/aerieos`) is covered the same way, so other spaces' build
 caches, their containers' data and the agent's tools are not there. The
 base home, which belongs to the account every session runs as, is new in
 the view and holds what a session runs from it, read-only: the launchers on

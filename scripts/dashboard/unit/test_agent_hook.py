@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import shutil
 import tempfile
 import unittest
@@ -66,16 +67,29 @@ class Runs(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.d, True)
         self.log = os.path.join(self.d, "log")
         # A stand-in for every hook: records its argv and what it read, and
-        # refuses a command with "rm -rf" in it the way bb-rule-hook does.
+        # refuses each in the real one's own way, which is what Claude Code
+        # reads: bb-rule-hook a command with "rm -rf" in it as a denial on
+        # stdout, bb-gate one with "held" in it as exit 2 and its sentence,
+        # bb-check-relay a stop while a check fails as a block on stdout.
         stub = os.path.join(self.d, "hook")
         with open(stub, "w") as f:
-            f.write("#!/usr/bin/env python3\nimport json, sys\nd = json.load(sys.stdin)\n"
+            f.write("#!/usr/bin/env python3\nimport json, os, sys\nd = json.load(sys.stdin)\n"
                     f"open({self.log!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n"
-                    "if sys.argv[1:2] == ['guard'] and 'rm -rf' in (d.get('tool_input') or {}).get('command', ''):\n"
-                    "    print('a rule refuses rm -rf here', file=sys.stderr); sys.exit(2)\n"
+                    "me, cmd = os.path.basename(sys.argv[0]), (d.get('tool_input') or {}).get('command', '')\n"
+                    "if sys.argv[1:2] == ['guard'] and 'rm -rf' in cmd:\n"
+                    "    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',\n"
+                    "                                             'permissionDecisionReason': 'a rule refuses rm -rf here'}}))\n"
+                    "if me == 'bb-gate' and 'held' in cmd:\n"
+                    "    print('this session is held', file=sys.stderr); sys.exit(2)\n"
                     "if sys.argv[1:2] == ['prompt']:\n"
-                    "    print(json.dumps({'hookSpecificOutput': {'additionalContext': 'RULE TEXT'}}))\n")
+                    "    print(json.dumps({'hookSpecificOutput': {'additionalContext': 'RULE TEXT'}}))\n"
+                    f"if me == 'bb-check-relay' and os.path.exists({self.d!r} + '/failing') and not d.get('stop_hook_active'):\n"
+                    "    print(json.dumps({'decision': 'block', 'reason': 'the tests fail: fix them'}))\n")
         os.chmod(stub, 0o755)
+        # The marks a stop leaves are under the account's home.
+        home = mock.patch.dict(os.environ, {"HOME": self.d})
+        home.start()
+        self.addCleanup(home.stop)
         # ...under each script's own name, in a directory of its own.
         hooks = os.path.join(self.d, "hooks")
         os.mkdir(hooks)
@@ -101,6 +115,40 @@ class Runs(unittest.TestCase):
         code, out, err = self.call("codex", "pre", {"tool_name": "shell", "tool_input": {"command": ["bash", "-lc", "rm -rf /"]}})
         self.assertEqual((code, err.strip()), (2, "a rule refuses rm -rf here"))
         self.assertEqual(self.ran(), [["alpha", "u_0123abcd"], ["guard", "alpha"]])
+
+    def test_the_gate_s_refusal_exit_2_and_its_sentence_is_passed_on_too(self):
+        code, _, err = self.call("codex", "pre", {"tool_name": "shell", "tool_input": {"command": ["bash", "-lc", "held here"]}})
+        self.assertEqual((code, err.strip()), (2, "this session is held"))
+        self.assertEqual(self.ran(), [["alpha", "u_0123abcd"]], "the guards after it are not asked")
+
+    def test_before_a_tool_the_guards_run_in_this_process(self):
+        # R228 step 17: each guard was a python of its own before every tool
+        # call. A refusal is passed on as before, and nothing was started.
+        real = self.h.subprocess.run
+        started = []
+        self.h.subprocess.run = lambda *a, **k: started.append(a) or real(*a, **k)
+        self.addCleanup(setattr, self.h.subprocess, "run", real)
+        code, out, _ = self.call("codex", "pre", {"tool_name": "shell", "tool_input": {"command": "rm -rf /tmp/x"}})
+        self.assertEqual(code, 2)
+        self.assertEqual(started, [])
+        self.assertEqual(self.ran(), [["alpha", "u_0123abcd"], ["guard", "alpha"]])
+        # ...while a prompt's steps, which may wait a long time, keep theirs.
+        self.call("codex", "prompt", {"prompt": "hello"})
+        self.assertTrue(started)
+
+    def test_a_stop_a_check_sends_back_is_refused_once_a_turn_whether_the_agent_says_so_or_not(self):
+        open(os.path.join(self.d, "failing"), "w").close()
+        sid = "0199aaaa-bbbb-7ccc-8ddd-eeeeffff0001"
+        for agent, stop in (("codex", {"session_id": sid}), ("grok", {"sessionId": sid}), ("open", {"session_id": sid})):
+            code, _, err = self.call(agent, "stop", stop)
+            self.assertEqual((code, err.strip()), (2, "the tests fail: fix them"), agent)
+            self.assertEqual(self.call(agent, "stop", stop)[0], 0, f"{agent}: sent back once, then let go")
+            self.assertEqual(self.call(agent, "stop", stop)[0], 2, f"{agent}: the stop after that is checked afresh")
+            self.call(agent, "stop", stop)
+        code, _, err = self.call("codex", "stop", {})
+        self.assertEqual(code, 0, "no conversation to remember it by: never looped")
+        os.unlink(os.path.join(self.d, "failing"))
+        self.assertEqual(self.call("codex", "stop", {"session_id": sid})[0], 0)
 
     def test_copilot_is_told_deny_in_its_own_words(self):
         code, out, _ = self.call("copilot", "pre", {"toolName": "bash", "toolArgs": {"command": "rm -rf build"}})
@@ -177,8 +225,29 @@ class OneList(unittest.TestCase):
             m = group.get("matcher")
             if m is not None and m != matcher and not (tool and re.fullmatch(m, tool)):
                 continue
-            out += [x["command"] for x in group["hooks"]]
+            # The gate's command carries what refuses when it cannot be run
+            # (closed); what it runs is the part before that.
+            out += [x["command"].split("; r=$?;")[0] for x in group["hooks"]]
         return out
+
+    def test_the_gate_refuses_when_it_cannot_be_run_and_is_itself_otherwise(self):
+        gate = self.settings["PreToolUse"][0]["hooks"][0]["command"]
+        self.assertIn("bb-gate alpha u_x; r=$?;", gate)
+
+        def run(command):
+            return subprocess.run(["sh", "-c", command], input="{}", capture_output=True, text=True)
+        gone = run(self.h.closed("/nonexistent/bb-gate alpha u_x"))
+        self.assertEqual(gone.returncode, 2, "a gate that is not there is a refusal, not a hook passed over")
+        self.assertIn("guard could not be run in this session", gone.stderr)
+        barred = os.path.join(tempfile.mkdtemp(), "bb-gate")
+        open(barred, "w").close()
+        self.assertEqual(run(self.h.closed(barred)).returncode, 2, "nor one that may not be run")
+        self.assertEqual(run(self.h.closed("true")).returncode, 0)
+        held = run(self.h.closed("sh -c 'echo the controller is away >&2; exit 2'"))
+        self.assertEqual((held.returncode, held.stderr.strip()), (2, "the controller is away"), "its own refusal goes through as it is")
+        self.assertEqual(run(self.h.closed("sh -c 'exit 1'")).returncode, 1)
+        others = [x["command"] for ev, groups in self.settings.items() for g in groups for x in g["hooks"] if "r=$?" not in x["command"]]
+        self.assertTrue(others and all("exit 2" not in c for c in others), "only the gate before a tool refuses this way")
 
     def test_claude_runs_what_the_other_agents_run_for_every_event_and_tool(self):
         tools = [None, "Bash", "Edit", "Write", "Grep", "Read"]

@@ -72,6 +72,128 @@ image tags people follow are not. A tag pushes the image under its exact
 version alone (`:0.9.0`, `:0.9.0-dev.N`), and publishing it moves `:dev`,
 and for a stable release `:latest` and `:0.9` too.
 
+AerieOS's own dev builds are published by CI, not by a press, and in two
+runs. The tag's own run builds every file it can, attests each one, and
+its last job makes the draft with them: the controller bundle, the OS
+image and the stick's, the companion's files, and one line naming the
+container image the tag pushed by its digest (`aerieos-image-VER.digest`).
+The Android app is not among them: that run hands it over unsigned, and the
+controller signs it with the app's own key and attaches it afterwards,
+minutes to hours later. Once it has, the controller starts the second run,
+`seal-release.yml`, for the tag and on the tag. That run makes the
+release's signed list of its files, which can only be made over every
+file: it checks that the release carries all of them, that the tag still
+names the commit it runs on, that each file's bytes match the sha256
+beside it and its build attestation by the workflow that builds it, and
+that the Android app, which no build attests, is signed by a certificate
+`config/apk-signers` names; then it signs `SHA256SUMS` with the release
+build's key, attaches it with `SHA256SUMS.sig`, and publishes the release,
+a pre-release and never the latest (`tools/release-attach.sh
+--publish-when-whole`). A release short of a file, or with a file nothing
+vouches for, is not sealed and stays a draft, with the reason in the run.
+A build whose image job fails makes no release at all. A stable release is
+not sealed or published this way: its key's holder signs its list on their
+own machine and its owner reads it first, as above.
+
+When the controller was down, or could not start the run (the bell says so,
+and the Signing view), a person starts it: the repository's Actions page,
+**seal release**, **Run workflow**, from the tag, with the tag typed as its
+input. Run again for a release that is sealed and published, it makes the
+same list and changes nothing. Run after a file was replaced (the Android
+app signed again with `aerie sign release --again`), it says what changed
+in a warning on the run and replaces the list.
+
+Two things the controller's start of it needs, as `aerie version rehearse`
+does: the space's token allowed to start workflows (Actions, write), and
+`seal-release.yml` on the repository's default branch, since GitHub starts
+a workflow by its file's name only once the default branch carries it.
+A release is refused before its tag while the default branch lacks it,
+saying so, since it would stay a draft; one tagged before that check is
+sealed from the Actions page once the file has reached main.
+
+### The release key on GitHub
+
+The key CI signs with (the agent's signature and a dev build's list) is
+the repository's secret `AERIEOS_RELEASE_KEY`. Two jobs read it: `signature`
+in the tag's run, which signs the agent once for the image, the bundle and
+the OS image, and `seal` in `seal-release.yml`. A push to main, the weekly
+rebuild, a run by hand and a branch's OS image build do not read it and
+ship the agent unsigned, as a branch always did; a tag whose agent does not
+carry the committed key's signature fails. Both jobs name the environment
+`release`, and the library they use the key with is installed from
+`tools/release-requirements.txt`, each file held to its hash, in a step
+that holds no secret.
+
+**What the workflow files hold, and what only GitHub's settings do.** A
+tag's run uses the tag's own copy of every workflow file, so whoever may
+push a `v*` tag writes the job that reads the key. The files hold what a
+file can: the job that holds the key asks, before the step that reads it,
+where the tag's commit is, by the default branch's copy of the rule
+(`tools/release-place.sh` and `tools/release-branches`: a dev build on
+`main` or a release's working branch, each a pattern a branch's whole name
+matches, a stable release or a candidate on `main` alone), so a tag on a
+stray commit signs nothing, and a default branch that does not carry the
+two files signs nothing at all, the tag's own copy never asked in their
+place (the rehearsal says when `main` lacks them or holds other copies);
+a release's files
+are attested on hosted runners, and the seal holds each attestation to the
+tag's commit and to a hosted runner (`tools/release-sign.py`); the Android
+app a release carries is built on a hosted runner, not on the machine a
+pull request's checks run on, and a rehearsal builds it there too; and the
+image tags people follow move only
+onto the digest a published, sealed release's signed list names. None of
+that stops a tag that rewrites the workflow itself. These settings do,
+each made once on GitHub, and until they are made the key is as open as
+the widest of them leaves it:
+
+- **The key in the environment alone.** Settings, Environments, `release`:
+  add `AERIEOS_RELEASE_KEY` as an environment secret, then delete it under
+  Settings, Secrets and variables, Actions, Repository secrets. A
+  repository secret is handed to any workflow of any branch that names it;
+  an environment's only to a job the environment admits.
+- **Which refs the environment admits.** The same page, **Deployment
+  branches and tags**: Selected branches and tags, one rule, the tag
+  pattern `v*`. A job on any other ref is refused before a step starts.
+- **Who approves a run that reads it.** The same page, **Required
+  reviewers**: the owner, with **Prevent self-review** left off where the
+  owner is the only maintainer. Each tag's `signature` job and each seal
+  then waits for a press, which is the one check a rewritten workflow
+  cannot remove. This is a step for a person at every release, and the
+  reason it stays is that it is the only one a tag's author cannot write
+  around; without it the next setting carries the whole weight.
+- **Who may push a `v*` tag.** Settings, Rules, Rulesets, New tag
+  ruleset: target `v*`, restrict creations, updates and deletions, bypass
+  for whoever cuts releases. A tag that cannot be moved is also what the
+  seal's commit check rests on.
+- **The branches a release is cut from.** Settings, Rules, Rulesets, a
+  branch ruleset for `main` and the release branches
+  (`tools/release-branches`, `claude/*` for the working branches): restrict
+  creations, deletions and force pushes, bypass for whoever cuts releases,
+  and require a pull request on `main`. The place check trusts what those
+  branches hold, and a release branch's name is one anybody who may push
+  could otherwise make.
+- **Pull requests from forks.** Settings, Actions, General, **Approval for
+  running fork pull request workflows from contributors**: Require approval
+  for all external contributors. The self-hosted runner is a machine on
+  its owner's network; `lint.yml` and `dashboard.yml` refuse a fork's
+  request, but a request that edits the workflow runs its own copy, so
+  this setting, and reading a request's workflow changes before approving
+  its run, is the protection.
+- **What a workflow's token may do by default.** Settings, Actions,
+  General, **Workflow permissions**: Read repository contents and packages
+  permissions, and "Allow GitHub Actions to create and approve pull
+  requests" off. Each workflow here names what its jobs need.
+- **The Windows certificate.** Settings, Environments, New environment
+  `windows-signing`: **Deployment branches and tags**, Selected branches
+  and tags, the tag pattern `v*`; then add `BB_WIN_CERT_PFX_B64` and
+  `BB_WIN_CERT_PASSWORD` as its secrets and delete any repository secrets
+  of those names. The companion's Windows job names the environment on a
+  tag's ref alone, so a run by hand from a branch, a rehearsal, and a
+  branch that rewrites the workflow to name it are handed no certificate
+  and build the `.exe` unsigned. A repository secret of either name would
+  be handed to any workflow of any branch that names it, which is why
+  the environment, made once, is the step that stays.
+
 A controller started for development, on the dev channel and holding a
 token for AerieOS's repository, sees the drafts as well. Updating
 AerieOS to one fetches the draft's files with that token and takes the
@@ -100,9 +222,29 @@ before it, or when its fix (a commit naming the bug, or the one it was closed
 on) changes a line the release's own copy has; a fix touching only tests and
 CI, or code that came after the release, owes nothing. `aerie changelog
 missing` lists what is owed at any time; `aerie changelog add "..." --cat
-Fixed --bug N` writes the line and ties it to the bug, and `aerie changelog
-skip N "why"` answers for a bug that needs none. Both answers are kept in
-the bug's notes. A line never names a bug's or a roadmap item's number: the
+Fixed --bug N` writes the line, ties it to the bug (several by repeating
+`--bug`) and names the commits that fixed it rather than whatever HEAD is
+then, `aerie changelog link N BUG...` ties a line already written to the
+bugs it answers, and `aerie changelog skip N "why"` answers for a bug that
+needs none. A bug that names the commit that fixed it (recorded when it is
+closed, or set with `aerie bug fixed-in`) is answered by any line naming that
+commit too. A tie is kept in the notebook, on the bug's row, which shows the
+line and the release that carried it, and in the changelog editor, where
+each line shows its bugs and the ones the next release owes are listed over
+the lines; an edit, a merge or the editor's Save keeps a line's bugs tied. A
+repository's Settings, Releases, says whether what is owed holds a release
+or goes out with it said.
+
+## What each file is for
+
+Every release AerieOS makes, and every draft published from Drafts, opens with
+a table of its files: each one's name and what it is for, from the list in the
+repository's Settings, Releases, where a name may hold `@VER@` for the version
+and `*` for anything. Checksums and signatures share one row, and a file the
+list says nothing of is listed by its name, which the draft's row says before
+it is published. A repository holding `docs/release-notes/downloads.md` has
+that file put over its notes instead, `@TAG@`, `@VER@` and `@REPO@` filled in;
+the same switch turns either off. A line never names a bug's or a roadmap item's number: the
 tool refuses one, since those are the notebook's and a reader of the
 repository cannot open them.
 
@@ -111,19 +253,25 @@ repository cannot open them.
 Each release says how far back it reaches, in two numbers.
 
 - **The state floor** is the oldest `/config` it reads (`SUPPORTED_FROM` in
-  `scripts/dashboard/stateversion.py`). AerieOS starts at 0.9, and nothing
-  upgrades from a build before it: an older `/config` is refused at start, and
+  `scripts/dashboard/stateversion.py`). Nothing updates from
+  `0.9.0-dev.5641` or earlier: such a `/config` is refused at start, and
   the way on is a fresh install.
 - **The agent's window** is the minor of `AGENT_VERSION`. A node whose agent is
   from another window takes nothing but its own update, and its spaces'
-  sessions wait until it has it. The controller keeps what the previous
-  window's agents need to be updated and to hand over what they left on the
-  node, and nothing older.
+  sessions wait until it has it. The controller keeps what an older agent
+  needs to take that update, and sends it no other job until it has.
 
 There is no downgrade. A container goes back by restoring the copy the
 upgrade took (`backups/before-VERSION`) under the older image. A bare-metal
 install goes back by itself only when a new release does not answer after an
-update.
+update. A node that holds AerieOS's release key never takes an agent older
+than the one it runs (its age floor), so after going back across an
+agent's window the older controller's update is refused there and that
+node's spaces wait until the newer build runs
+again or `sudo aerieos-agent older on` at the node's own console lets it
+take the older agent. That is a step at each such node's console, kept
+because a controller that could send an older agent by itself is what the
+floor is there to stop.
 
 ## Moving work between the lines
 

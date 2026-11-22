@@ -1,0 +1,16 @@
+{
+ "about": "A reading list with a database of its own beside it: every image it runs named by the digest of what is pulled.",
+ "compose": "compose.yml",
+ "fields": [
+  {"var": "SHELF", "kind": "folder", "label": "Its shelf", "default": "apps/curlew"},
+  {"var": "DB_PASSWORD", "kind": "secret", "label": "Database password"}
+ ],
+ "format": 5,
+ "framework": "5.2",
+ "label": "Curlew",
+ "license": {"label": "Apache-2.0", "url": "https://example.com/curlew/LICENSE"},
+ "maker": "Example Labs",
+ "name": "curlew",
+ "platforms": ["linux/amd64", "linux/arm64"],
+ "port": 8044
+}

@@ -37,6 +37,10 @@ await p2.addInitScript(() => { window.__csp = []; document.addEventListener('sec
 const r = await p2.goto(BASE + '/login');
 const h = r.headers()['content-security-policy'] || '';
 ok(/script-src 'self' 'sha256-/.test(h) && !/script-src[^;]*unsafe-inline/.test(h), `the login page's policy names its own script by hash (${h.slice(0, 60)})`);
-await p2.waitForTimeout(500);
+// The card drawn: the document complete, the form with a height, and two
+// frames on, so a refusal made while it drew has reached the listener.
+await p2.waitForFunction(() => document.readyState === 'complete' && document.querySelector('form')?.offsetHeight > 0,
+                         null, { timeout: 15000 }).catch(() => {});
+await p2.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 ok((await p2.evaluate(() => window.__csp)).length === 0, 'the login card draws under it');
 await done(browser);

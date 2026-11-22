@@ -7,7 +7,7 @@
 //
 // Same size matters as much as staying loaded: a hidden terminal is still an
 // attached tmux client, and tmux sizes a window to its smallest client.
-import { launch, newPage, ok, done, ready, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, section } from './lib.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const browser = await launch();
@@ -119,7 +119,9 @@ await page.evaluate(() => {
   window.__show = () => { v = 'visible'; document.dispatchEvent(new Event('visibilitychange')); };
   document.dispatchEvent(new Event('visibilitychange'));
 });
-await new Promise(r => setTimeout(r, 3600));    // past the "really dropped" gate
+// Past the "really dropped" gate, by the page's own clock: hidden for more
+// than three seconds since the moment it noted.
+await page.waitForFunction(() => hiddenAt && Date.now() - hiddenAt > 3000, null, { timeout: 20000 }).catch(() => {});
 await page.evaluate(() => window.__show());
 const after = await page.waitForFunction(keys => {
   const recs = [...TERMS.values()].filter(r => r.el.isConnected);
@@ -172,7 +174,7 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
 // Each in one round trip: a status poll landing between setting the limit
 // and opening the tab put the server's limit back, and the shell opened
 // (B289).
-{
+await section("The limit is on terminals, per account", async () => {
   const shell = await page.evaluate(() => {
     state.max_tabs = tabs.filter(t => t.kind === 'term').length;
     const before = tabs.length;
@@ -191,13 +193,13 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   ok(doc.after === doc.before + 1 && doc.nodes,
      '...while a document tab opens past it: it costs no terminal');
   await page.evaluate(() => { state.max_tabs = 12; });
-}
+});
 
 // A terminal in its own window (R8): the pop-out opens the terminal's own
 // URL in a window, the tab stays as a placeholder with Reattach and its
 // frame is torn down (a second client on the session is the size fight),
 // the layout carries the flag, and the window closing brings the tab back.
-{
+await section("A terminal in its own window", async () => {
   const id = ids[1];
   await page.evaluate(id => dockShow(id), id);
   await page.evaluate(() => { window.__pops = []; window.open = (url, name) => {
@@ -222,12 +224,12 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   await page.waitForFunction(id => tabOf(id).popped === false, id, { timeout: 6000 });
   ok(await page.evaluate(id => !!document.querySelector(`#pane1 .stack > [data-key^="${id}|"].on.ownterm`), id),
      'closing the popped window brings the tab back on its own');
-}
+});
 
 // The tab on show, pressed, puts the dock down on the first press, also
 // after a click in the page above took the keyboard there: the press gave
 // the dock the keyboard back and it shut on the second.
-{
+await section("The tab on show, pressed, puts the dock down on the first press, also", async () => {
   const id = ids[1];
   await page.evaluate(id => { dockToggle(false); dockShow(id); }, id);
   await page.waitForFunction(id => dockUp && active === 1 && panes[1] === id, id, { timeout: 4000 });
@@ -237,12 +239,12 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   ok(await page.evaluate(() => dockUp === false), `the tab on show puts the dock down on the first press, the keyboard on the page before it (${moved})`);
   await page.click(`.dockline [data-dock="${id}"]`);
   ok(await page.evaluate(id => dockUp === true && panes[1] === id, id), '...and brings it up again on the next');
-}
+});
 
 // The dock's line with more tabs than fit has an arrow at the end with more
 // past it on a desk, as a row of big chips has, and a press on it moves the
 // line along (the operator, 24 Oct).
-{
+await section("The dock's line with more tabs than fit has an arrow at the end with more", async () => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(() => { for (let n = 0; n < 14; n++) openTab({ kind: 'term', arg: `sh:${40 + n}:alpha`, label: `many ${n}` });
                               panes[1] = tabs.find(t => t.arg === 'sh:40:alpha').id; dockUp = false; render(); });
@@ -257,13 +259,31 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   }), null, { timeout: 30000 }).catch(() => {});
   await settled();
   // From the line's start: it keeps where the tabs just opened left it.
-  await page.$eval('.dockline', l => { l.scrollLeft = 0; });
-  await settled();
-  await page.waitForFunction(() => !document.querySelector('.dockline').classList.contains('chl'), null, { timeout: 3000 }).catch(() => {});
-  const was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
-  const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 10, y: b.top + b.height / 2 }; });
-  await page.mouse.click(r.x, r.y);
-  await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 15000 }).catch(() => {});
+  // Put there until it stays there: one more of those terminals' redraws
+  // after the line had read as at rest took it back to the tab in front,
+  // and the check began 353px along (the gate of 14 Nov, under load).
+  let was = { chr: false, left: -1 };
+  for (let i = 0; i < 6 && was.left !== 0; i++){
+    await page.$eval('.dockline', l => { l.scrollLeft = 0; });
+    await settled();
+    await page.waitForFunction(() => !document.querySelector('.dockline').classList.contains('chl'), null, { timeout: 3000 }).catch(() => {});
+    was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
+  }
+  // Pressed again when the line did not move: with fourteen terminals just
+  // opened the bar is still being drawn anew, and a press whose down and up
+  // fell either side of one of those draws is no press at all (the gate of
+  // 15 Nov: the line stayed at its start with its arrow still there). Each
+  // press is aimed at the arrow's middle as the line is then, since a point
+  // measured once went stale as the line was drawn anew (a later gate of 15
+  // Nov: three presses, no move); what was under it is said if none moves it.
+  let hit = '';
+  for (let i = 0; i < 3; i++){
+    const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 14, y: b.top + b.height / 2 }; });
+    hit = await page.evaluate(p => { const e = document.elementFromPoint(p.x, p.y);
+      return e?.matches('.dockline') ? '' : (e ? e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0] : 'nothing'); }, r);
+    await page.mouse.click(r.x, r.y);
+    if (await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 5000 }).then(() => true, () => false)) { hit = ''; break; }
+  }
   // Its smooth scroll come to rest, read twice the same a frame apart,
   // rather than a fixed pause a loaded gate outran (B420).
   const still = () => page.waitForFunction(() => new Promise(res => {
@@ -273,7 +293,7 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   await still();
   const now = await page.$eval('.dockline', l => ({ left: l.scrollLeft, chl: l.classList.contains('chl') }));
   ok(was.chr && was.left === 0 && now.left > 0 && now.chl,
-     `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })})`);
+     `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })}${hit ? '; under the press: ' + hit : ''})`);
   // Drawn again (something on the line moved, as a session's dot does), the
   // line stays where the press put it rather than going back to the tab in
   // front (B322). Chat's unread count, since a terminal's label is its
@@ -292,6 +312,6 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
      `the dock's line drawn again keeps where it was scrolled to (${JSON.stringify({ before, after, drawn })})`);
   await page.evaluate(() => { if (state.chat?.unread) delete state.chat.unread.probe; });
   await page.evaluate(() => { tabs.filter(t => /^sh:(4\d|5[0-3]):alpha$/.test(t.arg)).forEach(t => dropTab(t.id)); });
-}
+});
 
 await done(browser);

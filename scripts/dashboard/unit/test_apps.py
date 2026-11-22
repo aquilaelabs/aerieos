@@ -4,15 +4,37 @@ steps 3 and 4)."""
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import apps  # noqa: E402
 
+REL = "aerieos-release"
+KEY = {}
 
+
+def setUpModule():
+    """The key a stable release's list is signed with, named by the install
+    these tests stand up: an install that names no signer takes nothing."""
+    if not shutil.which("ssh-keygen"):
+        return
+    d = tempfile.mkdtemp()
+    unittest.addModuleCleanup(shutil.rmtree, d, True)
+    path = os.path.join(d, "release")
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "release", "-f", path], check=True,
+                   stdin=subprocess.DEVNULL, timeout=30)
+    with open(path + ".pub", encoding="utf-8") as f:
+        kt, kb = f.read().split()[:2]
+    KEY.update(path=path, line=f'{REL} namespaces="{REL}" {kt} {kb} {REL}')
+
+
+@unittest.skipUnless(shutil.which("ssh-keygen"), "ssh-keygen is not here to sign a release's list with")
 class Apps(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -25,6 +47,13 @@ class Apps(unittest.TestCase):
                        write_json=write)
         self.dev = True
         apps.unvetted_ok = lambda: self.dev
+        # An install that names the stable key, every release here signed by
+        # it over its files' own bytes: these are the sha256's own rules, and
+        # the signed list's are test_release_signing.py's.
+        (self.tmp / "release-signers").write_text(KEY["line"] + "\n")
+        named = mock.patch.object(apps, "SIGNERS", str(self.tmp / "release-signers"))
+        named.start()
+        self.addCleanup(named.stop)
 
     def release(self, tag, files, bad=()):
         rel = self.tmp / "rel"
@@ -37,6 +66,13 @@ class Apps(unittest.TestCase):
             (rel / (name + ".sha256")).write_text(f"{sha}  {name}\n")
             assets += [{"name": name, "browser_download_url": f"file://{rel / name}"},
                        {"name": name + ".sha256", "browser_download_url": f"file://{rel / name}.sha256"}]
+        sums = rel / "SHA256SUMS"
+        sums.write_text("".join(f"{hashlib.sha256(n.encode()).hexdigest()}  {n}\n" for n in files))
+        (rel / "SHA256SUMS.sig").unlink(missing_ok=True)
+        subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", KEY["path"], "-n", REL, str(sums)], check=True,
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
+        assets += [{"name": "SHA256SUMS", "browser_download_url": f"file://{sums}"},
+                   {"name": "SHA256SUMS.sig", "browser_download_url": f"file://{sums}.sig"}]
         return {"tag_name": tag, "assets": assets}
 
     def test_a_build_belongs_to_its_release(self):
@@ -100,6 +136,25 @@ class Apps(unittest.TestCase):
         self.assertFalse((self.tmp / "seed.json").exists())
         self.assertTrue((self.tmp / "seed.json.applied").exists())
         self.assertEqual(apps.seed(got.update), {})
+
+    def test_a_release_is_taken_on_its_signed_list_or_refused_never_unchecked(self):
+        # _signed_list answers a list or a refusal with its reason, so
+        # nothing reads a release whose files were checked against nothing
+        # (the audit of 21 Nov: the branches for one were dead code).
+        rel = {"tag_name": "v1.2.3-dev.4", "assets": []}
+        with mock.patch.object(apps, "signers", lambda: []):
+            self.assertEqual(apps._signed_list(rel), (None, "", apps.NO_SIGNER))
+        with mock.patch.object(apps, "signers", lambda: ["aerieos-dev namespaces=\"aerieos-dev\" ssh-ed25519 AAAA aerieos-dev"]):
+            listed, said, why = apps._signed_list(rel)
+            self.assertEqual((listed, said), (None, ""))
+            self.assertIn("carries no signed list", why)
+        import releasecheck
+        for mod in (apps, releasecheck):
+            with open(mod.__file__, encoding="utf-8") as f:
+                code = "\n".join(ln for ln in f.read().splitlines() if not ln.lstrip().startswith("#"))
+            self.assertNotIn("listed is not None", code, mod.__name__)
+            self.assertNotIn("refused or signature", code, mod.__name__)
+        self.assertNotIn("listed is None or", open(apps.__file__, encoding="utf-8").read())
 
 
 if __name__ == "__main__":

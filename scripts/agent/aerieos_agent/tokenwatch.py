@@ -14,21 +14,34 @@ start, the reason is kept and said once, and nothing else changes.
 import contextlib
 import ctypes
 import os
+import stat
 import struct
 import threading
 import time
 
-from .base import log
+from .base import SIGNINS, folder_at, log, pack_signins
 
-# The folder in an account's home, and the file in it that is the sign-in.
-TOKENS = {".claude": ".credentials.json", ".codex": "auth.json", ".copilot": "config.json", ".grok": "auth.json"}
+# The folder in an account's home, and the file in it that is the sign-in:
+# the shipped agents', from where each row says its own is kept.
+TOKENS = dict(os.path.split(row["kept"]) for row in SIGNINS.values())
+
+
+def watched():
+    """{folder under a home: the file in it that is a sign-in}: the shipped
+    agents', and the file each pack's agent keeps its own in, where its pack
+    says (R233 step 6)."""
+    out = dict(TOKENS)
+    for row in pack_signins().values():
+        folder, name = os.path.split(row["kept"])
+        if folder and name:
+            out.setdefault(folder, name)
+    return out
 
 FAN_CLOEXEC = 0x1
 FAN_CLASS_NOTIF = 0x0
 FAN_MARK_ADD = 0x1
 FAN_OPEN = 0x20
 FAN_EVENT_ON_CHILD = 0x08000000
-AT_FDCWD = -100
 META = struct.Struct("=IBBHQii")      # event_len, vers, reserved, metadata_len, mask, fd, pid
 KEEP = 32                             # reads kept for the hello
 SAY_S = 7 * 86400                     # ...for a week
@@ -75,6 +88,7 @@ class TokenWatch:
         self.fd = -1
         self.why = ""
         self.marked = set()
+        self.names = {}                   # a marked folder: the sign-in's file in it
         self.reads = []
         self.lock = threading.Lock()
         self.me = os.getpid()
@@ -104,22 +118,46 @@ class TokenWatch:
         """One account's home, its user `pw`: the token files 600 and its
         own, and their folders marked (a folder mark outlives the file being
         replaced, which every agent does when it refreshes a token)."""
-        for d, name in TOKENS.items():
+        for d, name in watched().items():
             folder = os.path.join(home, d)
-            f = os.path.join(folder, name)
-            with contextlib.suppress(OSError):
-                st = os.lstat(f)
-                if not os.path.islink(f) and (st.st_mode & 0o077 or st.st_uid != pw.pw_uid):
-                    os.chown(f, pw.pw_uid, pw.pw_gid, follow_symlinks=False)
-                    os.chmod(f, 0o600)
-            if self.fd < 0 or not os.path.isdir(folder) or os.path.islink(folder):
+            # The folder reached from the home through no link: one the
+            # account pointed elsewhere (another account's home among them)
+            # is neither held nor marked.
+            try:
+                fd, _ = folder_at(home, os.path.join(d, name))
+            except OSError:
                 continue
-            key = os.stat(folder).st_ino, folder
-            if key in self.marked:
-                continue
-            if self.libc.fanotify_mark(self.fd, FAN_MARK_ADD, FAN_OPEN | FAN_EVENT_ON_CHILD,
-                                       AT_FDCWD, folder.encode()) == 0:
-                self.marked.add(key)
+            try:
+                self._hold(fd, name, pw)
+                if self.fd < 0:
+                    continue
+                key = os.fstat(fd).st_ino, folder
+                if key in self.marked:
+                    continue
+                # Marked by the descriptor itself, never by its name again.
+                if self.libc.fanotify_mark(self.fd, FAN_MARK_ADD, FAN_OPEN | FAN_EVENT_ON_CHILD, fd, None) == 0:
+                    self.marked.add(key)
+                    self.names[folder] = name
+            finally:
+                os.close(fd)
+
+    @staticmethod
+    def _hold(fd, name, pw):
+        """The sign-in `name` in the folder `fd` is a descriptor on held at
+        600 and the account's: only a plain file with one name, changed by
+        the file itself."""
+        with contextlib.suppress(OSError):
+            st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 \
+                    or not (st.st_mode & 0o077 or st.st_uid != pw.pw_uid):
+                return
+            f = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+            try:
+                if os.fstat(f).st_ino == st.st_ino:
+                    os.fchown(f, pw.pw_uid, pw.pw_gid)
+                    os.fchmod(f, 0o600)
+            finally:
+                os.close(f)
 
     def loop(self):
         while True:
@@ -143,7 +181,7 @@ class TokenWatch:
                     with contextlib.suppress(OSError):
                         os.close(efd)
                 folder, name = os.path.split(path)
-                if not st or TOKENS.get(os.path.basename(folder)) != name:
+                if not st or self.names.get(folder, TOKENS.get(os.path.basename(folder))) != name:
                     continue
                 got = judge(path, pid, st.st_uid, self.me)
                 if got:

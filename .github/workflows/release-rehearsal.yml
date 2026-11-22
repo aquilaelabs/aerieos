@@ -8,9 +8,26 @@
 # OS image built and booted (os-image.yml), the Android APK built
 # (android-app.yml), and the companion's .pyz, .exe and the VS Code
 # extension built (companion-app.yml), each with no tag, so nothing is
-# attached, signed or handed over. The last job lists what a release from
-# this commit would carry, against the release's manifest
-# (.release-files).
+# attached, signed or handed over. The last job gathers what they built as
+# a tag's last job does, and says which of the files a release must carry
+# (.release-files) a release from this commit would have and lack.
+#
+# ...and the three checks a tag is held to before anything is built to
+# publish (R206): where a release of each kind may be cut from, said for
+# this commit and never refused here; aerie lint with the unit tier; and
+# every browser suite. Green here is what a tag on this commit would meet.
+#
+# ...and the seal's own steps, dry (R199): the library the release key is
+# used with, installed from its hash-pinned list, and the list of the
+# files this run built made and signed by tools/release-sign.py seal, with
+# a key made in the job and thrown away with it, then verified by
+# ssh-keygen against the signers file written for that key and refused
+# against the committed one. So the tool, ssh-keygen and the pinned library
+# are proved on a runner before any tag needs them. It reads no secret,
+# attaches nothing, and what it signs no install takes. The APK is built
+# on the hosted runner a tag's run builds it on. What only a tag can prove
+# stays unproved here: the build attestations, the Android app's
+# signature, the Windows code signing and the release environment's key.
 name: release rehearsal
 
 on:
@@ -41,19 +58,48 @@ jobs:
           ver="$(BB_RELAYED=1 bash scripts/aerie version --file)"
           name="aerieos-controller-${ver}.tar.gz"
           git archive --format=tar --prefix="builderbot-${ver}/" HEAD | gzip -n -9 > "$name"
-          tar -tzf "$name" | grep -qx "builderbot-${ver}/scripts/dashboard/server.py" \
+          # Listed to a file and read from it: grep stopping at its first match
+          # ended tar mid-list, and with pipefail that read as no match (the
+          # rehearsal of 14 Nov failed here on a bundle that was whole).
+          tar -tzf "$name" > bundle.names
+          grep -qx "builderbot-${ver}/scripts/dashboard/server.py" bundle.names \
             || { echo "::error::the bundle has no scripts/dashboard/server.py"; exit 1; }
+          sha256sum "$name" > "$name.sha256"
           ls -l "$name"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      # Handed to the last job as a tag's bundle is (build-image.yml).
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-bundle
+          path: |
+            ${{ steps.pack.outputs.name }}
+            ${{ steps.pack.outputs.name }}.sha256
+          if-no-files-found: error
+          retention-days: 1
 
   apps:
     uses: ./.github/workflows/companion-app.yml
+    with:
+      hand-on: true
+    # What the called workflow's jobs ask for (a job may not be granted
+    # less than it names); with no tag it attaches nothing and attests
+    # nothing.
     permissions:
       contents: write
-    secrets: inherit
+      id-token: write
+      attestations: write
+    # Handed no secret: a rehearsal runs from any branch, so its .exe is
+    # built as a release's is and left unsigned, which the build says. The
+    # Windows certificate is a tag's run's alone.
 
+  # On the hosted runner a tag's own run builds the APK on, so that build
+  # is proved here and not first by a tag.
   android:
     uses: ./.github/workflows/android-app.yml
+    with:
+      hosted: true
+      rehearse: true
     permissions:
       contents: read
 
@@ -62,20 +108,168 @@ jobs:
     permissions:
       contents: read
 
+  # What tools/release-place.sh would say of a tag here, by kind: a dev build
+  # may be cut from this commit when it is on a branch a release is cut from
+  # (tools/release-branches); a stable release or a release candidate only
+  # when it is on main. Said, never failed: a rehearsal runs on the branch a
+  # release is being made ready on.
+  place:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      stable: ${{ steps.say.outputs.stable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
+      - name: Where a tag on this commit may be cut
+        id: say
+        shell: bash
+        run: |
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+          base="$(head -1 VERSION | tr -d '[:space:]')"
+          # The jobs that hold the key ask main's copy of the rule and sign
+          # nothing without it: said here, before a tag finds it out.
+          for f in tools/release-place.sh tools/release-branches; do
+            if ! git cat-file -e "origin/main:$f" 2>/dev/null; then
+              echo "::warning title=Main does not carry $f::a tag's signing jobs would refuse every release until $f is merged to main"
+            elif ! git diff --quiet origin/main HEAD -- "$f"; then
+              echo "::notice title=Main's $f is not this commit's::a tag's signing jobs ask main's copy, which differs from this one"
+            fi
+          done
+          bash tools/release-place.sh "v${base}-dev.1" "$GITHUB_SHA" origin/main \
+            || echo "::notice title=No dev build from this commit::a dev build's tag here would be refused: its commit is on no branch a release is cut from (tools/release-branches)"
+          if bash tools/release-place.sh "v${base}" "$GITHUB_SHA" origin/main; then
+            echo "stable=may be cut here" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=not from this commit, which is not on main" >> "$GITHUB_OUTPUT"
+          fi
+
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  suites:
+    uses: ./.github/workflows/dashboard.yml
+
   manifest:
-    needs: [bundle, apps, android, appliance]
+    needs: [bundle, apps, android, appliance, place, lint, suites]
     if: always()
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
-      - name: Say what a release from this commit would carry
+      # What a tag's last job gathers, gathered the same way: the OS image's
+      # files, and every artifact this run named release-*.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        if: needs.appliance.result == 'success'
+        with:
+          name: aerieos-os
+          path: out
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          pattern: release-*
+          path: rel
+          merge-multiple: true
+      # The unsigned APK, which a release's controller signs and attaches
+      # before the seal: signed below with a key of this run's.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        if: needs.android.result == 'success'
+        with:
+          name: rehearsal-apk
+          path: ${{ runner.temp }}/apk
+      # The seal, dry (seal-release.yml's own steps, over what this run
+      # built): the pinned library in a step of its own, then the list made
+      # and signed with a key of this run's. Where the bundle was built at
+      # least; its outcome is a row of the summary below.
+      - name: The pinned library the seal uses its key with
+        id: lib
+        if: needs.bundle.result == 'success'
+        run: bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+      - name: Seal what was built, dry, with a key made for this run
+        id: seal
+        if: needs.bundle.result == 'success'
         shell: bash
         env:
+          PYTHONPATH: ${{ runner.temp }}/release-lib
+          ANDROID: ${{ needs.android.result }}
+        run: |
+          set -euo pipefail
+          dry="$RUNNER_TEMP/dry"
+          mkdir -p "$dry/files" out rel
+          # The files where they are, by links: the OS image is not copied.
+          find out rel -maxdepth 1 -type f -exec ln -s -t "$dry/files" "$PWD"/{} \;
+          # A key of this run's own, never the release's: 64 hex characters
+          # as the secret is, in this step's environment and nowhere else.
+          AERIEOS_RELEASE_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+          export AERIEOS_RELEASE_KEY
+          python3 tools/release-sign.py signer > "$dry/release-signers"
+          # A dev build's tag by its shape; nothing is looked up by it.
+          tag="v$(head -1 VERSION | tr -d '[:space:]')-dev.0"
+          # The Android app signed as a release's is, with a key of this
+          # run's, and its certificate the one the seal may take: so the
+          # seal's check of the app runs on this runner's own apksigner, as
+          # a tag's does (v0.9.0-dev.6049's found no signer in the newer
+          # build-tools' way of saying one).
+          apk="" signers=()
+          for f in "$RUNNER_TEMP"/apk/*.apk; do
+            if [ -e "$f" ]; then apk="$f"; fi
+          done
+          if [ -n "$apk" ]; then
+            aps="$(command -v apksigner || find "$ANDROID_HOME"/build-tools -mindepth 2 -maxdepth 2 -name apksigner | sort -V | tail -1)"
+            align="$(command -v zipalign || find "$ANDROID_HOME"/build-tools -mindepth 2 -maxdepth 2 -name zipalign | sort -V | tail -1)"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/rehearsal.ks" -storepass rehearsal -keypass rehearsal -alias rehearsal \
+              -keyalg RSA -keysize 2048 -validity 1 -dname "CN=AerieOS rehearsal" >/dev/null 2>&1
+            "$align" -p -f 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+            # Signed beside the files, not among them: apksigner writes a v4
+            # signature file next to what it signs, which no release carries.
+            "$aps" sign --ks "$RUNNER_TEMP/rehearsal.ks" --ks-pass pass:rehearsal --out "$RUNNER_TEMP/signed.apk" \
+              "$RUNNER_TEMP/aligned.apk"
+            cp "$RUNNER_TEMP/signed.apk" "$dry/files/aerieos-app-rehearsal.apk"
+            keytool -list -v -keystore "$RUNNER_TEMP/rehearsal.ks" -storepass rehearsal \
+              | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' > "$dry/apk-signers"
+            signers=(--apk-signers "$dry/apk-signers")
+          elif [ "$ANDROID" = success ]; then
+            echo "::error::the Android build passed and handed no APK to the dry seal"
+            exit 1
+          fi
+          python3 tools/release-sign.py seal "$tag" --from "$dry/files" --signers "$dry/release-signers" --out "$dry/sealed" \
+            "${signers[@]}" | tee "$dry/seal.log"
+          if [ -n "$apk" ]; then
+            grep -q "aerieos-app-rehearsal.apk  (apksigner verifies it as signed by a certificate config/apk-signers names)" "$dry/seal.log" \
+              || { echo "::error::the dry seal listed the Android app without apksigner holding it to the certificate it was signed with"; exit 1; }
+            # ...and one it was not signed with is refused, naming the certificate apksigner said.
+            if python3 tools/release-sign.py seal "$tag" --from "$dry/files" --signers "$dry/release-signers" --out "$dry/refused" \
+                 > "$dry/refused.log" 2>&1 || ! grep -q "is signed by a certificate config/apk-signers does not name" "$dry/refused.log"; then
+              cat "$dry/refused.log"
+              echo "::error::the dry seal took an Android app signed by a certificate config/apk-signers does not name"
+              exit 1
+            fi
+          fi
+          # ssh-keygen takes the signature against the file written for the
+          # key, as an install takes a release's against its own...
+          ssh-keygen -Y verify -f "$dry/release-signers" -I aerieos-dev -n aerieos-dev \
+            -s "$dry/sealed/SHA256SUMS.sig" < "$dry/sealed/SHA256SUMS"
+          # ...and no install takes this one: the committed file names another key.
+          if ssh-keygen -Y verify -f config/release-signers -I aerieos-dev -n aerieos-dev \
+               -s "$dry/sealed/SHA256SUMS.sig" < "$dry/sealed/SHA256SUMS" >/dev/null 2>&1; then
+            echo "::error::a key made in this job verifies against config/release-signers"
+            exit 1
+          fi
+          echo "sealed dry: $(wc -l < "$dry/sealed/SHA256SUMS") files listed and signed, and nothing attached"
+      - name: Say what a release from this commit would carry
+        # Whatever the seal above made of it: its outcome is said here.
+        if: always()
+        shell: bash
+        env:
+          SEAL: ${{ steps.seal.outcome }}
           VER: ${{ needs.bundle.outputs.version }}
           BUNDLE: ${{ needs.bundle.result }}
           APPS: ${{ needs.apps.result }}
           ANDROID: ${{ needs.android.result }}
           APPLIANCE: ${{ needs.appliance.result }}
+          LINT: ${{ needs.lint.result }}
+          SUITES: ${{ needs.suites.result }}
+          PLACE: ${{ needs.place.result }}
+          STABLE: ${{ needs.place.outputs.stable }}
         run: |
           set -eo pipefail
           {
@@ -88,11 +282,54 @@ jobs:
             echo "| Android APK (signed by the controller after a release) | $ANDROID |"
             echo "| AerieOS (built and booted) | $APPLIANCE |"
             echo
-            echo "The files the release must carry (.release-files), for ${VER:-this version}:"
+            echo "| What a tag is held to | Result |"
+            echo "| --- | --- |"
+            echo "| aerie lint and the unit tier | $LINT |"
+            echo "| The browser suites | $SUITES |"
+            echo "| The seal, dry: the pinned library, the list signed with a key made here and verified | ${SEAL:-not run} |"
+            echo "| A dev build from this commit | may be cut here |"
+            echo "| A stable release or a candidate from this commit | ${STABLE:-not said ($PLACE)} |"
             echo
-            grep -v '^[[:space:]]*\(#\|$\)' .release-files | sed "s|@VER@|${VER:-VERSION}|g; s|^|- |"
           } >> "$GITHUB_STEP_SUMMARY"
+          # The list read as the tag's last job reads it, over the files
+          # this run built. Some are never a rehearsal's: the signed Android
+          # app, which a controller attaches to a release that exists; the
+          # OS image's attestation and the line naming the pushed image by
+          # its digest, which the release's own job writes; and the signed
+          # list of the release's files, which is made over all of them once
+          # the app is there (seal-release.yml; sealed dry above).
+          # A branch's OS image is named for its version as the image says
+          # it of itself, X.Y.Z-dev.N+commit, where every other file is named
+          # with a hyphen there; on a tag the two are one. Read as one here.
+          mkdir -p out rel
+          mapfile -t have < <(find out rel -maxdepth 1 -type f -printf '%f\n' | tr '+' '-' | sort)
+          mapfile -t lacks < <(bash tools/release-missing.sh .release-files "${VER:-VERSION}" "${have[@]}")
+          later=() missing=()
+          for f in "${lacks[@]}"; do
+            case "$f" in
+              aerieos-app-*.apk|aerieos-app-*.apk.sha256|aerieos-os-*.attestation.jsonl) later+=("$f") ;;
+              aerieos-image-*.digest|SHA256SUMS|SHA256SUMS.sig) later+=("$f") ;;
+              *) missing+=("$f") ;;
+            esac
+          done
+          {
+            echo "The files a release must carry (.release-files), for ${VER:-this version}:"
+            echo
+            grep -v '^[[:space:]]*\(#\|$\)' .release-files | sed "s|@VER@|${VER:-VERSION}|g" | while IFS= read -r f; do
+              case " ${later[*]} " in *" $f "*) echo "- $f: added once a release is made"; continue ;; esac
+              case " ${missing[*]} " in *" $f "*) echo "- $f: **not built here**"; continue ;; esac
+              echo "- $f: built"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::a release from here would lack ${missing[*]}"
+            exit 1
+          fi
           for r in "$BUNDLE" "$APPS" "$ANDROID" "$APPLIANCE"; do
             [ "$r" = success ] || { echo "::error::not every build passed: a release from here would be missing files"; exit 1; }
           done
-          echo "every build passed: a tag on this commit carries the whole release"
+          for r in "$LINT" "$SUITES" "$PLACE"; do
+            [ "$r" = success ] || { echo "::error::not every check passed: a tag on this commit would publish nothing"; exit 1; }
+          done
+          [ "$SEAL" = success ] || { echo "::error::the dry seal did not pass (${SEAL:-not run}): a release from here could not have its list of files signed"; exit 1; }
+          echo "every build and every check passed: a tag on this commit carries the whole release"

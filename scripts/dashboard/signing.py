@@ -140,6 +140,10 @@ def _aead(key=None):
     return ChaCha20Poly1305(k)
 
 
+class NoCipher(RuntimeError):
+    """The vetted cipher is not on this machine: nothing is sealed with another."""
+
+
 def _have_aead():
     try:
         import cryptography.hazmat.primitives.ciphers.aead  # noqa: F401, PLC0415
@@ -151,16 +155,16 @@ def _have_aead():
 def seal(data, key=None):
     """`data` sealed under the install key, or under `key` (an account's own,
     R154): MAGIC, nonce, ciphertext with its tag, ChaCha20-Poly1305 from the
-    cryptography library (R158 step 3); the format before (BBSEAL1, a
-    HMAC-SHA256 stream and tag from the standard library alone) where the
-    library is missing, and still opened here for one release."""
-    if _have_aead():
-        nonce = secrets.token_bytes(12)
-        return MAGIC + nonce + _aead(key).encrypt(nonce, data, MAGIC)
-    enc, mac = _subkeys(key)
-    nonce = secrets.token_bytes(16)
-    ct = bytes(a ^ b for a, b in zip(data, _stream(enc, nonce, len(data)), strict=True))
-    return MAGIC1 + nonce + ct + hmac.new(mac, MAGIC1 + nonce + ct, hashlib.sha256).digest()
+    cryptography library (R158 step 3). Where the library is not on the
+    machine nothing is sealed, said by NoCipher: it fell back to a cipher
+    built here from HMAC-SHA256 (BBSEAL1), so a controller missing one
+    package sealed every secret with code nobody had reviewed, silently
+    (R243). A seal of that format is still opened."""
+    if not _have_aead():
+        raise NoCipher("the cryptography library is not on this machine, so nothing can be sealed: "
+                       "install python3-cryptography (the image carries it) and start again")
+    nonce = secrets.token_bytes(12)
+    return MAGIC + nonce + _aead(key).encrypt(nonce, data, MAGIC)
 
 
 def old_format(blob):

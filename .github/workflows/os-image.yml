@@ -3,11 +3,34 @@
 # build-image.yml for a release's tag, a manual run and the weekly rebuild,
 # which publishes what it built; and run on its own when a branch push
 # touches the image, which publishes nothing, so a fix to the image is proved
-# on a push rather than a tag (the operator, 30 Oct).
+# on a push rather than a tag (the operator, 30 Oct). A branch's build can
+# be asked for by hand as well, and publishes nothing either: a run GitHub
+# left queued is answered by another, without a change to the image.
 name: os image
 
 on:
+  # No secret is handed here. A release's tag asks for the agent's
+  # signature its own run made (build-image.yml's signature job, the one
+  # place the release key is read), taken as that run's artifact and
+  # checked against the committed key; every other build, a branch push
+  # among them, carries the agent unsigned. This workflow used to be handed
+  # the key and signed on every one of them (the audit of 20 Nov).
   workflow_call:
+    inputs:
+      agent-signature:
+        type: boolean
+        default: false
+    # What the build made, by its bytes, for the caller's job that attests
+    # the two files a release carries: it takes them as the run's artifact
+    # and holds each to these before it attests anything.
+    outputs:
+      iso-sha256:
+        description: "the sha256 of the ISO this run built"
+        value: ${{ jobs.appliance.outputs.iso }}
+      stick-sha256:
+        description: "the sha256 of the USB stick's image this run built"
+        value: ${{ jobs.appliance.outputs.stick }}
+  workflow_dispatch:
   push:
     branches-ignore: ["main"]
     paths:
@@ -19,6 +42,13 @@ on:
 
 permissions:
   contents: read
+
+# A branch push the next one supersedes is ended (R228 step 21): the image
+# it was building is the one the next push builds again. Never a tag's, a
+# dispatch's or the weekly rebuild's, which each stand alone.
+concurrency:
+  group: os-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') }}
 
 jobs:
   # The appliance image (R160 step 1): AerieOS, built by image/build.sh
@@ -34,27 +64,59 @@ jobs:
   appliance:
     runs-on: ubuntu-24.04
     timeout-minutes: 240
+    outputs:
+      iso: ${{ steps.sums.outputs.iso }}
+      stick: ${{ steps.sums.outputs.stick }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
           fetch-depth: 0
       - name: The tools mkosi and the disk need
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils
+          # The runner's own resolver failed for minutes at a time on 11 Nov
+          # ("Temporary failure resolving" one mirror, then the next, while
+          # the same names answered everywhere else), and a release's image
+          # build died here four times. Public resolvers stand in front of
+          # it for this job, and apt is tried three times before giving up.
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 127.0.0.53\noptions timeout:2 attempts:2\n' | sudo tee /etc/resolv.conf >/dev/null
+          apt_tools() {
+            local n
+            for n in 1 2 3; do
+              if sudo apt-get update -qq -o Acquire::Retries=3 &&
+                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 "$@"; then
+                return 0
+              fi
+              echo "apt failed (try ${n} of 3)"
+              sleep 20
+            done
+            return 1
+          }
+          apt_tools squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils \
+            python3-setuptools python3-setuptools-scm
           # Debian 13's archive keys, newer than the runner's own keyring
           # package, from the same snapshot the image is pinned to.
           snap="$(tr -d '[:space:]' < image/SNAPSHOT)"
           curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors -o keyring.deb "https://snapshot.debian.org/archive/debian/${snap}/pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb"
           echo "9ea7778e443144ca490668737a8ab22dd3e748bb99e805e22ec055abeb3c7fac  keyring.deb" | sha256sum -c -
           sudo dpkg -i keyring.deb
-          # The version build.sh pins (MKOSI_PIN), so a config key means the same here as there,
-          # from its tag on GitHub: mkosi is not published on PyPI.
+          # mkosi, which builds the image as root: its source at the tag
+          # config/image-tools.json pins, kept only when it is the pinned
+          # sha256 (scripts/lib/pin-fetch) and installed from that file.
+          # A tag's archive was installed straight from its address, held
+          # to nothing. The version is the one build.sh pins (MKOSI_PIN),
+          # so a config key means the same here as there, and the two
+          # disagreeing stops here; mkosi is not published on PyPI. Its build
+          # backend (setuptools, setuptools-scm) is the distribution's, from
+          # apt above, and pip fetches nothing: no build environment of its
+          # own and no dependency, so nothing PyPI serves that day runs as
+          # root here.
           pin="$(grep -oE 'MKOSI_PIN:-[0-9.]+' image/build.sh | head -1 | cut -d- -f2)"
-          sudo pip install --break-system-packages "mkosi @ https://github.com/systemd/mkosi/archive/refs/tags/v${pin}.tar.gz"
+          held="$(bash scripts/lib/pin-fetch config/image-tools.json mkosi linux/amd64 "$RUNNER_TEMP/mkosi-${pin}.tar.gz")"
+          [ "$held" = "$pin" ] || { echo "::error::image/build.sh pins mkosi $pin and config/image-tools.json pins $held: one of the two moved without the other"; exit 1; }
+          sudo pip install --break-system-packages --no-build-isolation --no-deps --no-index "$RUNNER_TEMP/mkosi-${pin}.tar.gz"
           mkosi --version
       - name: The weekly rebuild takes yesterday's snapshot
         if: github.event_name == 'schedule'
@@ -64,6 +126,36 @@ jobs:
           # tree is unchanged (a release moves it by a commit).
           date -u -d 'yesterday 00:00' +%Y%m%dT%H%M%SZ > image/SNAPSHOT
           echo "snapshot: $(cat image/SNAPSHOT)"
+      # mkosi's package cache, kept between runs (R228 step 21): the image is
+      # pinned to a snapshot, so a run on the same snapshot and package set
+      # fetches the same packages again. The weekly rebuild's new snapshot,
+      # set above, is a new key.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830   # v4.3.0, pinned by commit (R206)
+        with:
+          path: .mkosi-packages
+          key: mkosi-packages-${{ hashFiles('image/SNAPSHOT', 'image/mkosi.conf', 'config/controller-packages.tsv') }}
+      # The agent's signature (R227): a node that pinned AerieOS's release key
+      # takes an agent update only with it. A release's image takes the one
+      # its run made and checks it against the committed key, with the
+      # library held to its hashes (tools/release-lib.sh); this job holds no
+      # key. Any other image carries the agent unsigned, and says so.
+      - name: Take the agent's signature
+        if: inputs.agent-signature
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent
+      - name: The agent's signature, checked on a release
+        shell: bash
+        env:
+          SIGNED: ${{ inputs.agent-signature }}
+        run: |
+          if [ "$SIGNED" = true ]; then
+            bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+            PYTHONPATH="$RUNNER_TEMP/release-lib" python3 tools/sign-agent.py --check
+          else
+            echo "not a release's build: the agent ships unsigned, as a branch's does (the release key is read on a v* tag alone)"
+          fi
       - name: Build the image
         shell: bash
         # For gh's trusted root, which build.sh bakes into the image.
@@ -75,6 +167,7 @@ jobs:
           # do not outlast. Another try picks up from the packages already in
           # mkosi's package cache, which --force keeps, so it costs only what
           # is still missing.
+          export MKOSI_PACKAGE_CACHE="$PWD/.mkosi-packages"
           for try in 1 2 3; do
             sudo -E image/build.sh --out out 2>&1 | tee build.log && exit 0
             [ "$try" -lt 3 ] || break
@@ -87,6 +180,11 @@ jobs:
           # shows without signing in, where the log itself needs a token.
           tail -n 40 build.log | tail -c 3500 | python3 -c 'import sys; t = sys.stdin.read(); print("::error title=Build the image::" + t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
           exit 1
+      - name: The package cache, the runner's to keep
+        if: always()
+        shell: bash
+        # Written as root by the build; the cache is saved as the runner.
+        run: sudo chown -R "$(id -u):$(id -g)" .mkosi-packages 2>/dev/null || true
       - name: What moved since the last release
         if: github.event_name == 'schedule'
         shell: bash
@@ -103,13 +201,32 @@ jobs:
           last="$(find last -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
           { echo "## System packages moved since ${tag}"; echo; echo '```'; diff <(sort "$last") <(sort "$now") | grep '^[<>]' || echo "none"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           diff <(sort "$last") <(sort "$now") > out/packages-moved.diff || true
-      - uses: actions/upload-artifact@v4
+      # The two files a release carries, by their bytes, as this job made
+      # them: what the job that attests them holds the artifact to.
+      - name: The sha256 of the ISO and the stick's image
+        id: sums
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in "iso:aerieos-os-*.iso" "stick:aerieos-os-*.stick.raw.xz"; do
+            f="$(find out -maxdepth 1 -name "${pair#*:}" | head -1)"
+            [ -n "$f" ] || continue
+            echo "${pair%%:*}=$(sha256sum "$f" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
         with:
           name: aerieos-os
           path: |
             out/aerieos-os-*
             out/packages-moved.diff
           if-no-files-found: error
+          # A day, the shortest there is: this is how the image reaches the
+          # boot test and the release job of the same run, and nothing reads
+          # it afterwards (a release's files are on the release). Left at the
+          # default it sat for ninety days, several gigabytes from every tag,
+          # every branch push that touched the image and every weekly
+          # rebuild, and that is what used up the account's Actions storage.
+          retention-days: 1
 
   # The image booted before anything of it is published (R160 step 5): the
   # VM disk under QEMU with KVM, the dashboard's port forwarded, and a run
@@ -122,16 +239,32 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
         with:
           name: aerieos-os
           path: out
       - name: QEMU
         shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
+          set -euo pipefail
+          # As the build's own tools step: public resolvers in front of the
+          # runner's own, and apt tried three times.
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 127.0.0.53\noptions timeout:2 attempts:2\n' | sudo tee /etc/resolv.conf >/dev/null
+          apt_tools() {
+            local n
+            for n in 1 2 3; do
+              if sudo apt-get update -qq -o Acquire::Retries=3 &&
+                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 "$@"; then
+                return 0
+              fi
+              echo "apt failed (try ${n} of 3)"
+              sleep 20
+            done
+            return 1
+          }
+          apt_tools qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
           sudo chmod a+rw /dev/kvm 2>/dev/null || true
       - name: Boot the image and wait for the dashboard
         shell: bash
@@ -204,11 +337,14 @@ jobs:
               case "$code" in
                 200|302|303)
                   # The machine has to become its own node too, which takes a
-                  # little longer than the dashboard: a failure is said on the serial line.
+                  # little longer than the dashboard: said on the serial line
+                  # either way, and the wait ends on whichever comes (R228
+                  # step 21: two minutes were waited out on every boot).
                   for _ in $(seq 1 24); do
                     if grep -aq "did not become its controller's node" "$2"; then
                       tail -c 3000 "$2"; echo "$3: the machine did not become its own node"; exit 1
                     fi
+                    grep -aq "first boot: this machine is its controller's node" "$2" && break
                     sleep 5
                   done
                   kill "$(cat qemu.pid)" || true; sleep 2
@@ -264,9 +400,74 @@ jobs:
           env_set kept.raw aerie_kept_next=kept-test
           boot kept.raw serial-kept.log "aeriekept=kept-test"
           echo "kept and stick booted ($ver)" | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      # The ISO installs (B766): started as a machine with one blank disk
+      # starts it, the installer told its disk on the kernel's line
+      # (aerie_install_to, which asks nothing), and the disk it laid out
+      # booted after to its dashboard. No build was checked this way before,
+      # and none could install: the live boot waited for a disk of ours, its
+      # fstab for a boot partition, and the image carried no grub-install.
+      - name: Install from the ISO onto a blank disk and boot it
+        shell: bash
+        run: |
+          set -euo pipefail
+          iso="$(find out -maxdepth 1 -name 'aerieos-os-*.iso' | head -1)"
+          [ -f "$iso" ] || { echo "no ISO among the build's files:"; ls out; exit 1; }
+          kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
+          # The medium's own kernel and initrd with the installer's line, the
+          # disk named and the console on the serial line; the ISO itself in
+          # the drive, where live-boot finds its root.
+          mkdir -p isomnt
+          sudo mount -o loop,ro "$iso" isomnt
+          cp isomnt/live/vmlinuz iso-vmlinuz
+          cp isomnt/live/initrd iso-initrd
+          sudo umount isomnt
+          truncate -s 24G installed.raw
+          # shellcheck disable=SC2086
+          timeout 2400 qemu-system-x86_64 $kvm -m 6144 -smp 2 -machine q35 \
+            -drive file=installed.raw,format=raw,if=virtio \
+            -drive file="$iso",format=raw,media=cdrom,readonly=on \
+            -kernel iso-vmlinuz -initrd iso-initrd \
+            -append "boot=live components bbinstaller=1 aerie_install_to=/dev/vda console=ttyS0,115200" \
+            -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
+            -display none -serial file:serial-iso-install.log -no-reboot || true
+          tr -d '\r' < serial-iso-install.log | grep -a "aerieos-installer:" || true
+          if ! grep -aq "aerieos-installer: AerieOS .* is on /dev/vda" serial-iso-install.log; then
+            tr -d '\r' < serial-iso-install.log | sed 's/\x1b\[[0-9;=?]*[A-Za-z]//g' | grep -av '^[[:space:]]*$' | tail -n 150
+            echo "the ISO did not install onto a blank disk"
+            exit 1
+          fi
+          # ...and the disk it made, started by the firmware as its machine
+          # would start it, its console on the serial line.
+          at="installed.raw@@$(( $(sfdisk -J installed.raw | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start') * 512 ))"
+          mcopy -n -i "$at" ::/grub/grubenv grubenv
+          grub-editenv grubenv set aerie_args="console=ttyS0,115200 loglevel=6"
+          mcopy -o -i "$at" grubenv ::/grub/grubenv
+          # shellcheck disable=SC2086
+          qemu-system-x86_64 $kvm -m 6144 -smp 2 -machine q35 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive file=installed.raw,format=raw,if=virtio \
+            -netdev user,id=n0,hostfwd=tcp:127.0.0.1:7680-:7680 -device virtio-net-pci,netdev=n0 \
+            -display none -serial file:serial-iso-installed.log -daemonize -pidfile qemu.pid
+          for i in $(seq 1 120); do
+            code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
+            case "$code" in
+              200|302|303)
+                kill "$(cat qemu.pid)" || true
+                echo "installed from the ISO: the dashboard answered $code after $((i * 5)) s" | tee -a "$GITHUB_STEP_SUMMARY"
+                exit 0 ;;
+            esac
+            if grep -aq "end Kernel panic" serial-iso-installed.log 2>/dev/null; then break; fi
+            sleep 5
+          done
+          kill "$(cat qemu.pid)" || true
+          tr -d '\r' < serial-iso-installed.log | sed 's/\x1b\[[0-9;=?]*[A-Za-z]//g' | grep -av '^[[:space:]]*$' | tail -n 200
+          echo "the disk the ISO laid out did not reach its dashboard"
+          exit 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
         if: always()
         with:
           name: aerieos-os-boot
           path: serial*.log
           if-no-files-found: ignore
+          # The serial logs of a boot that failed, for whoever reads the run that week.
+          retention-days: 7

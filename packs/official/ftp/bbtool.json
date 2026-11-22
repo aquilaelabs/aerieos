@@ -1,5 +1,17 @@
 {
  "about": "The server behind a project's File access setting: FTPS on the project's node, where people sign in with their own AerieOS name and password. About 60 MB.",
+ "credits": [
+  {
+   "maker": "Giampaolo Rodola",
+   "name": "pyftpdlib"
+  },
+  {
+   "maker": "the Python Cryptographic Authority",
+   "name": "pyOpenSSL"
+  }
+ ],
+ "format": 5,
+ "framework": "5.1",
  "label": "File access server (FTPS)",
  "layout": {
   "bin": [
@@ -8,36 +20,136 @@
   "env": {},
   "tool": "bin/bb-ftpd"
  },
+ "maker": "AerieOS",
  "name": "ftp",
  "platforms": [
   "linux/amd64"
  ],
  "shipped": {
   "probe": "ftp",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "file",
+     "url": "{url}.sha256"
+    },
+    "from": "pin",
+    "sha256": "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5",
+    "version": "0.13.9"
    },
    "download": {
     "bytes": 60000000,
     "resolver": "approximate"
    },
+   "fetch": [
+    {
+     "found": {
+      "from": "file",
+      "url": "{base}/SHA256SUMS"
+     },
+     "platform": "linux/amd64",
+     "sha256": "6a9e62dad033790aef722dbd370e0ce76ce17b73627ba3ae679f537049350b39",
+     "to": "dl/python.tar.gz",
+     "track": {
+      "asset": "^cpython-3\\.12\\.\\d+\\+\\d+-x86_64-unknown-linux-gnu-install_only_stripped\\.tar\\.gz$",
+      "repo": "astral-sh/python-build-standalone",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+     "version": "20261110"
+    },
+    {
+     "found": {
+      "from": "json",
+      "path": "urls.0.digests.sha256",
+      "url": "https://pypi.org/pypi/pyftpdlib/{version}/json"
+     },
+     "sha256": "4ba0642078792df63dd3b2e9c8f838f2a3ecf428c7518d5921c0530d53512acf",
+     "to": "dl/pyftpdlib.tar.gz",
+     "track": {
+      "match": "^release-\\d+\\.\\d+\\.\\d+$",
+      "resolver": "git-tag",
+      "trim_prefix": "release-",
+      "url": "https://github.com/giampaolo/pyftpdlib.git"
+     },
+     "url": "https://files.pythonhosted.org/packages/source/p/pyftpdlib/pyftpdlib-{version}.tar.gz",
+     "version": "2.2.0"
+    },
+    {
+     "sha256": "c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf",
+     "to": "dl/pip/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/b1/db/dceb9dd5b231e1da801793f8acc9f3c52a7e1afe40bb1aae37e02b0faad5/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl"
+    },
+    {
+     "sha256": "4061c0079120205fb760c58acab6443e217307dcf05e3702cf970e0689972856",
+     "to": "dl/pip/cryptography-50.0.2-cp311-abi3-manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/1a/f1/b474e930c4d910328780e3940da76f5aa5cbc48ce1fc14e44d239d9ea9db/cryptography-50.0.2-cp311-abi3-manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "35b7859515693e479e8d95ebe9f32cbf4d6312ab7599ced39fc24699e51de46f",
+     "to": "dl/pip/pyasynchat-1.0.5-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/48/e8/e5ad498cb6a834c16af910e259926fd545dd7873a2da451f3a2bb228d7ee/pyasynchat-1.0.5-py3-none-any.whl"
+    },
+    {
+     "sha256": "269bbc5252671827387636822841a1fb721ec6e858b23a3e12cf92eb1f97da2a",
+     "to": "dl/pip/pyasyncore-1.0.5-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/1f/ab/b10cee56269ae150763f3f83b3e9305a11f42f50b3dcd58eeb8f7988f0bb/pyasyncore-1.0.5-py3-none-any.whl"
+    },
+    {
+     "sha256": "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e",
+     "to": "dl/pip/pycparser-3.12-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl"
+    },
+    {
+     "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c",
+     "to": "dl/pip/pyopenssl-26.4.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/51/ad/2cf6d3fa2fae5c79e1ed9960c0d42badd0f94d81dd12b50604cdc839e648/pyopenssl-26.4.0-py3-none-any.whl"
+    },
+    {
+     "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+     "to": "dl/pip/typing_extensions-4.16.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl"
+    }
+   ],
+   "files": {
+    "dl/pip/requirements.txt": "cffi==2.1.1 --hash=sha256:c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf\ncryptography==50.0.2 --hash=sha256:4061c0079120205fb760c58acab6443e217307dcf05e3702cf970e0689972856\npyasynchat==1.0.5 --hash=sha256:35b7859515693e479e8d95ebe9f32cbf4d6312ab7599ced39fc24699e51de46f\npyasyncore==1.0.5 --hash=sha256:269bbc5252671827387636822841a1fb721ec6e858b23a3e12cf92eb1f97da2a\npycparser==3.12 --hash=sha256:a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e\npyopenssl==26.4.0 --hash=sha256:f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c\ntyping-extensions==4.16.0 --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8\n"
+   },
    "fresh_only": true,
    "kind": "script",
+   "lock": [
+    {
+     "for": {
+      "linux/amd64": "x86_64-manylinux_2_28"
+     },
+     "kind": "pip",
+     "python": "3.12",
+     "requirements": [
+      "pyopenssl",
+      "pyasyncore",
+      "pyasynchat"
+     ],
+     "to": "dl/pip"
+    }
+   ],
    "run": [
     "sh",
     "-ec",
-    "dst=\"$2\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst/bin\" \"$dst/libexec\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; export UV_PYTHON_INSTALL_DIR=\"$dst/python\" UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1; \"$dst/libexec/uv\" venv -q --python 3.12 \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" pyftpdlib pyopenssl; test -f \"${BB_LIB:-}/bbftp.py\" || { echo \"bbftp.py is not beside bb: install this from aerie toolchains\" >&2; exit 1; }; cp \"$BB_LIB/bbftp.py\" \"$dst/libexec/bbftp.py\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$here/../libexec/bbftp.py\" \"$@\"\\n' > \"$dst/bin/bb-ftpd\"; chmod +x \"$dst/bin/bb-ftpd\"; rm -rf \"$t\"",
+    "dst=\"$2\"; dl=\"$dst/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst/bin\" \"$dst/libexec\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; tar -xzf \"$dl/python.tar.gz\" -C \"$dst\"; py=\"$dst/python/bin/python3.12\"; test -x \"$py\"; export UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1 UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never; \"$dst/libexec/uv\" venv -q --python \"$py\" \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" --no-index --find-links \"$dl/pip\" --require-hashes -r \"$dl/pip/requirements.txt\"; mkdir \"$t/src\"; tar -xzf \"$dl/pyftpdlib.tar.gz\" -C \"$t/src\"; cp -R \"$(find \"$t/src\" -maxdepth 2 -type d -name pyftpdlib | head -1)\" \"$(\"$dst/venv/bin/python\" -c 'import sysconfig; print(sysconfig.get_paths()[\"purelib\"])')/\"; test -f \"${BB_LIB:-}/bbftp.py\" || { echo \"bbftp.py is not beside bb: install this from aerie toolchains\" >&2; exit 1; }; cp \"$BB_LIB/bbftp.py\" \"$dst/libexec/bbftp.py\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$here/../libexec/bbftp.py\" \"$@\"\\n' > \"$dst/bin/bb-ftpd\"; chmod +x \"$dst/bin/bb-ftpd\"; rm -rf \"$t\" \"$dl\"",
     "--",
     "{script}",
     "{dir}"
    ],
-   "url": "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz",
+   "url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-x86_64-unknown-linux-gnu.tar.gz",
    "verify": [
     "{dir}/venv/bin/python",
     "-c",
     "import pyftpdlib, OpenSSL"
-   ]
+   ],
+   "version": {
+    "repo": "astral-sh/uv",
+    "resolver": "github-release"
+   }
   },
   "updatable": true
  },

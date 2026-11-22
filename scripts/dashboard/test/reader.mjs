@@ -7,13 +7,12 @@
 // refusal as an empty bin (B87); the settings page does not ask for what
 // the role cannot read (B89); the Profile's Password says what is wrong
 // under the field it is about (B90).
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, nbShown, splitPick } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick, OWNER as owner, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const owner = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const api = async (path, body, headers = owner) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
   let j = {}; try { j = await r.json(); } catch { /* not JSON */ }
@@ -43,7 +42,8 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 1000 },
   httpCredentials: { username: NAME, password: PW }, extraHTTPHeaders: { Authorization: auth } });
 const asked = [];
 page.on('request', r => asked.push(r.url().replace(/^https?:\/\/[^/]+/, '')));
-await page.goto(URL); await ready(page); await sleep(800);
+await page.goto(URL); await ready(page);
+await page.waitForFunction(() => (state.projects || []).some(p => p.name === 'alpha'), null, { timeout: 20000 }).catch(() => {});
 
 const row = await page.evaluate(() => (state.projects || []).find(p => p.name === 'alpha') || {});
 ok(/no Spaces Write on alpha/.test(row.write_why || '') && !!row.trash_why && !!row.settings_why,
@@ -78,7 +78,7 @@ const view = async (v, sel) => {
   await page.evaluate(([p, w]) => openNotebook(p, w), ['alpha', v]);
   await nbShown(page);
   if (sel) await page.waitForSelector(`.pane .nb ${sel}`, { state: 'attached', timeout: 20000 });
-  await sleep(400);
+  await settled(page);
 };
 await view('briefing', '#rlList');
 await page.waitForSelector('.pane .nb #memAdd', { state: 'attached', timeout: 20000 });
@@ -135,7 +135,8 @@ else {
 // Settings: no Delete project, and nothing asked to be refused (B89).
 const before = asked.length;
 await view('settings', '#rnDelete');
-await sleep(1500);
+// The window in which the view would have asked for what the role cannot read.
+await quiet(1500);
 const st = await page.evaluate(() => ({ del: document.querySelector('#rnDelete')?.hidden,
   snap: !document.querySelector('#rnSnapField')?.hidden, sess: !document.querySelector('#rnSessField')?.hidden,
   why: document.querySelectorAll('.deadwhy').length }));
@@ -147,7 +148,7 @@ ok(!st.snap && !st.sess, '...nor drawn');
 // ---- Tests, Wiki, Design, Artifacts and Pending (B101) --------------------
 // What each has to show, made by the owner: a test run ingested, a wiki
 // page, a build in dist/.
-{
+await section("Tests, Wiki, Design, Artifacts and Pending", async () => {
   const { writeFileSync, mkdirSync } = await import('node:fs');
   writeFileSync(`${DIR}/ws/alpha/.bb-test-run.log`,
     '[dashboard-test] == shape.mjs ==\nPASS  [+0.1s] a row a reader opens\n1 passed, 0 failed in 0.1s\n');
@@ -158,7 +159,7 @@ ok(!st.snap && !st.sess, '...nor drawn');
   writeFileSync(`${DIR}/ws/alpha/dist/rd-app-0.1.0.apk`, 'not really an apk');
   const wk = await api('/api/wiki', { project: 'alpha', action: 'save', name: 'Home', text: 'a page a reader reads', base: '' });
   ok(wk.status === 200, `the owner writes a wiki page for the reader to read (${wk.status} ${wk.error || ''})`);
-}
+});
 await view('tests', '#tstList .tst > summary');
 await page.click('.pane .nb #tstList .tst > summary');
 await page.waitForSelector('.pane .nb #tstList .tst[open] .bfield', { state: 'attached', timeout: 15000 });

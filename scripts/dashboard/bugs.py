@@ -35,6 +35,8 @@ from fields import field   # noqa: E402
 import agents
 import json
 import os
+import re
+import subprocess
 import sys
 
 # `aerie` execs this module by path (spec_from_file_location), so its directory
@@ -49,6 +51,7 @@ if _here not in sys.path:
 import statefile  # noqa: E402
 import ids  # noqa: E402
 import pending  # noqa: E402
+import tracker  # noqa: E402
 import time
 from pathlib import Path
 
@@ -64,12 +67,16 @@ tmux_name = None
 WORKSPACE = None
 releases = None
 changelog_refs = None
+changelog_lines = None
 
 
 def configure(*, write_json, state, tell=None, tmux_name=None, workspace=None,
-              actor=None, releases=None, changelog_refs=None):
+              actor=None, releases=None, changelog_refs=None, changelog_lines=None):
     globals().update(write_json=write_json, STATE=Path(state),
                      tell=tell, tmux_name=tmux_name, actor=actor,
+                     # project -> its Unreleased lines, [{words, cat}], for a
+                     # row's Tie to a line (R255).
+                     changelog_lines=changelog_lines,
                      # project -> [(version, end of its day)], newest first
                      # (roadmap.releases): what a fix shipped in (R254).
                      releases=releases, changelog_refs=changelog_refs,
@@ -91,8 +98,7 @@ def _by_whom():
     The Nodes page's audit has recorded the account since accounts existed
     (server._principal), and this is the same thing for the notebook.
     """
-    name = str((actor() if actor else "") or "")[:60]
-    return {"who": name} if name else {}
+    return _tracker.by_whom()
 
 
 
@@ -116,6 +122,23 @@ def replay(project, verb, args):
 # statefile.locked takes flock on the file itself, so the other process waits
 # instead of overwriting. Same sites, same shape. See statefile.py.
 _lock = statefile.on(lambda: FILE)
+
+# The file, its log, a batch and the numbers, which the roadmap keeps the
+# same way: tracker.py. What is the bug tracker's own about them is said
+# here, each of this module's names as a call that looks it up when it runs,
+# so what configure() sets later is what is read.
+_tracker = tracker.Tracker(
+    file=lambda: FILE, lock=_lock, save=lambda d: save(d),
+    number=lambda v: _int(v), actor=lambda: actor,
+    limit=lambda: MAX_HISTORY,
+    keep=lambda e: e.get("act") in KEEP_ACTS,
+    coalesce=lambda events: _coalesce(events),
+    noun="the tracker",
+    already_open="a batch is already open here",
+    find_keys=("text", "note", "act"),
+    # Every logged change moves `revn` too: see revisions() for why the
+    # history's length is not enough.
+    counts_revn=True)
 
 SEVERITIES = ("low", "medium", "high", "critical")
 # Whether it reproduces (R124), beside how: every time, now and then, the
@@ -147,14 +170,7 @@ FIELDS = ("area", "repro", "expected", "actual", "notes")
 
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-        if isinstance(d, dict) and isinstance(d.get("projects"), dict):
-            return d
-    except (OSError, ValueError):
-        pass
-    return {"projects": {}}
+    return _tracker.load()
 
 
 def save(d):
@@ -197,10 +213,7 @@ KEEP_ACTS = ("filed", "fixed", "wontfix", "na")
 def _trim(h):
     """The tracker's log to its last MAX_HISTORY events, less the filings
     and closings, which stay."""
-    if len(h) <= MAX_HISTORY:
-        return
-    cut = len(h) - MAX_HISTORY
-    h[:cut] = [e for e in h[:cut] if e.get("act") in KEEP_ACTS]
+    _tracker.trim(h)
 
 
 def _log(d, project, by, ev):
@@ -211,22 +224,7 @@ def _log(d, project, by, ev):
     series of decisions the operator needs to read one at a time. The tracker
     still changes as it goes, visibly; only the record waits for commit.
     """
-    # Counted here because every write to the tracker comes through here,
-    # batched or not: see revisions() for why a length is not enough.
-    d.setdefault("revn", {})[project] = int(d.get("revn", {}).get(project) or 0) + 1
-    ev = {"at": int(time.time()),
-          "by": "claude" if by == "claude" else "you", **agents.asker(by),
-          **_by_whom(),
-          **({"approved": True} if pending.replaying() else {}), **ev}
-    b = d.get("batch", {}).get(project)
-    if b is not None and ev["by"] == b.get("by", "claude"):
-        b.setdefault("events", []).append(ev)
-        return
-    # Anyone else's change goes straight to the history, which is also what
-    # makes revert's guard work: it looks there for the operator's hand.
-    h = d.setdefault("history", {}).setdefault(project, [])
-    h.append(ev)
-    _trim(h)
+    _tracker.log(d, project, by, ev)
 
 
 # ---- the tracker's half of a notebook batch ------------------------------
@@ -283,17 +281,7 @@ def _coalesce(events):
 
 
 def begin(project, by="claude"):
-    with _lock:
-        d = load()
-        if d.get("batch", {}).get(project):
-            return {"error": "a batch is already open here"}
-        h = d.get("history", {}).get(project) or []
-        d.setdefault("batch", {})[project] = {
-            "at": int(time.time()), "by": by, "events": [],
-            "yours": sum(1 for e in h if e.get("by") == "you"),
-            "rows": json.loads(json.dumps(d["projects"].get(project) or []))}
-        save(d)
-    return {"ok": True}
+    return _tracker.begin(project, by)
 
 
 def batches():
@@ -302,87 +290,32 @@ def batches():
     One read of the file for all of them, the same as the roadmap's: this runs
     on every poll, and asking per project would be a load and a lock each.
     """
-    with _lock:
-        d = load().get("batch", {})
-    return {p: {"at": b.get("at", 0), "by": b.get("by", ""),
-                "changes": len(b.get("events") or [])}
-            for p, b in d.items() if b}
+    return _tracker.batches()
 
 
 def batch(project):
     """The open batch here, or None."""
-    with _lock:
-        b = load().get("batch", {}).get(project)
-    return None if not b else {"at": b.get("at", 0), "by": b.get("by", ""),
-                               "changes": len(b.get("events") or [])}
+    return _tracker.batch(project)
 
 
 def commit(project):
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return {"error": "nothing is open here"}
-        kept = _coalesce(b.get("events") or [])
-        h = d.setdefault("history", {}).setdefault(project, [])
-        h.extend(kept)
-        _trim(h)
-        del d["batch"][project]
-        save(d)
-    return {"ok": True, "written": len(kept),
-            "folded": len(b.get("events") or []) - len(kept)}
+    return _tracker.commit(project)
 
 
 def revert_blocked(project):
     """Why a revert would refuse, or None. See roadmap.revert_blocked."""
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return "nothing is open here"
-        h = d.get("history", {}).get(project) or []
-        if sum(1 for e in h if e.get("by") == "you") > b.get("yours", 0):
-            return ("the operator has changed the tracker since the batch "
-                    "opened; reverting would undo their work too. "
-                    "Commit it and correct what is wrong.")
-    return None
+    return _tracker.revert_blocked(project)
 
 
 def revert(project):
-    why = revert_blocked(project)
-    if why:
-        return {"error": why}
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return {"error": "nothing is open here"}
-        d["projects"][project] = b.get("rows") or []
-        del d["batch"][project]
-        save(d)
-    return {"ok": True, "dropped": len(b.get("events") or [])}
+    return _tracker.revert(project)
 
 
 def history(project, limit=None, since=None, find=None):
     """What has happened to the tracker, newest first, optionally narrowed by
     the same filters the roadmap's log takes, because whoever learned one
     should not have to learn the other."""
-    with _lock:
-        h = load().get("history", {}).get(project) or []
-    out = sorted(h, key=lambda e: -e.get("at", 0))
-    if since is not None:
-        cut = _int(since)
-        if cut is not None:
-            out = [e for e in out if e.get("at", 0) >= cut]
-    if find:
-        needle = str(find).lower()
-        out = [e for e in out
-               if any(needle in str(e.get(k, "")).lower()
-                      for k in ("text", "note", "act"))]
-    n = _int(limit)
-    if n is not None and n > 0:
-        out = out[:n]
-    return out
+    return _tracker.history(project, limit=limit, since=since, find=find)
 
 
 def payload(project):
@@ -400,9 +333,17 @@ def payload(project):
         # later token (B201).
         rev = len((d.get("history") or {}).get(project) or []) + int((d.get("revn") or {}).get(project) or 0)
     rows.sort(key=lambda b: (b.get("status") != "open", -b.get("at", 0)))
+    # The lines each bug is tied to in the notebook (link_changelog), found
+    # in the changelog by their words, with the release that carried each.
+    linked = {f"B{b['id']}": b["changelog"] for b in rows if isinstance(b.get("changelog"), list) and b["changelog"]}
+    # ...and, for a fixed bug with none tied, the lines naming the commits
+    # that fixed it (R255), said as found by its commits.
+    commits = {f"B{b['id']}": b["commits"] for b in rows
+               if b.get("status") == "fixed" and isinstance(b.get("commits"), list) and b["commits"]}
     return {"project": project, "bugs": rows, "rev": rev,
             "releases": releases(project) if releases else [],
-            "changelog": changelog_refs(project, "B") if changelog_refs else {}}
+            "changelog": changelog_refs(project, "B", linked, commits) if changelog_refs else {},
+            "lines": changelog_lines(project) if changelog_lines else []}
 
 
 def counts():
@@ -557,23 +498,16 @@ def _image():
 def _next_id(d, project):
     """One above the highest number ever handed out: see roadmap._next_id.
     `reserved` is the high-water mark: held, filed, or deleted since."""
-    rows = d["projects"].get(project) or []
-    top = max((int(b.get("id", 0)) for b in rows), default=0)
-    return max(top, _int((d.get("reserved") or {}).get(project)) or 0) + 1
+    return _tracker.next_id(d["projects"].get(project) or [], d, project)
 
 
 def _took(d, project, n):
-    r = d.setdefault("reserved", {})
-    r[project] = max(_int(r.get(project)) or 0, int(n))
+    _tracker.took(d, project, n)
 
 
 def _moved_by(d, project, bug_id):
     """Who last touched this bug and when, for the refusal below."""
-    b = (d.get("batch", {}).get(project) or {}).get("events") or []
-    for e in reversed(list(d.get("history", {}).get(project) or []) + list(b)):
-        if _int(e.get("id")) == bug_id:
-            return {"by": e.get("by", ""), "at": e.get("at", 0)}
-    return {}
+    return _tracker.moved_by(d, project, bug_id)
 
 
 def _edit(project, bug_id, change, by="you", rev=None):
@@ -610,6 +544,145 @@ def _edit(project, bug_id, change, by="you", rev=None):
             bug["rev"] = int(bug.get("rev", 0)) + 1
             save(d)
     return out
+
+
+# The commits that fixed a bug (R255): several to a bug, and one commit may
+# fix several bugs. Kept here, never in a commit's message, so a public
+# repository's history names no notebook number; the release check reads
+# them first (releasegaps.fix_commits).
+COMMITS_MOST = 20
+_HEX = re.compile(r"^[0-9a-f]{4,40}$")
+# A stamp's commit: 0.9.0-dev.12+abc1234(.dirty), or abc1234(-dirty) where a
+# repository has no VERSION file.
+_STAMP_SHA = re.compile(r"(?:\+|^)([0-9a-f]{7,40})([.-]dirty)?$")
+
+
+def _resolve(project, sha):
+    """The seven-character form of a commit the project's repository holds,
+    or None."""
+    s = str(sha or "").strip().lower()
+    if not _HEX.match(s):
+        return None
+    try:
+        r = subprocess.run(["git", "-C", str(Path(WORKSPACE) / project), "rev-parse", "--verify", "--quiet",
+                            "--short=7", s + "^{commit}"], capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    out = r.stdout.strip()
+    return out[:7] if r.returncode == 0 and out else None
+
+
+def fixed_by(project, bug_id, add=(), drop=(), by="you"):
+    """Add commits to a bug's Fixed in, or take them off: {ok, bug} or
+    {error}. A commit is added only once it is found in the repository."""
+    adds = []
+    for c in add or ():
+        r = _resolve(project, c)
+        if not r:
+            return {"error": f"no commit {c} in this space's repository"}
+        adds.append(r)
+    drops = {str(c).strip().lower()[:7] for c in drop or () if str(c).strip()}
+
+    def change(bug):
+        have = [x for x in bug.get("commits") or [] if isinstance(x, str)]
+        now = [x for x in have if x[:7] not in drops]
+        for a in adds:
+            if a not in now:
+                now.append(a)
+        if now == have:
+            return {"ok": True, "bug": bug}
+        if now:
+            bug["commits"] = now[-COMMITS_MOST:]
+        else:
+            bug.pop("commits", None)
+        return {"ok": True, "bug": bug,
+                "log": {"act": "edited", "id": bug["id"], "text": bug["title"],
+                        "note": "fixed in " + (", ".join(now) or "no commit named")}}
+    return _edit(project, bug_id, change, by)
+
+
+# The changelog lines a bug is answered by, kept here by their words and
+# never as a number in the public file (aerie changelog add --bug, link): a
+# line names its commits, the notebook which bugs it answers.
+CHANGELOG_MOST = 20
+
+
+def link_changelog(project, bug_id, text, by="you"):
+    """Tie the changelog line `text` (its words, without its commits) to the
+    bug: its row lists it and the release that carried it. {ok} or {error}."""
+    t = " ".join(str(text or "").split())[:MAX_LONG]
+    if not t:
+        return {"error": "a changelog line's words are needed"}
+
+    def change(bug):
+        have = [x for x in bug.get("changelog") or [] if isinstance(x, str)]
+        if t in have:
+            return {"ok": True, "bug": bug}
+        bug["changelog"] = (have + [t])[-CHANGELOG_MOST:]
+        return {"ok": True, "bug": bug, "log": {"act": "linked", "id": bug["id"], "text": bug["title"], "note": "changelog"}}
+    return _edit(project, bug_id, change, by)
+
+
+def unlink_changelog(project, bug_id, text, by="you"):
+    """Untie the changelog line `text` from the bug: {ok, bug} or {error}."""
+    t = " ".join(str(text or "").split())
+
+    def change(bug):
+        have = [x for x in bug.get("changelog") or [] if isinstance(x, str)]
+        if t not in have:
+            return {"error": "that line is not tied to this bug"}
+        now = [x for x in have if x != t]
+        if now:
+            bug["changelog"] = now
+        else:
+            bug.pop("changelog", None)
+        return {"ok": True, "bug": bug, "log": {"act": "edited", "id": bug["id"], "text": bug["title"],
+                                                "note": "untied from a changelog line"}}
+    return _edit(project, bug_id, change, by)
+
+
+def no_line(project, bug_id, why, by="you"):
+    """A fixed bug that needs no changelog line, and why, kept in its notes as
+    the release check reads an answer (aerie changelog skip)."""
+    why = " ".join(str(why or "").split())[:MAX_SHORT]
+    if not why:
+        return {"error": "say why it needs no line: a release never had it, or nobody using it meets it"}
+
+    def change(bug):
+        if bug.get("status") != "fixed":
+            return {"error": "only a fixed bug is answered for the changelog"}
+        stamp = time.strftime("%d %b", time.localtime())
+        bug["notes"] = (str(bug.get("notes") or "") + f"\n\n[{stamp}] Changelog: needs no line: {why}").strip()[:MAX_LONG]
+        return {"ok": True, "bug": bug, "log": {"act": "noted", "id": bug["id"], "text": bug["title"],
+                                                "note": "needs no changelog line"}}
+    return _edit(project, bug_id, change, by)
+
+
+def relink_changelog(project, olds, new):
+    """A changelog line reworded or merged: every bug tied to one of `olds`
+    tied to `new` in its place. The number of bugs moved."""
+    olds = {" ".join(str(o or "").split()) for o in olds or []} - {""}
+    new = " ".join(str(new or "").split())[:MAX_LONG]
+    if not olds or not new:
+        return 0
+    with _lock:
+        d = load()
+        moved = 0
+        for b in d["projects"].get(project) or []:
+            have = [x for x in b.get("changelog") or [] if isinstance(x, str)]
+            if not olds & set(have):
+                continue
+            now = []
+            for x in have:
+                y = new if x in olds else x
+                if y not in now:
+                    now.append(y)
+            b["changelog"] = now
+            b["rev"] = int(b.get("rev", 0)) + 1
+            moved += 1
+        if moved:
+            save(d)
+    return moved
 
 
 def edit(project, bug_id, by="you", act="edited", rev=None, **fields):
@@ -717,7 +790,7 @@ def send(project, bug_id, sessions=(), note="", prefix="", want=""):
     return {"ok": True, "sent": True, "text": line}
 
 
-def set_status(project, bug_id, status, note="", by="you"):
+def set_status(project, bug_id, status, note="", by="you", commits=None):
     """Close a bug, or open it again.
 
     The note is the point of closing: "fixed" alone tells the next reader
@@ -729,6 +802,22 @@ def set_status(project, bug_id, status, note="", by="you"):
     # Taken once, outside the lock: git is slow and the lock is held by the
     # dashboard's poll too.
     closed_in = _stamp(project) if status != "open" else None
+    # The commits that fixed it (R255): the ones named, or the commit the
+    # project is on when the tree holds nothing uncommitted. A fix closed
+    # before it is committed names none, and its row says to add it.
+    fixes = []
+    if status == "fixed":
+        if commits:
+            for c in commits:
+                r = _resolve(project, c)
+                if not r:
+                    return {"error": f"no commit {c} in this space's repository"}
+                if r not in fixes:
+                    fixes.append(r)
+        else:
+            m = _STAMP_SHA.search(closed_in or "")
+            if m and not m.group(2):
+                fixes = [m.group(1)[:7]]
 
     def change(bug):
         was = bug.get("status", "open")
@@ -748,6 +837,7 @@ def set_status(project, bug_id, status, note="", by="you"):
             bug.pop("status_by", None)
             bug.pop("fixed_in", None)          # it turned out not to be true
             bug.pop("closed_at", None)
+            bug.pop("commits", None)
         else:
             bug["status_note"] = note_
             bug["status_by"] = "claude" if by == "claude" else "you"
@@ -755,6 +845,8 @@ def set_status(project, bug_id, status, note="", by="you"):
             bug["closed_at"] = int(time.time())
             if closed_in:
                 bug["fixed_in"] = closed_in[:80]
+            if fixes:
+                bug["commits"] = fixes[-COMMITS_MOST:]
         return {"ok": True, "bug": bug,
                 "log": {"act": "reopened" if status == "open" else status,
                         "id": bug["id"], "text": bug["title"], "note": note_}}
@@ -845,6 +937,16 @@ def verb(name, act, req, *, sessions, prefix):
                        note=field(req, "note"))
     elif act == "remove":
         r = remove(name, req.get("id"), why=field(req, "why"))
+    elif act == "commits":
+        # Its Fixed in (R255): commits added by their hash, or taken off.
+        lst = lambda k: [str(x) for x in (req.get(k) or []) if isinstance(x, (str, int))][:COMMITS_MOST]  # noqa: E731
+        r = fixed_by(name, req.get("id"), add=lst("add"), drop=lst("drop"))
+    elif act == "tie":
+        r = link_changelog(name, req.get("id"), field(req, "line"))
+    elif act == "untie":
+        r = unlink_changelog(name, req.get("id"), field(req, "line"))
+    elif act == "noline":
+        r = no_line(name, req.get("id"), field(req, "why"))
     elif act == "send":
         r = send(name, req.get("id"), sessions(), prefix=prefix, note=field(req, "note"),
                  want=field(req, "session"))

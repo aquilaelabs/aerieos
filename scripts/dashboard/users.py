@@ -44,7 +44,10 @@ write_json = None
 # identity override below. Injected, so users.py stays the module the
 # login path imports on its own.
 project_prefs = None
-_lock = threading.RLock()
+import statefile  # noqa: E402
+# Against the other processes that write the accounts too (aerie users), not
+# this one's threads alone.
+_lock = statefile.FileLock(lambda: _file())
 
 ROLES = ("owner", "admin", "user")
 # 600k is the OWASP floor for pbkdf2-sha256 at the time of writing. It costs
@@ -112,16 +115,47 @@ def mint_uid():
 
 
 def load():
-    try:
-        d = json.loads(_file().read_text())
-    except (OSError, ValueError):
-        return {"users": {}}
-    if not isinstance(d.get("users"), dict):
+    # Read once while the file is the same file (statefile.read_json, R228
+    # step 1): a status read asked for it seventy times. Its own copy each.
+    d = statefile.read_json(_file())
+    if not isinstance(d, dict) or not isinstance(d.get("users"), dict):
         return {"users": {}}
     return d
 
 
+def unreadable():
+    """Why the accounts file is there and cannot be read, or "" (B763).
+
+    `load` answers no accounts for a file that is missing, which is a fresh
+    install, and for one that is cut short or not JSON, which is not: read
+    as no accounts, the first-owner page opened to whoever reached the port,
+    and making that owner wrote over the accounts a person could still have
+    mended. So the two are told apart here, and everything that asks "is
+    there no account yet" asks this as well."""
+    f = _file()
+    try:
+        if not f.exists():
+            return ""
+        d = json.loads(f.read_text())
+    except (OSError, ValueError) as e:
+        return f"{f.name} cannot be read ({str(e)[:120]})"
+    if not isinstance(d, dict) or not isinstance(d.get("users"), dict):
+        return f"{f.name} is not an accounts file"
+    return ""
+
+
+def fresh():
+    """Whether nobody has made an account here yet: no accounts, and not an
+    accounts file that cannot be read."""
+    return not load()["users"] and not unreadable()
+
+
 def _save(d):
+    # Never over an accounts file that cannot be read (B763): what is in it
+    # is somebody's accounts, and this would be the empty view of them.
+    why = unreadable()
+    if why:
+        raise OSError(f"{why}: not written over; mend it or put back a copy from /config/backups first")
     # Private from the instant it is in place, where the helper can take a
     # mode (statefile's); the harness and aerie users hand in one that cannot.
     try:
@@ -161,15 +195,37 @@ def get(name):
 
 
 def uid_of(u):
-    """The minted id for a principal, or "" for one that is not a person.
+    """The minted id for a principal, or "" for the server's own contexts
+    (ALL), which are nobody: a background sweep has no tab strip, and every
+    per-account store treats "" as "do not store".
 
-    The server's own contexts (ALL) and a session's scoped token both reach
-    code that wants to remember something per account. Neither should: a
-    background sweep has no tab strip and a `aerie` invocation has no browser. So
-    they answer "" and every per-account store treats that as "do not store".
+    A session answers "" too (R227 step 4): it is a caller of its own kind
+    and carries no account's id, so whatever keeps something by this id keeps
+    nothing for a session unless its handler asked whose() by name. It
+    answered its person's id until then, and each handler that was a
+    person's alone had to remember to refuse a session as well (B764).
     """
+    if (u or {}).get("session"):
+        return ""
     uid = (u or {}).get("uid") or ""
     return "" if uid == "\u0000server" else str(uid)
+
+
+def seat_of(u):
+    """The id of the person a session works for, "" for anything that is not
+    a session or was minted for nobody: whose terminal it is. Asked by name
+    where a session's route acts for that person (their memories and
+    conversations on the space, their git token, the phone lent to them,
+    what a hook files as theirs) and nowhere else."""
+    u = u or {}
+    return str(u.get("seat") or "") if u.get("session") else ""
+
+
+def whose(u):
+    """The person a caller is, or works for: an account's own id, a
+    session's seat. For the routes a session's table names, where the work
+    is the person's whoever's hands did it."""
+    return uid_of(u) or seat_of(u)
 
 
 def starts_unpinned(u):
@@ -198,7 +254,7 @@ def tmux_prefix(u):
     conversation per project is the rule, and who holds it is a record the
     dashboard keeps rather than a name (roadmap #26 step 2).
     """
-    uid = uid_of(u)
+    uid = whose(u)
     return f"{uid}~" if uid and uid != owner_uid() else ""
 
 
@@ -228,9 +284,9 @@ def account_of(u):
     account it was minted for, found by uid. A session has an author too,
     and it is the person's."""
     u = u or {}
-    if u.get("session") and u.get("uid"):
+    if u.get("session") and u.get("seat"):
         for name, rec in load()["users"].items():
-            if isinstance(rec, dict) and rec.get("uid") == u["uid"]:
+            if isinstance(rec, dict) and rec.get("uid") == u["seat"]:
                 return {**rec, "name": name}
     return u
 
@@ -395,6 +451,46 @@ def _pw_recent(key, now, add=False):
     else:
         _pw_misses.pop(key, None)
     return ts
+
+
+def counted_address(sock, forwarded="", trusted=()):
+    """The address a wrong password is counted against. The socket's own,
+    which a client cannot write, unless the socket is a proxy this install
+    trusts (its own tunnel, a proxy named in Settings): then the address
+    that proxy says it passes on, the last one in X-Forwarded-For that is
+    not itself a trusted proxy. Counted by the socket alone, everybody
+    behind the tunnel or a reverse proxy was one address, and a hundred
+    wrong passwords from anyone there held every one of them (R243).
+    `trusted` is addresses and networks as text; what does not read as one
+    is ignored, and a header from anybody else is ignored whole."""
+    import ipaddress
+
+    def addr(s):
+        try:
+            a = ipaddress.ip_address(str(s).strip().strip("[]"))
+        except ValueError:
+            return None
+        return a.ipv4_mapped or a if a.version == 6 else a
+    nets = []
+    for t in trusted or ():
+        try:
+            nets.append(ipaddress.ip_network(str(t).strip(), strict=False))
+        except ValueError:
+            continue
+
+    def is_proxy(a):
+        return any(a.version == n.version and a in n for n in nets)
+    here = addr(sock)
+    if here is None:
+        return str(sock or "")[:45]
+    if is_proxy(here):
+        for part in reversed(str(forwarded or "").split(",")):
+            a = addr(part)
+            if a is None:
+                break                     # not an address: nothing past it is believed
+            if not is_proxy(a):
+                return str(a)
+    return str(here)
 
 
 def pw_held(where):
@@ -578,6 +674,13 @@ def may_see(u, name):
     return sees_all(u) or key_of(name) in _keys(u)
 
 
+def is_owner(u):
+    """Whether the account behind this caller is AerieOS's owner: for a
+    session, the account its token stands for (account_of), never what the
+    session's own record says of itself."""
+    return (account_of(u) or {}).get("role") == "owner"
+
+
 def is_admin(u):
     """Whether this account owns the machinery: nodes, toolchains, settings,
     other accounts. Everything that is not a project.
@@ -632,6 +735,13 @@ def may_instance(u, action, instance="", name=""):
         return ""
     return f"your roles give no {label} {lvl} on {name or instance}: an administrator gives one on the Users page"
 
+
+# What a session may ask for at all, each still bounded by the account
+# behind it (_session_account_why) and by its space's dials where the route
+# reads them: reading its space and the ones it reads, working in it, and
+# the relayed verbs. Everything else is a person's, said by name above
+# where there are words for it and in one sentence where there are not.
+SESSION_MAY = ("read", "work", "write", "bb")
 
 # The actions a session is refused whoever its account is, with what each
 # reaches, for the refusal.
@@ -698,14 +808,6 @@ def may(u, action, project=None):
     # carries its account's uid, and is still a session.
     if action in PERSON_ONLY and (u or {}).get("session"):
         return f"{PERSON_ONLY[action]} is a person's, not a session's"
-    # Setting up a project's file access over FTP (R152 (f)): an
-    # administrator's, or the project's own owner's; who may then sign in is
-    # File access on their roles, which ftp.login reads.
-    if action == "ftp" and project is not None:
-        import membership
-        if is_admin(u) or uid_of(u) == membership.owner_of(project):
-            return ""
-        return "file access over FTP is set up by the space's owner or an administrator"
     # The grants (R137): what the account's roles allow, on this project
     # where one is named. The built-in roles reproduce the answers from
     # before roles existed; a role of your own says exactly what it grants.
@@ -745,10 +847,8 @@ def may(u, action, project=None):
                          "changing the method or clearing it reaches everybody who works on it"),
             "docker-write": ("starting and stopping containers", "you can see what is running and open it"),
             "toolchains-write": ("installing on a node", "these are gigabytes on shared disk"),
-            # Named only (roles.NAMED_ONLY): an administrator too is
-            # refused until a role grants it by name (the operator, 6 Oct).
-            "debug": ("the debug options", "AerieOS's owner's, or a role's that grants debug by name"),
-            "ftp": ("file access over FTP", "AerieOS's owner's, or a role's that grants ftp by name"),
+            "debug": ("the debug options", ""),
+            "ftp": ("setting up file access over FTP", "it hands the space's files to a server on the network"),
         }[action]
         return f"{what} {_needs(action, project)}" + (f" ({why})" if why else "")
     if action == "admin":
@@ -760,6 +860,12 @@ def may(u, action, project=None):
     # may settings are what hold it.
     if not (u or {}).get("session"):
         return _roles_why(action, project)
+    # A session's own short list (R227 step 4): what one may ask for at all,
+    # each then held to the account behind it. It used to be everything the
+    # lines above did not name, so an action added tomorrow was a session's
+    # until somebody remembered it was not.
+    if action not in SESSION_MAY:
+        return f"that is a person's to do, not a session's ({action}): a session works on its own space, through aerie"
     return _session_account_why(u, action, project if project is not None else u.get("session"))
 
 
@@ -915,8 +1021,11 @@ def session_principal(tok):
     want = hmac.new(_session_key(), signed.encode(), hashlib.sha256).hexdigest()[:32]
     if not hmac.compare_digest(sig, want):
         return None
-    return {"name": f"session:{project}", "role": "user",
-            "projects": list(dict.fromkeys([project, key_of(project)])), "session": project, "uid": uid}
+    # A caller of its own kind (R227 step 4): no role's rights and no
+    # account's id. `seat` names the person it works for, which the routes a
+    # session's table names ask for by name (seat_of, whose).
+    return {"name": f"session:{project}", "kind": "session", "role": "session",
+            "projects": list(dict.fromkeys([project, key_of(project)])), "session": project, "seat": uid}
 
 
 # --- editing ---------------------------------------------------------------
@@ -935,6 +1044,9 @@ def claim(name, password):
     if len(password or "") < 8:
         return {"error": "a password is at least 8 characters"}
     with _lock:
+        if unreadable():
+            return {"error": f"the accounts file is there and cannot be read ({unreadable()}): "
+                             "no first account is made over it"}
         d = load()
         if d["users"]:
             return {"error": "this container already has an account"}
@@ -1003,27 +1115,53 @@ def adopt(owner, people):
         d["users"][name] = {"uid": mint_uid(), "role": "owner", "projects": [], "password": pw,
                             "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
         made.append(name)
-        for p in people or []:
-            pn = str((p or {}).get("name") or "").strip()
-            role = str((p or {}).get("role") or "user")
-            nt = str((p or {}).get("smb_nt") or "").upper()
-            if not NAME_RE.match(pn) or pn in d["users"]:
-                skipped.append((pn, "not a name, or a name taken"))
-                continue
-            if role not in ("admin", "user"):
-                role = "user"
-            u = {"uid": mint_uid(), "role": role, "roles": [], "projects": [], "password": "",
-                 "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
-            if re.fullmatch(r"[0-9A-F]{32}", nt):
-                u["smb_nt"], u["smb_at"] = nt, now
-            d["users"][pn] = u
-            made.append(pn)
+        _people_into(d, people, now, made, skipped)
         _save(d)
+    _keys_for(made)
+    return {"ok": True, "made": made, "skipped": skipped}
+
+
+def adopt_people(people):
+    """A prepared configuration's people made once the first-run page has
+    made the owner, where the stick came with no owner's password (B946):
+    each by name and role with no password, and their SMB password's NT
+    hash where one came with them. {ok, made, skipped} or {error}."""
+    made, skipped = [], []
+    with _lock:
+        d = load()
+        if not d["users"]:
+            return {"error": "no owner yet"}
+        _people_into(d, people, int(time.time()), made, skipped)
+        _save(d)
+    _keys_for(made)
+    return {"ok": True, "made": made, "skipped": skipped}
+
+
+def _people_into(d, people, now, made, skipped):
+    """Each of `people` made in `d` as adopt makes them, a name taken or not
+    a name set apart with why."""
+    for p in people or []:
+        pn = str((p or {}).get("name") or "").strip()
+        role = str((p or {}).get("role") or "user")
+        nt = str((p or {}).get("smb_nt") or "").upper()
+        if not NAME_RE.match(pn) or pn in d["users"]:
+            skipped.append((pn, "not a name, or a name taken"))
+            continue
+        if role not in ("admin", "user"):
+            role = "user"
+        u = {"uid": mint_uid(), "role": role, "roles": [], "projects": [], "password": "",
+             "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
+        if re.fullmatch(r"[0-9A-F]{32}", nt):
+            u["smb_nt"], u["smb_at"] = nt, now
+        d["users"][pn] = u
+        made.append(pn)
+
+
+def _keys_for(made):
     import accountkeys
     if accountkeys.STATE is not None:
         for n in made:
             accountkeys.key_of((load()["users"].get(n) or {}).get("uid") or "")
-    return {"ok": True, "made": made, "skipped": skipped}
 
 
 def accounts_in_use():
@@ -1039,16 +1177,46 @@ def accounts_in_use():
 # A share on the controller's own machine is reached as the account's own
 # Unix user there (bbu- and the id's hex, accounts.py), by the account's name
 # and password: a share lists people, and has no password of its own (the
-# operator, 4 Nov). On a machine that serves shares the hash is kept as the
-# account's password is set, unless the person set one apart on Profile
-# (smb_follows is absent then). Samba wants the NT hash (MD4 of the password
-# in UTF-16LE), which is what is kept here and handed to the own machine's
+# operator, 4 Nov). Samba wants the NT hash (MD4 of the password in
+# UTF-16LE), which is what is kept here and handed to the own machine's
 # agent in its hello; the password itself is never stored. The hash opens
-# the shares as the password does, so it is in the users file and nowhere
-# else, never listed, and a backup carries it sealed as the rest.
+# the shares as the password does and is far weaker than the password's own
+# hash, so it is kept for as few accounts as need it (the operator, 13 Nov):
+# on a machine that serves shares, for an account a share names, made from
+# the password as that account next signs in or changes it, and taken away
+# when no share names it any more; it was made for every account at every
+# sign-in, in the users file and every copy of it. A person may set one
+# apart on Profile (smb_follows is absent then), which is theirs until they
+# clear it. It is in the users file and nowhere else, and never listed.
+
+# () -> the Unix users a share this install serves names (its users and its
+# readers), or None while that is not known (the own machine has not said):
+# set by server.py to nodes.smb_named.
+share_named = None
+
+
+def _named():
+    """Those Unix users, or None where nobody can say."""
+    try:
+        got = share_named() if share_named else None
+    except Exception:                                          # noqa: BLE001 (a question, never the sign-in's fault)
+        return None
+    return None if got is None else set(got)
 
 def _md4(data):
-    """MD4 (RFC 1320), since OpenSSL 3 no longer offers it to hashlib."""
+    """MD4 (RFC 1320): the system's own where it still offers it, else the
+    one written out here, since OpenSSL 3 keeps it from hashlib by default
+    and the cryptography library has none. It is what Samba's NT hash is,
+    kept for no other use."""
+    try:
+        return hashlib.new("md4", data, usedforsecurity=False).digest()
+    except (ValueError, TypeError):
+        pass
+    return _md4_here(data)
+
+
+def _md4_here(data):
+    """MD4 written out, for a machine whose OpenSSL does not offer it."""
     mask = 0xFFFFFFFF
     f = lambda x, y, z: (x & y) | (~x & z)  # noqa: E731
     g = lambda x, y, z: (x & y) | (x & z) | (y & z)  # noqa: E731
@@ -1084,24 +1252,64 @@ def _serves_shares():
     return os.environ.get("BB_INSTALL", "") == "bare-metal"
 
 
-def _smb_follow(u, password):
-    """The account's share password follows its sign-in, where one was not set
-    apart. Called with the store's lock held, with the password in hand."""
-    if _serves_shares() and (u.get("smb_follows") or not u.get("smb_nt")):
-        u["smb_nt"], u["smb_at"], u["smb_follows"] = nt_hash(password), int(time.time()), True
+def _smb_follow(u, password, named=False):
+    """The account's share password follows its sign-in, where one was not
+    set apart and a share names the account; with no share naming it, a hash
+    that followed is taken away and none is made. Where it is not known who
+    is named, one that is there is kept in step and none is made. Called
+    with the store's lock held and the password in hand; whether the record
+    changed."""
+    if not _serves_shares() or (u.get("smb_nt") and not u.get("smb_follows")):
+        return False
+    named = _named() if named is False else named
+    if named is not None and smb_user_of(u.get("uid") or "") not in named:
+        return _smb_drop(u)
+    if named is None and not u.get("smb_nt"):
+        return False
+    nt = nt_hash(password)
+    if u.get("smb_nt") == nt and u.get("smb_follows"):
+        return False
+    u["smb_nt"], u["smb_at"], u["smb_follows"] = nt, int(time.time()), True
+    return True
+
+
+def _smb_drop(u):
+    """A hash that followed the password, taken off the record; whether one was there."""
+    if not (u.get("smb_follows") and u.get("smb_nt")):
+        return False
+    for k in ("smb_nt", "smb_at", "smb_follows"):
+        u.pop(k, None)
+    return True
 
 
 def smb_take_up(name, password):
-    """A person signing in whose account has no share password yet (it came by a
-    move, or from before this): the one they just proved, once."""
+    """A person signing in: the share password made from the one they just
+    proved where a share names them and they have none (they were named
+    since they last signed in, or came by a move), and one that followed
+    taken away where no share names them any more."""
     if not _serves_shares():
         return
     with _lock:
         d = load()
         u = d["users"].get(str(name))
-        if u and not u.get("smb_nt"):
-            _smb_follow(u, password)
+        if u and _smb_follow(u, password):
             _save(d)
+
+
+def smb_prune():
+    """Every share password that followed its account's sign-in, on an
+    account no share names any more, taken away; how many. Nothing where it
+    is not known who is named."""
+    named = _named()
+    if named is None:
+        return 0
+    with _lock:
+        d = load()
+        gone = sum(1 for u in d["users"].values()
+                   if smb_user_of(u.get("uid") or "") not in named and _smb_drop(u))
+        if gone:
+            _save(d)
+    return gone
 
 
 def smb_user_of(uid):
@@ -1131,7 +1339,11 @@ def set_smb_password(name, password):
 
 def smb_users():
     """Every account with an SMB password: [{user, nt, name}] for the own
-    machine's hello, the Unix user, the hash and the name it signs in by."""
+    machine's hello, the Unix user, the hash and the name it signs in by.
+    One that followed the sign-in of an account no share names any more is
+    taken away first (smb_prune), so the machine is never handed it."""
+    if any(u.get("smb_follows") and u.get("smb_nt") for u in load()["users"].values()):
+        smb_prune()
     out = []
     for _name, u in sorted(load()["users"].items()):
         user = smb_user_of(u.get("uid") or "")
@@ -1256,26 +1468,6 @@ def set_projects(name, projects):
     return {"ok": True, "name": name, "projects": u["projects"]}
 
 
-def migrate_star(names):
-    """An owner record that carried "*" (every project, taken on by
-    construction, until R135) gets the projects that exist now by name, so
-    nobody is locked out of what they were on; from then on a new project
-    is taken on like an administrator's. Run once at start, with the
-    projects on disk. Returns how many records moved."""
-    moved = 0
-    with _lock:
-        d = load()
-        for u in d["users"].values():
-            have = list(u.get("projects") or [])
-            if "*" not in have:
-                continue
-            kept = [p for p in have if p != "*"]
-            u["projects"] = (kept + [n for n in sorted(names) if n not in kept])[:200]
-            moved += 1
-        if moved:
-            _save(d)
-    return moved
-
 def give_owner_role(project, new_uid, old_uid=""):
     """PROJECT_owner moves with the project (R152): off the account that
     owned it, onto the one that does, on that project alone."""
@@ -1300,27 +1492,6 @@ def give_owner_role(project, new_uid, old_uid=""):
     return name
 
 
-def migrate_r152(owned):
-    """Once (R152, the operator, 7 Oct): an account on `user` carries no role
-    and so no permission, and each project's owner (`owned`, {project: uid},
-    AerieOS's owner's own projects left out, since it holds everything)
-    holds PROJECT_owner on it. Marked done in the store."""
-    with _lock:
-        d = load()
-        if d.get("r152"):
-            return False
-        for u in d["users"].values():
-            if u.get("role") not in ("owner", "admin"):
-                u["role"] = "user"
-                u["roles"] = [r for r in (u.get("roles") or []) if r not in ("user", "owner", "admin")]
-        d["r152"] = True
-        _save(d)
-    for project, uid in sorted((owned or {}).items()):
-        if uid and uid != owner_uid():
-            give_owner_role(project, uid)
-    return True
-
-
 def give_project_role(project, uid, role):
     """Add one role on one project to an account, which puts it on the
     project (R155): an invitation accepted."""
@@ -1337,44 +1508,6 @@ def give_project_role(project, uid, role):
             if project not in u["projects"] and "*" not in u["projects"]:
                 u["projects"].append(project)
         _save(d)
-
-
-def migrate_r155():
-    """Once (R155, the operator, 8 Oct): a role on a project is given on the
-    project, never through the account's own list, and being on a project is
-    holding a role there. A project role an account held through its list
-    is given on each project it was on, so nobody gains or loses anything
-    (an account on every project, "*", gets it on each one there is now);
-    a project it was on with no role, which allowed nothing, is let go.
-    AerieOS's owner and administrators hold everything and are left as
-    they are. Marked done in the store."""
-    import registry
-    known = roles.all_roles()
-    every = sorted(registry.labels()) if registry.FILE is not None else []
-    with _lock:
-        d = load()
-        if d.get("r155"):
-            return False
-        for u in d["users"].values():
-            if u.get("role") in ("owner", "admin"):
-                continue
-            pr = u.get("project_roles") if isinstance(u.get("project_roles"), dict) else {}
-            on = list(u.get("projects") or [])
-            on = every if "*" in on else on
-            keep = []
-            for rn in u.get("roles") or []:
-                r = known.get(rn)
-                if r and r.get("scope") == "projects":
-                    for p in on:
-                        pr[p] = sorted(set((pr.get(p) or []) + [rn]))
-                else:
-                    keep.append(rn)
-            u["roles"] = keep
-            u["project_roles"] = {p: rs for p, rs in pr.items() if rs}
-            u["projects"] = sorted(u["project_roles"])
-        d["r155"] = True
-        _save(d)
-    return True
 
 
 def take_on(name, project):
@@ -1533,10 +1666,9 @@ def _members_refused(name, want, may_change):
 
 def verb(act, req, seen, may_change=None):
     """One of the Users page's verbs on an account, an administrator's (the
-    server holds that gate): add, a password, a role, the projects, a
-    rename, the modal's one Save, remove. The store's own functions above
-    hold the owner's protections. `seen()` is the projects this
-    administrator sees. {ok} or {error}."""
+    server holds that gate): add, the account dialog's one Save (edit), and
+    remove. The store's own functions above hold the owner's protections.
+    `seen()` is the projects this administrator sees. {ok} or {error}."""
     name = field(req, "name")
     pw = req.get("password") or ""
     if act == "add":
@@ -1554,26 +1686,14 @@ def verb(act, req, seen, may_change=None):
             r2 = profile_set(name, pr)
             if r2.get("error"):
                 r = r2
-    elif act == "passwd":
-        r = set_password(name, pw)
-    elif act == "role":
-        r = set_role(name, field(req, "role"))
-    elif act == "projects":
-        # Only projects this admin can see; otherwise the tab becomes a
-        # way to learn what exists by handing it out.
-        # By project (R138): a project's key, or a repository's name, that
-        # stands for one this admin sees.
-        mine = {key_of(p) for p in seen()}
-        want = [p for p in (req.get("projects") or []) if key_of(str(p)) in mine]
-        why = _members_refused(name, want, may_change)
-        r = {"error": why} if why else set_projects(name, want)
-    elif act == "rename":
-        r = rename(name, field(req, "to"))
     elif act == "edit":
-        # The Users tab's modal: everything about one account in one
-        # Save. Each part is the same store function the single verbs
-        # use, so the owner protections hold here too; the rename goes
-        # last so every other part lands under the name it was asked for.
+        # The Users page's dialog: everything about one account in one
+        # Save. Each part is the store's own function, so the owner
+        # protections hold here too; the rename goes last so every other
+        # part lands under the name it was asked for. The projects are only
+        # ones this administrator sees, by key or a repository's name that
+        # stands for one, or the page becomes a way to learn what exists by
+        # handing it out.
         r = {"ok": True, "name": name}
         if isinstance(req.get("profile"), dict) and req["profile"]:
             r = profile_set(name, req["profile"])

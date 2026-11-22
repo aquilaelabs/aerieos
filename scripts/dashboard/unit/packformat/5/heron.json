@@ -1,0 +1,45 @@
+{
+  "name": "heron",
+  "label": "Heron",
+  "about": "The Heron schema compiler: turns a schema file into typed readers and writers for it.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Heron Schema Authors",
+  "platforms": ["linux/amd64", "linux/arm64"],
+  "terms": [{"label": "Heron (MIT)", "url": "https://github.com/heron-schema/heron/blob/main/LICENSE"}],
+  "install": {
+    "fetch": [
+      {"url": "https://github.com/heron-schema/heron/releases/download/v{version}/heron-{version}-linux-x64.tar.gz",
+       "version": "2.7.1",
+       "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+       "to": "dl/heron.tar.gz",
+       "platform": "linux/amd64",
+       "track": {"resolver": "github-release", "repo": "heron-schema/heron", "trim_prefix": "v"},
+       "found": {"from": "github-asset"}},
+      {"url": "https://github.com/heron-schema/heron/releases/download/v{version}/heron-{version}-linux-arm64.tar.gz",
+       "version": "2.7.1",
+       "sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+       "to": "dl/heron.tar.gz",
+       "platform": "linux/arm64",
+       "track": {"resolver": "github-release", "repo": "heron-schema/heron", "trim_prefix": "v"},
+       "found": {"from": "github-asset"}},
+      {"url": "https://schemas.heron.example.org/std/{version}/std.tar.gz",
+       "version": "2026.10",
+       "to": "dl/std.tar.gz",
+       "signed": {"sig": "https://schemas.heron.example.org/std/{version}/std.tar.gz.sig", "keys": "heron.asc"},
+       "track": {"resolver": "match", "url": "https://schemas.heron.example.org/std/latest.txt", "match": "^std ([0-9.]+)$"}},
+      {"url": "https://schemas.heron.example.org/logo.svg",
+       "sha256": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683",
+       "to": "dl/logo.svg"}
+    ],
+    "keyring": {
+      "heron.asc": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEaR9A5hYJKwYBBAHaRw8BAQdAr1KQyGkpm1yQ0Ae9xB8mY3mXZ4JfHk0z3w5c\nK8mQ2cq0IUhlcm9uIFNjaGVtYSA8cmVsZWFzZUBoZXJvbi5leGFtcGxlPoiQBBMW\nCAA4FiEE6vZk0oM9mN0W1h7Q2yq8L4rT0HsFAmkfQOYCGwMFCwkIBwIGFQoJCAsC\nBBYCAwECHgECF4AACgkQ2yq8L4rT0HuH5QD/V7y6dYp0oG2j8wqkZ1aU3bH1S0mE\n=RHfr\n-----END PGP PUBLIC KEY BLOCK-----\n"
+    },
+    "steps": [["sh", "{dir}/install.sh"]],
+    "verify": ["{dir}/bin/heron", "--version"]
+  },
+  "layout": {"bin": ["bin"], "tool": "bin/heron"},
+  "verbs": {
+    "compile": {"about": "Writes the readers and writers for a schema file.", "usage": "FILE", "run": ["{dir}/bin/heron", "compile", "{args}"]}
+  }
+}

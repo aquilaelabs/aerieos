@@ -86,9 +86,20 @@ class World:
         self.env = {"BB_OS_RELEASE": self.release, "BB_OS_SLOT": self.tool, "BB_OS_DEV_A": self.dev["a"], "BB_OS_DEV_B": self.dev["b"],
                     "BB_OS_ESP": self.esp, "BB_OS_WORK": self.work, "BB_OS_RELEASE_URL": "file://" + os.path.join(self.d, "rel"),
                     "BB_OS_STATE": self.state, "BB_OS_ATTEST_URL": "file://" + os.path.join(self.d, "attestations.json"),
-                    "BB_OS_TRUSTED_ROOT": os.path.join(self.d, "trusted-root.jsonl")}
+                    "BB_OS_TRUSTED_ROOT": os.path.join(self.d, "trusted-root.jsonl"),
+                    # An install that names this test's own key as its
+                    # release's signer, whatever this machine's own
+                    # /opt/aerieos holds: the signed list's rules are
+                    # test_release_signing.py's.
+                    "BB_RELEASE_SIGNERS": os.path.join(self.d, "release-signers")}
         with open(os.path.join(self.d, "trusted-root.jsonl"), "w") as f:
             f.write("{}\n")
+        self.key = os.path.join(self.d, "release-key")
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "release", "-f", self.key], check=True, capture_output=True)
+        with open(self.key + ".pub", encoding="utf-8") as f:
+            kind, pub = f.read().split()[:2]
+        with open(os.path.join(self.d, "release-signers"), "w") as f:
+            f.write(f"aerieos-release {kind} {pub}\n")
 
     def publish(self, version, bad=False, without=""):
         """The release's ISO under rel/vVERSION with its sha256: here a tar
@@ -118,6 +129,13 @@ class World:
             json.dump({"attestations": [{"bundle": bundle}]}, f)
         with open(os.path.join(d, f"aerieos-os-{version}.attestation.jsonl"), "w") as f:
             f.write(json.dumps(bundle) + "\n")
+        # The list of its files, signed by the key this install names.
+        sums = os.path.join(d, "SHA256SUMS")
+        with open(sums, "w") as f:
+            f.write(f"{want}  aerieos-os-{version}.iso\n")
+        if os.path.exists(sums + ".sig"):
+            os.unlink(sums + ".sig")
+        subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", self.key, "-n", "aerieos-release", sums], check=True, capture_output=True)
         return d, files
 
 
@@ -210,6 +228,10 @@ class TheAgent(unittest.TestCase):
         self.assertTrue(got["trial"])
         self.assertEqual(got["fell_back"], "")
         self.assertIn("gh attestation verify", text)
+        # ...held to the release workflow on a version's tag, not the
+        # repository alone (B729).
+        self.assertIn("--cert-identity-regex", text)
+        self.assertIn("build-image", text)
         self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "the working files are gone")
 
     def test_a_write_cut_short_leaves_the_slot_reading_as_empty(self):
@@ -410,6 +432,45 @@ class TheController(unittest.TestCase):
         releasecheck._applied["version"] = ""
         window[0] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[(time.localtime(at).tm_wday + 1) % 7]
         self.assertEqual(releasecheck.window_pass(at), "", "another weekday")
+
+
+
+class HostIdKept(unittest.TestCase):
+    """Each image has its own /etc/hostid: a pool is held to the one that last
+    had it, so the machine's is written through /etc's overlay and kept."""
+
+    def setUp(self):
+        agent = agentpkg.load("aerieos_agent_hostid")
+        self.av = sys.modules[agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
+
+    def test_it_is_written_through_the_overlay_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            work, hostid = os.path.join(d, "work"), os.path.join(d, "hostid")
+            os.makedirs(os.path.join(work, "etc", "upper"))
+            with open(hostid, "wb") as f:
+                f.write(b"\xcd\x65\x63\x3e")
+            before = os.stat(hostid).st_ino
+            with mock.patch.dict(os.environ, {"BB_OS_WORK": work, "BB_HOSTID": hostid}):
+                self.av.pin_hostid()
+                self.assertNotEqual(os.stat(hostid).st_ino, before, "written, which is what copies it up")
+                with open(hostid, "rb") as f:
+                    self.assertEqual(f.read(), b"\xcd\x65\x63\x3e")
+                # ...and once the overlay holds it, never again.
+                with open(os.path.join(work, "etc", "upper", "hostid"), "wb") as f:
+                    f.write(b"kept")
+                again = os.stat(hostid).st_ino
+                self.av.pin_hostid()
+                self.assertEqual(os.stat(hostid).st_ino, again)
+
+    def test_nothing_where_there_is_no_overlay(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"BB_OS_WORK": os.path.join(d, "none"), "BB_HOSTID": os.path.join(d, "hostid")}):
+            self.av.pin_hostid()
+            self.assertFalse(os.path.exists(os.path.join(d, "hostid")))
+
+    def test_the_image_imports_its_own_pools_by_force(self):
+        conf = os.path.join(os.path.dirname(__file__), "..", "..", "..", "image", "mkosi.extra", "usr", "lib", "systemd", "system", "zfs-import-cache.service.d", "60-aerieos.conf")
+        with open(conf, encoding="utf-8") as f:
+            self.assertIn("-aN -f", f.read())
 
 
 if __name__ == "__main__":

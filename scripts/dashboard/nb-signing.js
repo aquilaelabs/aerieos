@@ -44,26 +44,28 @@ function nbSigningView({$, nb, project}){
   let draft = {}, mapDraft = {}, fresh = [], lockOpen = false, pw = {}, adding = false, gen = 0;
   let keyPick = "";                             // the key the chips picked, "" for all (R122)
 
-  async function loadSigning(){
-    const mine = ++gen;
-    let j;
-    try{
-      j = await (await postJSON("/api/signing", {action: "list", project})).json();
-    }catch(e){ viewGlance($("sgHint"), [], esc("signing: " + e), "", "bad"); return; }
-    if (mine !== gen) return;
-    if (j.error){
-      // The server's own words, where the keys would be (R255 step 4).
-      keys = null;
-      viewGlance($("sgHint"), []);
-      $("sgAdd").innerHTML = ""; $("sgActs").innerHTML = "";
-      $("sgBox").innerHTML = `<div class="field"><div class="hint nbempty">${esc(j.error)}</div></div>`;
-      return;
-    }
-    keys = j.keys || {}; map = j.map || {}; nodeWhy = j.node_why || ""; tool = !nodeWhy;
-    why = j.why || ""; mayBackup = !!j.may_backup;
-    locked = !!j.backup_locked; mayLock = !!j.may_lock; atRest = j.at_rest || "";
-    rel = j.release || null;
-    drawSigning();
+  function loadSigning(){
+    return reading(`${project}:signing`, async () => {
+      const mine = ++gen;
+      let j;
+      try{
+        j = await postJSON("/api/signing", {action: "list", project});
+      }catch(e){ glanceBad($("sgHint"), "signing", e); return; }
+      if (mine !== gen) return;
+      if (j.error){
+        // The server's own words, where the keys would be (R255 step 4).
+        keys = null;
+        viewGlance($("sgHint"), []);
+        $("sgAdd").innerHTML = ""; $("sgActs").innerHTML = "";
+        drawHTML($("sgBox"), `<div class="field"><div class="hint nbempty">${esc(j.error)}</div></div>`);
+        return;
+      }
+      keys = j.keys || {}; map = j.map || {}; nodeWhy = j.node_why || ""; tool = !nodeWhy;
+      why = j.why || ""; mayBackup = !!j.may_backup;
+      locked = !!j.backup_locked; mayLock = !!j.may_lock; atRest = j.at_rest || "";
+      rel = j.release || null;
+      drawSigning();
+    });
   }
 
   // Every key named, the held ones and the ones New key added, default first.
@@ -139,9 +141,9 @@ function nbSigningView({$, nb, project}){
     // Import a backup and New key, the view's adds, the control row's
     // actions with New key the primary (a-notebook/views, R109), the form
     // either opens unrolling under the row.
-    $("sgActs").innerHTML = why ? "" : `<button type="button" id="sgImp" data-add="import" aria-expanded="${adding === "import"}"${
-        locked ? "" : ` disabled title="no key can be added until the backups have a password"`}><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="${adding === "key"}">New key</button>`;
-    $("sgAdd").innerHTML = why ? ""
+    patch($("sgActs"), why ? "" : `<button type="button" id="sgImp" data-add="import" aria-expanded="${adding === "import"}"${
+        locked ? "" : ` disabled title="no key can be added until the backups have a password"`}><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="${adding === "key"}">New key</button>`);
+    patch($("sgAdd"), why ? ""
       : adding === "key" ? `<div class="field"><div class="addbar actbar ctlrow">
           <input id="sgNewName" autocomplete="off" spellcheck="false" placeholder="name, e.g. watch" aria-label="a new key's name">
           <button type="button" id="sgNewGo">Add it</button><button type="button" id="sgAddCancel">Cancel</button></div></div>`
@@ -159,7 +161,7 @@ function nbSigningView({$, nb, project}){
           <div class="sub dim">A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with.</div>
           <div class="actbar"><button type="button" id="sgAddCancel">Cancel</button><button type="button" class="primary" id="sgImpGo" disabled>Import</button></div>
         </div></div>`
-      : "";
+      : "");
     // The backup password (the operator, 1 Oct): the project's owner's to
     // set, and every download's to give, AerieOS's owner's included.
     const lock = `<div class="field"><div class="rnsign rnsignlock">
@@ -224,7 +226,9 @@ function nbSigningView({$, nb, project}){
       const s = keys[key] || {}, n = SIGN_ROUTES.filter(([r]) => s[r]).length;
       return n ? `${n} of 2` : "none";
     };
-    $("sgBox").innerHTML =
+    // Patched (R244): a key's name, a password or an alias being typed stays
+    // when a release's signing moves the view.
+    patch($("sgBox"),
       // The keys are the project's, as many as it has: big chips pick one,
       // the small pills are for the view's own sections (R122). The chips
       // come first and the view's own boxes under them (the operator, 26 Oct).
@@ -245,7 +249,7 @@ function nbSigningView({$, nb, project}){
       + docSection("signing", "apps", "Apps", mapped.length ? `${mapped.length}` : "none",
           apps + (why ? "" : nb.sectBar("signing:apps")))
       + docSection("signing", "releases", "Releases", relStatus, relBody,
-          {cls: r.wanted && (r.why || (r.failed || []).length) ? "warn" : ""});
+          {cls: r.wanted && (r.why || (r.failed || []).length) ? "warn" : ""}));
     wireSections($("sgBox"));
     $("sgBox").querySelectorAll("[data-sgkey]").forEach(c => c.onclick = () =>
       chipMove(() => $("sgBox"), ".sect", () => { keyPick = c.dataset.sgkey; drawSigning(); }));
@@ -270,7 +274,7 @@ function nbSigningView({$, nb, project}){
               + "Once a build signed with it is out, it is that app's identity for good: download a backup straight after."))
           return;
         b.disabled = true;
-        const j = await (await postJSON("/api/signing", {action: "generate", project, key, route})).json();
+        const j = await postJSON("/api/signing", {action: "generate", project, key, route});
         if (j.error){ b.disabled = false; return notify(j.error, true); }
         notify(`${key}: a ${route === "play" ? "Play upload" : "sideload signing"} key was made; download a backup`);
         fresh = fresh.filter(n => n !== key);
@@ -281,7 +285,7 @@ function nbSigningView({$, nb, project}){
         if (!await askYes(`Rotate ${key}'s sideload key to ${to}? Builds then go out signed with both and a proof: `
               + `Android 9 and newer move to ${to}, older devices keep checking ${key}, and ${key} is kept for good.`)) return;
         b.disabled = true;
-        const j = await (await postJSON("/api/signing", {action: "rotate", project, from: key, to})).json();
+        const j = await postJSON("/api/signing", {action: "rotate", project, from: key, to});
         if (j.error){ b.disabled = false; return notify(j.error, true); }
         notify(`${key} is rotated to ${to}: the apps it signed now sign with ${to} and the proof`);
         loadSigning();
@@ -291,11 +295,10 @@ function nbSigningView({$, nb, project}){
       on("[data-signbackupgo]", async b => {
         const pass = row.querySelector("[data-signbackuppass]").value;
         b.disabled = true;
-        const r = await postJSON("/api/signing-backup", {project, key, route, password: pass});
-        if (!r.ok){ b.disabled = false; return notify((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`, true); }
-        const fname = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || `${project}-${key}-${route}`;
+        const got = await postJSON("/api/signing-backup", {project, key, route, password: pass}, {blob: true});
+        if (got.error){ b.disabled = false; return notify(got.error, true); }
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(await r.blob()); a.download = fname;
+        a.href = URL.createObjectURL(got.blob); a.download = got.name || `${project}-${key}-${route}`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 10000);
         delete pw[`${key}:${route}`];
@@ -315,7 +318,7 @@ function nbSigningView({$, nb, project}){
     }
     const rg = $("sgRelGo");
     if (rg) rg.onclick = () => pressing(rg, async () => {
-      const j = await (await postJSON("/api/signing", {action: "release-sign", project})).json();
+      const j = await postJSON("/api/signing", {action: "release-sign", project});
       if (j.error) return notify(j.error, true);
       notify(`${projLabel(project)}: looking for unsigned release APKs to sign`);
       // The answer says the look is going; its end moves the releasesign
@@ -342,7 +345,7 @@ function nbSigningView({$, nb, project}){
       if (nw !== again) return notify("the two new passwords differ", true);
       if (!nw && !locked) return notify("type a password to set", true);
       lg.disabled = true;
-      const j = await (await postJSON("/api/signing", {action: "backup-password", project, current: cur, new: nw})).json();
+      const j = await postJSON("/api/signing", {action: "backup-password", project, current: cur, new: nw});
       if (j.error){ lg.disabled = false; return notify(j.error, true); }
       notify(j.backup_locked ? `${projLabel(project)}'s key backups now ask for the password` : `${projLabel(project)}'s key backups no longer ask for a password`);
       lockOpen = false;
@@ -362,12 +365,12 @@ function nbSigningView({$, nb, project}){
       const name = add.querySelector("#sgImpKey").value.trim().toLowerCase();
       if (name && !/^[a-z0-9][a-z0-9-]{0,31}$/.test(name)) return notify("a key's name is lowercase letters, digits and dashes", true);
       await pressing(ig, async () => {
-        const j = await (await postJSON("/api/signing", {action: "import", project, key: name,
+        const j = await postJSON("/api/signing", {action: "import", project, key: name,
           route: add.querySelector("#sgImpRoute").value, password: add.querySelector("#sgImpPass").value,
-          filename: f.name, backup: await fileB64(f)})).json();
+          filename: f.name, backup: await fileB64(f)});
         if (j.error) return notify(j.error, true);
         const k = j.key || {};
-        notify(`${projLabel(project)}: ${k.key || "the key"}'s ${(SIGN_ROUTES.find(([r]) => r === k.route) || [])[1] || "key"} imported (${signFp(k.sha256)})`);
+        notify(`${projLabel(project)}: ${k.key || "the key"}'s ${(SIGN_ROUTES.find(([r]) => r === k.route) || [])[1] || "key"} imported`);
         adding = false;
         fresh = fresh.filter(n => n !== k.key);
         loadSigning();
@@ -412,7 +415,7 @@ function nbSigningView({$, nb, project}){
       else if (d.file) body = {action: "put", project, key: d.key, route: d.route, keystore: await fileB64(d.file),
                                password: d.pass || "", alias: (d.alias || "").trim(), key_password: d.keypass || ""};
       if (!body) continue;
-      const j = await (await postJSON("/api/signing", body)).json();
+      const j = await postJSON("/api/signing", body);
       if (j.error) return stop(`${d.key} ${word}: ${j.error}`);
       delete draft[`${d.key}:${d.route}`];
     }
@@ -422,16 +425,18 @@ function nbSigningView({$, nb, project}){
   }
   async function saveApps(){
     for (const [pkg, key] of Object.entries(mapDraft)){
-      const j = await (await postJSON("/api/signing", {action: "map", project, package: pkg, key: key || ""})).json();
+      const j = await postJSON("/api/signing", {action: "map", project, package: pkg, key: key || ""});
       if (j.error){ notify(`${pkg}: ${j.error}`, true); return null; }
       delete mapDraft[pkg];
     }
     await loadSigning();
     return `${projLabel(project)}: app mappings`;
   }
-  // For the notebook's leave and close questions.
-  const signStagedCount = () => Object.values(draft).filter(d => d.remove || d.file).length + mapCount();
-  function signClearStaged(){ draft = {}; mapDraft = {}; fresh = []; adding = false; drawSigning(); }
+  // For the notebook's leave and close questions: every staged change to
+  // a key or a mapping, and the way to drop them all.
+  nb.stage("signing", {
+    count: () => Object.values(draft).filter(d => d.remove || d.file).length + mapCount(),
+    revert: () => { draft = {}; mapDraft = {}; fresh = []; adding = false; drawSigning(); }});
 
-  return {loadSigning, signStagedCount, signClearStaged};
+  return {loadSigning};
 }

@@ -1,0 +1,11 @@
+# AerieOS's release key, public half, as config/catalog.pub names the catalog's:
+#   aerieos-release-ed25519 <64 hex characters>
+# made once by tools/sign-agent.py --keygen. A node pins it when it is enrolled
+# and then takes only agent updates the release build signed with its private
+# half (scripts/agent/aerieos_agent/release.py). The private half is the
+# release build's secret (AERIEOS_RELEASE_KEY) and is in no repository.
+# A second line of the same form names its spare: a node pins both and takes
+# an update signed by either, so this key can be replaced with no node cut
+# off. The spare's private half is kept apart from the build's secret.
+aerieos-release-ed25519 2eb9add8c065963469de797ff1d3e9679a19d904c93956487f5e2550d982e818
+aerieos-release-ed25519 5999f8948f031093527e378e6504bf436e82932835aeabce12d6031634586ce8

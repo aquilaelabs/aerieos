@@ -1,0 +1,2825 @@
+/* The page's components (R9 step 4; page-skin.css says how the four
+   layers stand): what more than one page draws. Wins over the skin, and
+   loses to a surface's own rule. */
+@layer components {
+html[data-theme="nostromo"]:not([data-mode="light"]) .pane{background:transparent;--sheen:none}
+html[data-theme="nostromo"]:not([data-mode="light"]) .pane .stack:has(> .doc.on){background-color:var(--glass)}
+/* The nostromo scheme's raised edge on a button, under the rules a page's
+   own bars give their buttons, which outrank it. */
+html[data-theme="nostromo"]:not([data-mode="light"]) button:not(.link){box-shadow:inset 0 1px 0 0 rgba(200,220,240,.14)}
+html[data-mode="light"][data-theme="nostromo"] .pane{background:transparent;--sheen:none}
+html[data-mode="light"][data-theme="nostromo"] .pane .stack:has(> .doc.on){background-color:var(--glass)}
+html[data-mode="light"][data-theme="nostromo"] button:not(.link){
+  box-shadow:inset 0 1px 0 0 rgba(255,255,255,.95),inset 0 -1px 0 0 rgba(0,0,0,.06)}
+/* The install's banner (R88): a band of the page's column under the header,
+   so the content below is shorter by it and nothing pinned to the page sits
+   over it. One line at a desk, wrapping on a phone. */
+.banner{flex:0 0 auto;padding:6px 12px;font:var(--f-ui);color:var(--ink);
+  background:var(--panel);border-bottom:var(--hair) solid var(--line);overflow-wrap:anywhere}
+.banner a{color:var(--note);margin-left:6px}
+.banner.held{color:var(--ground-ink);background:color-mix(in srgb, var(--bad) 16%, var(--ground))}
+.banner.moved{color:var(--warn-wash-ink);background:var(--warn-wash)}
+.banner.moved a{margin-left:0;color:inherit;text-decoration:underline}
+.banner.held a{margin-left:0}
+.banner[hidden]{display:none}
+/* The mark in the scheme's second color (the operator, 16 Oct); red when
+   the controller does not answer. */
+.logo{width:22px;height:22px;flex:0 0 auto;color:var(--note);display:block;
+  transition:color .2s ease}
+/* The default scheme's mark is its own cerulean, never its copper. */
+html:not([data-theme]) .logo{color:var(--accent)}
+html:not([data-theme]) .logo.off{color:var(--bad)}
+.logo.off{color:var(--bad)}
+html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
+.meta{color:var(--dim);font:var(--f-data);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+/* A USB device's row (R116): its picker and Give to a VM are a wide pair, so
+   under 600px they go under the words rather than squeezing the name into a
+   column beside them (B414). */
+@media (max-width:600px){ .ndusb{flex-direction:column;align-items:stretch;gap:6px}
+}
+.popbar{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;
+  min-height:var(--tap);padding:4px 8px 4px 12px;background:var(--panel);
+  border-bottom:var(--hair) solid var(--line)}
+.popbar>b{font:var(--f-ui);font-weight:600;color:var(--ink)}
+.popbar>b+button{margin-left:auto}
+/* What a page's bar knows about the one thing it is about, in the facts
+   voice: one dim mono line (Profile's name, roles and Claude account). */
+.docbarrow .barfacts{font:var(--f-data);color:var(--dim);min-width:0;overflow-wrap:anywhere}
+/* The log settings. Two downloads and a destructive button on one row, which
+   wraps rather than shrinking below a tap target on a phone. */
+.logset{display:flex;flex-direction:column;gap:8px}
+.logset .dim{font:var(--f-note)}
+.logdays{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font:var(--f-note);color:var(--dim)}
+/* Only what is its own. Ground, edge, radius, the mono face and the 16px that
+   stops iOS zooming into it all come from the field skin further down, which
+   this menu was simply not in the list for, so the box wore the browser's
+   default: a 2px gray edge, square corners and Arial, beside a page of 6px
+   sunk monospace fields. */
+/* Scoped to the menu so it outranks the skin's `width:100%`, which is right
+   for a field that owns its row and wrong for one sitting between a label and
+   a button: unscoped, this lost the tie on source order and the row broke
+   into four stacked lines. */
+/* Two selectors deep, to outrank the document-tab skin's width:100%
+   further down, which is right for a field that owns its row. */
+.logset .logdays input[type=number],.uimenu .logdays input{width:5em;
+  min-height:var(--tap);text-align:center;flex:0 0 auto}
+/* Pushed to the end of the row so it reads as acting on the field beside it,
+   and never shrunk below a tap target. */
+.logdays button{margin-left:auto;flex:0 0 auto;min-height:var(--tap)}
+/* A Settings-tab field row (R29): the label first, the control taking the
+   room, the source pill after it, and a text field that is not five
+   characters wide, which is the number field's width above. */
+.setrow label{flex:0 0 auto}
+/* A field with its label above it, and the ? that carries the explanation.
+   .col stacks the row; the field takes the row's width, which the cap on
+   .setrow already limits. */
+.setrow.col{flex-direction:column;align-items:stretch;gap:var(--label-gap)}
+/* A role's grant on the Roles tab (R137): the capability at the field
+   label's size and its sentence at the note size, the same voices a
+   built-in role's summary above it speaks in. A .sub is sized only inside
+   a .row, and these are field rows, so the sentence fell back to body
+   text and the tab spoke in two sizes (5 Oct). */
+/* The Roles tab (R152, R255 step 9): each section a list beside the one
+   picked, the list a column of rows (a name and its tags), the picked row
+   in the accent's tint; on a phone the list, then the detail over it with
+   Back. The detail: the projects an account is on, a row each (its name,
+   its roles there, x), Add to project under them, what it adds up to as a
+   grid; a role's areas a row each, its sentence and its Read and Write. */
+.rolestab label.pick,.ueaccess label.pick,#ramodal label.pick{font:var(--f-ui);color:var(--ink)}
+.rlist{display:flex;flex-direction:column;border-right:var(--hair) solid var(--line);min-width:0}
+.rrow{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;white-space:normal;
+  background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);border-radius:0;padding:var(--row-y) var(--row-x);
+  min-height:var(--tap);color:var(--ink)}
+.rrow .name{font:var(--f-row);font-weight:600}
+.rrow .rtags{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font:var(--f-note)}
+@media(hover:hover){ :is(.rolestab,.userstab) .rrow:hover:not(.on),.snav .rrow:hover:not(.on){background:color-mix(in srgb,var(--ink) 6%,transparent)}
+}
+/* The picked row is lit, so it wears the second color (--lit) as every lit
+   control does. */
+:is(.rolestab,.userstab) .rrow.on,:is(.rolestab,.userstab) .rrow.on:hover,.snav .rrow.on,.snav .rrow.on:hover{
+  background:color-mix(in srgb,var(--lit) 14%,transparent);border-bottom-color:var(--line)}
+/* ...and every row picked to show what is beside or under it is lit the
+   same way: a commit picked in the history, a file in Files, a node's
+   runner on the CI runner page. */
+.grow[data-sha].on,.grow[data-sha].on:hover,.fxtbl .tline.on,.fxtbl .tline.on:hover,.runnersall .row.on,.runnersall .row.on:hover{background:color-mix(in srgb,var(--lit) 14%,transparent)}
+/* A row that asks a person something (the bell's asks, a phone to pair, a
+   node's root command, a container to make): one mark, an edge of the
+   ask's tone inside its left side so nothing moves, a root command or an
+   ask that removes something in --bad and the rest in the accent. */
+:is(.ntask,.phask,.ndask,.dmask){box-shadow:inset 3px 0 var(--accent)}
+:is(.ntask.bad,.ndask){box-shadow:inset 3px 0 var(--bad)}
+/* A page of settings (page-docs.js splitSects, the operator, 16 Oct): its
+   sections a list beside the one picked, the Roles page's shape, the picked
+   section's heading a heading rather than a fold (a project's Settings,
+   Controller settings, Profile). On a phone one column for all of it: the
+   list, then the section over it with Back, the section sliding in from the
+   right and the list back from the left; no row stays lit on the list,
+   since none is open there. */
+.ssplit{display:grid;grid-template-columns:minmax(13rem,17rem) minmax(0,1fr);align-items:start}
+.ssplit>*{grid-column:2;min-width:0}
+.ssplit>.snav{grid-column:1;grid-row:1 / span 99;align-self:stretch}
+/* A page's head (the operator, 25 Oct) in the content column, where every
+   band of the page starts; at a desk it spans the list too (below). */
+.ssplit>.pghead{grid-column:2}
+/* ...and at a desk a card of its own, as a node's head is on the Nodes
+   page (the operator, 26 Oct: its facts loose over the cards read as part
+   of none): on the page's margin, or on the content column's edge beside a
+   settings page's list, with the cards' gap under it. */
+@media(min-width:901px){
+  .ssplit:has(>.pghead)>.snav{grid-row:2 / span 98}
+}
+/* The jump bar is the list's job here: hidden, over the dialog's own
+   .field.sectjump rule, which outranks a plain one. */
+.snav,.shback,.ssplit>.sectjump,.ssplit>.field.sectjump,.ssplit>h3{display:none}
+.ssplit>.snav{display:flex}
+.ssplit>details.sect:not(.scur){display:none}
+.ssplit>details.sect>summary{pointer-events:none}
+.ssplit>details.sect>summary::before,.ssplit>details.sect>summary::marker{display:none;content:""}
+.snav .sunsaved{color:var(--warn);font-weight:600}
+@media(max-width:900px){
+  .ssplit{grid-template-columns:minmax(0,1fr)}
+  .ssplit>*,.ssplit>.snav{grid-column:1;grid-row:auto}
+  .ssplit>.snav{border-right:0}
+  .ssplit:not(.sopen)>:not(.snav):not(.pghead){display:none}
+  /* ...over the list on a phone, and gone with it once a section opens. */
+  .ssplit.sopen>.pghead{display:none}
+  .ssplit>.pghead{grid-row:auto;grid-column:1;order:-1}   /* first, as at a desk: the list comes before it in the markup */
+  .ssplit.sopen>.snav{display:none}
+  /* The open section's head is the way back: a chevron before its name,
+     the whole head the press (splitSects). */
+  .ssplit.sopen>.scur>summary,.rsplit.open>.rdetail>.rhead{pointer-events:auto;cursor:pointer}
+  .ssplit:not(.sopen)>.snav .rrow.on{background:none;--sheen:none}
+  .ssplit.sopen[data-move="in"]>:not(.snav){animation:splitIn .26s cubic-bezier(.33,1,.68,1)}
+  .ssplit:not(.sopen)[data-move="back"]>.snav{animation:splitBack .26s cubic-bezier(.33,1,.68,1)}
+}
+@media(max-width:900px){
+  .rlist{border-right:0}
+}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.rareas .rexp{background:none;border:0}
+/* A node that was un-enrolled, kept on the one project still set to it
+   (page-projsettings.js): italic in the list and in the closed picker. */
+/* One class over the field skin's .nb select and .modal select, whose font
+   shorthand sets the style back to normal. */
+.nb select.removed,.modal select.removed,.doctab select.removed,option.removed{font-style:italic}
+.nb select.removed,.modal select.removed,.doctab select.removed{color:var(--dim)}
+/* Outranks the row rule's flex-basis, which is a WIDTH in a row and would
+   be a height here: a stacked field is as wide as its row and as tall as a
+   field. */
+.setrow.col>input:not([type=checkbox]):not([type=number]),.setrow.col>select{width:100%;flex:0 0 auto}
+.setrow.col>input[type=number]{width:7em;flex:0 0 auto}
+.lbl{display:block;font:var(--f-ui);color:var(--dim);margin:0}
+.help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+  margin-left:5px;border-radius:50%;border:var(--hair) solid var(--line);color:var(--dim);
+  font:11px/1 system-ui,sans-serif;vertical-align:middle;cursor:help;
+  transition:color .15s ease,border-color .15s ease}
+.help:hover,.help:focus-visible{color:var(--ink);border-color:var(--ink)}
+/* A ? opens its words in a tooltip (the operator, 26 Oct): fixed to the
+   window, so no pane clips it, beside the ? and inside the screen's edges
+   (helpShow places it), in the floating cards' panel and hairline. */
+.help.on{color:var(--ink);border-color:var(--ink)}
+.helppop{position:fixed;z-index:400;max-width:min(320px, calc(100vw - 16px));padding:8px 10px;background:var(--panel);
+  border:var(--hair) solid var(--line);border-radius:var(--r-surface);box-shadow:0 10px 28px rgba(0,0,0,.38);
+  color:var(--ink);font:var(--f-ui);white-space:normal;overflow-wrap:anywhere;
+  pointer-events:none;animation:menuIn .16s cubic-bezier(.33,1,.68,1)}
+.helppop[hidden]{display:none}
+.setrow input:not([type=checkbox]):not([type=number]){flex:1 1 12em;min-width:0;width:auto}
+.logset .setrow select{width:auto;flex:0 1 auto}
+.setrow .pill{flex:0 0 auto}
+/* A swatch's own background sits under the hover every button has, so a tile
+   pointed at takes the hover tint in its own scheme's note color; the
+   nostromo tiles' own backgrounds outrank that hover. */
+.sw{background:var(--bg)}
+.bnote{padding:8px 12px;border-bottom:var(--hair) solid var(--line);font:var(--f-ui)}
+.bnote:last-of-type{border-bottom:0}
+.bnote .bwhy{overflow-wrap:anywhere}
+.bnote.bad .bwhy{color:var(--bad)}
+.bnote.warn .bwhy{color:var(--warn)}
+/* Amber, and a left edge, because this one is not a record of something that
+   happened; it is a question with a deadline on it. */
+/* Not a notification with a different border: a different thing. It is the
+   only row here that is a question, it is pinned above every answer, and it
+   is the one the Clear button cannot touch. */
+.bnote.ask{border-left:3px solid var(--warn);background:var(--ground);
+  border-bottom:var(--hair) solid var(--warn)}
+.bnote.ask .bwhy{color:var(--warn)}
+.bnote.ask .btag{display:inline-block;margin-bottom:5px;padding:1px 6px;
+  border-radius:var(--r-small);font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;
+  background:var(--warn);color:var(--bg);font-weight:700}
+/* The two answers read as controls, not as links in a sentence. */
+.bnote.ask .acts a{padding:3px 10px;border-radius:var(--r-control);border:var(--hair) solid var(--line);
+  text-decoration:none}
+.bnote.ask .acts a[data-ballow]{background:var(--warn);color:var(--bg);
+  border-color:var(--warn);font-weight:600}
+.bnote .bdetail summary{font:var(--f-note);color:var(--dim);cursor:pointer;margin-top:4px}
+.bnote .bdetail pre{font:var(--f-data);white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow:auto;margin:6px 0 0;padding:8px;background:var(--sunk);border-radius:var(--r-control)}
+.bnote .bcmd{font:var(--f-code);color:var(--dim);overflow-wrap:anywhere;
+  margin-top:3px}
+/* Its actions beside what it says while they fit, and on a line of their
+   own under it when they do not, each button's words kept whole (B332). */
+.bnote .bfoot{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:5px;
+  color:var(--dim);font:var(--f-note)}
+.bnote .bfoot .acts{margin-left:auto;display:flex;gap:8px}
+.bnote .bfoot .acts a{white-space:nowrap}
+.bnote .bfoot a{color:var(--dim)}
+/* Approve is a filled control, its text the page's dark on the amber: an
+   older rule painted it the accent, which won by coming later and put
+   green on amber, hard to read in every theme (the operator, 5 Oct). */
+/* Pinned like a question, red like a fault: an agent from another window
+   is not waiting on an answer, it is stopping work until it is updated. */
+.bnote.ask.bad{border-left-color:var(--bad);border-bottom-color:var(--bad);
+  background:color-mix(in srgb, var(--bad) 13%, var(--ground))}
+.bnote.ask.bad .btag{background:var(--bad);color:var(--bg)}
+.bnote.ask.bad .bwhy{color:var(--bad)}
+/* The drawer in three groups, each headed by what it is and how many
+   (the operator, 10 Oct: one amber wall). A head is a label, not a row. */
+.bgroup,.uimenu h4{display:flex;align-items:center;gap:8px;padding:8px 12px 6px;
+  font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);
+  border-bottom:var(--hair) solid var(--line);background:var(--sunk)}
+.bgroup button{margin-left:auto}
+/* What needs doing but is not a question: the bar down its side says how
+   much it matters, the words stay in ink, and the long part is folded. */
+.bnote.att{border-left:3px solid var(--warn)}
+.bnote.att.bad{border-left-color:var(--bad)}
+.bnote .bt{font-weight:600}
+.bnote .bsum{color:var(--dim);margin-top:2px;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bnote .bwarn{color:var(--warn);font:var(--f-note);margin-top:3px}
+.bnote.att .acts a{padding:3px 10px;border-radius:var(--r-control);border:var(--hair) solid var(--line);
+  text-decoration:none}
+.bfootbar > span{margin-right:auto;color:var(--dim);font:var(--f-note);align-self:center}
+.bempty{padding:14px 10px;color:var(--dim);font:var(--f-note);text-align:center}
+.bfootbar{display:flex;justify-content:flex-end;padding:6px 8px;
+  border-top:var(--hair) solid var(--line)}
+/* The welcome panel's switch and its two pages: the guide is prose, the
+   changelog is a list with a line under what is new since the reader last
+   looked. Segmented like the notebook's strip, not a select. */
+.abswitch{display:flex;gap:6px;margin:10px 0 6px}
+.abswitch button{flex:0 1 auto}
+/* Picked, so lit as every picked control is (the second color filled):
+   text and edge in the accent clashed with the second color's hover. */
+.abswitch button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
+/* One scroller, not two. The page used to be capped at 52vh on its own while
+   the box capped itself at 90vh, and the lines under the page did not fit in
+   the difference, so the box scrolled a little around a page that scrolled
+   too (18 Sep, on every size measured). A column instead: the title, the
+   switch, the build lines and the foot keep their height, and the page takes
+   what is left and is the only thing that scrolls. */
+/* A question (page-ask.js): its words a note's measure, paragraphs apart. */
+.askdlg .asksaid{margin:0;font:var(--f-ui);color:var(--ink);overflow-wrap:anywhere}
+/* A question's title is the question, a sentence in its own case at reading
+   size: a dialog's label title is small capitals, and a question in it read
+   as shouting (the operator, 23 Oct). */
+.modal.askdlg h3{font:var(--f-sect);letter-spacing:0;text-transform:none}
+/* What one yes covers (R265): a short heading over its lines, each a point. */
+.askdlg .askpart ul{padding:0 0 0 1.1em;list-style:disc}
+.askdlg .askpart li+li{margin-top:4px}
+.modal .box.prose{display:flex;flex-direction:column}
+.modal .box.prose>*{flex:none}
+.modal .box.prose>.about{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+.about>*{flex:none}
+.about>.abpage{flex:0 1 auto;min-height:0}
+.abpage{overflow:auto;padding-right:4px}
+/* A guide's heading is the text's, not the dialog's: .modal h3 (the title
+   band's inset, rule and capitals) reached into it and set every heading
+   in from the paragraph under it (B110). */
+.about .abpage :is(h2,h3,h4){margin:12px 0 4px;padding:0;border:0;font:var(--f-ui);font-weight:600;
+  text-transform:none;letter-spacing:normal;position:static;background:none;--sheen:none}
+.modal .box.prose>.about,.about>.abpage{flex:1 1 auto}
+.abpage p,.abpage li{font:var(--f-ui);color:var(--ink);line-height:1.5}
+.abpage ul{margin:4px 0 8px 18px;padding:0}
+.abpage .dim{color:var(--dim)}
+.col{display:flex;flex-direction:column;gap:10px;min-height:0}
+body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:none}
+.setup{flex:1 1 auto;min-height:0;overflow:auto;background:var(--panel);
+  border:var(--hair) solid var(--line);border-radius:var(--r-surface)}
+@media(max-width:900px){ .setup{border:0;border-radius:0}
+}
+/* New container's import, beside the Compose pane's hint: never a button on a line of its own. */
+.cimport{flex-wrap:nowrap;align-items:flex-start}
+/* A hint beside a button in an action bar sits level with it, not a hint's
+   gap below the line above. */
+.actbar>.hint{margin:0;min-width:0}
+/* The reset dialog's list keeps its band's rhythm: a dialog's field sets its
+   children's margins, which outranks this one. */
+.resetwhat{margin:8px 0}
+
+/* Finger-sized where a finger is what presses it. */
+@media(max-width:900px){
+  header button,.docbar button{min-height:var(--tap);min-width:var(--tap)}
+  .pane .bar button{min-height:30px}
+}
+.row{display:flex;align-items:center;gap:8px;padding:var(--row-y) var(--row-x);
+  border-bottom:var(--hair) solid var(--line);flex-wrap:wrap}
+.row:last-child{border-bottom:0}
+/* The CI runner page's list of every node's runner, each row a press that
+   picks its node; the one shown wears the accent's edge. */
+/* Home (R218 step 5): its tiles are links, the one place tiles are pressed
+   (the home rule); Attention and Last jobs side by side at a desk, stacked
+   on a phone; the pinned projects as small cards. */
+.hometiles .tile.link{text-align:left;cursor:pointer;color:inherit;text-decoration:none;display:block}
+.hometiles .tile.link > span{display:block}
+.hometiles .tile .ts.bad{color:var(--bad)}
+@media(hover:hover){ .hometiles .tile.link:hover{border-color:var(--accent-mid)}
+}
+.homegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media(max-width:900px){ .homegrid{grid-template-columns:minmax(0,1fr)}
+}
+.hcard,.hsect{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  overflow:hidden;min-width:0}
+/* Home's cards keep the inset every card's words have, 16px, the tiles'
+   too (the operator, 17 Oct: the headings sat 4px left of the tiles'). */
+.hcard h3,.hsect h3{margin:0;padding:12px 16px;min-height:46px;box-sizing:border-box;display:flex;align-items:center;
+  font:var(--f-sect);border-bottom:var(--hair) solid var(--line);background:var(--head-bg)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.hcard .hjob{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
+.hcard.focus{border-color:var(--accent);transition:border-color .2s}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.runnersall .row{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
+
+/* A row nothing here can act on: a container this dashboard did not start, or
+   any instance while the daemon is not answering. Dimmed rather than dropped;
+   it is still the answer to "what is on record", and a row you cannot act on
+   should look like one before you press anything. The buttons inside carry
+   :disabled's own fade on top of this, which is the intended reading: the row
+   is inert and its controls doubly so. */
+/* The row's PARTS are dimmed, not the row: a More menu opened on a dimmed
+   row is drawn inside it, and an opacity on the row made the menu see-through
+   over the next row's words (R210). */
+.row.off > :not(.actbar),.row.off > .actbar > :not(.more),.row.off > .actbar > .more > button{opacity:.62}
+/* A directory name can be one long unbroken token; it wraps rather than
+   handing the whole page a sideways scroll. */
+/* A row's name, one font everywhere (the consistency pass): the row's
+   voice, bold. A card's or a page head's title is the larger title. */
+:is(.row,.hproj,.gcommit) .name{font:var(--f-row);font-weight:600;overflow-wrap:anywhere}
+.row .name.go{cursor:pointer}
+/* A name that opens what it names (a repository, a project, a person) is
+   linked text, as a session's name is on Sessions: the row's own ink, no box,
+   underlined under the pointer. Every list draws its names with .namelink. */
+.namelink{background:none;--sheen:none;border:0;padding:0;min-height:0;color:var(--ink);font:inherit;
+  text-align:left;white-space:normal;cursor:pointer;display:inline}
+@media(hover:hover){ .namelink:hover{background:none;--sheen:none;text-decoration:underline}
+}
+/* One .sub, the note voice, wherever it is (the operator, 17 Nov): a line
+   under a name says something in words. A line of facts (ids, sizes,
+   paths, versions, a node and an age) is .sub.data, in the data voice. */
+.sub{color:var(--dim);font:var(--f-note);overflow-wrap:anywhere}
+/* A NOTICE: what is wrong or what to know, under a row, in a voice of its
+   own (the operator, 13 Oct: facts, warnings and settings all wore the same
+   dim mono and read as one gray block). Sans, in the level's color, behind
+   a bar of that color, and no wider than a paragraph: the eye finds it
+   without reading the facts around it. `.notice` is the same thing where
+   there is no row (a tab's own line at the top). A problem the page can fix
+   is a link in the color of its own warning. */
+.row .sub.bad,.row .sub.warn,.row .sub.note,.notice{
+  font:var(--f-ui);padding:2px 0 2px 10px;border-left:3px solid var(--warn);
+  margin:4px 0;max-width:78ch;overflow-wrap:anywhere}
+.row .sub.warn,.notice,.notice.warn{color:var(--warn)}
+.row .sub.bad,.notice.bad{color:var(--bad);border-left-color:var(--bad)}
+.row .sub.note,.notice.note{color:var(--note);border-left-color:var(--note)}
+.notice a,.row .sub.warn a,.row .sub.bad a{color:inherit}
+/* Locked is a decision, not a fault: stated plainly rather than alarming.
+   Nothing about the row is dimmed for it: a locked project is one the operator
+   is actively running, and graying it out would say the opposite. */
+.row .sub.locked{color:var(--dim);font-style:italic}
+.grow{flex:1;min-width:120px}
+button,a.btn,.dockline .dtab{background-image:var(--sheen) !important}
+/* Hover, only where there is a pointer that hovers. On a touch screen a tap
+   leaves the element in :hover until the next tap somewhere else: a card
+   header stayed bright after collapsing it, a key stayed lit after ^C, the
+   bar button held its lighter gray, and with the tap highlight turned off
+   that stuck state was the only thing left over from the touch. Placed here,
+   ahead of button.primary/.on, which share button:hover's
+   specificity and win only by coming later. */
+@media(hover:hover){
+  .row .name.go:hover{text-decoration:underline}
+  /* ...and a highlighted button carries the scheme's second color (--lit), a tint in its
+     fill and its edge, where a resting one stays the plain control (the
+     operator, 16 Oct). */
+  button:hover{background:color-mix(in srgb, var(--btn-hi) 80%, var(--lit));
+    border-color:color-mix(in srgb, var(--lit) 65%, var(--line))}
+  /* The green buttons kept their color through button:hover (their own rules
+     come later and win), which meant no hover at all. A lighter green and a
+     brighter border are their version of the same lift. */
+  button.primary:hover,button.on:hover{
+    background:color-mix(in srgb, var(--lit), #000000 28%);
+    border-color:var(--lit)}
+  html[data-mode="light"] button.primary:hover,html[data-mode="light"] button.on:hover{
+    background:color-mix(in srgb, var(--panel), var(--lit) 26%)}
+  /* The notebook's tab strip borrows .on for its active view, but its
+     buttons are underlined text, not green blocks: the generic green-button
+     hover leaking in here painted the active tab as a filled pill the moment
+     the pointer crossed it. */
+  .nbtabs button:hover,.nbtabs button.on:hover{background:none;--sheen:none}
+  .modal .danger:hover{background:color-mix(in srgb, var(--bad) 35%, var(--ground))}
+  .nb .caution:hover{background:color-mix(in srgb, var(--warn) 30%, var(--ground))}
+  button:disabled:hover,button[aria-disabled="true"]:hover{background:var(--btn);border-color:var(--line)}
+  button.eye:hover{color:var(--ink)}
+  .pane .bar .x:hover{background:rgba(255,255,255,.1);color:var(--ink)}
+  .fx .grp>summary:hover{background:var(--btn)}
+}
+
+/* Hover states fade rather than snap. Background, border and color cover
+   every button variant on the page; the disabled fade rides on opacity;
+   transform and filter carry the press, so releasing eases back too. */
+button,.pane .bar .x{transition:background-color .15s ease,
+  border-color .15s ease,color .15s ease,opacity .15s ease,
+  transform .1s ease,filter .1s ease}
+/* Every button presses the same way: a one-pixel dip and a dim, mouse or
+   finger alike. :not(:disabled), so a dead button stays visibly inert. */
+button:active:not(:disabled),.pane .bar .x:active{
+  transform:translateY(1px);filter:brightness(.82)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
+button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
+.macros{display:flex;flex-wrap:wrap;gap:6px;padding:var(--row-y) var(--row-x)}
+.tc{display:flex;gap:10px;align-items:flex-start;padding:var(--row-y) var(--row-x);margin:0;
+  border-bottom:var(--hair) solid var(--line);cursor:pointer;color:var(--ink)}
+.tc:last-child{border-bottom:0}
+.tc input{margin:3px 0 0;width:16px;height:16px;flex:0 0 auto}
+.tc .nm{font:var(--f-row);font-weight:600}
+.tc .sub{display:block}
+
+/* An image nothing is built on: said, but quietly. It is the answer to "can
+   this go", not a warning. */
+.tc .sub.dim{opacity:.6}
+/* The ellipsis is ticked by a timer rather than a CSS animation: the row is
+   rebuilt every second while a job runs, which restarts any animation on it,
+   and dots that stutter once a second read as broken. The timer writes into
+   the span, and a rebuild renders whatever count it is on. Width held at
+   three characters so the line does not twitch as they come and go. */
+/* The row's and the button's alike: three characters of reserved width so the
+   line does not twitch as the dots come and go. */
+.doc .dots,.row .dots{display:inline-block;width:3ch;text-align:left;white-space:pre}
+.tc .where.on{color:var(--accent)}
+.tc .sub.bad{color:var(--bad);overflow-wrap:anywhere}
+.tc .sub.warn{color:var(--warn)}
+.tc .upd{color:var(--warn)}
+/* Installed and current: the row is done, and says so with a ticked box that
+   cannot be unticked: the tick reads as "this one is here", the fading as
+   "and there is nothing to do to it". Knowing a thing is present is the
+   point; an empty dead box said only the second half. */
+.tc.done input{opacity:.5}
+.tc .rm{flex:0 0 auto;align-self:center;color:var(--dim)}
+/* A row that is not a tick's label is not pressed as one: its press is the
+   button at its right (an image's Install, its bin). */
+div.tc{cursor:default}
+.tc>button{flex:0 0 auto;align-self:center}
+@media(hover:hover){ .tc .rm:hover{color:var(--bad);border-color:var(--red2-edge)}
+}
+/* Sizing only: the font is the house control font from the .doctab group.
+   It carried its own 12px sans here, which the conformance suite flagged the
+   first week it ran: two selects on one page in a different voice than every
+   other control, for no reason anybody could name. */
+.imgadd select{flex:1 1 190px;min-width:0;padding:6px 8px;min-height:var(--tap)}
+/* Bigger tap targets where a finger is doing the ticking. */
+@media(max-width:900px){ .tc input{width:20px;height:20px}
+}
+/* A project row's controls move as one block: four buttons that wrapped one
+   at a time left a lone eye stranded under the name (the link chain made
+   four possible). Together they either fit beside the name or drop below it
+   whole, which reads as a layout, not an accident. */
+.row .acts{display:flex;gap:6px;align-items:center;margin-left:auto}
+/* A project row stacks: name and its notes first, the buttons on their own
+   line under them. Side by side, "Notebook" as a word did not fit beside a
+   long project name on a phone, and the count it used to carry is the
+   panel's own business now. */
+/* nowrap, and it is the whole fix for a stacked row spilling off a phone:
+   .row wraps, and a COLUMN flex container that may wrap sizes its one line
+   to the widest item's max-content width and stretches every item to it.
+   So a job's kept-workspace path: one long token, even one that wraps when
+   drawn: set the line at 419px inside a 375px row, the action bar stretched
+   to match, and its Log button sat 58px past the edge. A stacked row has
+   nothing to wrap into a second column; saying so makes the row's width the
+   row's, and min-width:0 on the text column is then what lets it shrink. */
+.row.stack2{flex-direction:column;align-items:stretch;gap:4px;flex-wrap:nowrap}
+.row.stack2 .acts{margin-left:0;flex-wrap:wrap}
+/* Its dot is the session dot (.st, below): one rule for every place a
+   session's state is shown. */
+/* A reason line can carry a token nothing breaks (a node's name, a digest
+   from the agent-window sentence), and at phone width that token was the
+   21px the Projects tab scrolled sideways by. */
+/* The dialogs: the command editor and the new-project form. Dialogs rather
+   than cards of their own: each is a detour, and should hand the page back
+   when it is done. */
+.modal{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.68);
+  display:flex;align-items:safe center;justify-content:center;padding:16px;
+  overflow:auto;   /* a soft keyboard can leave less height than the box */
+  /* The DYNAMIC viewport, not the large one. A fixed overlay is laid out
+     against the large viewport on a phone, so while the browser's toolbar
+     slides in and out the box is centered in a taller box than the one being
+     looked at, and it bobs: a few pixels, every frame, for as long as the
+     toolbar is moving. The header does not move with it, because the header
+     is anchored to the top and only a centered thing feels a height change. */
+  height:100dvh;
+  /* ...and when the box is taller than the viewport, THIS is the scroller.
+     Without this, reaching its end hands the scroll on to the page behind,
+     which is why a dialog on a phone drags the whole page around under it. */
+  overscroll-behavior:contain}
+/* Not the in-place form (.inline, a notebook's Settings): it is a view, not
+   a dialog arriving, so it neither plays a dialog's entrance nor locks the
+   page behind it. */
+.modal:not([hidden]):not(.inline){animation:modalIn .16s ease}
+.modal:not([hidden]):not(.inline)>.box{animation:modalBoxIn .19s cubic-bezier(.2,.7,.3,1)}
+/* ...and leaves the same way (the observer beside noMotion plays it): while
+   it is leaving, the arrival must not replay, and nothing under it may take
+   a tap meant for the page behind. */
+.modal.leaving,.modal.leaving>.box{animation:none;pointer-events:none}
+.modal[hidden]{display:none}
+/* A dialog's box shown in place, in a notebook view (the project's Settings):
+   no overlay, no shadow, the document's width, and its own scroll is the
+   view's. Its title is the notebook's, so its h3 is not drawn. */
+.modal.inline{position:static;inset:auto;z-index:auto;background:none;--sheen:none;display:block;
+  padding:0;height:auto;overflow:visible}
+.modal.inline .box{width:auto;max-width:var(--doc-w);max-height:none;overflow:visible;
+  border:0;border-radius:0;box-shadow:none;background:none;--sheen:none}
+.modal.inline .box > h3{display:none}
+/* A dialog's box takes the focus as it opens (modalKeys), for a screen
+   reader and for Tab to start from; it is not a control, so no ring. */
+.modal>.box:focus{outline:none}
+/* A dialog element wearing the overlay (a container's settings): the
+   browser's top layer, the overlay's own look, none of the element's. */
+dialog.modal{width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;color:var(--ink)}
+dialog.modal:not([open]){display:none}
+dialog.modal::backdrop{background:transparent;--sheen:none}
+.modal .box{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  width:min(520px,100%);max-height:90vh;overflow:auto;
+  box-shadow:0 18px 50px rgba(0,0,0,.6)}
+/* A box that scrolls says so (scrollHints in page-motion.js), with a thin
+   scrollbar where the platform draws one. A page and a sheet fade what they
+   hold into the ground under them at the edge with more past it, a mask and
+   not a painted band; a dialog pins its title and buttons; a list draws a
+   hairline at that edge. */
+.modal .box,.modal .sheetslot,.pane .doc,.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap{
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+/* A dialog that scrolls keeps its title and its buttons where they are and
+   its content passes under them, each with the hairline it always had: the
+   frame says there is more, with no band of shade painted over what is
+   being read (the operator, 16 Oct: the black fades read as dirt). Not in a
+   box shown inline, which is a view's and scrolls with the page (B702). */
+.modal:not(.inline) .box>h3{position:sticky;top:0;z-index:2;background:var(--panel)}
+.modal:not(.inline) .box>.foot,.modal:not(.inline) .box>.dlgbody>.foot{position:sticky;bottom:0;z-index:2;background:var(--panel)}
+/* A dialog whose body a script draws (Enroll, Reset) draws it into a slot
+   laid out as the box itself: its fields and its foot are the box's. */
+.modal .box>.dlgbody{display:contents}
+.modal .sheetslot,.pane .doc{--edge-keep:rgba(0,0,0,.18)}  /* what is left of a line at the very edge: faded, not gone */
+/* Never while it holds an open dialog: a mask makes the box a stacking
+   context and clips what it paints, so a dialog opened from a page (the
+   History sheet, fixed over the window) was faded with it and drawn under
+   the dock (B782). */
+.modal .sheetslot.scrolldown:not(:has(.modal:not([hidden]):not(.inline))),.pane .doc.scrolldown:not(:has(.modal:not([hidden]):not(.inline))){
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),var(--edge-keep));
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),var(--edge-keep))}
+.modal .sheetslot.scrollup:not(:has(.modal:not([hidden]):not(.inline))),.pane .doc.scrollup:not(:has(.modal:not([hidden]):not(.inline))){
+  -webkit-mask-image:linear-gradient(to top,#000 calc(100% - 22px),var(--edge-keep));
+  mask-image:linear-gradient(to top,#000 calc(100% - 22px),var(--edge-keep))}
+.modal .sheetslot.scrollup.scrolldown:not(:has(.modal:not([hidden]):not(.inline))),.pane .doc.scrollup.scrolldown:not(:has(.modal:not([hidden]):not(.inline))){
+  -webkit-mask-image:linear-gradient(to bottom,var(--edge-keep),#000 22px,#000 calc(100% - 22px),var(--edge-keep));
+  mask-image:linear-gradient(to bottom,var(--edge-keep),#000 22px,#000 calc(100% - 22px),var(--edge-keep))}
+/* The memory book holds prose, not form fields: 520px wraps a description
+   every other line. */
+.modal .box.wide{width:min(760px,100%)}
+/* A log is lines, and lines want width: wider still than the book, and the
+   whole screen on a phone, where a log in a 520px box with a page showing
+   round it is a keyhole. The slot scrolls, not the box, so the title and the
+   way out stay put however long the log is. */
+.modal .box.sheet{width:min(980px,100%);max-height:88vh;
+  display:flex;flex-direction:column}
+/* A column, so that what is being read fills the window rather than sitting
+   in a strip at the top of it: the filter bar keeps its own height and the
+   pane under it takes the rest. A log longer than the box grows past it and
+   the slot scrolls, which is why this is flex-grow and not a height. */
+.box.sheet .sheetslot{overflow:auto;min-height:0;flex:1 1 auto;
+  display:flex;flex-direction:column}
+.box.sheet .sheetslot>*{display:block;flex:0 0 auto}
+.box.sheet .sheetslot>*:last-child{flex:1 1 auto}
+/* On a phone every dialog is the whole screen, a sheet as a log's is: the
+   box runs to the screen's edges with no page round it, its title at the
+   top, its foot at the bottom under the thumb however little it holds, and
+   what is between scrolls. The overlay keeps the screen's safe areas (a
+   notch, the home bar) and wears the box's color there, so the two read as
+   one surface. A part that takes the rest (a sheet's slot, About's page)
+   says so with a flex of its own; everything else keeps its height. */
+@media(max-width:900px){
+  .modal:not(.inline){padding:env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);background:var(--panel)}
+  .modal:not(.inline)>.box{width:100%;height:100%;max-width:none;max-height:none;
+    border:0;border-radius:0;box-shadow:none;display:flex;flex-direction:column}
+  :where(.modal:not(.inline)>.box,.modal:not(.inline)>.box>.dlgbody)>*{flex:none}
+  .modal:not(.inline)>.box>.foot,.modal:not(.inline)>.box>.dlgbody>.foot{margin-top:auto}
+  /* But for a question (R265, the operator, 19 Nov: two lines and two
+     buttons were a whole empty screen): a sheet at the foot, as tall as its
+     words, its buttons under the thumb, the page dimmed above it and a press
+     there Cancel. One long enough to fill the screen scrolls inside itself
+     and leaves a strip of the page showing. One that asks for a line of text
+     sits at the top instead, where the keyboard does not cover it. */
+  .modal.askdlg:not(.inline){align-items:flex-end;padding:0;background:rgba(0,0,0,.68)}
+  .modal.askdlg.typed:not(.inline){align-items:flex-start}
+  .modal.askdlg:not(.inline)>.box{height:auto;max-height:calc(100dvh - 56px);overflow:auto;overscroll-behavior:contain;
+    border-top:var(--hair) solid var(--line);border-radius:var(--r-surface) var(--r-surface) 0 0;
+    padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 28px rgba(0,0,0,.4)}
+  .modal.askdlg.typed:not(.inline)>.box{border-top:0;border-bottom:var(--hair) solid var(--line);
+    border-radius:0 0 var(--r-surface) var(--r-surface);padding:env(safe-area-inset-top) 0 0}
+}
+.modal h3{margin:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line);
+  font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.3px;text-transform:uppercase}
+/* The band inset, once, for every .field. It was scoped to .modal and .nb, so
+   the Analysis tab's filter bar carried the class, matched nothing and sat
+   flush against the tab's edge: the same allowlist failure as the field skin
+   below. The guard is the other half: a field inside a field is a row of the
+   outer one, and insetting twice is what put that same bar 28px in when the
+   rows beside it were at 14. */
+/* The rhythm inside a band, owned by the band. It was margin arithmetic
+   between bare siblings, which COLLAPSES between two blocks and ADDS around
+   a replaced element, so one form measured 0, 10, 15, 16, 22 down its length
+   and read as several forms. A flex column with one gap cannot do that, and
+   the stray margins on the children go with it: uniform.mjs measures every
+   dialog for the two numbers below and nothing else. */
+.field{padding:var(--row-y) var(--row-x)}
+/* A dialog's band, which is a stack of things to fill in. Not the bars that
+   also wear .field (a tab's filter row, an action bar): those are rows, and
+   they say so with a class of their own. */
+.modal .field:not(.histbar):not(.actbar):not(.macros):not(.sectjump){display:flex;
+  flex-direction:column;gap:var(--field-gap);align-items:stretch}
+.modal .field>*,.modal .prefrow>*{margin-top:0;margin-bottom:0}
+/* A label and the control under it are one thing, so they sit closer: the
+   band's gap, pulled back to the label gap. A .prefrow wraps to a column on
+   a phone and carries the same gap, so its labels need it too. */
+.modal .field>label,.modal .prefrow>label{
+  margin-bottom:calc(var(--label-gap) - var(--field-gap))}
+.field .field{padding:0}
+.prefrow{gap:var(--field-gap)}
+/* A row of fields straight in a dialog is a band like a .field, inset the
+   same, rather than flush against the dialog's edge (B192). */
+.modal .prefrow:not(.field .prefrow){padding:var(--row-y) var(--row-x)}
+.modal label,.nb label{display:block;font:var(--f-ui);color:var(--dim);
+  margin-bottom:var(--label-gap)}
+
+.modal input,.modal textarea,.modal select,
+.row input,.row select,
+.uimenu input:where(:not([type="checkbox"],[type="radio"])),.uimenu textarea,.uimenu select,
+.doctab input:where(:not([type="checkbox"],[type="radio"])),
+.doctab select,.doctab textarea,
+.nb input,.nb textarea,.nb select,
+.resumemenu select{width:100%;box-sizing:border-box;
+  padding:6px 9px;font:var(--f-field)}
+/* ...and one height for all of them, the buttons beside them included
+   (the header keeps its own smaller buttons: they sit beside no field). */
+.modal input:where(:not([type="checkbox"],[type="radio"])),.modal select,
+.doc .row input,.doc .row select,.uimenu input:where(:not([type="checkbox"],[type="radio"])),.uimenu select,
+.doctab input:where(:not([type="checkbox"],[type="radio"])),.doctab select,
+.nb input:where(:not([type="checkbox"],[type="radio"])),.nb select,
+/* ...and the session chooser's, which opens on a project's card, inside none
+   of those (the operator, 26 Oct: its pulldowns were the browser's size). */
+.resumemenu select{min-height:var(--ctl)}
+.modal button,.nb button,.doctab button,.uimenu button,.doc .row button{min-height:var(--ctl)}
+.modal textarea{min-height:132px;resize:vertical;white-space:pre}
+/* A value that is ONE LINE of prose, in a box that can show all of it. An
+   <input> shows about thirty characters at phone width, which is not enough
+   to read a sentence with, let alone edit one, and a roadmap item, a bug's
+   title or a changelog entry runs to three hundred. So: a textarea that
+   wraps and grows to its content, never scrolling inside itself, with Enter
+   still not making a newline because the value is still one line.
+   proseline() does the growing; see docs/design-language.md (Controls).
+
+   BELOW `.modal textarea` and not above it: that rule is `white-space:pre`
+   at the same specificity, so a proseline in a sheet stopped wrapping and
+   went back to being the one-line box this exists to replace. */
+textarea.proseline{resize:none;overflow:hidden;white-space:pre-wrap;
+  overflow-wrap:anywhere;min-height:var(--ctl)}
+.modal input:focus,.modal textarea:focus,.modal select:focus,
+.uimenu input:focus,.uimenu textarea:focus,.uimenu select:focus,
+.doctab input:focus,.doctab select:focus,.doctab textarea:focus,
+.nb input:focus,.nb textarea:focus,.nb select:focus{
+  outline:2px solid color-mix(in srgb, var(--note) 45%, var(--panel));outline-offset:-1px}
+/* A hint is the quiet note of whatever holds it, the same on every page,
+   in a dialog and in the notebook (consistency batch 3: a page's hint took
+   body text and a band's padding, a notebook's the note voice and none). */
+.hint{color:var(--dim);font:var(--f-note);margin-top:0}
+/* Wrapping, because a footer that does not fit does not merely look cramped:
+   the box scrolls sideways and the whole panel slides under your thumb. */
+.modal .foot,.nb .foot{display:flex;gap:8px;padding:var(--row-y) var(--row-x);border-top:var(--hair) solid var(--line);
+  flex-wrap:wrap}
+.modal .foot .sp,.nb .foot .sp{flex:1}
+/* A note in a dialog is the quiet explainer, as it is on a row: with no rule
+   here it drew at body size in full ink, larger than the label it explains
+   (project settings' People, the bug report's conversation line, B452). */
+.modal .sub.bad{color:var(--bad)}
+.modal .sub.warn{color:var(--warn)}
+.modal .sub.ok{color:var(--pass)}
+.nb .foot[hidden]{display:none}
+/* A verb that cannot be undone, once and everywhere. It was scoped to the
+   modals and the notebook, so the same decision: Remove a container, Revoke
+   a node's credential: was red on one surface and ordinary ink on another,
+   and nothing about a button said which kind it was. One class, so there is
+   one answer: `.rm` used to be a second word for it and is now only what it
+   also was, the dim icon that drops a row from a list. */
+.danger{color:var(--bad);border-color:var(--red2-edge)}
+/* A destructive button is filled, never an outline alone (the operator, 27
+   Oct): a tint of the scheme's own red under its red words, a little more of
+   it under the pointer, its edge the same red mixed down. */
+button.danger,a.btn.danger{background:color-mix(in srgb, var(--bad) 22%, var(--ground));
+  border-color:color-mix(in srgb, var(--bad) 50%, var(--ground))}
+@media(hover:hover){ button.danger:not([disabled]):hover,a.btn.danger:hover{background:color-mix(in srgb, var(--bad) 32%, var(--ground))}
+}
+button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--ground))}
+/* Revert is amber rather than red. It throws away what has not been saved
+   yet: a decision you might want back, and the color this page already uses
+   for "wants a decision from you". Red is kept for the controls that destroy
+   something already on disk, which is the other two on this panel. */
+.nb .caution{color:var(--warn);border-color:var(--gold-edge)}
+/* A verb that interrupts and loses nothing is amber, never red (the
+   operator, 19 Nov: red is kept for what is dangerous): Restart, End, Stop,
+   Reboot, Shut down, a job's Cancel, Sign out. What it stops starts again;
+   what a red one takes is gone. Filled as the red one is, in the scheme's
+   own amber. */
+button.caution,a.btn.caution{color:var(--warn);background:color-mix(in srgb, var(--warn) 18%, var(--ground));
+  border-color:color-mix(in srgb, var(--warn) 50%, var(--ground))}
+@media(hover:hover){ button.caution:not([disabled]):hover,a.btn.caution:hover{background:color-mix(in srgb, var(--warn) 28%, var(--ground))}
+}
+button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--ground))}
+/* Two-way choice as two buttons, not radios: one tap on a phone, and the
+   green .on state is the same vocabulary as everything else on the page. */
+/* Underlined and in the warm color, the way the CLAUDE.md fix link on a
+   project row is: both are a line of text you can press, and reading as one
+   is what tells you that. Dim and undecorated it read as a caption. */
+.modal .link{background:none;--sheen:none;border:0;color:var(--warn);padding:2px 0;
+  font:var(--f-ui);min-height:var(--tap);text-align:left;
+  text-decoration:underline;cursor:pointer}
+.modal .link[hidden]{display:none}
+/* The project settings' sections: folds, as a tab's sections are, one
+   open at a time (the operator, 7 Oct), and a section with no field showing
+   gone with its heading. Its fields are bands with their own inset, so the
+   fold's body adds none of its own. */
+/* A section shows while a setting in it does; its own Save bar does not count. */
+.rngroup:not(:has(> .body > .field:not([hidden]):not(.rnbarf))){display:none}
+/* The jump bar over a long surface (sectJump): its sections' names in a
+   line that wraps, each a link to its own. */
+.sectjump{display:flex;flex-wrap:wrap;gap:6px 8px;padding:var(--row-y) var(--row-x);
+  border-bottom:var(--hair) solid var(--line);font:var(--f-note)}
+/* Chips, not bare words: as links alone they read as one more line of text
+   (the operator, 11 Oct). In a dialog the bar is a .field band, whose stack
+   is a column; the chips still sit in a row. */
+.field.sectjump,.modal .sectjump{display:flex;flex-direction:row;flex-wrap:wrap}
+.sectjump a{color:var(--note);text-decoration:none;white-space:nowrap;padding:3px 10px;
+  border:var(--hair) solid var(--line);border-radius:99px;line-height:1.2}
+.sectjump a:hover{text-decoration:none;border-color:var(--note)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.artfp .link{background:none;border:0}
+.rnsignbar{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.sgview .link{background:none;border:0}
+.sgadds{display:flex;flex-wrap:wrap;gap:var(--field-gap)}
+.modal a.link{display:inline-flex;align-items:center}
+@media(hover:hover){ .modal .link:hover{color:var(--accent)}
+}
+.modal .pseg{display:flex}
+.modal .pseg button{flex:1;min-height:var(--tap)}
+/* pre-wrap: a failed clone reports with git's own message, which has lines. */
+.hint.bad{color:var(--bad);white-space:pre-wrap;margin-top:0}
+/* What to know before the press, in the warning's color (Copy or move's
+   data choice: a volume already there is written over). */
+.hint.warn{color:var(--warn)}
+/* The project settings' Test (the operator, 7 Oct): what is missing in red,
+   a list when it is more than one thing, and its notes in the quiet voice. */
+.hint.ok{color:var(--pass)}
+/* A number and its unit on one line, every such row in the settings: the
+   notebook's field width (100%) put "days" on a line under its box. */
+:is(.nb,.modal) .logdays>input[type=number]{width:7em;flex:0 0 auto;text-align:center}
+/* An agent's row in parts (its sign-in, what is yours on the node), each
+   under a small head in the gear's voice. */
+/* A fact whose value is news: applied in --ok, not applied in --warn (This
+   machine's From the stick, R161 step 8). */
+.facts dd.ok{color:var(--pass)}
+.facts dd.warn{color:var(--warn)}
+.facts dd.bad{color:var(--bad)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.fxplace{border:var(--hair) solid transparent;background:transparent}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.fxplace.on{background:color-mix(in srgb, var(--accent) 14%, transparent);border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
+/* On a phone, one column: the places a line that scrolls over the listing,
+   the bar's path on a line of its own over its filter and buttons, and a
+   row one line, its name and a file's size or a folder's day. */
+@media(max-width:900px){
+/* Its edge color sits under the place on show's, which outranks it. */
+.fxplace{border-color:var(--line)}
+}
+:is(.thingtab,.entrytab) .pghead .name{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
+:is(.thingtab,.entrytab) .pghead .actbar .state{margin-right:auto;font:var(--f-note)}
+/* A placeholder's chips wait on the one line the page's own scroll on. */
+.chips>.sk-chips{display:flex;flex-wrap:nowrap;overflow:hidden;gap:6px;padding:0;margin:0;align-items:center}
+.librarytab .libfilter .libsearchrow>input[type=search]{flex:1 1 14rem;min-width:0;max-width:24rem}
+/* The shared hostname list on the nginx tab: a record table as Routes is,
+   and the box to add one under it. */
+.field > .actbar input[data-nghostnew]{flex:1 1 14em;min-width:0}
+/* A field whose value cannot work. Only the border moves: tinting the text
+   too makes what you typed hard to read at the moment you are being asked to
+   look at it. */
+.modal input.bad{border-color:var(--bad)}
+/* "push" on a project row. Green because it is a capability the project has,
+   and plain text because it is not a control; it cannot be toggled here. */
+.row .sub .ok{color:var(--pass)}
+
+/* The disclosure marker, once, for every fold on the page (consistency
+   batch 5): a section (.sect, below) and any other fold, which wears .chev:
+   a memory, a bug report, a rule, a diff's file, a findings rule, the
+   version form. Each had grown its own hand-copied ::before, a findings
+   group and a diff's file their own sizes, and Containers' list a CSS
+   triangle; a fold built with .chev cannot lack the arrow that says it
+   opens. A roadmap group draws its caret as its row's first control. */
+.chev>summary,details.grp>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+.chev>summary::-webkit-details-marker,details.grp>summary::-webkit-details-marker{display:none}
+.chev>summary::before{content:"\25B8";color:var(--dim);font-size:11px;width:9px;flex:0 0 auto}
+.chev[open]>summary::before{content:"\25BE"}
+/* A roadmap group's summary is its item row, which fills the line, and its
+   caret is the row's own first control, in the place the send arrow had,
+   level with the first line of the words (the operator, 29 Sep). */
+details.grp>summary>.roadmap{flex:1 1 auto;min-width:0;padding-block:0}
+.roadmap .fold{flex:0 0 auto;align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;
+  color:var(--dim);font-size:11px;cursor:pointer}
+.roadmap .fold::before{content:"\25B8"}
+details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
+.roadmap .txt{cursor:pointer}
+
+/* The "N to M of T" footer under a long list, with Previous and Next. Quiet:
+   it is a fact about the list plus the controls that turn its page, not a
+   section of its own. */
+.pagemore{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:10px 0 2px;border-top:var(--hair) dashed var(--btn);margin-top:6px}
+.pagemore span{color:var(--dim);font:var(--f-note)}
+.pagemore button{margin-left:auto}
+.pagemore button+button{margin-left:0}
+/* The picked color's ring sits under the nostromo schemes' raised edge on a
+   button, which outranks it. */
+.pcpick button[aria-checked="true"]{box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--ink)}
+/* The swatches a card's Color unrolls under its name (the operator, 18 Oct:
+   picked from its menu, this account's own color for the project). */
+.pcard .pcpop,.phead~.pcpop,.pname~.pcpop{margin:6px 0 2px}
+/* An ask in a card (Group) sits on the card's own inset, not a band's. */
+.pcard .askline{padding:6px 0 2px}
+/* An ask box's field takes the row, its two buttons after it, wherever the
+   box is drawn (a card's Group, a group's rename): the box is one thing, on
+   one line. The field starts at a control's width, so a wrapping bar sent
+   Save under Cancel in a card before the field gave up any of it. */
+.askline .askrow{flex-wrap:nowrap}
+.askline .askrow input,.askline .askrow>.combo{flex:1 1 auto;min-width:0;width:auto}
+/* (the combo's field too: .actbar input's 12em cap came later and won, a
+   short field beside two buttons on a card at every width) */
+.askline .askrow>.combo>input{flex:1 1 auto;width:100%}
+.askline .askrow>button{flex:none}
+/* A field that is also a pulldown (askInline with options; the operator,
+   26 Oct): the chevron inside its right edge as a select's, the list a
+   floating card under it with every option, the one picked by arrow keys
+   tinted in the accent. */
+.combo{position:relative;display:flex;flex:1 1 auto;min-width:0}
+.combo>input{flex:1 1 auto;min-width:0;width:auto;padding-right:34px}
+.combo>.combobtn{position:absolute;right:2px;top:2px;bottom:2px;width:30px;min-height:0;padding:0;border:0;background:transparent;--sheen:none;
+  color:var(--dim);display:flex;align-items:center;justify-content:center}
+.combo>.combobtn svg{width:14px;height:14px}
+.combo>.combobtn:hover{color:var(--ink)}
+.combolist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;max-height:220px;overflow:auto;padding:4px;
+  display:flex;flex-direction:column;background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  box-shadow:0 10px 28px rgba(0,0,0,.38)}
+.combolist[hidden]{display:none}
+.combolist>button{text-align:left;background:transparent;--sheen:none;border:0;border-radius:var(--r-small);padding:6px 10px;min-height:34px;color:var(--ink);
+  font:var(--f-ui);flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.combolist>button:hover,.combolist>button.on{background:color-mix(in srgb, var(--accent) 18%, transparent)}
+.combonone{padding:6px 10px;color:var(--dim);font:var(--f-note)}
+@media (pointer:coarse){.combolist>button{min-height:44px}
+}
+/* A finger, not a pointer: the small controls that measured under 32px in the
+   polish tour (18 Sep, 344 to 840px wide) grow to a thumb's size on a touch
+   screen, and a desktop keeps its tighter strip. The bell stays bare (see its
+   own rule) and only its hit area widens. */
+@media(pointer:coarse){
+  /* Every button in a dialog and in the notebook at the tap height, as the
+     tabs, bars and cards already are: their feet (Save, Approve, Link) and
+     History measured 30px. */
+  .modal button,.nb button{min-height:var(--tap)}
+}
+.row[data-row].pc{box-shadow:inset 3px 0 var(--pc);
+  background-color:color-mix(in srgb, var(--pc) 14%, transparent)}
+/* A pane's bar says whose it is with the stripe. */
+.pane .bar.pc{box-shadow:inset 3px 0 var(--pc)}
+/* A group of picks (Agents may, Yours on this project, the new-project
+   dialog's): a grid of equal columns, each pick its label above its control
+   (the design language, Controls), so every select starts at the same x and
+   is the same width whatever its label says. The label was beside the
+   control before, and six labels of six lengths put six selects at six
+   positions with one label wrapping to three lines on a phone (the operator,
+   25 Sep). */
+.prefrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));
+  gap:var(--field-gap) 14px;max-width:var(--ctl-w)}
+.prefrow .pick{display:flex;flex-direction:column;gap:var(--label-gap);
+  font:var(--f-note);color:var(--dim);min-width:0}
+.prefrow .pick select,.prefrow .pick input{width:100%;max-width:100%}
+/* A pick whose words need the row: the test-run setting's options are
+   sentences, and half a row cut them mid-word. */
+.prefrow .pick.wide{grid-column:1 / -1}
+.verbtns{gap:6px;margin-top:8px}
+.grow[data-sha]{display:flex;flex-direction:column;justify-content:center;gap:1px;
+  padding:0 6px;border-bottom:var(--hair) solid var(--line);cursor:pointer;min-width:0;
+  transition:background-color .15s ease}
+.grow[data-sha]:last-child{border-bottom:0}
+@media(hover:hover){ .grow[data-sha]:hover{background:var(--btn)}
+}
+
+/* A lane's color: nb-git.js builds the name as gl${lane % 5}, so no file
+   holds .gl0 whole (R60 took these for dead, B79). */
+.gl0{stroke:var(--accent)} .gl1{stroke:var(--note)} .gl2{stroke:var(--warn)}
+.gl3{stroke:var(--bad)} .gl4{stroke:var(--dim)}
+/* The branches table (R269 step 1): a line a branch, its verbs behind the
+   ⋯ in the last column, drawn as every table is (tables), on a phone too;
+   a line that opens to its comparison wears a pointer, and the comparison
+   sits under it a step sunk. Behind and ahead of main are GitHub's: two
+   counts either side of a line, each over a bar. */
+.tbl.gbranches>.row.gbranch{align-items:stretch}
+.gbranches .td .pill{margin-left:4px}
+.gbpickmenu{min-width:16rem;max-width:min(26rem,92vw)}
+/* A diff: one fold per file, the lines colored, and it scrolls inside its
+   own box on a phone rather than the pane. */
+.dfile{border-top:var(--hair) solid var(--line);margin-top:6px}
+.dfile>summary{padding:6px 0;font:var(--f-ui);color:var(--dim)}
+pre.diff{margin:0;overflow-x:auto;font:var(--f-code);white-space:pre;
+  background:var(--sunk);border:var(--hair) solid var(--line);border-radius:var(--r-control);padding:6px 8px}
+pre.diff span{display:block;min-width:max-content;padding:0 4px}
+pre.diff .d-add{background:color-mix(in srgb, var(--accent), transparent 82%)}
+pre.diff .d-del{background:color-mix(in srgb, var(--bad), transparent 82%)}
+pre.diff .d-hunk{color:var(--note);background:color-mix(in srgb, var(--note), transparent 90%)}
+pre.diff .d-ctx{color:var(--dim)}
+/* A link wearing the button suit, wherever the browser has to navigate (a
+   download, which fetch would buffer for nothing; a container's Open, a new
+   tab at its address): the same box, face and fill as a button, the main
+   action's fill where it is one (the operator, 17 Oct). */
+a.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--tap);
+  padding:6px 10px;background:var(--btn);color:var(--ink);border:var(--hair) solid var(--line);
+  border-radius:var(--r-control);font:var(--f-ui);white-space:nowrap;text-decoration:none;
+  -webkit-tap-highlight-color:transparent}
+a.btn.primary{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
+a.btn svg{width:12px;height:12px;flex:0 0 auto}
+.actbar a.btn,.artrow a.btn{min-height:var(--tap)}
+@media(hover:hover){ a.btn:hover{background:color-mix(in srgb, var(--btn-hi) 80%, var(--lit));border-color:color-mix(in srgb, var(--lit) 65%, var(--line))}
+  a.btn.primary:hover{background:color-mix(in srgb, var(--lit), #000000 28%);border-color:var(--lit)}
+}
+/* ⋯ (actMore): a square press, as a project header's is. */
+.actbar .more>.moreb{min-width:var(--tap);padding:4px 8px;font-size:15px;line-height:1}
+
+/* The Phone tab's rows. Almost nothing of their own: .row like Projects, and
+   these are the few things a list of rows does not already say. */
+/* A pill used as a row's name sits flush on the explainer under it: a chip
+   has a border where a line of text has a descender, so it needs the air a
+   text line gets for free. */
+.row .name .pill{display:inline-block;margin-bottom:5px}
+.phcmd{font:var(--f-code);color:var(--dim);overflow-wrap:anywhere}
+/* The one warning on this card that is about what the operator is doing right
+   now rather than about the machine's state. */
+.row .sub b.warn{color:var(--warn)}
+/* Adding goes at the top: the control that adds to a view is the first band
+   under its head row, one shape on every view, and its form unrolls in its
+   place: never at the foot, where a phone scrolls past the list to find it. */
+.addbar,.roadmapadd{display:flex;gap:var(--field-gap);align-items:center}
+.addbar button{flex:0 0 auto;min-height:var(--tap)}
+/* The Design view's new page is three pickers and Add page on one row,
+   sharing it, where each picker took the row and they stacked. */
+.addbar[data-add="design"]>select{flex:1 1 8rem;width:auto;min-width:0}
+.addline>.addbar{flex:0 0 auto;max-width:none;margin:0}
+@media (min-width:600px){ .addbar[data-add="design"]{flex-wrap:nowrap;max-width:none}
+}
+/* Several pickers before the button (the Design view's platform, template
+   and copy) wrap on a phone rather than each shrinking past its words. */
+.addbar{flex-wrap:wrap}
+/* The Docker manager's top band: New container at the left, when the images
+   were checked and Check for updates at the right, one line. An action
+   bar's state takes a line of its own, which broke this band into three. */
+/* A page's status line (page-docs.js headLine): its words at the left
+   taking what room the actions leave, the actions at the right, one line
+   where it fits. An action bar's state takes a line of its own; this one
+   shares it. */
+.headline>.actbar{flex-wrap:wrap;justify-content:flex-end}
+.headline>.actbar>.state{flex:1 1 12rem;text-align:left}
+.grp{border-bottom:var(--hair) solid var(--line)}
+.grp:last-child{border-bottom:0}
+.roadmap{display:flex;gap:9px;align-items:flex-start;padding:9px 0}
+/* A group's steps sit under its title, indented and hairlined, so the shape
+   of "these go in this order" is visible without reading them. */
+.roadmap.step{padding:5px 0 5px 26px;border-top:var(--hair) dashed var(--btn)}
+/* A step's send button lines up under its item's, which sits in the
+   summary's inset, rather than on the card's edge. */
+.fx details.grp .roadmap.step{padding-right:var(--row-x)}
+/* What is under a row's words (done Oct 19, in 0.5.0) is a row's sub line,
+   in the data voice, not the summary's bold body text. */
+.histbar label{flex:0 0 auto;margin:0;color:var(--dim);font:var(--f-note);align-self:center;line-height:1}
+/* The badge: one voice for every small uppercase chip in the notebook:
+   the log's verb, the who-mark, a memory's type, a bug's severity and
+   status, each wearing .tag. They were four hand-copied rules before, then
+   one rule naming five component classes, which is how "the same design
+   language" quietly stops being the same. */
+.tag{flex:0 0 auto;
+  font:var(--f-tag);text-transform:uppercase;letter-spacing:.4px;
+  padding:3px 5px;border-radius:var(--r-small);border:var(--hair) solid var(--line);
+  color:var(--dim);white-space:nowrap}
+.roadmap .n{flex:0 0 auto;color:var(--dim);font:var(--f-data);font-weight:600;
+  min-width:1.2em;text-align:right}
+/* An item's own number, in the column its steps number themselves in. It is
+   the id, not the position; it does not change when the list is rearranged,
+   which is what makes it worth quoting in a conversation. */
+.roadmap .n.id{min-width:2.2em;opacity:.75}
+/* An item the server has never heard of has no number to show. It gets one
+   from Save, which is also the moment it becomes something a session can be
+   told about. */
+.roadmap .n.id.new{font:var(--f-tag);color:var(--accent);
+  opacity:.9}
+/* The words and their labels are one column, so a pill sits above the line
+   instead of eating a third of it, on a phone that difference is the whole
+   readability of the row. */
+.roadmap .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.roadmap .tags{display:flex;gap:5px;flex-wrap:wrap}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.roadmap .dtog{background:none;border:0}
+/* pre-wrap, because a step may be written across a few lines: one step is one
+   message the operator sends by hand, so the cheap unit has to be able to hold
+   a paragraph rather than pushing a plan into more steps than it needs. */
+.roadmap .txt{min-width:0;font:var(--f-row);
+  overflow-wrap:anywhere;cursor:text;white-space:pre-wrap}
+/* A step is one of these, not a smaller kind of one: it was 12.5 against the
+   item's 13, which reads as a rendering accident rather than a hierarchy.
+   What makes it secondary is its indent and its number, not half a pixel. */
+/* Sent is dim, not struck: it is still open, counted to send and sendable
+   again, so it stays where it was, the order being the record, and a step
+   that was handed over and quietly not carried out is still there to send
+   again (B55). */
+.roadmap.sent .txt{color:var(--dim)}
+/* Done is a session's mark, not the dashboard's: struck, and the number
+   becomes a tick, because a line that went and a line that is finished are
+   different claims, and only the second one comes from whoever did the work. */
+.roadmap.done .txt{color:var(--dim);text-decoration:line-through}
+.roadmap .n.tick{color:var(--accent)}
+/* Shelved: parked, at the bottom, and visibly not asking for anything. Dark
+   rather than struck: struck already means "this went", and a shelf is the
+   opposite claim. The whole row dims, steps included, because a shelved plan
+   is shelved entire. */
+.grp.shelved{color:var(--dim)}
+.grp.shelved .acts,.grp.shelved button{opacity:.6}
+/* Finished items (R78): below the shelved ones, behind the Finished toggle,
+   struck through and quiet, with no arrows: there is nothing left to send. */
+/* A finished item (R254 step 2): its title dim and struck, its details,
+   steps and Reopen read as any open row's, so a live button never looks dead. */
+.grp.done > summary .txt{color:var(--dim);text-decoration:line-through}
+.grp.shelved .roadmap .txt{font-style:italic}
+.grp.shelved .who{opacity:.7}
+.roadmap .go{flex:0 0 auto;align-self:flex-start}
+.roadmap .ed{color:var(--dim)}
+@media(hover:hover){ .roadmap .ed:hover{color:var(--ink)}
+}
+.roadmap .go{color:var(--accent)}
+/* Crossing out by hand: dim until it is on, then the same green as a line
+   that went, because the two mean the same thing to the group behind them. */
+.roadmap .x{color:var(--dim)}
+.roadmap .x.on{color:var(--accent)}
+@media(hover:hover){ .roadmap .x:hover{color:var(--ink)}
+}
+.roadmap .go[disabled]{opacity:.35;color:var(--dim);cursor:default}
+@media(hover:hover){ .roadmap .go:not([disabled]):hover{
+  color:color-mix(in srgb, var(--accent), #ffffff 34%);border-color:var(--accent-mid)}
+}
+/* Items a session raised, marked so the operator can see what was flagged at
+   them rather than by them: the reason the list exists at all. */
+.roadmap .who{border-color:var(--purple-edge);color:var(--purple);margin-top:1px}
+.roadmap .rm{color:var(--dim)}
+@media(hover:hover){ .roadmap .rm:hover{color:var(--bad);border-color:var(--red2-edge)}
+}
+/* Four controls and a number on one line is tight on a phone; the buttons
+   lose their padding before the words lose their width. */
+@media(max-width:600px){ .roadmap .go,.roadmap .x,.roadmap .rm,.roadmap .ed{padding:5px 4px}
+  .roadmap{gap:5px}
+}
+/* The notebook's own strip (R259): five groups in a row, underlined, not
+   boxed, since they switch what the page shows; a group's views in a row
+   under it. A row that ever outgrows a desk scrolls sideways rather than
+   spilling, with overflow-y set to hidden by hand: one axis on auto turns
+   the other from visible to auto, and the strip became a vertical scroller
+   too. No scrollbar: under a row of tabs it reads as a divider. */
+/* Pinned at the top of what scrolls (the operator, 7 Nov: the view strips
+   scrolled away under the header); a view's own sticky parts sit under it. */
+.nbtabs{border-bottom:var(--hair) solid var(--line);position:sticky;top:0;z-index:6;background:var(--bg)}
+.nbtabs .nbgroups,.nbtabs .nbsub{display:flex;padding:0 calc(8px + var(--doc-in));
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.nbtabs .nbgroups::-webkit-scrollbar,.nbtabs .nbsub::-webkit-scrollbar{display:none}
+.nbtabs button{background:none;--sheen:none;border:0;border-bottom:2px solid transparent;
+  color:var(--dim);padding:11px 13px;font:600 12px/1 system-ui,sans-serif;
+  min-height:var(--tap);border-radius:0;flex:0 0 auto}
+.nbtabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+/* ...and the view chosen in the group's row in the second color: the group
+   and its view are two choices, and two hues say so. */
+.nbtabs .nbsub button.on{border-bottom-color:var(--note)}
+/* The open group's views (R259): a row of their own under the groups, on
+   the sunk ground and in the regular weight, so it reads as the group's
+   and not as a second strip of the same rank. */
+.nbtabs .nbsub{background:var(--sunk);border-top:var(--hair) solid var(--line)}
+.nbtabs .nbsub button{font-weight:500;padding:9px 13px;min-height:calc(var(--tap) - 4px)}
+.nbtabs .nbsub[hidden],.nbtabs .nbsub button[hidden]{display:none}
+/* On a phone the five groups share the width in one row, and a group's
+   views share the row under it: every view one press away, nothing behind
+   an edge (docs/design-language.md, The notebook). */
+@media(max-width:600px){
+  .nbtabs .nbgroups,.nbtabs .nbsub{padding:0 4px}
+  /* ...and when there are more than fit, each keeps its words and the row
+     scrolls under a finger, its edges fading as the dock's line does (the
+     operator, 29 Oct). */
+  .nbtabs button{flex:1 0 auto;text-align:center;padding:9px 8px}
+}
+@media(hover:hover){ .nbtabs button:hover{color:var(--ink)}
+}
+.nbview[hidden]{display:none}
+
+/* ---- the Wiki view (nb-wiki.js) ------------------------------------------
+   Read like an encyclopedia (the operator, 2 Oct): the pages listed in a
+   narrow column beside one article at a time, the article's title large over
+   a hairline, its sections headed the same way, a Contents box for a page
+   with three or more, and prose at a reading width in a serif, the one place
+   the dashboard sets text to be read at length. On a phone the column gives
+   way to a picker above the article. */
+.wkreader{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);gap:22px;align-items:start}
+/* No pages yet: no nav, so the empty state is the whole width, not the
+   nav's 200px column (B457's walk). */
+.wkreader:not(:has(.wknav)){grid-template-columns:minmax(0,1fr)}
+/* Room under its last entry (the operator, 26 Oct): a list longer than the
+   pane ends, at the page's foot, above the 22px fade at the pane's edge
+   rather than inside it. */
+.wknav{position:sticky;top:0;font:var(--f-row);border-right:var(--hair) solid var(--line);padding-right:14px;padding-bottom:40px}
+.wknav ul{list-style:none;margin:0;padding:0}
+.wknav li{margin:0 0 6px}
+.wknav p,.wknav h2,.wknav h3{margin:0 0 6px;font-size:inherit}
+.wknav strong{display:block;color:var(--dim);font-weight:600;margin-bottom:8px}
+.wkarticle{min-width:0;max-width:820px}
+/* Help (R258): AerieOS's docs in this reader, the one on show marked in
+   the list, the bar's search as wide as a control, and a search's lines as
+   rows that open their doc at their section, the words marked. */
+.helptab .wknav a.on{color:var(--ink);font-weight:600;text-decoration:none}
+.helphit{display:flex;width:100%;text-align:left;background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);
+  border-radius:0;justify-content:flex-start;white-space:normal;min-height:var(--tap);padding:var(--row-y) 0;color:inherit}
+.helphit .sub{display:block;margin-top:2px}
+@media(hover:hover){ .helphit:hover .name{text-decoration:underline}
+}
+.helphits mark{background:color-mix(in srgb,var(--accent) 30%,transparent);color:inherit;border-radius:2px;padding:0 1px}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.wktabs .wktab{background:none;border:var(--hair) solid transparent;border-bottom:0}
+.wktitle{font:400 1.75em/1.25 var(--serif);color:var(--ink);margin:4px 0 2px;padding-bottom:4px;border-bottom:var(--hair) solid var(--line)}
+.wkmeta{color:var(--dim);font:var(--f-note);margin:4px 0 14px}
+.wktoc{display:inline-block;min-width:180px;max-width:100%;border:var(--hair) solid var(--line);border-radius:var(--r-small);
+  background:var(--panel);padding:8px 14px;margin:0 0 16px;font:var(--f-row)}
+/* Room for the numbers inside the box's own inset (the operator, 26 Oct:
+   they sat on its left line). */
+.wktoc ol{margin:0;padding-left:2.2em}
+.wktoc li.l2{margin-left:1em}
+.wktoc li.l3{margin-left:2em}
+.wkpage{font:1.02rem/1.65 var(--serif);color:var(--ink);overflow-wrap:anywhere;max-width:72ch}
+.wkpage h2,.wkpage h3,.wkpage h4,.wkpage h5,.wkpage h6{font-family:var(--serif);font-weight:400;color:var(--ink);margin:22px 0 8px}
+.wkpage h2{font-size:1.45em;padding-bottom:3px;border-bottom:var(--hair) solid var(--line)}
+.wkpage h3{font-size:1.2em;font-weight:600}
+.wkpage h4{font-size:1.05em;font-weight:600}
+.wkpage p,.wkpage ul,.wkpage ol,.wkpage blockquote,.wkpage pre,.wkpage table{margin:0 0 12px}
+.wkpage ul,.wkpage ol{padding-left:1.6em}
+.wkpage blockquote{border-left:2px solid var(--line);padding-left:12px;color:var(--dim)}
+.wkpage code{font-family:var(--mono);font-size:.86em;background:var(--sunk);padding:1px 4px;border-radius:var(--r-small)}
+.wkpage pre{font-family:var(--mono);font-size:.86em;line-height:1.5;background:var(--sunk);padding:9px 12px;
+  border-radius:var(--r-small);overflow-x:auto;white-space:pre}
+.wkpage pre code{background:none;--sheen:none;padding:0}
+.wkpage table{border-collapse:collapse;display:block;overflow-x:auto;font-family:system-ui,sans-serif;font-size:.92em}
+/* A cell breaks between words, never inside one (B78: 'Playwrig ht', 'Pyth on'):
+   the page's overflow-wrap:anywhere let a column shrink below its longest
+   word; break-word only breaks a word wider than the whole table can be. */
+.wkpage th,.wkpage td{border:var(--hair) solid var(--line);padding:5px 9px;text-align:left;vertical-align:top;overflow-wrap:break-word}
+.wkpage th{background:var(--panel)}
+.wkpage hr{border:0;border-top:var(--hair) solid var(--line);margin:16px 0}
+.wkpage a,.wknav a,.wktoc a,.wkfooter a{color:var(--note);text-decoration:none}
+.wkpage a:hover,.wknav a:hover,.wktoc a:hover{text-decoration:underline}
+/* Narrow is the PANE's width, not the window's (B728): a notebook in one of
+   two panes in a 1000px window, or on a phone, is 500px wide, and the page
+   column drawn over the article there was the window's rule not applying.
+   The view is the container; under 620px the column gives way to the
+   picker above the article. */
+.nbview[data-view="wiki"]{container-type:inline-size}
+@container (max-width:600px){
+  .wkreader{display:block}
+  .wknav{display:none}
+  .wktitle{font-size:1.5em}
+}
+/* ...and the window's rule too: a container query is not evaluated for a
+   view the phone's layout has not laid out yet, and a phone is narrow
+   whatever the pane's width. */
+@media(max-width:600px){
+  .wkreader{display:block}
+  .wknav{display:none}
+  .wktitle{font-size:1.5em}
+}
+.dsboardwrap{flex:1 1 520px;min-width:0;max-height:85vh;overflow-y:auto}
+/* The layers list's height, under the list box's own, which keeps it to four
+   rows. */
+.dslayers{max-height:85vh}
+/* The roadmap's summary is a full sentence where the other three are a few
+   words, so it is the one that has to be allowed to wrap inside the header
+   rather than shoving History off the end. */
+.nbhead .hint{min-width:0;margin:0}
+/* Held: a session is mid-change. The write controls dim as one statement:
+   the click-time guards are the enforcement, this is the reading of it. */
+.nb.held #bugAdd,.nb.held .bug .macts,.nb.held #memAdd,
+.nb.held .mem .macts{opacity:.4}
+.nb.ro .sectbar,.nb.ro #roadmapAdd,.nb.ro #roadmapText,
+.nb.ro #bugAdd,.nb.ro #memAdd,.nb.ro .addstep,.nb.ro .memadd,
+.nb.ro .bug .macts,.nb.ro .mem .macts,.nb.ro .roadmap .go,.nb.ro .roadmap .mv,
+.nb.ro .vbar .actbar button{
+  opacity:.4;pointer-events:none}
+.nb.ro textarea,.nb.ro input:not([type="checkbox"]){pointer-events:none;opacity:.6}
+.nb .nbhead{color:var(--dim);font:var(--f-ui)}
+/* Every view opens the same way: its one-line summary left, its controls
+   right: the same shape on every tab, which is most of what "the same
+   design language" means. And it is the FIRST band of the view: the History
+   sits at one height whichever tab is open, so the eye never has to look in a
+   different place per tab. uniform.mjs measures that on all six views; a
+   section put above the head on one tab is how it was broken once. */
+.nb .vbar{display:flex;gap:8px;align-items:center}
+/* A view's control row (R109) is a page's bar, one control high on every
+   view whatever it holds, and words never sit on it (Settings' one line
+   aside); a view's glance under it is its tiles and its status line. */
+.nb .nbview>.field.nbhead{min-height:calc(var(--ctl) + 2 * var(--row-y))}
+/* A view's top in every page's order (the operator, 29 Oct): its glance
+   (the tiles and the status line) first, then its control row, then the
+   rest as the view wrote it. */
+.nb .nbview:not([hidden]){display:flex;flex-flow:row wrap;align-content:flex-start}
+.nb .nbview>*{flex:1 1 100%;min-width:0}
+.nb .nbview>.nbglance{order:-1}
+/* A control row with a button or two and no words beside it shares the
+   tiles' line, at their right (the operator, 29 Oct: never a button on a
+   line of its own; the VMs view's VMs page and New VM stood under its one
+   tile): the glance takes the room, the buttons what they need, at the
+   right still when a narrow phone wraps them under the tiles. */
+.nb .nbview>.nbglance{flex:1 1 0;min-width:min(100%, 18rem)}
+.nb .nbview>.nbhead:not(:has(input:not([hidden]),select,.pseg,.nbsaidslot:not(:empty),>button:not([hidden]))):has(>.actbar>button:last-child:nth-child(-n+2)){flex:0 0 auto;order:0;align-self:center;margin-inline-start:auto}
+.nb .nbhead>.actbar{align-items:center}
+.nb .nbhead>.actbar>button{flex:0 0 auto;white-space:nowrap}
+.nb .nbhead>.actbar:empty{display:none}
+/* A view's status line on its control row, words at the left and the
+   row's buttons at the right (viewGlance's slot), and a row with neither
+   not drawn at all. */
+.nb .nbhead>.nbsaidslot{flex:1 1 12rem;min-width:0}
+/* The wiki's control row carries where it goes as words beside five
+   buttons: the words take a line of their own when the row has no room. */
+.nb .nbview[data-view="wiki"]>.nbhead{flex-wrap:wrap}
+/* ...and all of the room there is: the row's spacer took half of it, and
+   the words went to two lines beside buttons a little wider than they were. */
+.nb .nbview[data-view="wiki"]>.nbhead>.sp{display:none}
+.nb .nbhead>.nbsaidslot:empty{display:none}
+/* A view toggle before the status line (the Docker view's Cards and List)
+   leaves it a sliver between itself and the buttons on a phone: there it
+   takes a line of its own under them, the toggle and the buttons on one. */
+@media (max-width:600px){
+  .nb .nbview[data-view="docker"]>.nbhead{flex-wrap:wrap}
+}
+/* Agents may's note on each agent's guards: reference, folded under a
+   line that says what it holds. */
+details.guards{margin-top:var(--label-gap)}
+details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width:max-content}
+/* An empty part of a head row (the Docker view's view switch while it has
+   no containers) takes no gap: its status line sat 8px in from every other
+   view's. The spacer is the one empty span that stays. */
+.nb .nbhead>span:empty:not(.sp){display:none}
+.nb .nbhead>.nbsaidslot>.notice{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:var(--field-gap)}
+.nb .nbhead>.nbsaidslot>.notice>.actbar{margin-inline-start:auto}
+.nb .nbview>.field.nbhead:not(:has(>input:not([hidden]),>select,>label,>.pseg,>[id]:not(:empty),>.actbar>*:not([hidden]),>.nbsaidslot:not(:empty))){display:none}
+/* On a phone a status line's words take their own line and its buttons
+   the one under it together, never one alone. */
+@media(max-width:600px){ .nbsaid>.actbar>.state{flex-basis:100%}
+}
+/* Its underline sits under the nostromo light scheme's raised edge, which
+   every button but a link wears. */
+.nb .vbar button.on{box-shadow:inset 0 -2px 0 var(--accent)}
+/* Long lists scroll inside the panel rather than pushing the Add field and the
+   footer off the screen. A cap in rough proportion to the window, so a desktop
+   shows more of it than a phone does, and a shadowless inset edge to say there
+   is more below. */
+/* A control that is not offered still holds its place, so the words in a row
+   line up with the words in the row above it. Measured against the button
+   rather than guessed: 16px of icon inside the same padding and border. */
+.roadmap .ph{display:inline-block;width:32px;height:1px;flex:0 0 auto}
+@media(max-width:600px){ .roadmap .ph{width:26px}
+}
+/* The send strip: always there once there is a list, everything on it dead
+   until an arrow is armed. */
+/* The hint and the Reorder toggle share a line: the toggle belongs to the
+   list, not to the Add field above it. */
+/* The roadmap's header. It kept its own smaller buttons and its own shade of
+   green for `on`, which read as a different kind of control from the History
+   button two tabs over, doing the same job. It shares .vbar's now; only the
+   top margin is its own, because it sits under the add field rather than at
+   the top of its view. */
+/* Confirming a drop, with the reason it is going. Red-edged rather than a
+   browser dialog: it has to hold a field, and a phone's confirm() cannot. */
+.dropbox{border:var(--hair) solid var(--red2-edge);border-radius:var(--r-surface);padding:9px 10px;
+  margin:0 0 9px 26px;background:color-mix(in srgb, var(--bad) 8%, var(--ground))}
+.dropbox .q{font:var(--f-ui);color:var(--ink);margin-bottom:7px}
+.dropbox .q span{color:var(--dim)}
+.dropbox input{width:100%;box-sizing:border-box;padding:6px 8px;
+  font:var(--f-row);min-height:var(--tap)}
+.dropbox textarea{width:100%;box-sizing:border-box;padding:7px 8px;
+  font:var(--f-row);min-height:86px;resize:vertical;
+  white-space:pre-wrap}
+.roadmap[draggable="true"]{cursor:grab}
+.roadmap.dragging{opacity:.5}
+.dropbox .acts{display:flex;gap:8px;margin-top:8px}
+.dropbox .acts .sp{flex:1}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.addstep .link{background:none;border:0}
+/* Moving things about: dim until it can, like every other row control. */
+.roadmap .mv{color:var(--dim)}
+.roadmap .mv[disabled]{opacity:.3}
+@media(hover:hover){ .roadmap .mv:not([disabled]):hover{color:var(--ink)}
+}
+/* The armed arrow. Filled rather than outlined: it is the one control on the
+   panel that is about to do something outside it. */
+.roadmap .go.sel{background:color-mix(in srgb, var(--accent), #000000 49%);
+  border-color:var(--accent-mid);color:color-mix(in srgb, var(--accent), #ffffff 72%)}
+
+/* ---- the memory book ------------------------------------------------- */
+/* One <details> per memory: collapsed it is the summary line Claude wrote for
+   itself, opened it is the file. Native disclosure rather than a toggle of
+   our own; this page has no framework and does not need one for a fold. */
+/* A memory is a fold like a bug report and a rule: a line divider, no box.
+   The rounded, sunk card it used to be was the one row shape in the notebook
+   that did not match the others. */
+.mem{border-top:var(--hair) solid var(--line)}
+.mem:first-child{border-top:0}
+/* Each row of a notebook's list opens a row's room (--row-y) above its
+   first line, the room a .row has: a memory, a bug, a rule, a roadmap
+   item, a test, a file or a conversation alike. */
+.mem>summary{padding:var(--row-y) 2px;min-height:var(--tap);box-sizing:border-box}
+/* Wrapped, unlike the command editor's textarea: those are shell lines where a
+   wrap would lie about what runs, these are prose with an 80-column habit and
+   a description line that is nobody's idea of scrollable. */
+.mem textarea{white-space:pre-wrap;min-height:190px}
+.mem .body{padding:0 10px 10px}
+.macts{margin-top:8px}
+.memadd{border:var(--hair) dashed var(--line);border-radius:var(--r-surface);padding:10px}
+.memadd label{margin-top:8px}
+.memadd>label:first-child{margin-top:0}
+/* Wrapped, unlike the command editor's: this one is prose, and `.modal
+   textarea` defaults to pre for shell lines a wrap would lie about. */
+.memadd textarea{min-height:120px;white-space:pre-wrap}
+.memadd .actbar{margin-top:10px}
+/* Bugs: one <details> per report, severity leading the line the way type
+   leads a memory's. */
+.bug{border-top:var(--hair) solid var(--line)}
+.bug:first-child{border-top:0}
+.bug>summary{padding:var(--row-y) 2px}
+.bug .btitle{flex:1;min-width:0;font:var(--f-row);
+  overflow-wrap:anywhere}
+.bug .btitle.done{color:var(--dim);text-decoration:line-through}
+.bug .body{padding:0 2px 10px 17px}
+/* The fields of a row you open, under their labels. A memory and a test
+   read this way too: the same shape for every fold, and Edit is what puts
+   fields in its place. */
+/* A read-only field over its long value (a rule's text, a bug's steps): its
+   label in the facts' voice, the note a facts grid's names wear, wherever a
+   record draws one (consistency batch J: a third label style, small
+   uppercase, chosen through three components' names). */
+.bfield{margin-bottom:7px}
+.bfield>label{font:var(--f-note);color:var(--dim);display:block}
+.bval{font:var(--f-ui);white-space:pre-wrap;overflow-wrap:anywhere}
+.bval.dim{color:var(--dim)}
+.two{display:flex;gap:6px}
+.two>*{flex:1;min-width:0}
+/* Two fields side by side, the same pair in the bug form, a memory's and a
+   rule's (consistency batch 6: three copies with three phone blocks), and
+   stacked on a phone, where half of 393px is a field showing a dozen
+   characters (a memory's file name is one that has to be read to be
+   checked) and a label wrapping to three lines above it. */
+@media(max-width:600px){
+  .two{display:block}
+  .two>*+*{margin-top:6px}
+}
+/* Drift between the index and the files: never fatal, which is exactly why it
+   has to be said out loud rather than left to be noticed. */
+/* The notebook, as a pane's document. Its own heading goes: the pane's bar
+   already names it, and the pane is the ceiling, so nothing inside sets one.
+   The document is the only scroller: the list used to be one too, with
+   `overscroll-behavior: contain`, which is a scroll container that cannot
+   scroll refusing to pass the gesture on. A finger landing on the list: most
+   of the panel: did nothing at all, while the gaps between the rows worked. */
+/* The notebook runs the pane's width so its view strip can (the operator,
+   17 Oct: the strip goes all the way to the right edge, as the header above
+   it does); every other band keeps the reading width. */
+.nb,.pane .doc > .nb{display:block;max-width:none}
+/* Every band of the notebook shares it, so the rows, the banner and the
+   footer all end at the same edge. */
+.nb > *{max-width:var(--doc-w);margin-inline:auto}
+.nb > .nbtabs{max-width:none}
+.nb h3{display:none}
+/* ...but a dialog's title is its first line wherever the dialog sits, the
+   notebook's sheet (a log's history) among them, which had lost it. */
+.nb .modal:not(.inline) .box>h3{display:block}
+/* ...except a wiki article's: a page's ## is an h3 there, and this rule hid
+   every one of them, so the sections were missing and the contents box
+   linked to headings that were not drawn (the operator, 4 Oct). */
+.nb .wkpage h3,.nb .wkfooter h3{display:block}
+/* No inset and no ceiling: a document is the pane's whole content, not a box
+   floating in it. The padding and the darker ground behind it read as a window
+   sitting inside the window it is already in, and the Projects and Docker
+   tabs wore exactly that, a rounded card adrift on a darker gutter, while the
+   notebook beside them did not. One language, and this is it.
+   Scoped through .pane, or `.pane .doc` further down the sheet wins on
+   source order at equal specificity and the inset comes back. */
+.pane .doc.nbhost,.pane .doc.flush{padding:0}
+.pane .stack:has(> .doc.on:is(.nbhost,.flush)){background:var(--panel)}
+/* The same reading width the notebook's bands take, so a row's controls do
+   not end up an ultrawide pane away from the name they act on. */
+.projtab,.dmtab,.fxtab,.doctab{display:block;max-width:var(--doc-w);margin-inline:auto}
+/* One order for every page's top (the operator, 29 Oct: the numbers first,
+   then the search and the page's buttons, then the list they act on): what
+   a page says over everything (a notice), its head, its tiles, then its bar
+   row (the search at its left, its buttons at its right), then the rest in
+   the order the page wrote it. Done here rather than in every page's
+   markup: the list's children and a placeholder's take part in the
+   surface's own order, so a page and the shape it waits in agree. A page
+   of settings, whose list is its split (splitSects), keeps its own grid. */
+.doctab{display:flex;flex-direction:column}
+.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt,.doctab>.skel.skt{display:contents}
+:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>*{order:5}
+:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.field:has(>.notice){order:1}
+:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.pghead{order:2}
+:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.field:has(>.tiles){order:3}
+:is(.doctab,.doctab>.skel.skt)>.docbarrow{order:4}
+.doctab>.fnote{order:6}
+.doctab>.doclist::after,.doctab.dmtab::after,.doctab.vmtab::after{order:7}
+/* ---- floating cards at a desk (R262, the operator, 17 Oct) ---------------
+   Every page's content floats as cards on the page's margin, the way Home
+   and Projects do: no line runs to the page's edge. A page-level section is
+   a card (its heading over a line, its body under it); a table straight on
+   the page is a card; a run of rows straight on the page is one card, its
+   rows divided inside it; a page of settings and the Roles page are a list
+   card beside a detail card; the Docker manager's groups are cards with the
+   project as the heading. The page's bar keeps its band. A phone keeps the
+   full-width bands it has (the operator: "mobile is fine"). */
+@media(min-width:901px){
+  .doctab>.doclist>.tbl>.row:last-child,:is(.dmtab,.dkview,.vmtab) .dmcard>.row:last-child,:is(.dmtab,.dkview,.vmtab) .dmcard>.tbl>.row:last-child,
+  .nbview :is(#bugList, #roadmapList, #memList, #tstList, #roadmapHist)>:last-child{border-bottom:0}
+  /* A band's line under it is the card's edge now: a notebook view's head
+     row and a jump bar float like the rest. */
+  .nbview .nbhead,.nbview .sectjump,.doctab .sectjump{border-bottom:0}
+  /* ...a run of rows straight on the page, one card; or straight in the one
+     wrapper a page draws them into (Phone's .phonetab, Storage's node),
+     and the same inside a template's wrapper (.skt), as they will land. */
+  :is(.doctab>.doclist, .doctab>.doclist>.skt, .doctab>.doclist>:is(.phonetab, [data-stnode]), .doctab>.doclist>.skt>.phonetab)>.row{margin:0 var(--row-x);background:var(--panel);
+    border-left:var(--hair) solid var(--line);border-right:var(--hair) solid var(--line)}
+  :is(.doctab>.doclist, .doctab>.doclist>.skt, .doctab>.doclist>:is(.phonetab, [data-stnode]), .doctab>.doclist>.skt>.phonetab)>:is(.row:first-child, :not(.row)+.row){margin-top:var(--card-gap);
+    border-top:var(--hair) solid var(--line);border-top-left-radius:var(--r-surface);border-top-right-radius:var(--r-surface)}
+  :is(.doctab>.doclist, .doctab>.doclist>.skt, .doctab>.doclist>:is(.phonetab, [data-stnode]), .doctab>.doclist>.skt>.phonetab)>:is(.row:last-child, .row:has(+:not(.row))){margin-bottom:0;
+    border-bottom:var(--hair) solid var(--line);border-bottom-left-radius:var(--r-surface);border-bottom-right-radius:var(--r-surface)}
+  /* A page's template floats as the page will (R262 with R218 step 16): a
+     run of its placeholder rows is one card, its table a card. */
+  .doctab>.doclist>.skt>.sk-row{margin:0 var(--row-x);background:var(--panel);
+    border-left:var(--hair) solid var(--line);border-right:var(--hair) solid var(--line)}
+  .doctab>.doclist>.skt>:is(.sk-row:first-child, :not(.sk-row)+.sk-row){margin-top:var(--card-gap);
+    border-top:var(--hair) solid var(--line);border-top-left-radius:var(--r-surface);border-top-right-radius:var(--r-surface)}
+  .doctab>.doclist>.skt>:is(.sk-row:last-child, .sk-row:has(+:not(.sk-row))){
+    border-bottom:var(--hair) solid var(--line);border-bottom-left-radius:var(--r-surface);border-bottom-right-radius:var(--r-surface)}
+  /* Findings and the notebook's Analysis: a list of rules is one card, a
+     project's name over its card on the Findings page. */
+  .fxtab .fx:has(> .rule),.nbview #anaList:has(> .rule){margin:var(--card-gap) var(--row-x) 0;border:var(--hair) solid var(--line);
+    border-radius:var(--r-surface);background:var(--panel);overflow:hidden}
+  .fxtab .fx>.rule:first-child,.nbview #anaList>.rule:first-child{border-top:0}
+  .fxtab .fnote,.doctab .fnote{border-top:0}
+  /* A page of settings, and the Roles page: two cards side by side, their
+     tops level; a settings page's foot (Delete project) floats under the
+     section with no line across. */
+  .ssplit{column-gap:16px;padding:12px var(--row-x) 16px}
+  .ssplit>details.sect{margin:0;border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+    background:var(--panel);overflow:hidden}
+  .ssplit>details.sect[open]>summary{border-bottom:var(--hair) solid var(--line)}
+  .ssplit>details.sect>.body{padding-top:var(--row-y)}
+  .ssplit>.foot{border-top:0;padding-left:0;padding-right:0}
+  .ssplit>.snav,.rsplit>.rlist{border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+    background:var(--panel);overflow:hidden;align-self:start}
+  .ssplit>.snav>.rrow:last-child,.rsplit>.rlist>.rrow:last-child{border-bottom:0}
+}
+
+/* ---- the shell (R218 step 2) ---------------------------------------------
+   The rail: one column of groups at the left edge, an icon each, the label
+   under it from 1280px up, the one on show wearing the accent as a bar on
+   its left edge (the rail rule). On a phone the same items are the bar at
+   the foot of the page, five across and More. */
+.rail{display:flex;flex-direction:column;gap:2px;padding:6px 0 6px 6px;min-height:0;overflow:auto;
+  scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.ritem{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-height:44px;padding:6px 2px;border:0;border-radius:var(--r-control);background:transparent;--sheen:none;
+  color:var(--dim);font:var(--f-note);line-height:1.1;position:relative;cursor:pointer}
+.ritem svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.ritem .rlbl{display:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(min-width:1280px){ .rail .ritem .rlbl{display:block} .rail .ritem{min-height:52px}
+}
+.ritem:hover{background:var(--btn-hi);color:var(--ink)}
+.ritem.on{color:var(--ink);background:var(--sunk)}
+.rail .ritem.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;
+  border-radius:0 2px 2px 0;background:var(--accent)}
+.ritem:focus-visible{outline:2px solid var(--accent-mid);outline-offset:-2px}
+/* The marker that slides to the item pressed (slideMark): one per strip,
+   the strip's own static line put away while it is there. The rail's is
+   its bar beside the group; a sub-nav's and a notebook strip's the line
+   under the tab, in that strip's color. */
+.slmark{position:absolute;left:0;pointer-events:none;will-change:transform;transform-origin:0 0}
+.rail{position:relative}
+.rail.slides .ritem.on::before{content:none}
+.rail>.slmark{top:0;width:3px;border-radius:0 2px 2px 0;background:var(--accent)}
+.pane .bar .subnav.pseg{position:relative}
+.pane .bar .subnav.slides>button.on{box-shadow:none}
+.pane .bar .subnav>.slmark{bottom:0;height:2px;background:var(--accent)}
+.nbtabs .nbgroups,.nbtabs .nbsub{position:relative}
+.nbtabs .slides>button.on{border-bottom-color:transparent}
+.nbtabs .nbgroups>.slmark{bottom:0;height:2px;background:var(--accent)}
+.nbtabs .nbsub>.slmark{bottom:0;height:2px;background:var(--note)}
+.railbar{display:none}
+.railmore{display:none}
+@media(max-width:900px){
+  .rail{display:none}
+  .railbar{display:flex;flex:0 0 auto;gap:2px;padding:4px 4px calc(4px + env(safe-area-inset-bottom));
+    background:var(--panel);border-top:var(--hair) solid var(--line);
+    position:relative;z-index:1}   /* over a scheme's texture layer (body::before), not under it */
+  .railbar .ritem{flex:1 1 0;min-width:0;min-height:var(--tap)}
+  .railbar .ritem .rlbl{display:block}
+  .railbar .ritem.on{color:var(--accent);background:transparent;--sheen:none}
+  .railmore{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;
+    position:fixed;left:8px;right:8px;bottom:calc(58px + env(safe-area-inset-bottom));z-index:40;
+    background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+    box-shadow:0 10px 24px rgba(0,0,0,.5);animation:menuUp .32s cubic-bezier(.33,1,.68,1)}
+  .railmore[hidden]{display:none}
+  .railmore .ritem{min-height:var(--tap);background:var(--btn);border:var(--hair) solid var(--line)}
+  .railmore .ritem .rlbl{display:block}
+}
+/* A page's bar: the group's tools as a segment (the same .pseg the gear's
+   Appearance uses), or the page's name, and no close. */
+.pane .bar.page{padding:6px calc(var(--row-x) + var(--doc-in));min-height:var(--pbar-h)}
+/* A page standing alone (Home, Spaces, Jobs): its bar is its tab row, the
+   height a group's row has under its header. */
+.pane .bar.page:not(.grouped){padding-top:0;padding-bottom:0;min-height:var(--tabrow-h)}
+.pane .bar.page:not(.grouped) .subnav.pseg{margin:0}
+.nbhead .nbsum{min-width:0;flex:1 1 auto}
+/* A project's page (R218 step 3): the bar is its header, one band: the name
+   large, the branch and the node in the data face, the session's dot and
+   word, and the actions at the right; the one notice under it. */
+.pane .bar.proj{padding:6px calc(var(--row-x) + var(--doc-in));flex-wrap:wrap;gap:4px 10px;font:var(--f-ui);min-height:var(--pbar-h)}
+/* A group's header (R177, R178), drawn as a notebook's (the operator, 29
+   Oct): one row the height of the project header, the node picker where the
+   project's name is and in its type, plain until it is hovered or focused,
+   the facts beside it with the room they need; then the group's sub-nav in
+   a band of its own under a rule, in the notebook view strip's type, the
+   group's actions at its right (the operator, 28 Oct: on the tabs' line). */
+.pane .bar.page.grouped{flex-wrap:wrap;gap:0 10px;font:var(--f-ui);padding-top:0;padding-bottom:0}
+/* Its head is one row a little taller than the tab row under it, at a desk
+   and on a phone: the node's picker and its state as one pill beside it,
+   the picker giving up width before the pill. */
+.pane .bar.page.grouped .phead{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0;flex-wrap:nowrap;min-height:var(--ghead-h)}
+.pane .bar.page.grouped .phead>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap);margin:0;min-width:0;flex:0 1 auto}
+/* The word stays for a reader of the page, as the select's label. */
+.pane .bar.page.grouped .phead>label.pick>.pickw{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pane .bar.page.grouped .phead>label.pick>select{min-height:var(--tap);min-width:0;max-width:100%;text-overflow:ellipsis;margin-left:-8px;padding:3px 28px 3px 8px;font-weight:600;font-size:1.15rem;line-height:1.3;
+  color:var(--ink);box-sizing:border-box;background-color:transparent;border-color:transparent;transition:background-color .15s,border-color .15s}
+.pane .bar.page.grouped .phead>label.pick>select:focus-visible{background-color:var(--btn);border-color:var(--line)}
+@media(hover:hover){ .pane .bar.page.grouped .phead>label.pick>select:hover{background-color:var(--btn);border-color:var(--line)}
+}
+.pane .bar.page.grouped .pname{font-weight:600;font-size:1.15rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;min-width:0}
+/* The state pill is a press to the node's own page: a pill, not a button's
+   box, with the dot a state on a row's name line wears. */
+.pane .bar.page.grouped .phead>button.ndstate{flex:none;min-height:0;padding:3px 8px;background:none;--sheen:none;cursor:pointer;
+  font:var(--f-tag);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.pane .bar.page.grouped .phead>button.ndstate::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:currentColor;margin-right:5px;vertical-align:1px}
+@media(hover:hover){ .pane .bar.page.grouped .phead>button.ndstate:hover{background:var(--btn)}
+}
+.pane .bar.page.grouped .phead>.ndstatesk{flex:none}
+.pane .bar.page.grouped .phead>.sp{flex:1}
+.pane .bar.page.grouped>.subrow{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0;min-height:var(--tabrow-h);margin-top:0;position:relative}
+/* ...its rule the pane's whole width, as the notebook's over its strip,
+   though the header itself keeps the reading width. */
+.pane .bar.page.grouped>.subrow::before{content:"";position:absolute;top:0;left:-100vw;right:-100vw;border-top:var(--hair) solid var(--line);pointer-events:none}
+.pane .bar.page.grouped{overflow-x:clip}
+.pane .bar.page.grouped>.subrow>.subnav{flex:0 1 auto;min-width:0;margin:0}
+@media(min-width:601px){ .pane .bar.page.grouped>.subrow>.subnav.pseg>button{font:600 12px/1 system-ui,sans-serif;padding:0 13px}
+}
+.pane .bar.page.grouped>.subrow>.sp{flex:1}
+.pane .bar.page.grouped>.subrow>.actbar{display:inline-flex;gap:6px;flex:0 0 auto;padding:4px 0}   /* the dock line's 4px above and below (the operator, 13 Nov) */
+.pane .bar.page.grouped>.subrow>.actbar>button{min-height:var(--tap);padding:4px 12px;font:var(--f-ui)}
+/* A sub-tab whose feature the picked node lacks (R178): muted, a word after
+   its name, still a press. */
+.pane .bar.page.grouped .subnav>button.off{color:var(--dim)}
+.pane .bar.page.grouped .subnav>button.off.on{color:var(--ink)}
+.pane .bar.proj .phead{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;flex-wrap:wrap}
+.pane .bar.proj .pname{font-weight:600;font-size:1.15rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;min-width:0;display:inline-flex;align-items:center;gap:6px}
+.pane .bar.proj .pfacts{overflow-wrap:anywhere;min-width:0;max-width:40ch}
+.pane .bar.proj .sp{flex:1}
+.pane .bar.proj .phead>button{min-height:var(--tap);padding:4px 12px;font:var(--f-ui)}
+/* ...and its pulldown one height with them (the operator, 27 Oct: it sat
+   short of the buttons beside it). */
+.pane .bar.proj .phead>select{min-height:var(--tap);padding:4px 10px;font:var(--f-ui);box-sizing:border-box}
+.pane .bar.proj .more{position:relative;display:inline-flex}
+.pane .bar.proj .more>button{min-height:var(--tap);min-width:var(--tap);padding:4px 8px}
+/* On a phone the actions sit on the name's row, at its right, as at a desk
+   (the operator, 7 Nov: three rows of name, sessions and buttons); the facts
+   and the sessions' states go under them, each a line; the name and the
+   repository pulldown give up their width first. */
+@media(max-width:600px){
+  /* A grid, not a wrapping row: a wrapping row breaks before anything in it
+     shrinks, so a longer name with its pulldown and Manage agent sent the
+     menu's button to a line of its own (the operator, 11 Nov). The buttons
+     keep their width; the name is as wide as its words while there is room;
+     the pulldown takes what is left, up to its own width and never under a
+     thumb's, and the name is cut before the pulldown goes under that. */
+  .pane .bar.proj .phead{display:grid;align-items:center;gap:10px 0;
+    grid-template-columns:[name] minmax(0,max-content) [repo] minmax(auto,1000fr) [sp] minmax(0,1fr) [agent] max-content [shell] max-content [more] max-content}
+  .pane .bar.proj .phead>*{grid-column:1 / -1}
+  .pane .bar.proj .phead>.pfacts{max-width:none}
+  .pane .bar.proj .phead>.pname{grid-area:1 / name;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .pane .bar.proj .phead>.sp{grid-area:1 / sp}
+  .pane .bar.proj .phead>button{grid-area:1 / agent;margin-inline-start:10px;white-space:nowrap}
+  .pane .bar.proj .phead>button[data-s]{grid-area:1 / shell}
+  .pane .bar.proj .phead>.more{grid-area:1 / more;margin-inline-start:10px}
+}
+/* ...and on the narrowest phones the buttons sit closer and carry less
+   padding, so the name keeps most of its letters beside them. */
+@media(max-width:380px){
+  .pane .bar.proj .phead>button{padding-inline:8px;margin-inline-start:6px}
+  .pane .bar.proj .phead>.more{margin-inline-start:6px}
+}
+@media(max-width:600px){ .pane .bar.proj .pfacts{flex:1 1 100%;max-width:none}
+}
+.pgridband{padding-top:12px;padding-bottom:12px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.pgrid .empty{grid-column:1/-1}
+.pcard{position:relative;display:flex;flex-direction:column;gap:6px;padding:var(--row-y) var(--row-x);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);min-width:0}
+/* A colored card, and a project page's header as its card is (the operator,
+   19 Oct): the tint over the panel, never over the bar's see-through ground,
+   which turned a header black (29 Sep). */
+:is(.pcard,.pane .bar.proj).pc{box-shadow:inset 3px 0 var(--pc);background:color-mix(in srgb, var(--pc) 16%, var(--panel));
+  border-color:color-mix(in srgb, var(--pc) 45%, var(--line))}
+/* A colored card's buttons wear its color too (the operator, 18 Oct): a
+   lighter tint for the plain ones, a deeper one for Manage agent, so the card
+   reads as one color and the running session still stands out on it. Every
+   row of buttons the card holds: its actions and a box it asks in (Group),
+   so a form opened on it is the card's too (B863); and a project page's
+   header's, as its card's. */
+:is(.pcard.pc :is(.pcacts,.askrow,.pcname>.actbar),.pane .bar.proj.pc :is(.phead,.askrow))>button,:is(.pcard.pc .pcacts,.pane .bar.proj.pc .phead)>.more>button{background:color-mix(in srgb, var(--pc) 22%, var(--btn));
+  border-color:color-mix(in srgb, var(--pc) 50%, var(--line));color:var(--ink)}
+:is(.pcard.pc :is(.pcacts,.askrow,.pcname>.actbar),.pane .bar.proj.pc :is(.phead,.askrow))>button.primary{background:color-mix(in srgb, var(--pc) 50%, var(--btn));border-color:var(--pc)}
+:is(.pcard.pc,.pane .bar.proj.pc) .askrow input{background:color-mix(in srgb, var(--pc) 10%, var(--sunk));
+  border-color:color-mix(in srgb, var(--pc) 45%, var(--line))}
+:is(.pcard.pc,.pane .bar.proj.pc) .askrow input:focus{outline:2px solid color-mix(in srgb, var(--pc) 60%, var(--panel));outline-offset:-1px}
+@media(hover:hover){
+  :is(.pcard.pc :is(.pcacts,.askrow,.pcname>.actbar),.pane .bar.proj.pc :is(.phead,.askrow))>button:hover,:is(.pcard.pc .pcacts,.pane .bar.proj.pc .phead)>.more>button:hover{background:color-mix(in srgb, var(--pc) 34%, var(--btn))}
+  :is(.pcard.pc :is(.pcacts,.askrow,.pcname>.actbar),.pane .bar.proj.pc :is(.phead,.askrow))>button.primary:hover{background:color-mix(in srgb, var(--pc) 62%, var(--btn))}
+}
+.pcard:has(.pcpop,.askrow){z-index:41}
+/* The one box a press on a card's back opens (a rename, a move, Group, the
+   swatches) takes the repositories' place while it is open (the operator,
+   26 Oct), so the two are never on the card at once; askInline holds the
+   back's height until the box goes. */
+.pcard .pcback:has(>.askline,>.pcpop)>.pcrepos{display:none}
+/* One line on either face: a long name wraps within its room, its marks and
+   buttons after it on its first line (the operator, 26 Oct: pin and archive
+   were pushed under a long name). */
+.pcard .pcname{display:flex;align-items:flex-start;gap:6px;min-width:0;flex-wrap:nowrap}
+.pcard .pcname .name{font-weight:600;font-size:1.05rem;line-height:1.3;color:var(--ink);min-width:0;overflow-wrap:anywhere}
+.pcard .pcname>.sp{flex:1}
+/* ...so the back holds Back at its top right and the front its pin and
+   archive, the name's first line centered on them. */
+.pcard .pcname .name{flex:0 1 auto;padding-top:calc((var(--tap) - 1.3em) / 2)}
+.pcard .pcname>:not(.name):not(.sp){flex:none}
+/* Pin and Archive by the name (R138), pressed in where they are set: the
+   accent where it is, the quiet ink where it is not. */
+.pcard .pcname .pcmark{color:var(--dim)}
+.pcard .pcname .pcmark.on{color:var(--accent)}
+/* A favorite's star is filled; the others an outline. */
+.pcard .pcname .pcfav.on svg{fill:currentColor}
+.pcard .pcname button.eye.bare{min-height:var(--tap);min-width:var(--tap);display:inline-flex;align-items:center;justify-content:center}
+/* A space's facts and notes, one look wherever they are drawn (its card,
+   its notebook's header, Home's glance): the facts in the data voice, each
+   note in the control's voice in its tone. */
+:is(.pfacts,.pcfacts){font:var(--f-data);color:var(--dim)}
+.pnote{font:var(--f-ui)} .pnote.bad{color:var(--bad)} .pnote.warn{color:var(--warn)} .pnote.dim{color:var(--dim)}
+.pcard .pcfacts{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A project's repositories (R138), one line each under its facts and who
+   is there, with no rule between them (the operator, 25 Oct: the space
+   groups them); a finger's height only where a finger presses. */
+.pcard .pcrepos{display:flex;flex-direction:column;gap:2px;margin:4px 0 2px}
+.pcard .pcrepo{display:flex;align-items:center;gap:var(--field-gap);min-height:28px;min-width:0}
+/* A thumb's height only where the row carries presses (the back's Move and
+   Remove): the front's lines are a name and a branch, set close (the
+   operator, 27 Oct), the name's link too, which a document's button rule
+   otherwise makes a control's height. */
+@media(pointer:coarse){ .pcard .pcback .pcrepo{min-height:var(--tap)}
+}
+/* The id, the node and who is working there share one line, wrapping. */
+.pcard .pcmeta{display:flex;flex-wrap:wrap;align-items:center;gap:2px 14px;min-width:0}
+.pcard .pcmeta>.pcfacts{flex:none;max-width:100%}
+.pcard .pcrepo>.namelink{font:var(--f-ui);font-weight:600;min-height:0}
+/* In the compact view a card's name is the press that opens it, in the
+   name's own type. */
+.pcard .pcname>button.name{font-weight:600;font-size:1.05rem;line-height:1.3;text-align:left}
+.pcard .pcrepo>.pcfacts{flex:1}
+/* A repository on a card's back: its name, then the icons that change it,
+   each a thumb wide and its picture in the middle. */
+.pcard .pcrepo>.name{font:var(--f-ui);font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcard .pcrepo>.sp{flex:1}
+.pcard .pcrepo>button.eye.bare{flex:none;min-height:var(--tap);min-width:var(--tap);display:inline-flex;align-items:center;justify-content:center;color:var(--dim)}
+/* ...a finger's height on touch, and 32px wide still, so a repository's
+   name keeps its room beside five of them at a phone's 344px. */
+@media(pointer:coarse){ .pcard .pcrepo>button.eye.bare{min-height:var(--tap)}
+}
+.pcard .pcrepo>button.eye.bare[data-danger]{color:var(--bad)}
+@media(hover:hover){ .pcard .pcrepo>button.eye.bare:hover{color:var(--ink)} .pcard .pcrepo>button.eye.bare[data-danger]:hover{color:var(--bad)}
+}
+/* A long list of repositories scrolls inside the back, which keeps the
+   front's size (R138). */
+.pcard .pcback .pcrepos{max-height:calc(var(--tap) * 5 + 2px);overflow-y:auto}
+.pcard .pcacts{margin-top:auto;padding:6px 0 0;border:0;background:none;--sheen:none}
+.pcard .pcacts .more{position:relative;display:inline-flex;margin-left:auto}
+.pcard .pcacts .more>button{min-width:var(--tap);padding:4px 8px}
+.pcard:has(.actmenu:not([hidden])){z-index:41}
+/* A choice of two to four (.pseg: the group's tools in a page's bar, Cards
+   and List, Dark and Light, Deploy key and Access token) is one joined
+   control, the pick lifted in the ink's tint with the accent under it, a
+   tint no theme's accent can clash with. The accent fill is a
+   page's main action's alone (New container, Add user), and a verb that
+   looks after the page (Refresh, Check for updates) is the plain button, so
+   a choice, a chore and the action never look alike (the operator, 17 Oct). */
+.pseg{display:inline-flex;gap:0;flex-wrap:nowrap;max-width:100%;border:var(--hair) solid var(--line);
+  border-radius:var(--r-control);background:var(--btn);overflow:hidden}
+.pseg>button{flex:0 1 auto;min-width:0;margin:0;border:0;border-radius:0;background:none;--sheen:none;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pseg>button+button{border-left:var(--hair) solid var(--line)}
+.pseg>button.on{background:color-mix(in srgb, var(--ink) 11%, var(--btn));color:var(--ink);
+  box-shadow:inset 0 -2px 0 var(--accent)}
+@media(hover:hover){
+  .pseg>button:hover,.pseg>button.on:hover{background:color-mix(in srgb, var(--ink) 7%, var(--btn));border-color:var(--line);color:var(--ink)}
+  .pseg>button.on:hover{background:color-mix(in srgb, var(--ink) 15%, var(--btn))}
+}
+/* The page's sub-nav (a group's tools: Nodes, Storage, nginx) is its own
+   thing, not a switch (the operator, 17 Oct: in the switch's box it read
+   as one more button, and repeated the Cards and List beside it): the tools
+   as tabs standing on the bar's floor, the one on show in ink with the
+   accent under it, the rest dim, no box. It runs the bar's height, so the
+   line under the tab on show is the bar's own bottom edge. */
+.pane .bar .subnav.pseg{align-self:stretch;margin:-6px 0;border:0;border-radius:0;background:none;--sheen:none;gap:2px;
+  min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
+.pane .bar .subnav.pseg::-webkit-scrollbar{display:none}
+.pane .bar .subnav.pseg>button{min-height:0;padding:0 12px;border:0;border-radius:0;background:none;--sheen:none;
+  color:var(--dim);font:var(--f-ui);font-weight:500;box-shadow:none}
+.pane .bar .subnav.pseg>button+button{border-left:0}
+.pane .bar .subnav.pseg>button.on{color:var(--ink);background:none;--sheen:none;box-shadow:inset 0 -2px 0 var(--accent)}
+@media(hover:hover){
+  .pane .bar .subnav.pseg>button:hover,.pane .bar .subnav.pseg>button.on:hover{background:none;--sheen:none;color:var(--ink)}
+}
+/* On a phone the tools share the bar's width on a tighter inset, so a
+   group of five (Build) reads whole down to a fold's 344px cover. */
+@media(max-width:900px){
+  .pane .bar .subnav.pseg{flex:1 1 auto}
+  .pane .bar .subnav.pseg>button{min-height:var(--tap);flex:1 0 auto;padding:0 10px}
+}
+/* A press that is only an icon (the trash, ⋯ where it is drawn as one)
+   centers it: inline, an SVG sat on the text's baseline and two pixels off
+   (the operator, 17 Oct). */
+button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;align-items:center;justify-content:center}
+/* Search in the top bar: a field that jumps, its rows under it. */
+.jump{position:relative;flex:0 1 360px;min-width:0}
+/* The header's height, as the buttons beside it are (B142). */
+.jump input{width:100%;min-height:var(--tap);padding:4px 10px;background:var(--sunk);color:var(--ink);font:var(--f-data)}
+.jump input::placeholder{color:var(--dim)}
+@media(max-width:1000px){ .jump{flex:0 1 150px} .meta.host{display:none}
+}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.jrow{border:0;background:transparent}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.jrow.on,.jrow:hover{background:var(--btn-hi)}
+/* On a phone the field takes the width between the brand and the buttons:
+   the spacer beside it grew too and took half (the operator, 18 Oct: the
+   hint cut off beside a blank gap). */
+@media(max-width:900px){ .jump{flex:1 1 90px}
+}
+/* The search keeps at least 80px at every phone width (B744, B290): the
+   narrowest phones give the header's side padding back to make room. */
+@media(max-width:900px){ .jump{min-width:80px}
+}
+@media(max-width:600px){ .jump input{padding:4px 8px}
+}
+
+/* ---- tiles, facts and chips (R216) --------------------------------------
+   The 2.0 shapes, one definition each, read by every tab that draws them
+   (page-docs.js statTiles, factGrid, chipBar). A tile is a number the tab
+   is about, large, with its label under it; a facts grid is what a row
+   knows as labels and values; a chip narrows a list. Each is held by the
+   design's rule of the same name and measured by test/uniform.mjs. */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:var(--field-gap)}
+/* One grid on a page and a notebook view alike (the operator, 29 Oct):
+   the tiles share the width, and a lone one keeps a tile's width rather
+   than a band across the page. */
+@media(min-width:901px){ .tiles:has(>.tile:only-child){grid-template-columns:minmax(0,14rem)}
+}
+@media(max-width:900px){ .tiles{grid-template-columns:repeat(2,1fr)}
+}
+.tile{background:var(--sunk);border:var(--hair) solid var(--line);border-radius:var(--r-control);
+  padding:12px 16px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.tile .tv{font:var(--f-stat);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .tv .tu{font:var(--f-ui);color:var(--dim);margin-left:4px}
+.tile .tl{font:var(--f-note);color:var(--dim)}
+.tile .ts{font:var(--f-note);color:var(--dim);opacity:.85}
+.tile.ok .tv{color:var(--pass)}
+/* A tile that is a link and carries no news keeps the text color, as every
+   tile's number does (the operator, 18 Oct: Home's in the second color read
+   as news); its border on hover says it is a way to its page. */
+.tile.warn .tv{color:var(--warn)}
+.tile.bad .tv{color:var(--bad)}
+/* An odd number of tiles on a phone sits in threes rather than two to a row
+   with one left over (the operator, 17 Oct): three in one row, five as three
+   and two, seven as three, two and two, a short row's tiles splitting its
+   width. Six tracks, a tile two of them, a tile in a row of two three. */
+@media(max-width:900px){
+  .tiles:has(> .tile:last-child:nth-child(odd)){grid-template-columns:repeat(6,minmax(0,1fr))}
+  .tiles:has(> .tile:last-child:nth-child(odd)) > .tile{grid-column:span 2;padding:10px 12px}
+  .tiles:has(> .tile:last-child:nth-child(6n+5)) > .tile:nth-last-child(-n+2),
+  .tiles:has(> .tile:last-child:nth-child(6n+7)) > .tile:nth-last-child(-n+4){grid-column:span 3}
+  /* ...and one alone is the row (B822): spanning two of six it sat in the
+     left third. */
+  .tiles > .tile:only-child{grid-column:1 / -1}
+  /* ...over the odd count's span of two, which outranked it (B222). */
+  .tiles:has(> .tile:last-child:nth-child(odd)) > .tile:only-child{grid-column:1 / -1}
+  .tiles:has(> .tile:last-child:nth-child(odd)) .tl,
+  .tiles:has(> .tile:last-child:nth-child(odd)) .ts{overflow-wrap:anywhere}
+  /* ...and a number with its unit wraps at the space rather than being cut
+     in a third of the screen ("11.1 TB" read "11.1…", B150). */
+  .tiles:has(> .tile:last-child:nth-child(odd)) .tv{white-space:normal}
+}
+/* A container's card (the operator's concept, 17 Oct). Its head: the name,
+   its pill and how long it has been up, a mono line of what it is (image,
+   commit, compose file), and its buttons at the right on the same line,
+   under it when the card is narrow. */
+.dmid .name{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.dmid .dmorigin{margin-top:2px}
+.dmid .dmorigin .sep{display:inline-block;width:14px}
+.dmid .dmstate.bad{color:var(--bad)}
+.dmsvctbl>.thead,.dmsvctbl>.tline{padding:7px 12px}
+/* What a card's settings are, read (factPills): pills on one wrapping line. */
+/* ...the same room above and below it (the operator, 17 Oct): the card's
+   grid adds its 2px row gap above at a desk, and a fold's band starts below. */
+.fpills{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:6px 12px;margin:14px 0 12px}
+@media(max-width:900px){ .fpills{margin-top:16px}
+}
+.fpills>.fpl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+@media(max-width:600px){ .fpills{grid-template-columns:minmax(0,1fr)}
+}
+.fpill{display:inline-flex;align-items:baseline;gap:6px;padding:3px 9px;border:var(--hair) solid var(--line);
+  border-radius:var(--r-small);background:var(--sunk);font:var(--f-note);color:var(--ink);max-width:100%;min-width:0}
+.fpill .k{color:var(--dim);flex:0 0 auto}
+.fpill .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fpill .v a{color:var(--note)}
+.fpill.ok .v{color:var(--pass)}
+.dmhead{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 16px;min-width:0}
+.dmhead>.dmid{flex:1 1 16rem;min-width:0}
+.dmhead>.actbar.dmacts{flex:0 1 auto;margin-left:auto;padding:0;border:0;background:none;--sheen:none;justify-content:flex-end}
+.dmid .dmstate{font:var(--f-note);color:var(--dim);overflow-wrap:anywhere}
+.dmid .dmstate.ok{color:var(--pass)}
+.dmid .dmstate:empty{display:none}
+@media(max-width:600px){ .dmhead>.actbar.dmacts{flex:1 1 100%;justify-content:flex-start;margin-left:0}
+}
+/* Cards and List are their pictures at every width (viewSeg), each in the
+   middle of a square button (B342: a block svg in an inline box sat left). */
+.dmviewseg>button{display:inline-flex;align-items:center;justify-content:center;min-width:var(--ctl);padding:4px 10px}
+.dmviewseg svg{display:block}
+.facts dd a{color:var(--note)}
+/* The row's Log fold: each container's tail under its name, the whole no
+   taller than a screen, and the Follow switch on its action bar. */
+/* A page's head (pageHead): its name and state as a node's head has them,
+   its facts under it, its buttons at the right (the operator, 25 Oct). */
+.pghead > .name{font-weight:600;font-size:1.05rem;color:var(--ink);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.pghead > .actbar{margin-top:6px}
+/* A head with one action wears it in its top-right corner, on the head's
+   first line, as a card wears its action by its title (the operator, 29
+   Oct: never one button on a line of its own under the facts); with
+   several (a node's Test, Enroll script and Agent log) they keep the row
+   along its foot. */
+.pghead:has(> .actbar > :is(button, a.btn):only-child){display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--field-gap);align-items:start}
+.pghead:has(> .actbar > :is(button, a.btn):only-child) > *{grid-column:1}
+/* ...and at a desk a head whose actions are picks (the Audit page's Person
+   and Machine) keeps them beside its facts too, where they wrapped under
+   them onto a line of their own. */
+@media(min-width:901px){
+  .pghead:has(> .actbar > label.pick){display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--field-gap);align-items:start}
+  .pghead:has(> .actbar > label.pick) > *{grid-column:1}
+  .pghead:has(> .actbar > label.pick) > .actbar{grid-column:2;grid-row:1;margin:0;align-self:start}
+}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px var(--row-x);margin:4px 0 0}
+@media(max-width:900px){ .facts{grid-template-columns:minmax(0,1fr)}
+}
+.facts .fact{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:0 8px;align-items:baseline;min-width:0}
+/* Every value of a grid's column starts at one line, whatever its label's
+   length (B76: on a phone each value began where its own label ended, two
+   ragged columns): the labels share one track per column through subgrid. */
+@supports (grid-template-columns:subgrid){
+  .facts{grid-template-columns:repeat(2,minmax(5.5rem,max-content) minmax(0,1fr));column-gap:8px}
+  .facts .fact{grid-column:span 2;grid-template-columns:subgrid}
+  .facts .fact > dd{padding-right:calc(var(--row-x) - 8px)}
+}
+.facts dt{font:var(--f-note);color:var(--dim);margin:0;white-space:nowrap}
+.facts dd{font:var(--f-data);color:var(--ink);margin:0;min-width:0;overflow-wrap:anywhere}
+.facts dd code{font:inherit}
+/* Tables (R218 step 8, the tables rule): the header and every row's line
+   share one set of tracks (--tcols, from tblWrap); a cell holds one line and
+   ends in an ellipsis, the lead cell may wrap. On a phone the header goes,
+   the lead cell takes the line and the rest follow it, each wearing its
+   column's name, the buttons at the right of the last line they fit on. */
+/* A table's row is a column whatever else it is (a plain .row is a flex
+   line, which shrank the line to its content): the line spans the table. */
+.tbl > .row,.tbl > .tc{flex-direction:column;align-items:stretch;flex-wrap:nowrap}
+.tbl .thead,.tbl .tline{display:grid;grid-template-columns:var(--tcols);column-gap:var(--row-x);align-items:center;min-width:0}
+.tbl .thead{padding:var(--label-gap) var(--row-x);font:var(--f-note);color:var(--dim);border-bottom:var(--hair) solid var(--line)}
+.tbl .th,.tbl .td{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A lead cell wraps between words and breaks one only when it is longer
+   than its column: anywhere cut 'nginx-bb-dev-sandbox' mid-word in a column
+   that had room for it on the next line (B112). */
+.tbl .td.lead{white-space:normal;overflow-wrap:break-word;font-weight:600}
+.tbl .td{font:var(--f-data);color:var(--dim)}
+.tbl .td.lead{font:var(--f-ui);font-weight:600;color:var(--ink)}
+.tbl .td.act{overflow:visible;display:flex;justify-content:flex-end}
+.tbl .td .pill{margin:0}
+@media(max-width:900px){
+  .tbl .thead{display:none}
+  .tbl .tline{display:flex;flex-wrap:wrap;gap:var(--label-gap) var(--row-x);align-items:baseline}
+  .tbl .td.lead{flex:1 0 100%}
+  .tbl .td{white-space:normal;overflow:visible}
+  .tbl .td[data-th]::before{content:attr(data-th) " ";font:var(--f-note);color:var(--dim)}
+  .tbl .td:empty{display:none}
+  .tbl .td.act{flex:1 0 auto}
+}
+/* Charts (R218 step 9, the charts rule): one series each, a 2px line in
+   the accent over a tenth-strength wash, hairline grid in --line, the axis
+   and the readout in text tokens. The plot stretches; its strokes do not. */
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--row-x);padding:var(--row-y) 0}
+@media(max-width:900px){ .charts{grid-template-columns:minmax(0,1fr)}
+}
+.chart{margin:0;min-width:0}
+.chart figcaption{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin-bottom:var(--label-gap)}
+.chart .ct{font:var(--f-ui);font-weight:600;color:var(--ink)}
+.chart .cv{font:var(--f-data);color:var(--ink);font-variant-numeric:tabular-nums}
+.chart .cs{flex:1 0 100%;font:var(--f-note);color:var(--dim)}
+.chart .cplot{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 6px}
+.chart .cy{display:flex;flex-direction:column;justify-content:space-between;height:96px;
+  font:var(--f-note);color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+.chart .cy span{line-height:1;transform:translateY(-1px)}
+.chart .carea{position:relative;height:96px;outline-offset:3px;touch-action:pan-y;cursor:crosshair}
+.chart .carea svg{display:block;width:100%;height:100%;overflow:visible}
+.chart .cgrid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+/* A second chart beside the first (a node's Memory beside its CPU) is drawn
+   in the second color, so the pair reads as two measures. */
+.charts .chart + .chart{--chart-c:var(--note)}
+.chart .cline{fill:none;stroke:var(--chart-c, var(--accent));stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.chart .cfill{fill:var(--chart-c, var(--accent));opacity:.1;stroke:none}
+.chart .cdot{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--chart-c, var(--accent));
+  box-shadow:0 0 0 2px var(--panel);pointer-events:none}
+.chart .chair{position:absolute;top:0;bottom:0;width:0;border-left:var(--hair) solid var(--dim);pointer-events:none}
+.chart .ctip{position:absolute;top:-4px;transform:translate(6px,-100%);white-space:nowrap;pointer-events:none;
+  font:var(--f-note);color:var(--dim);background:var(--panel);border:var(--hair) solid var(--line);
+  border-radius:var(--r-small);padding:2px 6px;z-index:2}
+.chart .ctip.flip{transform:translate(calc(-100% - 6px),-100%)}
+.chart .ctip b{color:var(--ink);font:var(--f-data);font-weight:600}
+.chart .cx{position:absolute;left:0;right:0;top:100%;display:flex;justify-content:space-between;
+  font:var(--f-note);color:var(--dim);padding-top:2px}
+.chart .cplot{padding-bottom:18px}
+.spark{display:block;margin-top:4px;overflow:visible}
+.spark polyline{fill:none;stroke:var(--dim);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;opacity:.7}
+.spark circle{fill:var(--accent);stroke:var(--panel);stroke-width:1.5}
+.chips{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  padding-bottom:2px;mask-image:linear-gradient(to right,#000 calc(100% - 16px),transparent)}
+.chips::-webkit-scrollbar{display:none}
+/* Its ends on a desk (the operator, 23 Oct): an arrow at each end with more
+   past it, held there while the row scrolls under it, and the fade on that
+   side only; a mouse drags the row. A touch swipes, as before. */
+/* ...and the dock's line of tabs the same (the operator, 24 Oct). */
+:is(.chips,.dockline,.hscroll):not(.chl):not(.chr){mask-image:none}
+/* The arrow is a small round press of its own at that end, on the row's
+   middle (the operator, 29 Oct: a box the panel's color read as broken), on
+   a desk and on a touch screen alike (the operator, 29 Oct), where a tap on
+   it pages the row as a click does and it is a thumb's 30px. The row fades
+   to nothing at that end, and the mask keeps only a circle inside the
+   arrow's disc there, its ring drawn inside that circle, so a row whose
+   arrow sits a pixel or two off still shows nothing of what is cut off
+   around it. --arw is the disc, --arc its center from the edge, --arr the
+   circle kept open. */
+:is(.chips,.dockline,.hscroll){--arw:26px;--arc:14px;--arr:10.5px}
+@media (pointer:coarse){ :is(.chips,.dockline,.hscroll){--arw:30px;--arc:16px;--arr:12.5px}
+}
+:is(.chips,.dockline,.hscroll).chl:not(.chr){mask-image:radial-gradient(circle at var(--arc) 50%,#000 var(--arr),transparent calc(var(--arr) + .5px)),linear-gradient(to right,transparent calc(var(--arw) + 4px),#000 calc(var(--arw) + 38px))}
+:is(.chips,.dockline,.hscroll).chr:not(.chl){mask-image:radial-gradient(circle at calc(100% - var(--arc)) 50%,#000 var(--arr),transparent calc(var(--arr) + .5px)),linear-gradient(to left,transparent calc(var(--arw) + 4px),#000 calc(var(--arw) + 38px))}
+:is(.chips,.dockline,.hscroll).chl.chr{mask-image:radial-gradient(circle at var(--arc) 50%,#000 var(--arr),transparent calc(var(--arr) + .5px)),radial-gradient(circle at calc(100% - var(--arc)) 50%,#000 var(--arr),transparent calc(var(--arr) + .5px)),
+  linear-gradient(to right,transparent calc(var(--arw) + 4px),#000 calc(var(--arw) + 38px),#000 calc(100% - var(--arw) - 38px),transparent calc(100% - var(--arw) - 4px))}
+:is(.chips,.dockline,.hscroll).chl::before,:is(.chips,.dockline,.hscroll).chr::after{position:sticky;z-index:1;flex:0 0 var(--arw);width:var(--arw);height:var(--arw);
+  box-sizing:border-box;align-self:center;display:grid;place-items:center;border-radius:50%;
+  border:0;background:var(--panel);box-shadow:inset 0 0 0 2.5px var(--panel),inset 0 0 0 3.5px var(--line);
+  color:var(--ink);font:600 14px/1 system-ui;cursor:pointer}
+:is(.chips,.dockline,.hscroll).chl::before{content:"\2039";left:1px;margin-right:calc(0px - var(--arw));order:-1}
+:is(.chips,.dockline,.hscroll).chr::after{content:"\203A";right:1px;margin-left:calc(0px - var(--arw));order:99}
+@media (pointer:fine){
+  /* ...and a mouse drags the row and lights the arrow it is over. */
+  :is(.chips,.dockline,.hscroll).chl,:is(.chips,.dockline,.hscroll).chr{cursor:grab}
+  :is(.chips,.dockline,.hscroll).dragging{cursor:grabbing;user-select:none}
+  .chips.dragging .chip,.dockline.dragging .dtab,.hscroll.dragging>button{pointer-events:none}
+  :is(.chips,.dockline,.hscroll).chl:hover::before,:is(.chips,.dockline,.hscroll).chr:hover::after{box-shadow:inset 0 0 0 2.5px var(--panel),inset 0 0 0 3.5px var(--dim)}
+}
+/* A list's narrowing band (R254 step 1): its chips at the left and a search
+   at the right, the search taking the whole width under them on a phone.
+   A row the band leaves out wears .off, so paging counts only what is shown. */
+.lfilter{display:flex;align-items:center;gap:var(--field-gap);flex-wrap:wrap}
+/* Every group of chips shares the one band (R109: the Roadmap's state and
+   release, Bugs' state and seen-in), side by side, wrapping group by group
+   where the width runs out; a group wider than the line scrolls inside it.
+   Each keeps the room its fading edge takes, which also sets the groups
+   apart. */
+.lfilter .chips{flex:0 1 auto;min-width:0;margin-inline-end:16px}
+/* With no chips to draw (one kind of row), the search starts the band. */
+.lfilter .chips:empty{display:none}
+.lfilter input[type=search]{flex:0 1 16rem;min-width:10rem}
+@media(max-width:900px){
+  .lfilter input[type=search]{flex:1 1 100%}
+}
+.grp.off,.bug.off{display:none}
+.chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:0 0 auto;
+  font:var(--f-ui);padding:0 10px;min-height:var(--ctl);border-radius:99px}
+.chip .pill{font:var(--f-tag);padding:2px 6px}
+.chip.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
+.chip.on .pill{color:var(--on-fill);border-color:color-mix(in srgb, var(--on-fill) 40%, transparent)}
+/* A container's log: monospace, its own scroller, and tall enough to be
+   worth opening. The dialog's box is the one that scrolls nothing. */
+.dllog{max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+/* The findings card's footer: when the reports were written, and which were
+   left out of the counts. */
+.fnote{padding:7px var(--row-x);color:var(--dim);font:var(--f-note);
+  border-top:var(--hair) solid var(--line)}
+.fnote .warn{color:var(--warn)}
+/* Two writers, one thing (roadmap #26). A band rather than a modal: the
+   typing it is about is still on screen behind it, and covering that up to
+   ask which version wins is asking the question with the evidence hidden.
+   Both texts read as what they are (stored words, not fields), so they use
+   the sunk surface without the field skin's focus ring. */
+/* The test registry's rows. One <details> per test, the same shape a bug
+   report has: the summary is what you scan (how long it took, what it is
+   called, which suite), and the body is the half somebody wrote by hand.
+   Duration leads, because this list is sorted by it and a column of numbers
+   you can run your eye down is the whole point of sorting. */
+.tst{border-bottom:var(--hair) solid var(--line)}
+.tst:last-child{border-bottom:0}
+.tst>summary{padding:var(--row-y) var(--row-x);display:flex;gap:8px;
+  align-items:baseline;flex-wrap:wrap;cursor:pointer}
+/* A flagged row is marked on its edge rather than tinted: the list is read
+   for its numbers, and coloring whole rows would make the ones that matter
+   harder to scan rather than easier. */
+.tst.flagged{border-left:2px solid var(--warn)}
+.tst>.body{padding:0 var(--row-x) var(--row-y)}
+.tst>.body textarea{min-height:3.2em;margin-bottom:8px}
+.tst>.body label{margin-top:4px}
+/* Who else is in here. A quiet line, not a warning: nothing is wrong, and
+   the whole point of it is being read on the way past. */
+.clash{border-left:2px solid var(--bad)}
+.clash[hidden]{display:none}
+/* Icon-width, so it sits beside Shell rather than wrapping the row. */
+button.eye{padding:5px 7px;display:inline-flex;align-items:center;color:var(--dim)}
+/* The count rides on the book, so the row answers "does Claude remember
+   anything here?" without being opened. A project with none keeps the button;
+   that is how you find out there is nothing, which is also an answer. */
+button.eye i{font:600 10px/1 system-ui,sans-serif;font-style:normal;margin-left:3px}
+/* The row for a project that does not exist yet: a clone still arriving.
+   Marked, because it is the one row in this card that is not a directory. */
+.row.job{background:var(--sunk)}
+.row.job .name{color:var(--dim)}
+button.eye.none{opacity:.45}
+/* A locked padlock is gold rather than dim: it is a state somebody chose and
+   is still in, not a control waiting to be pressed. Deliberately not --accent,
+   which is the color of the buttons that act, and not --warn, because nothing
+   is wrong: the operator meant this. */
+button.eye.on{color:var(--gold)}
+button.eye.on:hover{color:var(--gold)}
+button.eye.pin.on,button.eye.pin.on:hover{color:var(--lit)}   /* on: the second color, as a pinned tack */
+/* A running session and an open notebook: the same green, because both mean
+   "this is live, and the button takes you to it" rather than "press to start". */
+button.eye.acc.on,button.eye.acc.on:hover{color:var(--accent)}
+/* The bin turns red under the pointer, the same as every other rm on the page.
+   Dim at rest: it sits in a row of six and should not be the thing the eye
+   lands on first. */
+@media(hover:hover){ button.eye.rm:hover{color:var(--bad)}
+}
+/* No box around it, the way the bell in the header has none: the row's other
+   icons are things you do TO the project and sit together as a group; this one
+   removes it, and putting it in the same tray invited the hand that was going
+   for the one beside it. Set apart by having no chrome at all, and last. */
+button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:auto}
+/* Remove, on a manager row: a text button among text buttons, red only under
+   the pointer. It is the one control there that takes something away. */
+/* The Analysis tab: the filter bar, and a project heading when reading
+   across all of them. The rules themselves reuse .rule from the notebook's
+   Analysis view: same data, same rendering, one implementation. */
+/* The bar is a .field and takes its inset from that; what is its own is the
+   line under it, because the first project heading below deliberately has no
+   top border. (This was written as #fxBar, an id the markup never carried, so
+   the bar had no padding at all and its controls sat against the edge.) */
+/* (Findings' bar has no rule under it: no other page's has, and it stopped
+   short of the edge, the operator, 17 Oct.) */
+/* What a page's bar says about the page (Users, Roles, Settings, Jobs) is a
+   quiet note beside its controls, not a heading (the operator, 17 Oct). */
+.docbarrow>.dim,.docbarrow>.dim .sub{font:var(--f-note);color:var(--dim)}
+/* A hint placed straight in a page's list is a band like any other: it
+   was the Analysis tab's own rule, so the same line on the Toolchains tab
+   sat flush against the edge with every band beside it indented. Anywhere
+   else it is the quiet note of what holds it (the hint rule above). */
+.doclist>.hint{padding:var(--row-y) var(--row-x)}
+/* Room under every page's last card, at every width (the operator, 17 Oct:
+   the bottom of a page ran into the dock): a spacer at the end of the
+   list, since a last child's margin is not kept at the end of a scrolling
+   box. */
+.doctab>.doclist::after,.doctab.dmtab::after,.doctab.vmtab::after,.nb .nbview:not([hidden])::after{content:"";display:block;height:16px;flex:0 0 auto}
+.fxtab .fnote,.doctab .fnote{padding:4px var(--row-x) 10px;color:var(--dim);
+  font:var(--f-note)}
+/* The Nodes tab's rows: capability toggles inline, the add form stacked. */
+/* One node's page, not a list of rows: the picker in the bar chooses, and
+   everything about that machine is open below it. The sections get air:
+   the complaint that started this was that a dozen settings, four stores
+   and a runner in one folded row read as a wall. */
+/* Vertical only: the shorthand wiped the band's horizontal inset, which is
+   the one rule uniform.mjs measures across every tab. */
+.nodestab .ndrow{padding-top:10px;padding-bottom:10px}
+/* Its margin sits under the fold's own for its lines, which comes later and
+   sets them flush. */
+.ndlabels{margin-top:4px}
+.ndcap{display:inline-flex;gap:6px;align-items:center;font:var(--f-ui);
+  color:var(--ink)}
+/* ...in a notebook or a dialog too, whose label{display:block} outranked
+   one class: the notebook's VMs view stacked a VM's "starts with its host"
+   box over its words. */
+:is(.nb,.modal) label.ndcap{display:inline-flex;color:var(--ink)}
+/* A set of things to pick from is a listbox (docs/design-language.md,
+   Controls): a bordered box of checkbox rows, a thumb high each, scrolling
+   past four so it stays small, never a select multiple or a loose column of
+   checkboxes. */
+.lbox{display:flex;flex-direction:column;max-height:calc(4 * var(--tap));overflow-y:auto;
+  border:var(--hair) solid var(--line);border-radius:var(--r-control);background:var(--sunk)}
+.docbarrow .sp{flex:1}
+/* The page bar is one row at every width (the design's page head): a band
+   of its own, not a filter row, so the filter row's narrow wrap (.histbar
+   under 560px) never takes it to two lines. It is one control high on every
+   page, whatever it holds (the operator, 19 Oct: a picker's word above it,
+   a count alone and a count beside a button each made a bar of its own
+   height): what it says and what it holds centered on that line, a
+   picker's word to its left. Containers' bar alone gives its search a line
+   of its own under 440px (.dmpick, below). */
+.docbarrow{display:flex;gap:var(--field-gap);align-items:center;flex-wrap:nowrap}
+:is(.doctab,.nb) .field.docbarrow{min-height:calc(var(--ctl) + 2 * var(--row-y))}
+:is(.doctab,.nb) .field.docbarrow>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap);margin:0}
+:is(.doctab,.nb) .field.docbarrow>label.pick>.pickw{font:var(--f-ui);color:var(--dim)}
+/* A page bar's search, one size on every page (Projects, Containers, Help
+   each sized their own: 220px, 12rem with a cap of their own, 85%), capped
+   with every bar control below. */
+.docbarrow>input[type=search]{flex:1 1 12rem;min-width:8rem}
+.docbarrow[hidden]{display:none}
+/* A command's margin, under the dialog field's own for its children, which
+   outranks it there. */
+.ndcmd{margin:6px 0}
+/* Its margin sits under a dialog field's own for its children, which
+   outranks it there. */
+.vmsteps{margin:10px 0 0}
+/* ---- sections and action bars, for every document tab -------------------
+   Two more pieces of the document language, added when the Nodes tab was
+   one long column of editors and a wall of buttons on a phone.
+
+   A long surface is SECTIONS: one <details class="sect"> per concern:
+   docSection() builds it, whose summary is a band (the same inset as every
+   other band, so the alignment rule holds) carrying the title and, on the
+   right, a one-line status in the shared status colors. The body is the
+   section's controls, stacked. A section remembers whether it was open, per
+   browser; by default every section is open on a desktop and none on a
+   phone, where the point is that you see the headings and pick one rather
+   than scroll past four editors to reach the buttons. (This said "only the
+   first on a phone" while the code opened none, which is the better answer
+   and the one every tab has been drawn against: an open first section is
+   the thing you scroll past to reach the headings.)
+
+   An ACTION BAR (.actbar) is the shape every set of buttons takes: the
+   status line first, on a line of its own, and the buttons under it, right
+   aligned and wrapping. On a phone they share the width in rows of equal
+   buttons at finger height. It replaces the .acts + <span class="sp"> +
+   status-inline pattern, where a status sentence and four buttons fought
+   for one line and the sentence won by pushing the buttons off the edge.
+
+   A BUSY button says so: busy(btn, word) grays it and puts the word and an
+   animated ellipsis in it until the repaint that follows the round trip
+   replaces the element with its real state, so a press cannot be repeated
+   and is never a mystery. unbusy(btn, word) is for the presses that have no
+   repaint behind them: the ones that stay on screen when the server says no.
+
+   The rest of the language, in the order the eye meets it:
+
+   - `.state` inside a bar is its STATUS LINE, and that is the only thing the
+     name means there. A status sentence never shares a line with buttons.
+   - A section's status is a word or a number: "live", "3 problems", the
+     version: never a sentence. It is what a SHUT section still answers.
+   - `.danger` is the verb that cannot be undone, and it is one class with
+     one color on every surface. It used to be scoped to the modals and the
+     notebook, so Remove was red in one place and ordinary ink in another.
+   - Nothing safe comes after it. Not "the last button is destructive":
+     a bar may end with two of them, but nothing you would press by habit
+     sitting under the thumb that was aiming for the one before it.
+
+   These are held to across every tab by test/uniform.mjs, measured rather
+   than read off the markup: a tab that restyles .actbar or .danger locally
+   fails even though its classes say the right words. That is the point of
+   writing them here: a change to the framework has to move every tab with
+   it, and the suite is what makes "every tab" true rather than hopeful. A
+   rule that is genuinely one tab's belongs in that tab's own file, not
+   here. */
+.sect{border-top:var(--hair) solid var(--line)}
+.sect>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;
+  padding:var(--row-y) var(--row-x);font:var(--f-ui);color:var(--ink);
+  min-height:max(var(--tap), 46px);box-sizing:border-box}
+.sect>summary::-webkit-details-marker{display:none}
+/* At a desk a page's sections stand open and do not fold (the operator, 18
+   Oct; sectFixed): no triangle on their heads and nothing to press. A fold
+   on purpose (data-fold) keeps both. */
+@media(min-width:901px){
+  :is(.doctab,.nbview) details.sect:not([data-fold]):not(details.sect details.sect):not(.row:not(.ndrow) details.sect):not(.modal details.sect)>summary{cursor:default}
+  :is(.doctab,.nbview) details.sect:not([data-fold]):not(details.sect details.sect):not(.row:not(.ndrow) details.sect):not(.modal details.sect)>summary::before{display:none}
+}
+/* A card's head, the same everywhere (the operator, 18 Oct): the Containers
+   project band's height, 46px (every section's, nested or not), on a shade of its own off the card's ground
+   so it reads as the head of what is under it. A page's sections and Home's
+   cards wear it; a fold inside a row (a container's Log) is the row's, not
+   a head. --head-bg is the ink mixed into the panel, so every scheme, light
+   or dark, gets its own step. */
+:is(.doctab,.nbview) details.sect:not(details.sect details.sect):not(.row:not(.ndrow) details.sect)>summary{
+  background:var(--head-bg)}
+.sect>summary::before{content:"\25B8";color:var(--dim);font-size:11px;width:9px;flex:0 0 auto}
+.sect[open]>summary::before{content:"\25BE"}
+.sect>summary .t{font:var(--f-sect);flex:0 1 auto;min-width:0}
+/* A section inside a section (a page's rules inside Pages) heads less than
+   the one holding it: a row's size, still at the heading's weight. */
+.sect .sect>summary .t{font:var(--f-sect);font-size:13px}
+/* One line, clipped with an ellipsis when it is long: a status that wrapped
+   letter by letter down the right edge was what min-width:0 alone did. */
+/* .sst, not .st; that one is the session dot beside a Claude tab's name. */
+.sect>summary .sst{margin-left:auto;font:var(--f-ui);color:var(--dim);text-align:right;
+  flex:0 1 auto;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sect>summary .sst.ok,.actbar .state.ok{color:var(--pass)}
+.sect>summary .sst.warn,.actbar .state.warn{color:var(--warn)}
+.sect>summary .sst.bad,.actbar .state.bad{color:var(--bad)}
+.sect>summary .sst.note,.actbar .state.note{color:var(--note)}
+.sect>.body{padding:0 0 var(--row-y);display:flex;flex-direction:column;gap:0}
+/* A section's own explainer line, straight in its body, is the quiet note
+   it is everywhere else: the Git view's Branches line read at body size
+   (the design pass, 4 Oct). */
+/* A control never spans its container. The cap goes on the ROW where there
+   is one, and every row of controls wears one class for it, .ctlrow (a
+   filter row, a field and its label, a picker row, an add row), so the
+   controls in it stop short together and are not capped a second time
+   inside it; a lone control takes the cap itself. No page is named here
+   (R218 step 64, the operator 19 Oct: three lists of row kinds had drifted
+   apart): a new surface's row is capped by wearing the class. Beside it,
+   the shared parts that size their own contents: an action bar, the
+   settings grid, a menu (a surface of its own whose fields run its width),
+   .ctlown for a box that sizes its own (a reason box), and the Design
+   view's .dsrow, whose pickers stop at their own labeled column (capped at
+   88% of it, a theme's name was cut on a desk). The union of a
+   row's controls is what uniform.mjs measures, against the surface holding
+   it. Terminals and logs are not controls and are not here. */
+:is(.doctab,.nb) .ctlrow{
+  max-width:min(var(--ctl-w),88%)}
+/* FORMS (the design's rule `forms`; uniform.mjs measures it on every page). One
+   way to lay out fields, so no page does it its own way:
+   - a label sits OVER its field, 4px above it, never beside it (.lbl, .pickw);
+   - fields stack with 14px between them, or go in .fgrid: two equal columns at
+     a desk, one on a phone, 14px down and 20px across, each filling its cell
+     (.fwide spans both, .fshort is a number's width);
+   - .fgroup is one concern: a head in the UI voice, a line of dim words under it,
+     a hairline and room between groups;
+   - a tick is a line of its own; a hint goes under what it explains;
+   - Save is at the foot on the right.
+   A picker in a band or an action bar is beside what it filters, and is not a
+   form's field: .docbarrow, .histbar, .actbar and .phead keep theirs inline. */
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px;align-items:start;max-width:calc(var(--ctl-w) * 2 + 20px)}
+.fgrid>[hidden]{display:none}
+.fgrid>.fwide{grid-column:1 / -1}
+/* ...three across where a row is three short numbers (a VM's vCPUs,
+   memory and disk), at every width: three numbers fit a phone's row. */
+.fgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.fgrid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;max-width:100%;box-sizing:border-box;min-height:var(--ctl)}
+.fgrid>.setrow,.fgrid>label.pick{max-width:none;margin:0}
+@media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)}
+}
+/* The older label.pick obeys too: over its field, as every label is. */
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick,[hidden]),.fgrid>label.pick:not([hidden]){display:flex;flex-direction:column;align-items:stretch;gap:var(--label-gap)}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>.pickw,.fgrid>label.pick>.pickw{font:var(--f-ui);color:var(--dim);min-width:0;flex:none}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>:is(input,select,textarea){width:100%;box-sizing:border-box;min-height:var(--ctl)}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick){max-width:min(var(--ctl-w),88%)}
+.field:not(.docbarrow,.histbar)>label.pick + label.pick,.field:not(.docbarrow,.histbar)>.hint + label.pick{margin-top:14px}
+.field:not(.docbarrow,.histbar)>label.pick + .hint{margin-top:var(--label-gap)}
+/* Fields down a form have room between them: a label belongs to the field under
+   it, not to the one above. */
+.field>.setrow.col.ctlrow + .setrow.col.ctlrow,.field>.setrow.col.ctlrow + label.pick,.field>label.pick + .setrow.col.ctlrow{margin-top:14px}
+label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
+.actbar>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap)}
+.actbar>label.pick>.pickw{font:var(--f-ui);color:var(--dim)}
+/* A prose editor in the notebook (a memory's body, a rule, a bug's repro)
+   is a page, not a control: it keeps the reading width. */
+.nb textarea{max-width:none}
+/* The document bar is a BAND, not a row of controls: it is the skeleton's
+   own slot (docSurface), and what it holds is what the tab is about at the
+   left and the action on it at the right. Capped to control width like the
+   rows above, its right end fell in the middle of the tab, so Refresh
+   floated in space with no edge to sit against, while every other action on
+   the page (a row's buttons, a section's status) lines up on the tab's
+   right edge. The controls inside it are still capped one by one.
+   Three classes deep to outrank the cap above. */
+:is(.doctab,.nb) .field.docbarrow{max-width:none}
+/* ...and because the bar is not capped, the controls in it are, one by one:
+   a search box in a band that spans the tab is exactly the full-width
+   control the rule above forbids everywhere else. */
+:is(.doctab,.nb) .field.docbarrow :is(input:not([type=checkbox]):not([type=radio]),select,textarea){
+  max-width:min(var(--ctl-w),88%)}
+/* A pulldown straight in the bar is a picker beside what it filters, as a
+   label.pick's is: its own width, so the search beside it keeps the room. */
+:is(.doctab,.nb) .field.docbarrow>select{width:auto;flex:0 1 auto;min-width:0}
+/* A bar button's short words (barSaid): kept for a phone. */
+.shrt{display:none}
+/* On a phone a page's bar is one line of its picker and its buttons (the
+   operator, 18 Oct: the node pulldown and the buttons fit on one line,
+   everywhere). The picker drops its word, which the node's name beside it
+   says, and shrinks to what is left, its name cut short last; the buttons
+   take their short words and never wrap; a search box gives up width
+   rather than its line, Containers' Cards and List being their pictures. */
+@media(max-width:600px){
+  /* Half the bar at most: Firefox and Safari size a picker to its longest
+     option, a disabled one's reason included, where Chrome sizes it to the
+     one chosen. */
+  :is(.doctab,.nb) .field.docbarrow>label.pick{flex:0 1 auto;min-width:0;max-width:50%;display:inline-flex;align-items:center;margin-inline-end:auto}
+  :is(.doctab,.nb) .field.docbarrow>label.pick>.pickw{display:none}
+  /* ...and a placeholder's picker box loses the gap it kept after the word. */
+  :is(.doctab,.nb) .field.docbarrow>label.pick>.skv{margin-left:0}
+  /* :not() twice: the cap on every bar control above is (0,5,1). */
+  :is(.doctab,.nb) .field.docbarrow>label.pick>select:not([multiple]):not([size]){min-width:0;max-width:none;width:auto;flex:0 1 auto}
+  :is(.doctab,.nb) .field.docbarrow>.sp{display:none}
+  :is(.doctab,.nb) .field.docbarrow>.actbar{flex:0 1 auto;min-width:0;flex-wrap:nowrap;justify-content:flex-end;margin-inline-start:auto}
+  :is(.doctab,.nb) .field.docbarrow>input[type=search]{order:-1;flex:1 1 9rem;min-width:9rem;max-width:none;width:auto}
+  :is(.doctab,.nb) .field.docbarrow>label.pick{min-width:6.5em}
+  /* While a job runs on Toolchains, Abort is the bar's one live button and
+     the three it holds dead step aside rather than crowd it. */
+  :is(.doctab,.nb) .field.docbarrow>.actbar>button.tcidle{display:none}
+  :is(.doctab,.nb) .field.docbarrow>input{flex:1 1 0;min-width:7em}
+  /* (the id's rule too, a desk's 12rem base and 8rem floor) */
+  :is(.doctab,.nb) .field.docbarrow:is(.dmpick,.pjbar)>input{flex:1 1 0;min-width:4em}
+  .lng{display:none}
+  .shrt{display:inline}
+}
+/* ...the same under 440px, on a page and a notebook view (R109). */
+@media(max-width:440px){
+  :is(.doctab,.nb) .field.docbarrow>input[type=search]{order:-1;flex:1 1 9rem;min-width:9rem;max-width:none}
+}
+:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.setgrid,.actmenu,.dsrow) *){
+  max-width:min(var(--ctl-w),88%)}
+/* A row whose text column holds a field is a row of controls, and its
+   action cluster belongs on the field's line: the Phone tab's Connect and
+   Pair sit beside one. A row of prose keeps its centered cluster.
+
+   NOT on a stacked row. `.stack2` turns a row into a COLUMN, where
+   align-items is the horizontal axis, so this pushed every one of its
+   children to the right edge, which is what the Settings tab was: three
+   sections in the right third of the surface with 600px of nothing beside
+   them, each starting at a different x. The rule is about a line of
+   controls, and a stacked row has no line. */
+.row:has(.setrow):not(.stack2){align-items:flex-end}
+.actbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.actbar .state{flex:1 1 100%;font:var(--f-note);color:var(--dim);overflow-wrap:anywhere}
+.actbar .lead{margin-right:auto}
+/* A select in a bar is one control among its buttons, sized like them,
+   not the field-that-owns-its-row width the skin gives a select. */
+.actbar select{width:auto;flex:0 0 auto}
+.actbar input{width:auto;flex:0 1 12em;min-width:0}
+/* MORE: a bar keeps its primary verbs and folds the rest behind one button
+   (R210; the operator, 13 Oct: seven buttons wrapped to two lines on a phone
+   and Remove sat alone on the second). The menu opens under the button, as
+   the gear's does, anything else closes it, and its items are the bar's
+   own buttons, so the destructive one is still last. `actMore()` draws it
+   and `wireMore()` wires it; a single leftover is drawn inline instead. */
+.actbar .more{position:relative;display:inline-flex;flex:0 0 auto}
+.actmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:40;
+  min-width:11em;width:max-content;max-width:calc(100vw - 32px);
+  background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  box-shadow:0 8px 22px rgba(0,0,0,.45);padding:6px;
+  display:flex;flex-direction:column;gap:4px;
+  animation:menuIn .22s cubic-bezier(.33,1,.68,1)}
+.actmenu>button{width:100%;min-height:var(--tap);justify-content:flex-start;text-align:left;flex:0 0 auto}
+/* A menu is a surface of its own, not a row on the page: a field in it runs
+   its width as its buttons do (the Git view's branch picker's box), so the
+   page's control cap leaves every menu's contents to the menu. */
+.actmenu>:is(input,select,textarea){width:100%;flex:0 0 auto}
+.floatm.up{animation-name:menuRise}
+/* The finger height on a phone, from 900px down as every tap target's is
+   (consistency batch 6: a bar's buttons got it only under 600px). */
+@media(max-width:900px){ .actbar button,.actbar select{min-height:var(--tap)}
+}
+@media(max-width:600px){
+  /* Nothing of the width: a phone's action bar used to share the row
+     between its buttons, which made every set of two span the screen edge
+     to edge: the shape the width rule above forbids. The buttons keep their
+     own size and sit at the right, as on a desktop. */
+  .actbar button,.actbar select{flex:0 0 auto}
+}
+/* The row whose More menu is open stacks above the rows after it: a dimmed
+   row (opacity) is a stacking context of its own, and the menu, z-indexed
+   inside it, drew under the next row's words. */
+.row:has(.actmenu:not([hidden])){position:relative;z-index:41}
+button[aria-busy="true"]{opacity:.75}
+/* Under a reason line's own margin, which keeps its space inside the fold. */
+.ndhmore>*{margin:0}
+/* At a desk the Nodes page is cards, as a notebook view is (the operator,
+   18 Oct): the node's head one card and each of its sections one of its
+   own on the page's margin; the row that holds them draws nothing but
+   keeps the page's inset, so it starts where the bar does. Storage and
+   Network come in a wrapper of their own (nodeConfSections), which
+   draws nothing either. */
+@media(min-width:901px){
+  .doctab.nodestab>.doclist>.row.stack2.ndrow,
+  .doctab.machinetab>.doclist>.row.stack2.ndrow,
+  .doctab.nodestab>.doclist>.skt>.row.stack2.ndrow{background:none;--sheen:none;border:0;border-radius:0;padding:0;margin:0 var(--row-x)}
+  .nodestab .ndrow>.grow,
+  .machinetab .ndrow>.grow{margin:var(--card-gap) 0 0;padding:var(--row-y) var(--row-x);background:var(--panel);
+    border:var(--hair) solid var(--line);border-radius:var(--r-surface)}
+}
+/* This machine's head says the name and the state: the node row's second copy
+   is not drawn. A label beside its field, each field starting at one edge,
+   and what a section says in the prose voice, not the facts' mono (the
+   operator, 4 Nov). */
+.machinetab .ndrow>.grow>.name{display:none}
+/* The controller's own machine (R90): a reference, in the reference's color. */
+.ndrow .name .tag.ndown{color:var(--purple);border-color:var(--purple-edge)}
+.ndnet{display:grid;gap:6px;align-items:center;
+  grid-template-columns:minmax(0,7em) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr)}
+/* The whole of a mount's reason, under its row (B660): the cell at the end
+   of the line keeps the state's first words. */
+.ndmount .ndmwhy{white-space:normal;overflow-wrap:anywhere;padding:0 var(--row-x) var(--row-y)}
+/* The name's row is an action bar (its field, then Rename), so it lays out
+   like every other bar; the input takes the room before it. */
+.ndname input{flex:1 1 auto;min-width:0}
+/* Its margin sits under a dialog field's own for its children, which
+   outranks it there. */
+.setgrid{margin:6px 0 2px}
+@media (max-width:600px){
+  .ndnet{grid-template-columns:minmax(0,1fr)}
+}
+
+/* The wiring fold. Its lines wrap rather than scroll: a host path is long, and
+   a row that scrolls sideways on a phone hides the half you were reading. */
+/* The running command's own output. Monospace and scrollable, capped so a
+   pull that writes a line per layer per tick does not push the row off the
+   screen; it is a window on what is happening, not a log file. */
+.dmlog{margin:6px 0 0;padding:7px 9px;max-height:150px;overflow:auto;
+  background:var(--sunk);border:var(--hair) solid var(--line);border-radius:var(--r-control);
+  color:var(--dim);font:var(--f-code);white-space:pre-wrap;
+  overflow-wrap:anywhere}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.tcs .link{background:none;border:0}
+/* Every icon button draws the same way, whichever class it wears. Keyed to
+   .eye alone, the Projects card's trash button (an .ic) got the browser's
+   default fill:black/stroke:none, and these paths are open strokes, so it
+   drew nothing at all. */
+button.eye svg,button.ic svg,#bTrashTab svg{width:16px;height:16px;display:block;fill:none;
+  stroke:currentColor;stroke-width:1.4;stroke-linecap:round}
+/* ...and the More button's three dots, which are filled rather than stroked:
+   left to the browser they were black on every dark scheme and sat on the
+   text baseline, high in the button (the operator, 16 Oct). */
+.more>button svg{width:16px;height:16px;display:block;margin:auto;fill:currentColor;stroke:none}
+@media(max-width:900px){ .row button,.macros button{min-height:var(--tap)}
+}
+
+/* What a Claude session is doing, at a glance: yellow and breathing while
+   it works, the accent's green once it is idle and ready for you (the
+   operator, 16 Oct; the green tab strip it once vanished into is gone). */
+.st{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 auto;
+  margin-right:6px;vertical-align:baseline}
+.st.working{background:var(--warn);animation:pulse 1.6s ease-in-out infinite}
+.st.waiting{background:var(--accent)}
+/* On Claude Code's own permission prompt (B52): the warn color, steady, so it
+   reads apart from working's pulse and from waiting's accent. */
+.st.asking{background:var(--warn)}
+/* What is live glows, softly, in its own color (R218 step 7): a session
+   working or waiting, a running job, a running container. One glow, small
+   and under half its color, so it reads as lit rather than as a highlight. */
+.st.working{box-shadow:0 0 0 2px color-mix(in srgb, var(--warn) 20%, transparent),
+  0 0 8px color-mix(in srgb, var(--warn) 55%, transparent)}
+.st.waiting{box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent),
+  0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)}
+.pill.live{box-shadow:0 0 0 1px color-mix(in srgb, var(--pass) 30%, transparent),
+  0 0 10px color-mix(in srgb, var(--pass) 30%, transparent)}
+.doctor .chips .pill.ok{color:var(--pass);border-color:color-mix(in srgb, var(--pass) 35%, var(--ground))}
+.st.ok{background:var(--pass)}
+.st.warn{background:var(--warn)}
+.st.bad{background:var(--bad)}
+.doctor .chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px 10px}
+/* A long check wraps rather than ending in an ellipsis: with no tooltips
+   (11 Oct) a cut chip says nothing of the rest. A chip of two lines takes the
+   control's corners, where a pill's round ends would bulge. */
+.doctor .chips .pill{white-space:normal;overflow-wrap:anywhere;max-width:100%;
+  border-radius:var(--r-control)}
+
+.pill{font:var(--f-pill);padding:3px 7px;border-radius:99px;
+  border:var(--hair) solid var(--line);color:var(--dim)}
+/* A STATE on a row's name line is a pill, not a parenthesis: running, stopped,
+   down, partly up, unknown, each in the level's color (R210). `.stat`: `.state` is
+   the action bar's status line and `.st` the session dot. */
+.row .name .pill.stat{font:var(--f-tag);text-transform:uppercase;letter-spacing:.5px;
+  vertical-align:2px;margin-left:6px;margin-bottom:0}
+/* ...with a dot of its color before the word (R216): the state is read at
+   a glance down a list, before the word is. */
+.row .name .pill.stat::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:currentColor;margin-right:5px;vertical-align:1px}
+.row .name .pill.stat.off{color:var(--purple);border-color:var(--purple-edge)}
+/* A state that is good or bad wears its own green, red and amber in every
+   scheme, as the doctor does (the operator, 17 Oct: a healthy container
+   read red in a scheme whose accent is red): --pass, --bad and --warn,
+   never the accent. */
+.pill.ok{color:var(--pass);border-color:var(--green2-edge)}
+.pill.devmark{color:var(--gold);border-color:var(--gold-edge)}
+.pill.bad{color:var(--bad);border-color:var(--red2-edge)}
+.pill.warn{color:var(--warn);border-color:var(--gold-edge)}
+.pill.note{color:var(--note);border-color:color-mix(in srgb, var(--note) 35%, var(--panel))}
+/* A bar for a measure the running thing reports itself (pctBar, page-docs.js):
+   a thin track in the line color, the accent as far as it has come. */
+progress.pbar{display:block;width:100%;max-width:var(--ctl-w);height:6px;margin:6px 0 2px;appearance:none;-webkit-appearance:none;border:0;
+  background:var(--line);border-radius:3px;overflow:hidden;color:var(--accent)}
+progress.pbar::-webkit-progress-bar{background:var(--line)}
+progress.pbar::-webkit-progress-value{background:var(--accent);border-radius:3px;transition:width .4s ease-out}
+progress.pbar::-moz-progress-bar{background:var(--accent);border-radius:3px}
+/* A press still going after a moment (pressing(), tab-nodes.js): a small ring
+   after its word, so it reads as taken rather than missed. */
+button.working::after,a.btn.working::after{content:"";display:inline-block;width:.8em;height:.8em;margin-left:6px;vertical-align:-.1em;
+  border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+/* ...and on a button that is an icon alone, the ring in place of the icon,
+   the button's size kept, rather than wrapped under it. */
+button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))>svg{visibility:hidden}
+button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))::after{position:absolute;left:50%;top:50%;margin:-.4em 0 0 -.4em}
+button.working:has(> svg):not(:has(> :not(svg, .dot, .meta))){position:relative}
+/* An empty state, one style everywhere (consistency batch 5): the page's
+   own was 9px 11px, a document's the tokens and a list box's 8px 10px. */
+/* An empty state is one dim line in the hint voice (the operator, 29 Oct:
+   italic here, the code face there and a bare word elsewhere said the same
+   thing four ways). */
+.empty{color:var(--dim);padding:var(--row-y) var(--row-x);font:var(--f-ui);font-style:normal}
+/* ...and a placeholder that has become a failure notice: the poll's words
+   for a card that could not draw, in the warning color and no longer
+   pulsing, because nothing is coming. */
+.empty.warn,.loading.warn{color:var(--warn);animation:none}
+/* A row's inset, as .empty's: one rule. */
+.loading{color:var(--dim);padding:var(--row-y) var(--row-x);font-style:italic;
+  animation:waiting 1.4s ease-in-out infinite}
+/* ...and, where what is coming has a known shape, the shape itself (R218
+   step 15, page-docs.js skel()): bars where the words will be, rows where the
+   rows will be, cards and tiles where they will stand, a light passing over
+   them left to right. Their color is the ink at a whisper, so every scheme
+   tints them its own way; the words stay for a screen reader. A failure
+   notice written over one (the poll's) is a line of words again. */
+.skel{--sk:color-mix(in srgb,var(--ink) 9%,transparent);--sk-hi:color-mix(in srgb,var(--ink) 17%,transparent);
+  font-style:normal;animation:none;display:flex;flex-direction:column;padding-top:0;padding-bottom:0}
+.skel.warn{display:block;padding:var(--row-y) var(--row-x);font-style:italic}
+.sk-said{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.skel .sk-b,.skv{display:block;height:.8em;width:60%;border-radius:var(--r-small);
+  background:linear-gradient(100deg,var(--sk) 40%,var(--sk-hi) 50%,var(--sk) 60%) var(--sk);
+  background-size:250% 100%;animation:shimmer 1.5s linear infinite}
+/* A page's own template while it waits (skTpl): laid out as the page lays
+   itself out, its real headings and labels, and a value on its way (skv) a
+   bar inline where the value will stand. */
+.skel.skt{display:block;padding:0}
+.skv{--sk:color-mix(in srgb,var(--ink) 9%,transparent);--sk-hi:color-mix(in srgb,var(--ink) 17%,transparent);
+  display:inline-block;vertical-align:middle;max-width:100%}
+.tile .tv .skv{height:.9em}
+.skv.ctl{display:block;height:var(--tap);border-radius:var(--r-control)}
+.pick .skv.ctl{display:inline-block;margin-left:6px}
+.docbarrow>.skv.ctl{display:inline-block;flex:none}
+.skel .sk-b.sub{height:.62em;margin-top:9px}
+/* A placeholder row is inset as the row that replaces it (.row), wherever
+   it stands: a card, a section's body, a list (B864: Home's Last jobs had
+   its bars on the card's edge, one of six places that each set it). Only
+   where its box is the inset already (a .field, the plain loading line's
+   own) does it start at the edge. */
+.sk-row{padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line);min-height:var(--tap)}
+.sk-row:last-child{border-bottom:0}
+.field>.sk-row,.skel:not(.skt)>.sk-row{padding-left:0;padding-right:0}
+/* The shapes start where a loading line's words would (the .loading's own
+   inset), and in a .field, which is inset already, at its edge rather than
+   a second one in. A section's body is not: its bands carry their own. */
+.field>.skel:not(.warn){padding-left:0;padding-right:0}
+.skel .sk-row:nth-child(3n+3) .sk-b{animation-delay:.12s} .skel .sk-row:nth-child(3n+4) .sk-b{animation-delay:.24s}
+/* The boot placeholder's row and its box, under .skel.warn, which makes it a
+   line of words once the first poll fails. */
+.skboot{display:flex;padding:0}
+.skpcard .skv{height:.9em} .skpcard .skv.name{height:1.1em}
+.sk-cards,.sk-tiles{display:grid;gap:12px;padding:var(--row-y) 0}
+.sk-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.sk-cards.halves{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding-top:0}
+.sk-tiles{grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:var(--field-gap)}
+@media(max-width:900px){ .sk-tiles{grid-template-columns:repeat(2,1fr)} .sk-cards.halves{grid-template-columns:minmax(0,1fr)}
+}
+.sk-card{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  padding:14px 14px 18px;min-height:132px;min-width:0}
+.sk-card>.sk-b:first-of-type{height:1em;margin-bottom:6px}
+.sk-tile{background:var(--sunk);border:var(--hair) solid var(--line);border-radius:var(--r-control);padding:12px 14px;min-height:76px}
+.skel .sk-b.big{height:1.5em}
+.sk-lines{padding-top:var(--row-y);padding-bottom:var(--row-y);gap:.75em}
+.skel .sk-b.line{height:.7em}
+.sk-chips{flex-direction:row;flex-wrap:wrap;gap:6px;padding-top:9px;padding-bottom:9px}
+.skel .sk-b.chip{height:var(--tap);width:7em;border-radius:var(--r-control)}
+.skel .sk-b.chip:nth-child(3n){width:9em} .skel .sk-b.chip:nth-child(4n+1){width:5.5em}
+span.skel.sk-word{display:inline-block;vertical-align:middle;padding:0}
+.sk-word .sk-b{width:8em;height:.75em}
+.justpainted{animation:contentIn .18s ease}
+
+/* The page column ------------------------------------------------------ */
+/* min-width:0 matters: a grid item's min-content width is its widest nowrap
+   line, which would push the column past the viewport on a phone. No gap
+   between its parts: the panes and the bottom bar are one frame. */
+.col.term{min-height:0;min-width:0;gap:0}
+
+/* Panes -------------------------------------------------------------- */
+/* Closed on every side (the operator, 16 Oct): its top was left open for
+   the tab strip that sat on it, and with the strip gone the box read as
+   open at the top while the dock's line closed its foot. */
+.panes{flex:1;min-height:0;display:grid;gap:6px;grid-template-columns:1fr;
+  background:var(--line);border:var(--hair) solid var(--line);
+  border-radius:var(--r-surface);overflow:hidden}
+.pane.dock.active{outline:0}
+/* The line takes the room and scrolls inside itself; the controls after it
+   stay at the right edge on every width (a phone's line once pushed the
+   chevron off the screen). */
+.dockline{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+/* A sideways swipe never takes the page back (B820): at the end of a
+   strip's scroll (the dock's line, a chip row, the notebook's views) the
+   gesture fell through to the page, and the page's sideways overscroll is
+   the phone browser's swipe-back, so the page went back a page. The strips
+   keep theirs, and the page has none to give; the system's own back is
+   untouched, and pull to refresh is vertical. */
+.dockline,.chips,.nbtabs .nbgroups,.nbtabs .nbsub{overscroll-behavior-x:contain}
+@media(max-width:900px){
+  .panes{border:0;border-radius:0}
+}
+.pane{position:relative;background:#000;min-height:0;display:flex;flex-direction:column}
+/* ...and it is the page's own ground until it holds something. A terminal
+   paints its own black and a document tab its own panel color; before the
+   first snapshot there is neither, and a black rectangle the size of the
+   pane is not a neutral thing to look at while waiting. The class comes off
+   on the first draw that had state to draw. */
+body.booting .pane{background:var(--bg)}
+body.booting .pane>.loading{margin:auto}
+body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
+.pane.hidden{display:none}
+.pane.active{outline:2px solid var(--accent-mid);outline-offset:-2px}
+.pane .bar{display:flex;align-items:center;gap:6px;padding:3px 6px;
+  background:color-mix(in srgb, var(--bg) 92%, transparent);
+  border-bottom:var(--hair) solid var(--line);
+  font:11px/1.6 var(--mono);color:var(--dim);flex:0 0 auto}
+.pane .bar .x{margin-left:auto;cursor:pointer;padding:2px 7px;border-radius:var(--r-small)}
+.pane .bar button{min-height:22px;padding:2px 8px;font-size:11px}
+/* The terminal's own background color, on the frame itself.
+   A terminal's document is transparent until xterm paints into it, so what
+   fills the frame until then is the browser's default canvas, and this page
+   declares a dark color-scheme, which (in Chromium) makes that canvas white
+   rather than dark. The result was a quarter-second of white in the middle of
+   a dark page every time a tmux tab was opened, worst on a phone where the
+   frame takes longest to arrive. Giving the element the color the terminal
+   settles on means there is no transition to see at all: measured, it holds
+   #2b2b2b from the first frame to the last.
+   Not color-scheme:dark on the frame; that is what turns the canvas white,
+   which is the opposite of what it sounds like it would do. */
+.pane iframe{flex:1;border:0;width:100%;display:block;background:#2b2b2b}
+.pane .doc.on{animation:docIn .22s cubic-bezier(.33,1,.68,1) .06s backwards}
+.pane .stack > .doc.leaving{visibility:visible;animation:docOut .09s ease-in forwards}
+.pane .doc{overflow:auto;padding:12px;
+  -webkit-overflow-scrolling:touch}
+.pane .stack:has(> .doc.on){background:var(--bg)}
+/* A document has a reading width. Left to fill an ultrawide pane, every row
+   here becomes a name at one end of two thousand pixels and the control that
+   acts on it at the other (the bin, the Revert, the version pill) with the
+   eye traveling the whole way between them. Capped and centered in the pane,
+   as the design's page says (the operator, 19 Oct: pinned left, a desk's
+   pane kept 214px empty at the right); a band spanning the pane sets its
+   contents in by --doc-in to start where the column does. */
+.pane .doc > *{max-width:var(--doc-w);margin-inline:auto}
+/* Every child of the stack occupies the whole of it, and one is visible. See
+   paneStack(): the frames behind stay loaded and stay the same size. */
+.pane .stack{position:relative;flex:1;min-height:0}
+.pane .stack > *{position:absolute;inset:0}
+.pane .stack > *:not(.on){visibility:hidden;pointer-events:none}
+/* A page left behind the one on show (kept with its scroll, its view and
+   what is typed in it) is not laid out or painted (R228 step 10):
+   visibility kept every one of them laid out on every change to the page.
+   Only the page's pane: the dock's terminals measure their box while
+   hidden. Not the page fading out, which is still on show. */
+#pane0 .stack > *:not(.on):not(.leaving){content-visibility:hidden}
+.pane .slot{display:flex}
+/* The console bar (roadmap #27), under a read-only Claude terminal for an
+   account with no shell. Column, so the frame keeps its flex:1 and the row
+   takes what it needs; the input picks up the global field skin like every
+   other control, so nothing is restyled here beyond the layout. */
+.pane .slot:has(.consbar){flex-direction:column}
+/* The chat, the dock's Chat tab (R250 step 2): the people and the project
+   channels in a column beside the open conversation at a desk, one at a
+   time on a phone (the list until one is picked, then the conversation with
+   ‹ all back to it). Only the layout is here: the input picks up the global
+   field skin and .row/.pill/.dot are the page's own, so a chat row looks
+   like every other row on the dashboard. */
+.pane .doc:has(> .chattab){overflow:hidden;padding:0}
+/* A chat row's rule line, under the rules every row and every button has:
+   the last row draws none, and a row pointed at takes the hover's edge
+   color. */
+.chatrow{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.chattab .chatrow{background:none}
+.chatlog{flex:1;overflow:auto;padding:6px 10px;min-height:0;
+  -webkit-overflow-scrolling:touch}
+
+/* The terminal's own bottom band ------------------------------------- */
+/* A phone's alone: the hot bar of the terminal in front, its keys in a line
+   that scrolls under a thumb and Links at its end. A desk's keys float over
+   the terminal, so there is no band there. (The Keys panel and the Commands
+   panel that opened from it are gone: the operator, 12 Nov.) */
+.mobar[hidden]{display:none}
+.mobar{display:none;gap:6px;padding:6px;flex:0 0 auto;background:var(--panel);position:relative;
+  border:var(--hair) solid var(--line);border-top:0;border-radius:0 0 var(--r-surface) var(--r-surface)}
+.mobar button{min-height:var(--tap)}
+.panes{border-radius:0}   /* the band below them owns the bottom corners */
+.col.term{position:relative}
+@media(max-width:380px){
+  .mobar{gap:4px;padding:5px}
+  .mobar button{padding-inline:4px}
+}
+@media(max-width:900px){
+  .pill.att{display:none}   /* one pane on a phone: nothing to say */
+  .mobar{display:flex}
+  .mobar[hidden]{display:none}
+  .mobar button[hidden]{display:none}
+  /* The hot bar is the band (the operator, 12 Nov): the terminal's keys in a
+     line that scrolls, and it reads as the dock's line of tabs at the
+     terminal's head does: the same gap, a key the height of a tab, the
+     line's faded ends and its round arrows where more keys lie past an
+     edge (.hscroll, which the line and a row of chips share), and Links
+     standing still to the right of the arrow. */
+  .mobar:has(.mhot:not([hidden])){gap:4px;padding:4px 6px;align-items:center}
+  .mobar{border:0;border-top:var(--hair) solid var(--line);border-radius:0}   /* its foot is the bottom bar's line */
+  .panes{min-height:90px}
+}
+
+/* Findings view ------------------------------------------------------ */
+.fx h3{margin:0 0 8px;font:var(--f-sect)}
+/* Not in the notebook. A pane's document carries `fx` whatever it holds, so
+   the findings card (bordered, rounded, floating on its own background)
+   landed on every row of the to-do list and made it read as a wall of
+   bubbles. Inside a tab the divider is the language; the card is for a report
+   whose groups really are separate documents. */
+.fx:not(.nbhost) .grp{border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  margin-bottom:10px;background:var(--panel);overflow:hidden}
+.fx .grp>summary{padding:var(--row-y) var(--row-x);font-weight:600;flex-wrap:wrap;
+  transition:background-color .15s ease}
+/* A rule is a row that opens (R234): the summary is the closed row, its
+   body the places, the description and the message. */
+.fx .rule{border-top:var(--hair) solid var(--line);padding:0 var(--row-x)}
+.fx .rule>summary{flex-wrap:wrap;padding:var(--row-y) 0}
+.fx .msg{font:var(--f-code);color:var(--dim);white-space:pre-wrap;
+  margin:5px 0 0;padding-left:9px;border-left:2px solid var(--line);
+  overflow-wrap:anywhere}
+.fx a{color:var(--note)}
+/* ...but a link dressed as a button keeps the button's face: at the same
+   weight and later, the rule above dressed the Sessions view's Download in
+   the link color beside Resume and Read. */
+.fx a.btn:not(.primary, .danger){color:var(--ink)}
+/* Agents may's groups (the notebook, building, shipping): a heading over
+   each row of pickers, the gap above it a band's, and the VM limits as
+   number and unit pairs, two to a line on a phone. */
+.rnsub{display:block;margin-top:14px}
+.vmcap{display:inline-flex;align-items:center;gap:8px}
+}

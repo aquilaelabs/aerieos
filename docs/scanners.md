@@ -1,8 +1,10 @@
 # The scanners
 
 AerieOS runs its own static analysis stack on each node that holds
-spaces, from the **Scanners** page: Configure on a node's scanners row in
-the Containers page's System section opens it.
+spaces, from the **Scanners** page. The Scanners are a service: Install on
+their card under Services in the Library puts them on a node, and Open on
+their row under Services on the Installed page opens the page, as Configure
+on a node's scanners row in the Containers page's System section does.
 Nothing is scanned on the controller and nothing of the controller's is
 mounted on a node: each node runs the scanners over the spaces whose node
 it is and sends what they found up to the controller over the agent's own
@@ -26,8 +28,8 @@ rule and vulnerability caches stay on the node between runs.
 1. **Deploy.** The page lists every node. Press **Deploy** on a node that
    holds spaces, or the bar's **Deploy on N nodes** for all of them at
    once: the controller writes the compose space to the node (the three
-   scanners as services, their versions pinned to the newest known) and the
-   node pulls the images, a job on the Jobs page. A node that hosts
+   scanners as services, each the image this AerieOS names by its digest)
+   and the node pulls the images, a job on the Jobs page. A node that hosts
    containers only holds no space and is not offered.
 2. **Schedule.** One timetable runs every node's scanners: daily, weekly
    (Sundays at 4:00, the default) or monthly at 4:00, or a cron line of your
@@ -48,12 +50,15 @@ with no scanners deployed.
 
 ## Keeping them current
 
-The versions a node runs are pinned when it is deployed. The controller
-reads Docker Hub and PyPI once a week for newer releases (**Check versions**
-reads them now); a node behind says so in its section and on the bell, and
-**Update** pins the newer versions there and pulls them. **Remove** takes
-the scanners off a node, with their images and caches, and forgets the
-reports it sent.
+Each scanner is an image with the tool already in it, named by its tag and
+the digest of what is pulled: nothing is installed at a scan, and a node
+runs exactly the images it was pinned to when it was deployed. Nothing
+asks a registry what is newest. A newer scanner arrives with an update of
+AerieOS, whose entry for the scanners then names another image: a node
+behind it says so in its section and on the bell, with the version and
+the first digits of the digest it would move to, and **Update** pins the
+node to those images and pulls them. **Remove** takes the scanners off a
+node, with their images and caches, and forgets the reports it sent.
 
 ## Answering a finding
 

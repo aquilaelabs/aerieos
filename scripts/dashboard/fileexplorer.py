@@ -14,19 +14,22 @@ import hashlib
 import hmac
 import json
 import re
-import socket
+import secrets
 import time
 
 node_fn = None          # nodes.node
 host_fn = None          # nodes.route_host
 key_fn = None           # nodes.screen_key
+connect_fn = None       # the agent's relaytls.connect: TLS to the certificate the node reported (R243)
+subject_fn = None       # ...and its subject: what is signed with a value of the request's own
 audit_fn = None         # db.audit(principal, what, detail, params)
 SCREEN_PORT = 7684
 OPS = ("list", "read", "write", "mkdir", "rename", "delete")
 
 
-def configure(*, node, host, key, audit, screen_port=7684):
-    globals().update(node_fn=node, host_fn=host, key_fn=key, audit_fn=audit, SCREEN_PORT=screen_port)
+def configure(*, node, host, key, audit, screen_port=7684, connect=None, subject=None):
+    globals().update(node_fn=node, host_fn=host, key_fn=key, audit_fn=audit, SCREEN_PORT=screen_port,
+                     connect_fn=connect, subject_fn=subject)
 
 
 def roots(n):
@@ -71,6 +74,12 @@ def roots(n):
     return out
 
 
+def off_said(n):
+    """What a node whose console switched root asks off says to a file
+    request: its files are root's to read, and the node answers none."""
+    return f"{n.get('name') or n.get('id')} has root asks switched off at its own console, so its files are not read from here"
+
+
 def _target(principal_ok, node_id, root):
     """(node, host, port, key) for a request on `root`, or an error dict."""
     if not principal_ok:
@@ -88,20 +97,32 @@ def _target(principal_ok, node_id, root):
     host, key = host_fn(node_id), key_fn(node_id)
     if not host or not key:
         return {"error": f"{n.get('name') or node_id} cannot be reached from here"}
-    return {"node": n, "host": host, "port": int(fs["port"]), "key": key}
+    # How its relay is spoken to (R243): the certificate it reported, which
+    # is the only one taken, and whether it takes a request once.
+    if (n.get("reported") or {}).get("root_off"):
+        return {"error": off_said(n)}
+    relay = (n.get("reported") or {}).get("relay") or {}
+    if not relay.get("tls"):
+        return {"error": f"{n.get('name') or node_id}'s relay has no certificate yet, so no file is opened there"}
+    return {"node": n, "host": host, "port": int(fs["port"]), "key": key,
+            "pin": str(relay.get("tls") or ""), "once": bool(relay.get("once"))}
 
 
-def _request_line(key, spec):
+def _request_line(key, spec, once=False):
     blob = base64.urlsafe_b64encode(json.dumps(spec, separators=(",", ":")).encode()).decode().rstrip("=")
     t = int(time.time())
-    sig = hmac.new(key.encode(), f"files.{blob}.{t}".encode(), hashlib.sha256).hexdigest()
-    return f"/files?a={blob}&t={t}&s={sig}"
+    # A value of this request's own signed with it, where the node takes a request once.
+    nonce = secrets.token_hex(12) if once and subject_fn else ""
+    what = subject_fn(blob, nonce) if nonce else blob
+    sig = hmac.new(key.encode(), f"files.{what}.{t}".encode(), hashlib.sha256).hexdigest()
+    return f"/files?a={blob}&t={t}&s={sig}" + (f"&n={nonce}" if nonce else "")
 
 
 def open_request(tg, spec, method="GET", length=None):
-    """A connection to the agent with the request's head sent: the socket."""
-    up = socket.create_connection((tg["host"], tg["port"]), timeout=15)
-    head = [f"{method} {_request_line(tg['key'], spec)} HTTP/1.1", f"Host: {tg['host']}:{tg['port']}", "Connection: close"]
+    """A connection to the agent with the request's head sent: the socket,
+    over TLS to the certificate the node reported where it reported one."""
+    up = connect_fn(tg["host"], tg["port"], tg.get("pin") or "", timeout=15)
+    head = [f"{method} {_request_line(tg['key'], spec, tg.get('once'))} HTTP/1.1", f"Host: {tg['host']}:{tg['port']}", "Connection: close"]
     if length is not None:
         head.append(f"Content-Length: {int(length)}")
     up.sendall(("\r\n".join(head) + "\r\n\r\n").encode())

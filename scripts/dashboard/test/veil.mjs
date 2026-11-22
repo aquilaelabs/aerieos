@@ -12,7 +12,7 @@
 //
 // Driven against synthetic frames rather than a real screen: the harness
 // runs no VM, and what is under test is the release rule.
-import { launch, newPage, ok, done, ready, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, quiet, URL } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -57,7 +57,10 @@ ok(await page.$eval('#veiltest iframe',
      f => getComputedStyle(f.contentDocument.documentElement).backgroundColor
           === 'rgb(43, 43, 43)'),
    'unveil gives it the pane color, so there is no white left to paint');
-ok(took < 120, `...and the cover comes off at once (${took}ms, not the old 350ms floor)`);
+// Timed from here, the page's round trips in it: under a whole run's load
+// that alone was 133 ms, so the bound is the old floor's side of the line
+// with room, not the machine's speed.
+ok(took < 250, `...and the cover comes off at once (${took}ms, not the old 350ms floor)`);
 await page.waitForFunction(() => !document.querySelector('#veiltest .veil'), { timeout: 3000 });
 ok(await veilState() === 'removed', '...then takes itself out of the pane');
 
@@ -67,7 +70,7 @@ ok(await veilState() === 'removed', '...then takes itself out of the pane');
 await build('data:text/html,<p>opaque');
 const t1 = Date.now();
 await page.evaluate(() => unveil(document.querySelector('#veiltest iframe')));
-await page.waitForTimeout(150);
+await quiet(150);
 ok(await veilState() === 'covering', 'a frame that cannot be reached stays covered');
 await lifted();
 const held = Date.now() - t1;
@@ -79,9 +82,35 @@ await page.evaluate(() => {
   unveil(document.querySelector('#veiltest iframe'));
   document.querySelector('#veiltest').remove();
 });
-await page.waitForTimeout(600);
+// Past the clock backstop, which is when a timer left behind would fire.
+await quiet(600);
 ok(page.errors.length === 0, 'a pane replaced while covered raises nothing');
 
-ok(page.errors.length === 0, 'zero console errors');
-if (page.errors.length) console.log(page.errors);
+// ---- a screen's tab, as the page itself opens one -------------------------
+// The checks above call unveil themselves, so they could not see the page
+// failing to: its frame said onload="unveil(this)", which the page's own
+// Content-Security-Policy refuses, and nothing else lifted the veil. The
+// harness runs no VM, so the frame's page is this server's answer for a
+// screen that is not there; the frame still loads, which is all a veil waits for.
+const refused = [];
+page.on('console', m => { if (/Content Security Policy|Refused to execute inline/i.test(m.text())) refused.push(m.text()); });
+await page.evaluate(() => openTab({ kind: 'term', arg: 'screen:alpha:nobody', label: 'screen nobody' }));
+await page.waitForSelector('.pane .slot.on iframe', { timeout: 10000 });
+ok(await page.$eval('.pane .slot.on iframe', f => !f.hasAttribute('onload')),
+   'a screen\'s frame carries no inline handler, which the page\'s own policy would refuse');
+const gone = await page.waitForFunction(() => {
+  const s = document.querySelector('.pane .slot.on');
+  const v = s && s.querySelector('.veil');
+  return s && (!v || v.classList.contains('gone'));
+}, { timeout: 5000 }).then(() => true, () => false);
+ok(gone, 'the veil over a screen the page opened comes off by itself when its frame has loaded');
+ok(refused.length === 0, `...and the policy refused nothing (${refused[0] || 'nothing'})`);
+ok(!(await page.evaluate(() => [...document.querySelectorAll('script')].length
+     && /onload="unveil/.test(String(window.drawPanes)))), 'no template of the panes writes that handler');
+
+// The harness carries no noVNC, so the screen's own page is a 404 here: that
+// one line is the fixture's, and anything else is the page's.
+const errs = page.errors.filter(e => !/404 \(Not Found\) \[\/novnc\/vnc_lite\.html/.test(e));
+ok(errs.length === 0, 'zero console errors');
+if (errs.length) console.log(errs);
 await done(browser);

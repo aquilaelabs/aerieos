@@ -11,6 +11,8 @@ job the agent answers at once (nodes.node_storage_measure).
 """
 import time
 
+import nodeset
+
 # Where a project's bytes are on a node, in the order the tab shows them.
 WHERE = ("workspace", "cache", "artifacts", "appdata", "emulator", "builds")
 
@@ -72,9 +74,7 @@ def view(nodes, who, *, is_admin, nodes_for, may_see, level_of):
     if allowed is not None and not allowed and not level_of(who, "storage"):
         return {"error": "the Storage page is its own area: ask for Read on Storage"}, 403
     out = []
-    for n in nodes:
-        if n.get("kind") != "agent" or n.get("state") in ("retired", "pending"):
-            continue
+    for n in nodeset.live_agents(nodes):
         if allowed is not None and n["id"] not in allowed:
             continue
         # Whether it may measure this one (R260: Storage held node by node).

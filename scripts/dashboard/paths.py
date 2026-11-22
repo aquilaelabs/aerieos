@@ -23,6 +23,8 @@ import threading
 import time
 from pathlib import Path
 
+import statefile
+
 STATE = Path("/config")
 WORKSPACE = Path("/workspace")
 FILE = "paths.json"
@@ -46,17 +48,17 @@ def configure(*, state, workspace):
 
 
 def _load():
-    try:
-        d = json.loads((STATE / FILE).read_text())
-        return {k: str(v) for k, v in d.items() if k in KINDS and isinstance(v, str)}
-    except (OSError, ValueError, AttributeError):
+    d = statefile.read_json(STATE / FILE)   # read once while the same file (R228 step 1)
+    if not isinstance(d, dict):
         return {}
+    return {k: str(v) for k, v in d.items() if k in KINDS and isinstance(v, str)}
 
 
 def _save(d):
     tmp = STATE / f".{FILE}.{os.getpid()}"
     tmp.write_text(json.dumps(d, indent=1, sort_keys=True))
     os.replace(tmp, STATE / FILE)
+    statefile.forget(STATE / FILE)
 
 
 def default(name):
@@ -86,6 +88,28 @@ def view():
     return {"paths": [{"name": k, "what": KINDS[k][1], "path": str(of(k)), "default": str(default(k)),
                        "set": k in set_, "pinned": pinned(k), **({"moving": moving[k]} if k in moving else {})}
                       for k in KINDS]}
+
+
+def room():
+    """For Controller settings' card: the free and whole space on the disks
+    under /config and the spaces share, and the database's size with its
+    log, each left out when it cannot be read."""
+    out = {}
+    for key, where in (("config", STATE), ("spaces", WORKSPACE)):
+        try:
+            u = shutil.disk_usage(str(where))
+            out[key] = {"free": u.free, "total": u.total}
+        except OSError:
+            pass
+    size = 0
+    for name in ("builderbot.db", "builderbot.db-wal"):
+        try:
+            size += (STATE / name).stat().st_size
+        except OSError:
+            pass
+    if size:
+        out["db"] = size
+    return out
 
 
 def problem(name, path):

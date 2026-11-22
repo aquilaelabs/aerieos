@@ -16,7 +16,11 @@ import sdkmeta  # noqa: E402
 class Reach(unittest.TestCase):
     def test_the_source_host_is_the_catalogs(self):
         self.assertEqual(sdkmeta.source_host(sdkmeta.toolchain("node")), "nodejs.org")
-        self.assertEqual(sdkmeta.source_host(sdkmeta.toolchain("android:ndk")), "dl.google.com")
+        # A source kind with no address of its own names its host in its row.
+        self.assertEqual(sdkmeta.source_host({"source": {"kind": "sdkmanager", "host": "dl.example.com"}}), "dl.example.com")
+        for bad in ("dl.example.com/x", "-h", "a b", 7, ""):
+            self.assertEqual(sdkmeta.source_host({"source": {"kind": "sdkmanager", "host": bad}}), "", bad)
+        self.assertEqual(sdkmeta.source_host({"source": {"kind": "sdkmanager"}}), "", "and the mechanism names no vendor for it")
         self.assertEqual(sdkmeta.source_host({"source": {"kind": "command"}}), "")
 
     def test_a_musl_system_takes_the_musl_build_where_there_is_one(self):

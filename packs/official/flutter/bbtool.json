@@ -1,5 +1,7 @@
 {
  "about": "Flutter with its Dart SDK. Builds Android apps on Linux, and iOS too on a Mac with Xcode.",
+ "format": 5,
+ "framework": "5.1",
  "label": "Flutter",
  "layout": {
   "bin": [
@@ -8,6 +10,7 @@
   "env": {},
   "tool": "bin/flutter"
  },
+ "maker": "Google",
  "name": "flutter",
  "platforms": [
   "linux/*",
@@ -16,16 +19,27 @@
  "shipped": {
   "probe": "flutter",
   "reports": "flutter",
+  "rev": 2,
   "source": {
    "branch": "stable",
+   "commit": "ae9b586f34a8443573f82ef57c3bf914a908cbf7",
    "depth": 1,
    "download": {
     "bytes": 520000000,
     "resolver": "approximate"
    },
+   "env": {
+    "FLUTTER_SUPPRESS_ANALYTICS": "true"
+   },
    "fresh_only": true,
    "kind": "git",
+   "online": "its first run downloads the Dart SDK and its engine from storage.googleapis.com, and its packages from pub.dev",
    "safe_directory": true,
+   "tag": "3.50.1",
+   "track": {
+    "match": "^\\d+\\.\\d+\\.\\d+$",
+    "resolver": "git-tag"
+   },
    "url": "https://github.com/flutter/flutter.git",
    "warm": [
     "{dir}/bin/flutter",

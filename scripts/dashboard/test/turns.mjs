@@ -4,15 +4,13 @@
 // Nodes tab where an administrator sets the number. The node is one this file
 // enrolls, with the session half up and a heartbeat whose panes carry the
 // spinner a working Claude pane does; the per-file world takes it away after.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, openSection, member } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, until, DIR, openSection, member, OWNER as ADMIN, asUser, asSession as bearer, usersPy, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -20,7 +18,6 @@ const call = async (path, body, headers = ADMIN) => {
   let j = {}; try { j = JSON.parse(t); } catch { /* 204 and friends */ }
   return { status: r.status, ...j };
 };
-const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const py = (mod, code) => execFileSync('python3', ['-c', `
 import importlib.util, json, time
 spec = importlib.util.spec_from_file_location("m", ${JSON.stringify(join(HERE, mod))})
@@ -30,7 +27,7 @@ if hasattr(m, "configure") and ${JSON.stringify(mod)} == "users.py":
 ${code}`], { encoding: 'utf8' }).trim().split('\n').pop();
 
 // ---- the rule on its own --------------------------------------------------
-{
+await section("the rule on its own", async () => {
   const r = JSON.parse(py('turns.py', `
 out = {}
 now = time.time()
@@ -79,7 +76,7 @@ print(json.dumps(out))`));
   ok(r.other === true, "another node's sessions do not count against this one");
   ok(JSON.stringify(r.limits) === '[0,3,5,64,null,null,null,null]',
      `a limit is a whole number from 0 to 64 (${r.limits})`);
-}
+});
 
 // ---- through the server ---------------------------------------------------
 // A node of this file's own, running sessions, bound to alpha; four people on
@@ -107,13 +104,13 @@ m._save(d); print(uid)`);
 const owner = py('users.py', 'print(next(r["uid"] for r in m.load()["users"].values() if r.get("role") == "owner"))');
 const uids = [owner, make('tn.one'), make('tn.two'), make('tn.three')];
 await member('tn.one', 'tn.two', 'tn.three');
-const toks = uids.map(u => py('users.py', `print(m.mint_session("alpha", uid=${JSON.stringify(u)}))`));
+const toks = uids.map(u => usersPy(`u.mint_session("alpha", uid=${JSON.stringify(u)})`));
 const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
 
 // A session told the controller moved (R83): the build it began on is
 // kept per session at `started`, and the first `seen` after the build has
 // changed carries one line naming both and where to read, once.
-{
+await section("A session told the controller moved", async () => {
   const sess = body => call('/api/v1/hook', { kind: 'seen', ...body }, bearer(toks[1]));
   const began = await call('/api/v1/hook', { kind: 'started', node: 'nodeA' }, bearer(toks[1]));
   const quiet = await sess({ node: 'nodeA' });
@@ -138,18 +135,21 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   const nb = await sess({ node: 'nodeA' });
   ok(/somebody else changed this space's bugs: read `aerie bug`/.test(nb.line || ''),
      `a bug the operator filed is named on the next prompt (${(nb.line || 'no line').slice(0, 90)})`);
-  await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
-  const own = await sess({ node: 'nodeA' });
-  ok(!/somebody else changed/.test(own.line || ''), `...and the session's own bug is not (${(own.line || 'no line').slice(0, 90)})`);
-  // ...nor one it filed with aerie bug add, which reaches the controller
-  // through the relay and not the notebook's route, and was told back to
+  // The notebook's own route is a person's (R227 step 4): a session's bug
+  // goes by the relay, as aerie bug add sends it, and one sent to the route
+  // with a session's token is refused, written by nobody.
+  const direct = await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
+  ok(direct.status === 403 && /a session's token does not reach this/.test(direct.error || ''),
+     `the notebook's own route refuses a session's token (${direct.status || ''} ${(direct.error || '').slice(0, 50)})`);
+  // The session's own bug, filed with aerie bug add, which reaches the
+  // controller through the relay and not the notebook's route, was told back to
   // the session that filed it as somebody else's (B375). A read through
   // the relay marks nothing: what the operator did is still news after it.
   const relay = argv => call('/api/v1/bb', { argv }, bearer(toks[1]));
   const filed = await relay(['bug', 'add', 'the session found another', '--sev', 'low', '--here']);
   const ownRelay = await sess({ node: 'nodeA' });
   ok(/filed B\d+/.test(filed.out || '') && !/somebody else changed/.test(ownRelay.line || ''),
-     `...nor one it filed with aerie bug add (${(filed.out || filed.error || '').trim().slice(0, 40)}; ${(ownRelay.line || 'no line').slice(0, 60)})`);
+     `...and the session's own bug, filed with aerie bug add, is not named back to it (${(filed.out || filed.error || '').trim().slice(0, 40)}; ${(ownRelay.line || 'no line').slice(0, 60)})`);
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found a second', severity: 'low' });
   await relay(['bug']);
   const afterRead = await sess({ node: 'nodeA' });
@@ -226,8 +226,8 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   ok(!/diagnostics/.test(plain.line || ''),
      `...and a plain account's session on the same space is told nothing (${(plain.line || 'no line').slice(0, 60)})`);
   await call('/api/prefs', { project: 'alpha', diag: false });
-}
-{
+});
+await section("with no limit set, four prompts at once all go", async () => {
   const free = await Promise.all([0, 1, 2, 3].map(i => hook(i, 'turn')));
   ok(free.every(r => r.status === 200 && r.go === true), 'with no limit set, four prompts at once all go');
   await Promise.all([0, 1, 2, 3].map(i => hook(i, 'turn-done')));
@@ -252,7 +252,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   r = await call('/api/login-code', { code: 'abc#def' }, bearer(toks[1]));
   ok(r.status === 403, `a session cannot type a code into the controller's sign-in (${r.status})`);
   r = await call('/api/v1/nodes', { action: 'turns', id: minted.id, limit: 1 },
-    { Authorization: 'Basic ' + Buffer.from('tn.one:pw-tn.one-1').toString('base64'), 'Content-Type': 'application/json' });
+    asUser('tn.one', 'pw-tn.one-1'));
   ok(r.status === 403, `...nor can a plain account (${r.status})`);
   r = await call('/api/v1/nodes', { action: 'turns', id: minted.id, limit: 'lots' });
   ok(/whole number/.test(r.error || ''), `a limit that is not a number is refused, saying what one is (${r.error})`);
@@ -261,6 +261,8 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
 
   const first = await Promise.all([0, 1].map(i => hook(i, 'turn')));
   const third = await hook(2, 'turn');
+  // Waiters are served in the order they asked, by the clock: the fourth
+  // asks at a later time than the third.
   await sleep(20);
   const fourth = await hook(3, 'turn');
   ok(first.every(x => x.go) && third.go === false && fourth.go === false,
@@ -294,13 +296,13 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   ok(goes.go === true, '...and it goes once a pane is waiting at its prompt again');
   await hook(3, 'turn-done');
   await beat([]);
-}
+});
 
 // ---- a session on Claude Code's own permission prompt (B52) -----------------
 // Its pane title reads as waiting, like an idle one; the Notification hook
 // (bb-gate --asking, fed Claude Code's JSON) marks it asking, with Claude's
 // words, until its turn ends.
-{
+await section("a session on Claude Code's own permission prompt", async () => {
   const name = `${uids[0]}~claude-alpha`;
   await beat([{ name, title: '✳ Refactor the parser' }]);
   const rowOf = async () => ((await call('/api/status')).sessions || [])
@@ -316,13 +318,13 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
      && /needs your permission to use Bash/.test(asking.task || '') && after.state === 'waiting',
      `a session on its permission prompt reads as asking, with Claude's words, until its turn ends (${before.state}, ${asking.state}: ${asking.task}, ${after.state})`);
   await beat([]);
-}
+});
 
 // ---- bb-gate, the hook itself ----------------------------------------------
 // The limit at one and somebody working: the prompt waits, and is refused
 // with a sentence when its wait runs out; given a longer wait, it goes the
 // moment the other turn ends.
-{
+await section("bb-gate, the hook itself", async () => {
   await call('/api/v1/nodes', { action: 'turns', id: minted.id, limit: 1 });
   await hook(0, 'turn');
   const cache = join(DIR, 'turncache'); mkdirSync(cache, { recursive: true });
@@ -348,11 +350,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   child.stdin.end('{"prompt":"go"}');
   const ended = new Promise(res => child.on('exit', code => res({ code, at: Date.now() })));
   // Until the queue holds it, rather than a fixed two and a half seconds.
-  let waiting = 0;
-  for (let i = 0; i < 50 && !waiting; i++){
-    waiting = (await call('/api/v1/nodes')).nodes.find(n => n.id === minted.id).turns.waiting;
-    if (!waiting) await sleep(100);
-  }
+  const waiting = await until(async () => (await call('/api/v1/nodes')).nodes.find(n => n.id === minted.id).turns.waiting, 5000, 100);
   const freed = Date.now();
   await hook(0, 'turn-done');
   const e = await Promise.race([ended, sleep(15000).then(() => ({ code: 'still waiting' }))]);
@@ -367,10 +365,10 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   gone.stdin.end('{"prompt":"go"}');
   const g = await Promise.race([new Promise(res => gone.on('exit', res)), sleep(15000).then(() => 'hung')]);
   ok(g === 0, `a controller that does not answer never holds a prompt (${g})`);
-}
+});
 
 // ---- the Nodes tab --------------------------------------------------------
-{
+await section("the Nodes tab", async () => {
   const browser = await launch();
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL); await ready(page);
@@ -388,7 +386,10 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   await page.fill(inp, '3');
   // A heartbeat repaints the tab; the number being typed survives it.
   await beat([{ name: `${uids[0]}~claude-alpha`, title: '◐ Work' }]);
-  await page.evaluate(() => loadNodes()); await sleep(300);
+  await page.evaluate(() => loadNodes());
+  // The repaint is the one that counts the heartbeat's working pane.
+  await page.waitForFunction(r => /^1 session working now/.test(document.querySelector(`${r} [data-nd="sess-save"]`)
+    ?.parentElement.querySelector('.state')?.textContent.trim() || ''), row, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval(inp, el => el.value) === '3', '...and a number being typed survives the repaint a heartbeat brings');
   await page.click(`${row} [data-nd="sess-save"]`);
   await page.waitForFunction(r => /of 3/.test(document.querySelector(`${r} [data-nd="sess-save"]`)
@@ -398,6 +399,6 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   ok(rec.config?.turns === 3, 'the limit is on the node\'s record');
   ok(page.errors.length === 0, `no console errors${page.errors.length ? ': ' + page.errors.slice(0, 2).join(' | ') : ''}`);
   await browser.close();
-}
+});
 
 await done();

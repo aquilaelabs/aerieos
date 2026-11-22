@@ -8,22 +8,11 @@
 // The harness's stub docker answers `compose config` and the build job, the
 // way devapp.mjs's New container tests use it, so this file proves the
 // asking, the routing, the reading and the answering.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, call as api, asUser, OWNER as owner, asSession, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
 const COMPOSE = 'services:\n  app:\n    image: alpine\n    command: sleep 1\n';
 const ask = (extra, headers = owner) => api('/api/phone', {
   action: 'ask', kind: 'container', why: 'a sonarr to test the media space against',
@@ -55,7 +44,7 @@ execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--rol
   { input: 'visitorpass1\nvisitorpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const other = asUser('visitor', 'visitorpass1');
-await api('/api/users', { action: 'projects', name: 'visitor', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'visitor', projects: ['alpha'] });
 
 // ---- the ask, who sees it, and what they see --------------------------------
 const asked = await ask({});
@@ -89,17 +78,22 @@ ok(/container sonarr-for-alpha on sandbox/.test(bell.text) && /a sonarr to test/
 // Approve is read at a glance: its text against its own fill at the
 // contrast body text needs (WCAG's 4.5), in every theme (the operator, 5 Oct:
 // green on amber).
-{
+await section("Approve is read at a glance", async () => {
   const low = await page.evaluate(async () => {
     const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(v => v / 255)
       .map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
     const out = [];
     const was = document.documentElement.dataset.theme;
     const themes = new Set(['default']);
+    // Into the cascade layers and any block inside them, where the schemes are.
+    const walk = rules => { for (const r of rules){
+      for (const m of (r.selectorText || '').matchAll(/html\[data-theme="([a-z]+)"\]/g)) themes.add(m[1]);
+      if (r.cssRules) walk(r.cssRules);
+    } };
     for (const sh of document.styleSheets){
       let rules = [];
       try { rules = [...sh.cssRules]; } catch { rules = []; }
-      for (const r of rules) for (const m of (r.selectorText || '').matchAll(/html\[data-theme="([a-z]+)"\]/g)) themes.add(m[1]);
+      walk(rules);
     }
     for (const t of themes){
       document.documentElement.dataset.theme = t;
@@ -112,7 +106,7 @@ ok(/container sonarr-for-alpha on sandbox/.test(bell.text) && /a sonarr to test/
     return { out, n: themes.size };
   });
   ok(low.n > 1 && low.out.length === 0, `Approve's text stands out from its fill in each of the ${low.n} themes (${low.out.join(', ') || 'all at 4.5 or more'})`);
-}
+});
 
 // ---- Allow: registered through the Docker tab's own path, then built -------
 const allowed = await api('/api/phone', { action: 'allow', id: asked.body.id });
@@ -126,14 +120,14 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
 // ---- a session's ask belongs to its own project -------------------------------
 // So the session that asked can see what it asked for once it exists, and
 // work on it as its project's settings allow (the operator, 24 Sep).
-{
+await section("a session's ask belongs to its own project", async () => {
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   // The dial at ask: the fixture's default is deny, and a session's is
   // under it (below).
   await api('/api/prefs', { project: 'alpha', devbuild: 'ask' });
   const bySession = await ask({ name: 'sonarr-by-session', project: '' },
-    { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok });
+    asSession(tok));
   const row = (await api('/api/phone')).body.asks.find(a => a.id === bySession.body.id);
   ok(row && row.for === 'alpha', `a session's ask belongs to its own space when it names none (${row?.for})`);
   await api('/api/phone', { action: 'deny', id: bySession.body.id });
@@ -141,7 +135,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   // the operator, 24 Sep): refused at deny, made at once at auto when it is
   // the project's own on its own node, and asked at auto all the same for
   // another project or a node it names.
-  const S = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
+  const S = asSession(tok);
   await api('/api/prefs', { project: 'alpha', devbuild: 'deny' });
   const denied = await ask({ name: 'sonarr-denied-by-dial', project: '' }, S);
   ok(denied.status === 403 && /Run its container/.test(denied.body.error || ''),
@@ -161,7 +155,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   const askedStill = await ask({ name: 'sonarr-asked', project: '' }, S);
   ok(askedStill.body.id > 0, '...and at ask it is asked');
   await api('/api/phone', { action: 'deny', id: askedStill.body.id });
-}
+});
 
 // ---- Deny: reported to the session, nothing made -------------------------------
 const again = await ask({ name: 'sonarr-denied' });
@@ -177,7 +171,7 @@ ok(no.state === 'denied' && !(await api('/api/docker')).body.instances.some(i =>
 const dup = await ask({});
 const asks = (await api('/api/phone')).body.asks || [];
 ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.error || '')
-   && /removes it from the Containers page first|env set/.test(dup.body.error || '')
+   && /change that container rather than asking for it again$/.test(dup.body.error || '')
    && !asks.some(a => a.kind === 'container' && a.name === 'sonarr-for-alpha' && a.state === 'pending'),
    `a name the store already has is refused before the bell, naming the ways forward (${dup.status}: ${
       (dup.body.error || '').slice(0, 70)})`);
@@ -189,15 +183,15 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
 // build: . and asked for it this way, and the build ran in an empty
 // directory (B329). Refused before the bell, and by create and Edit, with
 // the way a project's own code goes in.
-{
+await section("a build from nowhere is refused before anybody is asked", async () => {
   const BUILT = 'services:\n  app:\n    build: .\n    ports:\n      - "8080:80"\n';
   const r = await ask({ name: 'd2-armor-web', compose: BUILT });
   const asks = (await api('/api/phone')).body.asks || [];
   ok(r.status === 400 && /builds app from a relative path/.test(r.body.error || '')
-     && /own data directory, which is empty/.test(r.body.error || '')
-     && /aerie devapp new/.test(r.body.error || '') && /docker-compose\.yml or compose\.yml/.test(r.body.error || '')
+     && /absolute path or a git URL/.test(r.body.error || '') && /from its Artifacts view$/.test(r.body.error || '')
+     && !/aerie |\. /.test(r.body.error || '')
      && !asks.some(a => a.kind === 'container' && a.name === 'd2-armor-web'),
-     `an ask whose compose builds from a relative path is refused before the bell, naming aerie devapp new (${
+     `an ask whose compose builds from a relative path is refused before the bell, in one sentence naming the ways it builds (${
         r.status}: ${(r.body.error || '').slice(0, 90)})`);
   const made = await api('/api/container', { action: 'create', name: 'd2-armor-web', compose: BUILT, env: '' });
   ok(/builds app from a relative path/.test(made.body.error || '')
@@ -216,11 +210,11 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
   const kept = await api('/api/container', { action: 'read', name: 'd2-armor-abs' });
   ok(/builds app from a relative path/.test(ed.body.error || '') && /\/srv\/app/.test(kept.body.compose || ''),
      `...and Edit refuses the same change, keeping the file it had (${(ed.body.error || '').slice(0, 50)})`);
-}
+});
 // What counts as relative is compose's own answer, measured against the real
 // compose where the node has one: every way of writing a path that moves with
 // the project directory, and none of the ways that do not.
-{
+await section("What counts as relative is compose's own answer, measured against the real", async () => {
   const real = ['/usr/bin/docker', '/usr/local/bin/docker'].find(f => existsSync(f));
   if (!real) ok(true, 'skipped: no docker CLI here to ask compose what is relative');
   else {
@@ -245,12 +239,12 @@ print(json.dumps({k: containers.relative_builds(v) for k, v in cases.items()}))
     ok(JSON.stringify(rel.sort()) === JSON.stringify(['context', 'default', 'dot', 'envfile', 'up', 'var']),
        `compose's own answer: relative for . ./web .. the default context and a variable, not for an absolute path, a URL, an inline Dockerfile or an image (${JSON.stringify(said)})`);
   }
-}
+});
 
 // ---- the jump bar finds a container on any node (B26) -----------------------
 // Each named by its node, and picking one opens Containers on that node with
 // its search narrowed to it.
-{
+await section("the jump bar finds a container on any node", async () => {
   const rows = await page.evaluate(() => {
     const wasNodes = nodesList;
     nodesList = [...(nodesList || []), { id: 'n_jumpa', name: 'jumpa', kind: 'agent' }, { id: 'n_jumpb', name: 'jumpb', kind: 'agent' }];
@@ -268,8 +262,8 @@ print(json.dumps({k: containers.relative_builds(v) for k, v in cases.items()}))
   const at = await page.evaluate(() => ({ node: dockerNode, search: document.querySelector('#dmSearch')?.value, kind: tabOf(panes[0])?.kind }));
   ok(at.node === sandbox.id && at.search === 'zz-picked' && at.kind === 'docker',
      `...and a pick opens Containers on its node, narrowed to it (${JSON.stringify(at)})`);
-  await page.evaluate(() => { dmSearch = ''; dockerRev++; drawPanes(); });
-}
+  await page.evaluate(() => { dmSearch = ''; readMoved('docker'); drawPanes(); });
+});
 
 ok(page.errors.length === 0, 'zero console errors');
 await done(browser);

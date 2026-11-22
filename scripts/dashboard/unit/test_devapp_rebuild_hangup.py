@@ -63,7 +63,7 @@ class RebuildAfterAHangUp(unittest.TestCase):
 
     def run_rebuild(self):
         env = dict(os.environ, BB_CONTROLLER=f"http://127.0.0.1:{self.srv.server_address[1]}",
-                   BB_DEV_PROJECT="web", BB_DEV_AUTH="Bearer x", BB_DEV_CONTAINER="site",
+                   BB_PROJECT="web", BB_AUTH_HEADER="Bearer x", BB_DEV_CONTAINER="site",
                    BB_CONTROLLER_WAIT="0", PYTHONPATH=os.path.join(HERE, "..", "..", "lib"))
         return subprocess.run([sys.executable, VERBS, "rebuild"], env=env, capture_output=True,
                               text=True, timeout=90, check=False)

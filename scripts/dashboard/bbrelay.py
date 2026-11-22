@@ -48,6 +48,13 @@ HERE = Path(__file__).resolve().parent
 # verb cannot be added to one and not the other.
 VERBS = frozenset((HERE.parent / "lib" / "relay-verbs").read_text().split())
 
+# The variables a verb's own override of its project rides in, beside
+# BB_PROJECT: the relayed aerie is handed the project in every one. The
+# list is BB_PROJECT_VARS in scripts/aerie, which `aerie -p` sets and
+# bb_relay reads on the node's side: a name added there is added here.
+PROJECT_VARS = ("BB_ROADMAP_PROJECT", "BB_BUG_PROJECT", "BB_VERSION_PROJECT",
+                "BB_TESTS_PROJECT", "BB_CILOG_PROJECT", "BB_FINDINGS_PROJECT")
+
 # How many relayed bb verbs run at once, across every session.
 _SLOTS = threading.BoundedSemaphore(8)
 
@@ -187,7 +194,7 @@ def admit(me, req):
     # names no project still hears the useful half rather than "not a
     # project": having no author is the answer either way.
     if argv and argv[0] == "git" and argv[1:2] not in (["policy"], ["ls-remote"]) \
-            and users.uid_of(me) and not users.git_ready(me, project):
+            and users.whose(me) and not users.git_ready(me, project):
         return None, ({"error": "no name and email for commits yet: set them on your "
                                 "Profile (the gear in the dashboard's header), or for "
                                 "this space alone on its notebook's Settings"}, 403)
@@ -285,8 +292,8 @@ def run(me, req, project):
                                  f"not this session's to write. Push {head} and say what "
                                  "you want done with it"}, 403
     env = {k: v for k, v in os.environ.items() if k != "DASHBOARD_AUTH"}
-    env.update({"BB_PROJECT": project, "BB_ROADMAP_PROJECT": project,
-                "BB_BUG_PROJECT": project, "BB_VERSION_PROJECT": project,
+    env.update(dict.fromkeys(PROJECT_VARS, project))
+    env.update({"BB_PROJECT": project,
                 "DASHBOARD_STATE": str(STATE), "WORKSPACE": str(WORKSPACE),
                 "BB_TOKEN": users.mint_session(project), "BB_RELAYED": "1",
                 "BUILDERBOT_ROLE": "controller"})
@@ -295,8 +302,8 @@ def run(me, req, project):
     # session last read it, and whether a change was its own (#26, #27).
     # Only for a session token: a person at a node's console writes as a
     # person, and a person's writes are news to every session.
-    if me.get("session") and me.get("uid"):
-        env["BB_ACCOUNT_UID"] = me["uid"]
+    if users.seat_of(me):
+        env["BB_ACCOUNT_UID"] = users.seat_of(me)
     else:
         env.pop("BB_ACCOUNT_UID", None)
     if field(req, "from") == "session":
@@ -318,14 +325,14 @@ def run(me, req, project):
         # A session's git is its person's, with their own token, while they
         # are signed in (R159): signed out everywhere, aerie git waits for them,
         # and a project nobody signed in gave a token says so.
-        u = gitcreds.usable(project, str(me.get("uid") or ""))
+        u = gitcreds.usable(project, users.whose(me))
         # The project's git policy may turn the hold off (the Git view's
         # "Hold a push that looks sensitive"): the push then goes unread.
         hold = prefs.get(project)["gitpol"].get("scan") != "off"
         # A session's push is held to the project's Change CI workflow files
         # (B559): a workflow it wrote runs with the repository's secrets.
         wf = not me.get("session") or not forgeaccess or forgeaccess.override(project).get("workflows") != "deny"
-        r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=str(me.get("uid") or ""),
+        r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=users.whose(me),
                          token_why=u.get("why", ""), workflows=wf)
         if "error" in r:
             return r, 400
@@ -335,7 +342,7 @@ def run(me, req, project):
             # node's bb waits on the ask the way aerie root run does, and the
             # push runs here when they approve, its apply handed back then.
             a = phone.ask_push(project, str(cwd), argv[2:], r["held"],
-                               asker_uid=me.get("uid") or "", asker_name=me.get("name") or "",
+                               asker_uid=users.whose(me), asker_name=me.get("name") or "",
                                asker_admin=users.is_admin(me))
             if a.get("error"):
                 return {"error": a["error"]}, 400
@@ -353,8 +360,14 @@ def run(me, req, project):
                 "code": 75, "out": "", "err": ""}, 503
     limit = relay_limit(argv)
     try:
+        # A records file the session's side read and sent (B962), for the
+        # verb's --from -; nothing for any other.
+        stdin = req.get("stdin") if isinstance(req.get("stdin"), str) and "-" in argv else None
+        if stdin is not None and len(stdin) > 1_000_000:
+            return {"error": "a records file over a megabyte: split it into several", "code": 1, "out": "", "err": ""}, 413
         r = subprocess.run(["bash", str(HERE.parent / "aerie"), *argv], cwd=str(cwd),
-                           env=env, capture_output=True, text=True, timeout=limit)
+                           env=env, capture_output=True, text=True, timeout=limit,
+                           **({"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}))
     except subprocess.TimeoutExpired:
         return {"error": f"aerie {' '.join(argv[:2])} took longer than {limit // 60} minutes and was ended here: "
                          "what it had started on the controller may have gone on without it",

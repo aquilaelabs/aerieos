@@ -24,7 +24,9 @@ Usage (all output is plain, and empty means "not set"):
     sdkmeta.py field  NAME source.strip
     sdkmeta.py argv   NAME source.run  dir=/sdk/go version=go1.27.0
     sdkmeta.py resolve NAME                 -> version <TAB> url
+    sdkmeta.py offer   NAME                 -> version <TAB> sha256, for a pinned row
     sdkmeta.py size    NAME                 -> bytes of the download, if knowable
+    sdkmeta.py files   NAME DIR             -> writes the files the row carries into DIR
 """
 import glob
 import hashlib
@@ -51,12 +53,42 @@ import urllib.request
 import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# BB_TOOLCHAINS_JSON points this at another catalog. It exists so the install
-# machinery can be exercised against a fake one: five recipes fetched from
-# file:// URLs prove the fetching, unpacking, environment and verify steps
-# without spending gigabytes or touching the real toolchain store root.
-CATALOG = os.environ.get("BB_TOOLCHAINS_JSON") or os.path.join(
-    HERE, "..", "..", "config", "toolchains.json")
+# The file a node's bundle may carry beside the shipped catalog: the shipped
+# rows with the vetted catalog's newer ones in their places, which the
+# controller adds as a member of its own (workspace.CATALOG_ROWS).
+CATALOG_ROWS = "toolchains.catalog.json"
+
+
+def catalog_file(shipped):
+    """The catalog to read where `shipped` is config/toolchains.json: the
+    file beside it with the vetted catalog's newer rows where a bundle
+    carries one, the shipped file otherwise. The shipped file is never
+    rewritten for those rows: a release signs it as it is."""
+    newer = os.path.join(os.path.dirname(shipped), CATALOG_ROWS)
+    return newer if os.path.isfile(newer) else shipped
+
+
+# Whether this file is AerieOS's own source tree's, and not an install's
+# (sdk.sh's SDK_IN_TREE and the controller's seams.py, by the same two
+# neighbors): the tree's Dockerfile and its tools/ are beside it, which no
+# image, no bare-metal install (it holds the Dockerfile and scripts/, unit
+# tests and all, and none of tools/), no bundle a node fetches and no copy
+# root keeps holds. It is where the file is, which nothing in an
+# environment says. A job's seam, each one that reads IN_TREE: what a test
+# stands in for a check with is read only there, so no job and no pack
+# turns a check off by setting a variable.
+_HERE = os.path.dirname(os.path.realpath(__file__))
+IN_TREE = os.path.isfile(os.path.join(_HERE, "..", "..", "Dockerfile")) and os.path.isdir(os.path.join(_HERE, "..", "..", "tools"))
+
+# BB_TOOLCHAINS_JSON points this at another catalog, in the source tree
+# alone. It exists so the install machinery can be exercised against a fake
+# one: five recipes fetched from file:// URLs prove the fetching, unpacking,
+# environment and verify steps without spending gigabytes or touching the
+# real toolchain store root. An installed copy reads its own catalog, or
+# the one it is handed as its first words (--catalog FILE, which
+# held-run.sh hands it for the one row it runs: main).
+CATALOG = (os.environ.get("BB_TOOLCHAINS_JSON") if IN_TREE else "") or catalog_file(os.path.join(
+    HERE, "..", "..", "config", "toolchains.json"))
 TIMEOUT = 30
 # Some of these hosts hand a bare urllib a different answer, or none: go.dev
 # serves the plain version file happily, github's release redirect does not
@@ -171,6 +203,13 @@ def this_platform():
     return f"{_p.system().lower()}/{_ARCH.get(_p.machine().lower(), _p.machine().lower())}"
 
 
+# The platform to answer for in place of this machine's, as a row keys one
+# ("linux/arm64", "linux-musl/amd64", "darwin/*"). Empty at every install:
+# the tool that proposes pins (tools/pins.py) sets it to each platform a row
+# names in turn, so one machine learns every platform's file.
+AS_PLATFORM = ""
+
+
 def for_platform(value):
     """A recipe field that may differ per platform: a plain value, or a
     dict keyed "<os>/<arch>" with "<os>/*" as a fallback. A recipe whose
@@ -178,11 +217,11 @@ def for_platform(value):
     everything else stays a string."""
     if not isinstance(value, dict):
         return value
-    plat = this_platform()
+    plat = AS_PLATFORM.replace("linux-musl/", "linux/", 1) or this_platform()
     # A musl system (Alpine) cannot load a glibc build, so a recipe that
     # publishes a musl one says so under linux-musl/<arch>, tried first.
     musl = "linux-musl/" + plat.partition("/")[2]
-    if musl in value and glob.glob("/lib/ld-musl-*.so.1"):
+    if musl in value and (AS_PLATFORM.startswith("linux-musl/") if AS_PLATFORM else glob.glob("/lib/ld-musl-*.so.1")):
         return value[musl]
     if plat in value:
         return value[plat]
@@ -190,6 +229,129 @@ def for_platform(value):
     if f"{o}/*" in value:
         return value[f"{o}/*"]
     return ""
+
+
+def on_platform(plat):
+    """Whether this machine is the platform a declared download names:
+    "<os>/<arch>", or "<os>/*" for any architecture of a system, matched as
+    for_platform matches a key. One that names none is for every machine."""
+    return True if not plat else bool(for_platform({str(plat): True}))
+
+
+def declared_mine(rows):
+    """The rows of a declared list that are this machine's. A musl system
+    takes its own build of a file where a row names one (linux-musl/<arch>),
+    and the glibc row for the same `to` is then another machine's, as
+    for_platform tries a musl key first: two such rows may share a `to`
+    (packformat.platforms_meet), and only one of them is ever fetched."""
+    def musl(f):
+        return str(f.get("platform") or "").startswith("linux-musl/")
+    mine = [f for f in rows if on_platform(f.get("platform"))]
+    own = {f.get("to") for f in mine if musl(f)}
+    return [f for f in mine if musl(f) or f.get("to") not in own]
+
+
+def declared(tc):
+    """The downloads an entry declares that are this machine's
+    (source.fetch, a pack's install.fetch): each {url, to} with the sha256
+    it is held to, or `signed` where its publisher's signature holds it."""
+    rows = (tc.get("source") or {}).get("fetch")
+    return declared_mine([f for f in rows if isinstance(f, dict) and f.get("url")]) if isinstance(rows, list) else []
+
+
+def declared_address(f, key="url"):
+    """A declared download's address as it is fetched, or with `key` "sig"
+    its signature's: {version} filled with the version the entry itself
+    says the download is, with nobody asked. How a newer one is found
+    (`track`, `found`) is beside it for the tool that proposes a pin, and is
+    not read here."""
+    signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
+    text = str((signed.get("sig") if key == "sig" else f.get("url")) or "")
+    return fill(text, {"version": f["version"]}) if isinstance(f.get("version"), str) else text
+
+
+# A file a row carries into its directory: a path inside it, never one of
+# AerieOS's marks or of git's.
+CARRIED = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._/-]{1,200}$")
+
+
+def write_files(tc, d):
+    """The small files a row carries (source.files: {path: text}), written
+    into its directory `d` before anything of the row runs: what a package
+    manager installs by, its requirements with their hashes or its lock,
+    which a pack keeps in its repository and a shipped row has nowhere else
+    to keep. Returns the paths written. A path that would land outside the
+    directory, or on a mark of AerieOS's or git's, writes nothing."""
+    files = (tc.get("source") or {}).get("files")
+    if not isinstance(files, dict) or not files:
+        return []
+    root = os.path.realpath(d)
+    todo = []
+    for rel, text in files.items():
+        ok = isinstance(rel, str) and isinstance(text, str) and CARRIED.fullmatch(rel) \
+            and not any(part == ".git" or part.startswith(".bb-") for part in rel.split("/"))
+        path = os.path.realpath(os.path.join(root, rel)) if ok else ""
+        if not ok or not path.startswith(root + os.sep):
+            die(f"{tc['name']}: {str(rel)[:80]!r} is no file inside its directory: nothing of source.files was written")
+        todo.append((rel, path, text))
+    for _rel, path, text in todo:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    return [rel for rel, _path, _text in todo]
+
+
+# What separates the fields of a line of declared_plan: a character no
+# address, file name or sentence holds, and not white space, so the shell's
+# read keeps a field that is empty.
+PLAN_SEP = "\x1f"
+
+
+def held_by_entry(tc):
+    """Whether a row's own download is held to something its entry carries:
+    a pin, or its publisher's signature under keys the entry names (the
+    download's own, or the one over the checksum file it is read from).
+    Such a row has said what arrives, so what it runs afterwards runs with
+    no network unless it says online; a row whose download is checked
+    against its own origin, or not at all, has said nothing of the kind."""
+    src = tc.get("source") or {}
+    ck = src.get("checksum") if isinstance(src.get("checksum"), dict) else {}
+    signed = ck.get("signed") if isinstance(ck.get("signed"), dict) else {}
+    how = ck.get("from")
+    return src.get("kind") in ("tarball", "script") and (
+        how == "pin" or (how == "signature" and bool(ck.get("sig") and ck.get("keys")))
+        or (how == "file" and bool(signed.get("sig") and signed.get("keys"))))
+
+
+def declared_plan(tc):
+    """What an entry declares of its own install, as the lines sdk.sh reads
+    in one call (sdk_declared), or [] for an entry that declares nothing:
+    no download, neither offline nor online, and its own download held to
+    nothing it carries (held_by_entry). The first line says what its steps
+    run with, then a line a download, each field after a separator:
+
+        net    cut | online, the entry's sentence
+        fetch  url, sha256, to, signed.sig, signed.keys   (this machine's)
+        skip   to, platform                               (another's)
+    """
+    src = tc.get("source") or {}
+    rows = [f for f in src.get("fetch") or [] if isinstance(f, dict) and f.get("url")] if isinstance(src.get("fetch"), list) else []
+    online = " ".join(str(src.get("online") or "").split())
+    if not (rows or online or src.get("offline") or held_by_entry(tc)):
+        return []
+
+    def said(*fields):
+        return PLAN_SEP.join(" ".join(str(v or "").replace(PLAN_SEP, "").split()) for v in fields)
+
+    out = [said("net", "online" if online else "cut", online)]
+    mine = {id(f) for f in declared_mine(rows)}
+    for f in rows:
+        signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
+        if id(f) in mine:
+            out.append(said("fetch", declared_address(f), f.get("sha256"), f.get("to"), declared_address(f, "sig"), signed.get("keys")))
+        else:
+            out.append(said("skip", f.get("to"), f.get("platform")))
+    return out
 
 
 # Documents fetched while resolving, kept briefly on disk.
@@ -203,15 +365,42 @@ def for_platform(value):
 #
 # It is a cache and not a store: /tmp is cleared on every container start, and
 # a missing or stale entry simply means fetching again.
-CACHE_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "bb-sdkmeta-cache")
+#
+# /tmp is every account's, and what is read back from here is taken as what
+# an upstream published (an index a version is resolved from, a checksum
+# document). So the directory is this account's own: made 0700, and used
+# only while it is a real directory this account owns that nobody else may
+# read or write (cache_dir). One that is anything else, made first by
+# another account, is not used at all, and every document is fetched.
+CACHE_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"bb-sdk-cache-{os.getuid()}")
 CACHE_TTL = int(os.environ.get("BB_SDK_CACHE_TTL", "900"))
 
 
+def cache_dir():
+    """CACHE_DIR where it is this account's own (made 0700 when it is not
+    there; a real directory, its owner this process, no bit for anybody
+    else), or "" where it is not: then nothing is kept and nothing read."""
+    import stat  # noqa: PLC0415
+    try:
+        try:
+            os.mkdir(CACHE_DIR, 0o700)
+        except FileExistsError:
+            pass
+        st = os.lstat(CACHE_DIR)
+    except OSError:
+        return ""
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.geteuid() or st.st_mode & 0o077:
+        return ""
+    return CACHE_DIR
+
+
 def _cached(key, produce):
-    """produce()'s bytes, remembered for CACHE_TTL by key."""
-    if CACHE_TTL <= 0:
+    """produce()'s bytes, remembered for CACHE_TTL by key in this account's
+    own directory (cache_dir), or produced every time where it has none."""
+    kept = cache_dir() if CACHE_TTL > 0 else ""
+    if not kept:
         return produce()
-    path = os.path.join(CACHE_DIR, hashlib.sha256(key.encode()).hexdigest()[:32])
+    path = os.path.join(kept, hashlib.sha256(key.encode()).hexdigest()[:32])
     try:
         if time.time() - os.path.getmtime(path) < CACHE_TTL:
             with open(path, "rb") as f:
@@ -220,7 +409,6 @@ def _cached(key, produce):
         pass
     body = produce()
     try:
-        os.makedirs(CACHE_DIR, exist_ok=True)
         # Written aside and moved, so a reader never sees half a document.
         tmp = f"{path}.{os.getpid()}"
         with open(tmp, "wb") as f:
@@ -263,15 +451,212 @@ def final_url(url):
         return r.url
 
 
+# What a pinned download is said to have been held to: in the install's log,
+# in .bb-verified and on the Installed page.
+PIN_SAID = "the pin its entry carries"
+
+
+def pin_of(tc):
+    """The pin a row's source.checksum carries, or None for a row with none:
+    {"from": "pin", "version": the version it is, "sha256": the digest of
+    the exact file, or one per platform keyed as source.url is}. The row is
+    held by the signed catalog or the signed release, so the file is held to
+    something its own origin cannot change."""
+    spec = (tc.get("source") or {}).get("checksum")
+    return spec if isinstance(spec, dict) and spec.get("from") == "pin" else None
+
+
+def pinned_digest(tc):
+    """The sha256 a row's pin names for this machine, or "" where it names
+    none for it or the row has no pin."""
+    pin = pin_of(tc)
+    got = for_platform(pin.get("sha256")) if pin else ""
+    got = got.strip().lower() if isinstance(got, str) else ""
+    return got if re.fullmatch(r"[0-9a-f]{64}", got) else ""
+
+
+HELD_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}")
+
+
+def signed_version(tc):
+    """The version a row held by its publisher's signature carries, or "":
+    source.checksum.version, beside `from: signature` (the download itself
+    is signed) or `from: file` with `signed` (its list of digests is). A
+    signature says who published a file and not which release it is: every
+    release that publisher ever signed passes it. So a row that carries its
+    version installs that one and no other, as a pinned row installs its
+    pin's, and its resolver stays in the row as how a newer one is found."""
+    ck = (tc.get("source") or {}).get("checksum")
+    if not isinstance(ck, dict):
+        return ""
+    held = ck.get("from") == "signature" or (ck.get("from") == "file" and isinstance(ck.get("signed"), dict))
+    v = ck.get("version")
+    return v if held and isinstance(v, str) and HELD_VERSION.fullmatch(v) else ""
+
+
+def offered(tc):
+    """What a row its entry pins has on offer, (version, sha256 for this
+    machine), or None for a row whose version is whatever its vendor offers
+    at the moment: the pinned version and digest, the version a signed row
+    carries (signed_version), or a git source's commit. `aerie toolchains
+    check` compares an installed copy with this, so a pinned row is never
+    measured against a vendor's latest."""
+    pin = pin_of(tc)
+    if pin is not None:
+        return str(pin.get("version") or ""), pinned_digest(tc)
+    if signed_version(tc):
+        return signed_version(tc), ""
+    src = tc.get("source") or {}
+    if src.get("kind") == "git" and src.get("commit"):
+        return str(src["commit"])[:8], ""
+    return None
+
+
 def resolve(tc):
-    """(version, url) for a toolchain, asking upstream what it currently offers.
+    """(version, url) for a toolchain: what its pin names where its entry
+    carries one, or the version a signed row carries, with nobody asked;
+    otherwise what upstream currently offers.
 
     Either may come back empty: a recipe that needs no version does not have a
     resolver, and one whose resolver supplies the download URL itself has no
     template to fill in.
     """
     src = tc.get("source") or {}
-    spec = src.get("version") or {}
+    version, url = "", ""
+
+    pin = pin_of(tc)
+    if pin is not None:
+        # Pinned: the version its entry carries and the address made from
+        # it. The resolver stays in the row as how a newer version is
+        # found, which is not an install's question.
+        version = str(pin.get("version") or "")
+        if not pinned_digest(tc):
+            die(f"{tc['name']}: the row offers no pinned download for {this_platform()}")
+    elif signed_version(tc):
+        # Held by its publisher's signature, and it says which release:
+        # that one, with nobody asked what is newest.
+        version = signed_version(tc)
+    else:
+        version, url = newest(tc)
+
+    if src.get("url"):
+        url = fill(for_platform(src["url"]) or "", {"version": version})
+        if not url:
+            die(f"{tc['name']}: no download for {this_platform()}; the recipe names "
+                f"{', '.join(sorted(src['url']))}")
+    return version, url
+
+
+def _vkey(text):
+    """A version as something to order by: its runs of digits as numbers,
+    what is between them as text."""
+    return [(0, int(p)) if p.isdigit() else (1, p) for p in re.findall(r"\d+|\D+", str(text))]
+
+
+def git_refs(url, *refs):
+    """What `git ls-remote` says of a repository's refs, as text: one
+    "<commit>\\t<ref>" a line. No object is fetched."""
+    if not str(url).lower().startswith("https://"):
+        raise ValueError(f"not a repository's https address: {str(url)[:60]}")
+    p = subprocess.run(["git", "ls-remote", url, *refs], capture_output=True, text=True, timeout=120, check=False,
+                       env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+    if p.returncode:
+        raise ValueError(f"git could not list {url}: {(p.stderr or '').strip()[-200:]}")
+    return p.stdout
+
+
+def git_newest(tc, spec=None):
+    """(name, commit) for a repository: the tag or the branch its
+    source.track names and the commit it is at now, read with ls-remote.
+
+        git-tag     the newest tag `match` matches, by version order
+        git-branch  the head of `branch`
+    """
+    src = tc.get("source") or {}
+    spec = src.get("track") if spec is None else spec
+    kind = (spec or {}).get("resolver")
+    if kind == "git-branch":
+        ref = f"refs/heads/{spec['branch']}"
+        for line in git_refs(src["url"], ref).splitlines():
+            commit, _, name = line.partition("\t")
+            if name == ref:
+                return spec["branch"], commit
+        die(f"{tc['name']}: {src['url']} has no branch {spec['branch']}")
+    if kind == "git-tag":
+        tags = {}
+        for line in git_refs(src["url"], "refs/tags/*").splitlines():
+            commit, _, name = line.partition("\t")
+            name = name.removeprefix("refs/tags/")
+            # An annotated tag is listed twice: the tag itself, and under
+            # ^{} the commit it names, which is the one to pin.
+            if name.endswith("^{}"):
+                tags[name[:-3]] = commit
+            else:
+                tags.setdefault(name, commit)
+        want = [t for t in tags if re.search(spec.get("match") or "", t)]
+        if not want:
+            die(f"{tc['name']}: {src['url']} has no tag matching {spec.get('match')!r}")
+        tag = max(want, key=_vkey)
+        return tag, tags[tag]
+    die(f"{tc['name']}: unknown resolver for a repository {kind!r}")
+
+
+def _github_release(tc, spec):
+    """(tag, url) from a repository's releases as GitHub's API lists them,
+    newest first, for a resolver that says more than the repository: the
+    first whose tag `tag` matches and that has been out `settled` days (a
+    publisher that keeps only some of its builds for good), and, with
+    `asset`, the address of the file whose name that pattern matches, one
+    pattern per platform. With `asset` alone the release is the one GitHub
+    calls latest, asked for by itself: a publisher with a thousand files a
+    release has a list of releases too large to ask for."""
+    import calendar  # noqa: PLC0415
+    repo = spec["repo"]
+    before = time.time() - 86400 * float(spec.get("settled") or 0)
+    if spec.get("tag") or spec.get("settled"):
+        listed = json.loads(get(f"https://api.github.com/repos/{repo}/releases?per_page=100"))
+    else:
+        listed = [json.loads(get(f"https://api.github.com/repos/{repo}/releases/latest"))]
+    for rel in listed:
+        tag = str(rel.get("tag_name") or "")
+        if rel.get("draft") or rel.get("prerelease") or (spec.get("tag") and not re.search(spec["tag"], tag)):
+            continue
+        if spec.get("settled"):
+            try:
+                out = calendar.timegm(time.strptime(str(rel.get("published_at")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+            if out > before:
+                continue
+        if not spec.get("asset"):
+            return tag, ""
+        want = for_platform(spec["asset"])
+        if not want:
+            die(f"{tc['name']}: its resolver names no asset for {AS_PLATFORM or this_platform()}")
+        for a in rel.get("assets") or []:
+            if re.search(want, str(a.get("name") or "")):
+                return tag, str(a.get("browser_download_url") or "")
+        die(f"{tc['name']}: {repo}'s release {tag} has no asset matching {want!r}")
+    die(f"{tc['name']}: {repo} lists no release its resolver takes")
+
+
+def trimmed(tag, spec):
+    """A tag as the version it names: with the resolver's `trim_prefix`
+    and `trim_suffix` taken off (v1.2.3 for the 1.2.3 in a file's name)."""
+    for k, cut in (("trim_prefix", str.removeprefix), ("trim_suffix", str.removesuffix)):
+        if spec.get(k):
+            tag = cut(tag, spec[k])
+    return tag
+
+
+def newest(tc, spec=None):
+    """(version, url) as a version resolver finds them now: what upstream
+    currently offers. `spec` is the row's source.version when left out (a
+    declared download's track otherwise); url is the address where the
+    resolver supplies it itself, and "" where the entry's own template is
+    filled. Asked by an install of a row that pins nothing, and by the tool
+    that proposes a newer pin; never by an install of a pinned row."""
+    spec = ((tc.get("source") or {}).get("version") or {}) if spec is None else spec
     kind = spec.get("resolver")
     version, url = "", ""
 
@@ -283,12 +668,15 @@ def resolve(tc):
             die(f"{tc['name']}: expected a version starting {want!r}, got {version!r}")
 
     elif kind == "github-release":
-        tag = final_url(f"https://github.com/{spec['repo']}/releases/latest").rstrip("/")
-        tag = tag.rsplit("/", 1)[-1]
-        version = tag
-        for k, cut in (("trim_prefix", str.removeprefix), ("trim_suffix", str.removesuffix)):
-            if spec.get(k):
-                version = cut(version, spec[k])
+        if any(spec.get(k) for k in ("tag", "settled", "asset")):
+            tag, url = _github_release(tc, spec)
+        else:
+            # The release GitHub calls latest, read off where its page
+            # redirects to: a tag may be written with a slash, of which
+            # the last part is taken, and with a plus sign.
+            tag = final_url(f"https://github.com/{spec['repo']}/releases/latest").rstrip("/")
+            tag = urllib.parse.unquote(tag.rsplit("/", 1)[-1])
+        version = trimmed(tag, spec)
         if spec.get("numeric") and not version.replace(".", "").isdigit():
             die(f"{tc['name']}: could not read a version out of the tag {tag!r}")
 
@@ -297,10 +685,11 @@ def resolve(tc):
         # them: the nightly is not what anybody asked to install.
         index = json.loads(get(spec["url"]))
         version = next(k for k in index if k != "master")
-        asset = index[version].get(spec["asset"]) or {}
+        name = for_platform(spec["asset"])
+        asset = index[version].get(name) or {}
         url = asset.get("tarball") or ""
         if not url:
-            die(f"{tc['name']}: the index offers no {spec['asset']} build for {version}")
+            die(f"{tc['name']}: the index offers no {name or 'build for this platform'} build for {version}")
 
     elif kind == "node-index":
         # nodejs.org's own index, newest release first. LTS only: a node
@@ -313,14 +702,18 @@ def resolve(tc):
         if not version:
             die(f"{tc['name']}: the index offers no LTS release")
 
+    elif kind == "match":
+        # A document its publisher serves and a pattern: the version is
+        # what the pattern's first group matches first (a release file's
+        # `version = '1.2.3'` line, the newest release an API names).
+        m = re.search(spec["match"], get(spec["url"]), re.M)
+        if not m:
+            die(f"{tc['name']}: {spec['url']} holds nothing its resolver's pattern matches")
+        version = m.group(1) if m.groups() else m.group(0)
+
     elif kind:
         die(f"{tc['name']}: unknown version resolver {kind!r}")
 
-    if src.get("url"):
-        url = fill(for_platform(src["url"]) or "", {"version": version})
-        if not url:
-            die(f"{tc['name']}: no download for {this_platform()}; the recipe names "
-                f"{', '.join(sorted(src['url']))}")
     return version, url
 
 
@@ -334,6 +727,10 @@ def resolve(tc):
 #   android-repo   Google's repository listing, the archive's sha1
 #   zsync          an AppImage's .zsync, its SHA-1 line
 #   none           nothing to check against, and why (said on the install)
+# Each of those is read from the file's own origin at the moment of the
+# install, so it holds nothing against that origin. One is the row's own
+# (pack format 5):
+#   pin            the sha256 of the exact file, and the version it is
 # Each answers (algorithm, hex digest, where it came from).
 HEX = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$|^[0-9a-fA-F]{128}$")
 ALGOS = {40: "sha1", 64: "sha256", 128: "sha512"}
@@ -353,30 +750,65 @@ def _name_of(url):
 KEYS_DIR = os.path.join(HERE, "..", "..", "config", "release-keys")
 
 
-def keyring(name):
-    """The publisher's keys `name` (config/release-keys), as a keyring file
-    gpgv reads: dearmored once into this run's cache. Never the machine's
-    own keyring, which anybody with a shell may have added to."""
-    src = os.path.join(KEYS_DIR, os.path.basename(str(name or "")))
-    if not os.path.isfile(src):
-        die(f"no release keys named {name!r} beside the catalog")
-    with open(src, "rb") as f:
-        armored = f.read()
-    out = os.path.join(CACHE_DIR, "keys-" + hashlib.sha256(armored).hexdigest()[:16] + ".gpg")
-    if not os.path.isfile(out):
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        p = subprocess.run(["gpg", "--batch", "--dearmor"], input=armored, capture_output=True, check=False)
-        if p.returncode or not p.stdout:
-            die(f"gpg could not read the release keys {name}: {p.stderr.decode(errors='replace')[:200]}")
-        with open(out + ".tmp", "wb") as f:
-            f.write(p.stdout)
-        os.replace(out + ".tmp", out)
+KEY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+# Where gpg and gpgv are looked for: the system's own folders, as sdk.sh
+# looks for every tool a download is checked with (its SDK_SYS_PATH), never
+# a PATH a pack's bin folder is ahead of. In the source tree it is the
+# caller's PATH, where a test stands its tools in.
+SYS_PATH = (os.environ.get("PATH") or "") if IN_TREE else \
+    ("/opt/homebrew/bin:/usr/local/bin:" if sys.platform == "darwin" else "") + "/usr/sbin:/usr/bin:/sbin:/bin"
+
+
+def sys_tool(name):
+    """`name` among the system's own tools, or the bare name where it is
+    not there (which then fails as a missing program does)."""
+    import shutil  # noqa: PLC0415
+    return shutil.which(name, path=SYS_PATH) or name
+
+
+def keyring(name, tc=None, into=None):
+    """The publisher's keys `name`, as a keyring file gpgv reads: dearmored
+    every time it is asked for, into `into`, the caller's own directory for
+    this one check (one made here, 0700, when none is given, which the
+    caller removes). Never a file kept from another run: a keyring found
+    lying at a known name is whoever made it first's, and a signature would
+    verify under it. One rule for every entry: the armored key the entry
+    `tc` carries under that name (source.keyring, a pack's install.keyring)
+    where it carries one, which wins, so a publisher's key that changes is
+    a catalog commit; otherwise the file of that name AerieOS ships
+    (config/release-keys). Never the machine's own keyring, which anybody
+    with a shell may have added to."""
+    name = os.path.basename(str(name or ""))
+    carried = ((tc or {}).get("source") or {}).get("keyring")
+    armored = carried.get(name) if isinstance(carried, dict) else None
+    if isinstance(armored, str) and armored.strip():
+        if not KEY_NAME.fullmatch(name):
+            die(f"{name!r} is no name for a publisher's keys")
+        armored = armored.encode()
+    else:
+        src = os.path.join(KEYS_DIR, name)
+        if not KEY_NAME.fullmatch(name) or not os.path.isfile(src):
+            die(f"no release keys named {name!r} beside the catalog" + (", and its entry carries none" if tc else ""))
+        with open(src, "rb") as f:
+            armored = f.read()
+    import tempfile  # noqa: PLC0415
+    p = subprocess.run([sys_tool("gpg"), "--batch", "--dearmor"], input=armored, capture_output=True, check=False)
+    if p.returncode or not p.stdout:
+        die(f"gpg could not read the release keys {name}: {p.stderr.decode(errors='replace')[:200]}")
+    if into is None:
+        into = tempfile.mkdtemp(prefix="bb-keys.")
+    # A file of its own in the directory, made here and nowhere before.
+    fd, out = tempfile.mkstemp(prefix="keys-", suffix=".gpg", dir=into)
+    with os.fdopen(fd, "wb") as f:
+        f.write(p.stdout)
     return out
 
 
-def signed_by(data, sig, keys):
+def signed_by(data, sig, keys, tc=None):
     """Who of the publisher's keys `keys` signed `data` (bytes) with the
-    detached signature `sig` (bytes), or a refusal."""
+    detached signature `sig` (bytes), or a refusal. `tc` is the entry the
+    keys are resolved for (keyring)."""
     import tempfile  # noqa: PLC0415
     with tempfile.TemporaryDirectory() as d:
         dp, sp = os.path.join(d, "data"), os.path.join(d, "data.sig")
@@ -385,7 +817,7 @@ def signed_by(data, sig, keys):
         with open(sp, "wb") as f:
             f.write(sig)
         try:
-            p = subprocess.run(["gpgv", "--keyring", keyring(keys), sp, dp], capture_output=True, text=True,
+            p = subprocess.run([sys_tool("gpgv"), "--keyring", keyring(keys, tc, d), sp, dp], capture_output=True, text=True,
                                timeout=60, check=False)
         except FileNotFoundError:
             die("there is no gpgv here to check the publisher's signature with")
@@ -395,17 +827,24 @@ def signed_by(data, sig, keys):
     return m.group(1) if m else "a key of the publisher's"
 
 
-def checksum(tc, url, version):
+def checksum(tc, url, version, spec=None):
     """(algorithm, hex digest, where it came from) for the file `url`
     downloads, or ("none", "", why) for a row whose publisher states nothing
-    to check it against. A row that names no source is refused."""
-    spec = (tc.get("source") or {}).get("checksum")
+    to check it against. A row that names no source is refused. `spec` is
+    the row's source.checksum when left out; the tool that proposes a pin
+    hands it the pin's `found`, how the publisher states the digest."""
+    spec = (tc.get("source") or {}).get("checksum") if spec is None else spec
     if not isinstance(spec, dict) or not spec.get("from"):
         die(f"{tc['name']}: the catalog says nowhere to check its download against")
     how, name = spec["from"], _name_of(url)
     subs = {"version": version, "url": url, "name": name, "base": url.rsplit("/", 1)[0]}
     if how == "none":
         return "none", "", spec.get("why") or "its publisher states no checksum"
+    if how == "pin":
+        digest = pinned_digest(tc)
+        if not digest:
+            die(f"{tc['name']}: the row offers no pinned download for {this_platform()}")
+        return "sha256", digest, PIN_SAID
     if how == "github-asset":
         m = re.match(r"https://github\.com/([^/]+/[^/]+)/releases/(?:latest/download|download/([^/]+))/([^/?#]+)$", url)
         if not m:
@@ -431,7 +870,7 @@ def checksum(tc, url, version):
             # The checksum file believed only once the publisher's signature
             # over its exact bytes holds (Node's SHASUMS256.txt), so a mirror
             # cannot hand out a file and a list that agree with each other.
-            who = signed_by(raw, get(fill(signed["sig"], subs), decode=False), signed["keys"])
+            who = signed_by(raw, get(fill(signed["sig"], subs), decode=False), signed["keys"], tc)
             src = f"{src}, signed by {who}"
         lines = [ln.split() for ln in text.splitlines() if ln.strip()]
         for parts in lines:
@@ -480,7 +919,14 @@ def content_length(url):
 
 
 def download_urls(tc):
-    """Every URL an install of this toolchain would fetch, or none.
+    """Every URL an install of this toolchain would fetch, or none: what
+    its source names or can be asked for (_source_urls), and each download
+    it declares for this machine."""
+    return _source_urls(tc) + [declared_address(f) for f in declared(tc)]
+
+
+def _source_urls(tc):
+    """The URLs a toolchain's own source would fetch, or none.
 
     Two ways to know. A recipe whose own source.url is the payload (a tarball)
     is its own answer. Everything else has to ask the installer, and most of
@@ -497,6 +943,11 @@ def download_urls(tc):
     """
     src = tc.get("source") or {}
     spec = src.get("download")
+    if pin_of(tc) is not None and not src.get("online"):
+        # Pinned, with nothing fetched behind it: the pinned file is the
+        # download, whatever a dry run of the vendor's would name today.
+        _, url = resolve(tc)
+        return [url] if url and src.get("kind") in ("tarball", "script") else []
     if spec is None:
         _, url = resolve(tc)
         return [url] if url and src.get("kind") == "tarball" else []
@@ -669,19 +1120,19 @@ def size_of(tc, pkg_id=""):
     return str(total) if total else ""
 
 
-# Where a source kind with no url of its own downloads from: sdkmanager's
-# packages are Google's.
-KIND_HOST = {"sdkmanager": "dl.google.com"}
-
+HOST_NAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
 
 def source_host(tc):
     """The host an install of `tc` downloads from first, or "" where the
-    catalog does not say (a command run through another tool)."""
+    catalog does not say (a command run through another tool): its
+    address's, else the one its row names (source.host) for a source kind
+    with no address of its own."""
     src = tc.get("source") or {}
     url = for_platform(src.get("url")) if src.get("url") else ""
     if isinstance(url, str) and "://" in url:
         return urllib.parse.urlsplit(url).hostname or ""
-    return KIND_HOST.get(str(src.get("kind") or ""), "")
+    host = src.get("host")
+    return host if isinstance(host, str) and HOST_NAME.fullmatch(host) else ""
 
 
 def unreachable(host, timeout=6):
@@ -700,10 +1151,139 @@ def unreachable(host, timeout=6):
     return ""
 
 
+def receipt(d, commit, name=""):
+    """An install's receipt (R234): every file that landed in DIR with its
+    sha256, one hash over the whole list, and the commit it was installed
+    from (for an entry that is no repository, the sha256 its download was
+    held to, or nothing). A pack's pin covers its own files, and what its
+    install steps fetch from somewhere else left no trail (the operator,
+    13 Nov): this is it. Written to DIR/.bb-receipt, whose first line is
+    the summary the node's census reads (format, commit, tree, files,
+    bytes, when, the tree the same commit made here before where that was
+    another, and whether its steps ran with the network cut, for an entry
+    that declares its downloads: cut, open, online with the entry's
+    sentence in a field after it, or nothing for one that declares none),
+    and added as a line to the store's own log (.bb-receipts beside DIR),
+    which a remove and a reinstall leave alone. Returns the summary as
+    words.
+
+    Left out: git's own directory, AerieOS's marks (.bb-*) and compiled
+    python, which carries the moment it was compiled."""
+    import hashlib
+    import time
+    d = os.path.abspath(d)
+    lines, total = [], 0
+    for top, dirs, files in os.walk(d):
+        dirs[:] = sorted(x for x in dirs if x not in (".git", "__pycache__"))
+        for dn in list(dirs):
+            full = os.path.join(top, dn)
+            if os.path.islink(full):
+                lines.append((os.path.relpath(full, d), "link  " + os.readlink(full)))
+                dirs.remove(dn)
+        for fn in files:
+            if fn.startswith(".bb-") or fn.endswith(".pyc"):
+                continue
+            full = os.path.join(top, fn)
+            rel = os.path.relpath(full, d)
+            if os.path.islink(full):
+                lines.append((rel, "link  " + os.readlink(full)))
+                continue
+            if not os.path.isfile(full):
+                continue
+            h = hashlib.sha256()
+            try:
+                with open(full, "rb") as f:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        h.update(chunk)
+                        total += len(chunk)
+            except OSError as e:
+                lines.append((rel, f"unread  {e.strerror or 'could not be read'}"))
+                continue
+            lines.append((rel, h.hexdigest() + ("  x" if os.access(full, os.X_OK) else "  -")))
+    lines.sort(key=lambda r: r[0].encode("utf-8", "surrogateescape"))
+    body = "".join(f"{what}  {rel}\n" for rel, what in lines)
+    tree = hashlib.sha256(body.encode("utf-8", "surrogateescape")).hexdigest()
+    now = int(time.time())
+    name = name or os.path.basename(d)
+    # What the same commit made here the last time, where that was another.
+    log, before = os.path.join(os.path.dirname(d), ".bb-receipts"), ""
+    try:
+        with open(log, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                r = ln.rstrip("\n").split("\t")
+                if commit and len(r) >= 4 and r[1] == name and r[2] == commit:
+                    before = r[3] if r[3] != tree else ""
+    except OSError:
+        pass
+    # Whether its steps ran with the network cut (sdk.sh sdk_declared), or
+    # kept it because its entry says its installer downloads the rest, with
+    # the entry's own sentence on the line after.
+    net, why = "", ""
+    try:
+        with open(os.path.join(d, ".bb-net"), encoding="utf-8") as f:
+            net = f.readline().strip()
+            why = " ".join(f.readline().split())[:300]
+    except OSError:
+        pass
+    net = net if net in ("cut", "open", "online") else ""
+    why = why if net == "online" else ""
+    with open(os.path.join(d, ".bb-receipt"), "w", encoding="utf-8", errors="surrogateescape") as f:
+        f.write(f"1\t{commit}\t{tree}\t{len(lines)}\t{total}\t{now}\t{before}\t{net}" + (f"\t{why}" if why else "") + f"\n{body}")
+    try:
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(f"{now}\t{name}\t{commit}\t{tree}\t{len(lines)}\t{total}\n")
+    except OSError:
+        pass
+    # Filed under the commit it was fetched at or the sha256 its download
+    # was held to; a download its publisher's signature held has neither.
+    said = f"receipt: {len(lines)} files, {total} bytes, " + (f"from {commit[:12]}, " if commit else "") + f"{tree[:12]} over them all"
+    said += {"cut": "; its steps ran with no network", "open": "; its steps ran with the network, which this node cannot cut",
+             "online": f"; its steps kept the network, as its entry says: {why or 'its installer downloads the rest'}"}.get(net, "")
+    return said + (f"; the same commit made {before[:12]} here before" if before else "")
+
+
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
+
+
+def layout_dir(tc):
+    """The folder a row lands in under the store: its name, and android/ for
+    every android: row."""
+    return "android" if tc["name"].startswith("android:") else tc["name"]
+
+
+def layout_env(tc, root):
+    """[(name, value)] the row's layout sets for a job: `=VALUE` the value
+    itself, `root:REL` under the store `root`, anything else under the
+    row's own folder there. A name no shell could take is left out."""
+    out = []
+    for k, v in ((tc.get("layout") or {}).get("env") or {}).items():
+        if not ENV_NAME.fullmatch(str(k)) or not isinstance(v, str):
+            continue
+        if v.startswith("="):
+            out.append((k, v[1:]))
+        elif v.startswith("root:"):
+            out.append((k, os.path.join(root, v[5:])))
+        else:
+            out.append((k, os.path.join(root, layout_dir(tc), v) if v else os.path.join(root, layout_dir(tc))))
+    return out
+
+
 def main(argv):
+    # --catalog FILE, before anything else: the catalog this run reads, said
+    # by whoever started it and by no environment.
+    if len(argv) >= 2 and argv[0] == "--catalog":
+        global CATALOG
+        CATALOG, argv = argv[1], argv[2:]
     if not argv:
         die("usage: sdkmeta.py names|flavors|images|field|argv|resolve|size ...")
     op = argv[0]
+
+    if op == "receipt":
+        # receipt DIR COMMIT [NAME]: what an install left, written beside it.
+        if len(argv) < 3 or not os.path.isdir(argv[1]):
+            die("receipt needs the installed directory and the commit it came from")
+        print(receipt(argv[1], argv[2], argv[3] if len(argv) > 3 else ""))
+        return
 
     if op == "names":
         print("\n".join(p["name"] for p in catalog()))
@@ -716,9 +1296,14 @@ def main(argv):
         return
 
     if op == "keyring":
-        # The keyring file gpgv reads for one publisher's keys (R137).
-        print(keyring(argv[1] if len(argv) > 1 else ""))
+        # keyring KEYS [NAME [DIR]]: the keyring file gpgv reads for one
+        # publisher's keys (R137), the ones the entry NAME carries where it
+        # carries them, made in DIR, the caller's own directory for this
+        # one check.
+        print(keyring(argv[1] if len(argv) > 1 else "", toolchain(argv[2]) if len(argv) > 2 and argv[2] else None,
+                      argv[3] if len(argv) > 3 else None))
         return
+
 
     if op == "images":
         for pid, api, flavor, size in available_images():
@@ -752,6 +1337,14 @@ def main(argv):
         for k, v in (dig(tc, argv[2]) or {}).items():
             sys.stdout.write(f"{k}={fill(str(v), subs)}\0")
 
+    elif op == "layout_env":
+        # layout_env NAME root=ROOT: the variables the row's layout sets for
+        # every job where it is installed, KEY=VALUE NUL-terminated, as a
+        # step of its own install is started with them (sdk.sh sdk_row_env).
+        subs = dict(a.split("=", 1) for a in argv[2:] if "=" in a)
+        for k, v in layout_env(tc, subs.get("root") or ""):
+            sys.stdout.write(f"{k}={v}\0")
+
     elif op == "reach":
         # Exit 0 quietly when the source's host answers, or when the catalog
         # names none; else the sentence, and 1.
@@ -764,6 +1357,27 @@ def main(argv):
     elif op == "resolve":
         version, url = resolve(tc)
         print(f"{version}\t{url}")
+
+    elif op == "declared":
+        # What the entry declares of its own install, for sdk.sh's
+        # sdk_declared: nothing at all for one that declares nothing.
+        for line in declared_plan(tc):
+            print(line)
+
+    elif op == "files":
+        # files NAME DIR: the small files the row carries, written into
+        # DIR; a line a file written, nothing for a row that carries none.
+        if len(argv) < 3 or not os.path.isdir(argv[2]):
+            die("files needs the directory the row is installed in")
+        for rel in write_files(tc, argv[2]):
+            print(rel)
+
+    elif op == "offer":
+        # The version and the digest a pinned row has on offer, or nothing
+        # for a row whose version is its vendor's latest.
+        got = offered(tc)
+        if got:
+            print(f"{got[0]}\t{got[1]}")
 
     elif op == "checksum":
         # The algorithm, the digest and where it came from, tab-separated:

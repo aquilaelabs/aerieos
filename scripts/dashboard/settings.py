@@ -34,6 +34,7 @@ from pathlib import Path
 _here = os.path.dirname(os.path.abspath(__file__))
 if _here not in sys.path:
     sys.path.insert(0, _here)
+import checks  # noqa: E402
 import statefile  # noqa: E402
 
 write_json = None
@@ -87,8 +88,19 @@ KEYS = {
     # tunnel's rules are written rather than clicked. The two tokens are
     # secrets: kept here, never shown back, only said to be set.
     "tunnel_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
+    # A reverse proxy in front of the dashboard (R243): its address, or
+    # several and networks parted by spaces. Wrong passwords are then
+    # counted against the address it passes on, not against the proxy, which
+    # is everybody behind it. The install's own tunnel needs no entry.
+    "trusted_proxies": {"default": "", "kind": "text", "shape": "line", "applied": "now"},
     # The vetted catalog's address (R169 step 2): where index.json and index.sig are read from.
     "catalog_url": {"default": "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/", "kind": "text", "shape": "url", "applied": "now"},
+    # Whether a pack a person added themselves (sideloaded) may offer the
+    # coding agent it brings (the operator, 12 Nov): off, since an agent's
+    # adapter decides what runs in every session of it and nobody vetted
+    # this one; on for somebody trying an agent of their own before they
+    # submit it to the catalog.
+    "sideload_agents": {"default": False, "kind": "bool", "applied": "now"},
     "tunnel_token": {"default": "", "kind": "secret", "applied": "now"},
     "cf_api_token": {"default": "", "kind": "secret", "applied": "now"},
     # The dashboard's own connection (R158 step 2, tls.py): http, self (the
@@ -139,7 +151,7 @@ KEYS = {
     # How often each check runs by itself (R176, checks.py): weekly unless
     # an administrator says otherwise; Check now beside each runs it at once.
     **{f"check_{k}": {"default": "weekly", "kind": "choice", "applied": "now", "choices": ["daily", "weekly", "monthly", "off"]}
-       for k in ("release", "images", "nginx", "scanners", "catalog")},
+       for k in checks.KINDS},
     "update_hour": {"default": 4, "kind": "number", "min": 0, "max": 23, "applied": "now"},
     # How many versions an update pushes out of its slot stay on the boot
     # menu (R201), 0 for none; AerieOS alone.
@@ -216,12 +228,10 @@ _lock = statefile.on(lambda: FILE)
 
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = __import__("json").load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    # Read once while it is the same file (statefile.read_json, R228 step 1):
+    # every setting asked for reads it, a dozen times a status read.
+    d = statefile.read_json(FILE)
+    return d if isinstance(d, dict) else {}
 
 
 URL_RE = re.compile(r"^https?://[^\s/?#]+(/[^\s]*)?$")

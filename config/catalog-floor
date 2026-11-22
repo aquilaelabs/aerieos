@@ -1,0 +1,9 @@
+# The oldest catalog index this AerieOS takes: the moment the catalog's
+# signed index was made (its `generated`) as it stood when this release was
+# prepared. A signature says who made an index, never that it is the newest,
+# so an install that holds none yet would otherwise take any index the
+# maintainers ever signed from whoever answers at the catalog's address.
+# One made before this moment is refused. It moves forward with each
+# release, to the date of the index that release was proven against, and
+# never back.
+2026-11-12T21:34:58Z

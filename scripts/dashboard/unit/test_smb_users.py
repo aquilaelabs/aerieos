@@ -29,6 +29,14 @@ class SmbPasswords(unittest.TestCase):
         self.assertEqual(users.nt_hash("password"), "8846F7EAEE8FB117AD06BDD830B7586C")
         self.assertEqual(users.nt_hash(""), "31D6CFE0D16AE931B73C59D7E0C089C0")
         self.assertEqual(users._md4(b"abc").hex(), "a448017aaf21d8525fc10ae87aa6729d")
+        # The one written out, used where the system's OpenSSL keeps MD4 back: the same answers.
+        for text, want in ((b"", "31d6cfe0d16ae931b73c59d7e0c089c0"), (b"a", "bde52cb31de33e46245e05fbdbd6fb24"),
+                           (b"abc", "a448017aaf21d8525fc10ae87aa6729d"), (b"message digest", "d9130a8164549fe818874806e1c7014b"),
+                           (b"abcdefghijklmnopqrstuvwxyz", "d79e1c308aa5bbcdeea8ed63df412da9")):
+            self.assertEqual(users._md4_here(text).hex(), want)
+            self.assertEqual(users._md4(text).hex(), want)
+        with mock.patch.object(users.hashlib, "new", side_effect=ValueError("unsupported hash type md4")):
+            self.assertEqual(users._md4(b"abc").hex(), "a448017aaf21d8525fc10ae87aa6729d")
         self.assertEqual(users._md4(b"12345678901234567890123456789012345678901234567890123456789012345678901234567890").hex(),
                          "e33b4ddc9c38f2199c3e7b164fcc0536")
 
@@ -82,6 +90,11 @@ class FollowsTheSignIn(unittest.TestCase):
         for p in self.patch:
             p.start()
         self.d = {"users": {"sean": {"uid": "u_0a1b2c3d", "password": "x"}}}
+        # A share names sean, unless a test says otherwise.
+        self.named = {"bbu-0a1b2c3d"}
+        named = mock.patch.object(users, "share_named", lambda: self.named)
+        named.start()
+        self.addCleanup(named.stop)
 
     def tearDown(self):
         for p in self.patch:
@@ -124,6 +137,84 @@ class FollowsTheSignIn(unittest.TestCase):
         with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
             u.smb_take_up("sean", "proved-just-now")
         self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("proved-just-now"))
+
+    def test_an_account_no_share_names_has_no_share_password(self):
+        # The NT hash is far weaker than the password's own hash, and was
+        # kept for every account at every sign-in (the operator, 13 Nov).
+        u = self.users
+        self.d["users"]["mia"] = {"uid": "u_11112222", "password": "x"}
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            self.assertFalse(u._smb_follow(self.d["users"]["mia"], "correct-horse"))
+            u.smb_take_up("mia", "correct-horse")
+            self.assertNotIn("smb_nt", self.d["users"]["mia"])
+            # Named since: made from the password as they next sign in.
+            self.named = {"bbu-0a1b2c3d", "bbu-11112222"}
+            u.smb_take_up("mia", "correct-horse")
+            self.assertEqual(self.d["users"]["mia"]["smb_nt"], u.nt_hash("correct-horse"))
+            self.assertTrue(self.d["users"]["mia"]["smb_follows"])
+            # ...and the same sign-in again writes nothing.
+            saves = []
+            with mock.patch.object(u, "_save", lambda d: saves.append(1)):
+                u.smb_take_up("mia", "correct-horse")
+            self.assertEqual(saves, [])
+
+    def test_one_that_followed_goes_when_no_share_names_the_account_any_more(self):
+        u = self.users
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.smb_take_up("sean", "correct-horse")
+            self.assertIn("smb_nt", self.d["users"]["sean"])
+            self.named = set()
+            # The machine is never handed it, and it is off the record.
+            self.assertEqual(u.smb_users(), [])
+            for k in ("smb_nt", "smb_at", "smb_follows"):
+                self.assertNotIn(k, self.d["users"]["sean"])
+            # At a sign-in too, and a second pass finds nothing.
+            self.named = {"bbu-0a1b2c3d"}
+            u.smb_take_up("sean", "correct-horse")
+            self.named = set()
+            u.smb_take_up("sean", "correct-horse")
+            self.assertNotIn("smb_nt", self.d["users"]["sean"])
+            self.assertEqual(u.smb_prune(), 0)
+
+    def test_one_set_apart_stays_whoever_is_named(self):
+        u = self.users
+        self.named = set()
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.set_smb_password("sean", "a-separate-one")
+            u.smb_take_up("sean", "correct-horse")
+            self.assertEqual(u.smb_prune(), 0)
+            self.assertEqual(u.smb_users(), [{"user": "bbu-0a1b2c3d", "nt": u.nt_hash("a-separate-one"), "name": "sean"}])
+
+    def test_while_nobody_can_say_who_is_named_what_is_there_is_kept_and_nothing_is_made(self):
+        u = self.users
+        self.d["users"]["mia"] = {"uid": "u_11112222", "password": "x"}
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.smb_take_up("sean", "correct-horse")
+            self.named = None
+            u.smb_take_up("mia", "correct-horse")
+            self.assertNotIn("smb_nt", self.d["users"]["mia"])
+            self.assertEqual(u.smb_prune(), 0)
+            # A password changed meanwhile keeps the one that is there in step.
+            self.assertTrue(u._smb_follow(self.d["users"]["sean"], "a-new-password"))
+            self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("a-new-password"))
+            # The question failing is nobody's sign-in failing.
+            with mock.patch.object(u, "share_named", lambda: 1 / 0):
+                u.smb_take_up("sean", "a-new-password")
+            self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("a-new-password"))
+
+    def test_who_is_named_is_a_shares_users_and_readers_on_the_own_machine(self):
+        import nodes
+        own = {"id": "n1", "kind": "agent", "config": {"own": True},
+               "reported": {"shares": [{"name": "docs", "smb": {"on": True, "users": ["bbu-0a1b2c3d"], "readers": ["bbu-11112222"]}},
+                                       {"name": "everybody", "smb": {"on": True, "guest": True, "users": []}},
+                                       {"name": "off", "smb": {"on": False, "users": ["bbu-99999999"]}}]}}
+        other = {"id": "n2", "kind": "agent", "config": {}, "reported": {"shares": [{"name": "x", "smb": {"on": True, "users": ["bbu-77777777"]}}]}}
+        with mock.patch.object(nodes, "node_list", return_value=[other, own]):
+            self.assertEqual(nodes.smb_named(), {"bbu-0a1b2c3d", "bbu-11112222"})
+        with mock.patch.object(nodes, "node_list", return_value=[other, {"id": "n1", "kind": "agent", "config": {"own": True}, "reported": {}}]):
+            self.assertIsNone(nodes.smb_named(), "the own machine has not said what it has")
+        with mock.patch.object(nodes, "node_list", return_value=[other]):
+            self.assertIsNone(nodes.smb_named())
 
 
 if __name__ == "__main__":

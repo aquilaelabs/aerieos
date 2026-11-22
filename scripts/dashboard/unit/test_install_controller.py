@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,7 +28,7 @@ def sh(body, env=None, root=""):
     """bash with the installer sourced for its functions, under a scratch
     prefix; nothing is root, and nothing outside the prefix is written."""
     pre = f'set -euo pipefail\nBB_CONTROLLER_LIB=1 . "{INSTALLER}"\n'
-    e = dict(os.environ, BB_INSTALL_ROOT=root, NO_FETCH="1", **(env or {}))
+    e = {**os.environ, "BB_INSTALL_ROOT": root, "NO_FETCH": "1", **(env or {})}
     return subprocess.run(["bash", "-c", pre + body], capture_output=True, text=True, timeout=120,
                           check=False, env=e)
 
@@ -81,6 +82,7 @@ class LaidOutAsTheImage(unittest.TestCase):
     def test_every_copy_line_lands_where_the_image_puts_it(self):
         rel = os.path.join(self.root, "opt", "aerieos-releases", "1.2.3")
         os.makedirs(os.path.dirname(rel))
+        began = time.time() - 1
         r = sh(f'lay_out "{ROOT}" "{rel}" 1.2.3 abc123', root=self.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         copies = re.findall(r"^COPY (\S+) (/opt/aerieos\S*)$", dockerfile(), re.M)
@@ -102,6 +104,12 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.assertIn("BB_VERSION=1.2.3\n", env)
         self.assertIn("BB_IMAGE_REV=abc123\n", env)
         self.assertFalse(os.path.exists(rel + ".partial"))
+        # ...with the scripts' bytecode made here, as the image makes it (R228
+        # step 8), and not copied from the tree's (cp -a keeps its old time).
+        cache = os.path.join(rel, "scripts", "dashboard", "__pycache__")
+        made = [n for n in os.listdir(cache) if n.startswith("server.") and n.endswith(".pyc")]
+        self.assertTrue(made)
+        self.assertGreaterEqual(os.path.getmtime(os.path.join(cache, made[0])), began)
 
     def test_flip_keeps_the_one_before(self):
         rels = os.path.join(self.root, "opt", "aerieos-releases")
@@ -135,11 +143,41 @@ class LaidOutAsTheImage(unittest.TestCase):
         r = sh(f'tree_stamp "{t}"')
         self.assertEqual(r.stdout.split(), ["0.9.0", "f" * 40])
 
-    def test_the_images_pins_are_read_from_its_dockerfile(self):
-        r = sh("dockerfile_arg NOVNC_VERSION; dockerfile_arg NOVNC_SHA256")
-        ver, sha = r.stdout.split()
-        self.assertRegex(ver, r"^\d+\.\d+\.\d+$")
-        self.assertRegex(sha, r"^[0-9a-f]{64}$")
+    def test_novnc_is_laid_out_from_the_file_the_trees_table_pins(self):
+        # lay_out with the tree's pin-fetch stood in: what it is asked for
+        # is noVNC's row of the tree's own table, the version it prints
+        # names the folders taken out of the archive, and a file that is
+        # not the pinned one leaves no noVNC and says so.
+        tree = os.path.join(self.root, "tree")
+        for d in ("scripts/lib", "config", "nodes"):
+            os.makedirs(os.path.join(tree, d))
+        names = [*(f"config/f{i}" for i in range(6)), "nodes/provision-linux.sh"]
+        for name in (*names, "config/controller.env", "config/image-tools.json", "nodes/install-controller.sh"):
+            with open(os.path.join(tree, name), "w") as f:
+                f.write("x\n")
+        with open(os.path.join(tree, "Dockerfile"), "w") as f:
+            f.write("FROM x\nCOPY scripts/ /opt/aerieos/scripts/\n" + "".join(f"COPY {n} /opt/aerieos/{n}\n" for n in names))
+        src = os.path.join(self.root, "noVNC-9.9.9")
+        for part in ("core", "vendor"):
+            os.makedirs(os.path.join(src, part))
+        for name in ("core/rfb.js", "vendor/x.js", "vnc_lite.html", "LICENSE.txt", "README.md"):
+            with open(os.path.join(src, name), "w") as f:
+                f.write("x\n")
+        subprocess.run(["tar", "czf", os.path.join(self.root, "novnc.tgz"), "-C", self.root, "noVNC-9.9.9"], check=True)
+        fake = os.path.join(tree, "scripts", "lib", "pin-fetch")
+        with open(fake, "w") as f:
+            f.write(f'#!/bin/bash\necho "$*" >> "{self.root}/asked"\n[ -z "${{REFUSE:-}}" ] || {{ echo "pin-fetch: not the pinned file" >&2; exit 1; }}\ncp "{self.root}/novnc.tgz" "$4"\necho 9.9.9\n')
+        rel = os.path.join(self.root, "opt", "aerieos-releases", "1.2.3")
+        os.makedirs(os.path.dirname(rel))
+        r = sh(f'lay_out "{tree}" "{rel}" 1.2.3 abc123', env={"NO_FETCH": "0"}, root=self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(open(os.path.join(self.root, "asked")).read().split()[:3], [os.path.join(tree, "config", "image-tools.json"), "novnc", "linux/amd64"])
+        self.assertEqual(sorted(os.listdir(os.path.join(rel, "novnc"))), ["LICENSE.txt", "core", "vendor", "vnc_lite.html"])
+        self.assertFalse(os.path.exists(os.path.join(rel, "novnc.tar.gz")))
+        r = sh(f'lay_out "{tree}" "{rel}" 1.2.3 abc123', env={"NO_FETCH": "0", "REFUSE": "1"}, root=self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(rel, "novnc")))
+        self.assertIn("noVNC did not download or was not its pinned file", r.stderr + r.stdout)
 
 
 class TheEnvironment(unittest.TestCase):
@@ -252,7 +290,8 @@ class TheImagesOtherTools(unittest.TestCase):
             self.assertIn(tool, dockerfile(), tool)
             self.assertIn(tool, body, tool)
         self.assertNotIn("ttyd", text)
-        self.assertIn("NOVNC_SHA256", text)
+        self.assertIn("novnc", dockerfile())
+        self.assertIn(" novnc linux/amd64 ", text)
 
 
 class Updates(unittest.TestCase):
@@ -384,8 +423,11 @@ if __name__ == "__main__":
 class TheUpdatesFetch(unittest.TestCase):
     """fetch_tree with curl and gh stood in on the PATH: the bundle verified
     by its attestation read from GitHub's public API with --bundle (no
-    sign-in), and the source archive taken unverified only for a release
-    from before the bundle that GitHub says has none."""
+    sign-in) and held to the release workflow's identity, and a release that
+    carries no bundle not taken, whatever its version. The install here
+    names no signer, so a bundle that passed everything before the signed
+    list stops there, unpacked nowhere; the signed list's rules are
+    test_release_signing.py's."""
 
     def world(self, code, gh_ok=True):
         d = tempfile.mkdtemp()
@@ -407,7 +449,7 @@ while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -w) w="$2"; shift 2;
 case "$url" in
   *attestations/sha256:*) echo '{{"attestations":[{{"bundle":{{"x":1}}}}]}}' > "$out" ;;
   *releases/latest*) ;;
-  *api.github.com/repos/*/releases?per_page=*) echo '[{{"tag_name":"v0.9.0-dev.4750","assets":[{{"name":"builderbot-controller-0.9.0-dev.4750.tar.gz"}}]}},{{"tag_name":"v0.9.0-dev.4724","assets":[{{"name":"aerieos-controller-0.9.0-dev.4724.tar.gz"}}]}}]' ;;
+  *api.github.com/repos/*/releases?per_page=1) echo '[{{"tag_name":"v0.9.0-dev.5700","assets":[{{"name":"aerieos-controller-0.9.0-dev.5700.tar.gz"}}]}}]' ;;
   *.tar.gz.sha256) echo "{dig}  b.tar.gz" > "$out" ;;
   *archive/refs/tags/*) cp "{tgz}" "$out" ;;
   *.tar.gz) [ "{code}" = 200 ] && cp "{tgz}" "$out"; [ -n "$w" ] && printf '%s' "{code}" ;;
@@ -427,23 +469,32 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
 
     def fetch(self, tag, code, gh_ok=True):
         d, bin_ = self.world(code, gh_ok)
-        r = sh(f'fetch_tree {tag}', env={"PATH": bin_ + ":" + os.environ["PATH"]}, root=d)
+        with open(os.path.join(d, "release-signers"), "w") as f:
+            f.write("# no key\n")
+        r = sh(f'fetch_tree {tag}', env={"PATH": bin_ + ":" + os.environ["PATH"],
+                                         "BB_RELEASE_SIGNERS": os.path.join(d, "release-signers")}, root=d)
         log = open(os.path.join(d, "gh.log")).read() if os.path.exists(os.path.join(d, "gh.log")) else ""
         return r, log
 
     def test_a_bundle_is_verified_by_its_attestation_with_no_sign_in(self):
         r, log = self.fetch("v0.9.1", 200)
-        self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("verified by gh", r.stderr)
         self.assertIn("--bundle", log)
+        # ...held to the release workflow on a version's tag, as the OS
+        # updater holds an image: the repository alone passed any workflow.
+        self.assertIn(r"--cert-identity-regex ^https://github\.com/aquilaelabs/aerieos/\.github/workflows/build-image\.yml@refs/tags/v", log)
+        # ...and with no signer named the release is not taken, in one sentence.
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("this install names no release signer (its config/release-signers is missing or empty), "
+                      "so v0.9.1's signature cannot be checked: not taken", r.stderr)
+        self.assertEqual(r.stdout.strip(), "", "no tree is named")
 
-    def test_no_tag_takes_the_newest_dev_build_that_carries_the_bundle(self):
-        # No stable release: the newest dev build with an aerieos-controller
-        # bundle, past a newer one whose bundle is named for the old product
-        # (2 Nov, dev.4750 and before).
+    def test_no_tag_takes_the_newest_published_release(self):
+        # No stable release: the newest published one, a dev build, asked
+        # for alone; every release there is carries the controller bundle.
         r, _ = self.fetch("", 200)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("bundle aerieos-controller-0.9.0-dev.4724.tar.gz", r.stderr)
+        self.assertIn("bundle aerieos-controller-0.9.0-dev.5700.tar.gz", r.stderr)
+        self.assertIn("so v0.9.0-dev.5700's signature cannot be checked", r.stderr)
 
     def test_a_bundle_that_does_not_verify_is_not_taken(self):
         r, _ = self.fetch("v0.9.1", 200, gh_ok=False)
@@ -456,7 +507,13 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
             self.assertNotEqual(r.returncode, 0, (tag, code))
             self.assertIn("could not be fetched", r.stderr)
 
-    def test_only_a_release_from_before_the_bundle_falls_back_to_its_source(self):
+    def test_a_release_from_before_the_bundle_is_not_taken_from_its_source(self):
+        # It fell back to the tag's source archive, said as unverified:
+        # nothing an install can come from is that old (the state floor),
+        # and a source archive is in no signed list.
         r, _ = self.fetch("v0.8.2", "404")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("source archive is taken instead", r.stderr)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("could not be fetched", r.stderr)
+        self.assertNotIn("source archive", r.stderr)
+        with open(INSTALLER, encoding="utf-8") as f:
+            self.assertFalse("${REPO}/archive/" in f.read(), "the installer names a source archive of AerieOS's own")

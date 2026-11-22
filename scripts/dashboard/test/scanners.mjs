@@ -4,24 +4,26 @@
 // sending a SARIF per scanner up), the report on the Analysis page and the
 // node's section saying its last run and the reports it sent; the projects
 // nothing covers listed with why; Remove taking it off again.
-import { URL, launch, newPage, ok, done, ready, patience, settled } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, patience, settled, api } from './lib.mjs';
 
 const BASE = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
-const api = (path, body) => fetch(BASE + path, body ? { method: 'POST', headers: H, body: JSON.stringify(body) } : { headers: H }).then(r => r.json());
-const until = async (fn, ms = 30000) => { const end = Date.now() + patience(ms); for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) return null; await new Promise(r => setTimeout(r, 400)); } };
+const until = async (fn, ms = 30000) => { const end = Date.now() + patience(ms); for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) return null; await new Promise(r => setTimeout(r, 400)); } };   // the loop's own period
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-// The page: under Containers, the schedule first, a section per node.
+// The page: a service's, beside Installed (R264), the schedule first, a
+// section per node.
 await page.evaluate(() => openScannersTab());
 await page.waitForSelector('.scannerstab details[data-sect="scanners:schedule"]', { timeout: patience(20000) });
 await settled(page);
-ok(await page.evaluate(() => location.hash) === '#/containers/scanners' && await page.evaluate(() => groupOf('scanners')?.key) === 'containers',
-   'it is a page of the Containers group, at its own address');
+ok(await page.evaluate(() => location.hash) === '#/machines/scanners' && await page.evaluate(() => groupOf('scanners')?.key) === 'machines',
+   'it is a page of the Machines group, beside Installed, at its own address');
+ok(await page.evaluate(() => { const was = shellFrom; shellFrom = null; const h = backHead({ kind: 'scanners' }) + backHead({ kind: 'nginx' }); shellFrom = was;
+                               return (h.match(/back to Installed/g) || []).length === 2; }),
+   '...and Back on it or on nginx, opened by its address alone, is to Installed');
 // A node that holds a project: the fixture's stub node, given one here,
 // since the page lists only the nodes projects are bound to.
 const stub = ((await api('/api/v1/nodes')).nodes || []).find(n => n.kind === 'agent' && n.state === 'online' && !n.host_only);

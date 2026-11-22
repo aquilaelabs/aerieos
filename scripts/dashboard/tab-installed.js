@@ -13,7 +13,7 @@
 
 "use strict";
 
-let inst = null, instNode = "", instRev = 0, instSeq = 0, instLanded = 0, instFollow = null;
+let inst = null, instNode = "", instFollow = null;
 let instWantAgent = "";        // the agent whose page a door asked for, until the rows land
 const instDraft = {};          // what was typed into a Configure form and not saved yet, by row
 const INST_KINDS = [["agent", "Coding agents"], ["toolchain", "Toolchains"], ["pack", "Tool packs"], ["service", "Services"]];
@@ -24,78 +24,56 @@ function openInstalledTab(){
 // ...on a node somebody named (a project's Sign in on NODE, the bell), the
 // agent's row open on its sign-in once the rows land.
 function openInstalledOn(id, agent = "", row = ""){
-  if (id && id !== instNode){ instNode = id; inst = null; }
   // ...or any thing's own page by its key (service:model-router, R181: a
-  // system container's Configure), at its Configure.
+  // system container's Configure), at its Configure, on that node.
   if (row){ openThing(id, row, "configure"); return; }
   if (agent) instWantAgent = agent;
-  if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
-  try{ localStorage.setItem("bb.instnode", id); }catch(e){ /* private */ }
-  const was = location.hash;
-  openInstalledTab();
-  instRev++;
-  const to = routeOf(tabOf(panes[0]));
-  if (to && to !== was) shellPush(to);
-  loadInstalled();
+  openKindOn("installed", id);
 }
 
 // The node the page opens on: the one it showed last, else the Library's,
 // else the first agent node.
 function instPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
-  let want = instNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem("bb.instnode") || localStorage.getItem("bb.libnode") || ""; }catch(e){ want = ""; }
-  }
-  if (!live.some(n => n.id === want)) want = live[0]?.id || "";
+  const live = liveAgents(), want = keptNode("installed", {have: live, also: PAGE_KINDS.library.keep});
   instNode = want;
   // The toolchain job's verbs act on tcNode; the pack dialogs read its rows.
   if (want && want !== tcNode){ tcNode = want; toolchains = null; }
   return live.find(n => n.id === want) || null;
 }
 
-async function loadInstalled(){
-  const asked = ++instSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== instSeq) return;
-  if (!instPick()){
-    inst = {nonode: true};
-    instRev++; drawPanes();
-    return;
-  }
-  const node = instNode;
-  const keep = () => instNode === node && asked > instLanded;
-  try{
-    const r = await fetch("/api/library?node=" + encodeURIComponent(node));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (!keep()) return;
+function loadInstalled(){
+  return reading("installed", async () => {
+    if (nodesList === null || nodesStale) await nodesKnown();
+    if (!instPick()){ inst = {nonode: true}; return; }
+    // A reply is kept while it is still about the node on show.
+    const node = instNode;
+    const got = await getJSON("/api/library?node=" + encodeURIComponent(node));
+    if (instNode !== node) return;
     inst = got;
-  }catch(e){ if (!keep()) return; inst = {error: failWords(e)}; }
-  instLanded = asked;
-  let wantPage = "";
-  if (!inst.error){
-    tcSandboxNow = !!inst.sandbox; agYours = inst.yours || {plugins: [], mcp: {}};
-    if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = inst.job; else toolchains = {name: inst.name, job: inst.job, items: []};
-    if (instWantAgent){
-      const r = (inst.rows || []).find(x => x.kind === "agent" && x.agent === instWantAgent);
-      instWantAgent = "";
-      // The agent's own page, at its sign-in (R181 step 2), once drawn.
-      if (r) wantPage = `agent:${r.name}`;
+    let wantPage = "";
+    if (!inst.error){
+      toolchainsSeen(inst);
+      if (instWantAgent){
+        const r = (inst.rows || []).find(x => x.kind === "agent" && x.agent === instWantAgent);
+        instWantAgent = "";
+        // The agent's own page, at its sign-in (R181 step 2), once drawn.
+        if (r) wantPage = `agent:${r.name}`;
+      }
     }
-  }
-  clearTimeout(instFollow); instFollow = null;
-  if ((inst.rows || []).some(r => r.running)) instFollow = setTimeout(loadInstalled, 3000);
-  instRev++;
-  drawPanes();
-  if (wantPage) openThing(instNode, wantPage, "signin");
+    clearTimeout(instFollow); instFollow = null;
+    if ((inst.rows || []).some(r => r.running)) instFollow = setTimeout(loadInstalled, 3000);
+    if (wantPage) setTimeout(() => openThing(instNode, wantPage, "signin"));
+  });
 }
 
 // What is here: an installed row, the machine's own rows, a deployed
 // service, and an agent whose card a person signs in on (Claude Code's,
 // so a node without it still says where its sign-in would be).
 function instHere(r){
-  if (r.kind === "service") return true;
+  // A service that asks for settings first is here before it is deployed
+  // (the router: configured, then installed); one that asks nothing (nginx,
+  // the Scanners: R264) is here once the Library put it on the node.
+  if (r.kind === "service") return r.installed || r.running || !!(r.config || []).length;
   if (r.machine) return true;
   if (r.kind === "agent") return r.installed || r.agent === "claude";
   return r.installed || r.unknown || r.running;
@@ -103,23 +81,17 @@ function instHere(r){
 
 // Where it stands, in a few words at the row's right.
 function instState(r){
-  const w = (t, cls = "") => `<span class="state${cls ? " " + cls : ""}">${t}</span>`;
+  const w = packState;
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.doing === "deploy" ? "deploying" : r.installed ? "updating" : "installing")}<span class="dots"></span>`);
   if (r.kind === "service") return r.installed ? w("deployed", "ok") : r.ready ? w(esc(r.ready), "warn") : w("configured, not deployed", "warn");
-  if (r.machine){
-    const m = r.machine, st = m.state;
-    if (!m.managed) return w("installed by hand on this machine");
-    if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("installed and in use", "ok")
-      : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "update available" : "installed, takes the card at a restart", "warn");
-    return st === "absent" ? w("not installed") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
-      : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
-  }
+  if (r.machine) return packMachineState(r, "not installed");
   if (r.kind === "agent" && !r.installed) return w("not installed: the Library installs it", "warn");
+  // Kept here and not fitting this AerieOS: switched off until one that
+  // does is kept, which its Library card offers when the catalog has one.
+  if (r.pack?.disabled) return w(esc(r.pack.disabled) + ": the Library offers a version that fits when there is one", "warn");
   // The version that is out is the row's pill ("2.1.314 is out"), so the
   // state says only that, as the Library's card does.
-  if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");
-  if (r.unknown) return w("installed, version unknown");
-  return w("");
+  return packHeldState(r);
 }
 
 // The row's verbs: Update where its state says one is available, as the
@@ -134,8 +106,15 @@ function instActs(r, may){
     : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
-  const upd = r.installed && r.update ? a("update", "Update", "primary") : "";
-  if (r.kind === "pack" && r.pack) return `${upd}${a("edit", "Edit")}${r.installed ? a("remove", "Remove", "danger") : ""}`;
+  // Software update, as the Library's card says it (the operator, 13 Nov).
+  // ...and Install again on a copy an earlier manifest made, which takes what
+  // the one kept now installs (B799): the same job, removing it first.
+  const upd = r.installed && r.update ? a("update", "Software update", "primary")
+    : r.installed && r.receipt?.stale ? a("update", "Install again", "primary") : "";
+  // Edit on a pack a person added themselves, as on the Library's card: one
+  // kept from the catalog is the catalog's, its kept copy reached from its
+  // Details page there.
+  if (r.kind === "pack" && r.pack) return `${upd}${r.tier === "sideloaded" ? a("edit", "Edit") : ""}${r.installed ? a("remove", "Remove", "danger") : ""}`;
   return r.installed ? `${upd}${a("remove", "Remove", "danger")}` : "";
 }
 
@@ -172,6 +151,8 @@ function instAboutLines(r){
     return lines.filter(Boolean).join("");
   }
   if (r.about) lines.push(`<span class="sub">${esc(r.about)}</span>`);
+  // Who it is by, as its Library card's Details say (makerLine).
+  if (makerLine(r)) lines.push(makerLine(r));
   if (r.kind === "toolchain" || r.kind === "pack"){
     if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.${r.needed_by?.length ? ` Needed by ${esc(r.needed_by.join(", "))}.` : ""}</span>`);
@@ -180,6 +161,7 @@ function instAboutLines(r){
     lines.push(tcNeedsLine(r));
     if (r.path) lines.push(`<span class="sub">At ${esc(r.path)}.</span>`);
     lines.push(tcVerifiedLine(r));
+    lines.push(tcReceiptLines(r));
     if (r.reopen) lines.push(`<span class="sub warn">${r.reopen === 1 ? "1 session" : `${r.reopen} sessions`} open here started before this was installed: reopen ${r.reopen === 1 ? "it" : "them"} to use it.</span>`);
     if (r.pinned?.length) lines.push(`<span class="sub">Pinned by ${esc(r.pinned.map(projLabel).join(", "))}.</span>`);
     if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code> at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}.</span>`);
@@ -225,7 +207,7 @@ function instConfigField(f, v, key){
     case "switch": return `<div class="field"><label class="ndcap"><input id="${id}" type="checkbox" ${at}${v ? " checked" : ""}> ${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</label></div>`;
     case "choice": return `<div class="field setrow col ctlrow">${label}<select id="${id}" ${at}>${(f.choices || []).map(c => `<option value="${esc(c.value)}"${c.value === v ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select></div>`;
     case "projects": {
-      const all = (inst?.rows || []).find(x => x.kind === "service")?.all_projects || [];
+      const all = (inst?.rows || []).find(x => x.kind === "service" && x.service === "router")?.all_projects || [];
       return `<div class="field"><div class="fsub">${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</div><div class="chips">${all.length ? all.map(p => `<label class="chip"><input type="checkbox" data-icproj="${esc(f.name)}" value="${esc(p)}"${(v || []).includes(p) ? " checked" : ""}> ${esc(p)}</label>`).join("") : `<span class="dim">no spaces yet</span>`}</div></div>`;
     }
     case "list": {
@@ -287,8 +269,8 @@ function instServiceLines(r){
 // Configure where it asks for anything, open its own page (R181 step 2).
 function instRow(r, may){
   const key = `${r.kind}:${r.name}`;
-  const ver = r.version && r.version !== "-" && r.version !== "present" ? ` <span class="pill" title="installed">${esc(r.version)}</span>` : "";
-  const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && inst?.job?.errors?.[r.name] ? `<div class="sub bad">${esc(inst.job.errors[r.name])}</div>` : "";
+  const pill = packVersionPill(r), ver = pill && ` ${pill}`;
+  const err = packJobErr(r, inst?.job);
   const conf = instConfigurable(r) ? `<button type="button" data-instopen="${esc(key)}" data-instat="configure">Configure</button>` : "";
   return `<div class="row irow" data-irow="${esc(key)}"><div class="grow">
       <div class="name">${esc(r.label)}${ver}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""} <button type="button" class="link imore" data-instopen="${esc(key)}">Open</button></div>
@@ -301,21 +283,21 @@ function renderInstalledInto(i){
   if (!d) return;
   if (inst === null){
     d.setBar("");    // the node is the Machines header's (R177)
-    d.list.innerHTML = skTpl(pageHead({facts: [["Installed", GHOST], ["Updates due", GHOST]]})
-      + INST_KINDS.map(([k, title]) => docSection("installed", k, title, "", skRows(2))).join(""));
-    if (!instSeq) loadInstalled();
+    drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Updates due", GHOST]]})
+      + INST_KINDS.map(([k, title]) => docSection("installed", k, title, "", skRows(2))).join("")));
+    if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
   }
   const pnodes = (nodesList || []).filter(x => x.kind === "agent" && x.state !== "retired").map(x => ({id: x.id, name: x.name, live: x.live}));
   if (inst.nonode){
     d.setBar("");
-    d.list.innerHTML = noNodeYet("toolchains and coding agents install on a node", "instnone");
+    drawHTML(d.list, noNodeYet("toolchains and coding agents install on a node", "instnone"));
     return;
   }
   const may = inst.may || {};
   d.setBar("");    // the node is picked in the Machines group's header (R177)
   if (inst.error){
-    paint(d.list, `<div class="field"><div class="notice bad">${esc("could not read what is installed: " + inst.error)}</div></div>`);
+    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read what is installed: " + inst.error)}</div></div>`);
     return;
   }
   const rows = (inst.rows || []).filter(instHere);
@@ -323,7 +305,7 @@ function renderInstalledInto(i){
   const unmet = Object.entries(inst.sysdeps?.unmet || {});
   const notes = unmet.length ? `<div class="field"><div class="notice warn instsys">System packages ${esc(inst.name || "this node")} lacks for what its store holds (${esc(inst.sysdeps.family || "")}): ${
       unmet.map(([r, ps]) => `${esc(r)}: ${esc(ps.join(" "))}`).join("; ")}. ${inst.sandbox && may.install
-        ? `<button type="button" data-instsysdeps${inst.job?.running ? " disabled" : ""} title="install these on ${esc(inst.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
+        ? `<button type="button" data-instsysdeps title="install these on ${esc(inst.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : "";
   const head = pageHead({facts: [
     ["Installed", String(rows.filter(r => r.installed).length)],
@@ -331,19 +313,21 @@ function renderInstalledInto(i){
     ["Store", inst.store?.root || ""],
   ]});
   const sects = INST_KINDS.map(([k, title]) => {
-    const here = rows.filter(r => r.kind === k);
+    // By its group, as the Library sorts it: a pack that brings a coding
+    // agent sits with the coding agents (the operator, 12 Nov).
+    const here = rows.filter(r => libGroup(r) === k);
     if (!here.length) return "";
     const body = `<div class="rows">${here.map(r => instRow(r, may)).join("")}</div>`;
     return docSection("installed", k, title, k === "agent" ? `${here.filter(r => r.installed).length} of ${here.length}` : String(here.length), body);
   }).join("") || `<div class="empty">Nothing installed on ${esc(inst.name || "this node")} yet: the Library installs toolchains, coding agents and packs there.</div>`;
-  paint(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}</div>`);
+  patch(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}</div>`);
   wireInstalled(d.el);
 }
 
 function wireInstalled(root){
   wireSections(root);
-  if (typeof wireSignin === "function") wireSignin(root);
-  root.querySelectorAll("[data-instopen]").forEach(b => b.onclick = () => openThing(instNode, b.dataset.instopen, b.dataset.instat || ""));
+  wireSignin(root);
+  root.querySelectorAll("[data-instopen]").forEach(b => b.onclick = () => instOpen(b.dataset.instopen, b.dataset.instat || ""));
   root.querySelectorAll("[data-tcsys]").forEach(b => b.onclick = async () => { await tcAct("sysdeps", [b.dataset.tcsys]); loadInstalled(); });
   root.querySelectorAll("[data-tcneed]").forEach(b => b.onclick = async () => { await tcAct("install", [b.dataset.tcneed]); loadInstalled(); });
   const sd = root.querySelector("[data-instsysdeps]");
@@ -363,16 +347,20 @@ function wireInstalled(root){
           const i = row.querySelector(`[data-icsub="${CSS.escape(sf.name)}"]`); if (i && !i.value) i.value = dr[f.name][j][sf.name]; }
       });
     }
-    form.addEventListener("input", read);
-    form.addEventListener("change", read);
-    form.querySelectorAll("[data-icadd]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icadd] = [...(v[b.dataset.icadd] || []), {}]; instRev++; drawPanes(); });
-    form.querySelectorAll("[data-icrm]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icrm].splice(Number(b.dataset.icrow), 1); instRev++; drawPanes(); });
+    // Set, not added: a patched page keeps the form across its draws (R244).
+    form.oninput = read;
+    form.onchange = read;
+    form.querySelectorAll("[data-icadd]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icadd] = [...(v[b.dataset.icadd] || []), {}]; readMoved("installed"); drawPanes(); });
+    form.querySelectorAll("[data-icrm]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icrm].splice(Number(b.dataset.icrow), 1); readMoved("installed"); drawPanes(); });
     const save = form.querySelector("[data-icsave]");
     if (save) save.onclick = () => pressing(save, async () => {
       busy(save, "Saving");
-      const j = await (await postJSON("/api/library", {action: "configure", node: instNode, pack: r.name, values: read(), ...(scope === "person" ? {scope} : {})})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/library", {action: "configure", node: instNode, pack: r.name, values: read(), ...(scope === "person" ? {scope} : {})});
       if (j.error){ notify(j.error, true); return; }
       delete instDraft[dk];
+      // Saved, the form is drawn fresh: a key is shown as set and its field
+      // empties to type a replacement into.
+      drawFresh(form);
       notify(j.job ? "saved: the router is rebuilt with the change, its row on the Containers page has the build" : "saved");
       await loadInstalled();
     });
@@ -383,11 +371,22 @@ function wireInstalled(root){
     const act = b.dataset.instsvc;
     busy(b, act === "ollama-pull" ? "Pulling" : act === "ollama-remove" ? "Removing" : "Reading");
     const model = act === "ollama-pull" ? row.querySelector("[data-instpull]")?.value || "" : b.dataset.instmodel || "";
-    const j = await (await postJSON("/api/library", {action: act, node: instNode, pack: r.name, model})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/library", {action: act, node: instNode, pack: r.name, model});
     if (j.error) notify(j.error, true); else if (act === "ollama-pull") notify(`pulling ${model}: a job on the Jobs page`);
     await loadInstalled();
   }));
   root.querySelectorAll("[data-instact]").forEach(b => b.onclick = () => instAct(b, b.dataset.instact, b.dataset.instkind, b.dataset.instname));
+}
+
+// Open on a row: the thing's own page on this node. A service whose
+// settings are a page of their own (nginx's routes and certificates, the
+// Scanners' schedule and runs: R264) opens that page for the node.
+function instOpen(key, at = ""){
+  const pages = {nginx: node => openNginxTab(node), scanners: () => openScannersTab()};
+  const r = (inst?.rows || []).find(x => `${x.kind}:${x.name}` === key);
+  const page = r?.kind === "service" && r.installed ? pages[r.service] : null;
+  if (page) return page(instNode);
+  openThing(instNode, key, at);
 }
 
 async function instAct(b, act, kind, name){
@@ -395,38 +394,29 @@ async function instAct(b, act, kind, name){
   if (!r) return;
   const where = (nodesList || []).find(x => x.id === instNode)?.name || "this node";
   if (kind === "service"){
-    if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? Its keys stay here sealed; the spaces lose their way to it.`, {verb: "Remove", danger: true})) return;
-    busy(b, act === "remove" ? "Removing" : "Deploying");
-    const j = await (await postJSON("/api/library", {action: act, node: instNode, pack: r.name})).json().catch(() => ({error: "no answer"}));
-    if (j.error) notify(j.error, true);
-    else if (j.job) notify(`${act === "remove" ? "removing" : "deploying"} ${r.label}: its row on the Containers page has the build`);
-    await loadInstalled();
+    if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? ${r.removes || "Its keys stay here sealed; the spaces lose their way to it."}`, {verb: "Remove", danger: true})) return;
+    await packDeploy(b, instNode, r, act, loadInstalled);
     return;
   }
   if (act === "update"){
-    if (kind === "agent"){
-      if (!await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
-      busy(b, "Asking");
-      const j = await (await postJSON("/api/agents", {action: "install", node: instNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
-      if (j.error) notify(j.error, true);
-    } else {
-      busy(b, "Updating");
-      if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
-      await tcAct("install", [r.name]);
-    }
+    if (kind === "agent"){ await agentUpdate(b, instNode, r, loadInstalled); return; }
+    busy(b, "Updating");
+    // The job reads the store's record of this node, not its rows: the
+    // stand-in the page's read keeps will do.
+    if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
+    await tcAct("install", [r.name]);
     await loadInstalled();
     return;
   }
   if (kind === "agent"){
     if (!await askYes(`Remove ${r.label} from ${where}? Its sessions end, and none starts there until it is installed again.`)) return;
-    busy(b, "Removing");
-    const j = await (await postJSON("/api/agents", {action: "remove", node: instNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
-    if (j.error) notify(j.error, true);
-    await loadInstalled();
+    await sayPost(b, "Removing", "/api/agents", {action: "remove", node: instNode, agent: r.agent || ""}, "", loadInstalled);
     return;
   }
   if (act === "edit"){
-    if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
+    // The dialog finds the pack in the store's rows, read first where the
+    // page holds only its stand-in for them.
+    await toolchainsFor(instNode);
     tpOpen(r.name);
     return;
   }

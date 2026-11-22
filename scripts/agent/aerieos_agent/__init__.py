@@ -1,4 +1,5 @@
-"""AerieOS's node agent: one file, standard library only, dialing OUT.
+"""AerieOS's node agent: a package of the standard library alone, shipped
+as one zip, dialing OUT.
 
 A node runs this under systemd. It enrolls once with a token the operator
 minted on the Nodes page, then loops for the life of the machine: say hello,
@@ -7,8 +8,9 @@ never connects to a node (a node needs no open port, no inbound rule and no
 key the controller could lose), and the credential it holds opens nothing
 but its own row (docs/nodes.md §4, §8).
 
-The protocol is six verbs over plain HTTP, and this file speaks four of them
-plus the download that fetches itself:
+The protocol is verbs over plain HTTP. These carry every job; the
+features add their own beside them (sync, runner-token, signing, scans and
+the rest, channel.py on the controller says what each means):
 
     POST /api/v1/agent/enroll     once: the enroll token in, the node token out
     POST /api/v1/agent/hello      on connect and every ten minutes: the census,
@@ -23,16 +25,19 @@ plus the download that fetches itself:
                                   canceled), exit code and a one-line error
     GET  /api/v1/agent/download   the agent the controller ships, for self-update
 
-Three rules this file keeps that are worth knowing before changing it:
+Three rules the agent keeps that are worth knowing before changing it:
 
   * The agent is the DURABLE side of a job (door 5). A controller restart
     must never kill running work: log chunks that could not be posted are
     kept and re-sent by sequence number, the result is retried until it is
     acknowledged, and a job started before the controller went away finishes
     and reports late.
-  * The node enforces its own capabilities (door 7). A job that requires a
-    capability this node was not enrolled with is refused HERE, whatever the
-    controller's row says. The row is a claim, the enrollment is the fact.
+  * The node keeps the capabilities it enrolled with (door 7), and refuses
+    an exec job that names one it does not hold. What a job names is its
+    `requires`, a field the controller writes: a job that names none is
+    held to none, so this is a check of the controller's own bookkeeping
+    and no fence against it. What fences a node is below: the accounts its
+    jobs run as, and what its console allows (release.py, root-asks).
   * Jobs never run as root. The unit runs the agent as root so that phase 5's
     system jobs (mounts, network) can, but an exec job drops to the account
     the provisioner enrolled (the same `aerie` that docker runs as) before it
@@ -49,12 +54,20 @@ Three rules this file keeps that are worth knowing before changing it:
 
 Runs anywhere Python 3.8+ is, with nothing installed:
 
-    builderbot-agent enroll --controller URL --token bbe_… [--user bb]
+    aerieos-agent enroll --controller URL --token bbe_… [--user bb]
                             [--session-user builder] [--store data=/path]
-                            [--pin sha256:…]
-    builderbot-agent follow URL EXPECT   # after a controller moved while this node was off
-    builderbot-agent run            # the loop; what the unit runs
-    builderbot-agent status         # what this node is, and does it answer
+                            [--pin sha256//…]   # the controller's key, as the Enroll script carries it
+    aerieos-agent follow URL EXPECT [PIN]   # after a controller moved while this node was off
+    aerieos-agent release-key [HEX[,HEX]]   # show or pin AerieOS's release key and its spare (release.py)
+    aerieos-agent release-key none          # pin no release key, and have this node pin none by itself
+    aerieos-agent release-key add|drop HEX  # trust, or stop trusting, the key a build of your own is signed with
+    aerieos-agent unsigned on|off     # take an agent no release signed, or not
+    aerieos-agent older on|off        # take a signed agent older than the one running, or not
+    aerieos-agent record session-user NAME | tunnel ADDR   # what the provisioner writes into node.json on a later run
+    aerieos-agent check-update FILE [SIG]   # would this node take FILE as its agent: exit 0, or 77 refused
+    aerieos-agent root-asks [on|off]  # run a root command the controller sends, or refuse every one
+    aerieos-agent run            # the loop; what the unit runs
+    aerieos-agent status         # what this node is, and does it answer
 """
 
 # WINDOW.BUILD, and the two halves answer different questions.
@@ -72,4 +85,4 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.409"
+AGENT_VERSION = "0.9.530"

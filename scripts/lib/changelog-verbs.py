@@ -23,6 +23,13 @@ bugs = dash.load("bugs", _here)
 bugs.configure(write_json=statefile.write_json, state=_state)
 version.configure(workspace=os.environ.get("BB_WORKSPACE", "/workspace"),
                   state=_state, write_json=lambda *a: None, bugs_mod=bugs, changelog_mod=changelog)
+# The repository's Releases setting (R255): owed lines refuse or warn.
+try:
+    _prefs = dash.load("prefs", _here)
+    _prefs.configure(write_json=statefile.write_json, state=_state)
+    version.release_gate = lambda p: _prefs.get(p).get("release_gate", "refuse")
+except Exception as e:  # noqa: BLE001  (the default, refuse, stands)
+    print(f"the Releases setting could not be read, so owed lines refuse a release: {e}", file=sys.stderr)
 releasegaps = dash.load("releasegaps", _here)
 releasegaps.configure(version_mod=version, bugs_mod=bugs, changelog_mod=changelog)
 
@@ -64,16 +71,21 @@ if "--no-stamp" in argv:
     stamp = False
     argv = [a for a in argv if a != "--no-stamp"]
 
-# --bug N says which bug a Fixed line is about: kept in the bug's notes, so
-# the release check (aerie changelog missing) and a stable release's
-# gathering know the line answers it.
-bug_n = None
-if "--bug" in argv:
+# --bug N says which bug a Fixed line is about (several: --bug N --bug M, or
+# N,M): kept in the notebook, on the bug (its row lists the line) and in its
+# notes (the release check, aerie changelog missing, and a stable release's
+# gathering know the line answers it); the public file names commits alone.
+bug_ns = []
+while "--bug" in argv:
     i = argv.index("--bug")
     if i + 1 >= len(argv):
         print("--bug needs the bug's number", file=sys.stderr)
         raise SystemExit(1)
-    bug_n, argv = argv[i + 1], argv[:i] + argv[i + 2:]
+    bug_ns += [w for w in argv[i + 1].split(",") if w.strip()]
+    argv = argv[:i] + argv[i + 2:]
+
+# A line reworded or merged here keeps the bugs it answers.
+changelog.relinked = lambda _d, olds, new: bugs.relink_changelog(proj, olds, new)
 
 
 def _bug_of(word):
@@ -88,6 +100,15 @@ def _bug_of(word):
         print(f"no bug {ids.label('bugs', n)} here", file=sys.stderr)
         raise SystemExit(1)
     return b
+
+
+def _tie(b, words, kind):  # noqa: ARG001  (kind: the line's category, said by the caller)
+    """The bug tied to the changelog line `words` in the notebook: listed on
+    its row, and the release check's answer (R255) while the tie stands."""
+    r = bugs.link_changelog(proj, b["id"], words, by="claude")
+    if r.get("error"):
+        print(r["error"], file=sys.stderr)
+        raise SystemExit(1)
 
 
 def _answer(b, words):
@@ -116,15 +137,24 @@ if argv and argv[0] == "add":
         print(f"filed under {cat!r}, which is this space's own category rather than one "
               "of the six; kept as typed", file=sys.stderr)
     # Stamped with HEAD: the instruction in the template is to log after
-    # committing, so the sha names the commit the entry describes.
+    # committing, so the sha names the commit the entry describes. A line
+    # tied to bugs names the commits that fixed them instead, where they are
+    # recorded: two fixes committed and then logged one after the other
+    # would otherwise both name the second.
     sha = version._git(proj, "rev-parse", "--short=7", "HEAD") or ""
-    b = _bug_of(bug_n) if bug_n is not None else None
-    r = changelog.add(d, argv[1], sha=sha, cat=cat)
+    tied = [_bug_of(w) for w in bug_ns]
+    fixes = []
+    for b in tied:
+        fixes += [c for c in (b.get("commits") or []) if c not in fixes]
+    text = argv[1]
+    if fixes and not changelog._STAMP.search(text):
+        text = f"{text.rstrip()} ({', '.join(fixes)})"
+    r = changelog.add(d, text, sha=sha, cat=cat)
     if r.get("error"):
         print(r["error"], file=sys.stderr)
         raise SystemExit(1)
-    if b is not None:
-        _answer(b, f"{changelog.canonical(cat) or cat} line: {argv[1]}")
+    for b in tied:
+        _tie(b, " ".join(argv[1].split()), changelog.canonical(cat) or cat)
     n = len(changelog.unreleased(d))
     print(f"logged{' (new ' + changelog.FILE + ')' if r.get('created') else ''}: "
           f"{n} unreleased entr{'y' if n == 1 else 'ies'} now waiting for a bump")
@@ -155,7 +185,8 @@ if argv and argv[0] == "missing":
         print(f"  {r['label']}  {'carried' if r['carried'] == 'yes' else 'unsure'}: {r['why']}"
               + (f"  ({', '.join(r['commits'])})" if r["commits"] else ""))
         print(f"        {r['title']}")
-    print('each: aerie changelog add "..." --cat Fixed --bug N, or aerie changelog skip N "why it needs none"')
+    print('each: aerie changelog add "..." --cat Fixed --bug N, aerie changelog link N BUG for a line already '
+          'written, or aerie changelog skip N "why it needs none"')
     raise SystemExit(1)
 
 if argv and argv[0] == "skip":
@@ -166,6 +197,42 @@ if argv and argv[0] == "skip":
     b = _bug_of(argv[1])
     _answer(b, "no line: " + " ".join(argv[2:]))
     print(f"noted: {b.get('title', '')[:80]} needs no Fixed line")
+    raise SystemExit(0)
+
+if argv and argv[0] == "link":
+    # A line already written tied to the bugs it answers (the operator,
+    # 18 Nov): kept in the notebook, the public line left as it is.
+    if len(argv) < 3:
+        print("aerie changelog link N BUG [BUG...]   the unreleased line N (aerie changelog unreleased) "
+              "answers these bugs", file=sys.stderr)
+        raise SystemExit(1)
+    row = next((r for r in changelog.numbered(d) if str(r[0]) == str(argv[1]).strip()), None)
+    if row is None:
+        print(f"no unreleased line {argv[1]}: aerie changelog unreleased numbers them", file=sys.stderr)
+        raise SystemExit(1)
+    n, text, _shas, group = row
+    tied = [_bug_of(w) for a in argv[2:] for w in a.split(",") if w.strip()]
+    for b in tied:
+        _tie(b, text, changelog.canonical(group) or group or "the")
+    named = ", ".join("B" + str(b["id"]) for b in tied)
+    print(f"line {n} answers {named}, in the notebook; the changelog itself names its commits")
+    raise SystemExit(0)
+
+if argv and argv[0] == "unlink":
+    # aerie changelog unlink N BUG...: the line no longer answers them.
+    if len(argv) < 3:
+        print("aerie changelog unlink N BUG [BUG...]   untie the unreleased line N from these bugs", file=sys.stderr)
+        raise SystemExit(1)
+    row = next((r for r in changelog.numbered(d) if str(r[0]) == str(argv[1]).strip()), None)
+    if row is None:
+        print(f"no unreleased line {argv[1]}: aerie changelog unreleased numbers them", file=sys.stderr)
+        raise SystemExit(1)
+    for b in [_bug_of(w) for a in argv[2:] for w in a.split(",") if w.strip()]:
+        r = bugs.unlink_changelog(proj, b["id"], row[1], by="claude")
+        if r.get("error"):
+            print(f"B{b['id']}: {r['error']}", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"line {row[0]} no longer answers B{b['id']}")
     raise SystemExit(0)
 
 if argv and argv[0] == "unreleased":
@@ -246,7 +313,9 @@ if argv:
           "aerie changelog missing [TAG]       the fixed bugs the last release (or TAG) carried with\n"
           "                                 no Fixed line: a release is refused while there are any\n"
           'aerie changelog skip N "why"        a fixed bug that needs no line, and why\n'
-          "  add ... --bug N                  the Fixed line is about bug N\n"
+          "aerie changelog link N BUG...       the unreleased line N answers these bugs (kept in the notebook)\n"
+          "aerie changelog unlink N BUG...     the line no longer answers them\n"
+          "  add ... --bug N                  the Fixed line is about bug N (repeat it for several), stamped with its fix commits\n"
           "\nA category is a `### Name` subsection. Which ones exist and what\n"
           "order they and their lines sit in is the operator's, on the\n"
           "Changelog editor beside the version.",

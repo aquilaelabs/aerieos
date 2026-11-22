@@ -1,13 +1,14 @@
 """Behind `aerie dashboard trace [SECONDS]` (cmd_dashboard in bb): what the
 dashboard was asked over the last SECONDS, from the ring the server keeps
 (server.py trace_since), grouped by endpoint and by who asked, with how many
-times and how long each took. BB_TRACE_AUTH is the auth header.
+times and how long each took. The auth header is bbapi's own
+(BB_AUTH_HEADER, from api_py in aerie).
 """
-import os
 import sys
 import time
 
 import bbapi
+from say import need
 
 
 def main():
@@ -15,9 +16,8 @@ def main():
         secs = max(1, int(sys.argv[1] if len(sys.argv) > 1 else 60))
     except ValueError:
         sys.exit("[builderbot] ERROR: aerie dashboard trace [SECONDS]")
-    d = bbapi.call(f"/api/trace?since={int(time.time()) - secs}", auth=os.environ["BB_TRACE_AUTH"])
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    d = bbapi.call(f"/api/trace?since={int(time.time()) - secs}")
+    need(d)
     rows = d.get("rows") or []
     print(f"asked over the last {secs}s: {d.get('total', 0)} requests, {len(rows)} distinct")
     # How much of one core the server spent, and its threads: near 1.0 is a

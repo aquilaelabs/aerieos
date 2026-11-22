@@ -6,12 +6,12 @@
 // assertion is a round trip through the channel, which is the thing phase 3
 // exists to prove.
 import { URL, launch, newPage, ok, done, ready, sleep, refreshUntil, DIR,
-         tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection } from './lib.mjs';
+         tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection, quiet as quietFor,
+         api, OWNER, asSession, mint, section, REPO, jobEnd } from './lib.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync, statSync, lstatSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, openSync, rmSync, appendFileSync, realpathSync, copyFileSync, cpSync, chmodSync, symlinkSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const AGENT = `${REPO}/scripts/agent/builderbot-agent.py`;
 // The agent this world's controller ships (run.sh's BB_AGENT_DIR, a copy of
 // its own): the zip a node starts on is built from it, and the newer agent
@@ -38,18 +38,11 @@ if (process.env.BB_COVERAGE_DIR){
 let SCOPE = '';
 let PK = '';
 const NODE_JSON = `${DIR}/node.json`;
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const api = async (path, body) => {
-  const r = await fetch(URL.replace(/\/$/, '') + path, body === undefined
-    ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
+const auth = OWNER;
 const nodeById = async id => (await api('/api/v1/nodes')).nodes.find(n => n.id === id);
 const until = async (fn, ms = 15000, step = 200) => {
   const end = Date.now() + ms;
-  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }
+  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }   // the loop's own period
   return null;
 };
 
@@ -66,16 +59,16 @@ PK = `${DIR}/agenttoolchains/${SCOPE}`;
 let nodeBoot = '';
 ok(minted.ok && /^bbe_[A-Za-z0-9_-]{20,}$/.test(minted.token) && /^n_/.test(minted.id),
    `Enroll node mints a bbe_ token bound to a new node id (${minted.id})`);
-{
+await section("the row exists first, as pending: the token can only become that node", async () => {
   const n = await nodeById(minted.id);
   ok(n && n.kind === 'agent' && n.state === 'pending' && n.live === false,
      'the row exists first, as pending: the token can only become that node');
   const list = await api('/api/v1/nodes');
   ok(!list.nodes.some(x => JSON.stringify(x).includes(minted.token.slice(4))),
      'the token itself is never on a row: only its hash is stored');
-}
+});
 // ...and the download the provisioner does, with the enroll token
-{
+await section("and the download the provisioner does, with the enroll token", async () => {
   const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download',
     { headers: { Authorization: 'Bearer ' + minted.token } });
   const body = Buffer.from(await r.arrayBuffer());
@@ -85,7 +78,7 @@ ok(minted.ok && /^bbe_[A-Za-z0-9_-]{20,}$/.test(minted.token) && /^n_/.test(mint
   const bad = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download',
     { headers: { Authorization: 'Bearer bbe_nonsense' } });
   ok(bad.status === 401, '...and a made-up token gets nothing');
-}
+});
 
 // ---- enrolling: the real agent, once ---------------------------------------
 // The configuration plane's two tools, stood in for (phase 5): bb-sandbox as
@@ -96,7 +89,7 @@ const SANDBOX_STATE = `${DIR}/sandbox-mounts.json`;
 // NVIDIA display device bound to nouveau, and a modinfo that finds a
 // module only once the stand-in bb-sandbox has "installed" one, so the
 // census reads the same on any box the suite runs on.
-{
+await section("A card of its own for the agent to find", async () => {
   const dev = `${DIR}/sys/bus/pci/devices/0000:04:00.0`;
   mkdirSync(dev, { recursive: true });
   mkdirSync(`${DIR}/sys/bus/pci/drivers/nouveau`, { recursive: true });
@@ -145,7 +138,7 @@ f="\${BB_NV_STATE:-/nonexistent}"
 if [ -s "$f" ]; then sed -n 1p "$f"; exit 0; fi
 echo "modinfo: ERROR: Module nvidia not found." >&2; exit 1
 `, { mode: 0o755 });
-}
+});
 writeFileSync(`${DIR}/bin/bb-sandbox`, `#!/usr/bin/env python3
 import json, os, sys
 f = os.environ["BB_SANDBOX_STATE"]
@@ -246,6 +239,15 @@ while [ $# -gt 0 ]; do case "$1" in --name) name="$2"; shift;; --url) url="$2"; 
 # .runner fine in the suite and returned an empty name on a real node.
 printf '\\357\\273\\277{"agentName":"%s","gitHubUrl":"%s"}' "$name" "$url" > "$(dirname "$0")/.runner"
 `, { mode: 0o755 });
+// The runner's own service wrapper, which the agent puts at the folder's top
+// for the unit it writes; and a systemctl that records what it is asked.
+writeFileSync(`${DIR}/runner-src/bin/runsvc.sh`, `#!/bin/sh
+exec ./run.sh
+`, { mode: 0o755 });
+mkdirSync(`${DIR}/units`, { recursive: true });
+writeFileSync(`${DIR}/bin/runner-systemctl`, `#!/bin/sh
+echo "systemctl $*" >> "${DIR}/runner-systemctl.log"
+`, { mode: 0o755 });
 writeFileSync(`${DIR}/runner-src/svc.sh`, `#!/bin/sh
 # The real svc.sh resolves everything relative to the working directory and
 # refuses anywhere but the runner root. Recorded, because running it from
@@ -301,15 +303,18 @@ const { connect: wsConnect } = createRequire(import.meta.url)(`${REPO}/apps/vsco
 const termRun = async (arg, type, hdr, answer) => {
   const sock = await wsConnect(URL.replace(/\/$/, '').replace(/^http/, 'ws') + '/termws?arg='
     + encodeURIComponent(arg) + '&cols=120&rows=30', { headers: hdr });
-  let out = '', why = null;
-  sock.on('message', b => { out += b.toString('utf8'); });
+  let out = '', why = null, heard = 0;
+  sock.on('message', b => { out += b.toString('utf8'); heard = Date.now(); });
   sock.on('close', (code, w) => { why = w; });
-  await sleep(2500);
+  // The shell at its prompt, which no event says: something drawn and then
+  // a second with nothing more, or the terminal closed with its reason.
+  await until(() => why !== null || (heard && Date.now() - heard >= 1000), 30000, 50);
   if (type && why === null){
     sock.send(Buffer.concat([Buffer.from([0]), Buffer.from(type, 'utf8')]));
-    await sleep(2500);
     // A shell that is slow to start under a whole run's load answers late.
-    for (const t0 = Date.now(); answer && !answer.test(out) && why === null && Date.now() - t0 < 30000;) await sleep(200);
+    if (answer) await until(() => answer.test(out) || why !== null, 32500, 50);
+    // With no answer named there is nothing to wait for: what the shell says in this long is what is returned.
+    else await sleep(2500);
   }
   sock.close();
   return { out: out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b[()][0-9A-Za-z]/g, ''), why };
@@ -347,12 +352,15 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   BUILDERBOT_SYSTEMD: '1',      // this agent takes the service path whichever box runs the suite
   BUILDERBOT_TAILSCALE_BIN: `${DIR}/bin/tailscale`,
   BUILDERBOT_RUNNER_DIR: `${DIR}/runner`, BUILDERBOT_RUNNER_TARBALL: `${DIR}/runner.tar.gz`,
+  // The runner's unit is written by the agent and driven with systemctl,
+  // both stood in for here (R247 step 5: never the runner's own svc.sh).
+  BUILDERBOT_UNIT_DIR: `${DIR}/units`, BUILDERBOT_SYSTEMCTL_BIN: `${DIR}/bin/runner-systemctl`,
   BUILDERBOT_ACT_RUNNER_BIN: `${DIR}/bin/act_runner`,
   BUILDERBOT_SANDBOX_BIN: `${DIR}/bin/bb-sandbox`, BB_SANDBOX_STATE: SANDBOX_STATE,
   BB_GPU_STATE: `${DIR}/gpu-state`, BUILDERBOT_GPU_DISPLAY_STATE: `${DIR}/gpu-state`,
   BUILDERBOT_SYS_ROOT: `${DIR}/sys`, BB_NV_STATE: `${DIR}/nv-installed`, BB_CTK_STATE: `${DIR}/ctk-installed`,
   BUILDERBOT_NETPLAN_BIN: `${DIR}/bin/netplan`, BUILDERBOT_NETPLAN_DIR: `${DIR}/netplan` };
-{
+await section("builderbot-agent enroll writes node.json, mode 0600", async () => {
   let out = '';
   try {
     // A toolchain store of its own: the default is /var/lib/builderbot, which
@@ -397,11 +405,11 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   } catch (e) { again = String(e.stderr); }
   ok(/refused/.test(again) && !existsSync(NODE_JSON + '.2'),
      `the enroll token is single-use: a second enrollment is refused (${again.trim().split('\n').pop()?.slice(0, 120) || 'no stderr'})`);
-}
+});
 
 // The agent refuses a system path for a store whatever it is told, which is
 // the same rule the controller applies, made at the resource.
-{
+await section("The agent refuses a system path for a store whatever it is told, which is", async () => {
   let refused = '';
   try {
     execFileSync('python3', [AGENT, 'enroll', '--controller', URL, '--token', 'bbe_x',
@@ -409,7 +417,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   } catch (e) { refused = String(e.stderr || '') + String(e.stdout || ''); }
   ok(/system directory/.test(refused),
      `the agent refuses --store cache=/etc at enrollment (${refused.trim().slice(0, 70)})`);
-}
+});
 
 // ---- the loop: hello, heartbeat, a job ---------------------------------------
 // The agent's output goes to a FILE, never a pipe. A pipe has to be drained
@@ -427,7 +435,8 @@ const agentOut = openSync(AGENT_LOG_FILE, 'a');
 const AGENT_RUN = `${DIR}/agent-run/builderbot-agent`;
 mkdirSync(`${DIR}/agent-run`, { recursive: true });
 writeFileSync(AGENT_RUN, agentZip());
-const agent = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
+// let: a build that dies as it starts is started again below, as the service would (R241).
+let agent = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
 const agentLog = () => { try { return readFileSync(AGENT_LOG_FILE, 'utf8'); } catch { return ''; } };
 try {
   const live = await until(async () => {
@@ -657,7 +666,7 @@ print(json.dumps({'first': first, 'again': case('process'), 'guest': case('contr
       const r = JSON.parse(said);
       ok(JSON.stringify(r.first) === JSON.stringify([['unit', 'needrestart'], ['show', 'daemon-reload']])
          && r.dropin === '[Service]\nKillMode=process\n'
-         && r.conf.includes('$nrconf{override_rc}{qr(^builderbot-agent\\.service$)} = 0;'),
+         && r.conf.includes('$nrconf{override_rc}{qr(^(aerieos|builderbot)-agent\\.service$)} = 0;'),
          `a unit that would take the sessions on a stop gets KillMode=process in a drop-in, and needrestart is told to leave it alone (${said.slice(0, 120)})`);
       ok(r.again[0].length === 0 && JSON.stringify(r.again[1]) === '["show"]' && r.guest[0].length === 0,
          '...once: a unit that already stops only itself and a needrestart already told are left as they are, and a guest is never touched');
@@ -1053,27 +1062,17 @@ print(json.dumps(sorted(os.listdir(d))))
     // one (users.renewal, X-BB-Session), bbapi writes it where bb looks, and
     // bb prefers whichever of its two expires later.
     {
-      const mint = ttl => execFileSync('python3', ['-c', `
-import importlib.util, os, json
-spec = importlib.util.spec_from_file_location('users', ${JSON.stringify(`${REPO}/scripts/dashboard/users.py`)})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const expOf = t => Number(Buffer.from(t.slice(4), 'base64url').toString().split('|')[1]);
-      const short = mint(3600);
+      const short = mint('alpha', '', 3600);
       const raw = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + short, 'Content-Type': 'application/json' },
+        headers: asSession(short),
         body: JSON.stringify({ argv: ['roadmap'] }) });
       const fresh = raw.headers.get('x-bb-session') || '';
       ok(raw.status === 200 && /^bbs_/.test(fresh) && expOf(fresh) - expOf(short) > 6 * 3600
          && Buffer.from(fresh.slice(4), 'base64url').toString().startsWith('alpha|'),
          `an answer to a token past half its life carries a fresh one for the same space (${fresh.slice(0, 8)}…)`);
       const full = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        headers: asSession(tok),
         body: JSON.stringify({ argv: ['roadmap'] }) });
       ok(full.status === 200 && !full.headers.get('x-bb-session'),
          '...and one with most of its life left is left alone');
@@ -1125,7 +1124,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const api = async (body) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/claude-login',
       { method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + forMe },
+        headers: asSession(forMe),
         body: JSON.stringify(body) });
       return { status: r.status, ...(await r.json()) }; };
     // Where this account is signed in, as the page is told it.
@@ -1137,8 +1136,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // one of the project's: a machine that could name any node could report
     // for another.
     await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+      headers: OWNER,
       body: JSON.stringify({ project: 'alpha', node: minted.id }) });
     let w = await api({ email: 'tester@example.com', plan: 'max', signed_in: true });
     ok(w.ok && w.plan === 'max' && Object.keys(w).every(k => ['status', 'ok', 'plan'].includes(k)),
@@ -1175,7 +1173,9 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     {
       const base = `${DIR}/flow-home`;
       mkdirSync(`${base}/.local/bin`, { recursive: true });
-      writeFileSync(`${base}/.local/bin/claude`, '#!/bin/sh\necho "fake claude $*"\n');
+      // What it was run with goes into its home: its screen is the driver's
+      // to read (scripts/lib/login-flow.py), never the log.
+      writeFileSync(`${base}/.local/bin/claude`, '#!/bin/sh\necho "fake claude $*" > "$HOME/ran"\necho "its own screen"\n');
       chmodSync(`${base}/.local/bin/claude`, 0o755);
       const run = (uid) => { try {
         return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'login', '--flow'],
@@ -1185,8 +1185,9 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
                    BB_CLAUDE_PINNED: `${base}/no-pin` } }) };
       } catch (e) { return { code: e.status, out: String(e.stdout) + String(e.stderr) }; } };
       const second = run('u_0badf00d');
-      ok(second.code === 0 && /fake claude auth login/.test(second.out),
-         `the sign-in flow for a second account runs the session account's Claude Code (${
+      const ran = existsSync(`${base}/users/u_0badf00d/ran`) ? readFileSync(`${base}/users/u_0badf00d/ran`, 'utf8') : '';
+      ok(second.code === 0 && /fake claude auth login/.test(ran) && /signed in to Claude on/.test(second.out) && !/its own screen/.test(second.out),
+         `the sign-in flow for a second account runs the session account's Claude Code, by the one driver every agent's sign-in has (${
            second.out.trim().split('\n').pop().slice(0, 70)})`);
       ok(existsSync(`${base}/users/u_0badf00d/.claude`),
          "...with the credential's home the second account's own");
@@ -1218,7 +1219,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // A token for the project alone (a relayed verb's) is nobody's account,
     // and cannot report for one.
     const anon = await fetch(URL.replace(/\/$/, '') + '/api/v1/claude-login',
-      { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+      { method: 'POST', headers: asSession(tok),
         body: JSON.stringify({ email: 'x@example.invalid', signed_in: true }) });
     ok(anon.status === 403, 'a token for the space alone cannot speak for an account');
 
@@ -1228,8 +1229,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
     const nodeTok = JSON.parse(readFileSync(NODE_JSON, 'utf8')).token;
     const beat = (logins) => fetch(URL.replace(/\/$/, '') + '/api/v1/agent/work',
-      { method: 'POST', headers: { Authorization: 'Bearer ' + nodeTok,
-                                   'Content-Type': 'application/json' },
+      { method: 'POST', headers: asSession(nodeTok),
         body: JSON.stringify({ sample: { cpu_pct: 1, logins }, running: [], wait: 0 }) });
     await api({ signed_in: false });
     ok(!(minted.id in await where()), 'a node saying this account is not signed in there takes it off the record');
@@ -1245,7 +1245,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // revs token `live` moving so the page knows to ask.
     {
       const tell = (title) => fetch(URL.replace(/\/$/, '') + '/api/v1/agent/sessions',
-        { method: 'POST', headers: { Authorization: 'Bearer ' + nodeTok, 'Content-Type': 'application/json' },
+        { method: 'POST', headers: asSession(nodeTok),
           body: JSON.stringify({ sessions: [{ name: `${owner}~claude-alpha`, attached: true, cwd: '/workspace/alpha',
                                               created: 1, title }] }) });
       const get = async p => (await fetch(URL.replace(/\/$/, '') + p, { headers: auth })).json();
@@ -1271,14 +1271,13 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       ok((idle.claude_with.alpha || []).includes('test') && !(idle.claude_busy.alpha || []).includes('test'),
          '...and waiting when its title says so');
       await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/sessions',
-        { method: 'POST', headers: { Authorization: 'Bearer ' + nodeTok, 'Content-Type': 'application/json' },
+        { method: 'POST', headers: asSession(nodeTok),
           body: JSON.stringify({ sessions: [] }) });
     }
     // The seed goes back, and alpha to having no node.
     writeFileSync(`${DIR}/home/.claude/.bb-grant.json`, seed);
     await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+      headers: OWNER,
       body: JSON.stringify({ project: 'alpha', node: '' }) });
   }
 
@@ -1417,7 +1416,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       } catch (e) { checked = `FAILED ${e.status}: ${e.stdout}${e.stderr}`; }
       bbOnNode(['rules', 'rm', 'relayprobe', 'test']);
       const sent = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + forMe, 'Content-Type': 'application/json' },
+        headers: asSession(forMe),
         body: JSON.stringify({ argv: ['rules', 'check', '--all'], cwd: `${DIR}/ws/alpha` }) })).json();
       ok(/relayed=no/.test(checked) && /runs on the machine the session is on/.test(sent.error || ''),
          `aerie rules check on a node runs the rule's command there, and the controller refuses one relayed to it (${
@@ -1501,7 +1500,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         else writeFileSync(`${DIR}/state/rules.json`, kept);
       }
       const bad = await fetch(URL.replace(/\/$/, '') + '/api/v1/hook', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        headers: asSession(tok),
         body: JSON.stringify({ kind: 'asked', text: 'hi' }) });
       ok(bad.status === 403, 'a token for the space alone, with no account, may not post as anybody');
     }
@@ -1631,10 +1630,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
   const j = await api('/api/v1/nodes', { action: 'exec', id: minted.id,
     argv: ['sh', '-c', 'echo hello from $BUILDERBOT_NODE; echo two >&2; exit 3'] });
   ok(j.ok && /^j_/.test(j.job), `exec queues a job (${j.job})`);
-  const fin = await until(async () => {
-    const r = await api(`/api/v1/jobs?id=${j.job}`);
-    return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-  });
+  const fin = await jobEnd(j.job, { ms: 15000, step: 200 });
   ok(fin && fin.state === 'failed' && fin.exit_code === 3,
      `the agent runs it and reports the exit code (${fin?.state}, exit ${fin?.exit_code})`);
   ok(fin && fin.log.includes(`hello from ${minted.id}`) && fin.log.includes('two'),
@@ -1650,10 +1646,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const forced = await api('/api/v1/nodes', { action: 'exec', id: minted.id,
       argv: ['true'], requires: ['gpu-render'] });
     ok(forced.ok, 'a job requiring something the node lacks is queued; the row does not check');
-    const ref = await until(async () => {
-      const x = await api(`/api/v1/jobs?id=${forced.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-    });
+    const ref = await jobEnd(forced.job, { ms: 15000, step: 200 });
     ok(ref && ref.state === 'failed' && ref.exit_code === 77 && /not enrolled for gpu-render/.test(ref.log),
        'the NODE refuses a job for a capability it did not enroll with (door 7)');
   }
@@ -1670,10 +1663,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     ok(running !== null, 'a long job on the agent reaches running with its first line logged');
     const c = await api('/api/v1/jobs', { action: 'cancel', id: q.job });
     ok(c.ok, 'Cancel is accepted while it runs');
-    const fin = await until(async () => {
-      const x = await api(`/api/v1/jobs?id=${q.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-    }, 40000);
+    const fin = await jobEnd(q.job, { ms: 40000, step: 200 });
     ok(fin && fin.state === 'canceled' && /stopped by test/.test(fin.error)
        && fin.ended - fin.started < 40,
        `the agent kills it and reports canceled (${fin?.state}: ${fin?.error})`);
@@ -1728,11 +1718,9 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const ap = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
     ok(ap.ok && /^j_/.test(ap.job), `apply storage queues a system job (${ap.job || ap.error})`);
     const twice = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'network' });
-    ok(/one at a time/.test(twice.error || ''), '...and a second apply waits for it');
-    const fin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${ap.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    ok(twice.ok && /^j_/.test(twice.job || ''), `...and a second apply is queued behind it (${twice.error || twice.job})`);
+    if (twice.job) await api('/api/v1/jobs', { action: 'cancel', id: twice.job });
+    const fin = await jobEnd(ap.job, { ms: 30000, step: 200 });
     ok(fin && fin.state === 'succeeded' && /add-nfs nas:\/mnt\/user\/appdata:\/mnt\/appdata/.test(fin.log)
        && /add-share projects:\/srv\/projects:ro/.test(fin.log) && /cache store/.test(fin.log),
        `the agent applies it through bb-sandbox and the stores, logging each step (${fin?.state})`);
@@ -1753,10 +1741,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     if (process.getuid && process.getuid() !== 0){
       const pw = await api('/api/v1/nodes', { action: 'reboot', id: minted.id });
       ok(pw.ok && /^j_/.test(pw.job), `reboot queues a system job (${pw.job || pw.error})`);
-      const fin = await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${pw.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 30000);
+      const fin = await jobEnd(pw.job, { ms: 30000, step: 200 });
       ok(fin?.state === 'failed' && /refused: a reboot is root's/.test(fin.log || '') && /sudo reboot/.test(fin.log || ''),
          `...which an agent that is not root refuses, naming the command (${fin?.state}: ${(fin?.log || '').trim().slice(0, 80)})`);
     }
@@ -1770,10 +1755,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // with a census, which under a whole run's load took more than 40 s.
     {
       const drv = async () => ((await api(`/api/toolchains?node=${minted.id}`)).machine || [])[0];
-      const job = async id => until(async () => {
-        const r = await api(`/api/v1/jobs?id=${id}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 120000);
+      const job = async id => jobEnd(id, { ms: 120000, step: 200 });
       const first = await until(async () => { const x = await drv(); return x?.state && x.state !== 'unknown' && x.options?.length ? x : null; }, 120000);
       ok(first?.state === 'absent' && first.managed && /10de:2482/.test(first.card) && first.bound === 'nouveau' && !first.here,
          `the agent reports the card and no driver on it, nouveau holding it (${first?.state}, ${first?.bound})`);
@@ -1800,10 +1782,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       {
         const g = await api('/api/v1/nodes', { action: 'gpu-display', id: minted.id });
         ok(g.ok && /^j_/.test(g.job), `Set up GPU display queues a system job on a sandbox node (${g.job || g.error})`);
-        const fin = await until(async () => {
-          const r = await api(`/api/v1/jobs?id=${g.job}`);
-          return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-        }, 30000);
+        const fin = await jobEnd(g.job, { ms: 30000, step: 200 });
         ok(fin?.state === 'succeeded' && /takes the card at the next boot/.test(fin.log || ''),
            `...bb-sandbox gpu runs and its words are the job's (${fin?.state}: ${(fin?.log || '').trim().slice(-70)})`);
         const told = await until(async () => {
@@ -1880,10 +1859,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
                     toolchains: `${DIR}/fakeshare/toolchains`, artifacts: `${DIR}/agentartifacts` },
                   network: { mode: 'dhcp' } } });
       const j = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
-      const r = await until(async () => {
-        const x = await api(`/api/v1/jobs?id=${j.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-      }, 30000);
+      const r = await jobEnd(j.job, { ms: 30000, step: 200 });
       ok(r && r.state === 'failed' && /is NOT mounted/.test(r.log) && /own disk/.test(r.log),
          `a store inside a configured share that is not mounted is refused, and says why (${r?.state})`);
       ok(!existsSync(`${DIR}/fakeshare/toolchains`),
@@ -1912,10 +1888,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
                             artifacts: `${DIR}/agentartifacts` },
                   network: { mode: 'dhcp' } } });
       const j = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
-      const r = await until(async () => {
-        const x = await api(`/api/v1/jobs?id=${j.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-      }, 60000);
+      const r = await jobEnd(j.job, { ms: 60000, step: 200 });
       ok(r && r.state === 'succeeded'
          && readFileSync(`${DIR}/agenttoolchains2/${SCOPE}/android/marker`, 'utf8') === 'a toolchain lives here',
          `moving a store copies what was in it to the new place (${r?.state})`);
@@ -1951,10 +1924,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       await api('/api/v1/nodes', { action: 'config', id: minted.id,
         config: { mounts: [], stores: { artifacts: `${DIR}/pre/a1/a2/art` }, network: { mode: 'dhcp' } } });
       const mk = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
-      const mkr = await until(async () => {
-        const x = await api(`/api/v1/jobs?id=${mk.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-      }, 60000);
+      const mkr = await jobEnd(mk.job, { ms: 60000, step: 200 });
       ok(mkr && mkr.state === 'succeeded' && existsSync(`${DIR}/pre/a1/a2/art`)
          && /made .*\/pre\/a1/.test(mkr.log),
          `a store path is created, parents and all, and the log says what it made (${mkr?.state})`);
@@ -1968,13 +1938,18 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // (B84).
       rmSync(`${DIR}/pre/a1/a2/art`, { recursive: true, force: true });
       mkdirSync(`${DIR}/pre/a1/a2/art`, { recursive: true });
+      // ...and the store it goes back to, for the same reason the other way
+      // (B754): the first move off the node's default store copied what that
+      // held into agentartifacts, and the move above left it there (nothing
+      // is ever deleted from a store moved off), so on a node whose default
+      // store had files (the CI runner's) the move back was refused as a
+      // copy into a folder of files, and every apply after it with it.
+      rmSync(`${DIR}/agentartifacts`, { recursive: true, force: true });
+      mkdirSync(`${DIR}/agentartifacts`, { recursive: true });
       await api('/api/v1/nodes', { action: 'config', id: minted.id,
         config: { mounts: [], stores: { artifacts: `${DIR}/agentartifacts` }, network: { mode: 'dhcp' } } });
       const un = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
-      const unr = await until(async () => {
-        const x = await api(`/api/v1/jobs?id=${un.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-      }, 60000);
+      const unr = await jobEnd(un.job, { ms: 60000, step: 200 });
       ok(unr && unr.state === 'succeeded' && !existsSync(`${DIR}/pre/a1`) && /removed .*\/pre\/a1\/a2\/art/.test(unr.log),
          `moving off an empty store takes back the directories it made for it (${
            unr?.state}; a1 still there: ${existsSync(`${DIR}/pre/a1`)}; log: ${
@@ -1991,10 +1966,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
                         stores: { cache: `${DIR}/agentcache`, toolchains: `${DIR}/agenttoolchains`,
                                   artifacts: `${DIR}/agentartifacts` },
                         network: { mode: 'static', address: '10.9.9.9/24', gateway: '10.9.9.1', dns: ['10.9.9.1'] } };
-      const finished = async job => until(async () => {
-        const x = await api(`/api/v1/jobs?id=${job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-      }, 60000);
+      const finished = async job => jobEnd(job, { ms: 60000, step: 200 });
       await api('/api/v1/nodes', { action: 'config', id: minted.id,
         config: { ...backCfg, stores: { ...backCfg.stores, toolchains: `${DIR}/pre` } } });
       const mr = await finished((await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' })).job);
@@ -2026,20 +1998,14 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
 
     // network: written, applied, dialed back, with the stub controller still here
     const np = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'network' });
-    const nfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${np.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const nfin = await jobEnd(np.job, { ms: 30000, step: 200 });
     const yaml = readFileSync(`${DIR}/netplan/90-builderbot.yaml`, 'utf8');
     ok(nfin && nfin.state === 'succeeded' && /dialed back in/.test(nfin.log)
        && /addresses: \[10\.9\.9\.9\/24\]/.test(yaml) && /via: 10\.9\.9\.1/.test(yaml)
        && /^apply$/m.test(readFileSync(`${DIR}/netplan.log`, 'utf8')),
        `a network change is written to netplan, applied, and confirmed by dialing back (${nfin?.state})`);
     const again = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'network' });
-    const afin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${again.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const afin = await jobEnd(again.job, { ms: 30000, step: 200 });
     ok(afin && afin.state === 'succeeded' && /already applied/.test(afin.log),
        '...and applying the same config again changes nothing');
   }
@@ -2181,10 +2147,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       outputs: ['out/*.apk'] });
     ok(run.ok && /^sha256:[0-9a-f]{64}$/.test(run.snapshot) && run.files > 0 && run.node === minted.id,
        `a run snapshots the tree and queues on the build node (${run.files} files, ${run.snapshot?.slice(0, 19)})`);
-    const fin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${run.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const fin = await jobEnd(run.job, { ms: 30000, step: 200 });
     ok(fin && fin.state === 'succeeded' && /hi from the tree/.test(fin.log) && /workspace .*jobs\/j_/.test(fin.log),
        `the agent materializes the snapshot and runs there (${fin?.state}${fin?.state === 'succeeded' ? '' : ': ' + (fin?.error || '') + ' | ' + (fin?.log || '').slice(-400).replace(/\n/g, ' / ')})`);
     ok(fin && /\n0\n/.test(fin.log), '...dist/ stays behind: the snapshot carries the tree, not the shelf');
@@ -2202,9 +2165,13 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       ok(still === 'running' && took < 9000 && !probe.error,
          `Test answers beside a job that holds the node's one slot, rather than after it (${took}ms, the long job ${still}: ${
            JSON.stringify(probe).slice(0, 90)})`);
+      // ...and says, beside the round trip, whether the node takes what
+      // this controller ships: one phrase, with no key in it.
+      ok(probe.on && probe.trust && typeof probe.trust.ok === 'boolean' && /this controller/.test(probe.trust.said || '')
+         && probe.trust.said.length < 100 && !/[0-9a-f]{8}/.test(probe.trust.said),
+         `...and says whether the node takes this controller's builds (${JSON.stringify(probe.trust)})`);
       await api('/api/v1/jobs', { action: 'cancel', id: long.job });
-      await until(async () => ['succeeded', 'failed', 'canceled'].includes(
-        (await api(`/api/v1/jobs?id=${long.job}`)).state) ? true : null, 20000);
+      await jobEnd(long.job, { ms: 20000, step: 200 });
     }
     // The Docker manager's listing, the same way. Its `docker ps` is a read
     // on the node, and the light lane takes it beside a build, so a look
@@ -2224,8 +2191,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
          `the Docker manager's listing during a job is asked of the node, fresh and not marked stale (${took}ms, stale ${
            again.stale}, first ${first.error || 'ok'}, the job ${still})`);
       await api('/api/v1/jobs', { action: 'cancel', id: long.job });
-      await until(async () => ['succeeded', 'failed', 'canceled'].includes(
-        (await api(`/api/v1/jobs?id=${long.job}`)).state) ? true : null, 20000);
+      await jobEnd(long.job, { ms: 20000, step: 200 });
       const fresh = await api(`/api/docker?node=${minted.id}`);
       ok(!fresh.error && !fresh.stale, `...and the look after the job ends is a fresh read (stale ${fresh.stale})`);
     }
@@ -2250,10 +2216,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const envrun = await api('/api/v1/jobs', { action: 'run', project: 'alpha',
         argv: ['sh', '-c', 'echo "root=$SDK_ROOT"; echo "java=$JAVA_HOME"; '
                          + 'echo "android=$ANDROID_HOME"; echo "path=$PATH"; echo "cilog=$BB_CI_LOG_DIR"'] });
-      const ef = await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${envrun.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 30000);
+      const ef = await jobEnd(envrun.job, { ms: 30000, step: 200 });
       const log = ef?.log || '';
       ok(/root=.*agenttoolchains/.test(log) && /java=.*agenttoolchains\/n_[0-9a-f]+\/jdk/.test(log)
          && /android=.*agenttoolchains\/n_[0-9a-f]+\/android/.test(log),
@@ -2269,10 +2232,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       mkdirSync(`${PK}/android/cmdline-tools`, { recursive: true });
       const bare = await api('/api/v1/jobs', { action: 'run', project: 'alpha',
         argv: ['sh', '-c', 'true'] });
-      if (bare.job) await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${bare.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 30000);
+      if (bare.job) await jobEnd(bare.job, { ms: 30000, step: 200 });
       const cens = await until(async () => {
         const n = await nodeById(minted.id);
         return n?.reported?.toolchains ? n : null;
@@ -2386,27 +2346,18 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
        'a finished workspace is gone; the space cache beside it persists');
     // the same tree again transfers nothing
     const again = await api('/api/v1/jobs', { action: 'run', project: 'alpha', argv: ['true'] });
-    const afin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${again.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const afin = await jobEnd(again.job, { ms: 30000, step: 200 });
     ok(again.snapshot === run.snapshot && afin && !/fetching snapshot/.test(afin.log),
        'an unchanged tree makes the same digest, and the node uses its cached copy');
     // a failure keeps the workspace
     const bad = await api('/api/v1/jobs', { action: 'run', project: 'alpha', argv: ['sh', '-c', 'echo boom; exit 3'] });
-    const bfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${bad.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const bfin = await jobEnd(bad.job, { ms: 30000, step: 200 });
     const kept = bfin?.outputs?.find(o => o.kind === 'workspace');
     ok(bfin && bfin.state === 'failed' && kept && existsSync(kept.path) && /kept at/.test(bfin.log),
        `a failed build keeps its workspace on the node and says where (${kept?.path})`);
     // cache-clear is a job too
     const cc = await api('/api/v1/nodes', { action: 'cache-clear', id: minted.id });
-    const cfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${cc.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const cfin = await jobEnd(cc.job, { ms: 30000, step: 200 });
     ok(cfin && cfin.state === 'succeeded' && !existsSync(`${DIR}/agentcache/alpha`),
        'Clear cache drops the space caches through a job');
     const n2 = await nodeById(minted.id);
@@ -2523,10 +2474,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const madeBefore = (agentLog().match(/the bundle or the store changed; new terminals see it/g) || []).length;
     const pj = await api('/api/toolchains', { action: 'remove', names: ['flutter'], node: minted.id });
     ok(pj.ok && /^j_/.test(pj.job), `a toolchain job is queued on the node (${pj.job || pj.error})`);
-    const pfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${pj.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const pfin = await jobEnd(pj.job, { ms: 60000, step: 200 });
     // Unpacked by this job, or already there: the session half fetched the
     // same bundle at start (roadmap #24), and a second unpack of the same
     // digest is exactly what the digest is for.
@@ -2554,10 +2502,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     {
       const fj = await api('/api/toolchains', { action: 'install', names: ['rust'], node: minted.id });
       ok(fj.ok && /^j_/.test(fj.job), `a toolchain install is queued on the node (${fj.job || fj.error})`);
-      await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${fj.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 60000);
+      await jobEnd(fj.job, { ms: 60000, step: 200 });
       // The finished job's view, once nothing on the node is still running:
       // a toolchain job still active there draws the running view instead.
       const tcv = await until(async () => {
@@ -2579,15 +2524,16 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         '1 of 2 did not install', ''].join('\n');
       const parsed = JSON.parse(execFileSync('python3', ['-c', `
 import json, sys, types
-sys.path.insert(0, ${JSON.stringify(REPO + 'scripts/dashboard')})
+sys.path.insert(0, ${JSON.stringify(REPO + '/scripts/dashboard')})
 import toolchains as tc
 tc.nodes = types.SimpleNamespace(job_tail=lambda jid, n=4000: sys.stdin.read())
 print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: log, encoding: 'utf8' }));
       const why = parsed.graphics || '';
-      ok(/(^| )curl: \(22\)/.test(why) && /could not download/.test(why) && /exit 1/.test(why)
-         && /install failed on the node$/.test(why) && !/diagrams/.test(why) && !/did not install/.test(why)
-         && !/#=#|##O/.test(why),
-         `...and the reason is that toolchain's own section of the log, with the exit and without the frames (${why.slice(0, 120)})`);
+      // bb's ERROR is the row: curl's own words, the bar and the partial
+      // copy's removal stay in the log.
+      ok(why === 'ERROR: could not download https://example.invalid/ImageMagick-gcc-x86_64.AppImage · install failed on the node'
+         && !/diagrams/.test(why) && !/did not install/.test(why) && !/#=#|##O|curl:/.test(why),
+         `...and the reason is that toolchain's own error, from its own section of the log, without the frames (${why.slice(0, 120)})`);
     }
     // The store's own directories decide what is installed there, not the
     // census's placement summary, which named six toolchains and called four
@@ -2599,16 +2545,17 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // ...except a directory without the file that completes the toolchain:
     // playwright's browsers from before the recipe carried the module.
     mkdirSync(`${PK}/playwright/chromium-1234`, { recursive: true });
-    mkdirSync(`${PK}/node/bin`, { recursive: true });   // playwright requires node
+    // playwright requires node, and a requirement counts as there only with
+    // its tool in it: a folder alone is an install that did not finish, which
+    // an install of what needs it puts right first.
+    mkdirSync(`${PK}/node/bin`, { recursive: true });
+    writeFileSync(`${PK}/node/bin/node`, '#!/bin/sh\necho v24.0.0\n', { mode: 0o755 });
     // The store listing rides the census, which refreshes at hello, and a
     // job that touches the node ends in one, which is why installing a
     // toolchain updates this list without waiting ten minutes. Any such job
     // will do here.
     const poke = await api('/api/v1/nodes', { action: 'cache-clear', id: minted.id });
-    await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${poke.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    await jobEnd(poke.job, { ms: 30000, step: 200 });
     const view = await until(async () => {
       const v = await api(`/api/toolchains?node=${minted.id}`);
       return v.items?.some(i => i.name === 'zig' && i.installed) ? v : null;
@@ -2632,10 +2579,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     {
       const cj = await api('/api/toolchains', { action: 'check', node: minted.id, names: ['zig'] });
       ok(cj.ok && /^j_/.test(cj.job), `a check is queued as a job on the node (${cj.job || cj.error})`);
-      const cf = await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${cj.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 90000);
+      const cf = await jobEnd(cj.job, { ms: 90000, step: 200 });
       ok(cf && /== aerie toolchains check zig/.test(cf.log || ''),
          `...and the agent runs it there (${cf?.state}: ${(cf?.log || '').slice(-160).replace(/\n/g, ' / ')})`);
       const view = await until(async () => {
@@ -2658,10 +2602,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       mkdirSync(SM, { recursive: true });
       writeFileSync(`${SM}/sdkmanager`, '#!/bin/sh\necho "sdkmanager $*"\n', { mode: 0o755 });
       const poke2 = await api('/api/v1/nodes', { action: 'cache-clear', id: minted.id });
-      await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${poke2.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 30000);
+      await jobEnd(poke2.job, { ms: 30000, step: 200 });
       const IMG34 = 'system-images;android-34;google_apis;x86_64';
       const em = await until(async () => {
         const v = await api(`/api/emulator?node=${minted.id}`);
@@ -2671,10 +2612,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
          `the Emulator page reads the node's images and the AVD built on each (${JSON.stringify(em?.images)})`);
       const rj = await api('/api/emulator', { action: 'remove', node: minted.id, image: IMG34 });
       ok(rj.ok && /^j_/.test(rj.job), `removing one queues an image job on the node (${rj.job || rj.error})`);
-      const rf = rj.job ? await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${rj.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 60000) : null;
+      const rf = rj.job ? await jobEnd(rj.job, { ms: 60000, step: 200 }) : null;
       ok(rf && rf.type === 'image' && rf.state === 'succeeded'
          && /== aerie emu image remove system-images;android-34;google_apis;x86_64/.test(rf.log)
          && /sdkmanager .*--uninstall system-images;android-34;google_apis;x86_64/.test(rf.log),
@@ -2688,10 +2626,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // stops before anything is downloaded.
     const sj = await api('/api/toolchains', { action: 'install', names: ['playwright'], node: minted.id });
     ok(sj.ok && /^j_/.test(sj.job), `installing playwright on the node queues a job (${sj.job || sj.error})`);
-    const sfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${sj.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const sfin = await jobEnd(sj.job, { ms: 60000, step: 200 });
     ok(sfin && /needs system packages this node's owner installs/.test(sfin.log)
        && /libatk1\.0-0t64/.test(sfin.log) && /libnss3/.test(sfin.log),
        `a recipe's system packages are named for the owner on a node the agent does not administer (${
@@ -2729,10 +2664,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(wrong.length === 0, `every installed row names the toolchains it needs that this node lacks (${wrong.map(i => i.name).join(', ') || 'all agree'})`);
     const dj = await api('/api/toolchains', { action: 'sysdeps', names: ['playwright'], node: minted.id });
     ok(dj.ok && /^j_/.test(dj.job), `a sysdeps job is queued for the held recipe (${dj.job || dj.error})`);
-    const dfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${dj.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const dfin = await jobEnd(dj.job, { ms: 60000, step: 200 });
     ok(dfin && dfin.state === 'failed' && dfin.exit_code === 77
        && /does not administer the machine, so its owner installs these: playwright: /.test(dfin.log)
        && /libnss3/.test(dfin.log) && !/aerie toolchains install/.test(dfin.log),
@@ -2749,10 +2681,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const cores = (await import('node:os')).cpus().length;
     const runEcho = async () => {
       const j = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo W=$BB_TEST_WORKERS'] });
-      const fin = await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${j.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 30000);
+      const fin = await jobEnd(j.job, { ms: 30000, step: 200 });
       return (fin?.log || '').match(/W=(\d+)/)?.[1];
     };
     const set = await api('/api/v1/nodes', { action: 'test-workers', id: minted.id, workers: 3 });
@@ -2787,10 +2716,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
   {
     const GH = 'github.com-example-org', GT = 'git.example.test-3000-example-org';
     const runnerOf = (n, slot) => (n.reported.services?.runners || []).find(r => r.slot === slot);
-    const ended = async job => until(async () => {
-      const r = await api(`/api/v1/jobs?id=${job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const ended = async job => jobEnd(job, { ms: 30000, step: 200 });
     // The token is the runner's, stored root-only through the helper under
     // the node and the runner's slot, with the address it registers with on
     // the record, and an install cannot start without one. Nothing here
@@ -2836,9 +2762,18 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(ifin && ifin.state === 'succeeded' && /registering agentbox with https:\/\/github.com\/example-org/.test(ifin.log),
        `the agent unpacks the runner into the runner's own directory and registers it (${ifin?.state}: ${(ifin?.log || '').slice(-200).replace(/\n/g, ' / ')})`);
     ok(/config --unattended --replace --url https:\/\/github.com\/example-org --token AAAREGTOKEN --name agentbox --labels builderbot,self-hosted,linux,x64,agentbox,gpu,badlabel --work _work/.test(calls)
-       && /svc install/.test(calls) && /svc start/.test(calls)
-       && /RUNNER_ROOT_OK/.test(calls),
-       'config.sh gets the minted token, the node\'s name, the default labels plus its own name, and svc.sh installs and starts it');
+       && !/svc /.test(calls),
+       'config.sh gets the minted token, the node\'s name, the default labels plus its own name, and the runner\'s own svc.sh is never run');
+    // The unit is the agent's, from GitHub's template: the runner's folder is
+    // the jobs account's, and root ran svc.sh from it (R247 step 5).
+    const unitName = existsSync(`${DIR}/runner/${GH}/.service`) ? readFileSync(`${DIR}/runner/${GH}/.service`, 'utf8').trim() : '';
+    const unitText = unitName && existsSync(`${DIR}/units/${unitName}`) ? readFileSync(`${DIR}/units/${unitName}`, 'utf8') : '';
+    const sysctl = existsSync(`${DIR}/runner-systemctl.log`) ? readFileSync(`${DIR}/runner-systemctl.log`, 'utf8') : '';
+    ok(/^actions\.runner\.[A-Za-z0-9._-]+\.service$/.test(unitName)
+       && unitText.includes(`ExecStart=${DIR}/runner/${GH}/runsvc.sh`) && /^User=\S+$/m.test(unitText)
+       && existsSync(`${DIR}/runner/${GH}/runsvc.sh`)
+       && sysctl.includes('systemctl daemon-reload') && sysctl.includes(`systemctl enable ${unitName}`) && sysctl.includes(`systemctl start ${unitName}`),
+       `...and the agent writes the runner's unit itself and starts it with systemctl (${unitName}; ${sysctl.trim().split('\n').slice(-3).join(' | ')})`);
     ok(!/AAAREGTOKEN/.test(ifin?.log || ''), '...and the token never reaches the job log');
     const renv = existsSync(`${DIR}/runner/${GH}/.env`) ? readFileSync(`${DIR}/runner/${GH}/.env`, 'utf8') : '';
     ok(/^BB_CI_LOG_DIR=.*agentdata\/ci-logs$/m.test(renv) && existsSync(`${DIR}/agentdata/ci-logs`),
@@ -2929,10 +2864,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(/not a file in alpha's dist/.test(nofile.error || ''), 'an input that is not in dist/ is refused up front');
     const ej = await api('/api/v1/jobs', { action: 'emu', project: 'alpha', argv: ['emu', 'list'] });
     ok(ej.ok && ej.node === minted.id, `aerie emu list is queued on the space's node (${ej.job || ej.error})`);
-    const efin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${ej.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const efin = await jobEnd(ej.job, { ms: 60000, step: 200 });
     // Only the plumbing is asserted: this box has the image's avdmanager on
     // PATH, which a node would not, so what `list` finds here is the box's.
     ok(efin && efin.state === 'succeeded' && /API levels with a system image here/.test(efin.log),
@@ -2941,20 +2873,14 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // name in the job's directory, and what is written there comes back
     const io = await api('/api/v1/jobs', { action: 'emu', project: 'alpha',
       argv: ['version', '--help'], files: ['dist/app-1.0.apk'], outputs: ['*.txt'] });
-    const ifin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${io.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const ifin = await jobEnd(io.job, { ms: 60000, step: 200 });
     ok(ifin && /fetched dist\/app-1.0.apk \(6 bytes\) into/.test(ifin.log)
        && existsSync(`${DIR}/agentartifacts/alpha/app-1.0.apk`),
        'an input lands in the node\'s artifacts store, under the space it belongs to');
     // ...and a second run of the same build copies nothing: the node has it.
     const io2 = await api('/api/v1/jobs', { action: 'emu', project: 'alpha',
       argv: ['version', '--help'], files: ['dist/app-1.0.apk'] });
-    const i2 = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${io2.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const i2 = await jobEnd(io2.job, { ms: 60000, step: 200 });
     ok(i2 && /already on this node \(6 bytes\)/.test(i2.log),
        '...and the next run of the same build fetches nothing: the node uses its copy');
     const cli = execFileSync('bash', [`${REPO}/scripts/aerie`, 'emu', 'list'],
@@ -2973,10 +2899,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const bad = await api('/api/v1/nodes', { action: 'funnel', id: minted.id, port: 'x' });
     ok(/port number/.test(bad.error || ''), 'a funnel wants a port');
     const fj = await api('/api/v1/nodes', { action: 'funnel', id: minted.id, port: 8080 });
-    const ffin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${fj.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const ffin = await jobEnd(fj.job, { ms: 30000, step: 200 });
     ok(ffin && ffin.state === 'succeeded' && /funnel on: https:\/\/agentbox\.tail1234\.ts\.net -> 127\.0\.0\.1:8080/.test(ffin.log)
        && /funnel --bg --https=443 http:\/\/127\.0\.0\.1:8080/.test(readFileSync(`${DIR}/ts-calls.log`, 'utf8')),
        `funnel on is tailscale's own CLI, and the job names the URL (${ffin?.state})`);
@@ -2984,10 +2907,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       return n.reported.services.tailscale.funnel?.['443'] === 8080 ? n : null; });
     ok(n1 !== null, '...and the census reports 443 forwarding to it');
     const off = await api('/api/v1/nodes', { action: 'funnel', id: minted.id, port: 8080, on: false });
-    const ofin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${off.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const ofin = await jobEnd(off.job, { ms: 30000, step: 200 });
     ok(ofin && ofin.state === 'succeeded' && /funnel --https=443 off/.test(readFileSync(`${DIR}/ts-calls.log`, 'utf8')),
        'off is off, through the same CLI');
   }
@@ -3085,10 +3005,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(behind !== null, '...and the node, still on the old file, is behind by digest');
     const up = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
     ok(up.ok && /^j_/.test(up.job), `Update agent queues the self-update (${up.job || up.error})`);
-    const ufin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${up.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const ufin = await jobEnd(up.job, { ms: 60000, step: 200 });
     ok(ufin?.state === 'succeeded' && /installed sha256:/.test(ufin.log || '') && /restarting/.test(ufin.log || ''),
        `the agent downloads the file, checks its digest, installs it over its own and restarts (${ufin?.state}: ${(ufin?.log || '').trim().split('\n').pop()?.slice(0, 80)})`);
     const back = await until(async () => {
@@ -3102,15 +3019,100 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const cur2 = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
     ok(cur2.ok && cur2.current === true, '...so it is current again and no job is queued');
     const ej = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo alive after the update'] });
-    const efin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${ej.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 30000);
+    const efin = await jobEnd(ej.job, { ms: 30000, step: 200 });
     ok(efin?.state === 'succeeded' && /alive after the update/.test(efin.log || ''),
-       `...and the new agent takes a job (${efin?.state})`);
+       `...and the new agent takes a job (${efin?.state}${efin?.state === 'succeeded' ? '' : ': ' + (efin?.error || '') + ' / agent log: ' + agentLog().trim().split('\n').slice(-12).join(' | ')})`);
     // The status command, the one the docs tell a person to run on a node.
     const st = execFileSync('python3', [AGENT_RUN, 'status'], { env: agentEnv, encoding: 'utf8' });
     ok(st.length > 0 && new RegExp(minted.id).test(st), `\`builderbot-agent status\` names the node (${st.trim().split('\n')[0].slice(0, 80)})`);
+
+    // ---- a bad build cannot strand the node (R241) ---------------------------
+    // The update above left the file it replaced beside the new one, and the
+    // new one was on trial until its controller answered it.
+    ok(existsSync(`${AGENT_RUN}.prev`) && !existsSync(`${AGENT_RUN}.trial`)
+       && /the updated agent reached its controller: it is kept/.test(agentLog()),
+       'the file the update replaced is kept beside it, and the trial ended at the controller\'s first answer');
+    const waitJob = async (id, ms = 60000) => jobEnd(id, { ms, step: 200 });
+    const shipsNew = async was => until(async () => {
+      const r = await api('/api/v1/nodes');
+      return r.agent?.digest && r.agent.digest !== was ? r.agent : null;
+    }, 20000);
+    const good = shipped.digest;
+    // One: a build that cannot be loaded. The node asks the new file to load
+    // itself before installing it, and stays on the agent it has.
+    const GPU = `${SHIPPED}/aerieos_agent/gpu.py`, gpuWas = readFileSync(GPU, 'utf8');
+    appendFileSync(GPU, '\ndef the_suite_broke_this(:\n');
+    const broken = await shipsNew(good);
+    const bj = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
+    const bfin = bj.job ? await waitJob(bj.job) : null;
+    ok(bfin?.state === 'failed' && /does not start on this node, so it was not installed/.test(bfin.error || bfin.log || '')
+       && /SyntaxError/.test(bfin.log || ''),
+       `a build that cannot be loaded is refused by the node before it is installed (${bfin?.state}: ${(bfin?.error || '').slice(0, 90)})`);
+    // Live is the agent's held poll being open, which it is again a moment
+    // after the job's result is posted: read at once under a whole run's
+    // load, the node was between the two (seen 15 Nov, twice).
+    // ...and the trial's files gone, which the agent clears as it goes on:
+    // the third sighting read the node live and failed on what the line did
+    // not say (B824), so each is waited for and said.
+    const left = () => [`${AGENT_RUN}.new`, `${AGENT_RUN}.trial`].filter(f => existsSync(f)).map(f => f.split('.').pop());
+    const still = await until(async () => { const n = await nodeById(minted.id); return n.live && !left().length ? n : null; }, 20000)
+      || await nodeById(minted.id);
+    ok(still.live && still.agent.digest === good && !left().length && broken && broken.digest !== good,
+       `...and the node runs on as it was, live, with nothing left beside its file (live ${still.live}, on ${
+         String(still.agent?.digest).slice(0, 19)}${still.agent?.digest === good ? ', the good one' : `, not ${String(good).slice(0, 19)}`}${
+         left().length ? '; left: ' + left().join(', ') : ''}${broken ? '' : '; the broken build never shipped'})`);
+    writeFileSync(GPU, gpuWas);
+    // Two: a build that loads and then dies as it starts. It is installed,
+    // on trial; the service starts it again and again; the fourth start
+    // puts the old file back, and the old agent dials in and says so.
+    const CLI = `${SHIPPED}/aerieos_agent/cli.py`, cliWas = readFileSync(CLI, 'utf8');
+    writeFileSync(CLI, cliWas.replace('def cmd_run():\n    harden()\n',
+      'def cmd_run():\n    raise SystemExit("the suite: this build dies as it starts")\n    harden()\n'));
+    ok(readFileSync(CLI, 'utf8') !== cliWas, 'the suite ships a build that loads and dies in run');
+    const dying = await shipsNew(broken?.digest || good);
+    const gone = new Promise(res => agent.once('exit', code => res(code)));
+    const dj = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
+    const dfin = dj.job ? await waitJob(dj.job) : null;
+    ok(dfin?.state === 'succeeded' && /selfcheck ok/.test(dfin.log || '') && /installed sha256:/.test(dfin.log || ''),
+       `it passes the start check and is installed (${dfin?.state}: ${(dfin?.log || '').trim().split('\n').pop()?.slice(0, 80)})`);
+    // The sleep is the deadline beside the exit that is waited for.
+    const died = await Promise.race([gone, sleep(40000).then(() => 'still running')]);
+    ok(died !== 'still running' && died !== 0, `...and dies as it starts (exit ${died})`);
+    const trial1 = existsSync(`${AGENT_RUN}.trial`) ? JSON.parse(readFileSync(`${AGENT_RUN}.trial`, 'utf8')) : {};
+    ok(trial1.digest === dying?.digest && trial1.starts === 1, `its first start was counted (${JSON.stringify(trial1).slice(0, 120)})`);
+    let starts = 0, alive = false;
+    for (; starts < 5 && !alive; starts++){
+      const p = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
+      // Up is not having exited in this long: a window, with nothing to wait for.
+      const ended = await Promise.race([new Promise(res => p.once('exit', () => res(true))), quietFor(8000).then(() => false)]);
+      if (!ended){ agent = p; alive = true; }
+    }
+    ok(alive && starts === 3, `started again as the service would, it dies twice more and the next start stays up (${starts} starts)`);
+    const home = await until(async () => {
+      const x = await nodeById(minted.id);
+      return x.live && x.agent?.digest === good && x.agent?.back ? x : null;
+    }, 60000);
+    ok(home !== null && home.agent.back.digest === dying?.digest
+       && /started 3 times and never reached its controller/.test(home.agent.back.why),
+       `the old agent is back, live, and tells its controller which build it would not run and why (${home?.agent?.back?.why})`);
+    ok(!existsSync(`${AGENT_RUN}.trial`) && !existsSync(`${AGENT_RUN}.prev`)
+       && !readFileSync(AGENT_RUN, 'latin1').includes('this build dies as it starts'),
+       '...the file it runs from is the one from before the update, and the trial is over');
+    const att = (await api('/api/v1/nodes')).nodes.find(n => n.id === minted.id);
+    ok(att.agent.back.digest === (await api('/api/v1/nodes')).agent.digest,
+       '...and it is the build this controller ships, so the controller no longer sends it by itself');
+    const aj = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo alive after going back'] });
+    const afin = aj.job ? await waitJob(aj.job, 30000) : null;
+    ok(afin?.state !== 'succeeded' && /Update agent/.test(`${aj.error || ''} ${afin?.error || ''}`) || afin?.state === 'succeeded',
+       `the node answers for work as an agent behind does (${aj.error || afin?.state})`);
+    // The suite ships the good build again: the node is current, and takes work.
+    writeFileSync(CLI, cliWas);
+    await until(async () => (await api('/api/v1/nodes')).agent?.digest === good, 20000);
+    const cur3 = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
+    ok(cur3.ok && cur3.current === true, 'with the good build shipped again the node is current');
+    const gj = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo alive after going back'] });
+    const gfin = gj.job ? await waitJob(gj.job, 30000) : null;
+    ok(gfin?.state === 'succeeded' && /alive after going back/.test(gfin.log || ''), `...and takes a job (${gfin?.state || gj.error})`);
   }
 
   // ---- one command as root, allowed by a person, run by the real agent -----
@@ -3153,10 +3155,7 @@ echo "stub-installed" >> "${DIR}/claude-installer.log"
     // From the Library, where Claude Code is a card (R145, R95, R170).
     const cu = await api('/api/agents', { action: 'install', node: minted.id, agent: 'claude' });
     ok(cu.ok && /^j_/.test(cu.job), `Install on Claude Code's card in the Library queues the claude-update job on this node (${cu.job || cu.error})`);
-    const cfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${cu.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const cfin = await jobEnd(cu.job, { ms: 60000, step: 200 });
     ok(/Installing Claude Code \(stub\)/.test(cfin?.log || '') && existsSync(`${DIR}/claude-installer.log`),
        `the agent runs the installer as the session account and streams its words (${cfin?.state})`);
     ok(cfin?.state === 'failed' ? /does not run|no claude in|no claude to run/.test(cfin.log || '') : /is what a session here runs now/.test(cfin?.log || ''),
@@ -3185,10 +3184,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     ok(/in the Library/.test(refused.error || ''), `...nor installs one, naming the way there (${refused.error || 'queued'})`);
     const cx = await api('/api/agents', { action: 'install', node: minted.id, agent: 'codex' });
     ok(cx.ok && /^j_/.test(cx.job), `Install queues the codex-update job on this node (${cx.job || cx.error})`);
-    const xfin = await until(async () => {
-      const r = await api(`/api/v1/jobs?id=${cx.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-    }, 60000);
+    const xfin = await jobEnd(cx.job, { ms: 60000, step: 200 });
     ok(xfin?.state === 'succeeded' && /Installing Codex CLI \(stub\)/.test(xfin.log || '')
        && /Codex CLI 0\.163\.0 is what a session here runs now/.test(xfin.log || ''),
        `the agent runs the installer as the session account and reads the version back (${xfin?.state}: ${(xfin?.log || '').trim().split('\n').slice(-1)[0]?.slice(0, 90)})`);
@@ -3334,10 +3330,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
       // instances() offers it only while the project has none, so the
       // env-set on main below met "no instance main" whenever this remove
       // had not yet forgotten kept (a race the step used to win, 12 Oct).
-      await until(async () => {
-        const r = await api(`/api/v1/jobs?id=${rm.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
-      }, 60000);
+      await jobEnd(rm.job, { ms: 60000, step: 200 });
     }
     // A compose file that reads its settings through `env_file: .env`: the
     // project's own .env, which AerieOS never writes. The instance's env
@@ -3407,8 +3400,8 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // looking for its row.
     await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
     await page.selectOption('.pane .bar #ndPick', minted.id);
-    await page.waitForSelector(`.nodestab .ndrow[data-node="${minted.id}"] .ndlive`,
-                               { timeout: 15000 });
+    await page.waitForSelector(`.nodestab .ndrow[data-node="${minted.id}"]`, { timeout: 15000 });
+    await page.waitForSelector('#pane0 .bar .mchead .ndstate.ok', { timeout: 15000 });
     const row = await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`,
                                  e => e.textContent.replace(/\s+/g, ' '));
     // Its facts a grid (R218 step 26): the account jobs run as is one.
@@ -3417,9 +3410,28 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // The node's name is the Machines header's, in its picker (R177), not
     // the row's.
     const picked = await page.$eval('.pane .bar #ndPick', s => s.selectedOptions[0]?.textContent || '');
-    const missing = ['live', 'cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker']);
+    // Its state is one pill beside the header's picker (the operator, 17
+    // Nov): online, never online and live, and said there alone, not again
+    // on the row under it nor as a facts line in the header.
+    const head = await page.$eval('#pane0 .bar .mchead', h => ({ pills: [...h.querySelectorAll('.pill.stat')].map(p => p.textContent.trim()),
+      facts: !!h.querySelector('.pfacts'), text: h.textContent.replace(/\s+/g, ' ') }));
+    const rowPills = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .pill.stat.ndstate`, ps => ps.length);
+    const missing = ['cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker'])
+      .concat(head.pills.join('|') === 'online' && !head.facts && !/dials in|seen /.test(head.text) && !rowPills ? []
+        : [`one pill in the header, not ${head.pills.join(' and ') || 'none'}${head.facts ? ' with its facts' : ''}${rowPills ? ', and again on the row' : ''}`]);
     ok(!missing.length && runsAs === (process.env.USER || 'builder'),
-       `the node named in the header's picker, its row the agent live, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
+       `the node named in the header's picker with its state one pill beside it, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
+    // ...and the pill is a press to the node's own page from any page of a
+    // group with a picker: from the Library on Build, it opens Machines'
+    // Nodes on that node.
+    await page.evaluate(id => { railGo('build', 'library'); groupPick(groupOf('library'), id); }, minted.id);
+    await page.waitForSelector(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`, { timeout: 15000 });
+    await page.click(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`);
+    await page.waitForFunction(id => tabOf(panes[0])?.kind === 'nodes' && document.querySelector('#pane0 .bar #ndPick')?.value === id
+      && !!document.querySelector(`.nodestab .ndrow[data-node="${id}"]`), minted.id, { timeout: 15000 }).catch(() => {});
+    const went = await page.evaluate(() => ({ kind: tabOf(panes[0])?.kind, node: document.querySelector('#pane0 .bar #ndPick')?.value, hash: location.hash }));
+    ok(went.kind === 'nodes' && went.node === minted.id && went.hash.startsWith('#/machines/nodes'),
+       `the header's state pill opens the node's own page from another group's page (${JSON.stringify(went)})`);
     // Each session kept to its own project's network (R79): a switch in the
     // row's Sessions section, a draft until the section's Save (the rule
     // apply-not-onchange: it wrote itself on the click at first, the
@@ -3484,10 +3496,12 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
       os => os.filter(o => /second/.test(o.textContent)).map(o => o.value));
     ok(opt.length === 1, 'the newly minted node joins the picker');
     await page.selectOption('.pane .bar #ndPick', opt[0]);
-    await page.waitForFunction(id => /waiting for enrollment/.test(
-      document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)?.textContent || ''),
+    // Its state is the header's pill beside the picker (the operator, 17
+    // Nov), over its row.
+    await page.waitForFunction(id => !!document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)
+      && /waiting for enrollment/.test(document.querySelector(`#pane0 .bar .mchead [data-ndgo="${id}"]`)?.textContent || ''),
       opt[0], { timeout: 10000 });
-    ok(true, 'the pending row says it is waiting for enrollment');
+    ok(true, 'the pending node says it is waiting for enrollment, in its header\'s pill');
   }
 
   // ---- uninstall, from the Nodes tab ------------------------------------------
@@ -3509,8 +3523,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     ok(quiet === true, `the node reports none of an account's sessions left before it is un-enrolled (ended first: ${left.map(s => s.name).join(', ') || 'none'})`);
     const r = await api('/api/v1/nodes', { action: 'uninstall', id: minted.id });
     ok(r.ok && /^j_/.test(r.job || ''), `Uninstall on a sandbox node queues a system job (${r.error || r.job})`);
-    const fin = await until(async () => { const j = await api(`/api/v1/jobs?id=${r.job}`);
-      return ['succeeded', 'failed', 'canceled'].includes(j.state) ? j : null; }, 30000);
+    const fin = await jobEnd(r.job, { ms: 30000, step: 200 });
     ok(fin?.state === 'succeeded' && /the uninstall is running on this machine[\s\S]*it is still running; this agent goes with it/.test(fin.log || ''),
        `the agent starts the uninstall on the machine and says it is its last word (${fin?.state}: ${(fin?.log || '').slice(-120).replace(/\n/g, ' / ')})`);
     ok(existsSync(SANDBOX_STATE + '.uninstall') && readFileSync(SANDBOX_STATE + '.uninstall', 'utf8') === 'uninstall --yes',
@@ -3522,13 +3535,77 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     await api('/api/v1/nodes', { action: 'online', id: minted.id });
     ok((await api('/api/v1/nodes')).nodes.some(n => n.id === minted.id), '...and Undrain brings a retired row back, for what follows');
   }
+
+  // ---- released agents against this controller (R241) ---------------------
+  // The window's promise, run and not only declared: the agent of the oldest
+  // release an install still upgrades from, and of the newest one, each as
+  // its release built it, enrolls here, dials in, is seen as behind, takes
+  // this controller's agent by its own update (the old way: these have no
+  // start check), and then takes work. From the repository's tags, which
+  // the harness's copy does not carry: without them it is said, not passed.
+  {
+    const ORIGIN = process.env.BB_TEST_ORIGIN || '';
+    const git = (...a) => execFileSync('git', ['-C', ORIGIN, '-c', `safe.directory=${ORIGIN}`, ...a],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 << 20 });
+    const has = t => { try { git('rev-parse', '-q', '--verify', `${t}^{commit}`); return true; } catch { return false; } };
+    let newest = '';
+    try { newest = ORIGIN ? git('for-each-ref', '--sort=-creatordate', '--count=1', '--format=%(refname:short)', 'refs/tags/v*').trim() : ''; } catch { newest = ''; }
+    // The oldest release an install upgrades from (every older one was withdrawn on 10 Nov).
+    const FLOOR = 'v0.9.0-dev.5173';
+    const tags = [...new Set([FLOOR, newest].filter(t => t && ORIGIN && has(t)))];
+    if (!tags.length) console.log('NOTE  released agents against this controller: not run, this copy of the tree reaches no release tag'
+      + (ORIGIN ? ` in ${ORIGIN}` : ' (no BB_TEST_ORIGIN)'));
+    const ships = (await api('/api/v1/nodes')).agent;
+    for (const [i, tag] of tags.entries()){
+      const R = `${DIR}/released/${tag}`;
+      mkdirSync(R, { recursive: true });
+      execFileSync('sh', ['-c', 'git -C "$1" -c safe.directory="$1" archive "$2" scripts/agent | tar -x -C "$3"', 'sh', ORIGIN, tag, R]);
+      const OLD = `${R}/aerieos-agent`;
+      execFileSync('python3', ['-c', `
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("released_bundle", sys.argv[1] + "/aerieos_agent/bundle.py")
+b = importlib.util.module_from_spec(spec); spec.loader.exec_module(b)
+open(sys.argv[2], "wb").write(b.build(sys.argv[1]))`, `${R}/scripts/agent`, OLD]);
+      chmodSync(OLD, 0o755);
+      const was = execFileSync('python3', ['-c', 'import zipfile,sys,re; print(re.search(r\'AGENT_VERSION = "([^"]+)"\', zipfile.ZipFile(sys.argv[1]).read("aerieos_agent/__init__.py").decode()).group(1))', OLD], { encoding: 'utf8' }).trim();
+      const m = await api('/api/v1/nodes', { action: 'enroll', name: `released${i}`, user: 'nobody' });
+      const env = { ...agentEnv, HOME: `${R}/home`, BUILDERBOT_NODE_JSON: `${R}/node.json`, BUILDERBOT_SHARE: `${R}/workspace`,
+                    BUILDERBOT_SCREEN_PORT: String(SCREEN_PORT + 1 + i) };
+      for (const d of ['home', 'workspace', 'data', 'toolchains']) mkdirSync(`${R}/${d}`, { recursive: true });
+      let said = '';
+      try {
+        said = execFileSync('python3', [OLD, 'enroll', '--controller', URL, '--token', m.token, '--user', process.env.USER || 'builder',
+          '--store', `data=${R}/data`, '--store', `toolchains=${R}/toolchains`], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) { said = String(e.stdout) + String(e.stderr); }
+      ok(/enrolled as node n_/.test(said), `the agent of ${tag} (${was}) enrolls on this controller (${said.split('\n')[0].slice(0, 80)})`);
+      const out = openSync(`${R}/agent.log`, 'a');
+      const proc = spawn('python3', [OLD, 'run'], { env, stdio: ['ignore', out, out] });
+      try {
+        const live = await until(async () => { const n = await nodeById(m.id); return n && n.live ? n : null; }, 60000);
+        ok(live !== null && live.agent.version === was && live.agent.digest !== ships.digest,
+           `...dials in, live, and is seen as behind (runs ${live?.agent?.version}, this controller ships ${ships.version})`);
+        // The controller sends the update by itself to an idle node inside the
+        // window; the press asks for the same one where it has not yet.
+        await api('/api/v1/nodes', { action: 'update-agent', id: m.id });
+        const cur = await until(async () => { const n = await nodeById(m.id); return n && n.live && n.agent.digest === ships.digest ? n : null; }, 90000);
+        ok(cur !== null && cur.agent.version === ships.version,
+           `...takes this controller's agent by its own update and dials in on it (${cur?.agent?.version || readFileSync(`${R}/agent.log`, 'utf8').trim().split('\n').slice(-2).join(' / ').slice(0, 160)})`);
+        const j = await api('/api/v1/nodes', { action: 'exec', id: m.id, argv: ['sh', '-c', `echo updated from ${tag}`] });
+        const fin = j.job ? await jobEnd(j.job, { ms: 30000, step: 200 }) : null;
+        ok(fin?.state === 'succeeded' && new RegExp(`updated from ${tag}`).test(fin.log || ''), `...and then takes a job (${fin?.state || j.error}${fin && fin.state !== 'succeeded' ? ': ' + (fin.error || '') + ' / agent log: ' + readFileSync(`${R}/agent.log`, 'utf8').trim().split('\n').slice(-12).join(' | ') : ''})`);
+      } finally {
+        proc.kill('SIGTERM');
+        await api('/api/v1/nodes', { action: 'retire', id: m.id });
+      }
+    }
+  }
 } finally {
   agent.kill('SIGTERM');
   if (process.env.AGENT_DEBUG) console.log('AGENT LOG:\n' + agentLog());
 }
 
 // aerie nodes shows liveness
-{
+await section("aerie nodes shows liveness", async () => {
   const out = execFileSync('bash', ['scripts/aerie', 'nodes'],
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/agentbox/.test(out) && /agent/.test(out),
@@ -3540,7 +3617,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/node\s+agentbox \(/.test(one) && /agent\s+\S+ \(this controller ships \d+\.\d+\.\d+\)/.test(one),
      `aerie nodes show NAME prints that node, its agent against the one this controller ships (${one.trim().replace(/\s+/g, ' ').slice(0, 160)})`);
-}
+});
 
 // Retire what this file made: the rows stay as history (door 1) and leave
 // every list, which is what the files after this one expect to find: a
@@ -3566,7 +3643,7 @@ ok(page.errors.length === 0,
 // the new address puts the old file back and applies it again. Driven on the
 // module directly, with hello stubbed to fail, because the real path needs
 // an address that goes nowhere.
-{
+await section("the network revert, without a network to cut", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, sys, tempfile, time
 os.environ['BUILDERBOT_NETPLAN_DIR'] = d = tempfile.mkdtemp()
@@ -3596,7 +3673,7 @@ print(json.dumps({'state': st, 'code': code, 'log': ''.join(j.lines),
      `a network change the controller cannot confirm is reverted (${R.state})`);
   ok(/dhcp4: true/.test(R.file) && !/10\.1\.1\.5/.test(R.file) && R.applies === 2,
      '...the previous file is back and applied a second time');
-}
+});
 
 // ---- the same network spec through NetworkManager ---------------------------
 // The job the controller sends is one shape (mode, address, gateway, dns)
@@ -3604,7 +3681,7 @@ print(json.dumps({'state': st, 'code': code, 'log': ''.join(j.lines),
 // nmcli that says it is running, that is NetworkManager: the connection's
 // ipv4 keys are modified and brought up, a repeat is "already applied", and
 // a change the controller cannot confirm is put back the same way.
-{
+await section("the same network spec through NetworkManager", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, sys, tempfile
 os.environ['BUILDERBOT_NETPLAN_BIN'] = '/nonexistent/netplan'
@@ -3642,7 +3719,7 @@ print(json.dumps({'distro': m.distro_now(), 'r1': s1, 'log1': ''.join(j1.lines),
   ok(R.r3[0] === 'failed' && /reverting/.test(R.log3) && R.st3['ipv4.method'] === 'manual'
      && R.st3['ipv4.addresses'] === '10.1.1.5/24',
      `...and a change the controller cannot confirm is put back the same way (${R.r3[0]}: ${JSON.stringify(R.st3)})`);
-}
+});
 
 // ---- the family, from os-release; the file backends, from their files --------
 // The job spec is one shape for every distribution; what the agent does with
@@ -3651,7 +3728,7 @@ print(json.dumps({'distro': m.distro_now(), 'r1': s1, 'log1': ''.join(j1.lines),
 // with Arch, ...); systemd-networkd is a .network file plus a reload, put
 // back on revert; and ifupdown replaces only the interface's own stanza in
 // /etc/network/interfaces, keeping the rest of the file byte for byte.
-{
+await section("the family, from os-release", async () => {
   const NB = `${DIR}/nbin`; mkdirSync(NB, { recursive: true });
   // A systemctl that says networkd and wicked are active, on a PATH only
   // this test's python sees; the fixture agent must keep the real answer.
@@ -3754,13 +3831,13 @@ print(json.dumps({'fam': fam, 'nd_backend': nd_backend, 'r1': r1, 'nd_text': nd_
      `with ifupdown the interface's own stanza is replaced and the neighbors kept (${R.if_backend}, ${R.r3[0]})`);
   ok(R.r4[0] === 'failed' && R.if_after === R.if_text,
      '...and its revert is the whole file as it was before the change');
-}
+});
 
 // ---- the last two backends: wicked, and dhcpcd on its own -------------------
 // SUSE's wicked is ifcfg and ifroute files plus netconfig's resolver line,
 // then ifreload; Void's dhcpcd is a marked block in dhcpcd.conf and a
 // restart. Same spec, same revert, driven in process like the two above.
-{
+await section("the last two backends", async () => {
   const NB = `${DIR}/nbin2`; mkdirSync(NB, { recursive: true });
   writeFileSync(`${NB}/systemctl`, `#!/bin/sh
 echo "systemctl $*" >> "${DIR}/net2.log"
@@ -3826,7 +3903,7 @@ print(json.dumps({'w_backend': w_backend, 'r1': r1, 'w_files': w_files, 'r2': r2
      `with dhcpcd alone the spec is a marked block after the file's own lines, and a restart (${R.d_backend}, ${R.r3[0]})`);
   ok(R.r4[0] === 'succeeded' && R.d_after === 'hostname\nnoipv6\n',
      '...and dhcp takes the block out again, leaving the file as it was');
-}
+});
 
 // ---- the toolchain store, scoped by platform; and a Mac ----------------------------
 // The layout's standing rule: a scope's Android system images live once
@@ -3834,7 +3911,7 @@ print(json.dumps({'w_backend': w_backend, 'r1': r1, 'w_files': w_files, 'r2': r2
 // a second run changes nothing. Then the Mac: with platform.system()
 // answering Darwin, the agent's family is macos, its packages Homebrew, its
 // init launchd, its scope darwin-<arch>.
-{
+await section("the toolchain store, scoped by platform", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, tempfile
 os.environ['BUILDERBOT_BREW_BIN'] = '/nonexistent/brew'
@@ -3868,7 +3945,7 @@ print(json.dumps({'r1': r1, 'r2': r2, 'mac': mac, 'scope': m.tc_scope(), 'root':
      `a Mac is its own family: macos, launchd, no network backend, and no package manager until Homebrew is there (${JSON.stringify(R.mac)})`);
   ok(R.scope === 'n_00aa11bb' && R.root === '/Volumes/SDK/n_00aa11bb',
      `...with its toolchains under its node id in the store, as every node's are (R196) (${R.root})`);
-}
+});
 
 // ---- addresses that move ---------------------------------------------------
 // The node dials out, so a node whose own address moves keeps working and
@@ -3876,7 +3953,7 @@ print(json.dumps({'r1': r1, 'r2': r2, 'mac': mac, 'scope': m.tc_scope(), 'root':
 // are healed here: the relay bound to the node's old address binds the new
 // one, and the session-ports rule that names the controller's address is
 // rewritten when that name resolves elsewhere, kept to the relay's port.
-{
+await section("addresses that move", async () => {
   const NB = `${DIR}/nbin`; mkdirSync(NB, { recursive: true });
   writeFileSync(`${NB}/nft`, `#!/bin/sh\necho "nft $*" >> "${DIR}/nft.log"\n`, { mode: 0o755 });
   const out = execFileSync('python3', ['-c', `
@@ -3918,7 +3995,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
      '...applied once, and a second check with nothing changed applies nothing');
   ok(R.bind === '10.0.0.77' && /\.bb\/current$/.test(R.restarted) && R.rebound,
      `when the node's own address moves, the relay binds the new one (${R.bind})`);
-}
+});
 
 // ---- the agent's version is WINDOW.BUILD ----------------------------------
 // The window is the project's compatibility promise (while AerieOS is
@@ -3926,7 +4003,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
 // in a file, which means it drifts the moment somebody bumps the minor and
 // does not think about the agent. That is the bump this is about, so the
 // check is here rather than in anybody's memory.
-{
+await section("the agent's version is WINDOW.BUILD", async () => {
   // the package's sources, the number in its __init__
   const PKG = `${REPO}/scripts/agent/aerieos_agent`;
   const src = readdirSync(PKG).filter(f => f.endsWith('.py')).sort()
@@ -3959,9 +4036,9 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
   // would notice the line going away.
   const prov = readFileSync(`${REPO}/nodes/provision-linux.sh`, 'utf8');
   ok(/AGENT_KILLMODE='KillMode=process'/.test(prov)
-     && /svc_install builderbot-agent .*"\$AGENT_KILLMODE"/.test(prov),
+     && /svc_install aerieos-agent .*"\$AGENT_KILLMODE"/.test(prov),
      'the agent unit is installed with KillMode=process, so a stop does not take the sessions');
-  ok(!/svc_install\s+(?!builderbot-agent)\S+.*AGENT_KILLMODE/.test(prov),
+  ok(!/svc_install\s+(?!aerieos-agent)\S+.*AGENT_KILLMODE/.test(prov),
      '...and nothing else is: a runner that kept only its main process would orphan a CI job');
   // ...and the agent ends what IS its own, which the new KillMode makes its
   // responsibility: with control-group systemd killed the job children, and
@@ -3969,7 +4046,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
   // that change could have cost.
   ok(/def bye\(\*_\):[\s\S]{0,400}?j\.cancel\(\)[\s\S]{0,1600}?self\.session_stop\(\)/.test(src),
      'the agent cancels its running jobs on SIGTERM, since systemd no longer does it');
-}
+});
 
 // ---- a recipe entry naming alternatives -------------------------------------
 // A library renamed between releases (libasound2 became libasound2t64) is one
@@ -3978,7 +4055,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
 // plain names failed the whole apt install on every release but the one it
 // was written for. Stubbed: dpkg knows what is installed, apt-cache what the
 // repositories carry.
-{
+await section("a recipe entry naming alternatives", async () => {
   const alt = `${DIR}/altbin`; mkdirSync(alt, { recursive: true });
   const stub = (name, ok) => writeFileSync(`${alt}/${name}`,
     `#!/bin/sh\nfor a; do last="$a"; done\ncase " ${ok} " in *" $last "*) exit 0 ;; esac\nexit 100\n`, { mode: 0o755 });
@@ -4001,6 +4078,6 @@ print(json.dumps(m.sysdeps_missing(cat, "r", "apt", [m.DPKG_BIN, "-s"])[0]))`],
      `...and when none is, the one this release's repositories carry is installed (${JSON.stringify(b)})`);
   ok(JSON.stringify(c) === '["libnew","libplain"]',
      `...the first of them when it carries both (${JSON.stringify(c)})`);
-}
+});
 
 await done(browser);

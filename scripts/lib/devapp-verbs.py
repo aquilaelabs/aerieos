@@ -7,7 +7,7 @@ to the node; nothing runs docker anywhere.
 The first argument is the verb: status, rebuild, new, test (the test
 command's arguments after it), edit (env and remove, which BB_DEV_VERB
 names), ls, or ctl (log, start, stop and restart, which BB_DEV_VERB names).
-BB_DEV_AUTH is the auth header, BB_DEV_PROJECT the project, BB_DEV_INSTANCE
+BB_PROJECT is the project (and the auth header bbapi's own), BB_DEV_INSTANCE
 and BB_DEV_CONTAINER which of its containers, BB_DEV_WHY the reason a person
 reads, BB_DEV_FILE and BB_DEV_SET the env file and whether it is being set,
 BB_DEV_REF the branch a new container builds from, BB_DEV_COMPOSE which of the
@@ -22,6 +22,20 @@ import urllib.parse
 import bbapi
 import syncwait
 import waits
+from say import need
+
+
+def _auth():
+    """The header to ask with: none from aerie, whose own bbapi sends
+    (BB_AUTH_HEADER, from api_py), or the one in BB_DEV_AUTH, the name the
+    browser suite (test/devapp.mjs) hands this program its header in."""
+    return os.environ.get("BB_DEV_AUTH", "")
+
+
+def _project():
+    """The project: BB_PROJECT, from aerie, unless BB_DEV_PROJECT names
+    one, as the browser suite does."""
+    return os.environ.get("BB_DEV_PROJECT") or os.environ.get("BB_PROJECT", "")
 
 
 def built_from(st):
@@ -35,13 +49,12 @@ def built_from(st):
 
 
 def status():
-    d = bbapi.call("/api/devapp", {"project": os.environ["BB_DEV_PROJECT"],
+    d = bbapi.call("/api/devapp", {"project": _project(),
                                    "instance": os.environ.get("BB_DEV_INSTANCE", ""),
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
                                    "action": "state"},
-                   auth=os.environ["BB_DEV_AUTH"])
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+                   auth=_auth())
+    need(d)
     st = d.get("state") if isinstance(d.get("state"), dict) else d
     if not st.get("compose"):
         print("no compose file at this space's root (docker-compose.yml or compose.yml), so there is "
@@ -90,8 +103,8 @@ def _answers_at(name):
     so anywhere (29 Sep). Best effort: the list is the node's to give, and
     a node that is slow with it costs this one line."""
     try:
-        d = bbapi.call("/api/docker?project=" + urllib.parse.quote(os.environ["BB_DEV_PROJECT"]),
-                       auth=os.environ["BB_DEV_AUTH"], timeout=60)
+        d = bbapi.call("/api/docker?project=" + urllib.parse.quote(_project()),
+                       auth=_auth(), timeout=60)
     except Exception:                                   # noqa: BLE001
         return
     row = next((i for i in (d.get("instances") or []) if i.get("name") == name), None) \
@@ -124,7 +137,7 @@ def _client(instance=None):
     """post and look for one of this project's containers: the one
     BB_DEV_INSTANCE or BB_DEV_CONTAINER names, or `instance` when given (a
     container `new` just made)."""
-    proj, auth = os.environ["BB_DEV_PROJECT"], os.environ["BB_DEV_AUTH"]
+    proj, auth = _project(), _auth()
     which = ({"instance": os.environ.get("BB_DEV_INSTANCE", ""),
               "container": os.environ.get("BB_DEV_CONTAINER", "")}
              if instance is None else {"instance": instance, "container": ""})
@@ -149,11 +162,11 @@ def _client(instance=None):
 
 
 def rebuild():
-    auth = os.environ["BB_DEV_AUTH"]
+    auth = _auth()
     post, look = _client()
     # A rebuild's plan carries the compose file and env from the
     # controller's copy, so an edit made here goes up first (B623).
-    syncwait.up(os.environ["BB_DEV_PROJECT"], "the rebuild takes the compose file from the controller's copy")
+    syncwait.up(_project(), "the rebuild takes the compose file from the controller's copy")
     # What it was built from before, because that is the only signal that says a
     # build HAPPENED. A job that succeeded is not news to the row (job_view
     # returns nothing for one), so "no job running" reads the same three seconds
@@ -173,9 +186,8 @@ def rebuild():
         r = {}
     if r.get("hung_up"):
         r = _after_hang_up(look, post, was)
-    if r.get("error"):
-        # The refusal names the dial, so it is printed as it came.
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    # The refusal names the dial, so it is printed as it came.
+    need(r)
     if r.get("id") and not r.get("started"):
         # This project is on `ask`: nothing is building yet, a person has the
         # reason in front of them, and the wait is theirs. Allowing starts the
@@ -259,11 +271,27 @@ def _watch(look, was, auth, job_id=""):
                 print(tail)
             sys.exit(f"[builderbot] ERROR: the {what} failed: {str(job['error'])[:200]}")
         if seen or (st.get("built_rev") or "") != was:
+            # Running is looked at again a few seconds on before it is said:
+            # a container that exits as it starts (a dashboard refusing its
+            # state, a crash on boot) reads running for that moment, and was
+            # called up with exit 0 (B804).
+            stopped = False
+            if st.get("running"):
+                for _ in range(2):
+                    time.sleep(3)
+                    again = look(patient=True)
+                    if again is not None and not again.get("running"):
+                        st, stopped = again, True
+                        break
             print(f"[builderbot] {'rebuilt' if was else 'built'} from {built_from(st)}; "
                   f"{st.get('name') or 'the instance'} is "
                   + ("up" if st.get("running")
+                     else "not running: it started and stopped within seconds" if stopped
                      else "built and not running" if st.get("await_env")
                      else "not running"))
+            if stopped:
+                sys.exit("[builderbot] ERROR: its container stopped right after it started; "
+                         "aerie devapp log says why")
             if st.get("await_env"):
                 print("[builderbot] its env is not filled in: aerie devapp env set FILE writes it where "
                       "the space's settings allow, else the operator's Env on the Containers page",
@@ -284,11 +312,11 @@ def new():
     BB_DEV_HOST a hosting node to ship it to, and BB_DEV_FILE is its env. On `ask` one request carries all of it and
     Allow makes and builds it; on `auto` it is made, then built as `aerie
     devapp rebuild` builds."""
-    auth = os.environ["BB_DEV_AUTH"]
+    auth = _auth()
     post, _ = _client()
     # The compose file is read from the controller's copy: what was written
     # here a moment ago goes up first (B623).
-    syncwait.up(os.environ["BB_DEV_PROJECT"], "the controller reads the compose file from its copy")
+    syncwait.up(_project(), "the controller reads the compose file from its copy")
     body = {"action": "new", "why": os.environ.get("BB_DEV_WHY", ""),
             "ref": os.environ.get("BB_DEV_REF", ""),
             "compose": os.environ.get("BB_DEV_COMPOSE", ""),
@@ -301,8 +329,7 @@ def new():
     if path:
         body["text"] = open(path, encoding="utf-8").read()
     r = post(body)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     inst = r.get("instance") or ""
     name = r.get("name") or inst
     if r.get("id"):
@@ -322,8 +349,8 @@ def new():
 
 
 def test():
-    proj = os.environ["BB_DEV_PROJECT"]
-    auth = os.environ["BB_DEV_AUTH"]
+    proj = _project()
+    auth = _auth()
     # Two minutes, not the client's default thirty seconds. The controller checks
     # the instance before it answers, and each check is a round trip through the
     # agent to the node; on an unlucky poll cycle that ran past thirty seconds,
@@ -371,7 +398,7 @@ def follow_remove(jid, forgot=False, allowed=False):
     tree: "empty compose file") is said as a failure with the container still
     up, never as removed (B755, report #111), whether it ran at once or after
     an Allow."""
-    auth = os.environ["BB_DEV_AUTH"]
+    auth = _auth()
     for _ in range(300 if jid else 0):
         j = bbapi.call(f"/api/v1/jobs?id={jid}", auth=auth)
         if j.get("error") and "state" not in j:
@@ -411,7 +438,7 @@ def _warn_of_routes(proj, auth):
 
 
 def edit():
-    proj, auth = os.environ["BB_DEV_PROJECT"], os.environ["BB_DEV_AUTH"]
+    proj, auth = _project(), _auth()
     verb, setting = os.environ["BB_DEV_VERB"], os.environ.get("BB_DEV_SET") == "1"
     post = lambda b: bbapi.call("/api/devapp", b | {"project": proj, "instance": os.environ.get("BB_DEV_INSTANCE", ""),  # noqa: E731
                                                     "container": os.environ.get("BB_DEV_CONTAINER", "")}, auth=auth)
@@ -419,8 +446,7 @@ def edit():
     text = open(path, encoding="utf-8").read() if path else None
     if verb == "env" and not setting:
         d = post({"action": "env-get"})
-        if d.get("error"):
-            sys.exit(f"[builderbot] ERROR: {d['error']}")
+        need(d)
         # Ended with a newline whatever was stored, so a line appended to
         # this output stands on its own (B314).
         text = d.get("text") or ""
@@ -435,8 +461,7 @@ def edit():
     if text is not None:
         body["text"] = text
     r = post(body)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if r.get("id"):
         # On ask: Allow removes it, or writes the env and builds nothing,
         # since the card said env set and the rebuild is the next ask.
@@ -460,12 +485,12 @@ def edit():
 
 
 def ls():
-    proj = os.environ["BB_DEV_PROJECT"]
+    proj = _project()
     # The listing is a read on the node, which right after a build starts
     # there took longer than the client's thirty seconds and stopped with
     # "timed out" (B310): the look's patience, and a timeout that names the
     # reason rather than the clock.
-    d = bbapi.call("/api/docker?project=" + urllib.parse.quote(proj), auth=os.environ["BB_DEV_AUTH"],
+    d = bbapi.call("/api/docker?project=" + urllib.parse.quote(proj), auth=_auth(),
                    timeout=180)
     if d.get("error") and not (d.get("instances") or d.get("containers")):
         if "timed out" in str(d["error"]).lower():
@@ -494,7 +519,7 @@ def ls():
         # What the session can do next, not what the operator could (B537):
         # with a compose file at the root, its own aerie devapp new is the way
         # in, and the Docker tab's row is for a container made elsewhere.
-        st = bbapi.call("/api/devapp", {"project": proj, "action": "state"}, auth=os.environ["BB_DEV_AUTH"])
+        st = bbapi.call("/api/devapp", {"project": proj, "action": "state"}, auth=_auth())
         st = st.get("state") if isinstance(st.get("state"), dict) else st
         if st.get("compose"):
             print(f"nothing belongs to {proj} on any node yet: aerie devapp new builds its dev instance "
@@ -519,12 +544,11 @@ def ls():
 
 
 def ctl():
-    auth, verb, name = os.environ["BB_DEV_AUTH"], os.environ["BB_DEV_VERB"], os.environ["BB_DEV_NAME"]
+    auth, verb, name = _auth(), os.environ["BB_DEV_VERB"], os.environ["BB_DEV_NAME"]
     r = bbapi.call("/api/dockerctl", {"action": "logs" if verb == "log" else verb, "container": name,
-                                      "project": os.environ.get("BB_DEV_PROJECT", ""),
+                                      "project": _project(),
                                       "why": os.environ.get("BB_DEV_WHY", "")}, auth=auth)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if verb == "log":
         sys.stdout.write(r.get("text") or "")
         raise SystemExit(0)
@@ -552,13 +576,12 @@ def probe():
             path = args.pop(0)
         else:
             sys.exit(f"[builderbot] ERROR: aerie devapp probe takes --port N and --path /x, not {a}")
-    d = bbapi.call("/api/devapp", {"project": os.environ["BB_DEV_PROJECT"],
+    d = bbapi.call("/api/devapp", {"project": _project(),
                                    "instance": os.environ.get("BB_DEV_INSTANCE", ""),
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
                                    "action": "probe", "port": port, "path": path},
-                   auth=os.environ["BB_DEV_AUTH"])
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+                   auth=_auth())
+    need(d)
     print(f"{d.get('name') or 'the instance'} on {d.get('node') or 'its node'}, from its loopback, GET {path}:")
     bad = 0
     for p in d.get("ports") or []:
@@ -576,10 +599,9 @@ def override():
     """The compose file laid over the instance's own (BB_DEV_OVERRIDE, a
     path in the tree, or empty for none); the next rebuild takes it."""
     post, _ = _client()
-    syncwait.up(os.environ["BB_DEV_PROJECT"], "the controller reads the compose files from its copy")
+    syncwait.up(_project(), "the controller reads the compose files from its copy")
     r = post({"action": "override", "file": os.environ.get("BB_DEV_OVERRIDE", "")})
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     print(f"[builderbot] {'its override is ' + r['override'] if r.get('override') else 'no override'}; "
           "aerie devapp rebuild applies it", file=sys.stderr)
 

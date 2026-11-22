@@ -123,9 +123,9 @@ somewhere-elses.
     "docker": "27.3.1", "gpu": "nvidia GeForce RTX 3070 Ti",
     "toolchains": { "java": "21", "android-sdk": "35.0.2", "flutter": null },
     "stores": {                // each ROLE's location and headroom, see §6
-      "toolchains": { "path": "/var/lib/builderbot/toolchains", "free_mb": 118000 },
+      "toolchains": { "path": "/var/lib/aerieos/toolchains", "free_mb": 118000 },
       "data":       { "path": "/appdata",                       "free_mb": 800000 },
-      "cache":      { "path": "/var/lib/builderbot/cache",      "free_mb": 118000 }
+      "cache":      { "path": "/var/lib/aerieos/cache",      "free_mb": 118000 }
     }
   },
   "routing": { "public_ip": false, "tailscale": "", "wildcard": "" }
@@ -135,7 +135,7 @@ somewhere-elses.
 Points worth arguing about:
 
 **The id is the node's, not the address's.** Generated at enrollment, written
-to `/etc/builderbot/node.json` on the node, and used as the key for everything
+to `/etc/aerieos/node.json` on the node, and used as the key for everything
 the controller remembers about it: caches, last-known container lists, build
 records. An address is not an identity: two VMs can wear one IP, and one VM
 changes address when it moves. The Docker manager already learned this the
@@ -252,6 +252,39 @@ fair-share-per-pool or quota checks are one function swapped later rather than
 logic scraped out of four call sites. Until someone needs that, the function is
 ten lines.
 
+**A node's own names.** A node keeps its record in `/etc/aerieos` and its
+state in `/var/lib/aerieos`, and runs the service `aerieos-agent`; the
+command is `aerieos-agent`, and `aerie-sandbox` is the tool for the machine
+itself. A node provisioned before AerieOS had its name kept them under
+`builderbot`, and comes to the new ones in two steps, neither of which
+moves anything under a running agent, since an agent that cannot find its
+`node.json` cannot be reached to be told where it went. Every agent, as it
+starts, makes the new names answer where they do not yet: a link for each
+folder and a command for itself, added, nothing moved. The Enroll script,
+run on the machine, makes them the real ones: each folder renamed in place
+with the old name left as a link to it (so a store's path in a record, a
+container's bind and a session's environment go on resolving), the service
+installed as `aerieos-agent` with the old one taken off, and
+`builderbot-agent` left as a command that runs it. A folder that will not
+move (a mount of its own, or VMs' disks defined by its path) stays, with
+the new name a link to it. The session tools (`bb-session`, `bb-tty`) and
+`bb-sandbox`'s own file keep their names; so do the internal variables.
+
+**A press is never refused because something else is running.** A job that
+would collide with one already at work is queued behind it and handed over
+once that one ends (`nodes.job_waits`): a toolchain or image job waits for one
+writing the same part of the store, here or on a node sharing it; a system job
+for another system job on the node, a reboot or shut-down for an install
+there too, and an array job for a SnapRAID run the census says is going; a
+coding agent's install, update or removal for another of the same agent; a
+container's compose job for another on the same instance. The same press
+while its job still waits is answered with that job rather than a second.
+The space jobs (a clone, a first push) and the controller's own toolchain
+installer, which are not jobs on the queue, keep a line of their own the same
+way. What is still refused is a change under something a person is using:
+a container renamed or moved while its job runs, a node disabled with
+sessions or containers on it, a space moved from under a session.
+
 **This is not a CI engine, and enterprise pressure will try to make it one.**
 No workflow DSL, no step graph, no matrix builds, no plugin marketplace. The
 Actions runner *service* exists precisely so that pipeline-shaped work goes to
@@ -333,11 +366,15 @@ today, and the two it does not yet, are marked; the agent takes `exec` jobs
 and `self-update`, nothing else, until phase 6 gives it a workspace to build
 in.
 
-*Driving the self-update (after phase 9):* nothing does it unasked. The node
-list carries the digest and version this controller ships, the row compares
-its node's against them and says *update available*, and the **Update
-agent** button queues the `self-update` job with that digest in its spec,
-so a node is never handed a file other than the one this controller serves.
+*Driving the self-update:* inside a compatibility window the controller
+queues it by itself once the node is idle (`nodes.auto_update`), and asks
+again on a later idle beat when the node refused as busy; across a window it
+is a person's press, since that one ends the node's sessions. The node list
+carries the digest and version this controller ships, the row compares its
+node's against them and says *update available*, and the **Update agent**
+button queues the `self-update` job with that digest in its spec, so a node
+is never handed a file other than the one this controller serves. A press
+while one is already on its way returns that one.
 `provision-linux.sh` re-run on an enrolled node is the console path to the same
 swap, with the node's own token. The agent's `hello` after re-exec is what
 moves the row.
@@ -353,6 +390,18 @@ than an error, which is the worst of the three possible answers. So
 `self-update` excepted; the Nodes page and the Library ghost the buttons and
 say why before the press. It is one rule in `nodes.agent_stale` and the UI
 only mirrors it.
+
+*A node can be ahead.* A controller gone back to an older image (the
+backup an upgrade made, restored under the release before) has nodes on
+the agents the newer one sent them. A node that pinned a release key takes
+no signed agent older than the one it runs: the update is refused, and the
+job fails saying so. So a newer build inside the same window counts as
+current (within a window nothing is removed, and it works with this
+controller as the shipped build does) and is sent nothing. One from a newer
+window is held as one from an older window is, and its row and the bell say
+it is newer. To put the older agent back on such a node anyway, its console
+allows older agents (`sudo aerieos-agent older on`, until `older off`) and
+**Update agent** sends it.
 
 *Compose moved to the agent (2 Sep, roadmap #18):* a node enrolled with a
 token needed an ssh key on top of it, because `runner_of` kept compose on the
@@ -432,10 +481,21 @@ refreshes them itself.)
      pipeline can have it.
 2. The provisioner (or cloud-init) runs with the token; the agent posts it once
    and receives its **node id** and a **node token** (32 random bytes), both
-   written to `/etc/builderbot/node.json`, mode 0600.
+   written to `/etc/aerieos/node.json`, mode 0600.
 3. Every later request carries the node token as a bearer credential over TLS.
-   TLS is not optional: the token is a bearer credential. On a LAN that can be
-   a self-signed certificate pinned by the agent at enrollment.
+   TLS is not optional: the token is a bearer credential. On a LAN it is the
+   controller's own certificate, which its port answers a handshake with in
+   every Connection mode, and what the agent pins at enrollment is that
+   certificate's key (`--pin sha256//…`, the form `curl --pinnedpubkey`
+   takes), so the controller's renewals pass and no other key does. The
+   Enroll script and the token-only commands carry the pin and name the
+   controller as https at the same address; the provisioner fetches under
+   it (`--controller-pin`). A node enrolled over plain http before this
+   moves by itself at its controller's next hello, and one that cannot (a
+   proxy in front that speaks only http to the controller) stays, its row
+   saying `over plain http`. What that exposes, and what a renewed
+   certificate or a replaced key does, is in
+   [security.md](security.md#a-nodes-channel-to-its-controller).
 4. Rotation and revocation are rows: revoke a token and the node's next call
    fails closed with "credential revoked". The node's row says it is turned
    away and why, in place of quiet, and the bell carries a row for it until
@@ -465,6 +525,38 @@ a `self-update` job (a capability-independent type), which downloads the
 pinned new agent by digest, swaps the file and re-execs. In the homelab this
 is a convenience; at fleet scale it is the difference between a protocol that
 can evolve and one frozen by its oldest node.
+
+**And an update that does not start goes back by itself.** One build that
+cannot run would otherwise leave every node it reached needing a person at
+its console, since the update is the only thing a node behind is sent. So
+the swap has three guards:
+
+- *Before it.* The new file is run once as `aerieos-agent selfcheck`, which
+  loads the agent as `run` does, compiles every module and reads the node's
+  state. A file that fails is not installed; the job says why and the node
+  carries on as it was. Nor is one that has no such verb to ask, a build
+  from before the check: nothing would put the old one back if it did not
+  start. Nor, on a root agent, one that finds file work in an account's
+  folder cannot be done as the account here: it would refuse that work,
+  so the node keeps the agent it runs (docs/security.md), and the
+  controller sends that build again by itself once an hour.
+- *Beside it.* The file being replaced is kept (`FILE.prev`), and the new
+  one is on trial (`FILE.trial`) until the controller answers its first
+  `hello`.
+- *After it.* The zip's entry (`scripts/agent/builderbot-agent.py`, the
+  standard library alone, since it has to work when the package does not)
+  counts each start while the trial lasts. A package that cannot be loaded,
+  or a fourth start with the trial still on, puts the old file back and
+  starts it. An agent that runs and has not reached its controller in ten
+  minutes gives way the same way.
+
+A node that went back says so in its `hello` (the build it would not run,
+when, and why), and the controller stops sending that build by itself: the
+bell and the node's row say what happened, and **Update agent** sends it
+again on a person's press. A newer build is sent as any is. The count
+relies on the service starting the agent again, which systemd does; the
+first update onto a build with these guards is made by an agent without
+them.
 
 **That version is `WINDOW.BUILD`, and only the first half is a promise.** The
 window is AerieOS's own semver minor: while the space is `0.5.x`, any
@@ -503,9 +595,8 @@ homelab with off-LAN nodes.
 
 ## 5. Storage
 
-**SQLite by default, Postgres by configuration.** Nodes, jobs, job logs,
-artifacts, tokens, audit: all in one database, which is `/config/builderbot.db`
-until somebody sets `DATABASE_URL`.
+**SQLite.** Nodes, jobs, job logs, artifacts, tokens, audit: all in one
+database, `/config/builderbot.db`.
 
 This reverses an earlier decision (the notebook chose flock'd JSON over
 SQLite), and the reversal does not contradict it: the notebook is small,
@@ -600,7 +691,7 @@ agent on every hello (`share_images()`) and by the controller at boot
   the source of truth and the only writable copy.
 - **On a node: a synced copy, for sessions** (below), and nothing
   permanent for a job. A job gets
-  `/var/lib/builderbot/jobs/<job-id>/workspace`, materialized before the first
+  `/var/lib/aerieos/jobs/<job-id>/workspace`, materialized before the first
   step and deleted after, with a retention window (keep the last failed job
   per space), so failures can be inspected.
 - **The GUI's node browser reads that path**, read-only, for debugging: a
@@ -625,7 +716,10 @@ controller is.
   rather than the tree; the whole tree is walked when a directory comes or
   goes, when the kernel's queue overflows, and once a minute regardless. A
   file that has changed and then held still for a tick goes up as a put
-  naming the hash it was changed from.
+  naming the hash it was changed from. Removals go up together, up to five
+  hundred to a call (the sync verb's `gone`), since a `git gc` that packs
+  the loose objects removes thousands at once. One path that cannot be sent
+  is that path's error, counted as waiting, and the rest go on.
 - **Down.** A put, a write from VS Code (files.py tells wssync.py) or a
   change a scan of the share finds bumps the space's revision and leaves
   a hint the node's held work request takes at once; the agent then asks
@@ -680,8 +774,9 @@ controller is.
   store of `paths.py`, where no node API reaches). A file's contents are
   stored once by hash, read-only, and a day is a list of paths and hashes,
   so an unchanged file costs nothing. Kept for the space's *Snapshots
-  kept for* days (14 by default, 0 for none), older days and the objects
-  only they named removed. The space settings' Snapshots fold restores the
+  kept for* days (14 by default), older days and the objects only they
+  named removed; at 0 none is taken, and the days already kept stay until
+  some days are kept again. The space settings' Snapshots fold restores the
   whole tree as of a day, or one file; a restore first snapshots the tree
   as it is (a *before restore* day), writes through the files the sync
   reads, and tells the sync, so every node follows. An administrator's;
@@ -742,7 +837,7 @@ file with its hash and the revision it last changed at, deletions kept.
 
 ### Caches are the whole cost of this approach
 
-Per node, persistent, never job-scoped: `/var/lib/builderbot/cache/<project>/…`
+Per node, persistent, never job-scoped: `/var/lib/aerieos/cache/<project>/…`
 mounted into the job for Gradle, npm and friends; the Android SDK once per
 node; Docker layer cache is the node's own daemon. Cross-node image builds use
 buildx `--cache-to/--cache-from` against a registry: the first genuinely
@@ -858,7 +953,7 @@ page says what is missing and links to the Library.
 
 - **The store is a role with a location, not a mount.** Each node has a
   `toolchains` store: default an internal path
-  (`/var/lib/builderbot/toolchains`), because a node with its own disk should
+  (`/var/lib/aerieos/toolchains`), because a node with its own disk should
   not need NFS to hold a JDK. A share is allowed as the location where that
   is what the operator wants (the controller's own toolchain store is exactly
   this case, so the local node needs nothing migrated). **Sharing one store
@@ -873,7 +968,7 @@ page says what is missing and links to the Library.
   than by rule. What the machines on a share still write together is the
   Android system images under `<store>/shared`: `toolchains.store_sharers`
   identifies the machines on a share by the census's mount SOURCE under
-  the store path, never by the path string (`/var/lib/builderbot/toolchains`
+  the store path, never by the path string (`/var/lib/aerieos/toolchains`
   is every node's default and a different disk on each), and an image job
   waits while another machine's is running (`store_areas`, `store_busy`),
   naming it.
@@ -1126,6 +1221,32 @@ the pieces stack:
    rather than all being `localhost:22`, and says MobaXterm's way in: its
    own SSH sessions read no ssh config, so a Shell session that runs `ssh
    NAME` (R179).
+
+   The door's program is installed by the machine's package manager, from
+   a source it verifies, and one already on the machine is left as it is.
+   Where the vendor publishes a repository for that package manager it is
+   the vendor's, held to the vendor's signing key the provisioner carries
+   (`door_key` in `nodes/provision-linux.sh`, never a key fetched while
+   installing); otherwise it is the distribution's own package:
+
+   | System | cloudflared | Tailscale |
+   |---|---|---|
+   | Debian, Ubuntu | Cloudflare's apt repository | Tailscale's apt repository |
+   | RHEL and its rebuilds, CentOS Stream, Fedora | Cloudflare's rpm repository | Tailscale's rpm repository |
+   | openSUSE, SLES | the distribution's package where it carries one (Tumbleweed), else Cloudflare's rpm repository | the distribution's package where it carries one (Tumbleweed), else Tailscale's rpm repository |
+   | Arch | Arch's package | Arch's package |
+   | Alpine | none, and the script says so | Alpine's package (community) |
+   | Void | Void's package | Void's package |
+   | Gentoo | Gentoo's package | Gentoo's package |
+
+   A system with no verified source for a door is told so in one line and
+   nothing is downloaded: install the program yourself and run the script
+   again. An AerieOS disk is one, since its packages are its image's.
+   cloudflared's own self-update stays off (`--no-autoupdate`), so it moves
+   when the machine's packages are updated. A node given a cloudflared
+   door by an earlier version keeps the copy that version downloaded to
+   `/usr/local/bin/cloudflared`, which nothing updates: remove it and run
+   the enroll script again for the packaged one.
 5. *Put nginx in front of them* (R171, the nginx page): one reverse proxy
    per node, AerieOS's own, listed for every node on the nginx page,
    which Configure on a node's nginx row opens (the Containers page's
@@ -1242,7 +1363,7 @@ ID`, the node's own root helper: Enroll node's ticks hand the provisioner
 that install once the node has enrolled, and the node's Features section on
 the Nodes page runs the same one later as a `feature` system job
 (`node_feature`), so the two ways cannot drift. A marker in
-`/etc/builderbot/features` says AerieOS installed it and lists the
+`/etc/aerieos/features` says AerieOS installed it and lists the
 packages it added, so a remove takes those and leaves what the machine had
 before. The census reports each (`features`), and the section reads that.
 **VM host** is KVM through libvirt, run by the jobs account in the libvirt
@@ -1388,8 +1509,8 @@ power-off the node reads away until somebody switches the machine on.
 
 Profiles rather than knobs: the config surface stays one file/env-set, and the
 **defaults are the homelab** (SQLite, single-use tokens auto-approved, local
-node enabled, no OIDC). An enterprise install sets `DATABASE_URL`, an OIDC
-block, and approval mode, and nothing else changes meaning.
+node enabled, no OIDC). An enterprise install would add a database server, an
+OIDC block, and approval mode, and nothing else would change meaning.
 
 ### The unhardwiring
 
@@ -1402,7 +1523,7 @@ shift to be explicit. So it is a standing rule with a precedence contract,
 not a one-off migration:
 
 - **Every env var gets a scope from §13.** Container-scoped ones (ports,
-  mounts, credentials, `DATABASE_URL`) stay env forever; that is what env is
+  mounts, credentials) stay env forever; that is what env is
   for. Everything controller-scoped moves to the DB-backed settings
   Controller settings edits.
 - **Precedence: env seeds, the database owns.** On first boot a set env var
@@ -1451,11 +1572,11 @@ each taking either an internal path or a mount the script sets up:
 
 `--share`/`--nfs` remain the *transport* half for anything else the operator
 mounts; a role flag pointing at a mount implies it. Roles land in
-`/etc/builderbot/node.json`, the agent reports them (with headroom) in its
+`/etc/aerieos/node.json`, the agent reports them (with headroom) in its
 census, and nothing on the controller ever hard-codes a path on a node again.
 *Where phase 3 landed it:* the three role flags take a path (the `nfs:` form
 waits for phase 5, where mounts become jobs), default under
-`/var/lib/builderbot/`, and `--controller URL --token bbe_…` is what turns a
+`/var/lib/aerieos/`, and `--controller URL --token bbe_…` is what turns a
 provisioning run into an enrollment: the script fetches the agent from the
 controller, checks it against the digest header, enrolls as the docker
 account and enables the unit. Package-manager abstraction and
@@ -1500,13 +1621,13 @@ runs on the node: end them first, and the refusal counts them. What always
 goes is what the provisioner put there for AerieOS alone: the agent and
 its unit, the sessions' firewall rules and their own networks (every piece
 of the isolation, R79), the `aerie` and `builder` accounts with their homes
-(Claude Code, the runners' directories, caches), `/etc/builderbot` with the
+(Claude Code, the runners' directories, caches), `/etc/aerieos` with the
 tunnel to the controller, the sandbox label in `daemon.json` (docker keeps
 running; it takes at its next restart) and bb-sandbox itself. Three rings
 are asked for, in the Un-enroll dialog as boxes and on the machine as flags:
 `--stores` takes the stores on the machine's own disk (the toolchains, the
 caches, the artifacts, a dev instance's data, the synced space copies,
-`/var/lib/builderbot`); `--configured` undoes what was set up from the
+`/var/lib/aerieos`); `--configured` undoes what was set up from the
 dashboard after enrolling (the mounts AerieOS used, `/workspace` and
 whatever a store sits on, taken out of fstab; the runners' units; the GPU
 display); `--doors`, ticked by default for a hosting node, shuts what it was
@@ -1721,7 +1842,13 @@ sandbox is a permissions design of its own, not written). Allow queues the job w
 its spec so its log is the record, and only a sandbox node takes it: the
 agent refuses it without the stamp like storage and network. It is not
 sudo: there is no second command without a second question, and nothing
-pretends. A node can be LOCKED (`config.lock`, the Lock under Advanced,
+pretends. A machine's own console can refuse them all (`sudo aerieos-agent
+root-asks off`, kept in node.json as the console's word like the release
+key's pin and reported as `root_off`, the running agent saying hello at its
+next turn when the console's word changes): the agent then fails `apply: root`
+with 77 before anything runs, and the controller refuses the ask, a
+schedule as root and `root_wait` with the sentence `nodes.root_off` says,
+so nobody is asked to allow what the node would refuse. A node can be LOCKED (`config.lock`, the Lock under Advanced,
 `nodes.node_lock`): while it is, `node_apply` for storage and network and
 `root_wait` refuse with `node_locked`'s sentence, a root ask is refused at
 ask time, and the Nodes page ghosts both Apply buttons saying why, for a machine
@@ -1757,7 +1884,7 @@ zone. Per viewer, cosmetic, instant. Stays where it is: the gear's popup.
 Nothing here changes.
 
 **Container-scoped**, what the process needs before it can think: ports,
-mounts, credentials, PUID/PGID, `DATABASE_URL` itself. Stays in the
+mounts, credentials, PUID/PGID. Stays in the
 environment and the five documented places. The test for this scope: *if
 changing it means recreating the container, it is env.* This list should only
 ever shrink: `DOCKER_HOST` leaving it (§11) is the pattern. *Where it stands
@@ -2013,8 +2140,11 @@ installed/removed from the Nodes screen.
 
 *Where phase 7 landed it:* the fold on a sandbox node's row grows a *CI
 runner* section. Install is a `system` job with `apply: runner`: the agent
-fetches GitHub's latest runner release for the node's architecture into
-`/var/lib/builderbot/runner`, asks the controller for a registration token
+fetches GitHub's runner for the node's architecture into
+`/var/lib/aerieos/runner` (the release the controller's pin names, since
+20 Nov 2026, and unpacked only where the file is the pinned bytes; the
+newest release as GitHub named it that day, before), asks the controller
+for a registration token
 through the new `runner-token` agent verb: minted on request from the
 root-only stash by the same helper the container's runner uses, audited,
 never stored; the PAT stays here: registers as the enrolled account with
@@ -2096,8 +2226,8 @@ anything, and the order is a sketch of how it would go if the fantasy ever
 grew a name. The binding part of this document for enterprise purposes is not
 this list; it is §15, the doors.
 
-- **E1: Postgres** via `DATABASE_URL` (the storage rule from phase 1 is what
-  makes this a config change).
+- **E1: Postgres** (the storage rule from phase 1, every statement through
+  db.py's few calls, is what keeps that change small).
 - **E2: bulk enrollment + approval queue + agent self-update + the Go
   agent.** The fleet phase.
 - **E3: OIDC/SSO + roles** (admin/operator/viewer, then per-pool) on the
@@ -2335,7 +2465,7 @@ each is a real fork rather than a detail:
 6. **The shielding.** The sibling-project deny list, the shielded ssh keys and
    the PAT stash are all mechanisms of this image. They have to exist on the
    node or the bargain quietly changes. And measured on bb-sandbox on 4 Sep:
-   a job runs as `aerie`, which has no sudo and cannot read `/etc/builderbot`
+   a job runs as `aerie`, which has no sudo and cannot read `/etc/aerieos`
    (0700 root, so the node token is out of reach), but it IS in the `docker`
    group, which is root-equivalent on any machine running a daemon. That is
    acceptable while the sandbox is the blast radius and a session is only
@@ -2395,8 +2525,13 @@ above, in order:
    container's shell as the docker account), running bb-tty from the aerie
    bundle the controller ships (refetched when the bundle's digest moves in
    hello). The controller's `/termws` carries the browser's socket there
-   instead of to a pty of its own (phase 10b), signed with the node's screen
-   key, with the account, its name and a session token in bb-tty's words
+   instead of to a pty of its own (phase 10b), over TLS to the certificate
+   the node made for itself and reported, and to no other: a node that has
+   none (it has neither Python's cryptography library nor `openssl`) has no
+   terminal opened on it, its row says so, and it makes one by itself at
+   its next hello once either is there; a node with a certificate answers a
+   plain request with a refusal. The opening is signed with the node's
+   screen key, with the account, its name and a session token in bb-tty's words
    exactly as it gives them locally. On the node those words are only a
    claim, so bb-tty shows the token to the controller
    (`POST /api/v1/tty-grant`) before anything starts, and the account, its
@@ -2418,9 +2553,9 @@ above, in order:
    `--session-user`), made with the controller's PUID:PGID so files it saves
    on the share are owned as the controller's are; in `kvm` for the
    emulator, in **no docker group**, no sudo. Jobs stay `aerie`; the agent stays
-   root and drops to each. The node token lives in `/etc/builderbot`
+   root and drops to each. The node token lives in `/etc/aerieos`
    (0700 root) and never enters a session's environment: the sessions get
-   the controller's URL and certificate pin, and nothing else of the agent's.
+   the controller's URL and the pin its https is held to, and nothing else of the agent's.
 
 Phase 10b is built too: `server.session_target` decides per space:
 local, the node (`reported.session.up` and `/workspace` mounted), or
@@ -2492,11 +2627,11 @@ MACHINE: the toolchains, the card and `/dev/kvm` are its own, from
 `nodes/provision-linux.sh` and the toolchain store. `aerie emu` on a
 controller with no node for the space refuses and says where it runs.
 A node's sessions outlive a controller restart on purpose (the tmux is the
-node's) and, since B107, an AGENT restart too: the unit is installed with
+node's) and an AGENT restart too: the unit is installed with
 `KillMode=process`, because systemd's default takes the whole cgroup and the
 agent's cgroup holds the terminals, the tmux servers under them and the Claude
-sessions inside those, so Update agent ended every conversation on the
-machine. The agent stops what is its own on SIGTERM, its terminals and its jobs,
+sessions inside those, so Update agent would end every conversation on the
+machine; it asks nothing before it runs. The agent stops what is its own on SIGTERM, its terminals and its jobs,
 and leaves the tmux alone. What must NOT outlive anything is the idle rule:
 Controller settings' Idle sessions, "end any agent's session after N idle minutes", rides the
 hello reply into node.json and the agent enforces it on its own tmux,

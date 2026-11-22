@@ -1,0 +1,211 @@
+"""An install's receipt (R234; the operator, 13 Nov: what a pack's install
+downloads from somewhere else had no paper trail). The installer writes
+every file that landed with its sha256 and one hash over them all
+(sdkmeta.receipt), the agent reads the summary into its census, the
+controller keeps the shape it knows, and an installed pack's row says what
+the receipt shows: a copy from an earlier manifest, the same manifest
+having left other files there before, and another node's copy differing."""
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+import agentpkg  # noqa: E402
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
+import sdkmeta  # noqa: E402
+
+agent = agentpkg.load("aerieos_agent_receipt")
+C1, C2 = "a" * 40, "b" * 40
+SENTENCE = "Its installer downloads the compiler from releases.example.org."
+
+
+def put(root, rel, text="x", mode=0o644):
+    full = os.path.join(root, rel)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "w") as f:
+        f.write(text)
+    os.chmod(full, mode)
+
+
+class Receipt(unittest.TestCase):
+    def store(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, True)
+        return root
+
+    def pack(self, store, name="hexkit", fetched="one"):
+        d = os.path.join(store, name)
+        put(d, "bbtool.json", "{}")
+        put(d, "install.sh", "#!/bin/sh\n", 0o755)
+        # What its install steps fetched from somewhere else.
+        put(d, "bin/hexkit", fetched, 0o755)
+        os.symlink("hexkit", os.path.join(d, "bin", "hk"))
+        # What a receipt leaves out: git's own, AerieOS's marks, compiled python.
+        put(d, ".git/HEAD", "ref")
+        put(d, ".bb-verified", "sha1\t" + C1 + "\tthe commit\n")
+        put(d, "verbs/__pycache__/report.cpython-312.pyc", "moment")
+        put(d, "verbs/old.pyc", "moment")
+        return d
+
+    def read(self, d):
+        with open(os.path.join(d, ".bb-receipt")) as f:
+            head, *rows = f.read().splitlines()
+        return head.split("\t"), rows
+
+    def test_every_file_that_landed(self):
+        store = self.store()
+        d = self.pack(store)
+        said = sdkmeta.receipt(d, C1)
+        head, rows = self.read(d)
+        self.assertEqual(head[:2], ["1", C1])
+        self.assertEqual([r.split("  ")[-1] for r in rows], ["bbtool.json", "bin/hexkit", "bin/hk", "install.sh"])
+        self.assertEqual(int(head[3]), 4)
+        self.assertEqual(int(head[4]), len("{}") + len("one") + len("#!/bin/sh\n"))
+        self.assertEqual(head[6], "")
+        self.assertRegex(head[2], r"^[0-9a-f]{64}$")
+        # A file says whether it runs, a link where it points.
+        self.assertTrue(rows[1].split("  ")[1] == "x" and rows[0].split("  ")[1] == "-", rows)
+        self.assertEqual(rows[2], "link  hexkit  bin/hk")
+        self.assertIn("receipt: 4 files", said)
+        # The store's own log, which a remove and a reinstall leave alone.
+        with open(os.path.join(store, ".bb-receipts")) as f:
+            log = [ln.split("\t") for ln in f.read().splitlines()]
+        self.assertEqual([(r[1], r[2], r[3]) for r in log], [("hexkit", C1, head[2])])
+
+    def test_the_same_files_are_the_same_receipt(self):
+        a, b = self.pack(self.store()), self.pack(self.store())
+        sdkmeta.receipt(a, C1)
+        sdkmeta.receipt(b, C1)
+        self.assertEqual(self.read(a)[0][2], self.read(b)[0][2])
+        # ...written again over itself, it does not count its own file.
+        sdkmeta.receipt(a, C1)
+        self.assertEqual(self.read(a)[0][2], self.read(b)[0][2])
+
+    def test_what_was_fetched_changed(self):
+        store = self.store()
+        d = self.pack(store, fetched="one")
+        sdkmeta.receipt(d, C1)
+        first = self.read(d)[0][2]
+        # Removed and installed again from the same commit: its install
+        # fetched something else this time.
+        shutil.rmtree(d)
+        d = self.pack(store, fetched="two")
+        said = sdkmeta.receipt(d, C1)
+        head, _ = self.read(d)
+        self.assertNotEqual(head[2], first)
+        self.assertEqual(head[6], first)
+        self.assertIn("the same commit made " + first[:12], said)
+        # From another commit, other files are what was asked for.
+        shutil.rmtree(d)
+        d = self.pack(store, fetched="three")
+        sdkmeta.receipt(d, C2)
+        self.assertEqual(self.read(d)[0][6], "")
+
+    def test_the_agent_reads_each_summary(self):
+        store = self.store()
+        d = self.pack(store)
+        sdkmeta.receipt(d, C1)
+        head, _ = self.read(d)
+        os.makedirs(os.path.join(store, "old"))
+        put(os.path.join(store, "bad"), ".bb-receipt", "1\t" + C1 + "\tnot-a-hash\t1\t1\t1\t\n")
+        put(os.path.join(store, "newer"), ".bb-receipt", "9\twhatever\n")
+        mod = sys.modules[agent.sdk_receipts.__module__]
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            got = agent.sdk_receipts({})
+        self.assertEqual(set(got), {"hexkit"})
+        self.assertEqual({k: got["hexkit"][k] for k in ("commit", "tree", "files", "before", "net")},
+                         {"commit": C1, "tree": head[2], "files": 4, "before": "", "net": ""})
+        # A pack that declares its downloads: the installer left which it was
+        # (sdk.sh sdk_net_cut), the receipt says it, and the mark is not counted.
+        for mark in ("cut", "open"):
+            put(d, ".bb-net", mark + "\n")
+            said = sdkmeta.receipt(d, C1)
+            self.assertIn("with no network" if mark == "cut" else "which this node cannot cut", said)
+            self.assertEqual(self.read(d)[0][2], head[2])
+            with mock.patch.object(mod, "tc_root", lambda state: store):
+                got = agent.sdk_receipts({})["hexkit"]
+            self.assertEqual((got["net"], "why" in got), (mark, False))
+        # One whose entry kept the network for its steps (source.online):
+        # the word, and the entry's own sentence beside it.
+        put(d, ".bb-net", "online\n" + SENTENCE + "\n")
+        said = sdkmeta.receipt(d, C1)
+        self.assertIn("its steps kept the network, as its entry says: " + SENTENCE, said)
+        self.assertEqual(self.read(d)[0][7:], ["online", SENTENCE])
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            got = agent.sdk_receipts({})["hexkit"]
+        self.assertEqual((got["net"], got["why"]), ("online", SENTENCE))
+        # A sentence past its bound is cut to it, and one the installer did not write is none.
+        put(d, ".bb-receipt", "\t".join(self.read(d)[0][:7] + ["online", "x" * 900]) + "\n")
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            self.assertEqual(len(agent.sdk_receipts({})["hexkit"]["why"]), 300)
+        put(d, ".bb-receipt", "\t".join(self.read(d)[0][:7] + ["online"]) + "\n")
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            self.assertEqual(agent.sdk_receipts({})["hexkit"]["why"], "")
+
+    def test_the_controller_keeps_the_shape_it_knows(self):
+        import nodes  # noqa: PLC0415
+        t = "c" * 64
+        out = nodes._census({"toolchain_receipts": {
+            "hexkit": {"commit": C1, "tree": t, "files": 4, "bytes": 15, "at": 1700000000, "before": "d" * 64, "extra": "dropped"},
+            "evil": {"commit": C1, "tree": "$(rm -rf /)", "files": 1}, "odd": "not a dict",
+            "junk": {"commit": "zz; rm", "tree": t, "files": "many", "bytes": 1, "at": 1}}})
+        self.assertEqual(out["toolchain_receipts"], {"hexkit": {"commit": C1, "tree": t, "files": 4, "bytes": 15, "at": 1700000000, "before": "d" * 64, "net": ""}})
+        # Whether its steps ran with the network cut, for a pack that declares its downloads.
+        for said, kept in (("cut", "cut"), ("open", "open"), ("wide open; rm", "")):
+            out = nodes._census({"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": said}}})
+            self.assertEqual(out["toolchain_receipts"]["hexkit"]["net"], kept)
+            self.assertNotIn("why", out["toolchain_receipts"]["hexkit"], "a sentence is an installer's that kept the network, and no other's")
+        # The entry kept the network: the word, and its sentence, one line of
+        # printable words within its bound.
+        keep = lambda why: nodes._census({"toolchain_receipts": {"hexkit": {  # noqa: E731
+            "commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": "online", "why": why}}})["toolchain_receipts"]["hexkit"]
+        self.assertEqual((keep(SENTENCE)["net"], keep(SENTENCE)["why"]), ("online", SENTENCE))
+        self.assertEqual(keep("  two\nlines \x1b[31m and a\ttab ")["why"], "two lines [31m and a tab")
+        self.assertEqual(len(keep("y" * 900)["why"]), nodes.RECEIPT_WHY_MAX)
+        for odd in (None, 7, ["a sentence"], {"a": 1}):
+            self.assertEqual(keep(odd)["why"], "", odd)
+        # A sentence beside another word is not kept.
+        out = nodes._census({"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": "cut", "why": SENTENCE}}})
+        self.assertNotIn("why", out["toolchain_receipts"]["hexkit"])
+
+    def test_what_a_row_says(self):
+        import toolchains  # noqa: PLC0415
+        t1, t2 = "1" * 64, "2" * 64
+        mine = {"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t1, "files": 4, "bytes": 15, "at": 5, "before": ""}}}
+
+        class Nodes:
+            others = []
+
+            @staticmethod
+            def node_list():
+                return [{"id": "n_me", "name": "me", "reported": mine}, *Nodes.others]
+
+        with mock.patch.object(toolchains, "nodes", Nodes):
+            row = {"source": {"commit": C1}}
+            got = toolchains.receipt_of("n_me", mine, "hexkit", row)
+            self.assertEqual((got["tree"], got["stale"], got["before"], got["differs"]), (t1, "", "", []))
+            # The manifest kept now is a later one: the copy there is stale.
+            self.assertEqual(toolchains.receipt_of("n_me", mine, "hexkit", {"source": {"commit": C2}})["stale"], C2)
+            # Another node's copy of the same manifest is other files; one
+            # from another manifest, or the same files, is not said.
+            Nodes.others = [{"id": "n_a", "name": "alder", "reported": {"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t2}}}},
+                            {"id": "n_b", "name": "birch", "reported": {"toolchain_receipts": {"hexkit": {"commit": C2, "tree": t2}}}},
+                            {"id": "n_c", "name": "cedar", "reported": {"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t1}}}}]
+            self.assertEqual(toolchains.receipt_of("n_me", mine, "hexkit", row)["differs"], [{"node": "alder", "tree": t2}])
+            # What its steps ran with, and the entry's sentence where it kept the network.
+            self.assertEqual((got["net"], got["why"]), ("", ""))
+            for net, why, said in (("cut", "", ""), ("open", "", ""), ("online", SENTENCE, SENTENCE), ("cut", SENTENCE, "")):
+                rep = {"toolchain_receipts": {"hexkit": {**mine["toolchain_receipts"]["hexkit"], "net": net, **({"why": why} if why else {})}}}
+                got = toolchains.receipt_of("n_me", rep, "hexkit", row)
+                self.assertEqual((got["net"], got["why"]), (net, said))
+            # Installed before receipts, or by an agent from before them.
+            self.assertIsNone(toolchains.receipt_of("n_me", {}, "hexkit", row))
+            self.assertIsNone(toolchains.receipt_of("n_me", mine, "other", row))
+
+
+if __name__ == "__main__":
+    unittest.main()

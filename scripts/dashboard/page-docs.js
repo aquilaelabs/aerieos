@@ -3,8 +3,8 @@
 // draws, and the busy state a button wears while its request runs.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -30,24 +30,28 @@
 // the same label, the same place (the bar's left, verbs at its right) and the
 // same list on Toolchains, the Emulator, the Phone and the CI runner. A node
 // that cannot be picked for this tab says why in its option, and a quiet one
-// says so. `why(n)` is "" for one that can.
+// says so. `why(n)` is "" for one that can. `stated`: the page says the
+// node's state beside the picker (a group header's pill), so the node on
+// show is its name alone there, where "draconis (qui..." was cut off beside
+// a pill already saying NOT ANSWERING (the operator, 18 Nov); the others in
+// the list still say so, which is where it helps the choice.
 // `nodes` null is the page's placeholder (R218, the operator 18 Oct: a
 // placeholder drawn by the page's own code, so it cannot drift from it):
 // the same label and word, the picker's box shimmering.
-function nodePick(id, nodes, cur, why = () => ""){
+function nodePick(id, nodes, cur, why = () => "", {stated = false} = {}){
   if (nodes === null) return `<label class="pick nodepick"><span class="pickw">Node</span> ${skv(7, "ctl")}</label>`;
   if (!nodes.length) return "";
   return `<label class="pick nodepick"><span class="pickw">Node</span> <select id="${esc(id)}" aria-label="node">${nodes.map(n => {
     const w = why(n);
     return `<option value="${esc(n.id)}"${n.id === cur ? " selected" : ""}${w ? " disabled" : ""}>${esc(n.name)}${
-      w ? `: ${esc(w)}` : n.live === false ? " (quiet)" : ""}</option>`;
+      w ? `: ${esc(w)}` : n.live === false && !(stated && n.id === cur) ? " (quiet)" : ""}</option>`;
   }).join("")}</select></label>`;
 }
 
 // What a list, a grid or a page is waiting with (R218 step 15, the operator
 // 16 Oct): shapes laid out the way its content will land, shimmering, where
 // a "loading…" line said the same in words. Still a .loading, so everything
-// that knew a placeholder knows this one: paint() fades in what replaces it,
+// that knew a placeholder knows this one: a draw fades in what replaces it,
 // the poll's failure notice writes its words over it, a suite waits for it
 // to go. The words stay for a screen reader. A shape: rows (a list), cards
 // (a grid of cards), tiles (a row of numbers), home (Home's tiles and two
@@ -91,11 +95,11 @@ function skv(em = 5, cls = ""){ return `<i class="skv${cls ? " " + esc(cls) : ""
 function dropBox(at, {q, sub = "", placeholder = "", max = 1000, verb, tone = "primary", place = "append", go, cancel}){
   const box = document.createElement("div");
   box.className = "dropbox ctlown";
-  box.innerHTML = `<div class="q">${esc(q)}${sub ? `<span>${esc(sub)}</span>` : ""}</div>
+  drawHTML(box, `<div class="q">${esc(q)}${sub ? `<span>${esc(sub)}</span>` : ""}</div>
     <textarea class="proseline" rows="1" maxlength="${Number(max) || 1000}" placeholder="${esc(placeholder)}"></textarea>
     <div class="actbar">
       <button type="button" class="stop">Cancel</button>
-      <button type="button" class="${esc(tone)}" data-dropgo>${esc(verb)}</button></div>`;
+      <button type="button" class="${esc(tone)}" data-dropgo>${esc(verb)}</button></div>`);
   if (place === "after") at.after(box); else at.appendChild(box);
   arriveBox(box);
   const ta = box.querySelector("textarea");
@@ -152,7 +156,7 @@ function barSaid(full, short){
 // names, not the pane's .stack, so the first real draw builds the pane
 // afresh rather than inside it.
 function bootPage(hash){
-  const parts = String(hash || "").replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  const parts = routeIn(hash).replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   const key = parts[0] || "home", g = RAIL.find(x => x.key === key) || RAIL[0];
   const tool = g.tools.some(([k]) => k === parts[1]) ? parts[1] : g.tools[0][0];
   const seg = (tools, on) => `<span class="subnav pseg hscroll">${tools.filter(([k]) => !PRESSED.has(k)).map(([k, label]) =>
@@ -163,11 +167,9 @@ function bootPage(hash){
   if (key === "projects" && parts[1] && !g.tools.some(([k]) => k === parts[1])){
     // A project's notebook: its header, its view strip under it the
     // pane's width with the view's group open, then rows.
-    const GROUPS = [["overview", "Overview", [["overview", "Overview"], ["sessions", "Sessions"], ["permissions", "Permissions"], ["settings", "Settings"]]],
-                    ["plan", "Plan", [["roadmap", "Roadmap"], ["bugs", "Bugs"]]],
-                    ["code", "Code", [["git", "Git"], ["tests", "Tests"], ["analysis", "Analysis"]]],
-                    ["ship", "Ship", [["artifacts", "Artifacts"], ["docker", "Docker"], ["vms", "VMs"], ["signing", "Signing"]]],
-                    ["docs", "Docs", [["design", "Design"], ["wiki", "Wiki"]]]];
+    // The notebook's own groups and views (NB_VIEWS), each view by its
+    // name in an address, so this strip is the one the notebook then draws.
+    const GROUPS = NB_GROUPS.map(([k, w]) => [k, w, NB_VIEWS.filter(x => x.group === k).map(x => [x.addr || x.key, x.label])]);
     const view = parts[2] || "overview", grp = GROUPS.find(x => x[2].some(([v]) => v === view)) || GROUPS[0];
     const btn = (on, w) => `<button type="button" disabled class="${on ? "on" : ""}">${w}</button>`;
     bar = `<span class="phead"><span class="pname">${skv(6)}</span><span class="pfacts">${skv(14)}</span><span class="sp"></span>
@@ -177,12 +179,11 @@ function bootPage(hash){
       ${bootView(view) || `<div class="nbview"><div class="field">${skRows(5)}</div></div>`}</div></div>`;
     return {rail: key, bar: `<div class="bar proj">${bar}</div>`, body: `<div class="skstack">${body}</div>`};
   }
-  // The Machines group's header over its sub-nav (R177): the picker's
-  // placeholder, the facts' shimmer and the two actions, dead.
   // A group's header over its sub-nav (R177, R178): the picker's
-  // placeholder, the facts' shimmer, the Machines group's two actions dead.
+  // placeholder, the state pill's shimmer, the Machines group's two
+  // actions dead.
   bar = ["machines", "build", "containers"].includes(key)
-    ? `<div class="bar page grouped${key === "machines" ? " machines" : ""}"><span class="phead mchead">${nodePick("", null)}<span class="pfacts">${skv(14)}</span><span class="sp"></span></span>
+    ? `<div class="bar page grouped${key === "machines" ? " machines" : ""}"><span class="phead mchead">${nodePick("", null)}${skv(5, "ndstatesk")}<span class="sp"></span></span>
         <span class="subrow">${seg(g.tools, tool)}<span class="sp"></span>${key === "machines" ? `<span class="actbar"><button type="button" disabled>${"New VM"}</button><button type="button" class="primary" disabled>${barSaid("Enroll node", "Enroll")}</button></span>` : ""}</span></div>`
     : `<div class="bar page">${seg(g.tools, tool)}</div>`;
   if (key === "home")
@@ -192,7 +193,7 @@ function bootPage(hash){
         "sessions open", "updates due", "CI red"].map(l => `<span class="tile"><span class="tv">${skv(1.4)}</span><span class="tl">${l}</span></span>`).join("")}</div></div>
       <div class="field"><div class="homegrid"><section class="hcard"><h3>Attention</h3>${skRows(2)}</section>
         <section class="hcard"><h3>Last jobs</h3>${skRows(3)}</section></div></div>
-      <div class="field"><section class="hsect"><h3>Spaces at a glance</h3>${skRows(2)}</section></div>`);
+      <div class="field"><section class="hsect"><h3>Favorites</h3>${skRows(2)}</section></div>`);
   else if (key === "projects" && tool === "projects")
     body = doc(`<input type="search" disabled placeholder="name, branch or node"><span class="sp"></span>
       <span class="actbar"><button type="button" class="ic" disabled>${BIN}</button><button type="button" class="primary" disabled>New space</button></span>`,
@@ -209,7 +210,7 @@ function bootPage(hash){
 function skProjectCard(j = 0){
   const repo = k => `<div class="pcrepo">${skv(4 + (SKW[(j + k) % 8] % 5))}${skv(5)}</div>`;
   const mark = icon => `<button type="button" class="eye bare pcmark" disabled>${icon}</button>`;
-  return `<div class="pcard skpcard"><div class="pcname">${skv(5 + (SKW[j % 8] % 6), "name")}<span class="sp"></span>${mark(PIN)}${mark(ARCHIVE)}</div>
+  return `<div class="pcard skpcard"><div class="pcname">${skv(5 + (SKW[j % 8] % 6), "name")}<span class="sp"></span>${mark(STAR)}${mark(ARCHIVE)}</div>
     <div class="pcmeta"><span class="pcfacts">${skv(7)}</span></div>
     <div class="pcrepos">${repo(0)}${j % 3 === 1 ? repo(3) : ""}</div>
     <div class="pcacts actbar"><button type="button" disabled>Start agent</button><button type="button" disabled>Add repository</button><button type="button" disabled>Edit</button></div></div>`;
@@ -246,8 +247,8 @@ function bootOwn(root, tool){
   const was = doc.innerHTML;
   doc.id = "docboot";
   doc.innerHTML = "";
-  try{ spec.render("boot"); }catch(e){ doc.innerHTML = was; }
-  if (!doc.querySelector(".doclist > *")) doc.innerHTML = was;
+  try{ spec.render("boot"); }catch(e){ drawHTML(doc, was); }
+  if (!doc.querySelector(".doclist > *")) drawHTML(doc, was);
   doc.removeAttribute("id");
 }
 
@@ -281,11 +282,14 @@ const SKTPLS = {
   design: () => skTpl(`<nav class="sectjump"><a href="#">Pages</a><a href="#">Themes</a></nav>`
     + docSection("design", "pages", "Pages", "", skRows(2))
     + docSection("design", "themes", "Themes", "", skRows(2))),
-  // Its list, by the view's own titles (nb-artifacts.js ART_TITLES)...
-  // ...with the jump bar the view draws over its three sections (sectJump:
-  // Build, Version and Files), so the page does not move down as it lands.
-  artifacts: () => skTpl(`<nav class="sectjump">${["build", "version", "files"].map(k => `<a href="#">${esc(artTitle(k))}</a>`).join("")}</nav>`
-    + [["build", 1], ["files", 2]].map(([k, n]) => docSection("artifacts", k, artTitle(k), "", skRows(n))).join("")),
+  // Its sections by the view's own titles (nb-artifacts.js ART_TITLES), in
+  // the order it lands them: Build first, in its own box above the Version
+  // (nbArtBuildSection), under the jump bar the view draws over the three
+  // (sectJump), so the page does not move down as it lands; then Files
+  // under the Version.
+  artbuild: () => skTpl(`<nav class="sectjump">${["build", "version", "files"].map(k => `<a href="#">${esc(artTitle(k))}</a>`).join("")}</nav>`
+    + docSection("artifacts", "build", artTitle("build"), "", skRows(1))),
+  artifacts: () => skTpl(docSection("artifacts", "files", artTitle("files"), "", skRows(2))),
   // The Overview's box of sections (nb-rules.js BRIEF_SECTS) as drawRules
   // lands it, the Brief left out, with the jump bar over them and the
   // Memories under them that the markup holds.
@@ -293,6 +297,15 @@ const SKTPLS = {
     const sects = BRIEF_SECTS.filter(([k]) => k !== "brief");
     return skTpl(`<nav class="sectjump">${[...sects.map(([, t]) => t), "Memories"].map(t => `<a href="#">${esc(t)}</a>`).join("")}</nav>`
       + sects.map(([k, t, open], j) => docSection("briefing", k, t, "", skRows(j ? 1 : 3), {open})).join(""));
+  },
+  // The Signing view as a project with its one key lands (nb-signing.js
+  // drawSigning) on a node that signs: the jump bar over its sections, the
+  // backup password, the default key, the apps and the releases. A node
+  // without the tools heads the view with why, which is not the common case.
+  signing: () => {
+    const sects = [["lock", "Backup password", 1], ["key:default", "Default key", 2], ["apps", "Apps", 1], ["releases", "Releases", 2]];
+    return skTpl(`<nav class="sectjump">${sects.map(([, t]) => `<a href="#">${esc(t)}</a>`).join("")}</nav>`
+      + sects.map(([k, t, n]) => docSection("signing", k, t, "", skRows(n))).join(""));
   },
   // ...and the Version box above it, which the view fills on its own.
   version: () => skTpl(docSection("artifacts", "version", artTitle("version"), "", skRows(1))),
@@ -323,6 +336,10 @@ function askInline(after, {label, value = "", ok = "OK", options = [], allowEmpt
     if (was?.classList.contains("askline") && was.__label === label){ resolve(null); return; }
     const box = document.createElement("div");
     box.className = "field askline";
+    // The page's own while it is open: a redraw of the surface it is in
+    // (a card's back, a group's head) leaves it where it is, with what is
+    // typed in it (R244).
+    box.setAttribute("data-own", "");
     // With options, the field is one to type in and a pulldown of every
     // option at once (the operator, 26 Oct: a datalist hinted only once
     // something was typed): its chevron opens the whole list, typing narrows
@@ -330,11 +347,11 @@ function askInline(after, {label, value = "", ok = "OK", options = [], allowEmpt
     const list = options.length ? `askopts${++seq}` : "";
     const field = `<input type="text" autocomplete="off" spellcheck="false" aria-label="${esc(label)}"${
         list ? ` role="combobox" aria-expanded="false" aria-controls="${list}" aria-autocomplete="list"` : ""}>`;
-    box.innerHTML = `<label class="lbl">${esc(label)}</label><div class="askrow actbar ctlrow">${list
+    drawHTML(box, `<label class="lbl">${esc(label)}</label><div class="askrow actbar ctlrow">${list
         ? `<span class="combo">${field}<button type="button" class="combobtn" tabindex="-1" aria-label="every ${esc(label.toLowerCase())}">${CHEVRON_DOWN}</button>
             <span class="combolist" id="${list}" role="listbox" hidden></span></span>` : field}
       <button type="button" data-askno>Cancel</button><button type="button" class="primary" data-askok>${esc(ok)}</button>${
-        also ? `<button type="button" class="danger" data-askalso>${esc(also.label)}</button>` : ""}</div>`;
+        also ? `<button type="button" class="danger" data-askalso>${esc(also.label)}</button>` : ""}</div>`);
     // On a card's back the box takes the repositories' place, and the back
     // keeps its height while it is open: the card never changes size.
     const back = after.closest(".pcback");
@@ -372,9 +389,9 @@ function comboWire(box, inp, options){
     const q = inp.value.trim().toLowerCase();
     shown = all || !q ? options.slice() : options.filter(o => o.toLowerCase().includes(q));
     at = Math.min(at, shown.length - 1);
-    ul.innerHTML = shown.length ? shown.map((o, i) => `<button type="button" role="option" data-combo="${i}" aria-selected="${i === at}"${
+    drawHTML(ul, shown.length ? shown.map((o, i) => `<button type="button" role="option" data-combo="${i}" aria-selected="${i === at}"${
         i === at ? ' class="on"' : ""} tabindex="-1">${esc(o)}</button>`).join("")
-      : `<span class="combonone">none yet: what is typed is a new one</span>`;
+      : `<span class="combonone">none yet: what is typed is a new one</span>`);
     // Taken on the click, a press and its release on the one option, so a
     // press that holds to scroll the list takes nothing (B404); the press
     // itself only keeps the field's focus, whose blur would shut the list.
@@ -415,7 +432,7 @@ const PAGE_AT = {nodes: "#/machines/nodes", installed: "#/machines/installed", s
 // A page this account may not open is its words and no link (B114): the
 // address of one a grant forbids landed on the group's first page instead.
 function pageLink(page, words, hash = PAGE_AT[page]){
-  if (typeof railAllows === "function" && !railAllows(page)) return esc(words);
+  if (!railAllows(page)) return esc(words);
   return `<a href="${esc(hash || "#")}" class="pagelink">${esc(words)}</a>`;
 }
 // A table on its way: its real head over rows whose cells shimmer, each as
@@ -433,23 +450,24 @@ function docSurface(i, kind){
   // every draw, a page drawn by the poll was born again each time, its list
   // fading in as if it had just arrived, its scroll and whatever was under
   // the pointer lost, though nothing in it had changed. A draw that changes
-  // nothing now writes nothing: the list goes through paint(), and the bar
-  // and the foot are written only when what they say moved.
+  // nothing now writes nothing: the list goes through patch(),
+  // and the bar and the foot are patched only where what they say moved, a
+  // picker or a search in the bar kept as it is (R244).
   let box = el.firstElementChild;
   if (!box || el.children.length !== 1 || !box.classList.contains("doctab") || !box.classList.contains(`${kind}tab`)
       || !box.querySelector(":scope > .doclist")){
-    el.innerHTML = `<div class="doctab ${esc(kind)}tab">
+    drawHTML(el, `<div class="doctab ${esc(kind)}tab">
       <div class="field docbarrow" hidden></div>
       <div class="doclist"></div>
       <div class="fnote" hidden></div>
-    </div>`;
+    </div>`);
     box = el.firstElementChild;
   }
   const bar = box.querySelector(":scope > .docbarrow");
   const foot = box.querySelector(":scope > .fnote");
   const slot = (node, html) => {
     const s = String(html);
-    paint(node, s, true);
+    patch(node, s, true);
     const off = !s.trim();
     if (node.hidden !== off) node.hidden = off;
   };
@@ -579,13 +597,14 @@ function splitSects(root, key, {says = {}, sel = ":scope > details.sect", marks 
   if (!nav){
     nav = document.createElement("div");
     nav.className = "rlist snav";
+    nav.setAttribute("data-own", "");
     nav.setAttribute("role", "tablist");
     root.insertBefore(nav, root.firstChild);
     // A press on the open section's head, on a phone, goes back to the list.
     root.addEventListener("click", e => {
       const s = e.target.closest("summary"), d = s?.parentElement;
       if (!d || d.parentElement !== root || !d.classList.contains("scur") || !root.classList.contains("sopen")
-          || !matchMedia("(max-width: 900px)").matches) return;
+          || !isPhone()) return;
       e.preventDefault();
       SPLIT[root._split.key].open = false; splitMove(root, "back"); splitDraw(root);
     });
@@ -623,26 +642,28 @@ function splitDraw(root){
       <span class="name">${esc(d.querySelector(":scope > summary .t")?.textContent || k)}</span>
       <span class="rtags">${say ? `<span class="dim">${esc(say)}</span>` : ""}<span class="sunsaved" hidden>unsaved</span></span></button>`; }).join("");
   if (nav.dataset.drawn !== html){
-    nav.innerHTML = html; nav.dataset.drawn = html;
+    drawHTML(nav, html); nav.dataset.drawn = html;
     nav.querySelectorAll("[data-spick]").forEach(b => b.onclick = () => {
       // The section on show pressed again at a desk is no change: nothing
       // drawn again, no fade (B317). On a phone the list stands in its place,
       // so a press there still opens it.
       // It is still the one open, which a narrower window shows in place of
       // the list.
-      if (b.classList.contains("on") && !matchMedia("(max-width: 900px)").matches){ st.open = true; return; }
+      if (b.classList.contains("on") && !isPhone()){ st.open = true; return; }
       st.pick = b.dataset.spick; st.open = true;
       // At a desk the section fades through, as a rail page does; on a
       // phone it slides in over the list.
       splitAway(() => [...root.querySelectorAll(o.sel)].filter(d => d.classList.contains("scur")),
                 () => { splitMove(root, "in"); splitDraw(root); });
-      if (matchMedia("(max-width: 900px)").matches) root.scrollIntoView?.({block: "start"});
+      if (isPhone()) root.scrollIntoView?.({block: "start"});
     });
   }
   all.forEach(d => { const on = splitId(d) === pick;
     const s = d.querySelector(":scope > summary");
+    // Code's own (data-own), so a patch of the page steps over it rather
+    // than matching it to the title span the markup starts the head with.
     if (s && !s.querySelector(":scope > .shback"))
-      s.insertAdjacentHTML("afterbegin", `<span class="shback" role="img" aria-label="Back to ${esc(o.back)}">\u2039</span>`);
+      s.insertAdjacentHTML("afterbegin", `<span class="shback" role="img" aria-label="Back to ${esc(o.back)}" data-own>\u2039</span>`);
     if (d.classList.contains("scur") !== on) d.classList.toggle("scur", on);
     if (on && !d.open) d.open = true; });
   root.classList.toggle("sopen", st.open);
@@ -652,7 +673,7 @@ function splitDraw(root){
 // A pick on a list beside its detail: a fade through at a desk (fadeThrough),
 // and on a phone the redraw alone, which plays its slide (splitMove).
 function splitAway(parts, swap){
-  return matchMedia("(max-width: 900px)").matches ? swap() : fadeThrough(parts, swap);
+  return isPhone() ? swap() : fadeThrough(parts, swap);
 }
 
 // The phone's slide: in from the right to a section, back from the left to
@@ -698,7 +719,7 @@ function wireSections(root){
     // `:scope > summary` because a section can contain folds of its own, and
     // the section must not answer for theirs.
     const sum = d.querySelector(":scope > summary");
-    if (sum) sum.onclick = e => { e.preventDefault(); if (sectFixed(d)) return; if (!d.open) soleOpen(d); slideDetails(d, !d.open); };
+    if (sum) sum.onclick = e => { e.preventDefault(); if (sectFixed(d)) return; const will = !foldOpen(d); if (will) soleOpen(d); slideDetails(d, will); };
   });
   const view = root.closest?.(".nbview, .doctab") || root.querySelector?.(".doctab");
   if (view){
@@ -725,9 +746,19 @@ function sectJump(g){
   all.forEach(o => { seen[titleOf(o)] = (seen[titleOf(o)] || 0) + 1; });
   const mine = all.filter(o => seen[titleOf(o)] === 1);
   const have = g.querySelector(":scope .sectjump");
-  // Two or more (the operator, 23 Oct: every page with more than one).
-  if (mine.length < 2){ have?.remove(); return; }
+  // Two or more (the operator, 23 Oct: every page with more than one). One
+  // the page's markup drew (Settings') is hidden rather than taken out: its
+  // markup still has it, and a list missing a child the markup drew reads
+  // as another writer's at the next draw, which is then written whole (R244).
+  if (mine.length < 2){
+    if (have && have.__markup && !patchOwn(have)){ if (!have.hidden) have.hidden = true; }
+    else have?.remove();
+    return;
+  }
   const bar = have || document.createElement("nav");
+  if (bar.hidden) bar.hidden = false;
+  // The code's own, which a patched surface leaves where it is (R244).
+  if (!have) bar.setAttribute("data-own", "");
   // In a dialog every line is a .field band (the design's dialog layout).
   // Written only where it moved: this runs after every draw, and a poll that
   // brought nothing new must write nothing (when-a-view-re-reads).
@@ -735,7 +766,7 @@ function sectJump(g){
   if (bar.className !== cls) bar.className = cls;
   if (bar.getAttribute("aria-label") !== "sections") bar.setAttribute("aria-label", "sections");
   const html = mine.map((o, i) => `<a href="#" data-jump="${i}">${esc(titleOf(o))}</a>`).join("");
-  if (bar.innerHTML !== html) bar.innerHTML = html;
+  if (bar.innerHTML !== html) drawHTML(bar, html);
   // At the top, before the surface's first section of any kind (the
   // operator, 25 Oct: pills at the top of a page and nowhere else); before
   // its first jump target it stood mid-page under the sections its chips
@@ -861,7 +892,7 @@ function oneOpen(g){
 // skipped, a single leftover is drawn inline (a menu of one is a detour),
 // and two or more make the menu; `always` makes the menu of one too, for a
 // table's buttons column, whose width is the ⋯'s whatever the row offers.
-// wireMore() wires the button; the page's one click listener (index.html)
+// wireMore() wires the button; the page's one click listener (page-boot.js)
 // shuts every open menu.
 function actMore(items, always = false){
   const have = items.filter(Boolean);
@@ -873,7 +904,7 @@ function actMore(items, always = false){
     <div class="actmenu" hidden role="menu">${have.join("")}</div></span>`;
 }
 function wireMore(root){
-  root.querySelectorAll(".actbar .more > button").forEach(b => b.onclick = () => {
+  root.querySelectorAll(".actbar .more > button, .acts .more > button").forEach(b => b.onclick = () => {
     const m = b.nextElementSibling;
     const open = m.hidden;
     closeMore();
@@ -883,7 +914,7 @@ function wireMore(root){
 // A menu over the page, never inside what holds its button (the operator,
 // 18 Oct: a card's ⋯ in Archived was cut off at the fold's foot): at a desk
 // under its button and lined up with it, above it when it would pass
-// the screen's foot, at every width. The ⋯ menus and the Claude chooser both. Fixed to the screen, measured
+// the screen's foot, at every width: the page's menus. Fixed to the screen, measured
 // against whatever box holds it as its frame (a scheme's glass makes one),
 // its entrance played from the start where it lands.
 function floatAt(m, anchor){
@@ -993,16 +1024,6 @@ function closeMore(){
   });
 }
 
-function busy(btn, word){
-  if (!btn) return;
-  btn.disabled = true;
-  btn.setAttribute("aria-busy", "true");
-  btn.innerHTML = `${esc(word)}<span class="dots"></span>`;
-  // The one ticker every .dots on the page shares; it stops itself when
-  // the last one is repainted away.
-  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
-}
-
 // A bar where the thing running reports an honest measure of its own (the
 // operator, 8 Nov: SnapRAID's percentage, an upload's bytes sent), under the
 // word that says what runs; "" for anything that reports none, since a bar
@@ -1012,18 +1033,6 @@ function pctBar(said, label = "progress"){
   const m = typeof said === "number" ? said : parseInt(String(said || "").match(/(\d{1,3})%/)?.[1] ?? "", 10);
   if (!Number.isFinite(m)) return "";
   return `<progress class="pbar" max="100" value="${Math.max(0, Math.min(100, m))}" aria-label="${esc(label)}"></progress>`;
-}
-
-// ...and the other half, for a press that can fail without a repaint behind
-// it. Most busy() calls need none: the round trip redraws the surface and
-// the button with it, but the notebook's Send and Save both stay on screen
-// when the server says no, and a button left wearing "Sending…" over a
-// refusal is the worst of both.
-function unbusy(btn, word){
-  if (!btn) return;
-  btn.disabled = false;
-  btn.removeAttribute("aria-busy");
-  btn.textContent = word;
 }
 
 // ---- tiles, facts, tables, charts and chips (R216, R218, the 2.0 language)
@@ -1102,8 +1111,18 @@ function glanceWaiting(el){
   const was = glanceSeen[el.id];
   const n = was ? was.tiles : +el.dataset.tiles || 0;
   const said = was ? was.said : "said" in el.dataset;
-  return paint(el, statTiles(Array.from({length: n}, () => ({value: GHOST, label: "\u00a0"})))
-               + (said ? viewSaid(skel("word")) : ""));
+  const tiles = statTiles(Array.from({length: n}, () => ({value: GHOST, label: "\u00a0"})));
+  // ...its words where the view will say them: on the control row's slot
+  // where it has one, as viewGlance does, so the row's buttons wait beside
+  // the words under the tiles. With the slot empty a row of a button or two
+  // shares the tiles' line, and the buttons rode up beside the tiles while
+  // the view waited, dropping under them as it landed (the operator, 18 Nov).
+  const slot = el.closest(".nbview")?.querySelector(":scope > .nbhead > .nbsaidslot");
+  if (slot){
+    const wrote = patch(el, tiles);
+    return patch(slot, said ? `<div class="notice note">${skel("word")}</div>` : "") || wrote;
+  }
+  return patch(el, tiles + (said ? viewSaid(skel("word")) : ""));
 }
 // What a view has to say beside its tiles, in the notice voice (the operator,
 // 25 Oct: no loose words at a page's top): an error in red, a warning in
@@ -1125,14 +1144,17 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
   const slot = el.closest(".nbview")?.querySelector(":scope > .nbhead > .nbsaidslot");
   let wrote;
   if (slot){
-    wrote = paint(el, html);
-    wrote = paint(slot, said || actions ? `<div class="notice ${esc(tone || "note")}">${said}${actions ? `<div class="actbar">${actions}</div>` : ""}</div>` : "") || wrote;
-  } else wrote = paint(el, html + viewSaid(said, actions, tone));
+    wrote = patch(el, html);
+    wrote = patch(slot, said || actions ? `<div class="notice ${esc(tone || "note")}">${said}${actions ? `<div class="actbar">${actions}</div>` : ""}</div>` : "") || wrote;
+  } else wrote = patch(el, html + viewSaid(said, actions, tone));
   // Marked once: a poll that brings nothing new writes nothing (uniform).
   if (!el.dataset.drawn) el.dataset.drawn = "1";
   glanceSeen[el.id] = {tiles: el.querySelectorAll(".tile").length, said: !!(said || actions)};
   return wrote;
 }
+// A view's glance when its read failed: no tiles, and what was being read
+// with the error's words, in red.
+function glanceBad(el, what, err){ return viewGlance(el, [], esc(what + ": " + err), "", "bad"); }
 
 // What a card's settings are, read (the operator's concept, 17 Oct): one
 // wrapping line of pills, each its label in the quiet voice and its value,
@@ -1179,10 +1201,77 @@ function tblTracks(cols){
 // attribute the page's wiring reads (data-dmview, data-vmview).
 const VIEW_ICON_CARDS = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
 const VIEW_ICON_LIST = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg>`;
-function viewSeg(attr, cur, cardsSay, listSay, dead = ""){
+// A pulldown in a bar or a row is as wide as its longest answer (the
+// operator, 18 Nov; page-overrides.css keeps it from stretching). A base
+// select (page-skin.css) is as wide as the answer chosen, so the width is
+// set here from what it measures: itself with its longest answer chosen
+// and nothing sizing it, then put back as it was, its choice and its style.
+// The canvas only says which answer is longest. Kept by its answers' words,
+// so it is measured again only when they change; one not on show waits for
+// its turn. A browser without base-select sizes a select by its longest
+// answer itself.
+const PICKERS = ":is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select)";
+let pickFitDue = 0;
+let pickInk = null;
+// A group header's node picker is as wide as the name it shows, measured
+// here in every browser: left to size itself it was cut short with room
+// beside it (bb-sand… on a phone in Firefox, the operator, 19 Nov; in
+// WebKit too, B1018), each engine keeping a different room for the closed
+// picker's arrow at the header's larger face. The name's ink, its own
+// padding, and room for the arrow whatever draws it; the header's own
+// max-width still lets it give way to the pill beside it.
+const HEAD_PICKERS = ".pane .bar.page.grouped .phead > label.pick > select";
+const HEAD_ARROW = 52;
+function fitHeadPickers(){
+  pickInk = pickInk || document.createElement("canvas").getContext("2d");
+  for (const s of document.querySelectorAll(HEAD_PICKERS)){
+    const word = s.selectedOptions[0]?.label || s.selectedOptions[0]?.textContent || "";
+    if (!word || !s.checkVisibility()) continue;
+    const cs = getComputedStyle(s), font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const key = `${font}\n${word}`;
+    if (s.dataset.fitFor === key) continue;
+    pickInk.font = font;
+    const px = v => parseFloat(v) || 0;
+    // ...and what its own negative margin takes back: its label is as wide
+    // as it is less that margin, and the header's max-width holds it to that.
+    s.style.width = `${Math.ceil(pickInk.measureText(word).width + px(cs.paddingLeft) + Math.max(px(cs.paddingRight), HEAD_ARROW)
+      + px(cs.borderLeftWidth) + px(cs.borderRightWidth) + Math.max(0, -px(cs.marginLeft)))}px`;
+    s.dataset.fitFor = key;
+  }
+}
+function fitPickers(){
+  pickFitDue = 0;
+  fitHeadPickers();
+  // The rest is a base select's alone: a browser that draws its own select
+  // sizes one in a bar by its longest answer itself.
+  if (!CSS.supports("appearance", "base-select")) return;
+  pickInk = pickInk || document.createElement("canvas").getContext("2d");
+  for (const s of document.querySelectorAll(PICKERS)){
+    const words = [...s.options].map(o => o.label || o.textContent || "");
+    const key = words.join("\n");
+    if (!words.length || s.dataset.fitFor === key || !s.checkVisibility()) continue;
+    const cs = getComputedStyle(s);
+    pickInk.font = cs.font || `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const ink = words.map(w => pickInk.measureText(w).width);
+    const longest = ink.indexOf(Math.max(...ink)), at = s.selectedIndex;
+    const was = s.getAttribute("style") || "";
+    s.style.cssText = `${was};width:auto;flex:none;max-width:none;min-width:0`;
+    s.selectedIndex = longest;
+    const w = s.getBoundingClientRect().width;
+    s.selectedIndex = at;
+    s.setAttribute("style", was);
+    s.style.width = `${Math.ceil(w)}px`;
+    s.dataset.fitFor = key;
+  }
+}
+// ...asked for on a draw, once a frame however many draws there were.
+function fitPickersSoon(){
+  if (!pickFitDue) pickFitDue = requestAnimationFrame(fitPickers);
+}
+function viewSeg(attr, cur, cardsSay, listSay, dead = "", words = ["Cards", "List"]){
   const b = (v, word, say, icon) => `<button type="button" data-${attr}="${v}" class="${cur === v ? "on" : ""}" aria-pressed="${cur === v}" title="${esc(word)}: ${esc(say)}" aria-label="${word}"${dead}>${icon}</button>`;
-  return `<div class="pseg dmviewseg" role="group" aria-label="cards or a list">${
-    b("cards", "Cards", cardsSay, VIEW_ICON_CARDS)}${b("list", "List", listSay, VIEW_ICON_LIST)}</div>`;
+  return `<div class="pseg dmviewseg" role="group" aria-label="${esc(`${words[0]} or ${words[1]}`.toLowerCase())}">${
+    b("cards", words[0], cardsSay, VIEW_ICON_CARDS)}${b("list", words[1], listSay, VIEW_ICON_LIST)}</div>`;
 }
 function tblWrap(cols, rows, cls = ""){
   return `<div class="tbl${cls ? " " + esc(cls) : ""}" data-style="--tcols:${tblTracks(cols)}">
@@ -1337,12 +1426,13 @@ function saveBar({save, revert, state = "", dead = false, cls = "", attrs = ""})
 // (the operator, 26 Oct): each pane is drawn in turn before a frame is
 // painted, and the box is held at the tallest, never past its own
 // max-height; what fills in later (a node list, a file read) scrolls inside
-// it rather than growing it. `show(key)` draws a pane; `cur` is the one to
-// leave on show. Returns the height held.
+// it rather than growing it. On a phone the box is the whole screen on
+// every pane, so nothing is held. `show(key)` draws a pane; `cur` is the one
+// to leave on show. Returns the height held.
 function holdPanes(box, keys, show, cur){
   if (!box) return 0;
   box.style.height = "";
-  if (keys.length < 2) return 0;
+  if (keys.length < 2 || isPhone()) return 0;
   let h = 0;
   for (const k of keys){ show(k); h = Math.max(h, box.getBoundingClientRect().height); }
   show(cur);
@@ -1351,8 +1441,17 @@ function holdPanes(box, keys, show, cur){
   box.style.height = held + "px";
   return held;
 }
+// A dialog's foot in the dialog rule's one order: what it says (a .state
+// in `lead`) first, the spacer, then the verbs, the primary first and the
+// rest after it, the way out (`cancel`), and a verb that cannot be undone
+// last. A button handed in `lead` is a verb like the rest.
 function dlgFoot(cancel, acts, lead = ""){
-  return `<div class="foot">${lead}<span class="sp"></span>${cancel}${acts}</div>`;
+  const BUTTON = /<button\b[\s\S]*?<\/button>/g;
+  const btns = [...String(acts + lead).matchAll(BUTTON)].map(m => m[0]);
+  const is = (b, c) => new RegExp(`class="[^"]*\\b${c}\\b`).test(b.slice(0, b.indexOf(">")));
+  const verbs = [...btns.filter(b => is(b, "primary")), ...btns.filter(b => !is(b, "primary") && !is(b, "danger")),
+                 cancel, ...btns.filter(b => is(b, "danger"))];
+  return `<div class="foot">${String(lead).replace(BUTTON, "")}<span class="sp"></span>${verbs.join("")}</div>`;
 }
 
 // A row's remove, the bin, drawn one way on every page (consistency batch
@@ -1444,19 +1543,16 @@ function chipsUp(){
 function chipsClickGuard(e){
   if (chipDragged && e.target?.closest?.(".chips, .hscroll")){ e.stopPropagation(); e.preventDefault(); }
 }
-function chipsRestore(muts){
-  for (const m of muts) for (const n of m.addedNodes){
-    if (n.nodeType !== 1) continue;
-    // Its ends, once it is laid out.
-    if (n.matches(".chips, .hscroll") || n.querySelector(".chips, .hscroll")) requestAnimationFrame(() => chipsEdges(n.parentNode || document));
-    for (const c of n.matches(".chips[data-chips]") ? [n] : n.querySelectorAll(".chips[data-chips]")){
-      const x = chipScroll[c.dataset.chips];
-      if (x && c.scrollLeft !== x){
-        c.scrollLeft = x;
-        // ...and once more after layout, for a row not laid out yet when
-        // it was added (inside a view fading in).
-        requestAnimationFrame(() => { if (c.isConnected && c.scrollLeft !== x) c.scrollLeft = x; });
-      }
+function chipsBack(root){
+  // Its ends, once it is laid out.
+  if (root.matches(".chips, .hscroll") || root.querySelector(".chips, .hscroll")) requestAnimationFrame(() => chipsEdges(root.parentNode || document));
+  for (const c of root.matches(".chips[data-chips]") ? [root] : root.querySelectorAll(".chips[data-chips]")){
+    const x = chipScroll[c.dataset.chips];
+    if (x && c.scrollLeft !== x){
+      c.scrollLeft = x;
+      // ...and once more after layout, for a row not laid out yet when
+      // it was added (inside a view fading in).
+      requestAnimationFrame(() => { if (c.isConnected && c.scrollLeft !== x) c.scrollLeft = x; });
     }
   }
 }
@@ -1479,7 +1575,8 @@ function versionChips(rows, verOf, none){
 // Whether a row is under the release chip in force ("" is All).
 const inRelease = (v, on) => !on || (on === "none" ? !relOf(v) : relOf(v) === on);
 // The chips alone, for a band that holds more than them (a list's search
-// beside them, R254 step 1): "" when fewer than two groups have anything.
+// beside them, R254 step 1): "" when fewer than two groups have anything,
+// but for one that holds less than the whole, which narrows all the same.
 // `all` is All's count where the groups overlap (a branch both Active and
 // Yours), the groups' sum otherwise. `allWord` names the first chip where a
 // second row under another would say All again (the Library's sources,
@@ -1488,10 +1585,33 @@ function chipButtons(groups, on, attr, all, allWord = "All"){
   // A group with no count to give (a disk, a key: count null) is a chip
   // with its name alone; one whose count is 0 has nothing to show.
   const gs = (groups || []).filter(g => g && (g.count || g.count === null));
-  if (gs.length < 2) return "";
+  if (!gs.length) return "";
   const total = all ?? (gs.some(g => g.count === null) ? null : gs.reduce((n, g) => n + g.count, 0));
+  // One group alone is drawn only where it holds less than the whole (a
+  // list's favorites): otherwise All says the same.
+  if (gs.length < 2 && !(total !== null && gs[0].count !== null && gs[0].count < total)) return "";
   const chip = (key, label, count) => `<button type="button" class="chip${(on || "") === key ? " on" : ""}"
     ${attr}="${esc(key)}" aria-pressed="${(on || "") === key}">${esc(label)}${
       count === null || count === undefined ? "" : `<span class="pill">${count}</span>`}</button>`;
   return chip("", allWord, total) + gs.map(g => chip(g.key, g.label, g.count)).join("");
+}
+// A band of chips in a box of its own: the chips patched in and, when that
+// wrote anything, each wired so its press is a move (chipMove) of the
+// `items` in `scope` to what `pick` draws for the chip's key, which is its
+// `attr`. The band is there, it does not arrive, so the patch is a quiet
+// one. Answers whether it drew, as patch does.
+function chipBand(box, html, attr, scope, items, pick){
+  const drew = patch(box, html, true);
+  if (drew) box.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () =>
+    chipMove(scope, items, () => pick(b.getAttribute(attr))));
+  return drew;
+}
+// Whether a row answers a list's search: its number, with its letter or
+// bare (B12, R12 or 12), or any of its words, case aside. An empty search
+// is all. `q` comes trimmed and in lower case, `prefix` is the letter in
+// lower case, and `words` gives the row's words only when a search asks.
+function idOrWords(prefix, id, words, q){
+  if (!q) return true;
+  if (q === prefix + id || q === String(id)) return true;
+  return words().some(t => String(t || "").toLowerCase().includes(q));
 }

@@ -5,8 +5,7 @@
 
 "use strict";
 
-let fxRev = 0;                  // bumped when the filters change, so the pane
-let fxProject = "";             // repaints without waiting for a poll
+let fxProject = "";
 const fxState = {level: "", find: ""};
 
 // The narrowing itself, shared with every notebook's Analysis view: the same
@@ -56,10 +55,13 @@ function fxWireBar(root, st, redraw){
   // Debounced like the history search: a repaint per keystroke redraws the
   // list under the reader's cursor for nothing the last keystroke does not
   // already deliver.
+  // ...and never mid-word in an input method: the list narrows when the
+  // word is finished (R244 step 4).
   let t = null;
-  if (inp) inp.oninput = () => { clearTimeout(t); t = setTimeout(() => {
+  const narrow = () => { clearTimeout(t); t = setTimeout(() => {
     st.find = inp.value; redraw();
   }, 250); };
+  onTyping(inp, narrow);
 }
 
 // The one answer, from the poll: no /reports mount, nothing in it, or nothing
@@ -97,25 +99,15 @@ const levelClass = l => l === "error" ? "bad" : l === "warning" ? "warn"
 // survive, but their scroll position does not).
 let findingsMtime = null;
 
-async function loadFindings(force){
-  if (findings && !force) return;
-  findingsMtime = state?.reports_mtime ?? null;
-  findings = {loading: true};
-  try{
-    const r = await fetch("/api/findings");
-    findings = await r.json();
-  }catch(e){ findings = {error: String(e)}; }
-  // The Analysis tab repaints if one is open: it draws "loading…" while the
-  // fetch is in flight, and a fetch that completes without saying so leaves
-  // that word on the pane until some unrelated revision moves. Only then:
-  // notebooks call this too, and an unconditional drawPanes() from THEIR
-  // fetches landed mid pane-swap in flows that had nothing to do with
-  // findings, which is how the Resume test started failing on a tab this
-  // never touches.
-  if (tabs.some(t => t.kind === "findings")){
-    fxRev++;
-    drawPanes();
-  }
+// The Analysis tab draws "loading…" while the read is out, and its landing
+// moves the tab's live key, so the word goes when the answer comes.
+function loadFindings(force){
+  if (findings && !force) return Promise.resolve();
+  return reading("findings", async () => {
+    findingsMtime = state?.reports_mtime ?? null;
+    findings = {loading: true};
+    findings = await getJSON("/api/findings");
+  });
 }
 
 // Every project section starts collapsed: the summary line of pills is the
@@ -135,7 +127,7 @@ function fxRemember(e){
   if (!(d instanceof HTMLDetailsElement) || !d.classList.contains("rule") || !d.dataset.key) return;
   if (d.open) fxOpen.add(d.dataset.key); else fxOpen.delete(d.dataset.key);
 }
-function findingsRulesHtml(rows){
+function findingsRulesHtml(rows, limit = Infinity){
   const by = (xs, k) => xs.reduce((m, x) => ((m[x[k] ?? "none"] ??= []).push(x), m), {});
   const rules = by(rows, "rule");
   for (const k of Object.keys(rules))
@@ -147,8 +139,10 @@ function findingsRulesHtml(rows){
   // the rule, how many places and the first of them; open, every place, the
   // description, the message whole and the CVEs. The whole message on every
   // closed row made a report a wall.
+  // `limit`: the first so many rules alone, a list built a page at a time
+  // (pageLimit, R228 step 13).
   let html = "";
-  for (const rid of order){
+  for (const rid of order.slice(0, limit)){
     const hits = rules[rid];
     const f = hits[0];
     const cves = [...new Set(hits.flatMap(h => h.cves))];
@@ -193,8 +187,8 @@ function renderFindingsInto(i){
   const off = findingsOff();
   if (off){
     d.setBar("");
-    d.list.innerHTML = `<div class="empty">${esc(off)}. The Scanners page under Containers deploys AerieOS's
-      scanners to each node, and <a href="#/help/scanners">The scanners</a> says how.</div>`;
+    drawHTML(d.list, `<div class="empty">${esc(off)}. The Scanners, a service in the ${pageLink("library", "Library")}, are AerieOS's
+      scanners on each node, set from their row on Installed, and <a href="#/help/scanners">The scanners</a> says how.</div>`);
     return;
   }
   if (!findings){
@@ -208,18 +202,18 @@ function renderFindingsInto(i){
     // where they will, their boxes shimmering; the findings are on their way.
     d.setBar(fxBarHtml([], fxState, `<select aria-label="space" disabled><option>all spaces</option></select>`, true));
     // As it lands across projects: a project's name over its card.
-    d.list.innerHTML = skTpl(`<div class="fxproj"><span class="name">${skv(8)}</span></div>${skRows(6)}`);
+    drawHTML(d.list, skTpl(`<div class="fxproj"><span class="name">${skv(8)}</span></div>${skRows(6)}`));
     return;
   }
   if (findings.error){
-    d.list.innerHTML = `<div class="hint bad">${esc(findings.error)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(findings.error)}</div>`);
     return;
   }
   if (findings.available === false){
     // How to set the scanners up, one press away in Help (docs/scanners.md).
-    d.list.innerHTML = `<div class="empty">no scanner reports yet: the Scanners page under Containers
-      deploys AerieOS's scanners to each node and runs them on a schedule, and what they send up lands here.
-      <a href="#/help/scanners">The scanners</a> says how.</div>`;
+    drawHTML(d.list, `<div class="empty">no scanner reports yet: the Scanners, a service in the ${pageLink("library", "Library")}, are AerieOS's
+      scanners on each node, run on a schedule from their page off Installed, and what they send up lands here.
+      <a href="#/help/scanners">The scanners</a> says how.</div>`);
     return;
   }
   const rows = fxRows();
@@ -254,7 +248,7 @@ function renderFindingsInto(i){
           + "not what it checked."}</div>`;
   d.setBar(fxBarHtml(all.filter(f => !fxProject || fxProj(f) === fxProject),
                      fxState, projSelect));
-  d.list.innerHTML = body;
+  patch(d.list, body);
   const aside = findings.aside ? `${findings.aside} finding(s) are
       against paths that are no space's and are counted aside rather than
       listed${(state?.findings_heads || []).length
@@ -263,7 +257,7 @@ function renderFindingsInto(i){
         : ""}` : "";
   const ages = reportAges();
   d.setFoot([aside, ages].filter(Boolean).join("<br>"));
-  const redraw = () => { fxRev++; drawPanes(); };
+  const redraw = () => { readMoved("findings"); drawPanes(); };
   $("fxProject").onchange = e => { fxProject = e.target.value; redraw(); };
   fxWireBar(d.el, fxState, redraw);
 }

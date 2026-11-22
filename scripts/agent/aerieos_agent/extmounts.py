@@ -13,17 +13,16 @@ import os
 import re
 import shutil
 import subprocess
+import threading
+import time
 
-from .base import log
+from .base import env_or, log, log_once, statvfs_within
 from .stores import save_state
+from .names import ETC
 
 ROOT = "/mnt/other"
-CREDS = "/etc/builderbot/creds"
+CREDS = ETC + "/creds"
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
-
-
-def _env(k, d):
-    return os.environ.get(k) or d
 
 
 def _mounted(path):
@@ -32,7 +31,7 @@ def _mounted(path):
 
 def _df(path):
     try:
-        st = os.statvfs(path)
+        st = statvfs_within(path)     # a share gone away does not hold the census (B980)
         return st.f_frsize * st.f_blocks // 1048576, st.f_frsize * (st.f_blocks - st.f_bavail) // 1048576
     except OSError:
         return 0, 0
@@ -41,7 +40,7 @@ def _df(path):
 def disk_dev(source):
     """The device for a disk's by-id link: its first partition's link
     where one exists (a disk with a table), else the disk's own."""
-    root = _env("BB_BY_ID", "/dev/disk/by-id")
+    root = env_or("BB_BY_ID", "/dev/disk/by-id")
     # One link's name in that folder, never a path out of it: ../../sda1
     # mounted any device.
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:+@-]{0,200}", source or ""):
@@ -59,13 +58,20 @@ def extmounts_now(state):
     for m in state.get("ext_mounts") or []:
         if not isinstance(m, dict) or not NAME_RE.fullmatch(str(m.get("name") or "")):
             continue
-        path = f"{_env('BB_OTHER_ROOT', ROOT)}/{m['name']}"
+        path = f"{env_or('BB_OTHER_ROOT', ROOT)}/{m['name']}"
         mounted = _mounted(path)
         present = bool(disk_dev(str(m.get("source") or ""))) if m.get("kind") == "disk" else True
         size, used = _df(path) if mounted else (0, 0)
         out.append({"id": str(m.get("id") or "")[:16], "name": m["name"], "kind": str(m.get("kind") or "")[:4], "mounted": mounted, "present": present,
                     "size_mb": size, "used_mb": used, "error": str((state.get("ext_errors") or {}).get(m.get("id"), ""))[:200]})
     return out
+
+
+# How often the pass looks, on its own thread (B980): once a minute, as it
+# always said, rather than at every turn of the agent's loop.
+EVERY_S = 60
+# One pass at a time: the thread's and a change of the record's (forced).
+_PASS = threading.Lock()
 
 
 class ExtMountsMixin:
@@ -97,7 +103,7 @@ class ExtMountsMixin:
     def _ext_creds(self, want):
         """An SMB share's credentials file, root's alone; the files of shares
         gone removed."""
-        root = _env("BB_CREDS", CREDS)
+        root = env_or("BB_CREDS", CREDS)
         os.makedirs(root, mode=0o700, exist_ok=True)
         keep = set()
         for r in want:
@@ -120,13 +126,35 @@ class ExtMountsMixin:
                 except OSError:
                     pass
 
+    def ext_mounts_start(self):
+        """The pass once a minute on a thread of its own (B980). On the
+        agent's loop, a share that stopped answering held every turn for
+        minutes (mount.nfs retrying, a stat of the dead mount), and the work
+        poll, the jobs, the cancels and the keys waited behind it."""
+        if getattr(self, "_ext_thread", None) is not None:
+            return
+
+        def run():
+            while True:
+                try:
+                    self.ext_mounts_pass()
+                except Exception as e:                       # noqa: BLE001 (logged, tried again in a minute)
+                    log_once("ext-mounts", f"other mounts: {type(e).__name__}: {e}")
+                time.sleep(EVERY_S)
+        self._ext_thread = threading.Thread(target=run, name="extmounts", daemon=True)
+        self._ext_thread.start()
+
     def ext_mounts_pass(self, force=False):
         """Once a minute: a disk that arrived mounted, one that left said
         gone; with `force`, every mount brought to the record."""
+        with _PASS:
+            return self._ext_mounts_pass(force)
+
+    def _ext_mounts_pass(self, force=False):
         if os.geteuid() != 0:
             return
         rows = self.state.get("ext_mounts") or []
-        root = _env("BB_OTHER_ROOT", ROOT)
+        root = env_or("BB_OTHER_ROOT", ROOT)
         errors = dict(self.state.get("ext_errors") or {})
         wanted_names = set()
         for m in rows:
@@ -142,12 +170,16 @@ class ExtMountsMixin:
             if not argv:
                 continue
             os.makedirs(path, exist_ok=True)
-            p = subprocess.run(argv, capture_output=True, text=True, timeout=120, check=False)
-            if p.returncode == 0:
+            try:
+                p = subprocess.run(argv, capture_output=True, text=True, timeout=120, check=False)
+            except subprocess.TimeoutExpired:
+                p = None
+            if p is not None and p.returncode == 0:
                 errors.pop(m.get("id"), None)
                 log(f"other mounts: {name} mounted ({m.get('kind')})")
             else:
-                why = (p.stderr or p.stdout or f"exit {p.returncode}").strip()[:200]
+                why = ("did not answer in two minutes" if p is None
+                       else (p.stderr or p.stdout or f"exit {p.returncode}").strip()[:200])
                 if errors.get(m.get("id")) != why:
                     log(f"other mounts: {name} did not mount: {why}")
                 errors[m.get("id")] = why
@@ -175,18 +207,27 @@ class ExtMountsMixin:
             # programs or device files counting for anything here.
             return [shutil.which("mount") or "mount", "-o", "nosuid,nodev" + (",ro" if m.get("ro") else ""), dev, path] if dev else None
         if kind == "smb":
-            creds = os.path.join(_env("BB_CREDS", CREDS), m["name"])
-            opts = f"credentials={creds},uid=0,gid=0,file_mode=0664,dir_mode=0775,vers=3.0,soft" + (",ro" if m.get("ro") else "")
+            creds = os.path.join(env_or("BB_CREDS", CREDS), m["name"])
+            opts = f"credentials={creds},uid=0,gid=0,file_mode=0664,dir_mode=0775,vers=3.0,soft,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "cifs", f"//{m.get('host')}/{m.get('path')}", path, "-o", opts]
         if kind == "nfs":
-            opts = "nfsvers=4,soft,timeo=100" + (",ro" if m.get("ro") else "")
+            # retry=0: one try a pass, not mount.nfs's two minutes of its own
+            # in the foreground (B980); the pass is the retry.
+            opts = "nfsvers=4,soft,timeo=100,retry=0,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "nfs", f"{m.get('host')}:{m.get('path')}", path, "-o", opts]
         return None
 
     def _ext_umount(self, path, m, errors):
-        p = subprocess.run([shutil.which("umount") or "umount", path], capture_output=True, text=True, timeout=120, check=False)
-        if p.returncode != 0:
-            # Busy: lazily, so the record's word holds and the files close by themselves.
-            subprocess.run([shutil.which("umount") or "umount", "-l", path], capture_output=True, timeout=60, check=False)
+        try:
+            p = subprocess.run([shutil.which("umount") or "umount", path], capture_output=True, text=True, timeout=120, check=False)
+        except subprocess.TimeoutExpired:
+            p = None
+        if p is None or p.returncode != 0:
+            # Busy, or a share that stopped answering: lazily, so the
+            # record's word holds and the files close by themselves.
+            try:
+                subprocess.run([shutil.which("umount") or "umount", "-l", path], capture_output=True, timeout=60, check=False)
+            except subprocess.TimeoutExpired:
+                log_once(f"ext-umount-{m.get('name')}", f"other mounts: {m.get('name')} would not let go in a minute")
         errors.pop(m.get("id"), None)
         log(f"other mounts: {m.get('name')} unmounted")

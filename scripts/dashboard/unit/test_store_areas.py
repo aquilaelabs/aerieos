@@ -75,5 +75,21 @@ class AcrossNodes(unittest.TestCase):
         self.assertEqual(toolchains.store_busy("n_aaaa1111", ["jdk"]), "", "a toolchain is not an image")
 
 
+    def test_a_press_while_one_runs_queues_behind_it(self):
+        # The Library refused a second press while a job ran on the node; it
+        # queues now, and job_next holds it (store_gate) until the first ends.
+        self.jobs["n_aaaa1111"] = [{"id": "j_run", "type": "toolchain", "state": "running", "spec": {"action": "install", "names": ["go"]}},
+                                   {"id": "j_next", "type": "toolchain", "state": "queued", "spec": {"action": "install", "names": ["jdk"]}}]
+        self.assertIn("One at a time", toolchains.store_busy("n_aaaa1111", ["jdk"]))
+        self.assertTrue(toolchains.store_gate(self.jobs["n_aaaa1111"][1], "n_aaaa1111"), "the queued one waits")
+        self.jobs["n_aaaa1111"][0]["state"] = "succeeded"
+        self.assertFalse(toolchains.store_gate(self.jobs["n_aaaa1111"][1], "n_aaaa1111"),
+                         "...and goes once the running one has ended, never held by itself")
+
+    def test_a_queued_job_on_the_other_node_holds_nothing(self):
+        self.jobs["n_bbbb2222"] = [{"id": "j_q", "type": "image", "state": "queued", "spec": {"action": "add"}}]
+        self.assertEqual(toolchains.store_busy("n_aaaa1111", None), "")
+
+
 if __name__ == "__main__":
     unittest.main()

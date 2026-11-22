@@ -46,18 +46,69 @@ pkg_names() {
         docker) echo "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" ;;
     esac
 }
-# docker_install: docker, where this family gets it from.
+# docker_install: docker, where this family gets it from. DOCKER_KEYS and
+# DOCKER_SOURCES are the directories rpm's keys and dnf's repositories are
+# kept in.
+DOCKER_KEYS=/etc/pki/rpm-gpg
+DOCKER_SOURCES=/etc/yum.repos.d
 docker_install() {
 
             # Docker's own repository here too: fedora's, rhel's, and the
             # centos one that serves CentOS Stream, Rocky and Alma alike.
-            # The repo file is fetched as a file rather than through `dnf
+            # The repository's file is written here, the stable section of
+            # the docker-ce.repo Docker publishes under the name it has
+            # there, with one line changed: its gpgkey is the copy of
+            # Docker's key the core carries (docker_key), in a file, where
+            # Docker's own file names an address rpm would fetch the key from
+            # as it installs. Written as a file rather than through `dnf
             # config-manager`, which dnf4 and dnf5 spell differently; the
             # file is the same for both. podman-docker, if the image came
             # with it, would answer `docker` with podman: taken out.
             case "$ID" in fedora) repo=fedora ;; rhel) repo=rhel ;; *) repo=centos ;; esac
             dnf -y -q remove podman-docker >/dev/null 2>&1 || true
-            curl -fsSL "https://download.docker.com/linux/${repo}/docker-ce.repo" -o /etc/yum.repos.d/docker-ce.repo
+            install -d -m 0755 "$DOCKER_KEYS" || return 1
+            docker_key rpm > "$DOCKER_KEYS/RPM-GPG-KEY-docker" || { rm -f "$DOCKER_KEYS/RPM-GPG-KEY-docker"; echo "could not write Docker's signing key to ${DOCKER_KEYS}/RPM-GPG-KEY-docker" >&2; return 1; }
+            printf '%s\n' "[docker-ce-stable]" "name=Docker CE Stable - \$basearch" \
+                "baseurl=https://download.docker.com/linux/${repo}/\$releasever/\$basearch/stable" "enabled=1" "gpgcheck=1" \
+                "gpgkey=file://${DOCKER_KEYS}/RPM-GPG-KEY-docker" > "$DOCKER_SOURCES/docker-ce.repo" || return 1
+            chmod 0644 "$DOCKER_KEYS/RPM-GPG-KEY-docker" "$DOCKER_SOURCES/docker-ce.repo"
             # shellcheck disable=SC2046
             pkg $(pkg_names docker)
+}
+# door_install NAME: a door's program (cloudflared, tailscale) from its
+# vendor's own rpm repository, each package held by rpm to the vendor's
+# key. The key is the copy the core carries (door_key), written to a file
+# the repository's own gpgkey line names, and never one fetched here. 2
+# where this system has no verified source for it, DOOR_WHY saying why.
+# DOOR_KEYS and DOOR_SOURCES are the directories rpm's keys and dnf's
+# repositories are kept in.
+DOOR_KEYS=/etc/pki/rpm-gpg
+DOOR_SOURCES=/etc/yum.repos.d
+door_install() {
+    local at base index
+    case "$1" in
+        cloudflared)
+            # Its packages are signed with the key and its index is not:
+            # Cloudflare signs the index with an older key than the one it
+            # publishes (20 Nov 2026), so only the packages are held, and
+            # one the index names that the key did not sign is refused.
+            base="https://pkg.cloudflare.com/cloudflared/rpm"; index=0 ;;
+        tailscale)
+            # A repository a distribution, as Tailscale lays them out: RHEL
+            # and CentOS Stream by their major version, and Fedora's for
+            # Fedora and for the rebuilds, which take the same packages.
+            case "${ID:-}" in
+                rhel|centos) at="${ID}/${VERSION_ID%%.*}" ;;
+                *)           at=fedora ;;
+            esac
+            base="https://pkgs.tailscale.com/stable/${at}/\$basearch"; index=1 ;;
+        *) return 2 ;;
+    esac
+    install -d -m 0755 "$DOOR_KEYS" || return 1
+    door_key "$1" > "$DOOR_KEYS/RPM-GPG-KEY-$1" || return 1
+    printf '%s\n' "[$1-stable]" "name=$1 stable" "baseurl=${base}" "enabled=1" "gpgcheck=1" "repo_gpgcheck=${index}" \
+        "gpgkey=file://${DOOR_KEYS}/RPM-GPG-KEY-$1" > "$DOOR_SOURCES/$1.repo" || return 1
+    chmod 0644 "$DOOR_KEYS/RPM-GPG-KEY-$1" "$DOOR_SOURCES/$1.repo"
+    pkg "$1" || return 1
+    [ "$1" != tailscale ] || svc_enable tailscaled
 }

@@ -13,36 +13,22 @@
 
 let schedData = null;            // the last answer, or null before the first
 let schedErr = "";
-let schedRev = 0;
 let schedDraft = {};             // what the open dialog holds
 
 function openSchedulesTab(){
   openTab({kind: "schedules", arg: "__schedules", label: "Schedules"});
 }
 
-async function loadSchedules(){
-  try{
-    const j = await (await bootFetch("/api/schedules")).json();
-    schedErr = j.error || "";
-    schedData = j.error ? {schedules: [], nodes: [], may: false} : j;
-  }catch(e){
-    schedErr = failWords(e);
-    schedData = schedData || {schedules: [], nodes: [], may: false};
-  }
-  schedRev++;
-  if (tabs.some(t => t.kind === "schedules")) drawPanes();
+function loadSchedules(){
+  return readKept("schedules", "/api/schedules", {
+    err: said => { schedErr = said; },
+    keep: () => { schedData = schedData || {schedules: [], nodes: [], may: false}; },
+    land: j => { schedData = j.error ? {schedules: [], nodes: [], may: false} : j; },
+  });
 }
 
-async function postSchedule(body){
-  try{
-    const j = await (await postJSON("/api/schedules", body)).json();
-    if (j.error) notify(j.error, true);
-    return j;
-  }catch(e){
-    notify("schedules: " + failWords(e), true);
-    return {error: String(e)};
-  }
-}
+// A schedule's action: a refusal said, the answer back.
+function postSchedule(body){ return poster("/api/schedules")(body); }
 
 // When a run was or will be, as a person reads it: a weekday and a time,
 // the date where it is not this week.
@@ -96,13 +82,13 @@ function schedForm(s){
   return `<div data-schedform="${esc(s?.id || "new")}">
       <div class="field">${lbl("schName", "Name")}
         <input id="schName" data-schedf="name" type="text" value="${v("name")}" autocomplete="off"></div>
-      <div class="prefrow ctlrow">
+      <div class="field"><div class="fgrid">
         <div class="setrow col ctlrow">${lbl("schWhen", "When")}
           <select id="schWhen">${optionList([...SCHED_WHEN, ["", "Custom"]], custom ? "" : cron)}</select></div>
         <div class="setrow col ctlrow">${lbl("schNode", "Runs on")}
           <select id="schNode" data-schedf="node">${s?.node || schedDraft.node ? "" : `<option value="">pick where</option>`}${
             optionList(nodes.map(n => [n.id, n.name]), schedDraft.node ?? s?.node)}</select></div>
-      </div>
+      </div></div>
       <div class="field" id="schCronF"${custom ? "" : " hidden"}>${lbl("schCron", "Timetable", "cron's five fields: minute, hour, day of the month, month, weekday")}
         <input id="schCron" data-schedf="cron" type="text" value="${esc(cron)}" spellcheck="false" autocomplete="off"
           placeholder="0 4 * * 0">
@@ -144,11 +130,11 @@ function openSchedForm(s){
   // account: the note under Runs on says so.
   const at = (schedData.nodes || []).find(n => n.id === s?.node);
   if (s?.as === "root" && at && !at.sandbox) schedDraft.as = "job";
-  m.innerHTML = `<div class="box"><h3 id="schT">${s ? esc(s.name || "Schedule") : "New schedule"}</h3>
+  drawHTML(m, `<div class="box"><h3 id="schT">${s ? esc(s.name || "Schedule") : "New schedule"}</h3>
     ${schedForm(s)}
     ${dlgFoot(`<button type="button" data-schedcancel>Cancel</button>`,
               `<button type="button" class="primary" data-schedsave="${esc(s?.id || "")}">${s ? "Save" : "Add"}</button>`,
-              `<span class="state" id="schSay"></span>`)}</div>`;
+              `<span class="state" id="schSay"></span>`)}</div>`);
   wireSchedForm(m, s);
   m.hidden = false;
   m.onclick = e => { if (e.target === m) closeSchedForm(); };
@@ -175,7 +161,7 @@ function wireSchedForm(m, s){
       // Off a sandbox, the jobs account: root is not this node's to give.
       if (!n?.sandbox && (schedDraft.as ?? s?.as) === "root") schedDraft.as = "job";
       if (!row) return;             // a system schedule has no Runs as
-      row.innerHTML = schedAs(s);
+      drawHTML(row, schedAs(s));
       const as = row.querySelector("[data-schedf]");
       if (as) wireField(as);
     }
@@ -208,29 +194,29 @@ function renderSchedulesInto(i){
   if (!d) return;
   if (schedData === null){
     d.setBar("");
-    d.list.innerHTML = skTpl(pageHead({facts: [["Schedules", GHOST], ["Turned on", GHOST], ["Next run", GHOST]],
+    drawHTML(d.list, skTpl(pageHead({facts: [["Schedules", GHOST], ["Turned on", GHOST], ["Next run", GHOST]],
                                        actions: `<button type="button" class="primary" disabled>New schedule</button>`})
-      + docSection("schedules", "list", "Schedules", "", skRows(2)));
+      + docSection("schedules", "list", "Schedules", "", skRows(2))));
     loadSchedules();
     return;
   }
   if (schedErr){
     d.setBar("");
-    d.list.innerHTML = `<div class="field"><div class="notice bad">${esc(schedErr)}</div></div>`;
+    drawHTML(d.list, `<div class="field"><div class="notice bad">${esc(schedErr)}</div></div>`);
     return;
   }
   const rows = schedData.schedules || [], may = !!schedData.may;
   const on = rows.filter(s => s.on), next = on.filter(s => s.next_at).sort((a, b) => a.next_at - b.next_at)[0];
   // New schedule on the head (the operator, 29 Oct: not a row of its own).
   d.setBar("");
-  d.list.innerHTML = pageHead({facts: [["Schedules", String(rows.length)], ["Turned on", String(on.length)],
+  patch(d.list, pageHead({facts: [["Schedules", String(rows.length)], ["Turned on", String(on.length)],
                                        ["Next run", next ? `${next.name}, ${schedWhen(next.next_at)}` : "none"]],
                                actions: may ? `<button type="button" class="primary" id="bSchedNew">New schedule</button>` : ""})
     + docSection("schedules", "list", "Schedules", `${rows.length}`,
         rows.length ? `<div class="schedrows">${rows.map(s => schedRow(s, may)).join("")}</div>`
           // Nothing yet, said in words (the scan that used to stand here is
           // the Scanners page's own since R145).
-          : `<div class="empty">No schedule yet. New schedule runs a command on a node at the times you set, as cron runs one; the static analysis scan has a schedule of its own on the Scanners page.</div>`);
+          : `<div class="empty">No schedule yet. New schedule runs a command on a node at the times you set, as cron runs one; the static analysis scan has a schedule of its own on the Scanners page.</div>`));
   wireSchedules(d.el);
 }
 
@@ -255,7 +241,6 @@ function wireSchedules(root){
   });
   root.querySelectorAll("[data-schedrun]").forEach(b => b.onclick = async () => {
     const s = (schedData.schedules || []).find(x => x.id === b.dataset.schedrun);
-    if (!await askYes(`Run ${s?.name || "this schedule"} now?\n\nIt runs once on its node, as a job, whatever its timetable says.`)) return;
     busy(b, "Running");
     const j = await postSchedule({action: "run", id: b.dataset.schedrun});
     unbusy(b, "Run now");

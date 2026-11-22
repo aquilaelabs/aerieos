@@ -64,6 +64,15 @@ import threading
 import time
 from pathlib import Path
 
+# The compose reader an app's check shares (packformat.service_reach) and
+# the test seams (seams.py), found beside this file where a verb loads it
+# by its path.
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.append(_here)
+import packformat  # noqa: E402
+import seams  # noqa: E402
+
 # The request's timing parts (server.py's trace), where there is a request:
 # a suite or a verb loads this file by its path, outside the dashboard's
 # directory, and times nothing.
@@ -91,7 +100,8 @@ gpu_why = None
 room_why = None         # set by server.py: (node id) -> why a build there would run out of disk, or "" (R110)
 container_mem_gb = None  # set by server.py: () -> the memory limit in GB a container with none gets, 0 for none (R110)
 
-DOCKER = os.environ.get("BB_DOCKER_BIN", "docker")
+# docker, or the harness's stub in the source tree alone (seams.py).
+DOCKER = seams.get("BB_DOCKER_BIN", "docker")
 
 # The instance a project has always had, before instances were a thing. Every
 # call that does not name one means this, which is what keeps the migration
@@ -595,9 +605,14 @@ def job_view(project, instance):
     on the row until the next job on the instance replaces it."""
     if queue is None:
         return None
-    for j in queue.jobs_for(project=project, type="compose", n=40):
-        if (j.get("spec") or {}).get("instance", MAIN) != instance:
-            continue
+    mine = [j for j in queue.jobs_for(project=project, type="compose", n=40)
+            if (j.get("spec") or {}).get("instance", MAIN) == instance]
+    # Several pressed in turn (nodes.job_waits): the one at work, else the
+    # oldest queued, which goes first; the rest wait behind it.
+    active = [j for j in mine if j["state"] in queue.JOB_ACTIVE]
+    if active:
+        mine = [next((j for j in active if j["state"] in ("assigned", "running")), active[-1])]
+    for j in mine:
         running = j["state"] in queue.JOB_ACTIVE
         if not running and j["state"] == "succeeded":
             return None
@@ -821,6 +836,17 @@ def _forget_reads(node_id):
             del _last_reads[k]
 
 
+def on_own_machine(project, instance=MAIN):
+    """Whether this instance lives on the controller's own machine, where
+    docker is root over the controller and a session's build waits for a
+    person (B743)."""
+    if queue is None:
+        return False
+    nid = _instance_node(project, instance)
+    n = queue.node(nid) if nid else None
+    return bool(n) and n.get("kind") == "agent" and bool((n.get("config") or {}).get("own"))
+
+
 def _agent_exec(n, argv, timeout):
     """One docker verb on one container, run on the agent node as a probe
     job the Jobs page never keeps, in _run's own {"code", "out"} shape. Not
@@ -831,7 +857,7 @@ def _agent_exec(n, argv, timeout):
     # (B249: a build cache's prune was killed at 25s, partway through).
     cap = 600 if argv[1:] in [list(p) for p in PRUNES.values()] else 25
     r = queue.run_wait("dashboard", n["id"], argv, timeout=min(int(timeout), cap),
-                       forget=True)
+                       forget=True, docker=True)
     out = ({"code": 1, "out": r["error"]} if r.get("error")
            else {"code": int(r.get("code") or 0), "out": r.get("out") or ""})
     _docker_result(argv, out["code"], out["out"])
@@ -854,7 +880,7 @@ def _agent_read(n, argv, timeout):
     # answer at all.
     _docker_log("$ " + " ".join(argv) + f"   (on {n['name']})")
     r = queue.run_wait("dashboard", n["id"], argv, timeout=min(int(timeout), 25),
-                       forget=True)
+                       forget=True, docker=True)
     if r.get("error"):
         with _reads_lock:
             hit = _last_reads.get(key)
@@ -899,9 +925,9 @@ def _no_daemon_why():
     enrolled = [n["name"] for n in rows if not (n.get("config") or {}).get("own")]
     if rows and not enrolled:
         # Docker is on this machine, so "install Docker" would send a person
-        # the wrong way: what it lacks is the arrangement, not the program.
-        return ("containers do not run on the controller's own machine yet, since Docker here "
-                "is root over the controller: enroll another machine on the Nodes page to run them")
+        # the wrong way: on a stick it starts once a system pool is named.
+        return ("Docker on this machine is not answering yet: on a stick it starts once a system pool "
+                "is named, under The stick on this machine's row on the Nodes page")
     if enrolled:
         return (f"no node runs Docker that docker work can be sent to ({', '.join(enrolled[:3])}"
                 f"{' and more' if len(enrolled) > 3 else ''}): install Docker on one, "
@@ -958,7 +984,10 @@ def _available_agent(n):
                        "reports no daemon there. Install docker on that "
                        "machine, or check the agent's account is in its "
                        "docker group"} | source()
-    if not rep.get("sandbox"):
+    # The controller's own machine is never stamped a sandbox (it is not a box
+    # to be wrecked) and its containers are the root agent's, so a person's
+    # press reaches its daemon (B743).
+    if not rep.get("sandbox") and not (n.get("config") or {}).get("own"):
         return {"on": False,
                 "why": f"{n['name']} is not an AerieOS sandbox: it does "
                        "not report the provisioner's stamp, and a container "
@@ -1161,7 +1190,7 @@ def _mount_ok(root):
 
     The second used to be covered by the first by accident, because the store
     was /devdata and a one-component path is a share root. A node that reports
-    /var/lib/builderbot/appdata got its own module refused by its own guard,
+    /var/lib/aerieos/appdata got its own module refused by its own guard,
     on every poll, and the refusal said so: AerieOS asking AerieOS for
     something and being told no is a bug in it, which is how this was found.
 
@@ -1874,6 +1903,16 @@ def containers_dir(name):
     return STATE / "containers" / name
 
 
+def _app_name(name):
+    """The name of the app a written container was made from (its app.json,
+    containers.keep_app), or "" for one made any other way."""
+    try:
+        d = json.loads((containers_dir(name) / "app.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(d.get("name") or d.get("id") or "") if isinstance(d, dict) else ""
+
+
 def project_has_compose(project):
     """Whether the project's own checkout carries a compose file.
 
@@ -2083,14 +2122,7 @@ def set_gpu(project, instance, kind):
     kind = str(kind or "").strip()
     if kind and kind not in GPU_KINDS:
         return {"error": f"a container's GPU is nvidia or amd, not {kind}"}
-    with _lock:
-        store = _load()
-        rec = _rec(store, project, instance)
-        if kind:
-            rec["gpu"] = kind
-        else:
-            rec.pop("gpu", None)
-        write_json(FILE, store)
+    set_field(project, instance, "gpu", kind, create=True)
     _bump()
     return {"ok": True, "gpu": kind}
 
@@ -2141,14 +2173,7 @@ def set_override(project, instance, rel):
     why = override_ok(project, rel, instance)
     if why:
         return {"error": why}
-    with _lock:
-        store = _load()
-        rec = _rec(store, project, instance)
-        if rel:
-            rec["override"] = rel
-        else:
-            rec.pop("override", None)
-        write_json(FILE, store)
+    set_field(project, instance, "override", rel, create=True)
     _bump()
     return {"ok": True, "override": rel}
 
@@ -2732,9 +2757,8 @@ def _build_env(project, instance=MAIN):
     # beside this one on the dashboard and absent in a module-level test.
     with contextlib.suppress(Exception):
         import version                                 # noqa: PLC0415
-        # The IDENTITY form, which is what tools/build-image-here.sh stamps a
-        # production image with, so one commit built either way answers with
-        # one string. It used to take `file`, the docker-tag-safe form, whose
+        # The IDENTITY form, which is what a production image is stamped
+        # with, so one commit built either way answers with one string. It used to take `file`, the docker-tag-safe form, whose
         # whole job is that it cannot carry `+`: the same build then read
         # 0.5.0-dev.1633+59d8912 on production and 0.5.0-dev.1633-59d8912 on
         # the dev instance, and the rule that makes this string the first
@@ -3057,6 +3081,9 @@ def _overview_here(picked):
                 # ...and the GPU it was given (R207 step 4).
                 "gpu": str(rec.get("gpu") or ""),
                 "source": "file" if filed else "project",
+                # ...and, for one made from an app, the app's name (R238), so
+                # its row's press opens that app's panel as Configure.
+                "app": _app_name(project) if filed else "",
                 # A file read and one git call. risks/problems stay out:
                 # those are judgements to put in front of somebody about to
                 # press a button, and belong on the row that asked.
@@ -3343,14 +3370,7 @@ def set_ref(project, instance, ref):
                   "--quiet", ref + "^{commit}"], timeout=15)
         if r["code"] != 0:
             return {"error": f"{project} has no branch or commit called {ref}"}
-    with _lock:
-        d = _load()
-        rec = _rec(d, project, instance)
-        if ref:
-            rec["ref"] = ref
-        else:
-            rec.pop("ref", None)
-        write_json(FILE, d)
+    set_field(project, instance, "ref", ref, create=True)
     _bump()
     return {"ok": True, "ref": ref}
 
@@ -3513,16 +3533,13 @@ def set_owner(project, instance, owner):
         if own and here and here not in own:
             return {"error": f"{_pname(project, instance)} is on {node_name(here)} and {owner} works on "
                              f"{', '.join(node_name(n) for n in own)}: its sessions could not reach it"}
-    with _lock:
-        d = _load()
-        if instance not in (d.get(project) or {}):
+    with edit_rec(project, instance) as rec:
+        if rec is None:
             return {"error": f"{project} has no instance called {instance}"}
-        rec = _rec(d, project, instance)
         if owner == ("" if rec.get("source") == "file" else project):
             rec.pop("for", None)
         else:
             rec["for"] = owner
-        write_json(FILE, d)
     _bump()
     return {"ok": True, "owner": owner}
 
@@ -3569,7 +3586,8 @@ def session_net_own(node_id):
         rep = n.get("reported") or {}
         # A hosting-only node is a public box: what it says of itself does
         # not open it whole, only its containers' ports (R92).
-        if not rep.get("sandbox") and not (n.get("config") or {}).get("host_only"):
+        # ...nor does the controller's own machine.
+        if not rep.get("sandbox") and not (n.get("config") or {}).get("host_only") and not (n.get("config") or {}).get("own"):
             o["hosts"].add(addr)
             return
         pub = rep.get("published") or {}
@@ -3810,6 +3828,42 @@ def _rec(d, project, instance):
 def _read_rec(project, instance):
     """The same, read-only and never creating anything."""
     return (_load().get(project) or {}).get(instance) or {}
+
+
+@contextlib.contextmanager
+def edit_rec(project, instance, create=False):
+    """One instance's record to change: the block is handed the record under
+    the store's lock, and the store is written when the block ends without
+    an exception.
+
+    With `create` a record that is not there is made, as _rec makes it.
+    Without, the block is handed None for an instance the store does not
+    have and nothing is written: a result that lands after Remove forgot the
+    instance must not make its row again (B633). Only whether it is there is
+    asked: a record new made with nothing set is empty, and reading that as
+    gone left a first build unstamped (B646).
+
+    The lock is not reentrant, so the block calls nothing that takes it."""
+    with _lock:
+        d = _load()
+        rec = _rec(d, project, instance) if create else (d.get(project) or {}).get(instance)
+        yield rec
+        if rec is not None:
+            write_json(FILE, d)
+
+
+def set_field(project, instance, key, value, create=False):
+    """One field of an instance's record set to `value`, or taken off it
+    when the value is empty. False when the instance is not in the store
+    and `create` did not make it, so nothing was written."""
+    with edit_rec(project, instance, create=create) as rec:
+        if rec is None:
+            return False
+        if value:
+            rec[key] = value
+        else:
+            rec.pop(key, None)
+    return True
 
 
 def _load():
@@ -4061,11 +4115,8 @@ def make_dirs(project, instance=MAIN):
         else:
             failed.extend(f"{p}: the daemon could not make it" for p in paths)
     if remote and made:
-        with _lock:
-            d = _load()
-            rec = _rec(d, project, instance)
+        with edit_rec(project, instance, create=True) as rec:
             rec["made_dirs"] = sorted(set(rec.get("made_dirs") or []) | set(made))
-            write_json(FILE, d)
     _bump()
     return {"ok": True, "made": made, "failed": failed, "unreachable": cannot}
 
@@ -4086,30 +4137,12 @@ def risks(project, cfg):
     if cfg is None:
         return []
     out = []
+    tree = str(WORKSPACE / project) + "/"
     for name, sv in sorted(_services(cfg).items()):
-        if sv.get("privileged"):
-            out.append(f"{name} runs privileged: root on the host, in effect")
-        # Named beside privileged rather than left out: a check that catches
-        # `privileged: true` and misses `cap_add: [SYS_ADMIN]` has a hole in
-        # it that is obvious to anyone who would use it.
-        caps = sorted(c for c in (sv.get("cap_add") or []) if isinstance(c, str))
-        if caps:
-            out.append(f"{name} takes kernel capabilities: {', '.join(caps)}")
-        devs = [d for d in (sv.get("devices") or []) if d]
-        if devs:
-            shown = ", ".join(str(d.get("source") if isinstance(d, dict) else d)
-                              for d in devs[:3])
-            out.append(f"{name} is handed host devices: {shown}"
-                       + (" …" if len(devs) > 3 else ""))
-        if str(sv.get("pid") or "") == "host":
-            out.append(f"{name} shares the host's process namespace")
-        if str(sv.get("network_mode") or "") == "host":
-            out.append(f"{name} is on the host's own network")
-        if str(sv.get("userns_mode") or "") == "host":
-            out.append(f"{name} shares the host's user namespace")
-        loose = [o for o in (sv.get("security_opt") or []) if isinstance(o, str) and "unconfined" in o]
-        if loose:
-            out.append(f"{name} drops a security profile: {', '.join(loose)}")
+        # Privileges, capabilities, devices, the host's namespaces and
+        # another container's, a loosened profile, a build that reaches
+        # the host: read by the one reader an app's check refuses by.
+        out.extend(phrase for _key, phrase in packformat.service_reach(name, sv))
         # A bind mount of what gives control of the node is a risk a person
         # acknowledges, whatever the row already shows about it: with the
         # project's Run its container dial on auto, a session writes the
@@ -4121,9 +4154,46 @@ def risks(project, cfg):
         for host in _bind_sources(sv):
             if host == "/var/run/docker.sock" or host.endswith("/docker.sock"):
                 out.append(f"{name} mounts the docker socket: every container on the node, and root through it")
-            elif _system_path(host):
+            elif _system_path(host) or _behind_wall(host, tree):
                 out.append(f"{name} mounts {host} of the host: the node's own system, not a share")
+            else:
+                # ...and a path in the tree that is a link out of it, where
+                # this side can see it: judged by where it leads, not by its
+                # name (a link named data pointing at / passed as the tree's own).
+                real = _resolved(host)
+                if real and real != os.path.normpath(host) and (_system_path(real) or _behind_wall(real, tree)):
+                    out.append(f"{name} mounts {host}, a link to {real} of the host: the node's own system, not a share")
+        # What compose reads off the host as it starts or builds, not a bind
+        # and so not above: an env file, a build's folders.
+        for host in _read_sources(sv):
+            if (_system_path(host) and not host.startswith(tree) and os.path.basename(host) != "instance.env") \
+                    or _behind_wall(host, tree):
+                out.append(f"{name} reads {host} of the host into itself: the node's own system, not a share")
+    # A named volume whose driver options bind a host path is a bind by
+    # another name, and no service's volumes list shows where it leads.
+    for key, vol in sorted(((cfg.get("volumes") if isinstance(cfg, dict) else None) or {}).items()):
+        opts = vol.get("driver_opts") if isinstance(vol, dict) else None
+        dev = str((opts or {}).get("device") or "")
+        if dev.startswith("/") and "bind" in str((opts or {}).get("o") or "") + str((opts or {}).get("type") or ""):
+            if dev.endswith("/docker.sock") or _system_path(dev) or _behind_wall(dev, tree):
+                out.append(f"the volume {key} is {dev} of the host by another name: the node's own system, not a share")
+    # A top-level secret or config from a file is a bind by another name.
+    for kind in ("secrets", "configs"):
+        for key, item in sorted(((cfg.get(kind) if isinstance(cfg, dict) else None) or {}).items()):
+            host = str(item.get("file") or "") if isinstance(item, dict) else ""
+            if host and (_system_path(host) or _behind_wall(host, tree)):
+                out.append(f"{key} ({kind[:-1]}) is read from {host} of the host: the node's own system, not a share")
     return out
+
+
+def _resolved(host):
+    """Where a host path really leads, where this side has it to look at
+    (the tree is here on the controller, and on its own machine so is the
+    rest): "" where it is not here to follow."""
+    try:
+        return os.path.realpath(host) if os.path.lexists(host) else ""
+    except OSError:
+        return ""
 
 
 def _bind_sources(sv):
@@ -4142,6 +4212,39 @@ def _bind_sources(sv):
     return out
 
 
+def _behind_wall(host, tree):
+    """Whether a host path is in what the wall covers on the controller's own
+    machine (/etc/bb-session.wall, read here since this is that machine): the
+    controller's state and every space's tree, this space's own excepted."""
+    path = os.path.normpath(str(host)) + "/"
+    if not path.startswith("/") or path.startswith(tree):
+        return False
+    try:
+        with open(WALL_FILE, encoding="utf-8") as f:
+            cover = next((ln[6:].strip() for ln in f if ln.startswith("COVER=")), "")
+    except OSError:
+        return False
+    return any(c and (path.startswith(c.rstrip("/") + "/") or c.startswith(path)) for c in cover.split(":"))
+
+
+def _read_sources(sv):
+    """The absolute host paths compose reads for a service beyond its binds:
+    its env files and its build's context and extra contexts."""
+    out = []
+    env = sv.get("env_file") or []
+    for e in [env] if isinstance(env, (str, dict)) else env:
+        out.append(str(e.get("path") or "") if isinstance(e, dict) else str(e))
+    b = sv.get("build")
+    if isinstance(b, str):
+        out.append(b)
+    elif isinstance(b, dict):
+        out.append(str(b.get("context") or ""))
+        extra = b.get("additional_contexts") or {}
+        out += [str(v) for v in (extra.values() if isinstance(extra, dict) else extra)]
+    return [p for p in out if p.startswith("/")]
+
+
+WALL_FILE = os.environ.get("BUILDERBOT_SESSION_WALL", "/etc/bb-session.wall")
 SYSTEM_ROOTS = ("/etc", "/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/boot", "/root",
                 "/var", "/proc", "/sys", "/dev", "/run", "/home", "/opt")
 
@@ -4151,6 +4254,10 @@ def _system_path(host):
     directories: what a container could take the machine over through."""
     path = os.path.normpath(str(host))
     if path == "/":
+        return True
+    # A stick's system pool (image/.../system-pool) holds the controller's
+    # secrets and home under this folder, whatever the pool is called.
+    if "aerieos-system" in path.split("/"):
         return True
     return any(path == r or path.startswith(r + "/") for r in SYSTEM_ROOTS)
 
@@ -4438,21 +4545,47 @@ def _risk_gate(project, instance=MAIN, ack=""):
     if _read_rec(project, instance).get("risks_ack") == d:
         return ""
     if ack and ack == d:
-        with _lock:
-            store = _load()
-            _rec(store, project, instance)["risks_ack"] = d
-            write_json(FILE, store)
+        with edit_rec(project, instance, create=True) as rec:
+            rec["risks_ack"] = d
         return ""
     # With the way past it: a person acknowledges the list where it is
     # shown, once, and it holds until the compose asks for more. Taking the
     # risky lines out of the compose is the move the bare refusal suggested,
     # and it broke the container it was for (24 Sep, a PUID/PGID image that
-    # needs CHOWN and SETUID). A session's build never meets this: its
-    # project's Run its container setting is its answer (rebuild's `gate`).
+    # needs CHOWN and SETUID). A session's build on auto is put in front of
+    # a person with this list (devactions.request), whose Allow acknowledges
+    # it (ack_risks); it meets this only when the file changed after that.
     return ("this compose asks for more than its own directory: "
             + "; ".join(rs[:3]) + (" …" if len(rs) > 3 else "")
             + ". A person acknowledges that once by pressing Build or Rebuild on its row "
               "on the Containers page, where the list is shown")
+
+
+def unacked_risks(project, instance=MAIN):
+    """What this compose asks for beyond its own directory that no person
+    has acknowledged yet, or []: what a session's build on auto waits for a
+    person over (the operator, 10 Nov: auto runs at once unless the file
+    reaches the host)."""
+    rs = risks(project, _config(project, instance))
+    if not rs or _read_rec(project, instance).get("risks_ack") == risk_digest(rs):
+        return []
+    return rs
+
+
+def ack_risks(project, instance=MAIN):
+    """A person's yes to a build (Allow on a session's question, or
+    AerieOS's own container deployed from its page) is their yes to what its
+    compose asks for as it stands: kept as the row's own press keeps it, so
+    the same file is not asked about again. "" always: no gate."""
+    rs = risks(project, _config(project, instance))
+    if rs:
+        d = risk_digest(rs)
+        with _lock:
+            store = _load()
+            if _rec(store, project, instance).get("risks_ack") != d:
+                _rec(store, project, instance)["risks_ack"] = d
+                write_json(FILE, store)
+    return ""
 
 
 # ---- what a build ships beside the app (the operator, 17 Oct) -------------
@@ -4486,10 +4619,8 @@ def beside_digest(new):
 
 
 def _set_beside(project, instance, names):
-    with _lock:
-        store = _load()
-        _rec(store, project, instance)["beside"] = sorted(names)
-        write_json(FILE, store)
+    with edit_rec(project, instance, create=True) as rec:
+        rec["beside"] = sorted(names)
 
 
 def _beside_gate(project, instance=MAIN, yes=""):
@@ -4513,6 +4644,21 @@ def _beside_gate(project, instance=MAIN, yes=""):
             "ship: a person says whether that is part of the app by pressing Rebuild on its row on the "
             "Containers page, where it is named; if it is not, it is a container of its own (aerie container new), "
             "not a service in the space's compose file")
+
+
+def ack_beside(project, instance=MAIN):
+    """A person's Allow on a session's question about a build is their yes
+    to what its compose runs beside the app as it stands, as it is to what
+    the compose reaches (ack_risks): kept, so the same service is asked
+    about once. "" always: no gate."""
+    if is_file_source(project, instance):
+        return ""
+    cfg = _config(project, instance)
+    if cfg is not None:
+        now = beside_services(cfg)
+        if _read_rec(project, instance).get("beside") != now:
+            _set_beside(project, instance, now)
+    return ""
 
 
 # The variables that would make compose read another file, another stack or

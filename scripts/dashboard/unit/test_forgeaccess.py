@@ -301,3 +301,28 @@ class Governed(Base):
         rows = {r["id"]: r for r in forgeaccess.view("app")["rows"]}
         self.assertEqual(rows["push"]["fixed"], "set under Pushing")
         self.assertEqual(rows["workflows"]["fixed"], "")
+
+
+class OwnDispatch(Base):
+    def test_the_controller_starts_a_workflow_of_its_own_whatever_the_agents_switch_says(self):
+        # A release's list of files is signed once its APK is attached
+        # (releasesign.py): the controller's work, not an agent's ask, so
+        # the space's Deny on starting workflows does not hold it.
+        self.pol = {"actions_write": "deny"}
+        h = self.host({("POST", "/repos/o/app/actions/workflows/seal-release.yml/dispatches"): (204, {}, {})})
+        got, code = forgeaccess.dispatch("app", "seal-release.yml", "v0.9.1-dev.7", {"tag": "v0.9.1-dev.7"})
+        self.assertEqual((code, got), (200, {"dispatched": "seal-release.yml", "ref": "v0.9.1-dev.7"}))
+        self.assertEqual(h.asked, [("POST", "/repos/o/app/actions/workflows/seal-release.yml/dispatches",
+                                    {"ref": "v0.9.1-dev.7", "inputs": {"tag": "v0.9.1-dev.7"}})])
+        # What the host refuses is said as it said it; a name that is no
+        # workflow's or a ref that is none is not sent.
+        self.host({}, default=(403, {"message": "Resource not accessible by personal access token"}, {}))
+        got, code = forgeaccess.dispatch("app", "seal-release.yml", "v0.9.1-dev.7", {"tag": "v0.9.1-dev.7"})
+        self.assertEqual(code, 400)
+        self.assertIn("the host said 403: Resource not accessible", got["error"])
+        h = self.host({})
+        self.assertEqual(forgeaccess.dispatch("app", "../x", "v1")[1], 400)
+        self.assertEqual(forgeaccess.dispatch("app", "seal.yml", "a ref")[1], 400)
+        self.assertEqual(h.asked, [])
+        self.t = {"error": "this space has no remote"}
+        self.assertEqual(forgeaccess.dispatch("app", "seal.yml", "v1"), ({"error": "this space has no remote"}, 400))

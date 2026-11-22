@@ -3,7 +3,7 @@ disks of mixed sizes, each its own XFS or btrfs filesystem, pooled into one
 tree by mergerfs with parity on one or two disks kept by SnapRAID, which
 is periodic rather than real time: a file written since the last sync is
 unprotected until the next, and the page says so. AerieOS's own record
-(/etc/builderbot/array.json, written whole by the storage-array job) is
+(/etc/aerieos/array.json, written whole by the storage-array job) is
 what snapraid.conf and the array's fstab lines are rendered from; the
 census reads the record, each disk's room and the state file the last
 sync, scrub or check left. Disks are named to the record by their
@@ -14,7 +14,6 @@ disk; destroying the array unmounts it and forgets it, every data disk's
 files left as they are, readable on any Linux.
 """
 import contextlib
-import json
 import os
 import re
 import shutil
@@ -23,12 +22,13 @@ import tempfile
 import threading
 import time
 
-from .base import log
+from .base import env_or, log, read_json, run_out, write_atomic, write_json
 from .disks import disks_now, moved
-from .pools import by_id, _out
+from .pools import by_id
+from .names import ETC, VAR
 
-RECORD = "/etc/builderbot/array.json"
-STATE = "/var/lib/builderbot/array-state.json"
+RECORD = ETC + "/array.json"
+STATE = VAR + "/array-state.json"
 SNAPRAID_CONF = "/etc/snapraid.conf"
 FSTAB = "/etc/fstab"
 MARK = "# builderbot-array"
@@ -42,7 +42,7 @@ MOVE_PLACE = re.compile(r"array|[a-z][a-z0-9_-]{0,31}")
 MAX_MOVES = 128
 DISKS = "/mnt/disks"
 PARITY = "/mnt/parity"
-CONTENT = "/var/lib/builderbot/snapraid.content"
+CONTENT = VAR + "/snapraid.content"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
 POLICIES = {"mfs": "most free space", "lfs": "fill up (least free space)", "epmfs": "existing path, then most free space", "ff": "first disk with room"}
@@ -52,46 +52,27 @@ NAME_RE = re.compile(r"[a-z][a-z0-9]{0,31}")
 SLOT_RE = re.compile(r"(d|p)([1-9][0-9]?)")
 
 
-def _env(k, d):
-    return os.environ.get(k) or d
+# Under this name the unit tests stand in for it.
+_out = run_out
 
 
 def read_record():
-    try:
-        with open(_env("BB_ARRAY_RECORD", RECORD), encoding="utf-8") as f:
-            r = json.load(f)
-        return r if isinstance(r, dict) and isinstance(r.get("data"), list) else {}
-    except (OSError, ValueError):
-        return {}
+    r = read_json(env_or("BB_ARRAY_RECORD", RECORD), {})
+    return r if isinstance(r.get("data"), list) else {}
 
 
 def write_record(rec):
-    path = _env("BB_ARRAY_RECORD", RECORD)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".new"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(rec, f, indent=1, sort_keys=True)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
+    write_json(env_or("BB_ARRAY_RECORD", RECORD), rec, indent=1, sort_keys=True, mode=0o644, makedirs=True)
 
 
 def _state():
-    try:
-        with open(_env("BB_ARRAY_STATE", STATE), encoding="utf-8") as f:
-            s = json.load(f)
-        return s if isinstance(s, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(env_or("BB_ARRAY_STATE", STATE), {})
 
 
 def _state_set(**kw):
     s = _state()
     s.update(kw)
-    path = _env("BB_ARRAY_STATE", STATE)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(s, f)
-    os.replace(path + ".new", path)
+    write_json(env_or("BB_ARRAY_STATE", STATE), s, makedirs=True)
 
 
 def mount_of(kind, slot):
@@ -194,7 +175,7 @@ def stale_content():
     """With no array recorded, any content file on the system is an earlier
     one's (B704): taken away before a new array's first sync, which would
     otherwise read it and refuse its disks as changed."""
-    p = _env("BB_SNAPRAID_CONTENT", CONTENT)
+    p = env_or("BB_SNAPRAID_CONTENT", CONTENT)
     for x in (p, p + ".tmp", p + ".lock"):
         with contextlib.suppress(OSError):
             os.unlink(x)
@@ -205,7 +186,7 @@ def on_stick():
     its /var the stick's own small partition): the kernel's command line
     says so (aerietoram=1)."""
     try:
-        with open(_env("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
+        with open(env_or("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
             return "aerietoram=1" in f.read().split()
     except OSError:
         return False
@@ -242,19 +223,19 @@ def render_fstab(rec):
     # An array taken over keeps its data disks and its merged tree on the
     # adoption's own lines (adopt.render_fstab): only its parity is ours.
     for d in [] if rec.get("adopted") else rec.get("data") or []:
-        lines.append(f"UUID={d['uuid']} {mount_of('d', int(d['slot']))} {d.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
+        lines.append(f"UUID={d['uuid']} {mount_of('d', int(d['slot']))} {d.get('fs', 'xfs')} defaults,nofail,noatime,nosuid,nodev 0 0 {MARK}\n")
     for p in rec.get("parity") or []:
-        lines.append(f"UUID={p['uuid']} {slot_mount('p', p)} {p.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
+        lines.append(f"UUID={p['uuid']} {slot_mount('p', p)} {p.get('fs', 'xfs')} defaults,nofail,noatime,nosuid,nodev 0 0 {MARK}\n")
     if rec.get("data") and not rec.get("adopted"):
         policy = rec.get("policy") if rec.get("policy") in POLICIES else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={mount_of('d', int(d['slot']))}" for d in rec["data"])
-        lines.append(f"{DISKS}/d* {MOUNT} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,dropcacheonclose=true,"
+        lines.append(f"{DISKS}/d* {MOUNT} fuse.mergerfs defaults,nofail,nosuid,nodev,allow_other,use_ino,cache.files=off,dropcacheonclose=true,"
                      f"category.create={policy},moveonenospc=true,minfreespace=20G,fsname=bbarray,{req} 0 0 {MARK}\n")
     return "".join(lines)
 
 
 def write_fstab(rec):
-    path = _env("BB_ARRAY_FSTAB", FSTAB)
+    path = env_or("BB_ARRAY_FSTAB", FSTAB)
     try:
         with open(path, encoding="utf-8") as f:
             kept = [ln for ln in f.read().splitlines(True) if not ln.rstrip().endswith(MARK)]
@@ -263,10 +244,7 @@ def write_fstab(rec):
     text = "".join(kept)
     if text and not text.endswith("\n"):
         text += "\n"
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        f.write(text + render_fstab(rec))
-    os.chmod(path + ".new", 0o644)
-    os.replace(path + ".new", path)
+    write_atomic(path, text + render_fstab(rec), mode=0o644)
 
 
 def _df(path):
@@ -635,14 +613,14 @@ class ArrayMixin:
         for m in datas:
             if os.path.ismount(m["where"]):
                 self._sh(job, ["umount", m["where"]], timeout=120)
-            if self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), m["where"]], timeout=120) != 0:
+            if self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", adopt.FSTAB), m["where"]], timeout=120) != 0:
                 for w in sorted(plan_.get("merged") or {}):
-                    self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
+                    self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
                 say(f"{m['where']} did not mount writable (above): stopped before the parity disk was touched. The disks before it are "
                     "writable now, so the old system's parity no longer matches them; run the takeover again once it mounts\n")
                 return "failed", 1
         for w in sorted(plan_.get("merged") or {}):
-            self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
+            self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
         self._landing(say, moves, pools)
         new = {"policy": "adopted", "adopted": True, "data": [], "parity": [], "moves": moves}
         for m in datas:
@@ -683,7 +661,7 @@ class ArrayMixin:
             self.hello_again("the array was taken over")
             return "failed", 1
         say("taken over: the parity is being built in the background, hours for a large array; the array is unprotected until it ends, "
-            "and its progress is on This machine and the Storage page\n")
+            "and its progress is on the Nodes page and the Storage page\n")
         self.hello_again("the array was taken over")
         return "succeeded", 0
 
@@ -805,9 +783,7 @@ class ArrayMixin:
 
         def settle():
             write_fstab(rec)
-            with open(_env("BB_SNAPRAID_CONF", SNAPRAID_CONF) + ".new", "w", encoding="utf-8") as f:
-                f.write(render_snapraid(rec))
-            os.replace(_env("BB_SNAPRAID_CONF", SNAPRAID_CONF) + ".new", _env("BB_SNAPRAID_CONF", SNAPRAID_CONF))
+            write_atomic(env_or("BB_SNAPRAID_CONF", SNAPRAID_CONF), render_snapraid(rec))
             os.makedirs(os.path.dirname(CONTENT), exist_ok=True)
             write_record(rec)
 
@@ -1082,7 +1058,7 @@ class ArrayMixin:
             # data disk, or the next array's first sync reads them as this
             # one's and refuses its disks as changed (B704); on a disk taken
             # over from another system they are what this machine added.
-            for path in [_env("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), ".snapraid.content") for d in rec.get("data") or []]:
+            for path in [env_or("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), ".snapraid.content") for d in rec.get("data") or []]:
                 for p_ in (path, path + ".tmp", path + ".lock"):
                     with contextlib.suppress(OSError):
                         os.unlink(p_)
@@ -1107,7 +1083,7 @@ class ArrayMixin:
                     adopt.write_record(arec)
             rec = {}
             write_fstab(rec)
-            for path in (_env("BB_ARRAY_RECORD", RECORD), _env("BB_SNAPRAID_CONF", SNAPRAID_CONF), _env("BB_ARRAY_STATE", STATE)):
+            for path in (env_or("BB_ARRAY_RECORD", RECORD), env_or("BB_SNAPRAID_CONF", SNAPRAID_CONF), env_or("BB_ARRAY_STATE", STATE)):
                 try:
                     os.unlink(path)
                 except OSError:

@@ -210,22 +210,40 @@ def avd_homes(home):
     return [(uid, d) for uid, d in out if os.path.isdir(d)]
 
 
+def home_owner(path):
+    """(uid, gid) of whoever owns `path` itself (never through a link at its
+    name), for file work there done as them; None for root's or none."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return None
+    return (st.st_uid, st.st_gid) if st.st_uid else None
+
+
 def avd_running(avd_dir):
     """Whether the emulator holds this AVD: its multiinstance.lock flocked,
-    the test aerie emu's emu_held makes."""
+    the test aerie emu's emu_held makes. The lock is in an account's home:
+    opened only as a regular file reached by no link, and never waited on
+    (a FIFO there held the whole walk, R247 step 5)."""
     import fcntl
+    import stat
     lock = os.path.join(avd_dir, "multiinstance.lock")
-    if not os.path.exists(lock):
+    try:
+        fd = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY)
+    except OSError:
         return False
     try:
-        with open(lock, "rb") as f:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            fcntl.flock(f, fcntl.LOCK_UN)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return False
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(fd, fcntl.LOCK_UN)
         return False
     except BlockingIOError:
         return True
     except OSError:
         return False
+    finally:
+        os.close(fd)
 
 
 def _phones(home):

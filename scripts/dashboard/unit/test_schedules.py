@@ -47,14 +47,27 @@ class Store(unittest.TestCase):
         self.addCleanup(__import__("shutil").rmtree, self.dir, True)
         schedules.configure(state=self.dir, write_json=_write)
 
-    def test_the_scan_is_the_scanners_pages_now(self):
-        # The row the built-in scan kept before 0.9.0 is not listed, and
-        # not a schedule to save or remove (migration 0016 moved it).
-        self.assertEqual(schedules.listing(), [])
-        _write(schedules.FILE, {"schedules": {"scan": {"id": "scan", "on": True, "cron": "0 4 * * 0", "builtin": "scan"}}})
-        self.assertEqual(schedules.listing(), [])
-        self.assertIn("Scanners page", schedules.save({"id": "scan", "on": False}, "u")["error"])
-        self.assertIn("Scanners page", schedules.remove("scan")["error"])
+    def test_the_scans_old_row_is_taken_out_by_the_numbered_migration(self):
+        # The row the built-in scan kept goes in migration 0029; every other
+        # schedule is left as it was, and a file with no such row untouched.
+        import importlib
+        mig = importlib.import_module("statemigrations.0029_no_scan_schedule")
+        mine = {"id": "s_0123abcd", "name": "Backup", "on": True, "cron": "0 4 * * *", "script": "true", "node": "n1"}
+        _write(schedules.FILE, {"schedules": {"scan": {"id": "scan", "on": True, "cron": "0 4 * * 0", "builtin": "scan"},
+                                              "s_0123abcd": mine}, "other": 1})
+        os.chmod(schedules.FILE, 0o600)
+        mig.run({"state": self.dir})
+        with open(schedules.FILE) as f:
+            self.assertEqual(json.load(f), {"schedules": {"s_0123abcd": mine}, "other": 1})
+        self.assertEqual(os.stat(schedules.FILE).st_mode & 0o777, 0o600)
+        self.assertEqual([s["id"] for s in schedules.listing()], ["s_0123abcd"])
+        self.assertEqual(schedules.remove("scan"), {"error": "no such schedule"})
+        before = os.stat(schedules.FILE).st_mtime_ns
+        mig.run({"state": self.dir})   # run again: as it left it
+        self.assertEqual(os.stat(schedules.FILE).st_mtime_ns, before)
+        os.unlink(schedules.FILE)
+        mig.run({"state": self.dir})
+        self.assertFalse(os.path.exists(schedules.FILE), "an install with no schedules is given none")
 
     def test_a_schedule_is_held_to_its_shapes(self):
         self.assertIn("five fields", schedules.save({"name": "x", "cron": "every day", "script": "true"}, "u")["error"])

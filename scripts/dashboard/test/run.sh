@@ -15,6 +15,7 @@
 #   aerie dashboard test cards      # just cards.mjs
 #   BB_TEST_TIMING=1 ...         # seconds between results, to find the slow part
 #   BB_TEST_WORKERS=3 ...        # three suites at once, each in a world of its own
+#                                # (at most half the machine's cores; BB_TEST_SUITES_AT_ONCE=N for another number)
 #
 # One run at a time: a second one is refused while the first is alive. The
 # workers of one run are that run: they share its lock and none of anything
@@ -33,6 +34,26 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # Its own: the harness sources nothing of bb's, and the sentence a failed copy
 # meant to say ended as "die: command not found" (B231).
 die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
+# What a run takes out of the environment it starts in, for a fresh world's
+# own shell and for a suite attached to a kept one. Run from a session ON A
+# NODE, this script inherits BUILDERBOT_ROLE=node, the real controller's
+# address and pin, and the account the session runs as, and every `bash
+# scripts/aerie` a test makes then relays to the real controller with no
+# token, or reads a node's home. The suite drives the checkout's aerie as the
+# CONTROLLER's, against its own server; the tests that mean a node say so in
+# their own env. BB_EMU_LOCAL says "already on the node's store": aerie emu
+# would run here.
+SCRUB=(BUILDERBOT_ROLE BB_CONTROLLER BB_CONTROLLER_PIN BB_NODE BUILDERBOT_NODE
+       BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_CI_LOG_DIR
+       BB_NODE_TOOLCHAINS BB_EMU_LOCAL)
+# The root tier is the one thing here that is root's to run (R240 step 5):
+# what the root agent does in a folder an account controls. `aerie devapp test
+# root-tier` reaches it through the space's test command inside its dev
+# instance, where the exec is root, in a container.
+if [ "${1:-}" = root-tier ]; then
+    shift
+    exec python3 "$HERE/../../lib/roottier.py" "$@"
+fi
 # Never as root. The suite's premise is an unprivileged runner: the agent it
 # starts drops to the account sessions run as, which as root means an
 # account the machine may not have (inside AerieOS's own dev container,
@@ -99,6 +120,7 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
         cp "$HERE"/../*.js "$HERE"/../*.html "$KEEP_HERE/../" 2>/dev/null || true
         cp "$HERE/lib.mjs" "$KEEP_HERE/lib.mjs"
         rc=0
+        scrub=(); for v in "${SCRUB[@]}"; do scrub+=(-u "$v"); done
         for t in "$@"; do
             case "$t" in
                 /*) f="$KEEP_HERE/_probe-$(basename "${t%.mjs}").mjs"; cp "$t" "$f" ;;
@@ -107,13 +129,12 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
             printf '[dashboard-test] == %s == (attached to the kept fixture at %s)\n' "$(basename "$f")" "$KEEP_URL"
             # The kept world's own environment, the same as a fresh run sets
             # below: its private tmux server, its git config, and none of the
-            # node's or the session's own variables. Without it a suite that
-            # ends or makes a tmux session refused to run attached (B230).
-            env -u TMUX -u BUILDERBOT_ROLE -u BB_CONTROLLER -u BB_CONTROLLER_PIN -u BB_NODE \
-                -u BUILDERBOT_NODE -u BB_ACCOUNT_NAME -u BB_ACCOUNT_UID -u BB_PROJECT -u BB_TREE \
-                -u BB_TREE_OWNER -u BB_CI_LOG_DIR -u BB_NODE_TOOLCHAINS -u BB_EMU_LOCAL \
+            # node's or the session's own variables (SCRUB). Without it a suite
+            # that ends or makes a tmux session refused to run attached (B230).
+            env -u TMUX "${scrub[@]}" \
                 TMUX_TMPDIR="$KEEP_S/tmux" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$KEEP_S/gitconfig" \
                 DASHBOARD_TEST_URL="$KEEP_URL" DASHBOARD_TEST_CHROME="$KEEP_CHROME" \
+                BB_TEST_ORIGIN="${KEEP_ORIGIN:-$_here_root}" \
                 DASHBOARD_TEST_DIR="$KEEP_S" timeout --kill-after=10 "${SUITE_TIMEOUT:-1500}" node "$f" || rc=1
             case "$f" in */_probe-*) rm -f "$f" ;; esac
         done
@@ -173,8 +194,31 @@ sweep_leftovers() {
 # node holds its projects on its own disk (R163) nothing else made a copy.
 # BB_TEST_INPLACE=1 runs from the checkout for anyone debugging this, and
 # then nothing under the dashboard is edited until it ends.
+# A run on a commit (R55): --at REF, or BB_TEST_AT=REF, copies the tree as
+# that commit has it (git archive) rather than the working tree, so a
+# before-and-after needs no stash; the map the plan reads comes along as
+# ever. A copy without the repository (a test node's snapshot) cannot.
+_at="${BB_TEST_AT:-}"
+_args=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --at) [ $# -ge 2 ] || { printf '[dashboard-test] ERROR: --at needs a commit\n' >&2; exit 2; }; _at="$2"; shift 2 ;;
+        --at=*) _at="${1#--at=}"; shift ;;
+        --loaded) export BB_TEST_LOADED=1; shift ;;
+        *) _args+=("$1"); shift ;;
+    esac
+done
+set -- "${_args[@]}"
+if [ -n "$_at" ] && { [ -n "${BB_TEST_COPY:-}" ] || [ -n "${BB_TEST_INPLACE:-}" ]; }; then
+    printf '[dashboard-test] ERROR: --at makes its own copy, and this run is already one (or runs in place)\n' >&2; exit 2
+fi
 if [ -z "${BB_TEST_COPY:-}" ] && [ -z "${BB_TEST_INPLACE:-}" ]; then
     _src="$(cd "$HERE/../../.." && pwd)"
+    _sha=""
+    if [ -n "$_at" ]; then
+        _sha="$(git -C "$_src" -c safe.directory="$_src" rev-parse --verify --quiet "$_at^{commit}")" \
+            || { printf '[dashboard-test] ERROR: --at %s: no such commit in %s (a test node runs a snapshot without the repository)\n' "$_at" "$_src" >&2; exit 2; }
+    fi
     _dst="$(mktemp -d "${TMPDIR:-/tmp}/bb-suite.XXXXXX")"
     echo $$ > "$_dst/.bb-run-pid"
     # tar exits 1 for a file that changed under it (a CHANGELOG.md write, a
@@ -183,6 +227,13 @@ if [ -z "${BB_TEST_COPY:-}" ] && [ -z "${BB_TEST_INPLACE:-}" ]; then
     # (.bb-map): an ignored folder is a build's output or somebody's scratch,
     # and /tmp is memory on a node. An 11 GB trial install ignored at the
     # root was being copied into it when the run was cut (B433).
+    if [ -n "$_sha" ]; then
+        git -C "$_src" -c safe.directory="$_src" archive "$_sha" | tar -C "$_dst" -xf - \
+            || { rm -rf "$_dst"; die "could not copy commit $_sha to $_dst"; }
+        [ -d "$_src/.bb-map" ] && cp -r "$_src/.bb-map" "$_dst/" 2>/dev/null
+        printf '[dashboard-test] running commit %s (%s) from %s, a copy of it, not of the working tree\n' \
+            "$(git -C "$_src" -c safe.directory="$_src" log -1 --format='%h %s' "$_sha" | cut -c1-80)" "$_at" "$_dst" >&2
+    else
     _skip="$_dst/.bb-copy-skip"
     git -C "$_src" -c safe.directory="$_src" ls-files -oi --exclude-standard --directory 2>/dev/null \
         | sed -n 's#/$##; /^\.bb-map$/d; s#^#./#p' > "$_skip" || : > "$_skip"
@@ -191,6 +242,7 @@ if [ -z "${BB_TEST_COPY:-}" ] && [ -z "${BB_TEST_INPLACE:-}" ]; then
         | tar -C "$_dst" -xf - || { rm -rf "$_dst"; die "could not copy the tree to $_dst"; }
     rm -f "$_skip"
     printf '[dashboard-test] running from %s, a copy, so an edit to the tree meanwhile does not reach this run\n' "$_dst" >&2
+    fi
     BB_TEST_COPY="$_dst" BB_TEST_ORIGIN="$_src" exec bash "$_dst/scripts/dashboard/test/run.sh" "$@"
 fi
 DASH="$(dirname "$HERE")"
@@ -218,16 +270,16 @@ fi
 # every CI run of this suite was green without running a test (bug B74).
 # A run that could not start is not a pass.
 #
-# The same search bb uses, for both: the module and the browsers live on the
+# The same search aerie uses, for both: the module and the browsers live on the
 # store, and the /opt path is a symlink that only exists once the startup
-# hook has run. The checkout's bb, not the one on PATH: this harness tests
+# hook has run. The checkout's aerie, not the one on PATH: this harness tests
 # this tree, and the installed copy is whatever the running image shipped.
-NODE_PATH="$(bash "$DASH/../bb" capture shot --print-node-path 2>/dev/null \
+NODE_PATH="$(bash "$DASH/../aerie" capture shot --print-node-path 2>/dev/null \
             || printf '%s' "${NODE_PATH:-/usr/lib/node_modules}")"
 export NODE_PATH
 node -e "require.resolve('playwright')" 2>/dev/null \
     || die "node and playwright are not on PATH here (NODE_PATH=$NODE_PATH); on a node they are the playwright recipe in the toolchain store, installed from the Library"
-CHROME="$(bash "$DASH/../bb" capture shot --print-chromium 2>/dev/null || true)"
+CHROME="$(bash "$DASH/../aerie" capture shot --print-chromium 2>/dev/null || true)"
 [ -x "${CHROME:-}" ] || die "no Playwright chromium: install it with: aerie toolchains install playwright"
 command -v tmux >/dev/null || die "tmux is not installed"
 
@@ -242,15 +294,22 @@ command -v tmux >/dev/null || die "tmux is not installed"
 # server, a race in principle, and not one in practice on a box running two
 # of these at most, where the alternative is a constant that collides every
 # time. DASHBOARD_TEST_PORT still pins it for anyone who needs a known port.
-free_port() {
-    python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
+free_ports() {
+    # N distinct free ports, one per line. Bound all at once and released
+    # together, so the kernel cannot hand the same number to two of them,
+    # which it could if each of a run's workers asked for its own a moment
+    # apart.
+    python3 - "$1" <<'PY'
+import socket, sys
+socks = [socket.socket() for _ in range(int(sys.argv[1]))]
+for s in socks:
+    s.bind(("127.0.0.1", 0))
+    print(s.getsockname()[1])
+for s in socks:
+    s.close()
 PY
 }
+free_port() { free_ports 1; }
 PORT="${DASHBOARD_TEST_PORT:-$(free_port)}"
 [ -n "$PORT" ] || die "could not find a free port for the test server"
 # Refuse a port we do not own, before doing anything else. An interrupted run
@@ -335,8 +394,42 @@ done
 rm -f "$LOCK" 2>/dev/null || true
 ( umask 000; printf '%s' "$$" > "$LOCK" ) 2>/dev/null \
     || die "cannot take $LOCK: $(stat -c %U "$LOCK" 2>/dev/null || echo somebody)'s, and $LOCKDIR is not world-writable; fix the directory's mode (chmod 0777) and re-run"
+# ...and one run on the machine, whoever starts it (B986). A session's /tmp
+# and its pids are its own, so the lock above kept two runs of one session
+# apart and nothing else: two sessions' gates, or a session's and the CI
+# runner's, ran at once with all their workers each. The node's agent makes
+# this file for everyone (0666, in /run, which every session's view shares);
+# a lock on it is the kernel's, so it goes with its holder however that
+# ends. It is held by a process of its own beside this one, so the suites'
+# servers do not inherit it: one left behind would hold it for good.
+NODE_LOCK="${BB_TEST_NODE_LOCK:-/run/builderbot-test.lock}"
+if [ -z "${BB_TEST_CONCURRENT:-}" ] && [ -w "$NODE_LOCK" ] && command -v flock >/dev/null 2>&1; then
+    node_held="$(mktemp "${TMPDIR:-/tmp}/dashboard-test-node.XXXXXX")"
+    node_who="$(id -un)"; [ -z "${GITHUB_ACTIONS:-}" ] || node_who="the CI runner ($node_who)"
+    _run_pid=$$
+    (
+        exec 9<>"$NODE_LOCK"
+        if ! flock -n 9; then
+            echo "[dashboard-test] waiting for the run already going on this machine: $(tr -cd '[:print:]' < "$NODE_LOCK" | head -c 160)" >&2
+            flock -w "${BB_TEST_WAIT_LOCK:-900}" 9 || { echo busy > "$node_held"; exit 1; }
+        fi
+        printf '%s, since %s' "$node_who" "$(date '+%H:%M')" > "$NODE_LOCK" 2>/dev/null || true
+        echo held > "$node_held"
+        while kill -0 "$_run_pid" 2>/dev/null; do sleep 2; done
+    ) &
+    while [ ! -s "$node_held" ] && kill -0 $! 2>/dev/null; do sleep 0.2; done
+    if [ "$(cat "$node_held" 2>/dev/null)" != held ]; then
+        rm -f "$node_held"
+        die "another dashboard test run is going on this machine ($(tr -cd '[:print:]' < "$NODE_LOCK" | head -c 160)). One at a time on a machine, other sessions' and the CI runner's included; wait for it, or set BB_TEST_CONCURRENT=1"
+    fi
+    rm -f "$node_held"
+fi
 fi
 S="$(mktemp -d "${TMPDIR:-/tmp}/dashboard-test.XXXXXX")"
+# The images AerieOS's own services run, as the tree names them, in a file
+# of the world's own (BB_SERVICE_IMAGES_FILE): a suite moves an entry by
+# writing it, which is all an update of AerieOS does to one.
+cp "$DASH/service-images.json" "$S/service-images.json"
 # Where each suite's seconds are kept for the run's queue (run_file, the
 # queue's order, R130): beside the code map in the tree the run was made from, which
 # is this node's own and gitignored; workers inherit the path.
@@ -389,32 +482,41 @@ default_suites() {
 # them, so a worker takes none, and a worker never reruns a failed suite:
 # the parent does that, alone, after every worker is done, so "flaky" means
 # what it means in a single run, failed under load and passed by itself.
+# The workers' ports are asked for in one call (free_ports), so no two get
+# the same one.
 #
-free_ports() {
-    # N distinct free ports, one per line. Bound all at once and released
-    # together, so the kernel cannot hand the same number to two of them,
-    # which it could if each worker asked for its own a moment apart.
-    python3 - "$1" <<'PY'
-import socket, sys
-socks = [socket.socket() for _ in range(int(sys.argv[1]))]
-for s in socks:
-    s.bind(("127.0.0.1", 0))
-    print(s.getsockname()[1])
-for s in socks:
-    s.close()
-PY
-}
 stream_log() {
     # A worker's log as it grows, until the worker ends, then the rest of it.
     # tail --pid is GNU's and uutils' both; anywhere without it the log is
-    # printed whole once the worker is done.
+    # printed whole once the worker is done. Waited on rather than run in
+    # the foreground, so a TERM reaches this script's trap at once (bash
+    # holds a trap until a foreground child ends), and the tail ends by
+    # itself with its worker.
     local f="$1" p="$2"
     if tail --help 2>&1 | grep -q -- '--pid'; then
-        tail -n +1 -f --pid="$p" "$f"
+        tail -n +1 -f --pid="$p" "$f" &
+        wait "$!" || true
     else
         while kill -0 "$p" 2>/dev/null; do sleep 1; done
         cat "$f"
     fi
+}
+# A run whose launcher is gone ends (B926): a gate ended by its own pid
+# left this script under nobody, its workers going on through the queue,
+# servers and all, and tidy spared them for the lock it held. Every three
+# seconds it asks whose child it is now; another than the one it started
+# under is its launcher gone, and it ends as a TERM ends it, its cleanup
+# with it. A worker's launcher is the run, so a run ended any way ends its
+# workers too. A kept fixture outlives its launcher on purpose, and
+# BB_TEST_DETACHED=1 says a run means to.
+launcher_watch() {
+    [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_DETACHED:-}" ] || return 0
+    # Its launcher as bash read it at the start, so one gone before this
+    # line runs is gone too, not taken for the launcher.
+    local me=$$ was="$PPID"
+    [ -n "$was" ] || return 0
+    ( while [ "$(sed 's/.*) //' "/proc/$me/stat" 2>/dev/null | cut -d' ' -f2)" = "$was" ]; do sleep 3; done
+      kill -TERM "$me" 2>/dev/null ) > /dev/null 2>&1 &
 }
 WORKER_PIDS=()
 workers_cleanup() {
@@ -440,6 +542,15 @@ load_line() {
     printf '[dashboard-test] load: %s on %s cores\n' "$(cut -d' ' -f1,2 /proc/loadavg 2>/dev/null)" \
         "$(nproc 2>/dev/null || echo 1)"
 }
+# A run's flaky suites kept on record (lib/flakes.py): WORKERS, the logs
+# their first failures are read from (may be none), then the suites.
+flakes_record() {
+    local n="$1" logs="$2"; shift 2
+    [ -n "${SUITE_TIMES:-}" ] || return 0
+    # shellcheck disable=SC2086  # the logs are a list of paths with no spaces of their own
+    python3 "$DASH/../lib/flakes.py" record --file "$(dirname "$SUITE_TIMES")/flakes.tsv" --workers "$n" \
+        --load "$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo '?')" ${logs:+--logs $logs} --suites "$@" 2>/dev/null || true
+}
 run_workers() {
     local n="$1"; shift
     local names=("$@") t f i rc=0 wrc tp tf
@@ -447,7 +558,8 @@ run_workers() {
     [ -z "${DASHBOARD_TEST_PORT:-}" ] \
         || die "DASHBOARD_TEST_PORT pins one port and BB_TEST_WORKERS=$n asks for $n servers; unset one of them"
     trap 'workers_cleanup' EXIT
-    trap 'exit 130' TERM INT
+    trap 'exit 130' TERM INT HUP
+    launcher_watch
     for t in "${names[@]}"; do
         case "$t" in /*) f="$t" ;; *) f="$HERE/${t%.mjs}.mjs" ;; esac
         printf '%s\t%s\n' "$t" "$(wc -l < "$f" 2>/dev/null || echo 0)"
@@ -471,8 +583,14 @@ except OSError:
 key = lambda t: secs.get(os.path.basename(t).removesuffix(".mjs"), int(sizes[t] or 0) / 20)
 print("\n".join(sorted(sizes, key=key, reverse=True)))
 QUEUE
-    : > "$S/queue.ran"; : > "$S/queue.held"
+    : > "$S/queue.ran"; : > "$S/queue.held"; : > "$S/queue.done"
+    if [ -n "${LOADED_SUITE:-}" ]; then
+        { printf '%s\n' "$LOADED_SUITE"; grep -vxF -- "$LOADED_SUITE" "$S/queue"; } > "$S/queue.first"
+        mv "$S/queue.first" "$S/queue"
+        log "loaded: $LOADED_SUITE first, and $((n - 1)) more workers beside it taking the longest of the rest, as a whole run's load is; only its verdict counts"
+    else
     log "workers: $n taking from a queue of ${#names[@]} suites, longest first, each the next while the machine has room"
+    fi
     # What bounds this run (R130): when it started, the suites' timings
     # appended from here, and the machine's load every ten seconds.
     local t_start t_phase times_from=0 sampler=""
@@ -496,6 +614,34 @@ QUEUE
         WORKER_PIDS+=("$!")
         log "worker $((i + 1)) of $n (port ${ports[i]}, pid $!)"
     done
+    if [ -n "${LOADED_SUITE:-}" ]; then
+        # One suite beside the rest (R250 step 1): its verdict is the run's,
+        # and once it has one the others are stopped where they are.
+        local lrc="" w="" alive p
+        while :; do
+            lrc="$(awk -F'\t' -v s="$LOADED_SUITE" '$1 == s { r = $2 } END { print r }' "$S/queue.done")"
+            [ -z "$lrc" ] || break
+            alive=0
+            for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && alive=1; done
+            [ "$alive" = 1 ] || break
+            sleep 2
+        done
+        w="$(awk -F'\t' -v s="$LOADED_SUITE" '$1 == s { w = $2 } END { print w }' "$S/queue.ran")"
+        for p in "${WORKER_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
+        for p in "${WORKER_PIDS[@]}"; do wait "$p" 2>/dev/null || true; done
+        WORKER_PIDS=()
+        [ -n "$sampler" ] && kill "$sampler" 2>/dev/null
+        [ -z "$w" ] || awk -v b="== $(basename "${LOADED_SUITE%.mjs}").mjs" \
+            'index($0, b) { on = 1; print; next } on && /^\[dashboard-test\] == / { exit } on' "${logs[w]}"
+        log "loaded: beside it ran $(cut -f1 "$S/queue.ran" | grep -vxF -- "$LOADED_SUITE" | paste -sd' ' -)"
+        load_line
+        if [ -z "$lrc" ]; then
+            warn "loaded: $LOADED_SUITE never finished (its worker ended first): its lines above say how far it got"
+            exit 1
+        fi
+        [ "$lrc" = 0 ] && log "dashboard tests: all passed" || warn "dashboard tests: FAILURES above"
+        exit "$lrc"
+    fi
     for ((i = 0; i < n; i++)); do
         printf '[dashboard-test] == worker %s of %s ==\n' "$((i + 1))" "$n"
         stream_log "${logs[i]}" "${pids[i]}"
@@ -511,15 +657,65 @@ QUEUE
         fi
     done
     WORKER_PIDS=()
+    # Every suite queued is accounted for (B919): one no worker finished,
+    # never taken or taken by a worker that ended under it, is named and run
+    # once more alone, as a failed one is. A run that failed with every
+    # suite passed and none named was such a suite, and said nothing.
+    local never=()
+    for t in "${names[@]}"; do
+        awk -F'\t' -v s="$t" '$1 == s { f = 1 } END { exit !f }' "$S/queue.done" || never+=("$t")
+    done
+    if [ "${#never[@]}" -gt 0 ]; then
+        warn "never finished in the run: ${never[*]} (queued, and no worker finished it): run once more, alone"
+        failed+=("${never[@]}")
+    fi
     t_phase="$(date +%s)"
     read -r tp tf < <(cat "${logs[@]}" \
         | awk '/^[0-9]+ passed, [0-9]+ failed/ { p += $1; f += $3 } END { print p + 0, f + 0 }')
     log "workers: $tp passed, $tf failed across $n workers, ${#names[@]} suites${failed[*]:+; failed in the run: ${failed[*]}}"
-    # Once more, alone, for each suite that failed, the way a single run
-    # does it below: a worker of its own, one at a time, on a port of its
-    # own choosing, with the whole box to itself.
-    local again_failed=()
-    for t in "${failed[@]}"; do
+    # Once more for each suite that failed, in a world of its own, three at
+    # a time (R228 step 19; BB_TEST_RERUNS_AT_ONCE says otherwise). One at a
+    # time, each built its world while the rest of the box sat idle: 23 of a
+    # run's 40 minutes at its worst (14 Nov). Three worlds on a machine that
+    # ran eight beside each other with nothing failed are alone as far as a
+    # suite can tell, so "flaky" still means failed under the whole run's
+    # load and passed without it. Each on a port picked for it here, since
+    # three choosing their own at one moment could choose the same; their
+    # output in the order they were asked for.
+    local again_failed=() at_once="${BB_TEST_RERUNS_AT_ONCE:-3}" j k
+    local rports=() rlogs=() rpids=() beside=()
+    case "$at_once" in ''|*[!0-9]*|0) at_once=3 ;; esac
+    if [ "${#failed[@]}" -gt 0 ]; then
+        mapfile -t rports < <(free_ports "${#failed[@]}")
+        [ "${#rports[@]}" = "${#failed[@]}" ] || die "could not find ${#failed[@]} free ports for the reruns' servers"
+        [ "${#failed[@]}" -le 1 ] || log "reruns: ${#failed[@]} suites once more, $at_once at a time, each in a world of its own"
+    fi
+    for ((j = 0; j < ${#failed[@]}; j += at_once)); do
+        for ((k = j; k < j + at_once && k < ${#failed[@]}; k++)); do
+            rlogs[k]="$S/again-$((k + 1)).log"
+            BB_TEST_WORKER=again BB_TEST_AGAIN=1 DASHBOARD_TEST_PORT="${rports[k]}" \
+                bash "$0" "${failed[k]}" > "${rlogs[k]}" 2>&1 &
+            rpids[k]=$!
+            WORKER_PIDS+=("$!")
+        done
+        for ((k = j; k < j + at_once && k < ${#failed[@]}; k++)); do
+            t="${failed[k]}"
+            stream_log "${rlogs[k]}" "${rpids[k]}"
+            if wait "${rpids[k]}"; then
+                flaky+=("$(basename "${t%.mjs}").mjs")
+            else
+                beside+=("$t")
+            fi
+        done
+    done
+    WORKER_PIDS=()
+    # One that failed again beside two other reruns has not yet failed by
+    # itself, which is what "failed again alone" says: templates did, on a
+    # page slow to land, and passed twice running with the box to itself
+    # (14 Nov). So those are run once more, one at a time, and only one
+    # that fails then is a failure.
+    for t in "${beside[@]}"; do
+        log "$(basename "${t%.mjs}").mjs failed again beside the other reruns: once more, by itself"
         if BB_TEST_WORKER=again BB_TEST_AGAIN=1 bash "$0" "$t"; then
             flaky+=("$(basename "${t%.mjs}").mjs")
         else
@@ -529,6 +725,10 @@ QUEUE
     done
     if [ "${#flaky[@]}" -gt 0 ]; then
         warn "flaky: ${flaky[*]} failed in the whole run and passed again alone"
+        # ...and remembered (R7 step 3): a line each beside the suites'
+        # timings, with the first check that failed in the run, which
+        # aerie tests flakes counts.
+        flakes_record "$n" "${logs[*]}" "${flaky[@]}"
     fi
     # ...and named, the ones that failed again: a suite that ends before its
     # first check (an uncaught timeout in its set-up) prints no FAIL line and
@@ -585,18 +785,48 @@ BOUND
     [ "$rc" = 0 ] && log "dashboard tests: all passed" || warn "dashboard tests: FAILURES above"
     exit "$rc"
 }
+# One suite beside a whole run's load (R250 step 1, --loaded): the workers a
+# gate has here, the suite first and the longest of the rest beside it,
+# stopped once it has a verdict, so a suite that fails only in a gate fails
+# on demand.
+if [ -n "${BB_TEST_LOADED:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST_HOLD:-}" ]; then
+    [ $# -eq 1 ] || die "--loaded runs one suite beside a whole run's load: name one suite"
+    [ -z "${DASHBOARD_TEST_PORT:-}" ] || die "--loaded starts a server a worker, and DASHBOARD_TEST_PORT pins one port"
+    _n="${BB_TEST_SUITES_AT_ONCE:-$(( ($(nproc 2>/dev/null || echo 2) + 1) / 2 ))}"
+    case "$_n" in ''|*[!0-9]*|0|1) _n=2 ;; esac
+    LOADED_SUITE="$(basename "${1%.mjs}")"
+    mapfile -t _names < <(default_suites | grep -vxF -- "$LOADED_SUITE")
+    run_workers "$_n" "$LOADED_SUITE" "${_names[@]}"
+fi
 if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST_HOLD:-}" ]; then
     if [ $# -gt 0 ]; then _names=("$@"); else mapfile -t _names < <(default_suites); fi
     # No more workers than suites, and one suite is the single path below.
     _n="$BB_TEST_WORKERS"
+    # ...and no more than half the machine's cores (R228 step 19). A suite
+    # is a server, a browser and its node beside each other, so a worker a
+    # core runs the box at twice its cores and the suites time each other
+    # out. Measured on sixteen cores, a quiet machine, the whole run (14
+    # Nov): eight workers 9m16s with nothing failed; ten 14m21s, three
+    # suites failed under load and run again; sixteen 39m54s, ten of them.
+    # BB_TEST_WORKERS is what a test run here may use at most (the node's
+    # setting, every core unless it says); BB_TEST_SUITES_AT_ONCE is this
+    # harness's own number for one who knows better.
+    _half=$(( ($(nproc 2>/dev/null || echo 2) + 1) / 2 ))
+    case "${BB_TEST_SUITES_AT_ONCE:-}" in
+        ''|*[!0-9]*|0)
+            if [ "$_n" -gt "$_half" ]; then
+                log "workers: $_half, half this machine's cores, of the $_n a test run here may use: a suite is a server, a browser and its node (BB_TEST_SUITES_AT_ONCE=N for another number)"
+                _n="$_half"
+            fi ;;
+        *) _n="$BB_TEST_SUITES_AT_ONCE" ;;
+    esac
     [ "$_n" -le "${#_names[@]}" ] || _n="${#_names[@]}"
-    # Beside each other the suites get the patience CI gives them: every
-    # wait doubled. How many run beside each other is the node's row's
-    # (BB_TEST_WORKERS), not this file's to cap: four on four cores ran a
-    # suite a third slower than alone and timed out a dozen checks a day
-    # that passed alone every time (26 and 27 Sep), which is a fact about
-    # the waits, and lib.mjs's wrapper gives a slow page more time.
-    [ "$_n" -le 1 ] || export BB_TEST_SLOW="${BB_TEST_SLOW:-2}"
+    # Beside each other the suites wait as they do alone (R7 step 7): every
+    # wait was doubled here (BB_TEST_SLOW=2), from when four on four cores
+    # timed out a dozen checks a day that passed alone (26 and 27 Sep). At
+    # half the cores, with the suites waiting on what they check, a whole
+    # run with nothing doubled flaked no more than one with (15 Nov).
+    # BB_TEST_SLOW is still read, for a machine that wants every wait longer.
     [ "$_n" -le 1 ] || run_workers "$_n" "${_names[@]}"
 fi
 # Every tmux call from here on (ours and the server's) talks to a private
@@ -659,15 +889,8 @@ except Exception: print("")' 2>/dev/null || true)"
 fi
 
 unset BB_TOKEN
-# And the role. Run from a session ON A NODE, this script inherits
-# BUILDERBOT_ROLE=node, the real controller's address and pin, and the
-# account the session runs as, and every `bash scripts/aerie` a test makes
-# then relays to the real controller with no token, or reads a node's
-# home. The suite drives the checkout's bb as the CONTROLLER's, against its
-# own server; the tests that mean a node say so in their own env.
-unset BUILDERBOT_ROLE BB_CONTROLLER BB_CONTROLLER_PIN BB_NODE BUILDERBOT_NODE \
-      BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_CI_LOG_DIR \
-      BB_NODE_TOOLCHAINS BB_EMU_LOCAL   # "already on the node's store": aerie emu would run here
+# And the role, with the rest of what a node's session carries (SCRUB).
+unset "${SCRUB[@]}"
 export TMUX_TMPDIR="$S/tmux"
 mkdir -p "$TMUX_TMPDIR"
 # git's global and system config are the suite's own, not the machine's. The
@@ -687,7 +910,8 @@ case "$sock" in
        die "refusing to run: tmux is on '${sock:-?}', not the private test server" ;;
 esac
 trap 'cleanup' EXIT
-trap 'exit 0' TERM INT      # so a kept fixture's stop runs the cleanup above
+trap 'exit 0' TERM INT HUP  # so a kept fixture's stop runs the cleanup above
+launcher_watch
 probes=()
 pid=""
 suite_pid=""
@@ -764,10 +988,15 @@ mkdir -p "$S/ws/toolstore" && : > "$S/ws/toolstore/.bbignore"
 # container about it. It is not a project because the Projects card did not
 # accept it, which is the only test that matters now.
 mkdir -p "$S/ws/vendored-junk/deep" && echo x > "$S/ws/vendored-junk/deep/thing.py"
-# delta is archived and locked by an administrator (R119): out of sight, and
-# held against everybody, its owner included.
+# delta is locked by an administrator (R119): held against everybody, its
+# owner included. It is archived for the test owner too, once that account
+# is made below: an archive is each person's own.
 echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"
-echo '["delta"]' > "$S/state/archived-projects.json"
+# The world's Docker apps (R238): none is shipped, so the two this world
+# offers are kept here as the Library keeps one from the catalog, each from
+# a pin in a catalog that is made up (catalog-apps.json), every image by
+# its digest. A suite that wants another writes it beside them.
+cp "$HERE/catalog-apps.json" "$S/state/sideapps.json"
 # alpha may push, on the deploy key its remote uses. Stated here rather than
 # left to a migration: the one-off that used to grant this on first boot went
 # at 0.5.0, and a fixture that leans on a migration is a fixture that breaks
@@ -1379,7 +1608,12 @@ fresh() {
     # Tests view has rows, and testreg.mjs counts what it ingests.
     rm -f "$S/state/tests.json"
     echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"  # a test that locks must not hand that on
-    echo '["delta"]' > "$S/state/archived-projects.json"   # ...nor one that archives
+    # ...nor one that archives: delta archived for the test owner once that
+    # account is made (an archive is each person's own), nothing before.
+    python3 -c 'import json, os, sys
+f = sys.argv[1]
+u = (json.load(open(f)).get("users") or {}).get("test", {}).get("uid", "") if os.path.exists(f) else ""
+open(sys.argv[2], "w").write(json.dumps({u: ["delta"]} if u else {}))' "$S/state/users.json" "$S/state/archived-projects.json"
     rm -f "$S/state/pinned-projects.json"                  # ...nor one that unpins
     # ...nor one that binds a project to a node. nodes.mjs saves alpha's node
     # from the settings dialog; agent.mjs then asserts that a project with no
@@ -1470,6 +1704,14 @@ fresh
 # its own asynchronously was "wait_for: No record of process", which ended
 # the whole run now and then. Their pids come back through a file outside $S.
 PIDF="$(mktemp "${TMPDIR:-/tmp}/dashboard-test-pid.XXXXXX")"
+# Who may sign a release, for this world: a key of its own, made here. An
+# install that names no signer takes no release, so the fake release
+# devices.mjs writes carries a list of its files signed by this key
+# ($S/release-key), as a release's carries one signed by AerieOS's. The
+# signed list's other rules are the unit tier's (test_release_signing.py).
+rm -f "$S/release-key" "$S/release-key.pub"
+ssh-keygen -q -t ed25519 -N "" -C aerieos-release -f "$S/release-key" </dev/null
+printf 'aerieos-release namespaces="aerieos-release" %s aerieos-release\n' "$(cut -d' ' -f1,2 "$S/release-key.pub")" > "$S/release-signers"
 start_server() {
 # The agent this world's controller ships, a copy of its own made fresh for
 # each suite: agent.mjs appends to it to make its controller ship a newer
@@ -1496,8 +1738,9 @@ rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
     BB_ARCHIVE_SPOOL="$S/spool" \
     BB_CLAUDE_LATEST_URL="file://$S/claude-latest" BB_CLAUDE_CHECK_DELAY=3600 \
     BB_CODEX_LATEST_URL="file://$S/codex-latest.json" BB_COPILOT_LATEST_URL="file://$S/copilot-latest.json" \
-    BB_NGINX_TAGS_URL="file://$S/nginx-tags.json" BB_NGINX_CHECK_DELAY=3600 \
+    BB_SERVICE_IMAGES_FILE="$S/service-images.json" BB_NGINX_CHECK_DELAY=3600 \
     BB_APPS_RELEASES_URL="file://$S/releases.json" BB_APPS_BOOT_DELAY=3600 \
+    BB_RELEASE_SIGNERS="$S/release-signers" \
     BB_TOOLPACKS_FILE_URLS=1 \
     BB_IMAGE_DIGESTS_FILE="$S/image-digests.json" BB_IMAGE_CHECK_DELAY=3600 \
     BUILDERBOT_IDLE_UNIT=1 \
@@ -1546,6 +1789,8 @@ d["users"]["test"] = {"uid": u.mint_uid(), "role": "owner", "projects": fixtures
                       "password": u.hash_password("test"), "created": 0,
                       "seen": 0}
 u._save(d)
+# delta archived for this account (an archive is each person's own).
+open(os.path.join(sys.argv[2], "archived-projects.json"), "w").write(json.dumps({d["users"]["test"]["uid"]: ["delta"]}))
 PY
 
 # ---- the docker-host node --------------------------------------------------
@@ -1813,7 +2058,9 @@ if [ -n "${BB_TEST_QUEUE:-}" ]; then
         [ "$took" = 0 ] || room_wait
         took=1
         printf '%s\t%s\n' "$t" "$((BB_TEST_WORKER - 1))" >> "$BB_TEST_QUEUE.ran"
-        run_file "$HERE/${t%.mjs}.mjs" || { failed+=("$HERE/${t%.mjs}.mjs"); failed_names+=("$t"); }
+        r=0
+        run_file "$HERE/${t%.mjs}.mjs" || { r=$?; failed+=("$HERE/${t%.mjs}.mjs"); failed_names+=("$t"); }
+        printf '%s\t%s\n' "$t" "$r" >> "$BB_TEST_QUEUE.done"
     done
 else
 for i in "${!tests[@]}"; do
@@ -1848,6 +2095,7 @@ fi
 stop_world
 if [ "${#flaky[@]}" -gt 0 ]; then
     warn "flaky: ${flaky[*]} failed in the whole run and passed again alone"
+    flakes_record 1 "" "${flaky[@]}"
 fi
 load_line
 [ "$rc" = 0 ] && log "dashboard tests: all passed" || warn "dashboard tests: FAILURES above"

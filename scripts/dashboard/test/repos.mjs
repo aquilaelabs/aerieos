@@ -6,11 +6,10 @@
 // in it; a dial set through one repository is the project's. The card's
 // front and back, the trash naming the project, and Put back asking where
 // when the project is gone.
-import { ok, done, DIR, URL, launch, newPage, ready } from './lib.mjs';
+import { ok, done, DIR, URL, launch, newPage, ready, quiet, sleep, OWNER as ADMIN, section } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const post = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -77,7 +76,7 @@ ok(made.status === 200 && JSON.stringify(reposFile()[key]?.members) === '["gamma
    `Add repository makes one inside the space (${made.status} ${made.error || ''} ${JSON.stringify(reposFile()[key])})`);
 
 const browser = await launch();
-{
+await section("The old address still opens the page, which says its own address", async () => {
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL + '#/projects');
   await ready(page);
@@ -107,9 +106,16 @@ const browser = await launch();
   ok(await page.evaluate(() => tabs.length) === tabs, 'a press on the card opens nothing');
   // Edit turns it over at the size it was.
   const h0 = await page.$eval(card, c => c.getBoundingClientRect().height);
+  const pressed = Date.now();
   await page.click(`${card} .pcfront [data-pedit]`);
   await page.waitForSelector(`${card}.flipped`, { timeout: 3000 });
-  await page.waitForTimeout(500);
+  // Measured with the turn over: neither face still on its tween.
+  await page.waitForFunction(c => { const el = document.querySelector(c);
+    return !!el && el.classList.contains('flipped') && ![...el.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length); }, card, { timeout: 10000 }).catch(() => {});
+  // ...and the grid's own redraw behind it: flipCard may draw the cards
+  // again 450 ms after a turn, on a timer nothing on the page shows. A
+  // clock: what is left of that half second since the press.
+  await sleep(Math.max(0, 500 - (Date.now() - pressed)));
   const back = await page.$eval(card, c => ({
     h: c.getBoundingClientRect().height, frontInert: c.querySelector('.pcfront').inert,
     rows: [...c.querySelectorAll('.pcback .pcrepo')].map(r => [r.querySelector('.name')?.textContent.trim(),
@@ -117,13 +123,15 @@ const browser = await launch();
     foot: [...c.querySelectorAll('.pcback .pcacts > button')].map(b => b.getAttribute('aria-label')),
     lines: new Set([...c.querySelectorAll('.pcback .pcacts > button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
     frontLines: new Set([...c.querySelectorAll('.pcfront .pcacts > button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
-    rename: !!c.querySelector('.pcback .pcname [data-prn]') }));
+    rename: !!c.querySelector('.pcback .pcname [data-prn]'),
+    // Settings at the back's top right, out of its foot (the operator, 18 Nov).
+    gear: c.querySelector('.pcback [data-rn]:not(.pcacts *)')?.getAttribute('aria-label') || '' }));
   ok(Math.abs(back.h - h0) < 1 && back.frontInert, `Edit turns the card over at its size (${h0} then ${back.h})`);
   ok(back.rows.length === 3 && back.rows.every(r => ['rrn', 'rmove', 'del'].every(k => r.includes(k))) && back.rename,
      `each repository on the back has rename, move and delete, and the space's name its pencil (${JSON.stringify(back.rows)})`);
-  ok(['Color', 'Group', 'Report bug', 'Settings'].every(w => back.foot.includes(w)) && back.lines === 1 && back.frontLines === 1
-     && !back.foot.includes('Delete space'),
-     `each face's buttons are one line, the back's the space's controls as icons, Delete space only for an empty one (${JSON.stringify(back)})`);
+  ok(['Color', 'Group', 'Report bug'].every(w => back.foot.includes(w)) && back.foot.at(-1) === 'Back to the front' && back.lines === 1 && back.frontLines === 1
+     && !back.foot.includes('Delete space') && !back.foot.includes('Settings') && back.gear === 'Settings',
+     `each face's buttons are one line, the back's the space's controls as icons with Back last and Settings at its top, Delete space only for an empty one (${JSON.stringify(back)})`);
   // Report bug asks which repository, the first picked.
   await page.click(`${card} .pcback [data-bug]`);
   await page.waitForSelector('#reportModal:not([hidden])', { timeout: 3000 });
@@ -142,7 +150,8 @@ const browser = await launch();
     drawProjects(state.projects);
     state.projects[0].branch = was;
   });
-  await page.waitForTimeout(300);
+  // The redraw is made: this is the time in which it could have taken the box.
+  await quiet(300);
   const stayed = await page.$eval(`${card} .askline input`, i => i.value).catch(() => null);
   ok(stayed === 'half typed', `a redraw leaves a rename box open with what was typed in it (${stayed})`);
   await page.press(`${card} .askline input`, 'Escape');
@@ -151,8 +160,13 @@ const browser = await launch();
   // the answer and not the next read (held back here), sliding there with
   // the page scrolled to keep it in sight on a phone (the operator, 26 Oct).
   await page.setViewportSize({ width: 393, height: 700 });
-  await page.waitForTimeout(400);
+  // Laid out at the phone's width: the breakpoint's listeners run before a frame's callbacks, and what they move has landed.
+  await page.waitForFunction(() => innerWidth === 393, null, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
   let held = 0;
+  // The delay is the case: the next read of the status is held back past the rename's own answer.
   await page.route('**/api/status*', async r => { held++; await new Promise(z => setTimeout(z, 6000)); r.continue().catch(() => {}); });
   const renameTo = async to => {
     await page.click(`${card} .pcback [data-prn]`);
@@ -165,7 +179,10 @@ const browser = await launch();
   const moved = await page.$eval(card, c => ({ name: c.querySelector('.pcfront .pcname .name')?.textContent, flipped: c.classList.contains('flipped'),
     last: [...c.parentElement.children].pop() === c,
     sliding: [...document.querySelectorAll('.pgrid .pcard')].some(x => x.getAnimations().some(a => a.effect?.getKeyframes?.()[0]?.transform?.startsWith('translate'))) }));
-  await page.waitForTimeout(900);
+  // Its slide over, since while it slides it is drawn where it left, and the page come to it where it landed.
+  await page.waitForFunction(c => { const el = document.querySelector(c);
+    if (!el || el.getAnimations().length) return false;
+    const r = el.getBoundingClientRect(), d = el.closest('.doc').getBoundingClientRect(); return r.top < d.bottom && r.bottom > d.top; }, card, { timeout: 10000 }).catch(() => {});
   const seen = await page.$eval(card, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect();
     return r.top < d.bottom && r.bottom > d.top; });
   ok(moved.name === 'zz Shop & Co' && moved.flipped && moved.last && moved.sliding && seen,
@@ -190,6 +207,32 @@ const browser = await launch();
   const heights = await page.evaluate(() => { const h = e => e ? Math.round(e.getBoundingClientRect().height) : 0;
     return { sel: h(document.querySelector('.pane .bar.proj .phead>select[data-reposw]')), btn: h(document.querySelector('.pane .bar.proj .phead>button')) }; });
   ok(heights.sel && Math.abs(heights.sel - heights.btn) <= 1, `the pulldown is the height of the buttons beside it (${JSON.stringify(heights)})`);
+  // On a phone the name, the pulldown and the actions keep one row (the
+  // operator, 11 Nov: with a longer name and Manage agent the menu's button
+  // went to a line of its own, since a wrapping row breaks before anything
+  // in it gives up width): the name and the pulldown give up theirs.
+  const rows = [];
+  for (const w of [344, 360, 393, 412, 440]){
+    await page.setViewportSize({ width: w, height: 852 });
+    rows.push(await page.evaluate(w => {
+      const h = document.querySelector('.pane .bar.proj .phead');
+      const a = h.querySelector(':scope > button:not([data-s])');
+      const was = a?.textContent;
+      if (a) a.textContent = 'Manage agent';
+      const row = [...h.querySelectorAll(':scope > .pname, :scope > select.prepos, :scope > button, :scope > .more')].filter(e => e.offsetWidth);
+      const mid = row.map(e => { const r = e.getBoundingClientRect(); return Math.round(r.top + r.height / 2); });
+      const said = { w, n: row.length, oneRow: Math.max(...mid) - Math.min(...mid) <= 2,
+        inside: row.every(e => e.getBoundingClientRect().right <= innerWidth + 0.5) && document.documentElement.scrollWidth <= innerWidth,
+        apart: row.every((e, i) => !i || e.getBoundingClientRect().left >= row[i - 1].getBoundingClientRect().right + 4),
+        whole: row.every(e => e.tagName !== 'BUTTON' || e.scrollWidth <= e.clientWidth + 1),
+        pick: Math.round(h.querySelector(':scope > select.prepos').getBoundingClientRect().width) };
+      if (a) a.textContent = was;
+      return said;
+    }, w));
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  ok(rows.every(r => r.n >= 4 && r.oneRow && r.inside && r.apart && r.whole && r.pick >= 32),
+     `on a phone the name, the pulldown, Manage agent, Shell and the menu keep one row at every width, no button cut and the pulldown never under a thumb's width (${JSON.stringify(rows.filter(r => !(r.oneRow && r.inside && r.apart && r.whole && r.pick >= 32)).length ? rows : rows.map(r => r.w + ':' + r.pick))})`);
   await page.selectOption('.pane .bar.proj select[data-reposw]', 'shopweb');
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notebook' && tabOf(panes[0])?.arg === 'shopweb', null, { timeout: 10000 }).catch(() => {});
   ok(await page.evaluate(() => tabOf(panes[0])?.arg === 'shopweb'), "picking another repository in the pulldown opens its notebook");
@@ -211,7 +254,7 @@ const browser = await launch();
   await page.evaluate(k => setProjectPinned(k, false), key);
   await page.screenshot({ path: `${DIR}/repos-card.png` }).catch(() => {});
   await page.close();
-}
+});
 
 // One session for the project, on its first repository.
 const t = await fetch(base + '/termws?arg=' + encodeURIComponent('claude:ep.silon'), { headers: ADMIN });
@@ -263,7 +306,7 @@ ok(gone.status === 200 && !(await status()).repos[key], `an empty space is delet
 // Before a move, what it changes (the operator, 26 Oct): the nodes the
 // project it leaves has and the one it goes to has not, the dev instances on
 // them, offered to bring along, ticked; a move with them ticked adds them.
-{
+await section("Before a move, what it changes", async () => {
   const nid = (((await (await fetch(base + '/api/v1/nodes', { headers: ADMIN })).json()).nodes || []).find(n => n.kind === 'agent') || {}).id;
   const gammaNodes = prefsFile()[gammaWas]?.nodes || [];
   await post('/api/prefs', { project: 'gamma', nodes: [nid] });
@@ -280,7 +323,12 @@ ok(gone.status === 200 && !(await status()).repos[key], `an empty space is delet
   await pg.goto(URL); await ready(pg);
   const dlg = await pg.evaluate(async pl => {
     const got = moveConfirm(pl);
-    await new Promise(r => setTimeout(r, 300));
+    // The dialog shown and its opening scale over.
+    for (const end = Date.now() + 10000; Date.now() < end;){
+      await new Promise(r => setTimeout(r, 50));
+      const d = $('mvmodal');
+      if (d && !d.hidden && !d.getAnimations({ subtree: true }).some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))) break;
+    }
     const m = $('mvmodal');
     const out = { title: $('mvTitle').textContent, boxes: [...m.querySelectorAll('[data-mvnode]')].map(i => [i.dataset.mvnode, i.checked]),
                   text: m.querySelector('.box').textContent.replace(/\s+/g, ' ') };
@@ -313,7 +361,7 @@ ok(gone.status === 200 && !(await status()).repos[key], `an empty space is delet
   await post('/api/repos', { action: 'move', name: 'gamma', to: gammaWas });
   await post('/api/prefs', { project: 'gamma', nodes: gammaNodes });
   await post('/api/repos', { action: 'delete', key: p2.key });
-}
+});
 const ask = await post('/api/trash-restore', { name: 'shopweb' });
 ok(ask.status === 409 && ask.pick && /Shop, which is deleted/.test(ask.error || ''), `Put back asks where when its space is gone (${ask.error})`);
 const back = await post('/api/trash-restore', { name: 'shopweb', project: gammaWas });

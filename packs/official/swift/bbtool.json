@@ -1,5 +1,6 @@
 {
  "about": "The Swift toolchain for Linux: shared logic, server-side Swift, and compiling packages. Not an iOS SDK.",
+ "framework": "2.1",
  "label": "Swift",
  "layout": {
   "bin": [
@@ -8,6 +9,7 @@
   "env": {},
   "tool": "usr/bin/swift"
  },
+ "maker": "Apple",
  "name": "swift",
  "platforms": [
   "linux/amd64"
@@ -15,11 +17,13 @@
  "shipped": {
   "probe": "swift",
   "reports": "swift",
+  "rev": 2,
   "source": {
    "checksum": {
     "from": "signature",
     "keys": "swift.asc",
-    "sig": "{url}.sig"
+    "sig": "{url}.sig",
+    "version": "6.4.3"
    },
    "fresh_only": true,
    "kind": "tarball",

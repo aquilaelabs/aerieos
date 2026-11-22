@@ -46,6 +46,48 @@ class Knock(unittest.TestCase):
         self.assertTrue(self.saved and self.saved[-1]["controller"] == "https://new.example")
         self.assertEqual(self.a.hello_at, 0, "a hello to the new home comes next")
 
+    def test_a_token_the_new_home_never_saw_is_taken_back_by_an_older_one(self):
+        # B935: a hello after the bundle was packed handed this node a token
+        # the new home does not know; it holds the one before among its past.
+        self.a.state.update(token="bbn_new", past_tokens=[["bbn_old", 1]])
+        calls, answers = [], iter([(401, {"error": "unknown token"}),
+                                   (200, {"ok": True, "token": "bbn_fresh"}),
+                                   (200, {"answer": "c" * 64, "url": "", "pin": ""})])
+
+        class Ctl:
+            seen_pin = "sha256:seen"
+
+            def __init__(self, u, token, p=""):
+                self.token = token
+                calls.append((u, token, p))
+
+            def call(self, verb, body=None, timeout=30, **kw):
+                calls.append((verb, body, self.token))
+                return next(answers)
+        self.mod.Controller = Ctl
+        self.assertTrue(self.a.knock())
+        self.assertEqual(calls[2], ("recover", {"node": "n_1", "tokens": ["bbn_new", "bbn_old"]}, "bbn_new"),
+                         "its newest first, then the month's past")
+        self.assertEqual(calls[3], ("moved", {"node": "n_1"}, "bbn_fresh"), "knocked again with the token taken back")
+        self.assertEqual((self.a.state["token"], self.a.state["past_tokens"][0][0]), ("bbn_fresh", "bbn_new"))
+        # B936: no address in the answer keeps the one knocked at, pinned to
+        # the certificate met there.
+        self.assertEqual((self.a.state["controller"], self.a.state["pin"]), ("https://new.example", "sha256:seen"))
+
+    def test_a_knock_no_token_takes_back_says_where_the_line_is(self):
+        self.a.state.update(token="bbn_new", past_tokens=[])
+
+        class Ctl:
+            def __init__(self, u, token, p=""):
+                self.token = token
+
+            def call(self, verb, body=None, timeout=30, **kw):
+                return 401, {"error": "unknown token"}
+        self.mod.Controller = Ctl
+        ok, why = self.mod.follow(self.a.state)
+        self.assertFalse(ok)
+        self.assertIn("run the line its Nodes page gives it there", why)
+
     def test_a_wrong_or_missing_answer_leaves_the_node_where_it_is(self):
         self.fake(200, "d" * 64)
         self.assertFalse(self.a.knock())

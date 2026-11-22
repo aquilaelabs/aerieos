@@ -19,6 +19,7 @@ import claudegrant  # noqa: E402
 import signin  # noqa: E402
 
 LIST = os.path.join(HERE, "..", "..", "lib", "login-list.py")
+FLOW = os.path.join(HERE, "..", "..", "lib", "login-flow.py")
 PROBES = os.path.join(HERE, "..", "..", "lib", "doctor-probes.py")
 
 
@@ -44,6 +45,14 @@ class Listed(unittest.TestCase):
         p = subprocess.run([sys.executable, "-I", LIST], env={"BB_USERS_DIR": self.root, "PATH": os.environ["PATH"]},
                            capture_output=True, text=True, check=True)
         return json.loads(p.stdout)[0]
+
+    def sign_out(self, agent):
+        """The sign-out as `aerie login --out --agent` runs it: the one
+        driver, from what the agent's row says."""
+        p = subprocess.run([sys.executable, FLOW, "out", agent], env={"HOME": self.home, "PATH": os.environ["PATH"], "BB_NODE": "node one"},
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        return p.stdout
 
     def test_nobody_signed_in_lists_no_agent(self):
         self.assertEqual(self.listed()["agents"], {})
@@ -75,6 +84,20 @@ class Listed(unittest.TestCase):
         self.put(".grok/auth.json", {"token": "opaque"})
         self.assertEqual(self.listed()["agents"]["grok"], {"email": "an xAI account", "plan": ""})
 
+    def test_claude_is_the_rows_own_address_while_its_credential_is_there(self):
+        self.put(".claude.json", {"oauthAccount": {"emailAddress": "me@example.invalid"}})
+        self.assertEqual(self.listed()["email"], "", "a name left behind by a sign-out is not a sign-in")
+        self.put(".claude/.credentials.json", {"claudeAiOauth": {"accessToken": "never-read"}})
+        got = self.listed()
+        self.assertEqual((got["email"], got["agents"]), ("me@example.invalid", {}))
+
+    def test_a_file_that_does_not_read_is_unread_never_a_sign_out(self):
+        p = os.path.join(self.home, ".codex", "auth.json")
+        os.makedirs(os.path.dirname(p))
+        with open(p, "w") as f:
+            f.write("{half a file")
+        self.assertIn("error", self.listed()["agents"]["codex"])
+
     def test_copilot_s_managed_header_is_read_past_and_kept(self):
         # 1.0.103 opens its config with comment lines (B280).
         head = "// User settings belong in settings.json.\n// This file is managed automatically.\n"
@@ -83,7 +106,7 @@ class Listed(unittest.TestCase):
         with open(p, "w") as f:
             f.write(head + json.dumps({"lastLoggedInUser": {"login": "octo"}, "theme": "dark"}))
         self.assertEqual(self.listed()["agents"]["copilot"], {"email": "octo", "plan": ""})
-        subprocess.run([sys.executable, "-I", LIST, "--forget-copilot", self.home], check=True)
+        self.sign_out("copilot")
         with open(p) as f:
             got = f.read()
         self.assertTrue(got.startswith(head))
@@ -92,7 +115,7 @@ class Listed(unittest.TestCase):
     def test_forgetting_copilot_keeps_the_rest_of_its_config(self):
         self.put(".copilot/config.json", {"lastLoggedInUser": {"login": "octo"}, "loggedInUsers": [{"login": "octo"}],
                                           "copilotTokens": {"x": "y"}, "theme": "dark"})
-        subprocess.run([sys.executable, "-I", LIST, "--forget-copilot", self.home], check=True)
+        self.sign_out("copilot")
         with open(os.path.join(self.home, ".copilot", "config.json")) as f:
             self.assertEqual(json.load(f), {"theme": "dark"})
         self.assertNotIn("copilot", self.listed()["agents"])
@@ -158,21 +181,14 @@ class Flows(unittest.TestCase):
     def flow(self, agent, log, state="running"):
         return signin.NodeFlow(self.Nodes(log, state), "n1", "j_1", "box", uid="u_0123abcd", agent=agent).state()
 
-    def test_codex_s_device_login_shows_its_link_and_code(self):
-        log = ("Welcome to Codex [v0.163.0]\nFollow these steps to sign in with ChatGPT using device code authorization:\n"
-               "1. Open this link in your browser and sign in to your account\n   https://auth.openai.com/codex/device\n"
-               "2. Enter this one-time code (expires in 15 minutes)\n   \x1b[94mABCD-1234\x1b[0m\n")
-        st = self.flow("codex", log)
-        self.assertEqual((st["url"], st["code"], st["waiting"], st["agent"]),
-                         ("https://auth.openai.com/codex/device", "ABCD-1234", False, "codex"))
-
-    def test_copilot_s_device_login_shows_its_link_and_code(self):
-        st = self.flow("copilot", "To authenticate, visit https://github.com/login/device and enter code 1A2B-3C4D.\n"
-                                  "Waiting for authorization...\n")
-        self.assertEqual((st["url"], st["code"]), ("https://github.com/login/device", "1A2B-3C4D"))
+    def test_a_device_flow_shows_its_link_and_code_from_the_drivers_lines(self):
+        for agent, url in (("codex", "https://auth.openai.com/codex/device"), ("copilot", "https://github.com/login/device")):
+            st = self.flow(agent, f"[aerieos] open this link to sign in: {url}\r\n[aerieos] then enter this code there: ABCD-1234\r\n")
+            self.assertEqual((st["url"], st["code"], st["waiting"], st["agent"]), (url, "ABCD-1234", False, agent))
 
     def test_claude_s_flow_still_waits_for_a_pasted_code(self):
-        st = self.flow("claude", "visit: https://claude.com/cai/oauth/authorize?code=true&state=abc\nPaste code here if prompted > ")
+        st = self.flow("claude", "[aerieos] open this link to sign in: https://claude.com/cai/oauth/authorize?code=true&state=abc\n"
+                                 "[aerieos] Paste code: the one that page gives you once you have signed in there\n")
         self.assertTrue(st["waiting"])
         self.assertEqual(st["code"], "")
 
@@ -180,24 +196,18 @@ class Flows(unittest.TestCase):
            "&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key"
            "+user%3Aprofile&code_challenge=1Hwngyh1Ihh80Q&code_challenge_method=S256&state=XPQEcWJxK6HQ")
 
-    def test_claude_s_link_wrapped_at_the_pty_s_width_is_taken_whole(self):
-        # The job's pty is eighty wide: the flow broke the link across lines,
-        # and the page opened its first line alone (the operator, 12 Nov).
-        wrapped = "\n".join(self.URL[i:i + 80] for i in range(0, len(self.URL), 80))
-        st = self.flow("claude", "Browser didn't open? Use the url below to sign in (c to copy)\n\n"
-                                 + wrapped + "\n\nPaste code here if prompted > ")
+    def test_the_link_is_the_drivers_line_and_never_the_programs_screen(self):
+        # The driver on the node reads the program's screen and says the
+        # link whole on one line; a screen in the log is not taken as one.
+        st = self.flow("claude", "[aerieos] open this link to sign in: " + self.URL + "\r\n")
         self.assertEqual(st["url"], self.URL)
+        st = self.flow("claude", "Use the url below to sign in\n\n" + self.URL + "\n\nPaste code here if prompted > ")
+        self.assertEqual(st["url"], "")
 
-    def test_claude_s_link_as_a_terminal_hyperlink_is_its_target(self):
-        out = ("Use the url below to sign in\n\n\x1b]8;;" + self.URL + "\x07" + self.URL[:80] + "\x1b]8;;\x07\n"
-               "\x1b]8;;" + self.URL + "\x07" + self.URL[80:] + "\x1b]8;;\x07\n\nPaste code here if prompted > ")
-        self.assertEqual(self.flow("claude", out)["url"], self.URL)
-
-    def test_a_failed_claude_flow_never_gives_a_piece_of_its_link_as_why(self):
-        wrapped = "\n".join(self.URL[i:i + 80] for i in range(0, len(self.URL), 80))
-        st = self.flow("claude", "Use the url below to sign in\n\n\x1b]8;;" + self.URL + "\x07" + wrapped + "\x1b]8;;\x07\n", "failed")
-        self.assertNotIn("]8;;", st["error"])
+    def test_a_failed_claude_flow_never_gives_its_link_as_why(self):
+        st = self.flow("claude", "[aerieos] open this link to sign in: " + self.URL + "\n", "failed")
         self.assertNotIn("state=", st["error"])
+        self.assertEqual(st["error"], "the sign-in did not finish")
 
     def test_a_failed_device_flow_says_why_in_its_own_words(self):
         st = self.flow("codex", "https://auth.openai.com/codex/device\nError: device auth timed out after 15 minutes\n", "failed")

@@ -12,7 +12,7 @@ One page in the browser, at a desk or on a phone ([dashboard.md](dashboard.md)).
   at the foot.
 - **Home**: tiles for what is running and what needs you (nodes online,
   containers running, jobs and failures, sessions open, updates due, CI in
-  the red), your attention list, the last jobs and your pinned spaces.
+  the red), your attention list, the last jobs and your favorite spaces.
 - **Search** at the top jumps to any page, space, container or node.
 - **The bell** holds what waits on your answer and what was said; **the
   doctor's dot** beside it is the controller's health at a glance.

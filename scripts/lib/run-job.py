@@ -12,6 +12,7 @@ import sys
 
 import bbapi
 import waits
+from say import need
 
 
 auth, proj, role, node, timeout, *argv = sys.argv[1:]
@@ -31,8 +32,7 @@ if node:
 r = call("/api/v1/jobs", {"action": "run", "project": proj, "role": role, "node": nid,
                           "argv": argv, "outputs": outs, "timeout": int(timeout),
                           "from": "session" if os.environ.get("CLAUDECODE") or os.environ.get("BB_AGENT") else "operator"})
-if r.get("error"):
-    sys.exit(f"[builderbot] ERROR: {r['error']}")
+need(r)
 names = {n["id"]: n["name"] for n in (call("/api/v1/nodes").get("nodes") or [])}
 # Its place on that node (R151 step 5): one job at a time runs there, so a
 # run behind another says how many are ahead rather than looking stuck.

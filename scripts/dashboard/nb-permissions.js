@@ -61,8 +61,9 @@ function nbPermsView({$, nb, project, root}){
           <button type="button" class="permGitApply"${dirty && !locked ? "" : " disabled"}>Apply</button>
         </div></div></div>`;
     const html = docSection("permissions", "push", "Pushing", `${pol.push || "allow"} · ${pol.main || "deny"}${pol.scan === "off" ? " · unheld" : ""}`, body);
-    if (host.dataset.drawn === html) return;
-    host.innerHTML = html; host.dataset.drawn = html;
+    // Patched (R244): a pick not yet applied stays, and a read that brings
+    // nothing new writes nothing.
+    if (!patch(host, html)) return;
     wireSections(host);
     host.querySelectorAll("[data-gitpol]").forEach(sel => sel.onchange = () => {
       if (sel.value === (saved[sel.dataset.gitpol] || GITPOL_DEFAULT[sel.dataset.gitpol])) delete draft[sel.dataset.gitpol];
@@ -73,7 +74,7 @@ function nbPermsView({$, nb, project, root}){
     if (pa) pa.onclick = async () => {
       busy(pa, "Applying");
       try{
-        const j = await (await postJSON("/api/prefs", {project, gitpol: {...pol, ...draft}})).json();
+        const j = await postJSON("/api/prefs", {project, gitpol: {...pol, ...draft}});
         if (j.error) return notify(j.error, true);
         draft = {};
         notify("saved");
@@ -88,20 +89,28 @@ function nbPermsView({$, nb, project, root}){
   // staged until Apply as Pushing is. The token sets what is possible; a
   // Deny here takes an ability away whatever the token allows.
   let host = null, hostDraft = {}, hostFor = "";
-  async function loadHost(measure){
-    try{
-      const r = measure ? await postJSON("/api/forge-access", {project, action: "measure"})
-                        : await fetch("/api/forge-access?project=" + encodeURIComponent(project));
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
-      host = j; hostFor = project;
-    }catch(e){ host = {error: failWords(e)}; hostFor = project; }
-    drawHost();
+  // What is picked and not applied is unsaved work, as anything staged in
+  // the notebook is: the leave and close questions count it, and answering
+  // them drops it. Showing the view again reads the host's facts afresh and
+  // keeps it, so nothing but that answer, Apply or the pick put back ends it.
+  nb.stage("permissions:githost", {
+    count: () => Object.keys(hostDraft).length,
+    revert: () => { if (!Object.keys(hostDraft).length) return; hostDraft = {}; if (host) drawHost(); }});
+  function loadHost(measure){
+    return reading(`${project}:host`, async () => {
+      try{
+        const j = measure ? await postJSON("/api/forge-access", {project, action: "measure"})
+                          : await getJSON("/api/forge-access?project=" + encodeURIComponent(project));
+        if (j.error) throw new Error(j.error);
+        host = j; hostFor = project;
+      }catch(e){ host = {error: failWords(e)}; hostFor = project; }
+      drawHost();
+    });
   }
   function drawHost(){
     const el = view()?.querySelector(".permhost");
     if (!el) return;
-    if (hostFor !== project){ host = null; hostDraft = {}; loadHost(false); }
+    if (hostFor !== project){ host = null; loadHost(false); }
     const p = (state?.projects || []).find(x => x.name === project);
     const locked = !!p?.locked_me || !!projWriteWhy(project);
     const m = host?.measure || null, rows = host?.rows || [];
@@ -129,8 +138,7 @@ function nbPermsView({$, nb, project, root}){
     const on = rows.filter(r => r.token !== false && (r.fixed || (hostDraft[r.id] || r.set) === "allow")).length;
     const html = docSection("permissions", "githost", "On the git host",
       rows.length ? `${on} of ${rows.length} allowed` : "", facts + list + foot);
-    if (el.dataset.drawn === html) return;
-    el.innerHTML = html; el.dataset.drawn = html;
+    if (!patch(el, html)) return;
     wireSections(el);
     el.querySelectorAll("[data-forgepol]").forEach(sel => sel.onchange = () => {
       const r = rows.find(x => x.id === sel.dataset.forgepol);
@@ -143,7 +151,7 @@ function nbPermsView({$, nb, project, root}){
     if (ab) ab.onclick = async () => {
       busy(ab, "Applying");
       try{
-        const j = await (await postJSON("/api/prefs", {project, forgepol: {...hostDraft}})).json();
+        const j = await postJSON("/api/prefs", {project, forgepol: {...hostDraft}});
         if (j.error) return notify(j.error, true);
         hostDraft = {};
         notify("saved");

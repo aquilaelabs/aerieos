@@ -1,0 +1,109 @@
+{
+ "about": "A coding agent.",
+ "agent": {
+  "briefing": {
+   "how": "none"
+  },
+  "command": "otter",
+  "hooks": {
+   "answers": {
+    "pre": {
+     "pass": {
+      "ok": true
+     },
+     "refuse": {
+      "ok": false,
+      "why": "{reason}"
+     }
+    },
+    "prompt": {
+     "refuse": {
+      "block": true,
+      "message": "{reason}"
+     },
+     "say": {
+      "context": "{text}"
+     }
+    },
+    "stop": {
+     "refuse": {
+      "again": true,
+      "because": "{reason}"
+     }
+    }
+   },
+   "document": {
+    "entry": {
+     "do": [
+      "{handler}"
+     ]
+    },
+    "handler": {
+     "limit": "{seconds}",
+     "run": "{command}"
+    },
+    "keep": true,
+    "under": [
+     "agent",
+     "hooks"
+    ],
+    "with": {
+     "schema": 3
+    }
+   },
+   "events": {
+    "pre": "before_tool",
+    "prompt": "on_message",
+    "stop": "on_done"
+   },
+   "file": ".otter/settings.json",
+   "payload": {
+    "args": {
+     "command": "script",
+     "file": "target"
+    },
+    "cwd": "ctx.dir",
+    "input": "call.params",
+    "prompt": "message",
+    "session": "ctx.id",
+    "stop_active": "again",
+    "tool": "call.tool"
+   },
+   "tools": {
+    "edit": [
+     "patch_file"
+    ],
+    "shell": [
+     "terminal"
+    ]
+   }
+  },
+  "name": "Otter",
+  "product": "Otter CLI",
+  "provider": "",
+  "transcripts": {
+   "dir": ".otter/logs",
+   "file": "{session}.jsonl"
+  }
+ },
+ "format": 2,
+ "install": {
+  "steps": [
+   [
+    "sh",
+    "{dir}/install.sh"
+   ]
+  ]
+ },
+ "label": "Otter",
+ "layout": {
+  "bin": [
+   "bin"
+  ],
+  "tool": "bin/otter"
+ },
+ "name": "otter",
+ "platforms": [
+  "linux/amd64"
+ ]
+}

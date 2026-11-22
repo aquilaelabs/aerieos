@@ -959,6 +959,23 @@ VERBS = {
 ABILITY_OF = {v: a["id"] for a in ABILITIES for v in a["verbs"]}
 
 
+def dispatch(project, workflow, ref, inputs=None):
+    """A workflow started by the controller for work of its own (a
+    release's list of files signed once its APK is attached,
+    releasesign.py): (payload, status). The request `aerie forge run
+    dispatch` makes, with the space's token; the space's override is not
+    asked, since it says what an agent may do there and this is no agent's
+    ask. What the token may not do is the host's answer, said as it is."""
+    t = target_of(project)
+    if t.get("error"):
+        return {"error": t["error"]}, 400
+    args = {"pos": [workflow], "flags": {"ref": ref, "field": [f"{k}={v}" for k, v in (inputs or {}).items()]}}
+    try:
+        return VERBS["run dispatch"][1 if t["forge"]["kind"] == "gitlab" else 0](t, args)
+    except ValueError as e:
+        return {"error": str(e)}, 400
+
+
 def run(project, verb, args):
     """One aerie forge verb for this project: (payload, status)."""
     if verb == "whoami":

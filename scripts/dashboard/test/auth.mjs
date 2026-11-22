@@ -4,7 +4,8 @@
 // sign-in. A plain request to /termws is answered with what the socket
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
-import { launch, newPage, ok, done, sleep, URL, DIR, takeOn, openSection, member, splitPick, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey,
+         asUser, OWNER, asSession, usersPy, mint, section, REPO, aerie } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -53,25 +54,25 @@ r = await bare('/terminal?arg=shell');
 ok(r.status === 302 && r.headers.get('location').startsWith('/login'),
    'the terminal is behind the same sign-in');
 r = await bare('/login');
-{
+await section("the login page is the one open door", async () => {
   const html = await r.text();
   ok(r.status === 200 && html.includes('Sign in'), 'the login page is the one open door');
   // ...in AerieOS's own colors: nobody is signed in, so no scheme a person
   // picked is worn there (the operator, 17 Oct).
   ok(html.includes('--bg:#0b1322') && !html.includes('bb.theme'),
      '...wearing the Default scheme and never the scheme this browser kept');
-}
+});
 
 // Wrong credentials re-render the form with the reason; right ones mint the
 // cookie and land where the visitor was headed.
 r = await bare('/login', { method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: 'username=test&password=nope&next=/' });
-{
+await section("a bad password re-renders the form, saying so", async () => {
   const said = r.status === 200 ? await r.text() : '';
   ok(said.includes('Wrong username or password'), 'a bad password re-renders the form, saying so');
   ok(/name="username" value="test"/.test(said), '...with the username still typed in it (B38)');
-}
+});
 r = await bare('/login', { method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: 'username=test&password=test&next=/' });
@@ -106,7 +107,7 @@ ok(/Max-Age=0/.test(r.headers.get('set-cookie') || ''), 'logout clears the cooki
 
 // Big answers travel gzipped when the client takes it (the page and the
 // status snapshot a phone polls every 15s), and small ones as they are.
-const AUTHH = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+const AUTHH = OWNER;
 r = await bare('/api/status', { headers: { ...AUTHH, 'Accept-Encoding': 'gzip' } });
 ok(r.headers.get('content-encoding') === 'gzip', 'the status snapshot travels gzipped');
 r = await bigGet('/', { ...AUTHH, 'Accept-Encoding': 'gzip' });
@@ -136,7 +137,7 @@ ok(!r.headers.get('content-encoding'), 'a client that cannot take gzip gets plai
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
 await page.goto(URL);
-await page.waitForFunction(() => document.querySelectorAll('#linux [data-m]').length > 0, { timeout: 40000 });
+await page.waitForFunction(() => typeof state !== 'undefined' && !!state && Array.isArray(state.projects), { timeout: 40000 });
 ok(page.url().split('#')[0] === URL, 'preemptive basic auth bypasses the login page');   // the page's address rides the hash (R218)
 
 // And a browser with no credentials walks the login flow end to end.
@@ -182,12 +183,11 @@ await ctx2.close();
 // owner's password and could not put it back, because `test` is under the
 // eight-character floor the store enforces, which would have taken the
 // harness credential away from every file that runs after this one.
-{
+await section("accounts, not one env var", async () => {
   const { readFileSync, existsSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
-    { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
+  const bb = (args, input) => aerie(['users', ...args],
+    { input, env: { DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
   const read = () => JSON.parse(readFileSync(store, 'utf8'));
 
@@ -235,7 +235,7 @@ print(u.remove("alt"))`], { encoding: 'utf8' });
      'deleting an account ends its sessions too');
   ok(read().users.test && !read().users.alt,
      '...and the owner is untouched by all of it');
-}
+});
 
 // ---- the first run --------------------------------------------------------
 // Nobody owns a fresh container, and that used to be a refusal: the owner came
@@ -246,11 +246,10 @@ print(u.remove("alt"))`], { encoding: 'utf8' });
 //
 // Driven against a store of its own rather than this server's, which already
 // has an owner: the whole property is what happens when there is none.
-{
+await section("the first run", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdtempSync, readFileSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const fresh = mkdtempSync(`${tmpdir()}/bbsetup-`);
   const run = code => execFileSync('python3', ['-c', `
 import importlib.util, json, sys
@@ -292,7 +291,7 @@ ${code}`], { encoding: 'utf8' });
      'the first-run form is refused once somebody has claimed the container');
   ok((await bare('/api/status')).status === 401,
      '...and everything else still wants a sign-in, as it did before');
-}
+});
 
 // ---- a strip each (roadmap #25) --------------------------------------------
 // The tab layout was ONE file for the whole box: written by whichever browser
@@ -300,12 +299,11 @@ ${code}`], { encoding: 'utf8' });
 // moment there are two: you would watch somebody else's tabs open in front
 // of you. It is keyed by the account's minted id now, and the id is minted
 // rather than the name because the owner is renameable on purpose.
-{
+await section("a strip each", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
-    { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
+  const bb = (args, input) => aerie(['users', ...args],
+    { input, env: { DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
   const read = () => JSON.parse(readFileSync(store, 'utf8'));
   ok(Object.values(read().users).every(u => /^u_[0-9a-f]{8}$/.test(u.uid || '')),
@@ -315,19 +313,17 @@ ${code}`], { encoding: 'utf8' });
 
   bb(['add', 'sharer', '--role', 'user'], 'stripspass1\nstripspass1\n');
   await member('sharer');
-  const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                               'Content-Type': 'application/json' });
   const putTabs = (h, tabs) => bare('/api/layout', { method: 'POST', headers: h,
     body: JSON.stringify({ tabs, panes: [tabs[0]?.id || null, null], active: 0 }) });
   const strip = async h => ((await (await bare('/api/status', { headers: h })).json()).layout || {});
 
-  const owner = asUser('test', 'test');
+  const owner = OWNER;
   const other = asUser('sharer', 'stripspass1');
   // Given one project, because a `user` with none can reach nothing at all,
   // which is correct, and would make everything below pass for the wrong
   // reason.
   await bare('/api/users', { method: 'POST', headers: owner,
-    body: JSON.stringify({ action: 'projects', name: 'sharer', projects: ['beta'] }) });
+    body: JSON.stringify({ action: 'edit', name: 'sharer', projects: ['beta'] }) });
   // ...and an author, or no Claude session starts for it (users.git_ready):
   // the checks below are about whose session it is, not about that.
   await bare('/api/users', { method: 'POST', headers: owner,
@@ -362,7 +358,7 @@ ${code}`], { encoding: 'utf8' });
         body: JSON.stringify({ action: 'prefs', prefs: { theme: '../../etc' } }) })).status === 400,
      'a scheme that is not one of the names is refused, not stored');
   ok((await bare('/api/users', { method: 'POST', headers: other,
-        body: JSON.stringify({ action: 'role', name: 'test', role: 'user' }) })).status === 403,
+        body: JSON.stringify({ action: 'edit', name: 'test', role: 'user' }) })).status === 403,
      '...and prefs being open to everyone did not open the rest of the tab');
 
   // ---- a Claude sign-in is one account's, on one node ----------------------
@@ -375,8 +371,7 @@ ${code}`], { encoding: 'utf8' });
   // are a node's (R47), and its census is what says who has one open.
   {
     const term = (h, arg) => bare('/termws?arg=' + encodeURIComponent(arg), { headers: h });
-    const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
+    const H = OWNER;
     const napi = async (path, body, hdrs) => (await bare(path, {
       method: body ? 'POST' : 'GET', headers: { ...H, ...(hdrs || {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) })).json();
@@ -397,11 +392,17 @@ ${code}`], { encoding: 'utf8' });
     // sends, with no wait so nothing is held.
     // ...and its answer is a 204 when there is no job for the node, so the
     // body is not read.
-    const census = sessions => bare('/api/v1/agent/work', { method: 'POST',
-      headers: { ...H, Authorization: 'Bearer ' + agent.token },
+    const census = (sessions, more = {}) => bare('/api/v1/agent/work', { method: 'POST',
+      headers: { ...H, Authorization: 'Bearer ' + agent.token, ...more },
       body: JSON.stringify({ sample: { cpu_pct: 1, mem_mb: 4096,
         // ...with each project's synced copy there (R163), as an agent says.
         mem_used_mb: 512, sessions, sync: { alpha: { ready: true, rev: 1 }, beta: { ready: true, rev: 1 }, gamma: { ready: true, rev: 1 }, delta: { ready: true, rev: 1 } } }, running: [], wait: 0 }) });
+    // A node's address is where its call came from: an X-Forwarded-For it
+    // sends itself, with no proxy this install trusts in front, names
+    // nothing (B722), here or on a sign-in's row.
+    await census([], { 'X-Forwarded-For': '10.0.0.99' });
+    const talkbox = ((await napi('/api/v1/nodes')).nodes || []).find(n => n.id === box.id);
+    ok(talkbox?.agent?.addr === '127.0.0.1', `a node's own X-Forwarded-For does not set its address (${talkbox?.agent?.addr})`);
     await census([]);
     await napi('/api/prefs', { project: 'beta', node: box.id });
     const mine = async h => ((await as(h, '/api/status')).claude_auth || {}).nodes || {};
@@ -411,10 +412,8 @@ ${code}`], { encoding: 'utf8' });
     // that account, on the node its project is on) rather than by writing
     // the record, so what is under test is the path that makes one.
     // WORKSPACE too: the verb checks the project is one, off the filesystem.
-    const token = who => execFileSync('bash',
-      [`${REPO}/scripts/aerie`, 'users', 'token', 'beta', who],
-      { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
-                                 WORKSPACE: `${DIR}/ws` } }).trim();
+    const token = who => aerie(['users', 'token', 'beta', who],
+      { env: { DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const report = (who, email) => bare('/api/v1/claude-login', { method: 'POST',
       headers: { 'Content-Type': 'application/json',
                  Authorization: 'Bearer ' + token(who) },
@@ -445,17 +444,23 @@ ${code}`], { encoding: 'utf8' });
     ok(nonode.status === 400 && /which node/.test(nonode.error || ''), `a sign-in names its node (${nonode.error})`);
     const theirs = await as(other, '/api/signin', { node: box.id });
     const lj = theirs.job ? await napi(`/api/v1/jobs?id=${theirs.job}`) : {};
+    // (The token the flow reports with is the node's alone: a reader of the
+    // job is not handed it.)
     ok(theirs.status === 200 && lj.type === 'claude-login' && lj.node === box.id && lj.spec?.uid === uidOf('sharer')
-       && /^bbs_/.test(lj.spec?.token || ''),
-       `on its own space's node it starts one: a claude-login job there, for that account (${theirs.error || lj.type})`);
+       && !('token' in (lj.spec || {})),
+       `on its own space's node it starts one: a claude-login job there, for that account, its token not read with it (${theirs.error || lj.type})`);
     // The link a flow prints signs somebody in: it is shown to the person
     // the flow was started for and to nobody else, and only they type into it.
     ok((await as(other, '/api/status')).signin?.running === true && (await as(owner, '/api/status')).signin?.running === false,
        'a running sign-in is shown to the account it was started for, and to nobody else');
+    // ...and another account signs in at the same time, a flow of its own,
+    // which neither replaces the first nor takes its code.
+    const before = await as(owner, '/api/login-code', { code: 'abc#def' });
     const butt = await as(owner, '/api/signin', { node: box.id });
-    const code = await as(owner, '/api/login-code', { code: 'abc#def' });
-    ok(butt.status === 409 && /another account is signing in/.test(butt.error || '') && code.status === 403,
-       `...and another account neither replaces it nor types a code into it (${butt.error})`);
+    ok(before.status === 403 && butt.status === 200 && butt.job && butt.job !== theirs.job
+       && (await as(other, '/api/status')).signin?.running === true,
+       `...and another account signs in at the same time with a flow of its own, the first one still running (${butt.error || butt.job})`);
+    await as(owner, '/api/signin', { action: 'cancel' });
     await as(other, '/api/signin', { action: 'cancel' });
     // Signing out: that account's, on that node. Not while its own session
     // is open there; then a job on the node, and nobody else's sign-in moves.
@@ -594,11 +599,11 @@ ${code}`], { encoding: 'utf8' });
       const ak = projectKey('alpha');
       ok(!list.includes('*') && list.includes(ak) && await mine() === true,
          `the owner's "*" became the spaces that exist, alpha's among them (${list.join(', ')})`);
-      await post(owner, '/api/users', { action: 'projects', name: 'test', projects: list.filter(p => p !== ak) });
+      await post(owner, '/api/users', { action: 'edit', name: 'test', projects: list.filter(p => p !== ak) });
       const off = await post(owner, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' });
       ok(await mine() === false && off.status === 403,
          `...and off their own list, alpha is read-only to the owner too (${off.status})`);
-      await post(owner, '/api/users', { action: 'projects', name: 'test', projects: list });
+      await post(owner, '/api/users', { action: 'edit', name: 'test', projects: list });
       ok(await mine() === true, '...until it is put back');
     }
     // The resume offer is the asking account's own (B489): a transcript the
@@ -666,12 +671,12 @@ ${code}`], { encoding: 'utf8' });
 
     // ...and the remedy is theirs to apply, which is the whole difference
     // between this and a user's list.
-    ok((await post(adm, '/api/users', { action: 'projects', name: 'second',
+    ok((await post(adm, '/api/users', { action: 'edit', name: 'second',
                                         projects: ['alpha'] })).status === 200,
        'an admin can add a space to its own list: a seatbelt, not a wall');
     ok((await post(adm, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' })).status === 200,
        '...and then it works on it');
-    ok((await post(other, '/api/users', { action: 'projects', name: 'sharer',
+    ok((await post(other, '/api/users', { action: 'edit', name: 'sharer',
                                           projects: ['alpha'] })).status === 403,
        'a user cannot grant itself anything, which is why theirs is a boundary');
     execFileSync('python3', ['-c', `
@@ -768,7 +773,9 @@ print(u.remove("second"))`], { encoding: 'utf8' });
       const up = await page.evaluate(() => { const l = document.getElementById('chatlog'); l.scrollTop = 0;
                                              return { top: l.scrollTop, tall: l.scrollHeight > l.clientHeight }; });
       await page.evaluate(() => loadChat());
-      await sleep(800);
+      // The poll has landed and drawn; the status read it asks for is still
+      // to come, and this is the window in which either would snap the log.
+      await quiet(800);
       const kept = await page.evaluate(() => document.getElementById('chatlog').scrollTop);
       ok(up.tall && up.top === 0 && kept === 0, `a reader scrolled up stays where they were across a poll (${kept} ${JSON.stringify(up)})`);
       await page.evaluate(() => { const l = document.getElementById('chatlog'); l.scrollTop = l.scrollHeight; });
@@ -832,18 +839,17 @@ spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboar
 u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
 u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
 print(u.remove("renamed"))`], { encoding: 'utf8' });
-}
+});
 
 // ---- what a `user` sees, and does not (roadmap #22 step 2) --------------
 // The property the whole scheme leans on: a project somebody was not given is
 // ABSENT, not refused, so the existence check and the permission check are
 // the same check, and comparing error messages tells you nothing.
-{
+await section("what a `user` sees, and does not", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
-    { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
+  const bb = (args, input) => aerie(['users', ...args],
+    { input, env: { DASHBOARD_STATE: `${DIR}/state` } });
   const py = (code) => execFileSync('python3', ['-c', `
 import importlib.util, json
 spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
@@ -923,7 +929,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   // returns None, so `if (no := self._may(...))` was never true. The nodes
   // suite found it, three files later, as a node nobody had enrolled.
   {
-    const own = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const own = OWNER;
     const ns = await (await bare('/api/v1/nodes', { headers: own })).json();
     const made = (ns.nodes || []).map(n => n.name);
     ok(!made.includes('zzprobe'),
@@ -934,12 +940,12 @@ ${code}`], { encoding: 'utf8' }).trim();
        Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).status === 200,
      'none of it touches the owner');
   py('print(u.remove("lim"))');
-}
+});
 
 // ---- the Users tab (roadmap #22 step 3) ---------------------------------
 // The surface accounts are actually managed from; aerie users is the way back in
 // when this cannot be reached, not the way in generally.
-{
+await section("the Users tab", async () => {
   await page.evaluate(() => { const c = document.getElementById('cardTools');
     if (c?.classList.contains('closed')) c.querySelector('h2').click(); });
   await page.evaluate(() => openUsersTab());
@@ -1072,8 +1078,11 @@ ${code}`], { encoding: 'utf8' }).trim();
   ok(await page.$eval('.userstab #ueEmail', e => e.value) === 'tab@example.invalid',
      '...and what is typed survives the roles fields being drawn again');
   await page.click('.userstab #ueSave');
-  await page.waitForFunction(async () => (await (await fetch('/api/roles')).json()).people
-    .find(p => p.name === 'tabmade')?.project_roles?.alpha?.includes('reader'), null, { timeout: 15000 });
+  // By the space's key, as the page's own fields name it: asked by its
+  // folder's name this never came true, which nothing noticed while a wait
+  // on a Promise waited for nothing.
+  await page.waitForFunction(async k => (await (await fetch('/api/roles')).json()).people
+    .find(p => p.name === 'tabmade')?.project_roles?.[k]?.includes('reader'), projectKey('alpha'), { timeout: 15000 });
   ok(true, 'its one Save puts it on alpha with a role there');
   // Only its roles changed, and the account is read again all the same: not
   // left unsaved, its header and row saying what it holds (B33).
@@ -1104,8 +1113,7 @@ ${code}`], { encoding: 'utf8' }).trim();
 
   // The owner cannot be removed through the door either, not just in the page.
   const refused = await bare('/api/users', { method: 'POST',
-    headers: { 'Content-Type': 'application/json',
-               Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    headers: OWNER,
     body: JSON.stringify({ action: 'remove', name: 'test' }) });
   ok(refused.status === 400 && /cannot be deleted/.test((await refused.json()).error || ''),
      'and the store refuses it too, so aerie users is held to the same rule');
@@ -1123,89 +1131,56 @@ ${code}`], { encoding: 'utf8' }).trim();
     '.userstab [data-upick="tabmade"]'), null, { timeout: 15000 });
   ok((await as('/api/status')).status === 401,
      'Remove ends it: the account it made can no longer sign in');
-}
+});
 
 // ---- what a session holds (roadmap #22 step 4, bug #16) -----------------
 // A Claude session used to inherit DASHBOARD_AUTH, so "only the operator may
 // install a toolchain" was a rule the code asked nicely about. It gets a token
 // scoped to its own project instead.
-{
-  const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const mint = (proj) => execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.${proj})`], { encoding: 'utf8' }).trim();
-
-  const tok = mint('mint_session("alpha")');
+await section("what a session holds", async () => {
+  const tok = mint('alpha');
   const as = (path, opts = {}) => bare(path, { ...opts,
     headers: { Authorization: 'Bearer ' + tok, ...(opts.headers || {}) } });
   const post = (path, body) => as(path, { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-  const seen = await (await as('/api/status')).json();
-  ok(JSON.stringify((seen.projects || []).map(p => p.name)) === '["alpha"]',
-     `a session token sees its own space and no other (${
-       (seen.projects || []).map(p => p.name).join(', ')})`);
-  ok(/not a space/.test(((await (await post('/api/roadmap',
-       { action: 'save', project: 'ep.silon', items: [] })).json()).error) || ''),
-     '...and another space reads as absent, not refused');
-
-  // Parking a roadmap item is one direction for a session. It knows when
-  // something is blocked or waiting on somebody; it does not know why the
-  // operator wants one back, so taking it OFF the shelf is theirs. The CLI
-  // only ever passed on=true, and this door used to take whatever it was
-  // handed.
-  {
-    const added = await (await post('/api/roadmap',
-      { action: 'add', project: 'alpha', text: 'something to park' })).json();
-    const id = (added.items || []).slice(-1)[0]?.id ?? added.id;
-    const on = await (await post('/api/roadmap',
-      { action: 'shelve', project: 'alpha', id, on: true })).json();
-    ok(!on.error, `a session may park a roadmap item (${on.error || 'shelved'})`);
-    // ...and asking for it back is held for a person on the project (R78),
-    // the item still shelved: the door used to refuse outright.
-    const off = await post('/api/roadmap', { action: 'shelve', project: 'alpha', id, on: false, why: 'unblocked' });
-    const offBody = await off.json();
-    ok(off.status === 200 && offBody.held?.verb === 'unshelve' && /unblocked/.test(offBody.held?.summary || '')
-       && (offBody.items || []).find(r => r.id === id)?.shelved,
-       `...and asking for it back is held for approval, the item still shelved (${(offBody.held?.summary || offBody.error || '').slice(0, 60)})`);
-    const still = await (await as('/api/status')).json();
-    ok((still.projects || []).length === 1, '...with the refusal leaving the rest answering');
+  // A session is a caller of its own kind (R227 step 4): its token reaches
+  // the routes its own verbs and hooks use and nothing else. What it reads
+  // there is its own space's, and another space reads as absent.
+  const mine = await as('/api/brief?project=alpha');
+  const other = await as('/api/brief?project=ep.silon');
+  const otherSaid = (await other.json().catch(() => ({}))).error || '';
+  ok(mine.status === 200 && other.status !== 200 && /not a space/.test(otherSaid),
+     `a session's token reads its own space, and another reads as absent, not refused (${mine.status}; ${other.status}: ${otherSaid})`);
+  // The page's own reads are a person's (the operator, 15 Nov): the status
+  // read carried the controller's settings, the person's layout and the key
+  // store's state to a session that asked.
+  for (const path of ['/api/status', '/api/revs', '/api/live', '/api/findings', '/api/users', '/api/home', '/api/roles']) {
+    const r = await as(path);
+    const said = (await r.json().catch(() => ({}))).error || '';
+    ok(r.status === 403 && /a session's token does not reach this/.test(said), `${path} is not a session's to read (${r.status}: ${said.slice(0, 60)})`);
   }
-
-  // The scanner's report covers the whole share, so the Analysis surfaces are
-  // the one place a session could read somebody else's code back. The fixture
-  // report has a finding in alpha, in beta, in gamma, in delta, in two
-  // directories that are not projects, and one whose path places nowhere.
-  {
-    const fp = await (await as('/api/findings')).json();
-    const rows = (fp.reports || []).flatMap(r => r.findings || []);
-    ok(rows.length === 1 && rows[0].project === 'alpha' && rows[0].rule === 'A1',
-       `a session's findings are its own space's and no other (${
-         rows.map(r => `${r.project || '?'}:${r.rule}`).join(', ') || 'none'})`);
-    // Said of the whole payload, not just the rows: a project name in a
-    // subtitle or a count is the same leak in a smaller font.
-    const blob = JSON.stringify(fp);
-    const leaked = ['beta', 'gamma', 'delta', 'toolstore', 'vendored-junk', 'entirely.py']
-      .filter(w => blob.includes(w));
-    ok(leaked.length === 0,
-       `...and nothing else on the share is named anywhere in the payload (${
-         leaked.join(', ') || 'nothing leaked'})`);
-    ok(!('aside' in fp),
-       '...not even how many findings were held back, which would move when somebody else edits their code');
-    ok(JSON.stringify(fp.projects || []) === '["alpha"]',
-       `...and the spaces it lists are its own (${JSON.stringify(fp.projects || [])})`);
-    // The same question of the poll, which carries its own copy of the counts.
-    const stat = await (await as('/api/status')).json();
-    ok(Object.keys(stat.findings_counts || {}).join(',') === 'alpha',
-       `the poll's finding counts are its space's alone (${
-         Object.keys(stat.findings_counts || {}).join(',') || 'none'})`);
+  // ...and what acted as the person behind it, or wrote as a person, with
+  // no session's verb behind it: their chat, their tabs, their presence,
+  // a bug written as theirs and never held, a macro typed into their shell,
+  // their sessions ended, the roadmap over HTTP (aerie roadmap is relayed).
+  for (const [path, body] of [['/api/chat', { action: 'read' }], ['/api/layout', { tabs: [] }], ['/api/presence', { project: 'alpha' }],
+                              ['/api/bugs', { action: 'add', project: 'alpha', title: 'written as a person' }],
+                              ['/api/say', { session: 'claude-alpha', text: 'hello' }], ['/api/send', { session: 'claude-alpha', macro: 'lx-ls' }],
+                              ['/api/session', { session: 'claude-alpha', action: 'kill' }],
+                              ['/api/roadmap', { action: 'add', project: 'alpha', text: 'over HTTP' }]]) {
+    const r = await post(path, body);
+    const said = (await r.json().catch(() => ({}))).error || '';
+    ok(r.status === 403 && /a session's token does not reach this/.test(said), `${path} is not a session's to send (${r.status}: ${said.slice(0, 60)})`);
   }
+  // The page itself, its scripts, a terminal, a VM's screen and the metrics.
+  for (const path of ['/', '/index.html', '/page-shell.js', '/terminal', '/termws', '/screen/ws', '/metrics', '/apps/companion/x']) {
+    const r = await as(path);
+    const said = (await r.json().catch(() => ({}))).error || '';
+    ok(r.status === 403 && /the dashboard is a person's/.test(said), `${path} is not opened by a session's token (${r.status}: ${said.slice(0, 50)})`);
+  }
+  const alive = await as('/api/brief?project=alpha');
+  ok(alive.status === 200, '...with every refusal leaving its own routes answering');
 
   // The whole reason this exists: it is not the operator.
   for (const ep of ['/api/v1/nodes', '/api/toolchains', '/api/users']) {
@@ -1239,7 +1214,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
 
   // Rotating the key takes every session token at once, which is the
   // granularity that matters, since they are minted fresh per connection.
-  mint('revoke_sessions()');
+  usersPy('u.revoke_sessions()');
   ok((await as('/api/status')).status === 401,
      'revoking the session key invalidates a token already handed out');
 
@@ -1247,22 +1222,21 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   ok((await bare('/api/status', { headers: {
        Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).status === 200,
      'none of which touches the owner');
-}
+});
 
 // ---- the Profile tab: an account's own settings -----------------------
 // Anybody signed in, about themselves only: name and email, the git identity
 // their commits carry, and a password change that asks for the current one
 // first: a browser left signed in is not enough to lock its owner out. The
 // throwaway account, because the suite's own credential must keep working.
-{
+await section("the Profile tab", async () => {
   // Made here: the tabmade account above was removed by the flow that tests
   // removing one.
   await page.evaluate(async () => (await fetch('/api/users', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'add', name: 'profiled', password: 'tabmadepw1', role: 'user' }) })).json());
   await member('profiled');
-  const H = pw => ({ Authorization: 'Basic ' + Buffer.from(`profiled:${pw}`).toString('base64'),
-                     'Content-Type': 'application/json' });
+  const H = pw => asUser('profiled', pw);
   const api = async (pw, body) => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/profile',
       body ? { method: 'POST', headers: H(pw), body: JSON.stringify(body) } : { headers: H(pw) });
@@ -1364,7 +1338,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     // The status payload says whether the account administers this
     // controller, which is what words an empty Projects card for a user
     // with nothing granted rather than telling them the share is missing.
-    const plain = await bare('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    const plain = await bare('/api/users', { method: 'POST', headers: OWNER,
       body: JSON.stringify({ action: 'add', name: 'plainone', password: 'plainonepw1', role: 'user' }) });
     const asUser = await (await bare('/api/status', { headers: { Authorization: 'Basic ' + Buffer.from('plainone:plainonepw1').toString('base64') } })).json();
     const asOwner = await (await bare('/api/status', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
@@ -1395,7 +1369,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     // and the owner's own here keep bare names; nobody ends or types into
     // anybody else's. Decided before the session is looked up, so a
     // name is enough to ask with.
-    const ownerAuth = { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const ownerAuth = OWNER;
     const act = async (h, path, body) => {
       const r = await bare(path, { method: 'POST', headers: h, body: JSON.stringify(body) });
       return { status: r.status, error: ((await r.json().catch(() => ({}))).error || '') };
@@ -1409,28 +1383,32 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     ok(other.status === 403, `...nor can the owner type into another account's session (${other.status})`);
     const own = await act(ownerAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
     ok(own.status !== 403, `...while the owner still reaches their own (${own.status}: ${own.error.slice(0, 40)})`);
-    const { execFileSync: ef } = await import('node:child_process');
-    const ownerUid = JSON.parse((await import('node:fs')).readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
-    const stok = ef('python3', ['-c', `
-import importlib.util, json
-spec = importlib.util.spec_from_file_location("users", "${new globalThis.URL('..', import.meta.url).pathname}users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
-print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim();
-    const sessAuth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + stok };
+    const stok = mint('alpha', 'test');
+    const sessAuth = asSession(stok);
     const across = await act(sessAuth, '/api/send', { session: 'claude-beta', macro: 'lx-ls' });
     ok(across.status === 403, `a session's token cannot reach its own account's session on another space (${across.status})`);
+    // ...nor its own space's: typing into a person's shell is no verb of a
+    // session's, and its token reaches what its verbs use (R227 step 4).
     const home = await act(sessAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
-    ok(home.status !== 403, `...and does reach its own space's (${home.status})`);
+    ok(home.status === 403 && /a session's token does not reach this/.test(home.error || ''), `...nor its own space's (${home.status}: ${(home.error || '').slice(0, 50)})`);
+    // A session's token carries its person's id, and the Profile page is
+    // that person's alone (B764): no read of it, no notification sent
+    // elsewhere, no browser sign-in of theirs ended.
+    {
+      const read = await fetch(URL.replace(/\/$/, '') + '/api/profile', { headers: sessAuth });
+      const reach = await act(sessAuth, '/api/profile', { action: 'reach-set', kind: 'webhook', url: 'https://elsewhere.example/hook' });
+      const out = await act(sessAuth, '/api/profile', { action: 'signin-out', id: 'any' });
+      ok(read.status === 403 && reach.status === 403 && out.status === 403 && /never by a session|a session's token does not reach this/.test(reach.error || ''),
+         `a session's token is refused the Profile page of the person it runs for (${read.status} ${reach.status} ${out.status}: ${reach.error || ''})`);
+    }
     // B173-B175: what acts on a project by name asks the right as well as
     // the name. A plain account given alpha cannot lock it, move the shared
     // pins, read how its remote authenticates, or move its version; the
     // version panel is closed to a session's token outright.
-    await act(ownerAuth, '/api/users', { action: 'projects', name: 'plainone', projects: ['alpha'] });
+    await act(ownerAuth, '/api/users', { action: 'edit', name: 'plainone', projects: ['alpha'] });
     for (const [path, body, why] of [
         // Its owner's or an administrator's (R119), not a grant's.
         ['/api/lock', { name: 'alpha', locked: true }, /owner or an administrator/],
-        ['/api/archive', { name: 'alpha', archived: true }, /owner or an administrator/],
         ['/api/pin', { name: 'status', pinned: true }, /needs Controller Write/],
         ['/api/project-auth', { name: 'alpha' }, /needs .+ Write|rename/],
         ['/api/version', { project: 'alpha', action: 'bump', part: 'patch' }, /needs .+ Write/],
@@ -1457,8 +1435,18 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
       ok(un.status === 200 && plain && plain.pinned === false && owner && owner.pinned === true,
          `a plain account's unpin is its own: alpha off its sidebar and still on the owner's (${un.status}; ${plain?.pinned}/${owner?.pinned})`);
       const sess = await act(sessAuth, '/api/project-pin', { name: 'alpha', pinned: true });
-      ok(sess.status === 403 && /a session has no sidebar/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
+      ok(sess.status === 403 && /a session has no sidebar|a session's token does not reach this/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
       await act(plainAuth, '/api/project-pin', { name: 'alpha', pinned: true });
+      // An archive is each person's own too: anybody signed in folds a space
+      // away for themselves, nobody else's page changes, and a session
+      // archives nothing.
+      const arch = await act(plainAuth, '/api/archive', { name: 'alpha', archived: true });
+      const pa = (await rows(plainAuth)).find(p => p.name === 'alpha'), oa = (await rows(ownerAuth)).find(p => p.name === 'alpha');
+      ok(arch.status === 200 && pa?.archived === true && oa?.archived === false,
+         `a plain account's archive is its own: alpha archived for it and not for the owner (${arch.status}; ${pa?.archived}/${oa?.archived})`);
+      const sarch = await act(sessAuth, '/api/archive', { name: 'alpha', archived: true });
+      ok(sarch.status === 403, `...and a session archives for nobody (${sarch.status})`);
+      await act(plainAuth, '/api/archive', { name: 'alpha', archived: false });
     }
     // A project's signing keys (R106): a session never reaches them, not
     // even the listing, and never downloads one; a person who sees the
@@ -1572,13 +1560,8 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
         execFileSync('git', ['init', '-q', R]);
         gitR('add', '-A'); gitR('commit', '-qm', 'first');
         await takeOn('relproj');
-        const btok = ef('python3', ['-c', `
-import importlib.util, json
-spec = importlib.util.spec_from_file_location("users", "${new globalThis.URL('..', import.meta.url).pathname}users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
-print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim();
-        const rAuth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + btok };
+        const btok = mint('relproj', 'test');
+        const rAuth = asSession(btok);
         const rel = (body, h = rAuth) => bare('/api/version', { method: 'POST', headers: h,
           body: JSON.stringify({ action: 'release', project: 'relproj', why: '1.2.3 for testers', ...body }) })
           .then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }));
@@ -1590,7 +1573,9 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         const asked = await rel({});
         const ownerAsks = await (await bare('/api/phone', { headers: ownerAuth })).json();
         const ask = (ownerAsks.asks || []).find(a => a.id === asked.body.id);
-        ok(/has no version/.test(noVersion.body.error || '') && /uncommitted changes/.test(dirtyAsked.body.error || '')
+        // A VERSION file written and not committed is no version of the
+        // commit, which is what a release reads (R206 step 4).
+        ok(/has no version/.test(noVersion.body.error || '') && /has no version/.test(dirtyAsked.body.error || '')
            && asked.status === 200 && ask && ask.kind === 'release'
            && ask.tag === 'v1.2.3' && ask.sha === sha && !gitR('tag', '--list', 'v1.2.3'),
            `a session's aerie version release is refused before anybody is asked when it could not happen, then waits on the space's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
@@ -1671,14 +1656,14 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       // owner's alone (the operator, 6 Oct): an administrator on the project
       // is refused a change and may still save the dialog around it.
       {
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: ['alpha'] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
         const adminTry = await post(adminAuth, '/api/prefs', { project: 'alpha', reads: ['beta'] });
         const ownerTry = await post(ownerAuth, '/api/prefs', { project: 'alpha', reads: ['beta'] });
         const adminSame = await post(adminAuth, '/api/prefs', { project: 'alpha', reads: ['beta'] });
         const adminOff = await post(adminAuth, '/api/prefs', { project: 'alpha', reads: [] });
         const can = await bare('/api/status', { headers: adminAuth }).then(r => r.json()).then(j => j.can?.reads);
         await post(ownerAuth, '/api/prefs', { project: 'alpha', reads: [] });
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: [] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: [] });
         ok(adminTry.status === 403 && /AerieOS's owner alone/.test(adminTry.body.error || '') && ownerTry.status === 200
            && adminSame.status === 200 && adminOff.status === 403 && can === false,
            `only AerieOS's owner changes which spaces a space's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
@@ -1723,7 +1708,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         ok(held.status === 429, `...and five wrong in a row hold the downloads, even for the right one (${held.status})`);
         // Handing the project on leaves the password where it is (the
         // operator, 2 Oct): the new owner changes it only with it.
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: ['alpha'] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
         await post(ownerAuth, '/api/members', { action: 'set', project: 'alpha', owner: 'adminone' });
         const blind = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha', new: 'taken-over-pw' });
         const told = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha',
@@ -1736,7 +1721,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       }
       const view = await post(ownerAuth, '/api/members', { action: 'view', project: 'gamma' });
       const set = await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: true });
-      const self = await post(adminAuth, '/api/users', { action: 'projects', name: 'adminone', projects: ['gamma'] });
+      const self = await post(adminAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['gamma'] });
       const notOwner = await post(adminAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: false });
       ok(view.status === 200 && view.body.owner === 'test' && set.body.invite_only === true
          && /invite only/.test(self.body.error || '') && notOwner.status === 403,
@@ -1748,8 +1733,8 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         // By project (R138): the list names gamma's project by its key.
         const GK = projectKey('gamma');
         const without = list.filter(p => p !== GK);
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'test', projects: without });
-        const back = await post(ownerAuth, '/api/users', { action: 'projects', name: 'test', projects: [...without, 'gamma'] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'test', projects: without });
+        const back = await post(ownerAuth, '/api/users', { action: 'edit', name: 'test', projects: [...without, 'gamma'] });
         ok(back.status === 200 && (back.body.projects || []).includes(GK),
            `...while the owner adds themselves to it without an invitation (${back.status})`);
       }
@@ -1819,7 +1804,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
   await page.evaluate(async () => (await fetch('/api/users', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'remove', name: 'profiled' }) })).json());
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 // ---- the route tables ------------------------------------------------------
@@ -1828,17 +1813,34 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // /api/pin and /api/project-pin were that once, found only because the two
 // handlers also shared a name. Read from both tables (R60), with each method
 // they name checked to exist, since a typo there is a 500 on first use.
-{
+await section("the route tables", async () => {
   const got = JSON.parse(execFileSync('python3', ['-c', `
-import ast, json, re
+import collections, json, re
 src = open(${JSON.stringify(new globalThis.URL('../server.py', import.meta.url).pathname)}).read()
+# The route record and the tables read off it, run from the source as far
+# as route_gate, with the two names they take from the rest of the file.
+ns = {"collections": collections, "MAX_BODY_FOR": {}}
+exec(src[src.index("\\nRoute = collections.namedtuple("):src.index("\\ndef route_gate(")], ns)
 out = {}
 for table in ("GET_ROUTES", "POST_ROUTES"):
-    m = re.search(r'^' + table + r' = (\\(.*?^\\))', src, re.S | re.M)
-    routes = ast.literal_eval(m.group(1))
+    routes = ns[table]
     out[table] = {"routes": routes,
                   "missing": [n for _, _, n in routes if not re.search(r"^    def " + n + r"\\(self", src, re.M)]}
+gates = ns["ROUTE_GATES"]
+named = {n for t in out.values() for _, _, n in t["routes"]}
+out["GATES"] = {"none": sorted(named - set(gates)), "stale": sorted(set(gates) - named),
+                "odd": sorted(n for n, g in gates.items() if g != "handler" and not (isinstance(g, tuple) and g[0] in ("owner", "person") and g[1])),
+                "central": sum(1 for g in gates.values() if g != "handler")}
+out["SESSION"] = sorted(ns["SESSION_ROUTES"])
 print(json.dumps(out))`], { encoding: 'utf8' }));
+  // Every route names who may reach it, beside the routes (R227): one that
+  // names nothing is refused by the dispatcher, and is caught here first.
+  const G = got.GATES; delete got.GATES;
+  const SESSION = new Set(got.SESSION); delete got.SESSION;
+  ok(G.none.length === 0 && G.stale.length === 0 && G.odd.length === 0 && G.central >= 20,
+     `every route names its permission in ROUTE_GATES, and nothing else is named there (${
+       [G.none.length ? 'none for ' + G.none.join(', ') : '', G.stale.length ? 'no route for ' + G.stale.join(', ') : '',
+        G.odd.length ? 'not a gate: ' + G.odd.join(', ') : ''].filter(Boolean).join('; ') || G.central + ' held by the dispatcher'})`);
   for (const [table, t] of Object.entries(got)){
     const shadowed = [];
     t.routes.forEach(([how, path], i) => t.routes.slice(i + 1).forEach(([, later]) => {
@@ -1849,26 +1851,44 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     ok(t.missing.length === 0,
        `...and every method ${table} names is one the handler has (${t.missing.join(', ') || 'all there'})`);
   }
-}
+  // A session is refused by the dispatcher on every route its table does
+  // not name (R227 step 4): each one asked with a session's token, so a
+  // route added tomorrow is closed to a session until somebody names it.
+  const named = new Set(Object.values(got).flatMap(t => t.routes.map(r => r[2])));
+  const stale = [...SESSION].filter(n => !named.has(n));
+  ok(SESSION.size >= 30 && SESSION.size <= 50 && stale.length === 0,
+     `a session's table names ${SESSION.size} routes, each one a route there is (${stale.join(', ') || 'none stale'})`);
+  const tok = mint('alpha');
+  const open = [];
+  for (const [table, t] of Object.entries(got)){
+    for (const [, path, name] of t.routes){
+      if (SESSION.has(name)) continue;
+      const r = await bare(path, table === 'GET_ROUTES' ? { headers: { Authorization: 'Bearer ' + tok } }
+        : { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: '{}' });
+      const said = (await r.json().catch(() => ({}))).error || '';
+      if (r.status !== 403 || !/a session's token does not reach this|the dashboard is a person's/.test(said)) open.push(`${table === 'GET_ROUTES' ? 'GET' : 'POST'} ${path} ${r.status} ${said.slice(0, 40)}`);
+    }
+  }
+  ok(open.length === 0, `every other route refuses a session's token before its handler runs (${open.slice(0, 8).join('; ') || named.size - SESSION.size + ' refused'})`);
+});
 
 
 // ---- maintenance mode: the owner alone, until it is off --------------------
 // Every door another account comes in by is shut with the same sentence:
 // the page (its cookie kept for after), the API, a sign-in, a session's
 // token and the phone app's. The switch is the owner's and not an admin's.
-{
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
+await section("maintenance mode", async () => {
   const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-  const users = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args], { input, encoding: 'utf8', env });
+  const users = (args, input) => aerie(['users', ...args], { input, env });
   users(['add', 'maintuser', '--role', 'user'], 'maintpass11\nmaintpass11\n');
   users(['add', 'maintadm', '--role', 'admin'], 'maintpass22\nmaintpass22\n');
   await member('maintuser');
-  const basic = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'), 'Content-Type': 'application/json' });
+  const basic = asUser;
   const owner = basic('test', 'test'), user = basic('maintuser', 'maintpass11'), adm = basic('maintadm', 'maintpass22');
   const form = (u, pw) => bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `username=${u}&password=${pw}&next=/` });
   const theirCookie = ((await form('maintuser', 'maintpass11')).headers.get('set-cookie') || '').split(';')[0];
-  const token = who => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', ...(who ? [who] : [])], { encoding: 'utf8', env }).trim();
+  const token = who => aerie(['users', 'token', 'alpha', ...(who ? [who] : [])], { env }).trim();
   const ownerTok = token('test'), userTok = token('maintuser');
   const set = (h, on) => bare('/api/settings', { method: 'POST', headers: h, body: JSON.stringify({ set: { maintenance_mode: on } }) });
   const SAID = /down for maintenance: only its owner can sign in/;
@@ -1902,12 +1922,11 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   // The terminal's session is made a moment after its socket opens: asked
   // again until it is there, since an ask changes nothing.
   let ask = {};
-  for (let i = 0; i < 20; i++){
+  await until(async () => {
     r = await set(owner, true);
     ask = r.status === 409 ? await r.json() : {};
-    if ((ask.sessions || []).some(x => x.who === 'maintadm')) break;
-    await sleep(500);
-  }
+    return (ask.sessions || []).some(x => x.who === 'maintadm');
+  }, 15000, 500);
   ok(ask.confirm === 'maintenance' && (ask.sessions || []).some(x => x.who === 'maintadm' && x.what === 'a terminal' && x.state === 'open' && x.project === 'alpha'),
      `the owner is asked first, with the administrator's terminal listed (${r.status} ${JSON.stringify(ask.sessions || [])})`);
   ok(!(ask.sessions || []).some(x => x.who === 'test'), "...and not the owner's own");
@@ -1918,14 +1937,14 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   ok(onSaid.ended >= 1, `...and the owner can, which ends them (${r.status} ended ${onSaid.ended})`);
   // Ended, not only shut out: off and on again lists it no more.
   let gone = false;
-  for (let i = 0; i < 20 && !gone; i++){
-    await sleep(500);
+  await until(async () => {
     await set(owner, false);
     const again = await set(owner, true);
     const j = again.status === 409 ? await again.json() : { sessions: [] };
     gone = !(j.sessions || []).some(x => x.who === 'maintadm');
     await confirmOn();
-  }
+    return gone;
+  }, 20000, 500);
   ok(gone, "...and the administrator's terminal is ended, not only kept out");
 
   r = await bare('/api/status', { headers: user });
@@ -1936,13 +1955,15 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   r = await form('maintuser', 'maintpass11');
   ok(!r.headers.get('set-cookie') && SAID.test(await r.text()), '...a sign-in is refused with it, and no cookie minted');
   ok(SAID.test(await (await bare('/login')).text()), '...the sign-in page says it before anybody tries');
-  ok((await bare('/api/status', { headers: { Authorization: 'Bearer ' + userTok } })).status === 503,
+  // Asked of a route a session's token reaches (R227 step 4): the page's
+  // status read is a person's.
+  ok((await bare('/api/meta', { headers: { Authorization: 'Bearer ' + userTok } })).status === 503,
      "...a session of theirs is answered 503");
   r = await bare('/api/v1/device/signin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'maintuser', password: 'maintpass11', name: 'their phone', kind: 'phone' }) });
   ok(r.status === 503 && SAID.test((await r.json()).error || ''), '...and the phone app cannot sign in');
   ok((await bare('/api/status', { headers: owner })).status === 200
-     && (await bare('/api/status', { headers: { Authorization: 'Bearer ' + ownerTok } })).status === 200,
+     && (await bare('/api/meta', { headers: { Authorization: 'Bearer ' + ownerTok } })).status === 200,
      'the owner is answered, and the owner\'s own session too');
   await page.waitForFunction(() => document.getElementById('maintband') && !document.getElementById('maintband').hidden, null, { timeout: 15000 })
     .then(() => true, () => false).then(v => ok(v, "the owner's page shows the maintenance band"));
@@ -1959,7 +1980,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   ok(/<div class="banner maint" id="maintband" role="status">/.test(served),
      "the page is served with the maintenance band already showing while it is on");
 
-  for (let i = 0; i < 24 && !admTerm.closed; i++) await sleep(500);
+  await until(() => admTerm.closed, 15000);
   ok(/101/.test(admTerm.status) && admTerm.closed && /101/.test(ownTerm.status) && !ownTerm.closed,
      `a terminal another account had open ends when it starts, and the owner's goes on (${JSON.stringify({ adm: [admTerm.status, admTerm.closed], own: [ownTerm.status, ownTerm.closed] })})`);
   ownTerm.sock?.destroy();
@@ -1971,7 +1992,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     .then(() => true, () => false).then(v => ok(v, '...and the band goes'));
   ok(/id="maintband" role="status" hidden>/.test((await bigGet('/', owner)).body.toString()),
      '...and the page is served with it hidden again');
-}
+});
 
 // A terminal's socket opens from this dashboard's own page and no other
 // (B312): the sign-in cookie was SameSite=Lax, which a browser still sent
@@ -1979,7 +2000,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
 // R158 step 4, and the Origin check stands either way). A socket from
 // another origin is refused before anything is relayed; one from this
 // origin, or from a tool that sends no Origin, gets past that check.
-{
+await section("A terminal's socket opens from this dashboard's own page and no other", async () => {
   const u = new globalThis.URL(URL);
   const ask = (path, origin) => new Promise(resolve => {
     const headers = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
@@ -1999,6 +2020,33 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     got[path] = [await ask(path, evil), await ask(path, `${u.protocol}//${u.host}`), await ask(path, '')];
   ok(Object.values(got).every(([x, same, none]) => x === 403 && same !== 403 && none !== 403),
      `a terminal's or a screen's socket from another origin is refused, and this origin's is not (${JSON.stringify(got)})`);
-}
+});
+
+// Kept connections (R228 step 9): a read after a read goes on the same
+// connection, and who asked is proved for each request, never carried from
+// the one before it on that connection; a request that carried a body ends
+// its connection, which a handler may not have read whole.
+await section('A connection is kept from one request to the next, and each is proved on its own', async () => {
+  const u = new globalThis.URL(URL);
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  const ask = (path, headers = {}, body = null) => new Promise(resolve => {
+    const req = http.request({ host: u.hostname, port: u.port, path, agent, method: body ? 'POST' : 'GET',
+                               headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) } });
+    req.on('response', res => { res.resume(); res.on('end', () => resolve({ status: res.statusCode, reused: req.reusedSocket,
+                                                                              conn: res.headers.connection || '' })); });
+    req.on('error', e => resolve({ status: 0, error: String(e) }));
+    req.end(body || undefined);
+  });
+  const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const a = await ask('/api/revs', auth), b = await ask('/api/revs', auth), anon = await ask('/api/status');
+  ok(a.status === 200 && b.status === 200 && b.reused,
+     `a second read goes on the first one's connection (${JSON.stringify([a, b])})`);
+  ok(anon.status === 401 && anon.reused, `...and the next request on it, signed in as nobody, is nobody (${JSON.stringify(anon)})`);
+  const posted = await ask('/api/presence', auth, JSON.stringify({ project: 'alpha', client: 'keep', where: 'roadmap' }));
+  const after = await ask('/api/revs', auth);
+  ok(posted.conn === 'close' && after.status === 200 && !after.reused,
+     `a request with a body ends its connection, and the next read opens another (${JSON.stringify([posted, after])})`);
+  agent.destroy();
+});
 
 await done(browser);

@@ -29,6 +29,8 @@ import threading
 import time
 from pathlib import Path
 
+import statefile
+
 FILE = None
 WORKSPACE = None
 write_json = None
@@ -52,10 +54,9 @@ def configure(*, state, workspace, write_json):
 
 
 def _load():
-    try:
-        m = FILE.stat().st_mtime_ns
-    except OSError:
-        m = None
+    # What the file is, looked at once a request (statefile.sig, R228 step
+    # 1): a status read asked here some seven hundred times.
+    m = statefile.sig(FILE) if FILE is not None else None
     if m is not None and m == _cache["mtime"] and _cache["data"] is not None:
         return _cache["data"]
     try:
@@ -73,10 +74,9 @@ def _load():
 
 def _save(d):
     write_json(FILE, d)
-    try:
-        _cache.update(mtime=FILE.stat().st_mtime_ns, data=d)
-    except OSError:
-        _cache.update(mtime=None, data=None)
+    statefile.forget(FILE)
+    m = statefile.sig(FILE)
+    _cache.update(mtime=m, data=d if m is not None else None)
 
 
 def _add(d, dirname, name, state="live"):

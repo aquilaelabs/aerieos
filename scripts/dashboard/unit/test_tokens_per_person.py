@@ -65,20 +65,6 @@ class PerPerson(unittest.TestCase):
         self.assertEqual(accountkeys.open_entry_with(ADA, self.ada, accountkeys.key_of(ADA)), new)
         self.assertEqual(gitcreds.givers("web"), [(ADA, self.ada)])
 
-    def test_the_migration_collapses_a_pile_and_moves_its_projects(self):
-        import importlib
-        mig = importlib.import_module("statemigrations.0019_one_token_per_account")
-        sd = accountkeys._load_secrets()
-        old = dict(sd[ADA]["forges"][self.ada], at=1)
-        sd[ADA]["forges"]["oldone"] = old
-        accountkeys.statefile.write_json(accountkeys._secrets_file(), sd, mode=0o600)
-        gitcreds.link_account("api", ADA, "oldone")
-        mig.run({"state": str(self.d)})
-        self.assertEqual(sorted(accountkeys._entries(ADA)), [self.ada], "the newest is kept, the older dropped")
-        self.assertEqual(gitcreds.givers("api"), [(ADA, self.ada)], "its space moved to the one kept")
-        mig.run({"state": str(self.d)})
-        self.assertEqual(sorted(accountkeys._entries(ADA)), [self.ada], "and a second run changes nothing")
-
     def test_a_token_is_used_only_while_its_person_is_signed_in(self):
         gitcreds.link_account("web", ADA, self.ada)
         self.assertEqual(gitcreds.read_line("web", uid=ADA), "", "signed out everywhere: nothing")

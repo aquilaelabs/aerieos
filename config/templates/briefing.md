@@ -18,6 +18,7 @@ stopped by a hook when it runs, with the reason.
 - Read `aerie roadmap show N` or `aerie bug show N` before starting on one, and `aerie design show` before styling anything.
 - A question for the person goes in your reply, before acting on a guess that would change the work.
 - A refusal (a space's dial, a hook, a permission prompt) is an answer: never route around it.
+- What a session cannot see or do for want of root is asked for, not given up on: `aerie root run --why "..." -- CMD` puts one command on this node in front of a person. Offer it in your reply before saying a thing cannot be found out from here.
 - Run `aerie tidy` when a task or a batch of them is done.
 - Where a name is defined or called: `aerie map find NAME` and `aerie map who-calls NAME`; grep is for text.
 - To see a screen: `aerie capture shot` for one picture at rest, `aerie capture reel` for change over time; a video the person sends is read with `aerie capture reel --video FILE`, the frames that changed stamped with their times on one sheet.
@@ -105,6 +106,7 @@ to be missing, ask.
 
     aerie map who-calls NAME      every call of NAME, with the function it is made from
     aerie map find NAME           where NAME is defined; aerie map defs FILE lists a file
+    aerie map show NAME           the definition itself, whole (FILE:LINE: the one holding it)
     aerie map draws ID|.class     which functions draw an element, which suites name it
     aerie map suites FILE...      the suites that reach what a file defines or draws
 
@@ -144,12 +146,24 @@ A repository whose settings name a test node (Tests run, under Build and test) r
 its suites there: `aerie tests run`, `aerie dashboard test` and the gate send this
 tree as a job's snapshot, pick the workers from that node's cores and
 memory, stream the lines back and record the run as a local one; a run
-behind another there says how many are ahead.
+behind another there says how many are ahead. `aerie dashboard test SUITE --at
+REF` runs a commit as it was (git archive, not the working tree), so a
+before-and-after needs no stash; `--loaded` runs a suite beside a whole run's
+load, and `aerie tests bisect SUITE GOOD BAD` names the commit that broke it.
+
+Each test a run records is on the notebook's Tests view with what it
+protects. A test named as a sentence says it already ("a press outside the
+dialog puts it away", `test_a_late_reply_is_dropped`); one named tersely
+(`test_login`, `LoginWorks`) gets its line as you write it, with `aerie tests
+note KEY "what it protects"` (`aerie tests show KEY` names its key), or the
+view counts it undescribed.
 
 A space whose build or test command is not set refuses and says so: `aerie
 settings set build|test|outputs "..."` fills the field in for the operator,
 under the space's gate. When the toolchain lacks what a build needs, say
-so; installing is the operator's, from the Library. `aerie toolchains`
+so, and ask for it with `aerie tool install NAME --why "..."`: it goes on
+this node as the space's Install a tool pack setting says, and what that
+refuses is the operator's to install, from the Library. `aerie toolchains`
 says what is installed, where, and how each download was checked:
 this node carries git, tmux, jq, python3 and curl by itself, and nothing
 else is a given. That python3 has no pip and no venv: a space's own
@@ -275,6 +289,14 @@ Two ways to look, by the question you are asking:
   `Xvfb :9 -screen 0 1280x800x24 & DISPLAY=:9 the-app &`); `--video FILE`
   reels a recording you already have, the person's screen recording among
   them.
+- A page, for a shot or a reel, opens in the first browser installed
+  unless one is named: `--browser NAME`, or `--browser all` for a shot in
+  each (`aerie capture browsers` lists those here, `NAME-BROWSER.png` each).
+  Its screen is 1280x800 unless `--size WxH` or `--device "NAME"` says (any
+  device Playwright knows, with its size, density and touch: `aerie capture
+  devices [WORDS]`), and `--scheme dark|light` and `--set NAME=VALUE` tell
+  it the rest (`--set locale=de-DE`, `--set reducedMotion=reduce`). Look at
+  a page change in every browser installed, not one.
 - A frame is kept when any small patch of it changed from the last frame
   kept, so a tap circle, a typed letter and a slow scroll each show; a run of
   motion is thinned to where it starts and settles and a few frames between,
@@ -333,7 +355,9 @@ Design view: `aerie design show NAME` for one page, theme or rule
 (`nostromo/hull` for a theme's or a page's own), and `aerie design file` prints
 the docs/design-language.md it writes; `aerie design file --from FILE` prints it
 from a record of your own (what `aerie design json` prints, edited), so a
-branch's file carries its design and not what another branch saved. `aerie transcripts` lists this account's
+branch's file carries its design and not what another branch saved; `aerie
+design edit NAME --text FILE` (or `--append`) changes one rule or one page's
+notes in place, and `--file` writes docs/design-language.md with it. `aerie transcripts` lists this account's
 own earlier conversations here, from every coding agent it uses (Claude,
 ChatGPT, Copilot, Grok), each marked with its agent and never another
 account's, and `aerie transcripts show ID` prints one whole, every command and
@@ -375,7 +399,11 @@ The record's verbs, as you meet things: `aerie bug add "..." --sev medium
 bug that was there before your task (how often those steps showed it; one your
 own task caused is fixed as part of it, never filed), `aerie roadmap add "..."` for work worth
 doing, `aerie bug note B7 "..."` for what you learn about an open one, and `aerie
-bug fix B7 "what fixed it"` or `aerie roadmap step done R4 2` as you finish. A
+bug fix B7 "what fixed it"` or `aerie roadmap step done R4 2` as you finish: a
+fix is committed first and closed after, so the bug records that commit as
+what fixed it (`aerie bug fix B7 B8 "..."` for several one commit fixed,
+`--commit SHA` for another, `aerie bug fixed-in B7` to see or change them),
+and a commit message names no bug, which only the notebook can open. A
 roadmap item the operator has shelved is parked: `aerie roadmap unshelve N WHY`
 asks for it back, and the work waits on their approval. `aerie rules add NAME
 "..."` leaves a note for the next session, marked as yours; the operator's
@@ -403,10 +431,17 @@ product, under Added, Changed, Deprecated, Removed, Fixed or Security; with
 no category it says when each applies. Fixed is for a bug a released
 version had, and a published pre-release of any name is a released
 version: a fix to something no release has carried yet gets no line, since
-the changelog is read by somebody upgrading from a release. `--bug N` ties a Fixed line to its bug, `aerie
-changelog skip N "why"` answers for one that needs none, and `aerie
-changelog missing` lists what the next release owes; a release is refused
-until it owes nothing. Unreleased is what no published build has carried:
+the changelog is read by somebody upgrading from a release. Its line comes
+after the fix's commit and the bug's close, and `--bug N` ties it to its bug
+(repeat it for several) and stamps it with the bug's fix commits, where
+otherwise it names HEAD; `aerie changelog link N
+BUG...` ties a line already written and `unlink` unties one. A tie is kept in
+the notebook and follows its line through an edit, a merge and the editor's
+Save, while the line names its commits alone. A fixed bug is answered by a
+tied line, by a line naming the commit that fixed it, or by `aerie changelog
+skip N "why"` for one that needs none; `aerie changelog missing` lists the
+rest, and a release waits for them unless the repository's Releases settings
+say to go ahead and say so. Unreleased is what no published build has carried:
 cutting a pre-release (`--dev`, or `--pre rc`) moves it into the
 pre-release's own section, and a stable release gathers those since the
 last stable. Tagging and publishing the release is
@@ -624,7 +659,9 @@ check a container nginx reaches before a route goes in. Acting on one is the
 space's dial (Agents may: Run its container):
 `aerie devapp start|stop|restart NAME`, and `--container NAME` on `aerie devapp
 rebuild` or `aerie devapp env` for one written for this space. You have no
-Docker socket of your own. A container that does not exist yet is an ask
+Docker socket of your own. On the controller's own machine, where docker is
+root over the controller, Auto is Ask for this dial: a build waits for a person
+there, and a container there opens no shell. A container that does not exist yet is an ask
 (`aerie container new`, under Asking a person): it belongs to this space
 unless `--for` names another, lives on one of the space's nodes, and has
 no space tree behind it, so a compose that builds from a path (`build: .`)
@@ -673,7 +710,10 @@ a file in the tree: `aerie devapp env` prints it, a compose line `env_file:
 space is expected. A compose file in a folder starts from its own folder's
 `.env.example`, never the root's, and a variable the file requires
 (`${NAME:?...}`) is set in the env before the first build, or the build
-stops at the gate asking for it. A space may also tick hosting-only nodes
+stops at the gate asking for it. A rebuild whose compose file asks for more
+than its own folder, or runs a service beside the app that its last build
+did not ship, is put to a person on the bell with what it found, on auto
+too: say why with `--why` and wait for the answer. A space may also tick hosting-only nodes
 (marked Hosting only under Also works on, in its settings), which hold no
 code and no session: `aerie devapp new --node NODE` builds one here and ships it there, and
 rebuild and remove reach it. What comes back from a hosting-only node

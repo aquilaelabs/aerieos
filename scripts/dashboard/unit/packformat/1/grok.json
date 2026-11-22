@@ -1,0 +1,44 @@
+{
+ "about": "Grok Build, run by sessions as grok",
+ "agent": {
+  "allow": {
+   "flag": "--allow",
+   "how": "flag",
+   "rule": "Bash({cmd}:*)"
+  },
+  "briefing": "system-prompt-file",
+  "command": "grok",
+  "guards": "hooks",
+  "install": {
+   "also": [],
+   "bin": ".local/bin/grok",
+   "env": {
+    "GROK_BIN_DIR": "{home}/.local/bin"
+   },
+   "fresh": "",
+   "pin": [
+    "BB_PIN",
+    "{v}"
+   ],
+   "rev": 1,
+   "script": "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}"
+  },
+  "latest_url": "https://x.ai/cli/stable",
+  "login_job": "grok-login",
+  "logout_job": "grok-logout",
+  "product": "Grok Build",
+  "provider": "xAI",
+  "reported": "grok",
+  "state": "hooks",
+  "tool": "grok-build",
+  "transcripts": ".grok/sessions",
+  "update_job": "grok-update"
+ },
+ "label": "Grok",
+ "name": "grok",
+ "platforms": [
+  "linux/*"
+ ],
+ "terms": [],
+ "tier": "official"
+}

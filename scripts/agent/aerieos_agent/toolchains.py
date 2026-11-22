@@ -10,6 +10,7 @@ from .base import (
     APT_CACHE_BIN,
     DNF_BIN,
     PACMAN_BIN,
+    ROOT_BUNDLE_DIR,
     XBPS_QUERY_BIN,
     ZYPPER_BIN,
     _probe,
@@ -105,12 +106,12 @@ def tc_users(path, limit=8):
 
 
 def tc_users_said(name, users):
-    """One sentence naming who is using a toolchain, for the job's log."""
-    who = ", ".join(f"{u['what']} (pid {u['pid']}{', ' + u['project'] + chr(39) + 's session' if u['project'] else ''})"
-                    for u in users)
-    return (f"refused: {name} is in use by {who}. Updating or removing it under them "
-            "replaces files they are running from; try again when they have finished, "
-            "or stop them first\n")
+    """Who is using a toolchain, for the job's log: each on a line of its
+    own with its pid and its space's session, then the refusal in one
+    sentence with neither, the line a page shows."""
+    who = "".join(f"  in use by {u['what']} (pid {u['pid']}{', ' + u['project'] + chr(39) + 's session' if u['project'] else ''})\n"
+                  for u in users)
+    return who + f"refused: {name} is in use, so it was left as it is: try again once that has finished\n"
 
 
 def share_images(store, say=None):
@@ -227,14 +228,29 @@ def extract_sandbox_tool(text):
     return (m.group(1) + "\n") if m else ""
 
 
+def root_catalog(into):
+    """read_catalog() for what root does on a recipe's word (its system
+    packages): from root's own copy of the bundle where this agent is root,
+    since the copy in the store at `into` is the jobs account's to write."""
+    return read_catalog(os.path.join(ROOT_BUNDLE_DIR, "current") if os.geteuid() == 0 else into)
+
+
 def read_catalog(into):
     """The catalog the bundle carries, or {} when it cannot be read, with the
     tool packs a person added (R77, config/toolpacks.json beside it) among
-    its toolchains."""
-    try:
-        with open(os.path.join(into, "config", "toolchains.json")) as f:
-            cat = json.load(f)
-    except (OSError, ValueError):
+    its toolchains. Where the bundle carries the vetted catalog's newer
+    rows (config/toolchains.catalog.json, the shipped rows with those in
+    their places), that file is the one read: the shipped one goes as its
+    release signed it."""
+    cat = None
+    for name in ("toolchains.catalog.json", "toolchains.json"):
+        try:
+            with open(os.path.join(into, "config", name)) as f:
+                cat = json.load(f)
+            break
+        except (OSError, ValueError):
+            continue
+    if cat is None:
         return {}
     try:
         with open(os.path.join(into, "config", "toolpacks.json")) as f:
@@ -248,6 +264,36 @@ def read_catalog(into):
     return cat
 
 
+# A system package's name, the one shape a recipe's is held to before a
+# package manager is handed it: a letter or digit, then letters, digits and
+# . + : _ -, eighty at most, not ending in - (apt reads a trailing one as
+# "remove"; a trailing + is its "install", and real names end in it: g++,
+# and gcc-c++ for dnf and zypper). Nothing that begins with a dash, no path, no
+# address. Portage alone names a package category/name, each half of that
+# shape, and never a file of its own kinds. The controller holds a
+# recipe's names to the same (packformat.system_name_ok).
+PKG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]{0,79}")
+EMERGE_FILES = (".ebuild", ".tbz2", ".gpkg.tar", ".xpak")
+
+
+def pkg_name_ok(fam, name):
+    """Whether `name` is a package's name for the family `fam` (PKG_NAME)."""
+    name = str(name)
+    parts = name.split("/") if fam == "emerge" else [name]
+    if len(parts) > 2 or (fam == "emerge" and name.endswith(EMERGE_FILES)):
+        return False
+    return all(PKG_NAME.fullmatch(x) and x[-1] != "-" for x in parts)
+
+
+def sysdeps_refused(cat, name, fam):
+    """The entries of a recipe's system packages for `fam` that are not
+    package names (pkg_name_ok), an alternative of one among them: what a
+    job refuses the recipe's packages for."""
+    recipe = next((p for p in cat.get("toolchains") or [] if p.get("name") == name), {})
+    want = [str(x) for x in ((recipe.get("system") or {}).get(fam) or []) if x][:SYSDEPS_MAX] if fam else []
+    return [e for e in want if not all(pkg_name_ok(fam, a) for a in e.split("|") if a)]
+
+
 def pkg_available(fam, name):
     """Whether this machine's repositories carry `name`: how a recipe entry
     naming alternatives picks the one this release has. A library renamed
@@ -256,12 +302,14 @@ def pkg_available(fam, name):
     that fails the whole install on every release but one: apt refuses the
     lot when one name is unknown. True when it cannot tell, so the first
     alternative is tried and its failure is the package manager's to say."""
-    argv = {"apt": [APT_CACHE_BIN, "show", "-q", name],
-            "dnf": [DNF_BIN, "-q", "info", name],
-            "zypper": [ZYPPER_BIN, "-q", "-n", "search", "-x", name],
-            "pacman": [PACMAN_BIN, "-Si", name],
-            "apk": [APK_BIN, "search", "-x", name],
-            "xbps": [XBPS_QUERY_BIN, "-R", name]}.get(fam)
+    argv = {"apt": [APT_CACHE_BIN, "show", "-q", "--", name],
+            "dnf": [DNF_BIN, "-q", "info", "--", name],
+            "zypper": [ZYPPER_BIN, "-q", "-n", "search", "-x", "--", name],
+            "pacman": [PACMAN_BIN, "-Si", "--", name],
+            "apk": [APK_BIN, "search", "-x", "--", name],
+            "xbps": [XBPS_QUERY_BIN, "-R", "--", name]}.get(fam)
+    if not pkg_name_ok(fam, name):
+        return False
     if not argv or not _have(argv[0]):
         return True
     try:
@@ -285,17 +333,20 @@ def sysdeps_missing(cat, name, fam, query):
     names) when its recipe lists them for another family only). Asked by
     exit code, never by output: dpkg -s and pacman -Q both print a sentence
     on stderr for a missing package, which read as "installed" when the
-    text was the test, and rpm -q prints "not installed" on stdout."""
+    text was the test, and rpm -q prints "not installed" on stdout. An
+    entry that is not a package's name (sysdeps_refused) is asked of nothing
+    and is in no answer."""
     recipe = next((p for p in cat.get("toolchains") or [] if p.get("name") == name), {})
     system = recipe.get("system") or {}
     want = [str(x) for x in (system.get(fam) or []) if x][:SYSDEPS_MAX] if fam else []
+    want = [e for e in want if all(pkg_name_ok(fam, a) for a in e.split("|") if a)]
     if not want:
         other = next((k for k in ("apt", "dnf", "pacman", "zypper", "apk", "xbps", "emerge")
                       if k != fam and system.get(k)), "")
         return [], ((other, [str(x) for x in system[other][:SYSDEPS_MAX]]) if other else None)
     def installed(x):
         try:
-            return subprocess.run(query + [x], capture_output=True, timeout=30,
+            return subprocess.run(query + ["--", x], capture_output=True, timeout=30,
                                   check=False).returncode == 0
         except (OSError, subprocess.SubprocessError):
             return False
@@ -350,7 +401,7 @@ def sysdeps_now(state):
     into = os.path.join(store, ".bb", "current") if store else ""
     if not into or not os.path.isdir(into):
         return {}
-    cat = read_catalog(into)
+    cat = root_catalog(into)
     fam, query, _ = pkg_backend()
     if not fam or not cat:
         return {}
@@ -426,11 +477,14 @@ def _listdir(path):
         return []
 
 
-def sdk_env(state, who=None):
+def sdk_env(state, who=None, layout_env=True):
     """The environment a job runs with on this node: the toolchain store as
     the toolchain store root, its android/ directory as ANDROID_HOME, its jdk as
     JAVA_HOME, every toolchain it holds on PATH, and AVDs under the data
     store. What the image gets from its Dockerfile, a node gets from here.
+    Without `layout_env`, none of the variables the toolchains' layouts set
+    (JAVA_HOME and its like): an installer's environment, where one a pack
+    set would steer what it downloads.
 
     EVERY job, not only a bb verb. It used to be applied in the bb branch of
     Job.exec alone, so `aerie build` and `aerie test` (a plain exec) ran with a
@@ -456,12 +510,15 @@ def sdk_env(state, who=None):
                 d = _lay_path(store, entry, rel)
                 if os.path.isdir(d) and d not in front:
                     front.append(d)
-            for k, v in (entry.get("env") or {}).items():
+            for k, v in (entry.get("env") or {}).items() if layout_env else ():
                 # `=VALUE` is the value itself, not a path: what a toolchain
                 # needs set beside where it is (B548: Playwright told not to
                 # sweep browsers another install of it did not ask for).
+                # Where that toolchain is installed here and nowhere else: a
+                # pack's reaches no job on a node that does not hold it.
                 if v.startswith("="):
-                    env.setdefault(k, v[1:])
+                    if os.path.isdir(_lay_path(store, entry, "")):
+                        env.setdefault(k, v[1:])
                     continue
                 d = _lay_path(store, entry, v)
                 if os.path.exists(d):
@@ -530,6 +587,70 @@ def sdk_verified(state):
     return out
 
 
+def netcut_sudoers(user, tool):
+    """The sudo rule that lets the account a node's jobs run as cut the
+    network for a declared pack's install steps (R234): the one command, which
+    runs what it is handed as that account again and never as root."""
+    return (f"# Written by the AerieOS agent (R234): the one command {user}, the account this\n"
+            f"# node's jobs run as, may run as root for a tool pack's install. It runs what it\n"
+            f"# is handed as {user} again, in a network namespace that holds no network.\n"
+            f"Defaults!{tool} !use_pty, !lecture\n"
+            f"{user} ALL=(root) NOPASSWD: {tool}\n")
+
+
+def sdk_receipts(state):
+    """What each pinned install left behind (R234): {name: {commit, tree,
+    files, bytes, at, before, net, and why where net is online}} from the
+    first line of its .bb-receipt, which the installer writes (sdkmeta.py
+    receipt). `tree` is one sha256 over every file's, `before` the tree the
+    same commit made here the last time where that was another, `net` what
+    its steps ran with (cut, open, or online with the entry's sentence as
+    `why`). One installed before receipts has none and is left out."""
+    store = tc_root(state)
+    out = {}
+    if not store:
+        return out
+    try:
+        names = sorted(os.listdir(store))[:80]
+    except OSError:
+        return out
+    hexd = set("0123456789abcdef")
+    for name in names:
+        if name.startswith("."):
+            continue
+        with contextlib.suppress(OSError, ValueError):
+            with open(os.path.join(store, name, ".bb-receipt"), encoding="utf-8", errors="replace") as f:
+                r = f.readline().rstrip("\n").split("\t")
+            if len(r) < 6 or r[0] != "1" or len(r[2]) != 64 or not set(r[2]) <= hexd:
+                continue
+            before = r[6] if len(r) > 6 and len(r[6]) == 64 and set(r[6]) <= hexd else ""
+            out[name] = {"commit": r[1][:64], "tree": r[2], "files": int(r[3]), "bytes": int(r[4]), "at": int(r[5]), "before": before,
+                         # An entry that declares its downloads: whether its
+                         # steps ran with the network cut, this node could
+                         # not cut it, or the entry kept it (online).
+                         "net": r[7] if len(r) > 7 and r[7] in ("cut", "open", "online") else ""}
+            # ...and for one that kept it, the entry's own sentence: what
+            # its installer downloads by itself, and from where.
+            if out[name]["net"] == "online":
+                out[name]["why"] = " ".join(r[8].split())[:300] if len(r) > 8 else ""
+    return out
+
+
+def jobs_who(state, env):
+    """Popen's keywords for the account this node's jobs run as, its home
+    put into `env`: who a root agent is when it asks anything of the
+    toolchain store, which is that account's to write. {} where there is
+    nobody to become (not root, or enrolled as root on purpose); KeyError
+    when the account is not on this machine."""
+    user = str(state.get("user") or "")
+    if os.geteuid() != 0 or not user or user == "root":
+        return {}
+    import pwd
+    pw = pwd.getpwnam(user)
+    env.update({"HOME": pw.pw_dir, "USER": user, "LOGNAME": user})
+    return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": []}
+
+
 def sdk_versions(state):
     """What `aerie toolchains versions` reports on this node: {name: version}.
 
@@ -540,29 +661,39 @@ def sdk_versions(state):
     name a version for, an unstripped "go version go1.27.0 linux/amd64", and
     nothing at all for the NDK. One store, two descriptions of it.
 
-    Run from a bundle already cached in the toolchain store, which a
-    toolchain job puts there: no round trip, no second copy of the probe
-    logic, and nothing reported at all until a job has run, which is the
-    honest answer rather than a summary standing in for an inventory.
+    A root agent runs root's own copy of aerie (ROOT_BUNDLE_DIR), as the
+    account its jobs run as: the store, its copy of the bundle and every
+    binary the probe starts are that account's to replace, so none of them
+    is run by root. An agent that is not root runs the copy a toolchain job
+    cached in the store, as itself. Nothing is reported until a bundle has
+    been fetched, which is the honest answer rather than a summary standing
+    in for an inventory.
     """
     store = tc_root(state)
     if not store:
         return {}
-    bbdir = os.path.join(store, ".bb")
-    try:
-        cands = [os.path.join(bbdir, d) for d in os.listdir(bbdir)]
-        cands.sort(key=lambda p: os.path.getmtime(p), reverse=True)
-    except OSError:
-        return {}
     env = dict(os.environ)
     env.update(sdk_env(state))
+    try:
+        who = jobs_who(state, env)
+    except KeyError:
+        return {}
+    if os.geteuid() == 0:
+        cands = [os.path.join(ROOT_BUNDLE_DIR, "current")]
+    else:
+        bbdir = os.path.join(store, ".bb")
+        try:
+            cands = [os.path.join(bbdir, d) for d in os.listdir(bbdir)]
+            cands.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        except OSError:
+            return {}
     for c in cands[:3]:
         bb = os.path.join(c, "scripts", "aerie")
         if not os.path.isfile(bb):
             continue
         try:
             p = subprocess.run(["bash", bb, "toolchains", "versions"], capture_output=True,
-                               text=True, timeout=120, check=False, env=env)
+                               text=True, timeout=120, check=False, env=env, cwd="/", **who)
         except (OSError, subprocess.SubprocessError):
             return {}
         out = {}

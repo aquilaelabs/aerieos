@@ -68,7 +68,7 @@ A machine's own kernel arguments (the IOMMU, CPUs kept for VMs) are
 `aerie_args` in the same environment, which every boot entry ends with:
 `slot args NAME=VALUE...` sets them, each in place of one of that name,
 `slot args-off NAME...` takes them off, and plain `slot args` prints them;
-each counts from the next boot. The IOMMU switch on This machine's
+each counts from the next boot. The IOMMU switch on the Nodes page's
 Features sets its arguments this way.
 
 **The stick is written rarely.** Flash wears with every write, and many
@@ -80,7 +80,7 @@ again at each boot; the controller's logs go to a pool when Controller
 settings' paths put them there. What writes all day, docker's images and
 containers, the VMs, the toolchains and the spaces, lives on a **system
 pool**, and so does the secrets folder with the install key, so the stick
-alone opens nothing the controller sealed: picked under This machine's **Pool and spaces** from the pools and the
+alone opens nothing the controller sealed: picked on the Nodes page under **Pool and spaces** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
 picked, docker and the VMs wait, and the spaces are held (the secrets stay
@@ -117,8 +117,8 @@ controller's account with the rest of the folder, so read it before running
 it; **Let it go** never runs that one.
 
 **A move onto a stick lands last,** since it would otherwise land on the stick.
-The first page asks whether you are moving a controller here. Say yes and make
-a setup account, and the next page is **Moving here**, a walk of the steps in
+The first page asks whether you are moving a controller here. Say yes and give
+the move token, with no account to make, and the next page is **Moving here**, a walk of the steps in
 the order they have to happen, each done on that page: what to have with you
 (the move token and the bundle), the disks, where the spaces and containers
 go, landing the controller, what comes after it, and the way back. Every install
@@ -131,7 +131,7 @@ while the machine runs a job (adopting the disks, moving to a pool) every step
 that would start another waits for it, the page saying what runs. **Walk me
 through it** and **Set up a new one instead** go between the walk and a new
 start. The stick's own partition is small (a few gigabytes until a system
-pool takes docker, the spaces and the secrets off it), and This machine says
+pool takes docker, the spaces and the secrets off it), and the Nodes page says
 how much room it has left, as the bell does when it runs low: the
 controller stops when it is full. A
 pool the machine adopted can be the system pool whatever its filesystem; a
@@ -157,29 +157,44 @@ big stick unused.
 
 With a backup password set under Controller settings, Backup, the
 controller keeps a sealed copy of its configuration (the same bundle a move
-carries: the state without its logs, the stores, the secrets; never the
-repositories) after every change, once the state has been quiet for a
+carries: the state without its logs, the stores, the secrets, and the
+install key, so the password alone restores what the state keeps sealed;
+never the repositories) after every change, once the state has been quiet for a
 quarter of an hour: under the state, and on every pool of the machine at
 `/mnt/POOL/.builderbot/backup`, the five newest in each; Back up now writes
 one at once, and each copy under the state is downloadable. Backup copies'
 **Also copied to** sends each copy as well to a disk or share ticked under
 Other disks and shares (`/mnt/other/NAME/.builderbot/backup`), so one is off
 the machine. The key is the password's (scrypt), so a copy carried off is a
-sealed file. These copies are the controller, not the files on the pools:
+sealed file, and one opened with the password is the whole controller, its
+sign-ins and tokens included: keep the password as you keep the owner's. A
+copy written before copies carried the install key is marked without it, and
+restored, its sign-ins and tokens stay locked until the key is given under
+Controller, Keys. These copies are the controller, not the files on the pools:
 the Storage page's snapshots and Backups keep those.
 
 A stick that dies is replaced by one written from the release's image with
-no configuration: its first page offers *Restoring a saved configuration*,
-lists the copies found on the machine's pools (newest first, with the
-machine and the version each came from) and takes the password, or takes a
-copy you kept; held to the same gate as a move (never onto an older build),
-restored and restarted, the machine is the controller as it was, its nodes
-checking back in. A node whose token rotated since the copy was made is
+no configuration. The new stick has a host id of its own, so the machine's
+pools, never exported by the stick that died, read as last used by another
+system: its first page offers *Restoring a saved configuration*, which lists
+those pools and brings one back as it was when its name is typed again (the
+Storage page's **Import anyway** does the same after setup), then lists the
+copies found on the machine's pools (newest first, with the machine and the
+version each came from) and takes the password, or takes a copy you kept;
+held to the same gate as a move (never onto an older build), restored and
+restarted, the machine is the controller as it was, its nodes checking back
+in. The restored configuration knows its system pool by the mark the old
+stick left on it, so naming that pool again takes it back as it is, with its
+containers, VMs and spaces, rather than setting it aside as another install's. A node whose token rotated since the copy was made is
 taken back by itself: it keeps the tokens it held over the last month and
 offers them, newest first, and the one the restored record knows earns it a
 fresh one. A node that is gone is simply never back.
 
 ## The stick maker
+
+A stick of 16 GB or more takes the image (it needs about 11.3 GB); both
+makers read the size the image needs and refuse a smaller stick before
+anything on it is erased.
 
 On Windows, **AerieOS USB Maker** (`aerieos-usb-maker-VERSION.exe`,
 attached to every release) does it in a window: which release (the newest,
@@ -187,16 +202,19 @@ the newest dev build, one by name, or an image file you have), which stick
 (the removable disks alone), a few settings for the first boot (the dev
 channel, a name, a time zone, a fixed address), and a last page naming the
 stick by model and size, with a box to tick, before it is erased; then the
-progress and the read back. It asks for Administrator once at start, since
+progress and the read back. While no stable release is published, the newest
+release is the newest dev build, said when it is done, with where to pick
+the dev channel for its updates. It asks for Administrator once at start, since
 writing a disk needs it, and every step in it is the stick maker's own.
 
 `tools/aerieos-stick.py` writes a release's stick image onto a USB
-stick on Windows, a Mac or Linux with nothing but Python's own library: `list`
+stick on Windows, a Mac or Linux with Python's own library and the
+system's `ssh-keygen` (OpenSSH, which checks the release's signature): `list`
 names the removable disks here (the system disk marked, and never written),
 `write DISK` fetches the newest release's `aerieos-os-VERSION.stick.raw.xz`
-(or `--release vX.Y.Z`'s, or writes `--image FILE`) with its sha256, checks
-it, says what is on the stick is lost, writes the disk whole and reads it
-back; `verify` reads a stick back against an image. `--set KEY=VALUE`, as
+(or `--release vX.Y.Z`'s, or writes `--image FILE`) with its sha256 and the
+release's signed list of its files, checks it against both, says what is on
+the stick is lost, writes the disk whole and reads it back; `verify` reads a stick back against an image. `--set KEY=VALUE`, as
 often as needed, writes a line into the stick's `aerieos.env`, the file on
 the ESP each boot reads: `TZ` (`Europe/Berlin`) and `BB_RELEASE_LINE` (the
 release line updates follow, `0.9`) for the controller, and the stick's
@@ -251,10 +269,10 @@ hash (the dashboard's own scheme, so a tool that writes the file hashes what
 was typed) and each person by name and role, with their SMB password where
 it came with them and no dashboard password until the owner sets one on the
 Users page. `"first_run": "skip"` marks the setup page done unless the plan names disks, which that page walks through, and `"hold_first_start": true`
-holds that first start, so the disks are on This machine before anything
+holds that first start, so the disks are on the Nodes page before anything
 mounts; without an
 owner's hash the first-run page makes the owner as on any stick. The shares,
-pools, array and apps wait until their disks are adopted. This machine's
+pools, array and apps wait until their disks are adopted. The machine's row's
 **First boot** section says what was applied, what waits and what could
 not be, and nothing of a hash is kept on the controller beyond the accounts
 themselves. It runs as root (sudo) on Linux and a
@@ -273,7 +291,7 @@ a container that asks for the card gets it; nouveau is kept off the card.
 On a machine without a card the modules stay unloaded. An AMD card or APU
 runs on the kernel's own amdgpu driver with the firmware the image carries.
 Which way a card is used, by this machine and its containers or by one VM
-through vfio, is a choice under This machine's Features (R207).
+through vfio, is a choice under Features on the Nodes page (R207).
 
 ## Its disks at the first run
 
@@ -302,9 +320,9 @@ password as the dashboard. The Storage page does all of this too, later, the sam
 way, with each share's security and each person's access. On a stick made with a prepared configuration that
 names disks to adopt, those disks are the old system's: each is listed as
 such, with no box, and the step makes nothing of them; they are taken as
-they are in the first-run page's walk, and later on This machine under The old system's disks.
+they are in the first-run page's walk, and later on the Nodes page under The old system's disks.
 
-Once they are adopted, This machine and the Storage page show them under
+Once they are adopted, the Nodes page and the Storage page show them under
 **Adopted disks**, with the folders at the top of `/mnt/user` that had no
 share settings offered to serve as the old system did. **Take the array
 over** (after **Check the takeover**, which says every step and changes
@@ -312,12 +330,12 @@ nothing) makes the data disks writable where they are, never formatting
 one, gives the old parity disk's first partition a filesystem for
 SnapRAID's parity, and starts the first sync, which builds the parity from
 nothing. That sync runs in the background, hours for a large array, with
-its progress on This machine and the Storage page (a bar, since SnapRAID
+its progress on the Nodes page and the Storage page (a bar, since SnapRAID
 says how far it is): the takeover's job ends at once, so the machine's
 other jobs are not held behind it. The array is unprotected until the sync
 ends. Taking the array over is not a step of the first-run walk: it is
 done from here afterwards, and the bell carries a row saying the array
-has no parity yet, with This machine on it, until it is taken over or the
+has no parity yet, with the Nodes page on it, until it is taken over or the
 disks are released. SnapRAID's content files, its catalogue of every block
 of the array, live on the data disks; on a stick none goes on the stick's
 own partition, where one for a large array would fill it. The array then
@@ -343,7 +361,7 @@ minutes for its next run, and never follows a share folder that is a link.
 A sync, scrub or parity check is refused while any disk of the array is not
 mounted.
 
-**Going back to the old system** on This machine says the way back for the
+**Going back to the old system** on the Nodes page says the way back for the
 state the disks are in: nothing to do while they are read-only, a parity
 check there once they were written to, and a new configuration with its
 parity rebuilt once the array was taken over. Nothing here repartitions or
@@ -360,14 +378,14 @@ comes up. The installer opens on the same logo. Both are plain characters,
 so a serial console or a server's remote screen draws them too.
 
 To log in at the screen (a monitor or a KVM), set a console password on
-This machine's Console section: it logs in as `admin`, with `sudo` for
+the Console section of its row on the Nodes page: it logs in as `admin`, with `sudo` for
 root, and it is separate from the dashboard's password. The image's root
 forgets everything at each boot, so the password's hash is kept on the
 data partition and the account is made from it at every start; until one
 is set, the screen says where to set it. While a machine is first set up,
 `admin` logs in with no password and `sudo` asks for none, so there is a way
-in if the agent or the dashboard stops partway. The first-run page offers a
-password; setup's end, or setting one, closes that login. It opens only on a
+in if the agent or the dashboard stops partway. **Generate console login** at the top
+of the first-run page shows a password once; setup's end, or setting one, closes that login. It opens only on a
 machine's first boot, so an update never opens it on an install already set
 up, and it is a login at the screen or serial line only. Root itself has no
 password. When
@@ -376,31 +394,46 @@ starts nothing and opens a root shell at the screen: whoever is at the
 keyboard can already take the disks out, so it opens nothing they do not
 have, and it is never the default.
 
-## Installing it on a machine
+## Setting up a new machine
 
-`aerieos-os-VERSION.iso` boots the same root live (UEFI or BIOS) with
-the installer on the console: it lists the machine's disks (the medium it
-booted from left out), asks which one to lay out and says that everything
-on it is lost, asks which features to turn on at the first boot (VM host
-and the hosting firewall on, the IOMMU off), then lays the disk out with
-the very script that made the image (`image/lay-disk`, carried in the
-image at `/usr/lib/aerieos-os/lay-disk`), the data partition grown to
-the disk, and asks for a restart. Nothing else is asked: the first boot
-makes the machine its own node with those features, and the dashboard's
-first page, at `http://ITS-ADDRESS:7680` on the LAN, makes the owner and
-names the machine. The ISO's second entry boots the live system without
-installing, for a look or a rescue.
+A new machine is set up from the USB edition: the stick's image, written
+with the USB maker or `tools/aerieos-stick.py`, booted on the machine, and
+the dashboard's first page at `http://ITS-ADDRESS:7680` on the LAN, which
+makes the owner, names the machine and sets up its disks as a pool or an
+array ([On a stick](#on-a-stick-run-from-memory), [The stick maker](#the-stick-maker)).
+
+`aerieos-os-VERSION.iso` is not an installer. It is the file a machine
+already running AerieOS updates from ([Updating](#updating)): the same root,
+kernel and initrd under `live/`. Booted by itself (UEFI or BIOS) its menu
+starts nothing on its own; its one entry runs AerieOS from the medium with
+nothing installed and nothing kept, for a look or a rescue, and the other
+says where a new machine starts. An installer on the machine's own screen,
+which puts this system on a disk and sets up the machine's disks there, is
+being built; until it is, no release offers one.
+
+The console installer that the ISO used to open is still in the image, for
+the build's check and for what replaces it: with `bbinstaller=1` on the
+kernel's line it lists the machine's disks (the medium left out), asks which
+to lay out and which features to turn on, and lays the disk out with the
+script that made the image (`image/lay-disk`). With
+`aerie_install_to=/dev/DISK` beside it the install asks nothing: that disk
+is laid out with no feature turned on, each step is said on the kernel's
+console, and the machine turns itself off at the end. That is how the build
+checks that its ISO lays out a blank disk that then boots; no menu carries
+either word.
 
 ## In a VM
 
-A VM installs from the ISO as a machine does: give it a disk of 16 GB or
-more, boot the ISO and pick that disk. It boots into the bare-metal
-controller with the machine as its own node, as a stick or an installed
-disk does. The build also converts the raw disk, never laid out again, into
-`aerieos-os-VERSION.qcow2` and `aerieos-os-VERSION.ova` (a
-stream-optimized VMDK with its OVF descriptor, `image/ovf.xml`, and a
-manifest), which the boot test runs and the CI run keeps as its artifact;
-a release does not carry them. Give the VM two processors and 4 GB at least, and
+A VM runs the USB edition as a machine does: the stick's image
+(`aerieos-os-VERSION.stick.raw.xz`, unpacked) as its first disk, and at
+least one more virtual disk for a pool, since the stick keeps the
+configuration and the containers' data goes on a pool. The build also
+converts the raw disk, never laid out again, into
+`aerieos-os-VERSION.qcow2`, which the boot test runs and the CI run keeps
+as its artifact; `image/build.sh --all-disks` makes
+`aerieos-os-VERSION.ova` (a stream-optimized VMDK with its OVF descriptor,
+`image/ovf.xml`, and a manifest) and the raw disk as `.raw.xz` as well. A
+release carries none of them. Give the VM two processors and 4 GB at least, and
 turn nested virtualization on for it where VMs are to run inside it (the
 Features row says when `/dev/kvm` is missing); the data partition is grown
 to the disk the hypervisor gives it at boot, so a disk made bigger later is
@@ -442,7 +475,7 @@ waits for the controller, which the image's own service started, puts up
 the wall between the controller and the sessions, and enrolls the machine as
 its controller's own node, as a bare-metal install's last step does. From
 there the machine is what [install.md](install.md)'s bare-metal section
-describes, and its page is This machine.
+describes, and its row is on the Nodes page.
 
 `/usr/lib/aerieos-os/slot` is the slot tool: `current` (the slot this
 boot came from), `other`, `next [a|b]` (the one GRUB boots next time, which
@@ -453,14 +486,20 @@ An updated slot's trial and Safe mode are under [Updating](#updating).
 
 CI builds the image on a hosted runner with a workflow of its own,
 `.github/workflows/os-image.yml`, which builds it and then boots the VM
-disk under QEMU until the dashboard answers (`appliance-boot`). The image
+disk under QEMU until the dashboard answers (`appliance-boot`), and the ISO
+installed onto a blank disk there, which is then booted to its dashboard. The image
 build calls it on every release tag, from the Actions page's *Run
 workflow* with its *appliance* box ticked, and weekly; a branch push that
 touches the image runs it alone and publishes nothing, so a fix to the
 image is proved on a push. A release carries two of its files, the ISO and
 the stick's image, each with its sha256 and a build attestation, and only
-after the boot (`appliance-publish`); the raw disk, the qcow2 and the OVA
-stay the run's artifact.
+after the boot: the run's last job (`release`) makes the release with them
+and every other file, once all of it has passed; the raw disk, the qcow2
+and the OVA stay the run's artifact. Only a release's image carries the
+agent's signature, made by that run's one job that reads the release key
+and checked here against the committed key; a branch's, a manual run's and
+the weekly rebuild's carry the agent unsigned, and this workflow is handed
+no secret.
 The weekly run takes the day before's snapshot, builds, and says in its
 summary which system packages moved since the last release (each image
 carries its package list, `.packages`); a patch release from it is a press
@@ -486,12 +525,16 @@ A newer release is found the way a bare-metal install's is (checked weekly
 unless Controller settings' Update checks says otherwise, and on **Check
 now** under Controller settings, Updates, and said on the bell). It follows
 the release line the install is on (`BB_RELEASE_LINE`, which the stick
-maker's `--set` writes) and the releases as published; the dev builds'
+maker's `--set` writes: `0.9` is offered 0.9's releases and dev builds alone,
+and a stick that names none every release) and the releases as published; the dev builds'
 channel is in [versions.md](versions.md#two-channels). On AerieOS **Update** does not run the installer: the own
-node's root agent fetches the release's ISO, checks it against the sha256
-the release carries and against its build attestation (`gh attestation
-verify`; an image that does not verify, or a machine without `gh`, writes
-nothing), opens it read-only and takes the root, the kernel, the initrd and
+node's root agent reads the release's signed list of its files (below, The
+release keys; a release it may not take is refused before the image is
+fetched), fetches the release's ISO, checks it against the sha256
+the release carries, against its build attestation (`gh attestation
+verify`, held to the release workflow on a version's tag; an image that
+does not verify, or a machine without `gh`, writes nothing) and against
+the signed list, opens it read-only and takes the root, the kernel, the initrd and
 the stamp out of its `live/` folder as plain files, points the next boot
 back at the slot running now, writes the slot not in use, puts the kernel
 beside it on the ESP, and only then names that slot for the next boot, on
@@ -499,35 +542,79 @@ trial, in one write. An update is refused while the slot running now is
 itself on trial, since the other slot is then the only good one, and when
 a second AerieOS disk or stick in the machine carries the same slot.
 Nothing running changes until you restart
-from This machine, and the slot running now stays to fall back to: at the
+from This controller, and the slot running now stays to fall back to: at the
 GRUB menu, or with `slot next a`. The Updates section says which slot runs
 and which boots next.
 
 An offline machine takes the same files from a folder on it (a stick, a
 share): **Update from the folder** under Updates, the folder holding the
-release's ISO with its `.sha256` and its `.attestation.jsonl` beside it,
-all three from the release. The ISO is checked against both with no
-network: the attestation against the trusted root the running image was
+release's ISO with its `.sha256`, its `.attestation.jsonl`, `SHA256SUMS`
+and `SHA256SUMS.sig` beside it, all five from the release. The ISO is
+checked against each with no network: the attestation against the trusted root the running image was
 built with, so a folder on a share others can write cannot hand over an
 image AerieOS's release workflow did not build. A release's attestation
 is read from GitHub's public API, and neither way asks for a sign-in.
 
-**The release key.** The sha256 and the attestation prove a file is the one
-AerieOS's release workflow built, which is not enough when the workflow
-or the repository itself is changed by someone else: they would build and
-attest a release of their own. So a release also carries `SHA256SUMS` and
-`SHA256SUMS.sig`, the list of its files' sha256 signed with an Ed25519 key
-that lives offline on the release key holder's own machine
-(`tools/release-sign.py sign TAG`), never in CI, the repository or a
-controller. The keys a signature must verify against are the install's own
-copy of `config/release-signers`, read from the image it is running, never
-from the release: an update that no key this install already held signed
-is refused, by the OS updater, the stick maker (`write` checks the image it
-fetched against the list) and the installer alike. Each checks with
-OpenSSH's `ssh-keygen -Y verify`. While `config/release-signers` holds no
-key the check is skipped and said so, which is how a build before the first
-key behaves; once it holds one, an unsigned release is refused. The key's
-fingerprint is published on aerieos.org to check the file against.
+**The release keys.** The sha256 beside a file is the release's word for
+itself, and whoever can replace a file on a release can replace that too;
+the attestation proves which workflow built a file, which is not enough
+when the workflow or the repository itself is changed by someone else. So
+a release also carries `SHA256SUMS` and `SHA256SUMS.sig`: the list of its
+files with the sha256 of each one's own bytes, signed with an Ed25519 key.
+The keys a signature must verify against are the install's own copy of
+`config/release-signers`, which the image carries at
+`/opt/aerieos/config/release-signers` and a bare-metal release is laid out
+with, never the release's: a file is taken only when it is in a list a key
+this install already held signed. Four things check it, each with OpenSSH's
+`ssh-keygen -Y verify`, and each hashes the file it took and holds those
+bytes to the list: the OS updater, the installer's `--update`, the stick
+maker (`write`, which carries the same lines in itself) and the Library's
+downloads of the apps.
+
+What the list is made over is every file of the release, and each is
+vouched for before it is listed. Every file CI builds carries a build
+attestation made by the job that built it: the controller bundle, the ISO,
+the stick's image and the line naming the container image by the release
+workflow (`build-image.yml`), the two `.exe`, the `.pyz` and the `.vsix` by
+the companion's workflow it calls (`companion-app.yml`), each run on the
+release's tag; the seal takes a file only from the workflow named for it
+(`tools/release-sign.py`'s `WORKFLOWS`). The Android app is the one file no
+build attests, since a controller signs it after the build: it is taken
+only when `apksigner` verifies it as signed by a certificate
+`config/apk-signers` names. The container image itself carries no
+attestation, so that the registry serves it as a plain manifest; what
+names it is `aerieos-image-VER.digest`, one line,
+`ghcr.io/aquilaelabs/aerieos@sha256:...`, attested and in the signed list,
+so a signed release says which image is its own. A container that follows
+`:dev` or `:latest` of that image is held to it on the Containers page:
+an update is said by the digest the newest signed release names, and a
+tag that serves any other image is said plainly, with no update offered
+from it. How the list is made and when is in
+[versions.md](versions.md#drafts).
+
+Who may have signed follows the release's tag, and the namespace a signer
+is named for says the channel. Dev builds publish by themselves, so their
+list is signed in CI (`seal-release.yml`, once the signed Android app is on
+the release), in the namespace `aerieos-dev`, with the release
+build's key (`tools/release-sign.py seal TAG`): the key and its spare of
+`config/aerieos-release.pub`, written into `config/release-signers` as
+OpenSSH keys by `tools/release-signers.py` and held there by `aerie lint`.
+A stable release is signed in `aerieos-release` by its key's holder, on
+their own machine (`tools/release-sign.py sign TAG`), with a key that is
+never in CI, the repository or a controller, so a stable release waits for
+its holder's signature. A pre-release tag (`vX.Y.Z-dev.N`, `-rc.N`) takes a
+list signed in either namespace; a stable tag (`vX.Y.Z`) takes
+`aerieos-release` alone, so the key CI holds can never sign a stable
+release. A release whose list is missing (every release made before
+releases were signed, and a stable one its holder has not signed yet),
+signed by no key the install names, or signed in a namespace its tag may
+not use is refused with the reason, and so is a stable release while
+`config/release-signers` names no stable signer yet. An install whose
+file names no signer at all takes no release: every build ships the file,
+so one without it has lost it. Both signing modes
+make the list from the files themselves, downloaded and hashed, never from
+the sha256 files the release carries. The stable key's fingerprint is
+published on aerieos.org to check the file against.
 
 **On trial.** The slot an update wrote boots on trial: GRUB counts each
 boot of it in its environment, and the health check
@@ -537,7 +624,7 @@ node's agent runs. A trial boot that is not healthy
 within ten minutes restarts, a kernel or initramfs that panics restarts
 after fifteen seconds, and a kernel that will not load falls to the slot
 before at once; a second boot without the health check's word goes back to
-the slot before by itself, and This machine says so until the next update.
+the slot before by itself, and This controller says so until the next update.
 Picking the slot before from the menu during a trial ends the trial there,
 and visiting an older version is refused while one runs. The new image's
 own boot menu goes on the disk only once its slot is marked good, so a
@@ -561,16 +648,15 @@ version in it is kept instead of lost, as files under
 `/var/lib/aerieos-os/kept/` with the configuration's copy from when it was
 left: about 2 GB each, the three newest by default (Update window's **Older
 versions kept on the boot menu**, 0 for none). Each is an entry under **Older
-versions** on the boot menu and a row on This machine, whose **Boot this next**
+versions** on the boot menu and a row on This controller, whose **Boot this next**
 visits it once. A visit loads its root into memory from the data partition, on
 a disk as on a stick. It lasts one boot: the next restart is the version it came
 from, and one that does not come up restarts into it by itself. If the
 configuration has moved on further than that version reads, its copy is used and
 yours is set aside, and comes back when the visit ends; what the visit changed
 is set aside in `/var/lib/aerieos-os/rolled-back-TIME-visit/`. Updates wait
-until a visit ends. An image built before this feature cannot boot from files,
-so it is said and not kept, and a version kept already is never replaced by
-what the slot holds later. The menu on the ESP follows the image running, so a
+until a visit ends. A version kept already is never replaced by what the
+slot holds later. The menu on the ESP follows the image running, so a
 disk laid by an older image takes the entry with its first update.
 
 **The short address.** On a controller's own machine the dashboard stays on its
@@ -586,7 +672,7 @@ dashboard a route of its own on the nginx page.
 boots is the default after four seconds, and **Safe mode** boots the slot
 that runs now with the start held: the dashboard and the shares come up
 and nothing else starts (no container, VM or session) until Start is
-pressed on This machine.
+pressed on This controller.
 
 **Update window.** By default nothing is applied by itself. Under
 Controller settings, *Update window* names a day (daily, or one weekday)
@@ -594,11 +680,6 @@ and an hour; in that hour a newer release is applied the way Update does
 it, once per release, and the restart still waits for you.
 
 ## What is not here yet
-
-Containers do not run on the controller's own machine yet: Docker is here and
-its images have their place on the system pool, but it is root over the
-controller, so the machine's own node is no docker host and the Containers
-page sends work to another enrolled machine.
 
 The boot in CI does not yet try a ZFS pool and an array on virtual disks, a
 share over SMB, a node enrolled and a container started, or the browser

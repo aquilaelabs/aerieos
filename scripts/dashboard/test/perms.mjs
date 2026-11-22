@@ -5,21 +5,9 @@
 // (the operator, 17 Oct).
 // Honored by the gate where they hold and nowhere else; a project's owner
 // gives roles on the projects they own and nothing Global.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey, asUser, call as api, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
+import { join } from 'node:path';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1400 } });
@@ -85,10 +73,10 @@ ok(/space areas only/.test((await api('/api/roles', { action: 'set', name: 'bad'
 execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'dep', '--role', 'user'],
   { input: 'deppass11\ndeppass11\n', encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const depAuth = asUser('dep', 'deppass11');
-{
+await section("a new account holds no role and may do nothing", async () => {
   const none = await api('/api/version', { project: 'alpha', action: 'nothing-much' }, depAuth);
   ok(none.status === 403 || none.status === 400, `a new account holds no role and may do nothing (${none.status} ${none.body.error || ''})`);
-}
+});
 await page.evaluate(() => loadRoles());
 await page.waitForFunction(() => (rolesData?.people || []).some(p => p.name === 'dep'), null, { timeout: 10000 });
 // An account's roles are picked in its settings on the Users page.
@@ -122,7 +110,7 @@ const onBeta = await api('/api/version', { project: 'beta', action: 'nothing-muc
 // role there), so it reads as absent rather than refused.
 ok(onAlpha.status !== 403 && (onBeta.status === 403 || (onBeta.status === 400 && /not a space/.test(onBeta.body.error || ''))),
    `People gives the role on alpha and the gate holds it there alone (alpha ${onAlpha.status}, beta ${onBeta.status})`);
-{
+await section("and being on alpha follows the role", async () => {
   const p = (await api('/api/roles')).body.people.find(x => x.name === 'dep');
   ok(JSON.stringify(p.projects) === JSON.stringify([AK]), `...and being on alpha follows the role (${JSON.stringify(p.projects)})`);
   const glob = await api('/api/roles', { action: 'assign', name: 'dep', roles: ['deployer'] });
@@ -131,7 +119,7 @@ ok(onAlpha.status !== 403 && (onBeta.status === 403 || (onBeta.status === 400 &&
   const kind = await api('/api/roles', { action: 'set', name: 'deployer', scope: 'global', perms: { projects: 'read' } });
   ok(kind.status === 400 && /dep holds deployer/.test(kind.body.error || ''),
      `...and a held role keeps its kind (${kind.body.error})`);
-}
+});
 ok((await api('/api/rename', { name: 'alpha', to: 'alpha2' }, depAuth)).status === 403,
    '...and nothing the role did not say');
 
@@ -155,7 +143,7 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
 // Making projects on one node (the operator, 7 Oct): New projects is its
 // own area, and an Everywhere role holds a node area node by node, the
 // area's row opened on the nodes, Read and Write on each (R260, 16 Oct).
-{
+await section("Making projects on one node", async () => {
   const sandbox = (await api('/api/v1/nodes')).body.nodes.find(n => n.kind !== 'local');
   // A second node, so one ticked of two is not every node.
   const other = (await api('/api/v1/nodes', { action: 'enroll', name: 'roles-other' })).body;
@@ -214,12 +202,12 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
   await api('/api/roles', { action: 'assign', name: 'dep', roles: [] });
   await api('/api/roles', { action: 'remove', name: 'creator' });
   await api('/api/v1/nodes', { action: 'retire', id: other.id });
-}
+});
 
 // An area without Read is refused and hidden (R152 step 3): a role that
-// reads Toolchains alone sees that tab and none of the others.
-{
-  await api('/api/roles', { action: 'set', name: 'tc-viewer', scope: 'global', perms: { toolchains: 'read' } });
+// reads Install alone sees that tab and none of the others.
+await section("An area without Read is refused and hidden", async () => {
+  await api('/api/roles', { action: 'set', name: 'tc-viewer', scope: 'global', perms: { install: 'read' } });
   await api('/api/roles', { action: 'assign', name: 'dep', roles: ['tc-viewer'] });
   const tc = await api('/api/toolchains', undefined, depAuth);
   const nd = await api('/api/v1/nodes', undefined, depAuth);
@@ -256,12 +244,12 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
   await dp.close();
   await api('/api/roles', { action: 'assign', name: 'dep', roles: [] });
   await api('/api/roles', { action: 'remove', name: 'tc-viewer' });
-}
+});
 
 // Controller is a rail group of its own (the operator, 22 Oct), after
 // Containers so a phone's bar keeps its four, and an address from before
 // either move still finds it.
-{
+await section("Controller is a rail group of its own", async () => {
   const before = await page.evaluate(() => location.hash);
   await page.evaluate(() => railGo('home'));
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'home', null, { timeout: 10000 });
@@ -280,7 +268,7 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
      && Object.values(at).every(v => v === '#/controller/settings controller'),
      `Controller is its own group after Containers, a phone's four unchanged, and both old addresses land on it (${JSON.stringify({ homeAt, rail, phone, at })})`);
   if (before) await page.evaluate(h => openRoute(h), before);
-}
+});
 
 // Removed, the role goes with it.
 await api('/api/roles', { action: 'remove', name: 'deployer' });

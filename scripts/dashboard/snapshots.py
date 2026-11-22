@@ -33,7 +33,6 @@ import wssync
 
 WORKSPACE = Path("/workspace")
 days_of = None            # set by server.py: (project) -> days to keep, 0 for none
-on_of = None              # set by server.py: (project) -> whether one is taken each day (R105)
 projects = None           # set by server.py: () -> [project names]
 audit = None
 CHECK_EVERY = 1800        # seconds between looks for a project with no snapshot today
@@ -41,10 +40,10 @@ DAY = re.compile(r"\d{4}-\d{2}-\d{2}(T\d{6}-before-restore)?")
 _lock = threading.Lock()
 
 
-def configure(*, workspace, days, names, audit_fn=None, on=None):
+def configure(*, workspace, days, names, audit_fn=None):
     """paths.py and wssync.py are configured by the server already; this
     takes what is the project settings' and the audit's."""
-    globals().update(WORKSPACE=Path(workspace), days_of=days, projects=names, audit=audit_fn, on_of=on)
+    globals().update(WORKSPACE=Path(workspace), days_of=days, projects=names, audit=audit_fn)
 
 
 def _store():
@@ -164,12 +163,18 @@ def pin(project, day, on=True):
 
 
 def prune(project, keep):
-    """Days older than `keep` go; 0 keeps none. A pinned day stays."""
+    """Days older than `keep` go, and a pinned day stays. At 0 nothing goes
+    (the operator, 13 Nov): 0 is no snapshot taken, and the ones a
+    repository has are a person's to let go, by keeping some days again.
+    It removed them all, so a repository set to 0 lost what it could be
+    restored from at the next daily look."""
+    if keep <= 0:
+        return
     cut = time.time() - keep * 86400
     for d in days(project):
         if d["pinned"]:
             continue
-        if keep == 0 or d["at"] < cut:
+        if d["at"] < cut:
             (_days_dir(project) / f"{d['day']}.json").unlink(missing_ok=True)
 
 
@@ -203,8 +208,7 @@ def daily():
             except (TypeError, ValueError, KeyError):
                 continue
             try:
-                on = bool(on_of(project)) if on_of else True
-                if on and keep and not (_days_dir(project) / f"{today}.json").exists():
+                if keep > 0 and not (_days_dir(project) / f"{today}.json").exists():
                     take(project)
                 prune(project, keep)
             except (OSError, ValueError) as e:

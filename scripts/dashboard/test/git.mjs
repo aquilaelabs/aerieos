@@ -3,11 +3,10 @@
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
 // here writes through the dashboard, because this step has no actions.
-import { launch, newPage, ok, done, ready, refreshUntil, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const B = `${DIR}/ws/beta`;
 const git = (...a) => execFileSync('git', ['-C', B, ...a], { encoding: 'utf8' }).trim();
 // A history worth a graph: two commits on the main line, a branch off the
@@ -31,14 +30,14 @@ git('branch', 'claude/no-such-account');
 // root commit made with plumbing: --date-order never lists a child before
 // its parent, so an old commit on top of today's would still sort first,
 // and a checkout would fight the uncommitted a.txt above.
-{
+await section("and a branch whose last commit is three days old, because every row of", async () => {
   const three = `${Math.floor(Date.now() / 1000) - 3 * 86400} +0000`;
   const blob = execFileSync('git', ['-C', B, 'hash-object', '-w', '--stdin'], { input: 'old\n', encoding: 'utf8' }).trim();
   const tree = execFileSync('git', ['-C', B, 'mktree'], { input: `100644 blob ${blob}\told.txt\n`, encoding: 'utf8' }).trim();
   const old = execFileSync('git', ['-C', B, 'commit-tree', tree, '-m', 'Old work'], { encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_DATE: three, GIT_COMMITTER_DATE: three } }).trim();
   git('branch', 'old-work', old);
-}
+});
 writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n');
 writeFileSync(`${B}/new.txt`, 'brand new\n');
 
@@ -49,13 +48,13 @@ await ready(page);
 // claude/tabmade is a session's branch because its account exists (git.py
 // branch_owner): made the way the Users tab makes one.
 await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST',
-  headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+  headers: OWNER,
   body: JSON.stringify({ action: 'add', name: 'tabmade', password: 'tabmade-pass-1', role: 'user' }) });
 await member('tabmade');
 
 // ---- the API, first ---------------------------------------------------------
 const api = async q => (await (await fetch(URL.replace(/\/$/, '') + '/api/git?project=beta&' + q,
-  { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json());
+  { headers: OWNER })).json());
 const st = await api('what=status');
 ok(st.branch === main && st.files.some(f => f.path === 'a.txt' && f.state === 'modified')
    && st.files.some(f => f.path === 'new.txt' && f.state === 'untracked'),
@@ -100,7 +99,7 @@ ok(cmp.commits?.length === 1 && cmp.commits[0].subject === 'Old work' && cmp.fil
 ok((await api('what=compare&branch=' + main)).error && (await api('what=compare&branch=nope')).error,
    '...and main itself, or a branch that is not there, is refused');
 ok((await api('what=status').then(() => fetch(URL.replace(/\/$/, '') + '/api/git?project=nope&what=status',
-  { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } }))).status === 400,
+  { headers: OWNER }))).status === 400,
    'a space that is not one is refused');
 
 // ---- the view ---------------------------------------------------------------
@@ -123,7 +122,7 @@ ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.tes
 // hundred reads in a few minutes on the controller). The view redraws when
 // a commit lands: one of another file asks nothing of this one; one after
 // this file changed asks once.
-{
+await section("An open diff is read once, not on every redraw of the view", async () => {
   const g = (...a) => execFileSync('git', ['-C', B, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a]);
   const landed = subject => page.waitForFunction(([sel, s]) => (document.querySelector(sel)?.textContent || '').includes(s),
     [NB, subject], { timeout: 30000 });
@@ -132,7 +131,7 @@ ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.tes
   page.on('request', onReq);
   writeFileSync(`${B}/other.txt`, 'another\n'); g('add', 'other.txt'); g('commit', '-qm', 'another file, for the redraw');
   await landed('another file, for the redraw');
-  await page.waitForTimeout(500);
+  await quietFor(500);
   const quiet = asked.length;
   writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\nfour\n');
   writeFileSync(`${B}/other2.txt`, 'more\n'); g('add', 'other2.txt'); g('commit', '-qm', 'a second file, for the redraw');
@@ -147,9 +146,20 @@ ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.tes
   g('reset', '-q', '--soft', 'HEAD~2'); g('reset', '-q', '--', 'other.txt', 'other2.txt');
   rmSync(`${B}/other.txt`); rmSync(`${B}/other2.txt`);
   writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n');
-}
+});
 // One section open at a time (the operator, 5 Oct): History is opened.
 await openFold(page, `${NB} [data-sect="git:history"]`);
+// By day first, as a forge lists commits: a head where the day changes and
+// each commit under it, with the graph a switch away.
+await section("History lists the commits by day, with the graph a switch away", async () => {
+  const days = await page.$eval(`${NB} [data-sect="git:history"]`, d => ({
+    heads: [...d.querySelectorAll('.gdays .gdayhead')].map(h => h.textContent), rows: d.querySelectorAll('.gdays .grow[data-sha]').length,
+    graph: !!d.querySelector('.gitgraph'), on: d.querySelector('[data-ghist].on')?.dataset.ghist }));
+  ok(days.heads.length >= 2 && days.heads.every(h => /^Commits on /.test(h)) && days.rows >= 5 && !days.graph && days.on === 'day',
+     `History lists the commits by day, a head where the day changes, with no graph until it is asked for (${JSON.stringify(days)})`);
+  await page.click(`${NB} [data-ghist="graph"]`);
+  await page.waitForSelector(`${NB} .gitgraph`, { timeout: 10000 });
+});
 const graph = await page.$eval(`${NB} .gitgraph`, g => ({
   rows: g.querySelectorAll('.grow[data-sha]').length, nodes: g.querySelectorAll('circle').length,
   edges: g.querySelectorAll('path').length, lanes: parseInt(getComputedStyle(g).getPropertyValue('--glanes')) }));
@@ -175,6 +185,14 @@ ok(await page.$eval(`${NB} #gitDetail`, e => !!e.querySelector('pre.diff .d-add'
 // The detail sits under the whole history, so on a short window a click has
 // to take the page down to it rather than leave the change below the fold.
 await page.setViewportSize({ width: 1280, height: 360 });
+// The view laid out again at that height and its reads in before the pick:
+// under a whole run's load what sat above the detail changed after the
+// page had gone down to it, leaving it 151 px past the pane's top (B833).
+await until(async () => {
+  const a = await page.$eval(`${NB} .nbview[data-view="git"]`, e => Math.round(e.scrollHeight));
+  await new Promise(r => setTimeout(r, 250));
+  return a === await page.$eval(`${NB} .nbview[data-view="git"]`, e => Math.round(e.scrollHeight));
+}, 10000, 50);
 await page.click(`${NB} .grow[data-sha="${merge.sha}"]`);
 const landed = await page.waitForFunction(sel => {
   const d = document.querySelector(sel);
@@ -184,7 +202,7 @@ const landed = await page.waitForFunction(sel => {
   // At the top of the pane that scrolls, or as far down as the pane goes.
   return !!p && (Math.abs(d.getBoundingClientRect().top - p.getBoundingClientRect().top) < 24
                  || p.scrollTop >= p.scrollHeight - p.clientHeight - 2);
-}, `${NB} #gitDetail`, { timeout: 5000 }).then(() => true, () => false);
+}, `${NB} #gitDetail`, { timeout: 15000 }).then(() => true, () => false);
 const at = await page.$eval(`${NB} #gitDetail`, e => {
   let p = e.parentElement;
   while (p && !(p.scrollHeight > p.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(p).overflowY))) p = p.parentElement;
@@ -200,7 +218,7 @@ ok(await page.$eval(`${NB}`, e => { const r = [...e.querySelectorAll('.gbranch')
    'a branch row says how old its last commit is, not "just now" for everything');
 // A commit made elsewhere reaches the open view on the git revision, not a poll.
 writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n'); git('commit', '-q', '-am', 'Third line');
-await refreshUntil(page, () => /Third line/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''),
+await refreshUntil(page, () => /Third line/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''),
                    { timeout: 30000 });
 ok(true, 'a commit made outside the dashboard arrives on the view by itself');
 
@@ -209,8 +227,8 @@ ok(true, 'a commit made outside the dashboard arrives on the view by itself');
 // the acting account's author; the network ones against a bare repository
 // standing in for GitHub, with push rights granted the way the clone dialog
 // grants them. An account's, never a session's, and not on a locked project.
-{
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+await section("the actions (step 2)", async () => {
+  const H = OWNER;
   const act = async (action, args, headers = H) => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/git', { method: 'POST', headers,
       body: JSON.stringify({ project: 'beta', action, args: args || {} }) });
@@ -426,7 +444,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     // moves (R94): a branch switched under it is read at once, never a
     // kept answer from before.
     const statusBranch = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/status',
-      { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json()).projects || [])
+      { headers: OWNER })).json()).projects || [])
       .find(p => p.name === 'beta')?.git;
     const onReady = await statusBranch();
     git('checkout', '-q', main);
@@ -647,14 +665,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   }
 
   // Whose: a session's token cannot press these; it has aerie git.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, json, os, sys
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
+  const tok = mint('beta');
   const asSession = await act('fetch', {}, { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
   ok(asSession.status === 403 && /aerie git/.test(asSession.error), "a session's token is refused the buttons, and told about aerie git");
   // Its owner's lock leaves its owner working (R119); an administrator's
@@ -722,8 +733,12 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   await page.waitForFunction(() => [...document.querySelectorAll('.nb .nbview[data-view="git"] .gbranch:not([hidden])')].every(r => r.dataset.kind === 'remote'), null, { timeout: 5000 });
   await page.click('.nb .nbview[data-view="git"] [data-gbchip=""]');
   await page.fill('.nb .nbview[data-view="git"] #gitBranchFind', 'old-w');
-  ok(await page.$$eval('.nb .nbview[data-view="git"] .gbranch:not([hidden])', rs => rs.map(r => r.dataset.branch).join()) === 'old-work',
-     'a chip narrows the table to its kind, and the search to the names holding what is typed');
+  // ...the rows on show, not the copies of the ones a chip took away while
+  // they fade (.fghost, which every reader of the parts skips).
+  const narrowed = await page.$$eval('.nb .nbview[data-view="git"] .gbranch:not([hidden]):not(.fghost)', rs => rs.map(r => r.dataset.branch).join());
+  const ghosts = await page.$$eval('.nb .nbview[data-view="git"] .gbranch.fghost', rs => rs.length);
+  ok(narrowed === 'old-work',
+     `a chip narrows the table to its kind, and the search to the names holding what is typed (${JSON.stringify({ narrowed, ghosts })})`);
   await page.fill('.nb .nbview[data-view="git"] #gitBranchFind', '');
   await page.click('.nb .nbview[data-view="git"] [data-gbchip="active"]');
   // R69 step 1 in the view: the fold lists what is only on the host, and
@@ -770,13 +785,36 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
        `a new branch made and switched to with changes not committed takes them along (${JSON.stringify({ error: j.error, on, dirty, still })})`);
   }
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:changes"]');   // one section open at a time
+  // A message being typed outlives the view drawn again under it (R244): a
+  // session's commit moves the view (its token is HEAD's log) while a person
+  // writes the words of their own.
+  {
+    const V = '.nb .nbview[data-view="git"]';
+    await page.click(`${V} #gitMsg`);
+    await page.keyboard.type('From the', { delay: 30 });
+    const box = await page.$(`${V} #gitMsg`);
+    git('commit', '-q', '--allow-empty', '-m', 'A session commits meanwhile');
+    const moved = await refreshUntil(page, () => /A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 15000 })
+      .then(() => true, () => false);
+    await page.keyboard.type(' view', { delay: 30 });
+    const r = await page.evaluate(b => ({ kept: b.isConnected, focus: document.activeElement === b, value: b.value, caret: b.selectionStart }), box);
+    ok(moved && r.kept && r.focus && r.value === 'From the view' && r.caret === 13,
+       `a commit message being typed keeps its box, its focus and its caret while a commit draws the view again (${JSON.stringify({ moved, ...r })})`);
+    git('reset', '-q', '--soft', 'HEAD~1');
+    await refreshUntil(page, () => !/A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 15000 }).catch(() => {});
+  }
   await page.fill('.nb .nbview[data-view="git"] #gitMsg', 'From the view');
   await page.click('.nb .nbview[data-view="git"] #gitCommit');
-  await refreshUntil(page, () => /From the view/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 20000 });
+  await refreshUntil(page, () => /From the view/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 20000 });
   ok(git('log', '-1', '--format=%s') === 'From the view', 'Commit from the view commits, and the graph shows it');
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time (the operator, 5 Oct)
   await page.click('.nb .nbview[data-view="git"] .grow[data-sha]');
   await page.waitForSelector('.nb .nbview[data-view="git"] #gitDetail [data-gitrevert]', { timeout: 10000 });
+  // ...and its read is in: a commit picked earlier in this file left its
+  // detail drawn, so the Revert above can be that one's, and the read for
+  // this press, landing a moment later, takes the page down to the detail,
+  // which shut the picker opened below it.
+  await page.waitForFunction(() => !readBusy('beta:commit'), null, { timeout: 15000 });
   ok(true, "a picked commit's detail carries Revert and Branch here");
   // The branch picker in the head row (R269 step 3), on a clean tree: the branch the tree is
   // on, opening the local branches under a box; a name nobody has offers
@@ -797,8 +835,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     ok(/Create branch picked-new from/.test(offer.make) && offer.shown === 0 && offer.open,
        `...a name nobody has narrows the list to nothing and offers to create it, the menu staying open while it is typed (${JSON.stringify(offer)})`);
     await page.press(`${V} #gitPickFind`, 'Enter');
-    let made = false;
-    for (let i = 0; i < 40 && !made; i++) { made = git('rev-parse', '--abbrev-ref', 'HEAD') === 'picked-new'; if (!made) await new Promise(r => setTimeout(r, 250)); }
+    const made = await until(() => git('rev-parse', '--abbrev-ref', 'HEAD') === 'picked-new', 10000, 250);
     const said = await refreshUntil(page, () => document.querySelector('.nb .nbview[data-view="git"] #gitPicker .gbpickname')?.textContent === 'picked-new', { timeout: 15000 })
       .then(() => true, () => false);
     ok(made && said, `...Enter makes it from the commit the tree is on and switches to it, and the head row says so (${JSON.stringify({ made, said,
@@ -807,21 +844,20 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     await page.click(`${V} #gitPicker .gbpickb`);
     await page.waitForSelector(`${V} #gitPicker .gbpickmenu:not([hidden])`, { timeout: 5000 });
     await page.click(`${V} #gitPicker [data-gitpick="${was}"]`);
-    let back = false;
-    for (let i = 0; i < 40 && !back; i++) { back = git('rev-parse', '--abbrev-ref', 'HEAD') === was; if (!back) await new Promise(r => setTimeout(r, 250)); }
+    const back = await until(() => git('rev-parse', '--abbrev-ref', 'HEAD') === was, 10000, 250);
     ok(back, `...and a press on another branch in it switches the tree back (${git('rev-parse', '--abbrev-ref', 'HEAD')})`);
     git('branch', '-D', 'picked-new');
     await refreshUntil(page, () => document.querySelector('.nb .nbview[data-view="git"] #gitPicker .gbpickname')?.textContent !== 'picked-new', { timeout: 15000 });
   }
-}
+});
 
 // ---- step 3: the policy, and Send to Claude --------------------------------
 // What a session may send to the remote is the project's to say, on the Git
 // view, and the controller's to enforce where the push runs: the relay. A
 // commit, a change or a branch is handed to the session as one line naming
 // it and the ask, typed into the session the way a roadmap step arrives.
-{
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+await section("step 3: the policy, and Send to Claude", async () => {
+  const H = OWNER;
   const post = async (path, body, headers = H) => {
     const r = await fetch(URL.replace(/\/$/, '') + path, { method: 'POST', headers, body: JSON.stringify(body) });
     return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -841,15 +877,8 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
      'a value or a key that is not one is refused');
 
   // The relay is the door: a session's aerie git push is judged there.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
-  const S = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+  const tok = mint('beta');
+  const S = asSession(tok);
   const origin = `${DIR}/ws/.remotes/beta-origin.git`;
   const relay = (argv) => post('/api/v1/bb', { argv, cwd: B }, S);
   const denied = await relay(['git', 'push', 'origin', 'topic']);
@@ -1094,16 +1123,16 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   // owner's, so a second account's press typed into the owner's
   // conversation, or found no session while its own was running.
   {
-    const hh = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+    const hh = OWNER;
     for (const body of [{ action: 'add', name: 'w.asker', password: 'w.asker-pass-1', role: 'user' },
-                        { action: 'projects', name: 'w.asker', projects: ['beta'] }])
+                        { action: 'edit', name: 'w.asker', projects: ['beta'] }])
       await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST', headers: hh, body: JSON.stringify(body) });
     await member('w.asker');
     const auid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.asker'].uid;
     const theirs = `${auid}~claude-beta`;
     tmuxNew(theirs, B);
     const r = await fetch(URL.replace(/\/$/, '') + '/api/git', { method: 'POST',
-      headers: { Authorization: 'Basic ' + Buffer.from('w.asker:w.asker-pass-1').toString('base64'), 'Content-Type': 'application/json' },
+      headers: asUser('w.asker', 'w.asker-pass-1'),
       body: JSON.stringify({ project: 'beta', action: 'ask', kind: 'review', args: { sha: head.sha } }) });
     const their = await r.json();
     ok(their.ok && their.session === theirs && tmuxCapture(theirs).includes(head.sha.slice(0, 7)),
@@ -1126,11 +1155,17 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     file: !!el.querySelector('[data-gitaskfile]'), commit: !!el.querySelector('#gitDetail [data-gitaskcommit]'),
     branch: el.querySelectorAll('[data-gitaskbranch]').length,
     pol: el.querySelectorAll('[data-gitpol]').length }));
-  await page.waitForFunction(() => {
+  const offered = () => page.waitForFunction(() => {
     const el = document.querySelector('.nb .nbview[data-view="git"]');
     return el && el.querySelector('[data-gitaskfile]') && el.querySelector('#gitDetail [data-gitaskcommit]')
       && el.querySelectorAll('[data-gitaskbranch]').length >= 1;
-  }, null, { timeout: 10000 }).catch(() => {});
+  }, null, { timeout: 30000 }).then(() => true, () => false);
+  // A commit's detail is read when its row is picked, slower than 10 s under
+  // a whole run's load (B923); a pick a repaint took is picked again.
+  if (!await offered() && !(await page.$('.nb .nbview[data-view="git"] .grow[data-sha].on'))) {
+    await page.click('.nb .nbview[data-view="git"] .grow[data-sha]:not(.on)');
+    await offered();
+  }
   const v = await look();
   ok(v.file && v.commit && v.branch >= 1 && v.pol === 0,
      `the view offers Send to Claude on a change, a commit and a branch, and no push policy, which is the Permissions view's (${JSON.stringify(v)})`);
@@ -1144,7 +1179,9 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     page.answers.push(q => { asked = q.text; return -1; });
     // Pressed from the page: the change sits in a section shut by default.
     await page.$eval('.nb .nbview[data-view="git"] [data-gitaskfile]', b => b.click());
-    await page.waitForTimeout(300);
+    // The question asked and answered no, then time in which a send would have gone.
+    await until(() => asked);
+    await quietFor(300);
     page.off('request', seen);
     ok(/^Send .* to beta's Claude session\?/.test(asked) && asks.length === 0,
        `Send to Claude asks first, naming the session, and sends nothing when the answer is no (${asked.split('\n')[0]}; ${asks.length} sent)`);
@@ -1155,7 +1192,9 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   {
     const r = await page.evaluate(() => {
       const was = state.sessions;
-      state.sessions = [...(was || []), { name: myAgentSession('codex', 'beta') }];
+      // Without a Claude session on beta: one an earlier check started may
+      // still be up, and sendAgent takes Claude's first (B917).
+      state.sessions = [...(was || []).filter(s => s.name !== myAgentSession('claude', 'beta')), { name: myAgentSession('codex', 'beta') }];
       const opened = [], realL = window.launchAgent, realS = window.startClaude;
       window.launchAgent = (id, p) => opened.push(`agent:${id}:${p}`);
       window.startClaude = p => opened.push(`claude:${p}`);
@@ -1207,6 +1246,22 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
      && hostSect.elsewhere,
      `Permissions lists each git host ability it governs with an Allow or Deny, merging at Deny, the rest where they are set, and Measure (${JSON.stringify(hostSect)})`);
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-forgepol="pr_write"]', 'deny');
+  // A pick not applied yet is unsaved work, as a staged step or an edited
+  // rule is: pressing another view asks first, and a no leaves the view, the
+  // pick and Apply as they were. It was dropped with no word.
+  {
+    page.dialogs.length = 0;
+    page.answers.push(-1);
+    await page.evaluate(() => document.querySelector('.nb .nbtabs [data-v="bugs"]').click());
+    await new Promise(r => setTimeout(r, 600));
+    const stayed = await page.$eval('.nb', el => ({
+      view: [...el.querySelectorAll('.nbview')].find(v => !v.hidden)?.dataset.view,
+      pick: el.querySelector('.nbview[data-view="permissions"] [data-forgepol="pr_write"]')?.value,
+      apply: el.querySelector('.nbview[data-view="permissions"] .permHostApply')?.disabled }));
+    ok(page.dialogs.length === 1 && /a staged git host permission would be thrown away/.test(page.dialogs[0])
+       && stayed.view === 'permissions' && stayed.pick === 'deny' && stayed.apply === false,
+       `a git host pick not applied yet is asked about before another view is shown, and a no keeps it (${page.dialogs[0]?.slice(0, 70)}; ${JSON.stringify(stayed)})`);
+  }
   await page.click('.nb .nbview[data-view="permissions"] .permHostApply');
   const saved = await page.waitForFunction(async () => {
     const j = await (await fetch('/api/forge-access?project=beta')).json();
@@ -1226,7 +1281,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
      `leaving Permissions hands Agents may back to the form, which Settings does not list (${JSON.stringify(home)})`);
   await page.evaluate(() => openNotebook('beta', 'git'));
   execFileSync('git', ['-C', B, 'checkout', '-q', '--', 'a.txt']);
-}
+});
 
 // ---- the strip on a phone -------------------------------------------------
 // Five groups in one row (R259, the operator 16 Oct: eleven tabs were too
@@ -1246,7 +1301,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 
 // Back goes back (R256 step 3): a view switched to is a history entry, and
 // a node page's address names the node it shows.
-{
+await section("Back goes back", async () => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const before = await page.evaluate(() => location.hash);
   await page.click('.pane .nb .nbgroups [data-g="plan"] >> visible=true');
@@ -1260,12 +1315,12 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   await page.waitForFunction(() => /^#\/build\/library\/[^/]+$/.test(location.hash), null, { timeout: 15000 });
   const tc = await page.evaluate(() => ({ hash: location.hash, node: libNode }));
   ok(tc.hash.endsWith('/' + encodeURIComponent(tc.node)), `a node page's address names its node (${tc.hash})`);
-}
+});
 
 // aerie projects lists what the dashboard lists: a directory carrying .bbignore
 // (the fixture's toolchain store) is not a project, and a worktree, whose .git
 // is a file naming its repository, is one and has a branch (B122).
-{
+await section("aerie projects lists what the dashboard lists", async () => {
   git('worktree', 'add', '-q', `${DIR}/ws/beta-wt`, '-b', 'wtcheck');
   const listed = execFileSync('bash', [`${REPO}/scripts/aerie`, 'projects'],
     { encoding: 'utf8', env: { ...process.env, WORKSPACE: `${DIR}/ws`, DASHBOARD_STATE: `${DIR}/state` } });
@@ -1273,7 +1328,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
      `aerie spaces skips a .bbignore directory and names a worktree's branch (${listed.split('\n').filter(l => /beta-wt|toolstore/.test(l)).join(' | ') || 'neither line'})`);
   git('worktree', 'remove', '--force', `${DIR}/ws/beta-wt`);
   git('branch', '-D', 'wtcheck');
-}
+});
 
 // ---- a branch is its session's: its account's, or an administrator's ------
 // The operator's rule of 24 Sep. A branch checked out in another account's
@@ -1282,16 +1337,16 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 // administrator may merge it, asked every time with the owner named, and
 // never while that account's Claude session there is working. Before the
 // fallback check below, so these writes are held to it too.
-{
-  const H2 = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
-  const PEER = { Authorization: 'Basic ' + Buffer.from('w.peer:w.peer-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+await section("a branch is its session's", async () => {
+  const H2 = OWNER;
+  const PEER = asUser('w.peer', 'w.peer-pass-1');
   const post = async (body, h = H2) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/git',
     { method: 'POST', headers: h, body: JSON.stringify(body) }); return { status: r.status, ...(await r.json()) }; };
   const users = async body => fetch(URL.replace(/\/$/, '') + '/api/users',
     { method: 'POST', headers: H2, body: JSON.stringify(body) });
   for (const n of ['w.dev', 'w.peer']) {
     await users({ action: 'add', name: n, password: `${n}-pass-1`, role: 'user' });
-    await users({ action: 'projects', name: n, projects: ['beta'] });
+    await users({ action: 'edit', name: n, projects: ['beta'] });
     await member(n);
   }
   const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.dev'].uid;
@@ -1341,11 +1396,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   await page.evaluate(() => [...document.querySelectorAll('.nb .nbview[data-view="git"] .gbranch')]
     .find(x => x.querySelector('code')?.textContent === 'claude/w.dev')
     ?.querySelector('[data-gitmerge]').click());
-  let landed = false;
-  for (let i = 0; i < 40 && !landed; i++) {
-    try { git('merge-base', '--is-ancestor', 'claude/w.dev', main); landed = true; }
-    catch { await new Promise(r => setTimeout(r, 250)); }
-  }
+  const landed = await until(() => { git('merge-base', '--is-ancestor', 'claude/w.dev', main); return true; }, 10000, 250);
   ok(page.dialogs.some(d => /^Merge claude\/w\.dev into /.test(d) && /claude\/w\.dev is w\.dev's session's branch\./.test(d))
      && landed,
      `...and pressing it asks, naming whose, then merges (${page.dialogs.join(' | ').replace(/\n+/g, ' ')})`);
@@ -1384,14 +1435,14 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
      `a plain account cannot commit, discard, switch, pull, revert or branch-and-switch in the owner's tree (${
        peerTree.map(r => r.status).join(',')}: ${peerTree[0].error})`);
   for (const body of [{ action: 'add', name: 'w.boss', password: 'w.boss-pass-1', role: 'admin' },
-                      { action: 'projects', name: 'w.boss', projects: ['beta'] }]) await users(body);
-  const BOSS = { Authorization: 'Basic ' + Buffer.from('w.boss:w.boss-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+                      { action: 'edit', name: 'w.boss', projects: ['beta'] }]) await users(body);
+  const BOSS = asUser('w.boss', 'w.boss-pass-1');
   const bossAsked = await post({ project: 'beta', action: 'revert', args: { sha: 'zzzz' } }, BOSS);
   const bossSure = await post({ project: 'beta', action: 'revert', args: { sha: 'zzzz', confirmed: true } }, BOSS);
   ok(bossAsked.status === 409 && /test's working tree/.test(bossAsked.confirm || '')
      && !/working tree/.test(bossSure.error || '') && bossSure.status !== 409,
      `an administrator is asked first, naming whose tree, and then goes on (${bossSure.error})`);
-  const theirs = { Authorization: 'Basic ' + Buffer.from('w.dev:w.dev-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+  const theirs = asUser('w.dev', 'w.dev-pass-1');
   const own = await post(merge, theirs);
   ok(!/session's branch|asked/.test(own.error || '') && own.status !== 409,
      `...and its own account merges it unasked (${own.ok ? (own.out || 'merged').slice(0, 40) : (own.error || '').slice(0, 60)})`);
@@ -1399,7 +1450,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   git('branch', '-D', 'claude/w.dev');
   rmSync(`${B}/owner-note.txt`, { force: true });
   page.errors = [];                     // the 403s and the 409 above are refusals by design
-}
+});
 
 // B153's protection degrades QUIETLY by design: where the controller cannot
 // build a git dir of its own it falls back to the tree, because a Git view
@@ -1408,21 +1459,21 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 // the tree's hooks, so a transient failure turns every guarantee above into a
 // coin toss, and the only trace is a line in the log. Read it here, which is
 // how a hook firing in the container was told from a test being wrong (R65).
-{
+await section("B153's protection degrades QUIETLY by design", async () => {
   const log = (() => { try { return readFileSync(`${DIR}/server.log`, 'utf8'); }
                        catch { return ''; } })();
   const fell = log.split('\n').filter(l => /falling back to the tree/.test(l));
   ok(fell.length === 0,
      `the controller never fell back to running git in the tree (${
        fell.length ? fell[0].slice(0, 400) : 'no fallback'})`);
-}
+});
 // ---- a project with no repository gets one from the view ----------------
 // gamma is the fixture's directory-only project. It could be adopted,
 // listed and opened, and its Git view said "nothing to show" with no way
 // on: no version, no dist/, no push, and a session told not to decide that
 // for the person. Init is that way, from the API and from the row.
-{
-  const H2 = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+await section("a project with no repository gets one from the view", async () => {
+  const H2 = OWNER;
   const g = async (action) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/git',
     { method: 'POST', headers: H2, body: JSON.stringify({ project: 'gamma', action, args: {} }) });
     return { status: r.status, ...(await r.json()) }; };
@@ -1462,12 +1513,12 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   // design, and the browser logs every one as a failed resource. Cleared,
   // so the check below is about the page.
   page.errors = [];
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 // B164: a repository with no main and no master. Merge into main cannot
 // mean anything there, and the refusal said "or on :" with the name empty.
-{
+await section("B164: a repository with no main and no master", async () => {
   const said = execFileSync('python3', ['-c', `
 import importlib.util, json, os, subprocess, tempfile
 spec = importlib.util.spec_from_file_location("git", "${REPO}/scripts/dashboard/git.py")
@@ -1484,20 +1535,20 @@ print(json.dumps(g.act(repo, "merge", {"name": "trunk", "into": "main"})))`], { 
   const r = JSON.parse(said.split('\n').pop());   // the module may print a line of its own first
   ok(/no main or master branch/.test(r.error || '') && !/or on :/.test(r.error || '') && !/Switch to/.test(r.error || ''),
      `with no main or master, the merge refusal says so rather than naming an empty branch (${r.error})`);
-}
+});
 
 // ---- the CI watch (R117) ------------------------------------------------------
 // What the daily look found, planted where ciwatch keeps it: a CI section on
 // the Git view saying it in rows, a bell row while main is red, and Check now
 // replacing it with a fresh look (beta has no workflows, and it says so).
-{
+await section("the CI watch", async () => {
   mkdirSync(`${DIR}/state/ciwatch`, { recursive: true });
   writeFileSync(`${DIR}/state/ciwatch/beta.json`, JSON.stringify({
     format: 3, at: Math.floor(Date.now() / 1000) - 3600, repo: 'o/beta', workflows: 1,
     run: { id: 11, name: 'Android CI', branch: 'main', conclusion: 'failure', at: '2026-10-03T00:44:51Z' },
     findings: [
       { kind: 'run', sev: 'bad', where: 'run 11', url: 'https://github.com/o/beta/actions/runs/11',
-        text: 'The Android CI check failed on main (3 Oct, 00:44 UTC). A session can read why with aerie ci-log 11.' },
+        text: 'The Android CI check failed on main (3 Oct, 00:44 UTC)' },
       { kind: 'label', sev: 'warn', where: 'android.yml:10', text: 'runs on ubuntu-latest, which GitHub moves to a new release on its own date',
         fix: { from: 'ubuntu-latest', to: 'ubuntu-24.04' } },
       { kind: 'action', sev: 'note', where: 'android.yml:14', text: 'android-actions/setup-android@v3: v4 is out' }],
@@ -1586,6 +1637,38 @@ print(json.dumps(g.act(repo, "merge", {"name": "trunk", "into": "main"})))`], { 
   await page.waitForFunction(() => !(state?.ci_red || []).length, null, { timeout: 15000 });
   ok(true, '...and the bell row leaves with the red run');
   rmSync(`${DIR}/state/ciwatch/beta.json`, { force: true });
-}
+});
+
+// The history a hundred commits at a time (the long-lists rule): its head
+// says how many there are, its foot how many are on show of them, and Show
+// more brings the next hundred, read with the ones above so the lanes stay
+// whole. The commits are made with plumbing on top of HEAD, so the index
+// and the tree's changes are left as they are, and HEAD goes back after.
+await section("The history pages past a hundred commits", async () => {
+  // From its first page, and by the press alone: the pages a view of beta
+  // has shown are forgotten, and the foot's own loading as it comes into
+  // view (paginate's, held by paging.mjs) is left out of this part.
+  await page.evaluate(() => { for (const k of Object.keys(pageState)) if (/gitlog$/.test(k)) delete pageState[k];
+    window.IntersectionObserver = undefined; });
+  const was = git('rev-parse', 'HEAD'), tree = git('rev-parse', 'HEAD^{tree}');
+  let top = was;
+  for (let i = 0; i < 110; i++) top = git('commit-tree', tree, '-p', top, '-m', `Paging ${i}`);
+  git('update-ref', '-m', 'paging', 'HEAD', top);
+  const total = Number(git('rev-list', '--all', '--count'));
+  await openFold(page, `${NB} [data-sect="git:history"]`);
+  await refreshUntil(page, () => /Paging 109/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 30000 });
+  const first = await page.$eval(`${NB} [data-sect="git:history"]`, d => ({ head: d.querySelector(':scope > summary .sst')?.textContent,
+    rows: d.querySelectorAll('.grow[data-sha]').length, foot: d.querySelector('.pagemore span')?.textContent || '' }));
+  ok(first.head === String(total) && first.rows === 100 && first.foot === `100 of ${total} commits`,
+     `History shows its first hundred commits, its head saying how many there are and its foot how many are on show (${JSON.stringify(first)}, ${total} in all)`);
+  // The first view's history: the suite has a second notebook open on beta.
+  const HIST = `${NB} [data-sect="git:history"]`;
+  await page.click(`${HIST} .pagemore .next`);
+  const all = await page.waitForFunction(([sel, n]) => document.querySelector(sel)?.querySelectorAll('.grow[data-sha]').length === n, [HIST, total],
+    { timeout: 15000 }).then(() => true, () => false);
+  const after = await page.$eval(HIST, d => ({ rows: d.querySelectorAll('.grow[data-sha]').length, foot: !!d.querySelector('.pagemore') }));
+  ok(all && !after.foot, `...and Show more brings the rest, the foot going with nothing more to show (${after.rows} of ${total})`);
+  git('update-ref', '-m', 'paging done', 'HEAD', was);
+});
 
 await done(browser);

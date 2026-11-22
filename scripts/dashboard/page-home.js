@@ -3,7 +3,7 @@
 // whole install and a link into the page that holds it; under them
 // Attention (the bell's rows, put away there as on the bell) and the last
 // ten jobs, side by side at a desk and stacked on a phone; under those, the
-// pinned projects at a glance. A glance, not a place to act: a tile opens
+// favorite spaces, this person's. A glance, not a place to act: a tile opens
 // its page, a row opens what it is about, and nothing here is a setting.
 //
 // What the status poll carries (sessions, updates, CI) is counted here;
@@ -18,9 +18,7 @@
 "use strict";
 
 let homeData = null;             // /api/home's last answer, or null before the first
-let homeRev = 0;                 // bumped when it lands, so the page repaints
-let homeFetching = false;
-let homeAgain = null;            // a read asked while one was out: null, "light" or "whole"
+let homeWhole = false;           // a whole read asked and not yet made
 
 function openHome(){
   openTab({kind: "home", arg: "__home", label: "Home"});
@@ -33,35 +31,33 @@ function homeOpen(){
   loadHome(false);
 }
 
-// One out at a time, and never dropped (as refresh() is): a read asked
-// while one is out is remembered, the whole one outranking a light one,
-// and asked when that one lands, or the queue's last move went unread.
-async function loadHome(light = false){
-  if (homeFetching){ homeAgain = homeAgain === "whole" || !light ? "whole" : "light"; return; }
-  homeFetching = true;
-  try{
-    const j = await (await bootFetch("/api/home" + (light ? "?light=1" : ""))).json();
+// One out at a time (reading), and a whole read asked while one is out
+// outranks a light one asked after it: the read made then is whole.
+function loadHome(light = false){
+  if (!light) homeWhole = true;
+  return reading("home", async () => {
+    const whole = homeWhole;
+    homeWhole = false;
+    const j = await getJSON("/api/home" + (whole ? "" : "?light=1"));
     homeData = j.error ? {error: j.error}
-      : light && homeData && !j.containers ? {...j, containers: homeData.containers} : j;
-  }catch(e){
-    homeData = {error: "could not read Home: " + e};
-  }finally{
-    homeFetching = false;
-  }
-  homeRev++;
-  drawPanes();
-  if (homeAgain){ const whole = homeAgain === "whole"; homeAgain = null; loadHome(!whole); }
+      : !whole && homeData && !j.containers ? {...j, containers: homeData.containers} : j;
+  });
 }
 
 // The updates due across the install, each thing behind counted once: each
-// toolchain behind on a node, each container with a newer image, nginx
-// behind, an agent behind. A move (relocate) is not an update, nor a node
-// short of room (R110), nor a release's signing (R106) or its files (R190), and a CI run has
-// its own tile.
+// toolchain or coding agent behind on a node, each container with a newer
+// image, nginx behind, a node's agent behind, a machine's security updates,
+// a newer release of AerieOS itself. Named, not what is left once the rest
+// is taken out: every other row on the bell (a move, a failing disk, a node
+// short of room, a release's signing) is news of another kind, and a new
+// kind of row is not an update until it is listed here.
+const HOME_UPDATES = new Set(["toolchain", "agents", "image", "nginx", "agent", "release"]);
 function homeUpdates(){
   return (state?.attention || []).reduce((n, a) =>
-    a.kind === "relocate" || a.kind === "room" || a.kind === "release-sign" || a.kind === "release-files" || a.kind === "git-unlinked" || a.kind === "project-leftover" || a.kind === "acme" ? n : n + (a.kind === "toolchain" || a.kind === "agents" ? (a.tools || []).length || 1
-      : a.kind === "image" ? (a.containers || []).length || 1 : 1), 0);
+    a.kind === "host" ? n + (a.what === "security" ? 1 : 0)
+      : !HOME_UPDATES.has(a.kind) ? n
+      : n + (a.kind === "toolchain" || a.kind === "agents" ? (a.tools || []).length || 1
+        : a.kind === "image" ? (a.containers || []).length || 1 : 1), 0);
 }
 
 // The tiles, each one a press into its page (the home rule: unlike a tab's
@@ -135,14 +131,15 @@ function homeJobsHtml(){
   const names = homeData.jobs.nodes || {};
   return last.map(j => `<button type="button" class="row hjob" data-hjob="${esc(j.id)}">
       <span class="grow"><span class="name">${jobTitle(j)} ${jobStatePill(j)}</span>
-        <span class="sub">${esc(names[j.node] || j.node || "")}${j.node ? " · " : ""}${esc(ago(j.ended || j.started || j.queued))}</span></span>
+        <span class="sub data">${esc(names[j.node] || j.node || "")}${j.node ? " · " : ""}${esc(ago(j.ended || j.started || j.queued))}</span></span>
     </button>`).join("");
 }
 
 function homeGlanceHtml(){
-  // Not an archived one (the operator, 18 Oct), pinned or not.
-  const pinned = projectList().filter(c => c.pinned && !c.archived);
-  if (!pinned.length) return `<div class="empty">no space is pinned: the pin by a space's name on the Spaces page puts it here</div>`;
+  // Your favorites, archived or not: an archive only folds a card away on
+  // the Spaces page.
+  const pinned = projectList().filter(c => c.pinned);
+  if (!pinned.length) return `<div class="empty">no favorite space yet: the star by a space's name on the Spaces page puts it here</div>`;
   // In groups, in the Projects page's order, each group's name over its
   // cards (R273): the page this glances at is sorted so. Each opens its
   // first repository's page (R138).
@@ -151,7 +148,7 @@ function homeGlanceHtml(){
     return `<div class="hproj${pc.cls}"${pc.style}>
       ${first ? `<button type="button" class="name namelink" data-hproj="${esc(first.name)}">${esc(c.name)}</button>`
               : `<span class="name">${esc(c.name)}</span>`}
-      <div class="pcfacts">${[`<span class="pid">${esc(c.pid)}</span>`,
+      <div class="pcfacts">${[pidMark(c.pid),
         c.rows.length > 1 ? `${c.rows.length} repositories` : first ? projFacts({...first, pid: 0}) : "no repository yet"]
         .filter(Boolean).join(" · ")}</div>
       ${first ? projectState(first) + projectNote(first) : ""}
@@ -202,8 +199,9 @@ function homeStartHtml(){
     canNodes ? ["Claude Code on your node", !!s.claude, `<button type="button" data-hstart="claude"${s.node ? "" : " disabled"}>Library</button>`] : null,
     ["A first space", s.project, `<button type="button" data-hstart="project">New space</button>`],
     // What a move from an old system leaves for after it lands.
-    state?.held?.held ? ["Start this machine: nothing runs until then", false, `<button type="button" data-hstart="machine">This machine</button>`] : null,
-    state?.firstboot?.apps_from ? ["The old system's containers and VMs", !!ownMachine()?.reported?.adopted?.apps, `<button type="button" data-hstart="machine">This machine</button>`] : null,
+    state?.held?.held ? ["Start this machine: nothing runs until then", false, `<button type="button" data-hstart="machine">This controller</button>`] : null,
+    ownMachine() && oldAppsFrom(ownMachine()) && (ownMachine().reported?.adopted?.mounts || []).length
+      ? ["The old system's containers and VMs", !!ownMachine()?.reported?.adopted?.apps, `<button type="button" data-hstart="ownnode">Containers page</button>`] : null,
   ].filter(Boolean);
   const left = steps.filter(x => !x[1]).length;
   if (!left) return "";
@@ -213,7 +211,7 @@ function homeStartHtml(){
     ${steps.map(([t, done, act]) => `<div class="hsrow${done ? " done" : ""}"><span class="setnum">${done ? "✓" : ""}</span><span class="grow">${esc(t)}</span>${done ? "" : act}</div>`).join("")}</section></div>`;
 }
 
-// Attention, Last jobs and the pinned projects: the cards under the tiles,
+// Attention, Last jobs and the favorite spaces: the cards under the tiles,
 // with Last jobs' rows handed in (its own, or the shapes of them on the way).
 function homeCards(jobs){
   const needs = needsRows(), hidden = state?.bell_hidden || 0;
@@ -224,7 +222,7 @@ function homeCards(jobs){
               <button type="button" data-brestore>Show again</button></div>` : ""}</section>
         <section class="hcard"><h3>Last jobs</h3>${jobs}</section>
       </div></div>
-      <div class="field"><section class="hsect"><h3>Spaces at a glance</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
+      <div class="field"><section class="hsect"><h3>Favorites</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
 }
 
 // The Attention card brought into view and marked a moment: where the
@@ -242,19 +240,19 @@ function renderHomeInto(i){
   if (!d) return;
   if (homeData === null){
     // Its template while /api/home is on its way (R218 step 16): the poll
-    // already holds Attention, the pinned projects and three of the tiles,
+    // already holds Attention, the favorite spaces and three of the tiles,
     // so only the node, container and job numbers and Last jobs wait.
     const tiles = homeTiles().map(t => t.key === "jobs" ? {...t, wait: true, sub: ""} : t);
     if (railAllows("nodes")) tiles.unshift({key: "nodes", label: "nodes online", wait: true},
                                            {key: "containers", label: "containers running", wait: true});
-    d.list.innerHTML = skTpl(homeTilesHtml(tiles) + homeCards(skRows(3)), {live: true});
+    drawHTML(d.list, skTpl(homeTilesHtml(tiles) + homeCards(skRows(3)), {live: true}));
     wireNeeds(d.list);
-    if (!homeFetching) homeOpen();
+    if (!readBusy("home")) homeOpen();
     return;
   }
   // Painted only when it changed: Home redraws on every poll (its rows are
   // the poll's), and an unchanged draw keeps a pointer's hover and a fold.
-  if (!paint(d.list, (homeData.error ? `<div class="hint bad">${esc(homeData.error)}</div>` : "")
+  if (!patch(d.list, (homeData.error ? `<div class="hint bad">${esc(homeData.error)}</div>` : "")
     + homeTilesHtml(homeTiles()) + homeCards(homeJobsHtml()))) return;
   const root = d.list;
   root.querySelectorAll('[data-htile="sessions"]').forEach(a => a.onclick = e => { e.preventDefault(); railGo("sessions"); });
@@ -274,10 +272,11 @@ function renderHomeInto(i){
     else if (k === "claude" && s.node) openNodeClaude(s.node.id);
     else if (k === "project") openNewProject();
     else if (k === "machine") openMachineTab();
+    else if (k === "ownnode") openDockerOn(ownMachine()?.id || "");
     else if (k === "hide"){ homeStartHidden = true; try{ localStorage.setItem("bb.gsHidden", "1"); }catch(e){ /* private */ } drawPanes(); }
   });
   // The Claude step's state is the nodes list's, read on open and again
   // when the nodes move (index.html's watch).
-  if (homeStartReadsNodes() && (nodesList === null || nodesStale)) loadNodes().then(() => drawPanes());
+  if (homeStartReadsNodes() && (nodesList === null || nodesStale)) nodesKnown().then(() => drawPanes());
   wireNeeds(root);
 }

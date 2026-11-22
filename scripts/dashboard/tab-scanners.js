@@ -18,25 +18,22 @@
 
 let scannersData = null;          // {nodes, schedule, latest, uncovered}, or null before the first read
 let scannersErr = "";
-let scannersRev = 0;
 let scannersCustom = null;        // the Custom timetable being typed, or null
 
 function openScannersTab(){
   openTab({kind: "scanners", arg: "__scanners", label: "Scanners"});
 }
 
-async function loadScanners(){
-  try{
-    const j = await (await bootFetch("/api/scanners")).json();
+function loadScanners(){
+  return reading("scanners", async () => {
+    const j = await getJSON("/api/scanners");
     scannersErr = j.error || "";
     if (!j.error) scannersData = j;
-  }catch(e){ scannersErr = "scanners: " + failWords(e); }
-  scannersRev++;
-  if (tabs.some(t => t.kind === "scanners")) drawPanes();
+  });
 }
 
 async function scannersAct(body){
-  const j = await (await postJSON("/api/scanners", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/scanners", body);
   if (j.error) notify(j.error, true);
   else if (j.note) notify(j.note, true);
   else if (body.action === "deploy") notify("deploying the scanners: the pull is a job on the Jobs page");
@@ -128,8 +125,7 @@ function scannersUncovered(rows){
 // their own over a gap).
 function scannersActs(d){
   const undeployed = d ? (d.nodes || []).filter(n => !n.deployed && !n.host_only && (n.projects || []).length).length : 0;
-  return `<button type="button" data-scancheck${d ? "" : " disabled"}>Check for updates</button>${
-    undeployed ? `<button type="button" class="primary" data-scandeployall>Deploy on ${undeployed === 1 ? "the node" : `${undeployed} nodes`}</button>` : ""}`;
+  return undeployed ? `<button type="button" class="primary" data-scandeployall>Deploy on ${undeployed === 1 ? "the node" : `${undeployed} nodes`}</button>` : "";
 }
 
 function renderScannersInto(i){
@@ -137,11 +133,13 @@ function renderScannersInto(i){
   if (!d) return;
   if (scannersData === null){
     d.setBar("");
-    d.list.innerHTML = scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
-      : skTpl(pageHead({facts: [["Newest known", GHOST], ["Checked", GHOST]], actions: scannersActs(null)})
+    drawHTML(d.list, scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
+      : skTpl(pageHead({facts: [["This AerieOS names", GHOST], ["Nodes scanning", GHOST]], actions: scannersActs(null)})
         + docSection("scanners", "schedule", "Schedule", "", `<div class="field">${skRows(2)}</div>`)
-        + docSection("scanners", "node-", GHOST, "", `<div class="field">${skRows(3)}</div>`)
-        + docSection("scanners", "uncovered", "Not covered", "", `<div class="field">${skRows(1)}</div>`));
+        // A node's section before its name is read: a word, since a
+        // section's title is words and the ghost is a fact's value.
+        + docSection("scanners", "node-", "Nodes", "", `<div class="field">${skRows(3)}</div>`)
+        + docSection("scanners", "uncovered", "Not covered", "", `<div class="field">${skRows(1)}</div>`)));
     if (!scannersErr) loadScanners();
     return;
   }
@@ -149,25 +147,23 @@ function renderScannersInto(i){
   const lt = data.latest || {};
   d.setBar("");
   const deployed = (data.nodes || []).some(n => n.deployed);
-  d.list.innerHTML = pageHead({facts: [["Newest known", scannersVersions(lt.versions)],
-      ["Checked", lt.at ? ago(lt.at) : "never: the defaults this release pins"], ["Nodes scanning", String((data.nodes || []).filter(n => n.deployed).length)]], actions: scannersActs(data)})
-    + (lt.error ? `<div class="hint warn">${esc(lt.error)}</div>` : "")
+  patch(d.list, pageHead({facts: [["This AerieOS names", scannersVersions(lt.versions)],
+      ["Nodes scanning", String((data.nodes || []).filter(n => n.deployed).length)]], actions: scannersActs(data)})
     + scannersScheduleSection(data.schedule || {}, deployed)
     + (data.nodes || []).map(scannersNodeSection).join("")
     + ((data.nodes || []).length ? "" : noNodeYet("the scanners run on a node"))
-    + scannersUncovered(data.uncovered || []);
+    + scannersUncovered(data.uncovered || []));
   wireScannersTab(d.el);
 }
 
 function wireScannersTab(root){
   wireSections(root);
-  const act = (sel, fn) => root.querySelectorAll(sel).forEach(b => b.onclick = async () => { busy(b, "Working"); await fn(b); });
+  const act = (sel, fn) => root.querySelectorAll(sel).forEach(b => b.onclick = async () => { busyFor(b); await fn(b); });
   act("[data-scandeploy]", b => scannersAct({action: "deploy", node: b.dataset.scandeploy}));
   act("[data-scandeployall]", () => scannersAct({action: "deploy-all"}));
   act("[data-scanupdate]", b => scannersAct({action: "update", node: b.dataset.scanupdate}));
   act("[data-scanrun]", b => scannersAct({action: "run", node: b.dataset.scanrun}));
   act("[data-scanrunall]", () => scannersAct({action: "run"}));
-  act("[data-scancheck]", () => scannersAct({action: "check"}));
   act("[data-scanon]", b => scannersAct({action: "schedule", on: b.dataset.scanon === "1"}));
   act("[data-scansave]", () => scannersAct({action: "schedule", cron: scannersCustom ?? root.querySelector("#scanCron")?.value ?? ""}).then(() => { scannersCustom = null; }));
   root.querySelectorAll("[data-scanremove]").forEach(b => b.onclick = async () => {
@@ -179,7 +175,7 @@ function wireScannersTab(root){
   const when = root.querySelector("#scanWhen");
   if (when) when.onchange = () => {
     if (when.value){ scannersCustom = null; scannersAct({action: "schedule", cron: when.value}); }
-    else { scannersCustom = root.querySelector("#scanCron")?.value || scannersData?.schedule?.cron || "0 4 * * 0"; scannersRev++; drawPanes(); }
+    else { scannersCustom = root.querySelector("#scanCron")?.value || scannersData?.schedule?.cron || "0 4 * * 0"; readMoved("scanners"); drawPanes(); }
   };
   const cron = root.querySelector("#scanCron");
   if (cron) cron.oninput = () => { scannersCustom = cron.value; };

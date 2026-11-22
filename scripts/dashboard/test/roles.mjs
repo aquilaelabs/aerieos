@@ -5,7 +5,7 @@
 // and every notebook view they can, changes the settings that are theirs, is
 // refused the ones that are not, and meets the others' changes. Console
 // errors and server errors are collected per person across the whole walk.
-import { launch, newPage, ok, done, ready, sleep, refreshUntil, URL, DIR, member, splitPick } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, URL, DIR, member, splitPick, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -44,7 +44,7 @@ const pageFor = async (who) => {
     httpCredentials: { username: who.name, password: who.pw }, extraHTTPHeaders: { Authorization: auth } });
   page.fivexx = [];
   page.on('response', r => { if (r.status() >= 500 && !r.url().includes('/term')) page.fivexx.push(`${r.status()} ${r.url().replace(/^https?:\/\/[^/]+/, '')}`); });
-  await page.goto(URL); await ready(page); await sleep(800);
+  await page.goto(URL); await ready(page); await settled(page);
   return page;
 };
 // Through the context's own request API, with the person's credentials,
@@ -83,7 +83,7 @@ for (const who of CAST) {
   for (const proj of mine) {
     for (const v of VIEWS) {
       await page.evaluate(([p, view]) => openNotebook(p, view), [proj, v]);
-      await sleep(350);
+      await settled(page);
     }
   }
   ok(true, `${tag} opened all ${VIEWS.length} notebook views of ${mine.length ? mine.join(' and ') : 'no space'}`);
@@ -100,9 +100,9 @@ for (const who of CAST) {
   // below that matters.
   if (isAdmin) for (const fn of Object.values(ADMIN_TABS)) {
     await page.evaluate(f => window[f](), fn);
-    await sleep(500);
+    await settled(page);
   }
-  await page.evaluate(() => openProfileTab()); await sleep(500);
+  await page.evaluate(() => openProfileTab()); await settled(page);
   ok(true, `${tag} opened Profile and ${isAdmin ? 'every administration tab' : 'what a user can reach'}`);
 
   // Settings that are theirs.
@@ -160,9 +160,9 @@ for (const who of CAST) {
 // An administrator grants a project and the user sees it; what one person
 // adds to a shared roadmap the others read; the project's own settings are
 // one set for everybody, and each person's own are theirs alone.
-{
+await section("meeting each other", async () => {
   const [owner, admin1, , user1, user2, user3] = CAST;
-  const g = await api(admin1.page, '/api/users', { action: 'projects', name: 'w.user3', projects: ['alpha'] });
+  const g = await api(admin1.page, '/api/users', { action: 'edit', name: 'w.user3', projects: ['alpha'] });
   ok(g.status === 200 && !g.error, `an administrator grants w.user3 alpha (${g.status}${g.error ? ': ' + g.error : ''})`);
   await user3.page.reload(); await ready(user3.page);
   ok(await user3.page.evaluate(() => (state.projects || []).some(p => p.name === 'alpha')),
@@ -223,7 +223,7 @@ for (const who of CAST) {
   const models = await Promise.all([owner, user1, user2].map(p => p.page.evaluate(() =>
     (state.projects || []).find(p => p.name === 'alpha')?.yours?.model || '')));
   ok(models.every(m => m === 'sonnet'), `each person's own model on alpha is their own setting (${models.join(', ')})`);
-}
+});
 
 // ---- found walking the dev pair (19 Oct) ----------------------------------------------
 // B19: a member whose role reads Project settings and does not write them
@@ -232,7 +232,7 @@ for (const who of CAST) {
 // B21: such a member is not handed every account name by the People view.
 // B20: a role removed is taken off every account that held it, so a role
 // made later under its name gives them nothing.
-{
+await section("found walking the dev pair", async () => {
   const u2 = await pageFor(CAST.find(c => c.name === 'w.user2'));
   const own = await api(u2, '/api/prefs', { project: 'alpha', capture_days: 9 });
   ok(own.status === 403, `a member without Space settings is refused a space setting (${own.status} ${own.error || ''})`);
@@ -254,14 +254,14 @@ for (const who of CAST) {
   ok(made.status === 200 && before.includes('walk-g') && gone.status === 200 && !after.includes('walk-g') && gone.held_by === 1,
      `a role removed is taken off the account that held it (${before.join()} then ${after.join() || 'none'}, ${gone.held_by} held it)`);
   await owner.close();
-}
+});
 
 // ---- Accounts and roles Read alone (B34), and a plain account by link (B38)
 // Read sees Users and Roles to read: every field dead, no Add, Save or
 // Remove, and the reason said on the page; the Roles page is not refused.
 // A plain account sent to either by link is told it may not, with no count
 // and no Add.
-{
+await section("Accounts and roles Read alone", async () => {
   const [owner, , , , , user3] = CAST;
   const who = { name: 'w.acctread', pw: 'pw-w.acctread-1', role: 'user', projects: [] };
   make(who.name, 'user', []);
@@ -323,12 +323,16 @@ for (const who of CAST) {
   const seen = await user3.page.evaluate(() => (state.projects || []).map(p => p.name));
   const notTheirs = ALL.find(n => !seen.includes(n)) || 'no-such-project';
   await user3.page.goto(URL.replace(/\/$/, '') + '/#/projects/' + notTheirs);
-  await ready(user3.page); await sleep(3000);
+  // The address is opened on the first draw that has state, which ready()
+  // has seen: what that page reads has landed, and nothing in it still says
+  // loading.
+  await ready(user3.page); await settled(user3.page);
+  await user3.page.waitForFunction(() => !document.querySelector('#pane0 .loading, #pane0 .skboot'), null, { timeout: 15000 }).catch(() => {});
   const nb = await user3.page.evaluate(p => ({ project: p, hash: location.hash, kind: tabOf(panes[0])?.kind || '',
     arg: tabOf(panes[0])?.arg || '', loading: !!document.querySelector('#pane0 .loading, #pane0 .skboot'),
     mem: !!document.querySelector(`#pane0 [data-project="${p}"]`) }), notTheirs);
   ok(!nb.loading && !nb.mem && nb.arg !== notTheirs,
      `a plain account sent to a space not theirs by link is not left on a notebook loading forever (${JSON.stringify(nb)})`);
-}
+});
 
 await done(browser);

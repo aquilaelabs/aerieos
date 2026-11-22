@@ -20,7 +20,23 @@ import xml.parsers.expat  # nosemgrep: python.lang.security.use-defused-xml.use-
 
 import dash
 
-verb, args = sys.argv[1], sys.argv[2:]
+verb, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+
+
+def newest_release(tags):
+    """The newest of these vX.Y.Z and vX.Y.Z-NAME.N tags: by its numbers, a
+    release above every pre-release that leads to it. git's own version
+    sort puts v0.9.0-dev.5341 above v0.9.0, so once 0.9.0 was tagged the
+    checks that compare against the newest release would have kept reading
+    a dev tag (the audit of 13 Nov). "" when none of them is a version."""
+    def key(t):
+        m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)(?:-([a-z][a-z0-9]*)\.(\d+))?", t)
+        if not m:
+            return None
+        x, y, z, name, n = m.groups()
+        return (int(x), int(y), int(z), 0 if name else 1, int(n or 0))
+    known = [(key(t), t) for t in tags if key(t) is not None]
+    return max(known)[1] if known else ""
 
 
 def runner():
@@ -80,6 +96,31 @@ def hosted():
     for where, label, pin in found:
         print(f"  {tag} {where} runs on {label}, which GitHub moves to a new release on its own date;"
               f" runs-on: {pin} moves only when a commit moves it")
+    sys.exit(1 if strict else 0)
+
+
+def pinned():
+    """Every action a workflow uses is named by its commit (R206; the audit of
+    13 Nov): `uses: owner/action@v4` runs whatever its publisher points v4 at
+    that day, in jobs that hold the release key and may write packages and
+    releases. A note in any project, a failure in this one (--strict)."""
+    strict = "--strict" in args
+    found = []
+    for f in sorted(pathlib.Path(".github/workflows").glob("*.y*ml")):
+        for i, line in enumerate(f.read_text(errors="replace").splitlines(), 1):
+            m = re.match(r"\s*-?\s*uses:\s*([^\s#]+)", line)
+            if not m or m.group(1).startswith(("./", "docker://")):
+                continue
+            name, _, ref = m.group(1).partition("@")
+            if not re.fullmatch(r"[0-9a-f]{40}", ref):
+                found.append((f"{f.name}:{i}", name, ref or "no version"))
+    if not found:
+        print("  [ok]   every action is pinned by its commit")
+        sys.exit(0)
+    tag = "[FAIL]" if strict else "[note]"
+    for where, name, ref in found:
+        print(f"  {tag} {where} uses {name} at {ref}, which its publisher can move;"
+              f" name the commit (uses: {name}@<40 hex>   # the version) so it moves only in a commit here")
     sys.exit(1 if strict else 0)
 
 
@@ -273,6 +314,39 @@ def _state_floor():
     return int(m.group(1)) if m else 0
 
 
+def formats():
+    """Every manifest kept for a pack format (R234) that the newest release
+    tag carried is in the tree byte-for-byte: a manifest a release read is
+    what later builds must still read, so the proof is never rewritten to
+    fit a change. A new manifest, and a new format's folder, are free."""
+    import subprocess
+
+    def git(*a):
+        return subprocess.run(["git", *a], capture_output=True, check=False)
+    where = "scripts/dashboard/unit/packformat"
+    tag = newest_release(git("tag", "-l", "v[0-9]*").stdout.decode().split())
+    tags = [tag] if tag else []
+    names = list(filter(None, git("ls-tree", "-r", "--name-only", tags[0], "--", where).stdout.decode().split("\n"))) if tags else []
+    if not names:
+        print("  [ok]   no release has carried a kept manifest yet")
+        sys.exit(0)
+    bad = []
+    for path in names:
+        try:
+            now = pathlib.Path(path).read_bytes()
+        except OSError:
+            bad.append(f"{path} was kept in {tags[0]} and is gone: a format a release read is read for good")
+            continue
+        if now != git("show", f"{tags[0]}:{path}").stdout:
+            bad.append(f"{path} was kept in {tags[0]} and has changed: a kept manifest is never edited; "
+                       "what a change needs goes in a new format's folder")
+    for b in bad:
+        print(f"  [FAIL] {b}")
+    if not bad:
+        print(f"  [ok]   every one of the {len(names)} manifest(s) kept in {tags[0]} is unchanged")
+    sys.exit(1 if bad else 0)
+
+
 def shipped():
     """Every migration present at the newest release tag (v*) is in the tree
     byte-for-byte, but a state migration at or under the state floor, which no
@@ -282,11 +356,11 @@ def shipped():
 
     def git(*a):
         return subprocess.run(["git", *a], capture_output=True, check=False)
-    tags = git("tag", "-l", "v[0-9]*", "--sort=-v:refname").stdout.decode().split()
-    if not tags:
+    tag = newest_release(git("tag", "-l", "v[0-9]*").stdout.decode().split())
+    if not tag:
         print("  [ok]   no release tag yet, so no migration has shipped")
         sys.exit(0)
-    tag, bad = tags[0], []
+    bad = []
     names = git("ls-tree", "-r", "--name-only", tag, "--", *SHIPPED).stdout.decode().split("\n")
     for path in filter(None, names):
         then = git("show", f"{tag}:{path}").stdout
@@ -359,14 +433,31 @@ def changelog():
     B655 and R209 are the notebook's, which a reader of the public
     repository cannot open; a line points at the commit it landed in, as
     the others do, and at nothing otherwise."""
+    import subprocess  # noqa: PLC0415
     bad = []
-    for i, ln in enumerate(pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+    lines = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8", errors="replace").splitlines()
+    for i, ln in enumerate(lines, 1):
         if re.search(r"\b[BR]\d{2,}(\.\d+)?\b", ln):
             bad.append(f"CHANGELOG.md:{i}: {ln.strip()[:100]}")
+    # ...and every commit the unreleased lines name is one this branch holds:
+    # the section is the release's notes, and a hash that is not on the
+    # branch (an amended copy, a helper's worktree) links to nothing.
+    head = subprocess.run(["git", "rev-list", "HEAD"], capture_output=True, text=True, check=False)
+    held = head.stdout.split() if head.returncode == 0 else []
+    if held:
+        unreleased = True
+        for i, ln in enumerate(lines, 1):
+            if ln.startswith("## ") and not ln.startswith("## Unreleased"):
+                unreleased = False
+            if not unreleased:
+                continue
+            for h in re.findall(r"\b[0-9a-f]{7,12}\b", ln):
+                if re.search(r"[a-f]", h) and not any(c.startswith(h) for c in held):
+                    bad.append(f"CHANGELOG.md:{i}: names {h}, which is no commit on this branch")
     for b in bad:
         print(f"  [FAIL] {b}")
     if not bad:
-        print("  [ok]   the changelog names commits, never a bug's or a roadmap item's number")
+        print("  [ok]   the changelog names commits this branch holds, never a bug's or a roadmap item's number")
     sys.exit(1 if bad else 0)
 
 
@@ -436,5 +527,44 @@ def dupes():
     sys.exit(1 if bad else 0)
 
 
-{"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
- "channels": channels, "shipped": shipped, "packs": packs, "unraid": unraid, "changelog": changelog, "dupes": dupes}[verb]()
+def releasekey():
+    """config/aerieos-release.pub parses to the release key, or the key and
+    its spare, each 64 hex characters, as its one reader reads it
+    (releasepub.py: the Enroll script's and the build's signer's). A file
+    that does not parse names no key at all, so every node enrolled from
+    that build would pin nothing: a red build here, never that."""
+    # The tree being linted, not the copy of aerie this runs from.
+    sys.path.insert(0, os.path.join(os.getcwd(), "scripts", "lib"))
+    import releasepub                                               # noqa: E402
+    keys, why = releasepub.read(os.path.join("config", "aerieos-release.pub"))
+    if why:
+        print(f"  [FAIL] config/aerieos-release.pub: {why}. It names the release key on one line and its spare on a "
+              f"second, each as {releasepub.NAME} and 64 hex characters; as it is, the Enroll script would hand a new "
+              "node no key to pin")
+        sys.exit(1)
+    print("  [ok]   config/aerieos-release.pub names the release key" + (" and its spare" if len(keys) > 1 else "")
+          + ", read as the Enroll script and the build's signer read it")
+    sys.exit(0)
+
+
+def releasesigners():
+    """config/release-signers' dev lines are config/aerieos-release.pub's keys
+    as OpenSSH writes them, each line is a signer in the one namespace it is
+    named for, no stable signer is a key the release build holds, and the
+    stick maker carries the same lines: tools/release-signers.py --check,
+    which --write puts right. A file that drifted is an install that
+    refuses every dev build, or a stick checked against other keys."""
+    import subprocess
+    r = subprocess.run([sys.executable, "tools/release-signers.py", "--check"], check=False)
+    sys.exit(r.returncode)
+
+
+CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
+          "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
+          "changelog": changelog, "dupes": dupes, "releasekey": releasekey, "releasesigners": releasesigners}
+
+if __name__ == "__main__":
+    # What a check returns is its verdict: layout answered 1 for a tracked
+    # file its page does not name and this line dropped it, so the check
+    # printed FAIL and lint was clean (the audit of 13 Nov).
+    sys.exit(CHECKS[verb]() or 0)

@@ -42,6 +42,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 
 # path -> [reentrant lock, depth, fd]. The RLock makes the depth and the fd
 # safe to touch: only the thread holding it ever does.
@@ -49,11 +50,292 @@ _locks = {}
 _guard = threading.Lock()
 
 
-def write_json(path, obj, mode=0o644):
+# Held by every write of a state file for the moment it lands, and by
+# frozen() for as long as a copy of the state is being taken: a backup or a
+# move's bundle read the files one by one while the server went on writing
+# them, so it could hold an account without its secrets, or a link to a
+# token the copy of the other file had already dropped.
+_gate = threading.RLock()
+
+
+@contextlib.contextmanager
+def frozen():
+    """No state file of this process's lands while the block runs; writers
+    wait, and go on when it ends. For reading the state as one moment (a
+    bundle's walk of /config), so kept short: nothing slow that could wait
+    on a writer belongs inside. The CLI's own writes, another process's,
+    are not held."""
+    with _gate:
+        yield
+
+
+class Landing(OSError):
+    """A write refused because the state it was for is being replaced."""
+
+
+# The folder a landing is replacing and the thread doing it, or nothing.
+_landing = []
+
+
+def landing_begins(folder):
+    """The state under `folder` is being replaced whole (a move's bundle or
+    a backup landing, R227 step 8): from here every state file another
+    thread of this process would write there is refused, at once and
+    without waiting, since what that thread holds is the state that is
+    going. A writer already renaming its file finishes first. Refused, never
+    held: a writer made to wait while it holds its module's lock would stop
+    the landing, which takes those locks. The landing's own thread writes as
+    before. It stays so until landing_over(), or until the process ends,
+    which is how a landing that worked ends."""
+    with _gate:
+        _landing[:] = [os.path.realpath(str(folder)), threading.get_ident()]
+
+
+def landing_over():
+    """The state that was there is back as it was: writers go on."""
+    with _gate:
+        _landing[:] = []
+
+
+def _not_landing(path):
+    if _landing and _landing[1] != threading.get_ident():
+        folder, into = _landing[0], os.path.realpath(os.path.dirname(path) or ".")
+        if into == folder or into.startswith(folder.rstrip("/") + "/"):
+            raise Landing(errno.EBUSY, "this controller's state is being replaced by the one that just landed: "
+                                       "nothing more is written to it until the controller has restarted", path)
+
+
+class FileLock:
+    """`with lock:` over `locked(path)`, for a module that held a threading
+    lock alone around a read, a change and a save of its file: the same
+    block now holds the file against every other process too (the CLI's
+    verbs, a relay's worker), which the threading lock never did. Reentrant
+    in one thread, as `locked` is. `path` is asked each time, since a
+    module is told where its file is after it is imported; with none yet,
+    the threads of this process are what it holds."""
+
+    def __init__(self, path):
+        self._path = path
+        self._here = threading.RLock()
+        self._held = threading.local()
+
+    def __enter__(self):
+        p = self._path()
+        cm = locked(p) if p else self._here
+        cm.__enter__()
+        stack = getattr(self._held, "stack", None)
+        if stack is None:
+            stack = self._held.stack = []
+        stack.append(cm)
+        return self
+
+    def __exit__(self, *exc):
+        return self._held.stack.pop().__exit__(*exc)
+
+
+def _sync(f):
+    """The file's bytes on the disk before it is renamed into place: without
+    it a power cut after the rename could leave the name pointing at a file
+    cut short, which every loader then read as empty and the next save wrote
+    over (B763). Never fatal: a filesystem that cannot sync keeps the rename."""
+    with contextlib.suppress(OSError, ValueError):
+        f.flush()
+        os.fsync(f.fileno())
+
+
+def _sync_dir(path):
+    """...and the rename itself, by syncing the folder that holds the name."""
+    with contextlib.suppress(OSError):
+        fd = os.open(os.path.dirname(path) or ".", os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+
+def unreadable(folder):
+    """The state files in `folder` that are there and cannot be read as JSON:
+    [(name, why)]. Asked at start, before any of them is loaded: a loader
+    reads one as empty, and a save after that writes the empty view over
+    what a person could still have mended."""
+    out = []
+    try:
+        names = sorted(os.listdir(_p(folder)))
+    except OSError:
+        return out
+    for name in names:
+        if not name.endswith(".json") or name.startswith("."):
+            continue
+        f = os.path.join(_p(folder), name)
+        if not os.path.isfile(f):
+            continue
+        try:
+            with open(f, encoding="utf-8") as fh:
+                json.load(fh)
+        except (OSError, ValueError) as e:
+            out.append((name, str(e)[:160]))
+    return out
+
+
+def set_aside(folder, name):
+    """A copy of an unreadable state file kept beside it, so what a save
+    writes over it afterwards is not the only copy: NAME.unreadable-STAMP.
+    The copy's name, or "" when it could not be made."""
+    import shutil
+    import time
+    src = os.path.join(_p(folder), name)
+    dst = f"{src}.unreadable-{time.strftime('%Y%m%d-%H%M%S')}"
+    try:
+        shutil.copy2(src, dst)
+        os.chmod(dst, 0o600)
+    except OSError:
+        return ""
+    return os.path.basename(dst)
+
+
+# ---- a state file read once while it stays the same file (R228 step 1) ----
+# The text of each state file read through here, kept by what the file is on
+# disk (its inode, size and times): on a /config served over the network each
+# open and read was a round trip, and one status read opened users.json
+# seventy times. Every caller still parses its own copy, so nothing one
+# changes reaches another; what is saved is the trip to the disk. A request
+# (begin_request) looks at each file once: the first ask stats it, and the
+# same answer serves the rest of that request, as a request is one moment.
+# A write through write_json, write_text or write_bytes forgets the file at
+# once.
+_texts = {}
+_texts_lock = threading.Lock()
+_here = threading.local()
+
+
+# How long a request's look at a file holds: a request is one moment, and
+# one that lives on (a terminal's socket, a node's long-poll) looks again.
+REQUEST_HOLD_S = 2.0
+
+
+def begin_request():
+    """A request begins on this thread: each file is looked at once in it."""
+    _here.seen = {}
+    _here.t0 = time.monotonic()
+
+
+def end_request():
+    """...and ends: the next one looks again."""
+    _here.seen = None
+
+
+def writes_here():
+    """How many state files this thread has written: a request's own answer
+    about itself (who is asking) is kept until it writes one."""
+    return getattr(_here, "wrote", 0)
+
+
+def _forget(path):
+    with _texts_lock:
+        _texts.pop(path, None)
+    seen = getattr(_here, "seen", None)
+    if seen is not None:
+        seen.pop(path, None)
+        seen.pop(("sig", path), None)
+    _here.wrote = getattr(_here, "wrote", 0) + 1
+
+
+def forget(path):
+    """A state file written some other way than write_json or write_text
+    (its own temporary and rename): read afresh from now on."""
+    _forget(_p(path))
+
+
+def _request_seen():
+    seen = getattr(_here, "seen", None)
+    if seen is not None and time.monotonic() - getattr(_here, "t0", 0) > REQUEST_HOLD_S:
+        seen.clear()
+        _here.t0 = time.monotonic()
+    return seen
+
+
+# A file changed this recently is never taken as the same file: a
+# filesystem's clock moves in ticks, and two writes of one size in place
+# within a tick leave inode, size and times as they were (git's "racy"
+# entries). Such a file is read again until it has been still this long.
+RACY_NS = 2_000_000_000
+
+
+def sig(path):
+    """What the file is on disk, (inode, size, mtime, ctime, racy), or None
+    when it is not there: looked at once a request, for a module that keeps
+    its own parse of a file (registry, repos, roles) and checked it on every
+    call. `racy` is 0 for a file still since RACY_NS, and a value no other
+    look gives for one changed since, so it matches nothing kept."""
+    path = _p(path)
+    seen = _request_seen()
+    key = ("sig", path)
+    if seen is not None and key in seen:
+        return seen[key]
+    try:
+        st = os.stat(path)
+        racy = time.time_ns() - max(st.st_mtime_ns, st.st_ctime_ns) < RACY_NS
+        got = (st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns, time.monotonic_ns() if racy else 0)
+    except OSError:
+        got = None
+    if seen is not None:
+        seen[key] = got
+    return got
+
+
+def read_text(path):
+    """The file's text, or None when it cannot be read (missing, a folder,
+    not text): from what was kept while the file is the same one."""
+    path = _p(path)
+    seen = _request_seen()
+    if seen is not None and path in seen:
+        return seen[path]
+    sig_ = sig(path)
+    text = None
+    if sig_ is not None:
+        with _texts_lock:
+            got = _texts.get(path)
+        if got and got[0] == sig_:
+            text = got[1]
+        else:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+            except (OSError, UnicodeDecodeError):
+                text = None
+            if text is not None:
+                with _texts_lock:
+                    if len(_texts) > 1024:
+                        _texts.clear()
+                    _texts[path] = (sig_, text)
+    if seen is not None:
+        seen[path] = text
+    return text
+
+
+def read_json(path, default=None):
+    """The file's JSON, parsed for this caller alone, or `default` when the
+    file is missing or is not JSON."""
+    text = read_text(path)
+    if text is None:
+        return default
+    try:
+        return json.loads(text)
+    except ValueError:
+        return default
+
+
+def write_json(path, obj, mode=0o644, sync=True):
     """Atomically replace `path` with `obj` as JSON. `mode` is the file's
     from the moment it is in place: a file of password hashes was 0644
-    for the instant between the rename and the chmod that followed it."""
+    for the instant between the rename and the chmod that followed it.
+    `sync=False` is for a store that is only notes of the moment (which
+    session is editing which file, what a session last saw): still replaced
+    whole, never half-written, but not waited onto the disk, which is tens
+    of milliseconds a write and was paid on every edit a session made. A
+    power cut can cost such a store its last minutes and nothing else."""
     path = _p(path)
+    _not_landing(path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
                                prefix=os.path.basename(path) + ".",
@@ -61,9 +343,16 @@ def write_json(path, obj, mode=0o644):
     try:
         with os.fdopen(fd, "w") as f:
             f.write(json.dumps(obj, indent=2) + "\n")
+            if sync:
+                _sync(f)
         # mkstemp gives 600 and these were world-readable before.
         os.chmod(tmp, mode)
-        os.replace(tmp, path)
+        with _gate:
+            _not_landing(path)
+            os.replace(tmp, path)
+        _forget(path)
+        if sync:
+            _sync_dir(path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
@@ -77,18 +366,118 @@ def write_text(path, text, mode=0o644, encoding="utf-8"):
     gitrelay.py, changelog.py and memory.py each carried their own and each
     met the fixed-temp-file race on its own before this."""
     path = _p(path)
+    _not_landing(path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
                                prefix="." + os.path.basename(path) + ".", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(text)
+            _sync(f)
         os.chmod(tmp, mode)
-        os.replace(tmp, path)
+        with _gate:
+            _not_landing(path)
+            os.replace(tmp, path)
+        _forget(path)
+        _sync_dir(path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
         raise
+
+
+def write_bytes(path, data, mode=0o644):
+    """Atomically replace `path` with `data`, as write_text does with text:
+    for a file that is not text (a sealed blob), whose writer would
+    otherwise carry a temporary and a rename of its own."""
+    path = _p(path)
+    _not_landing(path)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
+                               prefix="." + os.path.basename(path) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            _sync(f)
+        os.chmod(tmp, mode)
+        with _gate:
+            _not_landing(path)
+            os.replace(tmp, path)
+        _forget(path)
+        _sync_dir(path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+# ---- a module's own JSON file: one load, one save, one revision ----
+class Store:
+    """One module's JSON object in a file of its own: the load, the save and
+    the revision counter each such module would otherwise write for itself.
+
+    `path` is a function asked on every call, since a module is told where
+    its file is after it is imported and a unit test points it somewhere
+    else; `write` is one too, answering the module's own `write_json` of the
+    moment, and with none given the write is statefile's own.
+
+    load() answers the object the file holds, and {} for a file that is
+    missing, is not JSON, or holds anything but an object. `validate` is
+    then handed that dict and answers the one to use (the shape a module
+    insists on), and each key of `defaults()` the answer lacks is set from
+    it, in its order: a function, so no two loads share a value.
+
+    The read is the file's own every time. `cached` reads through read_json
+    instead, which answers what this thread's request already read of the
+    file (begin_request) until this thread writes it: another thread's save
+    in between is not seen, so it is a module's own choice, never the
+    default.
+
+    save(d) writes the object, with `mode` where the file has one of its
+    own, and moves rev(), the counter a page's poll watches. write(d) is
+    the same write without the move, and bump() the move without a write,
+    for a change kept somewhere else."""
+
+    def __init__(self, path, write=None, defaults=None, mode=None, validate=None, cached=False):
+        self._path, self._write = path, write
+        self._defaults, self._mode, self._validate, self._cached = defaults, mode, validate, cached
+        self._rev = 0
+
+    def load(self):
+        path = self._path()
+        if self._cached:
+            d = read_json(path)
+        else:
+            try:
+                with open(path) as f:
+                    d = json.load(f)
+            except (OSError, ValueError):
+                d = None
+        if not isinstance(d, dict):
+            d = {}
+        if self._validate:
+            d = self._validate(d)
+        if self._defaults:
+            for k, v in self._defaults().items():
+                d.setdefault(k, v)
+        return d
+
+    def write(self, d):
+        write = self._write() if self._write else write_json
+        if self._mode is None:
+            write(self._path(), d)
+        else:
+            write(self._path(), d, mode=self._mode)
+
+    def save(self, d):
+        self.write(d)
+        self._rev += 1
+
+    def bump(self):
+        self._rev += 1
+
+    def rev(self):
+        return self._rev
 
 
 @contextlib.contextmanager

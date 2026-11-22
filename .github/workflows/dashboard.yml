@@ -20,16 +20,35 @@ on:
     # Replaces the git-diff test the old step did by hand. Same intent (only
     # worth running when it could have changed), expressed where GitHub can
     # act on it, so the job is never queued rather than started and skipped.
+    #
+    # What the suites test, all of it (R206; the audit of 13 Nov): they start
+    # the node's agent, run aerie and the root helpers and read the image's
+    # own files, and a change to any of those ran no suite.
     paths:
       - "scripts/dashboard/**"
+      - "scripts/agent/**"
+      - "scripts/lib/**"
+      - "scripts/aerie"
+      - "nodes/**"
+      - "config/**"
+      - "apps/vscode/**"
+      - "Dockerfile"
       - ".github/workflows/dashboard.yml"
   workflow_dispatch:
+  # ...and for a release's tag, called by build-image.yml before anything is
+  # built to publish: nothing is published that the suites have not passed.
+  workflow_call:
 
 # A superseded push's result is worthless, so cancel it rather than make the
 # (single) self-hosted runner work through the backlog serially.
 concurrency:
   group: dashboard-${{ github.ref }}
   cancel-in-progress: true
+
+# To read the repository, and nothing else: a pull request's, or a tag's
+# when its workflow calls this one.
+permissions:
+  contents: read
 
 jobs:
   dashboard:
@@ -38,7 +57,19 @@ jobs:
     # bb job gets). The harness FAILS by name when they are missing rather
     # than passing by omission: it skipped with exit 0 until 8 Sep, and every
     # run here was green without a test (bug B74).
+    # Not for a fork's pull request: this runner is a machine on its owner's
+    # network and its jobs account reaches Docker there. This line stops a
+    # fork's request that leaves the workflow as it is; one that changes the
+    # workflow runs its own copy, so the protection that holds is the
+    # repository's setting (Settings, Actions, General: require approval for
+    # all external contributors) and reading a request's workflow changes
+    # before approving its run. A request from a branch of this repository,
+    # and a manual run, go on as before.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, bb-sandbox]
+    # A run that hangs is ended, not left holding the one runner: the whole
+    # set and its second try are under an hour on this machine.
+    timeout-minutes: 120
     # `bash` rather than the default `bash -e`, because that one difference is
     # pipefail, and the run below is piped into tee. Without it the tee's exit
     # status is the step's, and a failing suite would report success.
@@ -46,7 +77,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
 
       - name: Open a log this container can read afterwards
         # The same archive lint.yml keeps, and for the same reason: the runner
@@ -72,45 +103,34 @@ jobs:
           log="$dir/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
           echo "CI_LOG=$log" >> "$GITHUB_ENV"
           echo "CI_LOG_DIR=$dir" >> "$GITHUB_ENV"
-          {
-            echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
-            echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
-            echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
-            echo "commit: ${GITHUB_SHA}"
-            echo "opened: $(date -Is)"
-            echo
-          } > "$log"
+          # One log a run: its first job writes the head `aerie ci-log` names
+          # the run by, and each job after it (a tag's run has the lint, the
+          # unit tier and the browser suites) adds its own part under it.
+          if [ -s "$log" ]; then
+            printf '\n== %s ==\n' "${GITHUB_JOB}" >> "$log"
+          else
+            {
+              echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
+              echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+              echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
+              echo "commit: ${GITHUB_SHA}"
+              echo "opened: $(date -Is)"
+              echo
+            } > "$log"
+          fi
 
       - name: Dashboard browser tests
         # An isolated instance on a spare port with a private tmux server and a
         # scratch state dir; nothing it does can reach the live dashboard this
         # runner's container is also serving.
         #
-        # Retried once, and only once, because of what this suite's failures
-        # actually are. It drives a real browser against a page that repaints on
-        # a poll, on a runner sharing its box with the live dashboard, any
-        # session and any image build, so a file times out under load and
-        # passes alone, every time, which is bug #13. A run that fails twice in
-        # a row is worth reading; a run that fails once is worth running again,
-        # and mailing somebody about the first one teaches them to ignore the
-        # mail. The second attempt is logged separately, so a genuine
-        # regression still shows both.
-        env:
-          # This runner shares its box with the live dashboard, any session and
-          # any image build, so every wait in the suite is competing for CPU
-          # that a quiet run has to itself. Doubling them costs seconds on a
-          # green run and removes the commonest way this goes red for reasons
-          # that are not the code (bug #13).
-          BB_TEST_SLOW: "2"
+        # Once, with nothing doubled (R7 step 7). It ran with every wait
+        # doubled and, when it failed, the whole suite a second time: the
+        # harness itself runs a suite that failed once more by itself, which
+        # is what tells a flake from a failure, and a second whole run only
+        # made a real failure take twice as long to say.
         run: |
           set -o pipefail
-          if bash scripts/dashboard/test/run.sh 2>&1 | tee -a "$CI_LOG"; then
-            exit 0
-          fi
-          echo | tee -a "$CI_LOG"
-          echo "== first attempt failed, running once more ==" | tee -a "$CI_LOG"
-          echo "   (this suite is timing-sensitive on a shared box; see bug #13)" \
-            | tee -a "$CI_LOG"
           bash scripts/dashboard/test/run.sh 2>&1 | tee -a "$CI_LOG"
 
       - name: Close the log

@@ -1,5 +1,33 @@
 {
  "about": "What aerie lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, aerie lint on a node skips its checks.",
+ "credits": [
+  {
+   "maker": "Vidar Holen",
+   "name": "shellcheck"
+  },
+  {
+   "maker": "the hadolint project",
+   "name": "hadolint"
+  },
+  {
+   "maker": "rhysd",
+   "name": "actionlint"
+  },
+  {
+   "maker": "Astral",
+   "name": "ruff"
+  },
+  {
+   "maker": "Mike Farah",
+   "name": "yq"
+  },
+  {
+   "maker": "David Peter",
+   "name": "fd"
+  }
+ ],
+ "format": 5,
+ "framework": "5.1",
  "label": "Lint tools (shellcheck, hadolint, actionlint, ruff, yq, fd)",
  "layout": {
   "bin": [
@@ -8,6 +36,7 @@
   "env": {},
   "tool": "bin/shellcheck"
  },
+ "maker": "AerieOS",
  "name": "lint-tools",
  "platforms": [
   "linux/amd64"
@@ -15,29 +44,114 @@
  "shipped": {
   "probe": "lint-tools",
   "reports": "shellcheck",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "github-asset"
+    },
+    "from": "pin",
+    "sha256": "c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507",
+    "version": "v2.15.1"
    },
    "download": {
     "bytes": 70000000,
     "resolver": "approximate"
    },
+   "fetch": [
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/amd64",
+     "sha256": "129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973",
+     "to": "dl/yq",
+     "track": {
+      "repo": "mikefarah/yq",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/mikefarah/yq/releases/download/{version}/yq_linux_amd64",
+     "version": "v4.54.3"
+    },
+    {
+     "found": {
+      "from": "file",
+      "url": "{url}.sha256"
+     },
+     "platform": "linux/amd64",
+     "sha256": "94b33791f48cd54ab35ad673a443a5c001d3e6d87effeaba9899070b700d45f3",
+     "to": "dl/ruff.tar.gz",
+     "track": {
+      "repo": "astral-sh/ruff",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/astral-sh/ruff/releases/download/{version}/ruff-x86_64-unknown-linux-gnu.tar.gz",
+     "version": "0.17.6"
+    },
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/amd64",
+     "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198",
+     "to": "dl/shellcheck.tar.xz",
+     "track": {
+      "repo": "koalaman/shellcheck",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/koalaman/shellcheck/releases/download/{version}/shellcheck-{version}.linux.x86_64.tar.xz",
+     "version": "v0.11.0"
+    },
+    {
+     "found": {
+      "from": "file",
+      "url": "{base}/actionlint_{version}_checksums.txt"
+     },
+     "platform": "linux/amd64",
+     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
+     "to": "dl/actionlint.tar.gz",
+     "track": {
+      "repo": "rhysd/actionlint",
+      "resolver": "github-release",
+      "trim_prefix": "v"
+     },
+     "url": "https://github.com/rhysd/actionlint/releases/download/v{version}/actionlint_{version}_linux_amd64.tar.gz",
+     "version": "1.7.12"
+    },
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/amd64",
+     "sha256": "985e24041e9ef6e9a38e9e088743405dde23d7220aa96740f091862167d9ff28",
+     "to": "dl/fd.tar.gz",
+     "track": {
+      "repo": "sharkdp/fd",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/sharkdp/fd/releases/download/{version}/fd-{version}-x86_64-unknown-linux-gnu.tar.gz",
+     "version": "v10.5.2"
+    }
+   ],
    "fresh_only": true,
    "kind": "script",
    "run": [
     "sh",
     "-ec",
-    "dst=\"$2/bin\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; get() { curl -fsSL --retry 3 -o \"$2\" \"$1\"; }; tag() { curl -fsSIL -o /dev/null -w '%{url_effective}' \"https://github.com/$1/releases/latest\" | sed 's#.*/tag/##'; }; get https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \"$dst/yq\"; get https://github.com/astral-sh/ruff/releases/latest/download/ruff-x86_64-unknown-linux-gnu.tar.gz \"$t/ruff.tgz\"; tar -xzf \"$t/ruff.tgz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; v=\"$(tag koalaman/shellcheck)\"; get \"https://github.com/koalaman/shellcheck/releases/download/$v/shellcheck-$v.linux.x86_64.tar.xz\" \"$t/sc.txz\"; tar -xJf \"$t/sc.txz\" -C \"$t\"; cp \"$t/shellcheck-$v/shellcheck\" \"$dst/\"; v=\"$(tag rhysd/actionlint)\"; get \"https://github.com/rhysd/actionlint/releases/download/$v/actionlint_${v#v}_linux_amd64.tar.gz\" \"$t/al.tgz\"; tar -xzf \"$t/al.tgz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; v=\"$(tag sharkdp/fd)\"; get \"https://github.com/sharkdp/fd/releases/download/$v/fd-$v-x86_64-unknown-linux-gnu.tar.gz\" \"$t/fd.tgz\"; tar -xzf \"$t/fd.tgz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\"",
+    "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; mv \"$dl/yq\" \"$dst/yq\"; tar -xzf \"$dl/ruff.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; tar -xJf \"$dl/shellcheck.tar.xz\" -C \"$t\"; cp \"$(find \"$t\" -name shellcheck -type f | head -1)\" \"$dst/\"; tar -xzf \"$dl/actionlint.tar.gz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; tar -xzf \"$dl/fd.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
     "--",
     "{script}",
     "{dir}"
    ],
-   "url": "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64",
+   "url": "https://github.com/hadolint/hadolint/releases/download/{version}/hadolint-Linux-x86_64",
    "verify": [
     "{dir}/bin/shellcheck",
     "--version"
-   ]
+   ],
+   "version": {
+    "repo": "hadolint/hadolint",
+    "resolver": "github-release"
+   }
   },
   "updatable": true
  },

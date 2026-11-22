@@ -29,6 +29,18 @@ class Beside(unittest.TestCase):
         with mock.patch.object(devapp, "_config", lambda p, i=devapp.MAIN, env_extra=None: cfg):
             return devapp._beside_gate("alpha", "main", yes)
 
+    def test_a_persons_allow_on_a_sessions_question_is_the_yes(self):
+        """A session's rebuild that would ship a new service is put to a
+        person on the bell (devactions.request names it); their Allow takes
+        the set as it stands, and the build after it meets no gate."""
+        self.gate(APP)
+        with mock.patch.object(devapp, "_config", lambda p, i=devapp.MAIN, env_extra=None: MORE):
+            self.assertEqual(devapp.beside_new("alpha", "main", MORE), ["gitea", "gitea-seed"])
+            self.assertEqual(devapp.ack_beside("alpha", "main"), "")
+            self.assertEqual(self.rec["beside"], ["db", "gitea", "gitea-seed"])
+            self.assertEqual(devapp.beside_new("alpha", "main", MORE), [])
+        self.assertEqual(self.gate(MORE), "", "and it is asked about once")
+
     def test_image_only_services_are_what_rides_beside(self):
         self.assertEqual(devapp.beside_services(MORE), ["db", "gitea", "gitea-seed"])
 

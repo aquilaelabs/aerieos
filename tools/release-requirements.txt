@@ -1,0 +1,24 @@
+# What a release's build installs to use the release key with: Python's
+# cryptography library and the two it needs, each pinned to a version and
+# held to the sha256 of the file PyPI published for it. The steps that hold
+# AERIEOS_RELEASE_KEY (the agent's signature, tools/sign-agent.py; a dev
+# build's signed list, tools/release-sign.py seal) import nothing else, and
+# `pip install cryptography` took whatever PyPI served that day into them.
+# tools/release-lib.sh installs this file with --require-hashes, in a step
+# that holds no secret.
+#
+# The hashes are of the x86-64 Linux wheels a hosted ubuntu runner takes
+# (cryptography's one wheel for Python 3.11 and later, by the C library's
+# age; cffi's for Python 3.12 to 3.14), as PyPI lists them on each
+# version's own page. To move a version: the new number, and its files'
+# sha256 from https://pypi.org/project/NAME/VERSION/#files.
+cryptography==46.0.5 \
+    --hash=sha256:4c3341037c136030cb46e4b1e17b7418ea4cbd9dd207e4a6f3b2b24e0d4ac731 \
+    --hash=sha256:3ee190460e2fbe447175cda91b88b84ae8322a104fc27766ad09428754a618ed \
+    --hash=sha256:4d7e3d356b8cd4ea5aff04f129d5f66ebdc7b6f8eae802b93739ed520c47c79b
+cffi==2.1.1 \
+    --hash=sha256:c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf \
+    --hash=sha256:a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1b2fdc770e2 \
+    --hash=sha256:b0431303acaea1089ad4b3e9ce4e6518193def1118d4073ca848635ee4ea2e96
+pycparser==3.12 \
+    --hash=sha256:a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e

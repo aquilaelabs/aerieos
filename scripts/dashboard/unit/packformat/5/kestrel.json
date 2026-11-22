@@ -1,0 +1,25 @@
+{
+  "name": "kestrel",
+  "label": "Kestrel",
+  "about": "The Kestrel compiler and its package tool, for firmware written in Kestrel.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Kestrel Language Foundation",
+  "platforms": ["linux/amd64", "linux/arm64"],
+  "terms": [{"label": "BSD-3-Clause", "url": "https://opensource.org/license/bsd-3-clause"}],
+  "install": {
+    "fetch": [
+      {"url": "https://get.kestrel.example.org/1.8.0/kestrel-up.sh",
+       "sha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+       "to": "dl/kestrel-up.sh"}
+    ],
+    "online": "Its installer, kestrel-up, downloads the compiler and the standard library for this machine from releases.kestrel.example.org.",
+    "steps": [["sh", "{dir}/dl/kestrel-up.sh", "--prefix", "{dir}", "--version", "1.8.0"]],
+    "verify": ["{dir}/bin/kestrel", "--version"]
+  },
+  "touches": {"hosts": ["releases.kestrel.example.org"]},
+  "layout": {"bin": ["bin"], "tool": "bin/kestrel"},
+  "verbs": {
+    "build": {"about": "Builds the firmware in a directory.", "usage": "DIR", "run": ["{dir}/bin/kestrel", "build", "{args}"]}
+  }
+}

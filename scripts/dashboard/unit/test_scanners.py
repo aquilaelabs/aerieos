@@ -1,8 +1,9 @@
 """AerieOS's own scanners on each node (R145, scanners.py): the record
-and the compose file with pinned versions, Deploy and Update as compose
-jobs, a run as a scan job over the projects whose node it is, the schedule
-firing from the timer, a report taken from a node and read by findings
-beside the host folder, the versions check, and the bell's rows."""
+and the compose file with each scanner the image its entry names by
+digest, Deploy and Update as compose jobs, a run as a scan job over the
+projects whose node it is, the schedule firing from the timer, a report
+taken from a node and read by findings beside the host folder, a node
+behind when the entry names another image, and the bell's rows."""
 import io
 import json
 import os
@@ -15,8 +16,13 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import findings    # noqa: E402
+import packformat  # noqa: E402
 import scanners    # noqa: E402
 import schedules   # noqa: E402
+import services    # noqa: E402
+
+IMAGES = {"semgrep": "semgrep/semgrep:1.2.3@sha256:" + "a" * 64, "trivy": "aquasec/trivy:0.9.9@sha256:" + "b" * 64,
+          "mobsfscan": "opensecurity/mobsfscan:0.4.5@sha256:" + "c" * 64}
 
 
 def write_json(path, d):
@@ -44,15 +50,29 @@ class Scanners(unittest.TestCase):
                            project_nodes=lambda: dict(self.bound), project_names=lambda: sorted(self.bound),
                            job_add=job_add, job_state=lambda jid: self.states.get(jid, ""),
                            next_after=schedules.next_after, cron_words=schedules.words)
+        self.addCleanup(setattr, services, "IMAGES_FILE", services.IMAGES_FILE)
+        services.IMAGES_FILE = str(self.tmp / "service-images.json")
+        self.entry()
 
-    def test_the_compose_file_pins_the_versions_as_one_shot_services(self):
-        text = scanners.compose_text("n1", {"versions": {"semgrep": "1.2.3", "trivy": "0.9.9", "mobsfscan": "0.4.5"}})
-        self.assertIn("image: semgrep/semgrep:1.2.3", text)
-        self.assertIn("image: aquasec/trivy:0.9.9", text)
-        self.assertIn("mobsfscan==0.4.5", text)
+    def entry(self, **moved):
+        """The scanners' entry naming those images, `moved` in their place."""
+        write_json(services.IMAGES_FILE, {"services": [{"name": "scanners", "images": {**IMAGES, **moved}}]})
+
+    def test_the_compose_file_names_each_scanner_by_digest_as_one_shot_services(self):
+        text = scanners.compose_text("n1", {})
+        self.assertEqual(packformat.compose_images(text), list(IMAGES.values()), "each the image its entry names, by its digest")
+        self.assertNotIn("pip install", text, "nothing is installed at a scan: the tool is in its image")
+        self.assertNotIn("python:", text)
+        self.assertIn('entrypoint: ["sh", "-c"]', text)
+        self.assertIn("mobsfscan --sarif -o /reports/mobsfscan.sarif /src; s=$$?; [ $$s -le 1 ]", text, "its exit 1 is a finding, not a failed scan")
         self.assertEqual(text.count("profiles: [scan]"), 3, "nothing starts at an up: a run is compose run per service")
         self.assertIn("./reports:/reports", text)
         self.assertEqual(scanners.container_name("n1"), "scanners-build-box")
+        pinned = {"images": {**IMAGES, "trivy": "aquasec/trivy:0.9.0@sha256:" + "d" * 64}}
+        self.assertIn("image: aquasec/trivy:0.9.0@sha256:" + "d" * 64, scanners.compose_text("n1", pinned), "a node runs what its record is pinned to")
+        with open(services.IMAGES_FILE.replace(str(self.tmp), os.path.dirname(os.path.abspath(scanners.__file__))), encoding="utf-8") as f:
+            shipped = next(r for r in json.load(f)["services"] if r["name"] == "scanners")["images"]
+        self.assertEqual(sorted(shipped), sorted(scanners.SCANNERS), "the shipped entry names an image for each scanner")
 
     def test_deploy_and_update_are_compose_jobs_and_remove_takes_it_off(self):
         self.assertIn("hosts containers only", scanners.deploy("n2")["error"])
@@ -64,16 +84,21 @@ class Scanners(unittest.TestCase):
         self.assertIn("compose.yml", j["spec"]["files"])
         rec = scanners.record("n1")
         self.assertTrue(rec["deployed"])
-        self.assertEqual(rec["versions"], scanners.VERSIONS)
-        self.assertEqual(scanners.update("n1")["same"], True, "nothing newer known yet")
-        # Newer known: the node is behind, Update pins and pulls.
-        with scanners._lock:
-            d = scanners._load()
-            d["latest"] = {"at": 1, "versions": {**scanners.VERSIONS, "trivy": "9.9.9"}}
-            scanners._save(d)
-        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9"})
+        self.assertEqual(rec["images"], IMAGES, "pinned to the images the entry names")
+        self.assertEqual(rec["versions"], {"semgrep": "1.2.3", "trivy": "0.9.9", "mobsfscan": "0.4.5"})
+        self.assertEqual(scanners.update("n1")["same"], True, "the entry names what it runs")
+        # The entry names another image: the node is behind, Update pins and pulls.
+        newer = "aquasec/trivy:9.9.9@sha256:" + "e" * 64
+        self.entry(trivy=newer)
+        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9"}, "said with the tag it would move to")
+        self.assertIn("image: " + IMAGES["trivy"], scanners.compose_text("n1", scanners.record("n1")), "and it still runs what it is pinned to")
         self.assertEqual(scanners.update("n1")["versions"]["trivy"], "9.9.9")
+        self.assertIn("image: " + newer, self.jobs[-1]["spec"]["files"]["compose.yml"])
         self.assertEqual(scanners.behind(scanners.record("n1")), {})
+        # The same tag under another digest is an Update too.
+        self.entry(trivy="aquasec/trivy:9.9.9@sha256:" + "f" * 64)
+        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9"})
+        self.entry(trivy=newer)
         self.assertIn("not deployed", scanners.update("n3")["error"])
         r = scanners.remove("n1")
         self.assertEqual(self.jobs[-1]["spec"]["plan"][0]["name"], "down")
@@ -148,25 +173,24 @@ class Scanners(unittest.TestCase):
         self.assertEqual(scanners.record("n1"), {})
         self.assertIsNone(findings.report_files())
 
-    def test_the_check_reads_newer_versions_and_the_bell_says_behind_and_failed(self):
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            json.dump({"results": [{"name": "latest"}, {"name": "1.200.1"}, {"name": "1.9.0-nonroot"}, {"name": "1.199.9"}]}, f)
-            tags = f.name
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            json.dump({"info": {"version": "0.4.9"}}, f)
-            pypi = f.name
-        self.addCleanup(os.unlink, tags)
-        self.addCleanup(os.unlink, pypi)
-        scanners.SEMGREP_TAGS_URL = scanners.TRIVY_TAGS_URL = f"file://{tags}"
-        scanners.MOBSFSCAN_URL = f"file://{pypi}"
-        lt = scanners.check_versions()
-        self.assertEqual((lt["versions"]["semgrep"], lt["versions"]["trivy"], lt["versions"]["mobsfscan"]), ("1.200.1", "1.200.1", "0.4.9"))
-        self.assertEqual(lt["error"], "")
-        scanners.deploy("n1")
-        self.assertEqual(scanners.behind(scanners.record("n1")), {}, "deployed after the check: the newest")
+    def test_a_node_whose_record_names_no_images_is_pinned_at_its_next_run(self):
         with scanners._lock:
             d = scanners._load()
-            d["nodes"]["n1"]["versions"]["trivy"] = "0.1.0"
+            d["nodes"]["n1"] = {"deployed": 5, "versions": {"semgrep": "1.0.0", "trivy": "0.1.0", "mobsfscan": "0.4.0"}}
+            scanners._save(d)
+        self.assertEqual(scanners.behind(scanners.record("n1")), {})
+        scanners.run_now("ann", "n1")
+        self.assertEqual(packformat.compose_images(self.jobs[-1]["spec"]["files"]["compose.yml"]), list(IMAGES.values()))
+        self.assertEqual(scanners.record("n1")["images"], IMAGES)
+        self.entry(semgrep="semgrep/semgrep:1.3.0@sha256:" + "e" * 64)
+        self.assertEqual(list(scanners.behind(scanners.record("n1"))), ["semgrep"], "and from then on the entry moving is an Update")
+
+    def test_the_bell_says_behind_and_failed_and_nothing_asks_what_is_newest(self):
+        scanners.deploy("n1")
+        self.assertEqual(scanners.behind(scanners.record("n1")), {}, "deployed from the entry: nothing to move to")
+        self.entry(trivy="aquasec/trivy:1.200.1@sha256:" + "e" * 64)
+        with scanners._lock:
+            d = scanners._load()
             d["nodes"]["n1"]["last"] = {"at": 5, "job": "j9", "error": ""}
             scanners._save(d)
         self.states["j9"] = "failed"
@@ -176,7 +200,10 @@ class Scanners(unittest.TestCase):
         v = scanners.view()
         self.assertEqual(v["nodes"][0]["name"], "Build Box")
         self.assertEqual(v["nodes"][0]["behind"], {"trivy": "1.200.1"})
+        self.assertEqual(v["nodes"][0]["versions"]["trivy"], "0.9.9")
+        self.assertEqual(v["latest"], {"versions": {"semgrep": "1.2.3", "trivy": "1.200.1", "mobsfscan": "0.4.5"}})
         self.assertEqual(v["nodes"][1]["host_only"], True)
+        self.assertFalse(hasattr(scanners, "check_versions"), "nothing reads a registry or an index for what is newest")
 
 
 if __name__ == "__main__":

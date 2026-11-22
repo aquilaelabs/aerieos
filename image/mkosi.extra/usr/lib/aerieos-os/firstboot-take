@@ -4,7 +4,7 @@ controller starts: aerieos/firstboot.json on the ESP holds, after its
 marker line, the JSON a stick maker's --config wrote (format 1, docs/image.md).
 When it does, the machine's own part is applied here (the hostname, the time
 zone, a static address written to the stick's aerieos.env), the rest is handed to the controller's account under
-/run/aerieos-os/firstboot/, and the file on the stick is blanked in place,
+/var/lib/aerieos-os/firstboot/, and the file on the stick is blanked in place,
 its size kept, so the password hash it may carry is never left on the stick.
 The controller applies what it was handed and says what it did on This
 machine. A blank file is a plain stick: nothing happens.
@@ -18,6 +18,11 @@ import sys
 
 ESP = os.environ.get("BB_ESP", "/boot/efi")
 RUN = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot")
+# Where the prepared configuration is handed over: on the stick's data
+# partition, not in memory, so a reset or a failed start before the
+# controller applies it does not lose it once the stick's copy is blanked
+# (B943). The controller removes it once applied.
+HAND = os.path.join(os.environ.get("BB_OS_WORK", "/var/lib/aerieos-os"), "firstboot")
 ENV = os.environ.get("BB_CONTROLLER_ENV", "/etc/aerieos-controller/controller.env")
 MARK = b"AERIE-FIRSTBOOT-1\n"
 HOST = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
@@ -245,15 +250,23 @@ def main():
     if m.get("features"):
         said["features"] = features(m["features"])
     pw = account()
-    os.makedirs(RUN, mode=0o700, exist_ok=True)
+    os.makedirs(HAND, mode=0o700, exist_ok=True)
     if pw:
-        os.chown(RUN, pw.pw_uid, pw.pw_gid)
-    out = os.path.join(RUN, "firstboot.json")
+        os.chown(HAND, pw.pw_uid, pw.pw_gid)
+    out = os.path.join(HAND, "firstboot.json")
     with open(os.open(out + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
         json.dump({"config": cfg, "machine": said}, f)
+        f.flush()
+        os.fsync(f.fileno())
     if pw:
         os.chown(out + ".new", pw.pw_uid, pw.pw_gid)
     os.replace(out + ".new", out)
+    # On the disk before the stick's copy goes.
+    fd = os.open(HAND, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
     # Blanked in place, its size kept: the stick maker finds it again by its
     # marker, and nothing of what it held stays on the stick.
     with open(path, "r+b") as f:

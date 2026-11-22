@@ -1,14 +1,9 @@
 """The id for a run of the machine: the same from the controller, the agent and
 bb-tty, digits alone, and untouched by the clock, whose steps reloaded every
-page open on a machine at its first time sync. And the state migration that
-carries a stamp from the old shape."""
-import importlib.util
-import json
-import os
+page open on a machine at its first time sync."""
 import re
 import subprocess
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -63,41 +58,6 @@ class BootId(unittest.TestCase):
             return real(path, *a, **k)
         with mock.patch.object(Path, "read_text", no_id):
             self.assertEqual(layout.boot_id(), old_shape())
-
-    def test_bb_tty_still_knows_an_older_agents_stamp(self):
-        self.assertEqual(bbtty("boot_id_by_btime"), old_shape())
-
-
-class Migration(unittest.TestCase):
-    def setUp(self):
-        spec = importlib.util.spec_from_file_location("m20", HERE / "statemigrations" / "0020_boot_stamp.py")
-        self.m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.m)
-        self.dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.dir.cleanup)
-        self.f = Path(self.dir.name) / "tabs.json"
-
-    def stamp(self, boot):
-        self.f.write_text(json.dumps({"boot": boot, "users": {"u": {"rev": 3}}}))
-        self.m.run({"state": self.dir.name})
-        return json.loads(self.f.read_text())
-
-    def test_this_boots_old_stamp_takes_the_new_shape(self):
-        d = self.stamp(old_shape())
-        self.assertEqual(d["boot"], layout.boot_id())
-        self.assertEqual(d["users"], {"u": {"rev": 3}})
-
-    def test_another_boots_stamp_is_left_to_read_as_one(self):
-        self.assertEqual(self.stamp("1.2")["boot"], "1.2")
-
-    def test_again_changes_nothing(self):
-        self.stamp(old_shape())
-        self.m.run({"state": self.dir.name})
-        self.assertEqual(json.loads(self.f.read_text())["boot"], layout.boot_id())
-
-    def test_no_file_is_nothing_to_do(self):
-        self.m.run({"state": self.dir.name})
-        self.assertFalse(os.path.exists(self.f))
 
 
 if __name__ == "__main__":

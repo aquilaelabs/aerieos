@@ -36,6 +36,10 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import services
+import statefile
+import syscontainer
+
 STATE = None
 write_json = None
 seal = None
@@ -47,13 +51,14 @@ node_addr = None            # nid -> the node's address, as the sessions and thi
 project_names = None        # () -> every project's name
 job_add = None
 job_get = None              # jid -> the job row with its log
+node_gpu = None             # nid -> whether the node reports a graphics card, which Ollama is then given
+container_gone = None       # name -> True once no written container has that name (R238)
 _lock = threading.Lock()
-_rev = 0
 SEALED = "bbseal:"
 PORT = 4000
-IMAGE = "ghcr.io/berriai/litellm:main-stable"
-OLLAMA_IMAGE = "ollama/ollama:latest"
-DB_IMAGE = "postgres:16-alpine"
+# The pack this service is, and so the row of services.py's images that is
+# its own: LiteLLM, its database and Ollama, each by its digest.
+PACK = "model-router"
 TIMEOUT = 20
 # Each provider: its environment variable in the compose file, the
 # wildcard LiteLLM routes to it, and its name on the page.
@@ -72,7 +77,10 @@ def pack():
     its Library card, its configuration the fields the Node settings
     section asked before, written to packs/services/model-router by
     tools/packs-export.py and held to this by aerie lint."""
-    return {"name": "model-router", "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+    return services.entry({"name": PACK, "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+            # Two makers' programs behind one card: AerieOS's, each credited.
+            "maker": "AerieOS", "credits": [{"name": "LiteLLM", "maker": "BerriAI"}, {"name": "Ollama", "maker": "Ollama"}],
+            "framework": "2.1",
             "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the spaces you allow: "
                      "each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
             "service": {"kind": "router"},
@@ -85,7 +93,7 @@ def pack():
                          {"name": "ollama", "label": "Run Ollama beside it", "kind": "switch",
                           "help": "on this node's card where it has one, else its CPU and memory; its models one more provider (ollama/NAME)"},
                          {"name": "projects", "label": "Spaces that may use it", "kind": "projects",
-                          "help": "each handed the address and its own key at a session's start; a session of any other space cannot reach it"}]}
+                          "help": "each handed the address and its own key at a session's start; a session of any other space cannot reach it"}]})
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 
 
@@ -101,22 +109,21 @@ def _file():
     return STATE / "router.json"
 
 
+# Read once while the same file (R228 step 1); 0600, since the providers'
+# keys are in it.
+_store = statefile.Store(_file, write=lambda: write_json, mode=0o600, cached=True)
+
+
 def _load():
-    try:
-        d = json.loads(_file().read_text())
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError, AttributeError):
-        return {}
+    return _store.load()
 
 
 def _save(d):
-    global _rev
-    write_json(_file(), d, mode=0o600)
-    _rev += 1
+    _store.save(d)
 
 
 def rev():
-    return _rev
+    return _store.rev()
 
 
 def _keep(v):
@@ -140,13 +147,11 @@ def record(nid):
 
 
 def container_name(nid):
-    base = re.sub(r"[^a-z0-9-]", "-", str(node_name(nid) or nid).lower()).strip("-") or "node"
-    return f"router-{base}"[:60]
+    return syscontainer.container_name("router", node_name(nid) or nid)
 
 
 def deployed(devapp, nid):
-    name = container_name(nid)
-    return bool(devapp.is_file_source(name) and devapp._read_rec(name, devapp.MAIN).get("node") == nid)
+    return syscontainer.deployed(devapp, container_name(nid), nid)
 
 
 def _url(nid, rec=None):
@@ -171,8 +176,7 @@ def _qc(v):
 
 
 def _indent(text, n):
-    pad = " " * n
-    return "\n".join(pad + ln if ln else ln for ln in text.splitlines())
+    return syscontainer.indent(text, n, every_break=True)
 
 
 def litellm_config(rec):
@@ -202,10 +206,12 @@ def litellm_config(rec):
 def compose_text(nid, rec, gpu=False):
     """The router's compose file: LiteLLM on the node's address, its
     database beside it, Ollama where it is on (the card given to it where
-    the node has one), the keys as the services' environment, the config
-    inline."""
+    the node has one), each the image its entry names by digest, the keys
+    as the services' environment, the config inline."""
     addr = node_addr(nid) if node_addr else ""
     name = container_name(nid)
+    # What each service runs: the image its entry names, by its digest.
+    image = services.images(PACK)
     port = int(rec.get("port") or PORT)
     env = [f"      LITELLM_MASTER_KEY: {_qc(_open(rec.get('master')))}",
            f"      DATABASE_URL: {_qc('postgresql://litellm:' + _open(rec.get('dbpass')) + '@db:5432/litellm')}"]
@@ -218,7 +224,7 @@ def compose_text(nid, rec, gpu=False):
     out = ["# Written by AerieOS from a node's Model router section (router.py); Save there rewrites it.",
            "services:",
            "  litellm:",
-           f"    image: {IMAGE}",
+           f"    image: {image['litellm']}",
            f"    container_name: {name}",
            "    restart: unless-stopped",
            "    command: [\"--config\", \"/app/config.yaml\", \"--port\", \"4000\"]",
@@ -231,7 +237,7 @@ def compose_text(nid, rec, gpu=False):
            "    depends_on:",
            "      - db",
            "  db:",
-           f"    image: {DB_IMAGE}",
+           f"    image: {image['db']}",
            "    restart: unless-stopped",
            "    environment:",
            "      POSTGRES_USER: litellm",
@@ -241,7 +247,7 @@ def compose_text(nid, rec, gpu=False):
            "      - router_db:/var/lib/postgresql/data"]
     if (rec.get("ollama") or {}).get("on"):
         out += ["  ollama:",
-                f"    image: {OLLAMA_IMAGE}",
+                f"    image: {image['ollama']}",
                 "    restart: unless-stopped",
                 "    volumes:",
                 "      - router_ollama:/root/.ollama"]
@@ -327,55 +333,74 @@ def deploy(nid, containers, devactions, devapp, gpu=False):
     why = _ready(nid)
     if why:
         return {"error": why}
-    name = container_name(nid)
-    if devapp.is_file_source(name):
-        was = devapp._read_rec(name, devapp.MAIN).get("node")
-        live = {n["id"] for n in node_list() if n.get("state") != "retired"}
-        if was == nid or was in live:
-            return {"error": f"{name} is already on the Containers page"}
-        devapp.forget_container(name)
-    rec = record(nid)
-    r = containers.create_container(name, compose_text(nid, rec, gpu), "", node=nid, for_project=devapp.SYSTEM)
-    if r.get("error"):
-        return r
-    with _lock:
-        d = _load()
-        d.setdefault(str(nid), {})["deployed"] = int(time.time())
-        _save(d)
-    b = devactions.rebuild(name, devapp.MAIN, gate=False)
-    if b.get("error"):
-        return {"ok": True, "name": name, "note": f"made, but not built: {b['error']}"}
-    return {"ok": True, "name": name, "job": b.get("job")}
+
+    def made():
+        # When it was deployed, which is what says the router is there.
+        with _lock:
+            d = _load()
+            d.setdefault(str(nid), {})["deployed"] = int(time.time())
+            _save(d)
+    return syscontainer.deploy(nid, container_name(nid), lambda: compose_text(nid, record(nid), gpu),
+                               containers, devactions, devapp, node_list, made=made)
 
 
 def apply(nid, containers, devactions, devapp, gpu=False):
     """A deployed router given its new compose file and rebuilt."""
-    name = container_name(nid)
-    if not devapp.is_file_source(name):
-        return {"ok": True, "deployed": False}
-    r = containers.update_container(name, compose_text(nid, record(nid), gpu), "")
-    if r.get("error"):
-        return r
-    b = devactions.rebuild(name, devapp.MAIN, gate=False)
-    if b.get("error"):
-        return {"ok": True, "deployed": True, "note": f"saved, but not rebuilt: {b['error']}"}
-    return {"ok": True, "deployed": True, "job": b.get("job")}
+    return syscontainer.apply(container_name(nid), lambda: compose_text(nid, record(nid), gpu),
+                              containers, devactions, devapp)
 
 
 def remove(nid, devactions, devapp):
-    name = container_name(nid)
-    if not devapp.is_file_source(name):
-        return {"error": f"{name} is not on the Containers page"}
-    r = devactions.remove_instance(name, devapp.MAIN)
-    with _lock:
-        d = _load()
-        rec = d.get(str(nid)) or {}
-        rec.pop("deployed", None)
-        rec.pop("projects", None)
-        rec.pop("models", None)
-        d[str(nid)] = rec
-        _save(d)
-    return r
+    def gone():
+        # No longer deployed, and with it the keys it had made for the
+        # spaces and the models it listed; the provider keys stay.
+        with _lock:
+            d = _load()
+            rec = d.get(str(nid)) or {}
+            rec.pop("deployed", None)
+            rec.pop("projects", None)
+            rec.pop("models", None)
+            d[str(nid)] = rec
+            _save(d)
+    return syscontainer.remove(container_name(nid), devactions, devapp, gone=gone)
+
+
+# ---- the Library's service (services.py) --------------------------------------
+# What the Library asks of every service by the same names: whether it is on
+# a node, its Install and its Remove, which are Deploy and Remove here, and
+# the sentence Remove shows, which for the router is the page's own. The
+# three modules a written container is made, built and removed through are
+# syscontainer.hands().
+
+REMOVES = ""
+
+
+def service_deployed(nid):
+    return bool(record(nid).get("deployed"))
+
+
+def service_install(nid, by=""):
+    containers, devactions, devapp = syscontainer.hands()
+    return deploy(nid, containers, devactions, devapp, bool(node_gpu(nid)) if node_gpu else False)
+
+
+def service_remove(nid, by=""):
+    _containers, devactions, devapp = syscontainer.hands()
+    return remove(nid, devactions, devapp)
+
+
+def service_update(nid, by=""):
+    """Update on its Containers row: its compose file written again, with
+    the images its entry names now, and rebuilt."""
+    containers, devactions, devapp = syscontainer.hands()
+    return apply(nid, containers, devactions, devapp, bool(node_gpu(nid)) if node_gpu else False)
+
+
+def service_row(nid):
+    """What the router's row carries beyond the others': its status whole
+    (the card draws its configuration from it), what it still needs before
+    a deploy, and the spaces its card offers to allow."""
+    return {"status": status(nid), "ready": _ready(nid), "all_projects": sorted(project_names())}
 
 
 # ---- Ollama's models ---------------------------------------------------------------
@@ -488,6 +513,76 @@ def disallow(nid, project):
     return {"ok": True}
 
 
+# ---- a container's own key (R238 step 7) -------------------------------------
+# An app that talks to a model (Paperclip) runs on the router with a key of
+# its own, made at the router when New container makes it and given by
+# whoever may set the router up (the operator, 18 Nov): the router's own
+# gate, docker-write, which is also New container's. Kept sealed under the
+# container's name, its spend read with the spaces', and deleted at the
+# router when the container goes.
+
+def routers():
+    """The routers a container can be given a key at: [{node, name}], each
+    deployed and with an address."""
+    return [{"node": nid, "name": (node_name(nid) if node_name else nid) or nid}
+            for nid, rec in _load().items() if rec.get("deployed") and _url(nid, rec)]
+
+
+def container_key(nid, name, by=""):
+    """{url, key} of container `name` at node `nid`'s router: the one it
+    has there, or one made now; {error} when none can be."""
+    rec = record(nid)
+    if not rec.get("deployed"):
+        return {"error": "the router is not deployed on that node"}
+    url = _url(nid, rec)
+    if not url:
+        return {"error": "the router's node has no address here"}
+    have = (rec.get("containers") or {}).get(str(name))
+    if have:
+        return {"url": url, "key": _open(have.get("key"))}
+    try:
+        got = _api(nid, "/key/generate", {"key_alias": f"builderbot-container-{name}", "metadata": {"container": name, "by": by}})
+    except Exception as e:                                  # noqa: BLE001 (said to the person)
+        return {"error": f"no key for {name}: {_why(e)}"}
+    key = str(got.get("key") or "")
+    if not key:
+        return {"error": "the router made no key"}
+    with _lock:
+        d = _load()
+        d.setdefault(str(nid), {}).setdefault("containers", {})[str(name)] = {"key": _keep(key), "made": int(time.time())}
+        _save(d)
+    return {"url": url, "key": key}
+
+
+def drop_container(name, keep=()):
+    """Delete container `name`'s key at every router but the nodes in
+    `keep`, and forget it where the router said so: one whose router does
+    not answer stays on the record, deleted at its next spend read."""
+    for nid, rec in _load().items():
+        c = (rec.get("containers") or {}).get(str(name))
+        if not c or nid in keep:
+            continue
+        if rec.get("deployed"):
+            try:
+                _api(nid, "/key/delete", {"keys": [_open(c.get("key"))]})
+            except Exception:                               # noqa: BLE001 (tried again at the next spend read)
+                continue
+        with _lock:
+            d = _load()
+            (d.get(nid) or {}).get("containers", {}).pop(str(name), None)
+            _save(d)
+
+
+def which(url):
+    """The node whose router answers at `url` (a container's environment
+    holds the address), or ""."""
+    for nid, rec in _load().items():
+        base = _url(nid, rec)
+        if base and str(url or "").startswith(base):
+            return nid
+    return ""
+
+
 def for_project(project):
     """{url, key, node} a session of `project` is handed (bb-tty's launcher,
     the open agent's config), from the first router that allows it; {}."""
@@ -585,6 +680,16 @@ def refresh_spend(nid):
     time), kept per project and model."""
     rec = record(nid)
     out, rate = {}, {}
+    # A key whose container is gone, its delete missed while the router was
+    # away, goes now.
+    for name in list(rec.get("containers") or {}):
+        if container_gone and container_gone(name):
+            drop_container(name)
+    rec = record(nid)
+    for name, c in (rec.get("containers") or {}).items():
+        with contextlib.suppress(Exception):
+            got = _api(nid, "/key/info?key=" + urllib.parse.quote(_open(c.get("key"))))
+            out[f"{name} (container)"] = float((got.get("info") or got).get("spend") or 0)
     for project, p in (rec.get("projects") or {}).items():
         key = _open(p.get("key"))
         with contextlib.suppress(Exception):
@@ -681,6 +786,8 @@ def seal_all(again=False):
                     again_(c, "key")
             for p in (rec.get("projects") or {}).values():
                 again_(p, "key")
+            for c in (rec.get("containers") or {}).values():
+                again_(c, "key")
         if n:
             _save(d)
     return n

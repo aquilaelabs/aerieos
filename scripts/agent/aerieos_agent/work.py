@@ -12,10 +12,11 @@ import time
 import urllib.request
 import zipfile
 from . import keyops, storage
-from .base import DRIVER, SANDBOX_BIN, SIGN_WORK, TOOLKIT
+from .base import DRIVER, OWN_COMPOSE, SANDBOX_BIN, SIGN_WORK, TOOLKIT, fs_holds, root_docker_env
 from .stores import tc_root, tc_scope
 from .backends import pkg_backend
-from .toolchains import held_recipes, read_catalog, sdk_env, sysdeps_missing, tc_dir, tc_users, tc_users_said, tc_verbs
+from .toolchains import (held_recipes, pkg_name_ok, read_catalog, root_catalog, sdk_env, sysdeps_missing, sysdeps_refused, tc_dir,
+                         tc_users, tc_users_said, tc_verbs)
 from .gpu import DRIVER_PKG, _gpu_card
 
 
@@ -65,10 +66,16 @@ class WorkMixin:
             job.say("refused: this node has no docker\n")
             return "failed", 78
         name = re.sub(r"[^A-Za-z0-9._-]", "_", str(spec.get("name") or "compose"))
-        cdir = os.path.join((self.state.get("stores") or {}).get("data") or "/tmp",
-                            "compose", name)
+        by_root = self.docker_by_root()
+        cdir = os.path.join(OWN_COMPOSE if by_root else (self.state.get("stores") or {}).get("data") or "/tmp",
+                            *([] if by_root else ["compose"]), name)
         who = self.drop_privileges({})
-        self.own_dir(cdir, who)
+        if by_root:
+            os.makedirs(os.path.dirname(cdir), mode=0o700, exist_ok=True)
+            os.makedirs(cdir, mode=0o700, exist_ok=True)
+            os.chmod(cdir, 0o700)
+        else:
+            self.own_dir(cdir, who)
         job.say(f"compose for {name} in {cdir}\n")
         # The compose file and the env, as the controller holds them: this
         # node never reads the project's tree for them, so a file edited on
@@ -78,11 +85,11 @@ class WorkMixin:
             if not base or base.startswith("."):
                 base = base or "file"
             path = os.path.join(cdir, base)
-            with open(path, "w") as f:
-                f.write(str(body))
-            if who:
-                with contextlib.suppress(OSError):
-                    os.chown(path, who["user"], who["group"])
+            # In the job account's folder, as that account; on the
+            # controller's own machine the folder is root's and so is this.
+            with fs_holds(None if by_root else who):
+                with open(path, "w") as f:
+                    f.write(str(body))
             job.say(f"wrote {base} ({len(str(body))} bytes)\n")
         # The bind directories, made here rather than by a throwaway
         # container over ssh: this process is already on the machine that
@@ -174,12 +181,17 @@ class WorkMixin:
             # job's drop gives HOME, USER and LOGNAME their account's, and
             # OpenRC hands a root service HOME=/root, which docker run as
             # another account cannot read and then finds no compose plugin.
-            env = {k: v for k, v in os.environ.items() if k not in ("HOME", "USER", "LOGNAME")}
-            env.update(sdk_env(self.state))
+            # A step that is no docker work (the checkout's git) stays the
+            # job account's, in a folder that account may enter.
+            as_root = by_root and not stp.get("as_job")
+            env = root_docker_env() if as_root else {
+                k: v for k, v in os.environ.items() if k not in ("HOME", "USER", "LOGNAME")}
+            if not as_root:
+                env.update(sdk_env(self.state))
             env.update({k: str(v).replace("{cdir}", cdir)
                         for k, v in (stp.get("env") or {}).items()})
-            st_, code = job.exec({"argv": argv, "cwd": cdir, "env": env,
-                                  "timeout": stp.get("timeout") or 1800})
+            st_, code = job.exec({"argv": argv, "cwd": cdir if as_root or not by_root else "/tmp", "env": env,
+                                  "timeout": stp.get("timeout") or 1800, **({"docker": True} if as_root else {})})
             if st_ != "succeeded":
                 job.outputs.append({"kind": "compose", "steps_done": done,
                                     "failed_at": stp.get("name")})
@@ -226,14 +238,12 @@ class WorkMixin:
             job.say("sent, and removed here\n")
             return "succeeded", 0
         job.say(f"fetching {what} from the controller\n")
-        code, _ = self.ctl.fetch(verb, real, timeout=int(stp.get("timeout") or 3600))
+        who = self.drop_privileges({})
+        with fs_holds(who):
+            code, _ = self.ctl.fetch(verb, real, timeout=int(stp.get("timeout") or 3600))
         if code != 200:
             job.say(f"the controller answered {code}\n")
             return "failed", 75
-        who = self.drop_privileges({})
-        if who:
-            with contextlib.suppress(OSError):
-                os.chown(real, who["user"], who["group"])
         job.say(f"fetched ({os.path.getsize(real) >> 20} MB)\n")
         return "succeeded", 0
 
@@ -300,26 +310,29 @@ class WorkMixin:
             days = 7.0
         now, freed, n = time.time(), 0, 0
         for _uid, d in storage.avd_homes(storage.SESSION.get("home") or ""):
-            for proj in sorted(os.listdir(d))[:300]:
-                pd = os.path.join(d, proj)
-                if not storage.NAME_RE.match(proj) or not os.path.isdir(pd):
-                    continue
-                for x in sorted(os.listdir(pd)):
-                    avd = os.path.join(pd, x)
-                    snaps = os.path.join(avd, "snapshots")
-                    if not x.endswith(".avd") or not os.path.isdir(snaps) or storage.avd_running(avd):
+            # As the home's owner: the folder is theirs, and a link they left
+            # at snapshots had root remove whatever it led to (R247 step 5).
+            with fs_holds(storage.home_owner(os.path.dirname(os.path.dirname(d)))):
+                for proj in sorted(os.listdir(d))[:300]:
+                    pd = os.path.join(d, proj)
+                    if not storage.NAME_RE.match(proj) or not os.path.isdir(pd):
                         continue
-                    ran = next((os.path.getmtime(os.path.join(avd, f)) for f in ("hardware-qemu.ini", "emulator-user.ini")
-                                if os.path.exists(os.path.join(avd, f))), os.path.getmtime(avd))
-                    if (now - ran) / 86400 < days or not os.listdir(snaps):
-                        continue
-                    mb = (storage._du_children(snaps) or {}).get("", 0)
-                    for s in os.listdir(snaps):
-                        shutil.rmtree(os.path.join(snaps, s), ignore_errors=True)
-                    freed += mb or 0
-                    n += 1
-                    job.say(f"{proj}'s {x[:-4]}: quick-boot snapshot removed, {mb} MB (not started for "
-                            f"{int((now - ran) / 86400)} days)\n")
+                    for x in sorted(os.listdir(pd)):
+                        avd = os.path.join(pd, x)
+                        snaps = os.path.join(avd, "snapshots")
+                        if not x.endswith(".avd") or not os.path.isdir(snaps) or storage.avd_running(avd):
+                            continue
+                        ran = next((os.path.getmtime(os.path.join(avd, f)) for f in ("hardware-qemu.ini", "emulator-user.ini")
+                                    if os.path.exists(os.path.join(avd, f))), os.path.getmtime(avd))
+                        if (now - ran) / 86400 < days or not os.listdir(snaps):
+                            continue
+                        mb = (storage._du_children(snaps) or {}).get("", 0)
+                        for s in os.listdir(snaps):
+                            shutil.rmtree(os.path.join(snaps, s), ignore_errors=True)
+                        freed += mb or 0
+                        n += 1
+                        job.say(f"{proj}'s {x[:-4]}: quick-boot snapshot removed, {mb} MB (not started for "
+                                f"{int((now - ran) / 86400)} days)\n")
         job.say(f"{n} snapshot{'' if n == 1 else 's'} removed, {freed} MB freed\n")
         if n:
             storage.measure(self.state)
@@ -345,9 +358,10 @@ class WorkMixin:
         if storage.avd_running(avd):
             job.say(f"{name} is running: stop it (aerie emu stop in the space's session) and remove it then\n")
             return "failed", 75
-        shutil.rmtree(avd, ignore_errors=True)
-        with contextlib.suppress(OSError):
-            os.remove(os.path.join(d, project, name + ".ini"))
+        with fs_holds(storage.home_owner(os.path.dirname(os.path.dirname(d)))):
+            shutil.rmtree(avd, ignore_errors=True)
+            with contextlib.suppress(OSError):
+                os.remove(os.path.join(d, project, name + ".ini"))
         if os.path.isdir(avd):
             job.say(f"could not remove all of {avd}\n")
             return "failed", 1
@@ -387,11 +401,14 @@ class WorkMixin:
         if len(names) > TC_NAMES_MAX:
             job.say(f"refused: {len(names)} toolchains in one job; at most {TC_NAMES_MAX}\n")
             return "failed", 64
-        if action not in ("install", "remove", "sysdeps", "check") or (
+        # clean among them: the controller queued it and this line refused it
+        # before its branch below, so taking a retired node's directory off
+        # a store always failed (the audit of 13 Nov).
+        if action not in ("install", "remove", "sysdeps", "check", "clean") or (
                 not names and action not in ("sysdeps", "check")):
             job.say("refused: a toolchain job installs or removes named toolchains, "
-                    "installs the system packages the held ones need, or checks "
-                    "what is newer upstream\n")
+                    "installs the system packages the held ones need, checks "
+                    "what is newer upstream, or takes a retired node's directory off the store\n")
             return "failed", 64
         who = self.drop_privileges({})
         into = self.bundle(job, who)
@@ -399,6 +416,10 @@ class WorkMixin:
             return "failed", 69
         if action == "sysdeps":
             return self.sysdeps(job, names, into)
+        # What cuts the network for a declared pack's steps where the job
+        # account cannot (R234), from the bundle just fetched.
+        if action == "install":
+            self.refresh_netcut_tool()
         # The NVIDIA driver (R102), a member of the batch like any row, but
         # the machine's and not the store's: installed or removed as root by
         # bb-sandbox, after the store's names, since it ends at a restart.
@@ -500,7 +521,7 @@ class WorkMixin:
                 # the whole batch ends, so a session opened meanwhile has it
                 # on its PATH (the operator, 12 Oct: one opened an hour into
                 # a batch still had the old environment). Open sessions run on.
-                if action in ("install", "update"):
+                if action == "install":
                     self.session_renew()
         # The machine's own two, in the order each needs: the toolkit hands
         # the driver's libraries to a container, so it goes on after the
@@ -577,13 +598,17 @@ class WorkMixin:
         try:
             os.makedirs(work, mode=0o700, exist_ok=True)
             os.chmod(work, 0o700)
-            if who:
-                os.chown(work, who["user"], who["group"])
+            # Fetched while the folder is root's alone, and the folder given
+            # to the account only then: from there on a name in it is the
+            # account's to point elsewhere, and root writes nothing by name.
             src = os.path.join(work, "in" + kind)
             st, _ = self.ctl.fetch(f"file?job={job.job['id']}&path={urllib.parse.quote(rel)}", src)
             if st != 200:
                 job.say(f"could not fetch {rel} from the controller ({st})\n")
                 return "failed", 69
+            if who:
+                os.chown(src, who["user"], who["group"])
+                os.chown(work, who["user"], who["group"])
             # Which app it is, so the controller can hand the key its package
             # is mapped to (R106 step 6): aapt2 for an .apk; a bundle's
             # manifest is a protobuf no tool here reads, and the package name
@@ -591,8 +616,9 @@ class WorkMixin:
             package = ""
             if kind == ".apk":
                 with contextlib.suppress(OSError, subprocess.SubprocessError):
+                    # The store's aapt2, as the account the store is.
                     p = subprocess.run([tools["aapt2"], "dump", "packagename", src], capture_output=True,
-                                       text=True, timeout=60, check=False)
+                                       text=True, timeout=60, check=False, env=env, cwd=work, **who)
                     package = (p.stdout or "").strip().splitlines()[0] if p.returncode == 0 and p.stdout.strip() else ""
             else:
                 with contextlib.suppress(OSError, KeyError, zipfile.BadZipFile):
@@ -609,26 +635,15 @@ class WorkMixin:
             if st != 200 or not isinstance(k, dict) or not k.get("keystore"):
                 job.say(f"the controller did not hand over the key: {(k or {}).get('error') or st}\n")
                 return "failed", 69
-            ks = os.path.join(work, "key")
-            fd = os.open(ks, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(fd, "wb") as f:
-                f.write(base64.b64decode(k["keystore"]))
-            for p in (src, ks):
-                if who:
-                    os.chown(p, who["user"], who["group"])
+            ks = keyops.private(work, "key", base64.b64decode(k["keystore"]), who)
             env.update({"BB_KS_PASS": str(k.get("store_pass") or ""),
                         "BB_KEY_PASS": str(k.get("key_pass") or k.get("store_pass") or "")})
             # A rotated key (R106 step 7): the key it replaced signs first and
             # the proof says the new one takes over, from Android 9 on.
             prev = k.get("previous") if kind == ".apk" and k.get("lineage") else None
             if prev:
-                pks, lin = os.path.join(work, "previous"), os.path.join(work, "lineage")
-                for path, data in ((pks, prev.get("keystore")), (lin, k.get("lineage"))):
-                    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                    with os.fdopen(fd, "wb") as f:
-                        f.write(base64.b64decode(data or ""))
-                    if who:
-                        os.chown(path, who["user"], who["group"])
+                pks = keyops.private(work, "previous", base64.b64decode(prev.get("keystore") or ""), who)
+                lin = keyops.private(work, "lineage", base64.b64decode(k.get("lineage") or ""), who)
                 env.update({"BB_PREV_KS": str(prev.get("store_pass") or ""),
                             "BB_PREV_KEY": str(prev.get("key_pass") or prev.get("store_pass") or "")})
             elif k.get("previous"):
@@ -663,9 +678,8 @@ class WorkMixin:
                     return "failed", 1
                 said = step([tools["apksigner"], "verify", "--verbose", "--print-certs", out], "apksigner verify")
             else:
-                shutil.copyfile(src, out)
-                if who:
-                    os.chown(out, who["user"], who["group"])
+                if step(["cp", "--", src, out], "the copy to sign") is None:
+                    return "failed", 1
                 if step([tools["jarsigner"], "-keystore", ks, "-storepass:env", "BB_KS_PASS",
                          "-keypass:env", "BB_KEY_PASS", out, alias], "jarsigner") is None:
                     return "failed", 1
@@ -685,9 +699,12 @@ class WorkMixin:
             base = os.path.basename(rel)[:-len(kind)]
             base = base.replace("-unsigned", "") if "-unsigned" in base else base
             name = f"{base}-signed{kind}"
-            st, r = self.ctl.upload(f"artifact?job={job.job['id']}&name={name}&signed={route}"
-                                    f"&cert={cert or want}&schemes={schemes}&key={k.get('key') or 'default'}"
-                                    + (f"&rotated={prev.get('key')}" if prev else ""), out)
+            # Read as the account that signed it (as deliver() reads a job's
+            # outputs): the folder is that account's.
+            with fs_holds(who):
+                st, r = self.ctl.upload(f"artifact?job={job.job['id']}&name={name}&signed={route}"
+                                        f"&cert={cert or want}&schemes={schemes}&key={k.get('key') or 'default'}"
+                                        + (f"&rotated={prev.get('key')}" if prev else ""), out)
             if st != 200 or r.get("error"):
                 job.say(f"could not deliver {name}: {r.get('error') or st}\n")
                 return "failed", 1
@@ -740,8 +757,8 @@ class WorkMixin:
         try:
             os.makedirs(work, mode=0o700, exist_ok=True)
             os.chmod(work, 0o700)
-            if who:
-                os.chown(work, who["user"], who["group"])
+            # The APK fetched while the folder is root's alone, the folder
+            # given to the account only then (as a sign job's).
             package, src = "", os.path.join(work, "in.apk")
             if op == "release":
                 st, _ = self.ctl.fetch(f"file?job={jid}&path=release.apk", src)
@@ -751,6 +768,9 @@ class WorkMixin:
                     return "failed", 69
                 if who:
                     os.chown(src, who["user"], who["group"])
+            if who:
+                os.chown(work, who["user"], who["group"])
+            if op == "release":
                 package = keyops.package_of(tl["aapt2"], src, **kw)
                 if package:
                     job.say(f"the APK is {package}\n")
@@ -790,7 +810,8 @@ class WorkMixin:
                 got, why = keyops.sign_apk(tl, src, signed, raw(k), raw(prev) if prev else None,
                                            base64.b64decode(k.get("lineage") or ""), **kw)
                 if not why:
-                    st, r = self.ctl.upload(f"signing-put?job={jid}", signed)
+                    with fs_holds(who):
+                        st, r = self.ctl.upload(f"signing-put?job={jid}", signed)
                     if st != 200 or (r or {}).get("error"):
                         why = f"the signed APK did not reach the controller: {(r or {}).get('error') or st}"
                     out = {**got, "key": k.get("key") or "", "package": package,
@@ -855,9 +876,15 @@ class WorkMixin:
         False when the install was tried and failed; a missing package on a
         node this cannot administer is a warning, not a refusal: the
         download is still worth having, and the tool names what is missing
-        when it is used."""
-        cat = read_catalog(into)
+        when it is used. The catalog read is root's own copy where this
+        agent is root (root_catalog), and a recipe naming anything that is
+        not a package's name has none of its packages installed."""
+        cat = root_catalog(into)
         fam, query, install = pkg_backend()
+        bad = sysdeps_refused(cat, name, fam)
+        if bad:
+            job.say(f"refused: {name}'s recipe names a system package that is not a package's name ({bad[0][:60]!r})\n")
+            return False
         missing, other = sysdeps_missing(cat, name, fam, query)
         # Which family this machine is decides which list applies. A recipe
         # that names packages for the other family only is not wrong, it is
@@ -891,7 +918,7 @@ class WorkMixin:
         node enrolled afterwards has dotnet and not libicu, and the only
         gesture that installed libicu was reinstalling dotnet onto the share
         for everybody. Named recipes, or every held one when none are."""
-        cat = read_catalog(into)
+        cat = root_catalog(into)
         fam, query, install = pkg_backend()
         if not fam:
             job.say("refused: no package manager this agent knows is on this machine\n")
@@ -901,8 +928,13 @@ class WorkMixin:
         if names and not want:
             job.say(f"none of {' '.join(names)} is on this node's store, so nothing here needs anything\n")
             return "succeeded", 0
-        needed = {}
+        needed, refused = {}, 0
         for name in want:
+            bad = sysdeps_refused(cat, name, fam)
+            if bad:
+                job.say(f"refused: {name}'s recipe names a system package that is not a package's name ({bad[0][:60]!r})\n")
+                refused += 1
+                continue
             missing, other = sysdeps_missing(cat, name, fam, query)
             if other:
                 job.say(f"{name}: its recipe names packages for {other[0]} only, not {fam}; "
@@ -910,6 +942,8 @@ class WorkMixin:
             if missing:
                 needed[name] = missing
         if not needed:
+            if refused:
+                return "failed", 65
             job.say(f"every system package the held recipes need is installed here ({fam})\n")
             return "succeeded", 0
         if not self.administers():
@@ -917,7 +951,7 @@ class WorkMixin:
                     "installs these: "
                     + "; ".join(f"{n}: {' '.join(m)}" for n, m in needed.items()) + "\n")
             return "failed", 77
-        bad = 0
+        bad = refused
         for name, missing in needed.items():
             job.step(name)
             job.say(f"== system packages for {name}: {' '.join(missing)}\n")
@@ -925,16 +959,22 @@ class WorkMixin:
                 bad += 1
         self.hello()
         if bad:
-            job.say(f"{bad} of {len(needed)} did not install\n")
+            job.say(f"{bad} of {len(needed) + refused} did not install\n")
             return "failed", 1
         return "succeeded", 0
 
     def _install_system(self, job, name, fam, install, missing):
+        """The package manager, as root, handed `missing` after `--`: every
+        one a package's name (pkg_name_ok) or none of them is installed."""
+        bad = [m for m in missing if not pkg_name_ok(fam, m)]
+        if bad:
+            job.say(f"refused: {name}'s recipe names a system package that is not a package's name ({bad[0][:60]!r})\n")
+            return False
         env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
         try:
             # emerge builds from source: fifteen minutes is a package
             # manager's clock, not a compiler's.
-            p = subprocess.run([*install, *missing], env=env, capture_output=True, text=True,
+            p = subprocess.run([*install, "--", *missing], env=env, capture_output=True, text=True, cwd="/",
                                timeout=4 * 3600 if fam == "emerge" else 900, check=False)
         except (OSError, subprocess.SubprocessError) as e:
             job.say(f"{install[0]}: {e}\n")

@@ -32,16 +32,39 @@ BOOT_READY_FILE="${BOOT_READY_FILE:-/run/builderbot-ready}"
 # always a controller. Read here rather than only in the entrypoint because
 # bb, bb-tty and the account helpers below all have a node answer that
 # differs, and all three run on a node out of the bundle.
+# Matched in the shell, in either case, with no process started: this is
+# asked dozens of times in one aerie call.
 bb_role() {
-    case "$(printf '%s' "${BUILDERBOT_ROLE:-controller}" | tr '[:upper:]' '[:lower:]')" in
-        node|worker|agent) printf 'node' ;;
-        *)                 printf 'controller' ;;
+    case "${BUILDERBOT_ROLE:-controller}" in
+        [Nn][Oo][Dd][Ee]|[Ww][Oo][Rr][Kk][Ee][Rr]|[Aa][Gg][Ee][Nn][Tt]) printf 'node' ;;
+        *) printf 'controller' ;;
     esac
 }
 
 # on_node: true on a node. The four account helpers, bb's notebook verbs
 # and bb-tty all branch on it, so it is one word rather than a case each.
-on_node() { [ "$(bb_role)" = node ]; }
+on_node() {
+    case "${BUILDERBOT_ROLE:-controller}" in
+        [Nn][Oo][Dd][Ee]|[Ww][Oo][Rr][Kk][Ee][Rr]|[Aa][Gg][Ee][Nn][Tt]) return 0 ;;
+    esac
+    return 1
+}
+
+# bb_scope_dir PROJECT [ACCOUNT]: this account's AerieOS cache folder for
+# one space on this machine, into _bb_scope: where bb-tty keeps a session's
+# launcher, its scope and its token, and where aerie and the hooks read
+# them back. The one place the shell builds the path, as scopedir.scope_dir
+# is Python's, since a reader has to look where the writer wrote. The
+# account is BB_ACCOUNT_UID unless one is named, and it is in the path on
+# purpose (B159): on a node every account's ~/.cache is a link to the base
+# home's, so the id is all that separates two accounts' files. With no home
+# to keep it under, a folder of this user's own in /tmp. Set rather than
+# printed, so aerie's token read, made by every verb that signs in, starts
+# no process for it.
+bb_scope_dir() {
+    local base="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}" who="${2-${BB_ACCOUNT_UID:-}}"
+    _bb_scope="${base:-/tmp/bb-scope-${UID:-$(id -u)}}/builderbot/u/${who:-_none}/project/$1"
+}
 
 log()  { printf '[builderbot] %s\n'      "$*"; }
 warn() { printf '[builderbot] WARN: %s\n' "$*" >&2; }

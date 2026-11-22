@@ -20,8 +20,11 @@ project = os.environ.get("BB_RELAY_PROJECT", "")
 # A verb that reads or changes the project's tree, which on the controller is
 # its own copy: on a node holding a synced copy (R163), what was saved here
 # goes up first, and what the verb changed comes back down before it is used.
+# A bug's close names the commit that fixed it (R255): the one asked for,
+# or the tree's own when it is clean, read off the controller's copy, which
+# a commit made here a moment ago had not reached.
 TREE = {"git", "version", "changelog"}
-tree = bool(argv) and argv[0] in TREE and bool(project)
+tree = bool(project) and bool(argv) and (argv[0] in TREE or argv[:2] in (["bug", "fix"], ["bug", "fixed-in"]))
 if tree:
     import syncwait
     if not syncwait.up(project) and argv[0] == "git":
@@ -36,8 +39,26 @@ _repo = os.environ.get("BB_REPO", "")
 if tree and _repo and os.path.isdir(_repo) and os.path.realpath(here) == os.path.realpath(
         os.path.join(os.environ.get("WORKSPACE", "/workspace"), project)):
     here = _repo
+# A records file (aerie bug add --from FILE, aerie roadmap add --from FILE)
+# is read here, where the session wrote it, and sent as the verb's stdin: the
+# controller's copy of the tree holds no file in dist/ or /tmp, and the read
+# there said No such file for one that was here (B962).
+stdin = None
+if argv[:1] in (["bug"], ["roadmap"]) and "add" in argv and "--from" in argv:
+    i = argv.index("--from")
+    if i + 1 < len(argv) and argv[i + 1] != "-":
+        src = argv[i + 1]
+        try:
+            with open(src, encoding="utf-8") as f:
+                stdin = f.read(1_000_001)
+        except OSError as e:
+            sys.exit(f"[builderbot] ERROR: {src}: {e.strerror or e}")
+        if len(stdin) > 1_000_000:
+            sys.exit(f"[builderbot] ERROR: {src} is over a megabyte; split it into several files")
+        argv = argv[:i + 1] + ["-"] + argv[i + 2:]
 r = bbapi.call("/api/v1/bb", {"argv": argv, "project": project,
                               "cwd": here,
+                              **({"stdin": stdin} if stdin is not None else {}),
                               # A session of any coding agent (R95): Claude
                               # Code sets CLAUDECODE, bb-tty's launcher sets
                               # BB_AGENT for every agent, and which one rides
@@ -118,4 +139,21 @@ if isinstance(ap, dict):
         step = (["rebase", m["ref"]] if mode == "rebase"
                 else ["merge", "--no-edit", *(["--ff-only"] if mode == "ff-only" else []), m["ref"]])
         code = subprocess.run(["git", *step], check=False).returncode
+# A push sends the controller's copy of this tree, so a commit made here that
+# had not reached it was left out, and pushed again said "Everything
+# up-to-date" (B805). A plain push (no refspec) of the branch checked out is
+# held to this tree's HEAD: behind it, said and failed.
+pos = [a for a in argv[2:] if not a.startswith("-")] if argv[:2] == ["git", "push"] else None
+if tree and code == 0 and pos is not None and len(pos) <= 1:
+    import subprocess
+
+    def rev(*a):
+        return subprocess.run(["git", "rev-parse", "-q", "--verify", *a], capture_output=True, text=True,
+                              check=False).stdout.strip()
+    head, pushed = rev("HEAD"), rev("@{upstream}")
+    if head and pushed and head != pushed and not subprocess.run(
+            ["git", "merge-base", "--is-ancestor", head, pushed], capture_output=True, check=False).returncode == 0:
+        sys.exit(f"[builderbot] ERROR: the controller pushed {pushed[:9]}, and this tree is at {head[:9]}: "
+                 "what was committed here since had not reached the controller's copy. "
+                 "aerie git push again once this space is in step (the Nodes page's Sessions section says its state)")
 sys.exit(code)

@@ -45,6 +45,7 @@ import re
 import secrets
 import shutil
 import ssl
+import subprocess
 import tarfile
 import tempfile
 import threading
@@ -54,6 +55,8 @@ import urllib.parse
 import urllib.request
 import zlib
 
+import seams
+import statefile
 import stateversion
 from pathlib import Path
 
@@ -68,20 +71,26 @@ BACKUP_HEADER = b"BBBACKUP1\n"
 # trees, the apps fetched from the releases, this module's own output.
 # The install key kept beside the state (an install with no secrets folder,
 # lib/boot.sh install_key_made) is left out too: it travels only as the
-# ticked install-key entry, as the one under the secrets does (B720).
+# ticked install-key entry, as the one under the secrets does (B720). So
+# are the state's own copies, which are this install's way back and no use
+# elsewhere: the copies taken before each update (backups/) and the
+# stick's configuration copies (backup/). On the dev instance they were
+# 2.1 GB of a 2.2 GB bundle, copies of copies, and a stick's state lands
+# on its small partition.
 LEAVE = {"os-draft", "logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next",
-         ".install-key"}
+         ".install-key", "backups", "backup"}
 
 _lock = threading.Lock()
 write_json = None
 seal = None
+unseal = None
 open_with = None
 checkpoint = lambda: None     # noqa: E731 (configured: db.checkpoint)
 
 
 
-# What a bundle is called: .aeriemove, and .bbmove from an install older than the name.
-BUNDLE_SUFFIXES = (".aeriemove", ".bbmove")
+# What a bundle is called.
+BUNDLE_SUFFIX = ".aeriemove"
 
 
 def _key_beside_state(key, state_dir):
@@ -125,21 +134,71 @@ def _file():
     return STATE / "move.json"
 
 
+_store = statefile.Store(_file, write=lambda: write_json)
+
+
 def _load():
-    try:
-        with open(_file()) as f:
-            d = json.load(f)
-    except (OSError, ValueError):
-        d = {}
-    return d if isinstance(d, dict) else {}
+    return _store.load()
 
 
 def _save(d):
-    write_json(_file(), d)
+    _store.save(d)
 
 
 def new_token():
     return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
+
+
+# The account the first page makes for a person moving a controller here,
+# whose password is the move token, and which goes when the move lands.
+SETUP_ACCOUNT = "setup"
+
+
+# The move token the person gave on the first page, kept for the landing
+# (the operator, 10 Nov: the walk asked for it twice). Sealed under the
+# install key where there is one, since the walk's steps restart the
+# controller; in memory where there is none yet. Dropped when the move
+# lands or the setup ends.
+SETUP_TOKEN_FILE = "move-setup-token.sealed"
+_setup_token = {"tok": ""}
+
+
+def keep_setup_token(token):
+    if not token_shaped(token):
+        return
+    _setup_token["tok"] = token
+    if seal is None:
+        return
+    with contextlib.suppress(Exception):     # noqa: BLE001 (no install key yet: memory alone)
+        statefile.write_bytes(STATE / SETUP_TOKEN_FILE, seal(token.encode()), mode=0o600)
+
+
+def setup_token():
+    """The token kept from the first page, or ""."""
+    if _setup_token["tok"]:
+        return _setup_token["tok"]
+    if unseal is None:
+        return ""
+    try:
+        tok = unseal((STATE / SETUP_TOKEN_FILE).read_bytes()).decode()
+    except Exception:                        # noqa: BLE001 (missing, or under a key no longer here)
+        return ""
+    if token_shaped(tok):
+        _setup_token["tok"] = tok
+        return tok
+    return ""
+
+
+def drop_setup_token(state_dir=None):
+    _setup_token["tok"] = ""
+    with contextlib.suppress(OSError):
+        (Path(state_dir or STATE) / SETUP_TOKEN_FILE).unlink()
+
+
+def token_shaped(token):
+    """Whether a string could be what new_token() printed. Only the shape: a
+    move token is proved against its bundle when the move lands."""
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]{43}", str(token or "")))
 
 
 def key_of(token):
@@ -220,7 +279,11 @@ def bundle_path():
 
 # Inside the state and never carried: what a landing or a reset set aside, and
 # a landing's own spool and working folder.
-NEVER_PACKED = (".moved-", ".move-", ".reset-")
+# ...nor the running dashboard's own files (its pid, which the supervisor
+# watches, and the lock that keeps it the one server on this folder): a
+# landing that swapped in the old controller's had the supervisor start a
+# second dashboard on the half-swapped state, which took the free lock.
+NEVER_PACKED = (".moved-", ".move-", ".reset-", ".server.")
 # The landing's mark while the state is being swapped (B622), under the
 # state folder and never packed; left behind only by a landing cut midway.
 LANDING_MARK = ".move-landing.json"
@@ -238,19 +301,27 @@ def cut_landing(state_dir=None):
     return d if isinstance(d, dict) and d.get("stamp") else None
 
 
+# The cut landings the log has named the folder of, once each.
+_cut_said = set()
+
+
 def cut_landing_rows():
-    """The bell's row for a landing cut midway (B622): what is where, and
-    that landing the same bundle with its token again finishes it."""
+    """The bell's row for a landing cut midway (B622): that landing the
+    same bundle with its token again finishes it. What was here is kept
+    whole in the folder the record names, under the state folder, said in
+    the log once, and the first-run page shown meanwhile is not a fresh
+    install."""
     c = cut_landing()
     if not c:
         return []
     when = time.strftime("%d %b %H:%M", time.localtime(int(c.get("at") or 0)))
-    aside = os.path.basename(str(c.get("aside") or ""))
+    if c["stamp"] not in _cut_said:
+        _cut_said.add(c["stamp"])
+        print(f"[dashboard] move: a landing was cut midway on {when}; what was here is kept whole in "
+              f"{c.get('aside') or 'the state folder'}", flush=True)
     return [{"kind": "move", "id": f"cut-{c['stamp']}", "bad": True, "key": f"movecut:{c['stamp']}",
-             "why": f"A move's landing was cut midway on {when}: what is here is part of what was and part of the bundle, "
-                    f"and what was here is kept whole in {aside} under the state folder. Land the same bundle again with its "
-                    "token from Controller settings, Move a controller here, which finishes it; a first-run page shown "
-                    "meanwhile is not a fresh install."}]
+             "why": f"A move's landing was cut midway on {when}: landing the same bundle again with its token, "
+                    "from Controller settings, finishes it"}]
 
 
 def _tar_tree(tar, src, arc, leave=()):
@@ -284,6 +355,44 @@ STORES_OFF = {"logs", "job-snapshots"}
 # What the secrets folder holds that is not the secrets: the install key's
 # folder (installkey.py), carried only by its own tick (B619).
 SECRETS_LEAVE = {"install-key"}
+
+
+# The secrets folder on a machine of its own is root's: the dashboard's
+# account can neither read it nor write into it, so a bundle carried none of
+# it and a landing left the copy to a person, as root (B728). The root
+# helper the account may run through sudo carries it instead
+# (scripts/secrets-carry: pack on the old home, land on the new, where each
+# *.env line is held to a secret's name and a value with no shell in it,
+# since the controller's start reads those files as root). A coding agent's
+# session runs as another account, which may not run it, and a move is the
+# owner's alone. A test names a stand-in with BB_SECRETS_CARRY.
+CARRY = seams.get("BB_SECRETS_CARRY") or str(Path(__file__).resolve().parent.parent / "secrets-carry")
+CARRY_MAX = 4 << 20
+# What the helper hands over and takes: a *.env file, or a plain file under ssh/.
+_CARRIED = re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.env|ssh/[A-Za-z0-9][A-Za-z0-9._-]{0,99})")
+
+
+def _carry(verb, data=None, timeout=60):
+    """The root helper run with `verb`: (exit code, stdout bytes, stderr
+    text), (127, b"", why) where it cannot be run at all."""
+    stand_in = bool(seams.get("BB_SECRETS_CARRY"))
+    # Only on a machine of its own, as its account: the helper serves root's
+    # folder there and nowhere else, and a process that is root already (a
+    # test run as root) must never be the one to ask it.
+    if not stand_in and not (bare_metal() and os.geteuid() != 0 and os.path.isfile(CARRY)):
+        return 127, b"", "no root helper on this install"
+    argv = [CARRY, verb] if stand_in else ["sudo", "-n", CARRY, verb]
+    try:
+        r = subprocess.run(argv, input=data, capture_output=True, timeout=timeout, check=False)
+    except (OSError, subprocess.SubprocessError) as e:
+        return 127, b"", str(e)[:200]
+    return r.returncode, r.stdout, r.stderr.decode("utf-8", "replace").strip()[:600]
+
+
+def _secrets_closed():
+    """Whether the secrets folder is there and closed to this account: the
+    case the root helper serves."""
+    return bool(SECRETS) and Path(SECRETS).is_dir() and not os.access(SECRETS, os.R_OK | os.X_OK)
 
 
 # How long a piece is measured for (B432: the workspace on a share took
@@ -363,11 +472,22 @@ def pieces():
             out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
         else:
             # Root's alone on a machine of its own: the dashboard cannot
-            # list it, and a walk of it carried nothing without a word (B728).
-            out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
-                        "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
-                                 "and ssh/ to the new home by hand, as root"})
-    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the spaces folder", WORKSPACE, False))
+            # list it, so AerieOS's root helper packs it (B728); where that
+            # cannot run either, the piece is off and says what to copy.
+            rc, said, _why = _carry("--can", timeout=15)
+            got = re.match(rb"(\d+) files, (\d+) bytes", said or b"")
+            if rc == 0 and got:
+                out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": int(got.group(2)), "over": False,
+                            "on": True, "fixed": True,
+                            "about": f"{SECRETS} is root's alone here: AerieOS packs its *.env files and ssh/ as root ({int(got.group(1))} file(s))"})
+            elif rc == 3:
+                out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
+                            "about": f"{SECRETS} is root's alone here and holds no *.env file or ssh key to carry"})
+            else:
+                out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
+                            "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
+                                     "and ssh/ to the new home by hand, as root"})
+    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where the Nodes page names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=max(1, len(asked))) as pool:
@@ -535,9 +655,9 @@ def split_form(src, content_type, file_field, dest, small=64 << 10):
 
 # The manifest line is plain, read before anything is opened, so it is held
 # to the body by a MAC under the bundle's key, checked once the body is
-# unpacked and before anything here changes (B724). A bundle that carries
-# the mark below as its first sealed entry has one, so a MAC taken off the
-# line is caught too; a bundle made before (no mark) lands as it did.
+# unpacked and before anything here changes (B724). Every bundle carries
+# the mark below as its first sealed entry, so a MAC taken off the line is
+# caught too, and a body with no mark is refused.
 MANIFEST_MARK = "bundle.json"
 
 
@@ -548,13 +668,13 @@ def _manifest_mac(key, m):
 
 def _manifest_held(path, key, work):
     """Why the manifest line is not the one the bundle was sealed with, or
-    "" when it is (or the bundle is from before manifests were held)."""
+    "" when it is."""
     try:
         mark = json.loads((Path(work) / MANIFEST_MARK).read_text())
     except (OSError, ValueError):
         mark = None
     if not isinstance(mark, dict) or not mark.get("mac"):
-        return ""
+        return "the bundle comes from a build too old to land here: nothing here was changed"
     try:
         with open(path, "rb") as f:
             f.readline()
@@ -643,6 +763,29 @@ def _db_snapshot():
         return None
 
 
+def _tar_carried(tar):
+    """Into `tar`, under secrets/, what the root helper packs of a secrets
+    folder this account cannot read: its count, 0 where the helper cannot
+    run or the folder holds nothing to carry."""
+    rc, data, _why = _carry("pack")
+    if rc != 0 or not data or len(data) > CARRY_MAX:
+        return 0
+    n = 0
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as src:
+            for m in src.getmembers():
+                name = m.name.removeprefix("./")
+                if not m.isfile() or not _CARRIED.fullmatch(name):
+                    continue
+                info = tarfile.TarInfo(f"secrets/{name}")
+                info.size, info.mtime, info.mode = m.size, m.mtime, 0o600
+                tar.addfile(info, src.extractfile(m))
+                n += 1
+    except (tarfile.TarError, OSError):
+        return n
+    return n
+
+
 def _pack_into(tar, repos=False, carry_key=False, stores=None):
     """Into `tar`, the tree a move or a backup carries: the state without
     its logs and job trees, the stores kept outside it (`stores` names the
@@ -653,14 +796,19 @@ def _pack_into(tar, repos=False, carry_key=False, stores=None):
     # the server writes it all the while (its minute's fold among it), and
     # a copy read across a write is torn. The file and its log are left out
     # of the walk, the snapshot put in their place.
-    snap = _db_snapshot()
-    try:
-        counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE | (set(DB_FILES) if snap else set()))
-        if snap:
-            tar.add(str(snap), arcname=f"state/{DB_FILES[0]}", recursive=False)
-    finally:
-        if snap:
-            snap.unlink(missing_ok=True)
+    # ...and the files beside it at that same moment: no state file lands
+    # while the database is copied and the state is walked (statefile.frozen),
+    # so the bundle is not an account from before a change and its secrets
+    # from after it.
+    with statefile.frozen():
+        snap = _db_snapshot()
+        try:
+            counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE | (set(DB_FILES) if snap else set()))
+            if snap:
+                tar.add(str(snap), arcname=f"state/{DB_FILES[0]}", recursive=False)
+        finally:
+            if snap:
+                snap.unlink(missing_ok=True)
     for kind, path in (store_paths() or {}).items():
         if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
             counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
@@ -669,7 +817,9 @@ def _pack_into(tar, repos=False, carry_key=False, stores=None):
     # The install key's own folder under the secrets (lib/boot.sh
     # install_key_made) stays out: the key travels only as the entry below,
     # when ticked (B619).
-    if SECRETS and Path(SECRETS).is_dir():
+    if _secrets_closed():
+        counts["secrets"] = _tar_carried(tar)
+    elif SECRETS and Path(SECRETS).is_dir():
         counts["secrets"] = _tar_tree(tar, SECRETS, "secrets", leave=SECRETS_LEAVE)
     if carry_key:
         k = install_key() or b""
@@ -699,9 +849,7 @@ def prepare(principal, to, repos=False, carry_key=False, stores=None):
     # nodes' knocks from the key kept here, under the state that moved.
     with _lock:
         d = _load()
-        for old in (STATE / "move").glob("*"):
-            if old.suffix not in BUNDLE_SUFFIXES:
-                continue
+        for old in (STATE / "move").glob("*" + BUNDLE_SUFFIX):
             old.unlink(missing_ok=True)
         d = {k: v for k, v in d.items() if k in ("moved_to", "moved_at")}
         d.update(made_at=made_at, to=to, bundle="", size=0, used=False, repos=bool(repos), carries_key=bool(carry_key),
@@ -712,6 +860,41 @@ def prepare(principal, to, repos=False, carry_key=False, stores=None):
     if r.get("error"):
         return r
     return {"ok": True, "token": token, "bundle": r["bundle"], "size": r["size"], "counts": r["counts"], "to": to, "made_at": made_at}
+
+
+def far_nodes(to, nodes):
+    """The nodes that cannot follow a move to `to`: a new home named by an
+    address of the local network, and a node that dials in from outside it
+    (the operator, 10 Nov: a node on a server elsewhere stayed quiet after a
+    move to a LAN address), unless it dials a public hostname, which it is
+    told to keep (node_url). `nodes` is [(name, address, hostname)]; the
+    names."""
+    import ipaddress
+    host = urllib.parse.urlsplit(str(to or "")).hostname or ""
+    try:
+        here = ipaddress.ip_address(host)
+    except ValueError:
+        return []
+    if not (here.is_private or here.is_loopback or here.is_link_local):
+        return []
+    out = []
+    for name, addr, *host in nodes:
+        if host and host[0]:
+            continue
+        try:
+            a = ipaddress.ip_address(str(addr or "").split("%")[0])
+        except ValueError:
+            continue
+        if a.is_global:
+            out.append(str(name))
+    return out
+
+
+def far_said(far, to):
+    one = len(far) == 1
+    return (f"{', '.join(far)} {'dials' if one else 'dial'} in from outside this network, so {to} cannot be reached from "
+            f"{'it' if one else 'them'}: prepare the move with an address {'it reaches' if one else 'they reach'}, or enroll "
+            f"{'it' if one else 'them'} again first at the hostname Reach from outside gives this controller")
 
 
 def pack_bundle():
@@ -727,9 +910,7 @@ def pack_bundle():
     out_dir.mkdir(parents=True, exist_ok=True)
     # Named to the millisecond: two packs in one second are two bundles.
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
-    # .aeriemove since the name moved; a .bbmove an older install packed
-    # still lands (only its contents are read), and is cleaned up as one.
-    name = f"aerieos-move-{stamp}.aeriemove"
+    name = f"aerieos-move-{stamp}{BUNDLE_SUFFIX}"
     tmp = out_dir / (name + ".partial")
 
     def manifest_of(counts):
@@ -741,7 +922,7 @@ def pack_bundle():
     # what moves, and kept while the new one was packed it took its room
     # twice over on a disk the bundle may only just fit.
     for old in out_dir.glob("*"):
-        if old.suffix in BUNDLE_SUFFIXES or old.name.endswith((".partial", ".body")):
+        if old.suffix == BUNDLE_SUFFIX or old.name.endswith((".partial", ".body")):
             old.unlink(missing_ok=True)
     try:
         manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
@@ -767,9 +948,8 @@ def _no_room_said(e, where, repos):
         free = f"{shutil.disk_usage(str(where)).free / 1e9:.1f} GB"
     except OSError:
         free = "too little"
-    return (f"the disk holding this controller's state ({where}) filled up: {free} free once the unfinished bundle was removed. "
-            + ("Free room there, or prepare the move again without the repositories, which then move by naming their folder on the new home"
-               if repos else "Free room there and try again"))
+    return (f"the disk holding this controller's state filled up, with {free} free once the unfinished bundle was removed"
+            + (", so free room there or prepare the move without the repositories" if repos else ", so free room there and try again"))
 
 
 # A backup of the controller under a token of its own (the operator, 6 Nov):
@@ -829,13 +1009,30 @@ def forget(principal):
             return {"error": "no move is prepared"}
         if d.get("moved_to"):
             return {"error": "this controller has moved; the move is not withdrawn after it landed"}
-        for old in (STATE / "move").glob("*"):
-            if old.suffix not in BUNDLE_SUFFIXES:
-                continue
+        for old in (STATE / "move").glob("*" + BUNDLE_SUFFIX):
             old.unlink(missing_ok=True)
         d = {k: v for k, v in d.items() if k in ("moved_to", "moved_at")}
         _save(d)
     return {"ok": True}
+
+
+# The root helper's keeping of a moved controller's deploy keys (B966), set by
+# the server: (folder) -> what to say of it; None where there is no helper.
+place_deploy_keys = None
+
+
+# The public hostname a node dials the controller at through the home tunnel
+# (nodes.tunnel_host), "" for one on the network: handed in by the server.
+tunnel_host = lambda nid: ""  # noqa: E731
+
+
+def node_url(nid, here):
+    """Where a node reaches the controller after a move: the public hostname
+    it was enrolled at, which the tunnel's settings carry to the new home,
+    else `here` (the operator, 10 Nov: a node on a server elsewhere could
+    never follow a move to a local address)."""
+    h = tunnel_host(nid)
+    return f"https://{h}" if h else here
 
 
 def for_node(nid):
@@ -859,7 +1056,22 @@ def for_node(nid):
             if nid not in told and d.get("made_at"):
                 d["told"] = told + [str(nid)]
                 _save(d)
-    return {"url": d.get("moved_to") or d["to"], "expect": challenge(key, nid)}
+    return {"url": node_url(nid, d.get("moved_to") or d["to"]), "expect": challenge(key, nid)}
+
+
+def moved_answer(nid, pin=""):
+    """The old controller's answer to a node's call once it moved (the 410
+    its agent door says): where to, and for a node it knows, that node's
+    challenge (for_node) with the key it knocks under there: `pin`, this
+    controller's own key, which went to the new home with the rest of its
+    state ("" where its port answers under none). Said down the channel the
+    node already holds, as the hello that armed the move said it, so a node
+    that pinned a certificate before keys were pinned knocks under the key
+    too, rather than with none."""
+    mv = for_node(nid) if nid else {}
+    if mv and pin:
+        mv = {**mv, "pin": pin}
+    return {"error": "this controller moved", "moved": True, "to": moved_to(), **({"move": mv} if mv else {})}
 
 
 def answer_for(nid):
@@ -1071,9 +1283,9 @@ def room_for(size, where):
     if free >= need:
         return ""
     gb = lambda n: f"{n / 1e9:.1f} GB"  # noqa: E731
-    return (f"this machine has {gb(free)} free where a move lands, and the bundle needs about {gb(need)} (it, and what it unpacks to): "
-            "a stick keeps that on itself until a system pool is named. Make the bundle without the repositories, land it, then name "
-            "the folder they are in as the spaces folder on This machine")
+    # A stick keeps a landing on itself until a system pool is named.
+    return (f"this machine has {gb(free)} free where a move lands and the bundle needs about {gb(need)}: make it without the "
+            "repositories, land it, then name their folder as the spaces folder on the Nodes page")
 
 
 def fetch_bundle(old_url, token, dest):
@@ -1127,7 +1339,10 @@ def follow_line(nid):
     key = _key()
     if not d.get("restored_at") or not key:
         return ""
-    return f"builderbot-agent follow {page_url() or d.get('to', '')} {challenge(key, nid)}"
+    # The address the move named first: it is where the nodes were told to
+    # go; the page's public name may be the tunnel's, which a node on the
+    # network was never enrolled at (B936).
+    return f"aerieos-agent follow {node_url(nid, d.get('to') or page_url() or '')} {challenge(key, nid)}"
 
 
 def node_here(nid):
@@ -1166,7 +1381,7 @@ def read_manifest(path):
         m = json.loads(line)
         if isinstance(m, dict) and head == BACKUP_HEADER:
             m["kind"] = "backup"
-        return (m, "") if isinstance(m, dict) and m.get("format") in (1, FORMAT) else (None, "a bundle of a format this build does not read")
+        return (m, "") if isinstance(m, dict) and m.get("format") == FORMAT else (None, "a bundle of a format this build does not read")
     except (OSError, ValueError) as e:
         return None, f"could not read the bundle: {e}"
 
@@ -1253,6 +1468,27 @@ def _carry_share_people(aside, state_dir):
     return said
 
 
+def _land_carried(src):
+    """The bundle's secrets handed to the root helper to place: its own
+    lines, [] where it could not be run or took nothing."""
+    buf = io.BytesIO()
+    n = 0
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        for p in sorted(Path(src).rglob("*")):
+            rel = p.relative_to(src).as_posix()
+            if p.is_symlink() or not p.is_file() or not _CARRIED.fullmatch(rel):
+                continue
+            tar.add(str(p), arcname=rel, recursive=False)
+            n += 1
+    if not n or buf.tell() > CARRY_MAX:
+        return []
+    rc, out, _why = _carry("land", data=buf.getvalue())
+    lines = [ln.removeprefix("secrets-carry: ") for ln in out.decode("utf-8", "replace").splitlines() if ln.strip()]
+    if rc != 0:
+        return []
+    return [f"the old controller's secrets, placed as root: {'; '.join(lines)[:900]}"] if lines else []
+
+
 def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
             work_root=None):
     """The bundle unsealed under the token and put in place of the state here
@@ -1269,14 +1505,21 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     m, why = read_manifest(path)
     if not m:
         return {"error": why}
-    if int(m.get("state_version") or 0) > here_ver:
-        return {"error": f"the bundle's state is at version {m.get('state_version')} and this build reads up to {here_ver}: "
-                         "a move never lands on an older build; update this install first"}
-    # ...nor a state this build no longer upgrades from: it would land, and the
-    # next start refuse it (B600).
-    if m.get("state_version") and int(m["state_version"]) < stateversion.SUPPORTED_FROM:
-        return {"error": f"the bundle's state is at version {m['state_version']}, and this build upgrades from "
-                         f"{stateversion.SUPPORTED_FROM} on: move it through a release between them first"}
+    # A bundle names the state it carries; one that names none is not landed.
+    try:
+        m["state_version"] = int(m.get("state_version") or 0)
+    except (TypeError, ValueError):
+        m["state_version"] = 0
+    if m["state_version"] > here_ver:
+        # Named both ways, with what to do (B961): a stick cannot update
+        # itself before a landing, so it is written again from a newer one.
+        return {"error": f"the bundle comes from AerieOS {m.get('version') or 'a newer build'}, and a move never lands on an older build: "
+                         f"update this install, or write this stick again from {m.get('version') or 'that release'} or newer, then land it"}
+    # ...nor a state this build does not read: it would land, and the next
+    # start refuse it (B600).
+    if m["state_version"] < stateversion.SUPPORTED_FROM:
+        made_by = f"AerieOS {m['version']}" if m.get("version") else "an older build"
+        return {"error": f"the bundle comes from {made_by}, which nothing updates from, so it cannot land here"}
     # A backup opens under the key its password derives (backup.py); a
     # move under its token's.
     if key is None:
@@ -1288,27 +1531,14 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     wrong = "the bundle did not open under that " + ("password" if m.get("kind") == "backup" else "token")
     fh = open(path, "rb")
     fh.readline(); fh.readline()
-    if m.get("format") == 1:
-        # The format before was opened whole in memory; a bundle that big
-        # was never one of them (B724: the format is read from the plain line).
-        if os.path.getsize(path) > (2 << 30):
-            fh.close()
-            return {"error": "the bundle says it is of the format before, which was never this big: not opened"}
-        try:
-            src, mode = io.BytesIO(open_with(key, fh.read())), "r:gz"
-        except Exception:                                          # noqa: BLE001 (any failure to open is one answer)
-            fh.close()
-            return {"error": wrong}
+    # A piece at a time; the first opened here, so a wrong token is said as
+    # one before anything is unpacked.
+    src, mode = _Opener(fh, key), "r|gz"
+    try:
+        src._next()
+    except ValueError:
         fh.close()
-    else:
-        # A piece at a time; the first opened here, so a wrong token is said
-        # as one before anything is unpacked.
-        src, mode = _Opener(fh, key), "r|gz"
-        try:
-            src._next()
-        except ValueError:
-            fh.close()
-            return {"error": wrong}
+        return {"error": wrong}
     # Unpacked inside the state, or where the caller says (`work_root`: on a
     # stick, the projects folder on the machine's disks, never the stick).
     work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir)))
@@ -1325,6 +1555,18 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         changed = _manifest_held(path, key, work)
         if changed:
             return {"error": changed}
+        # Room where the state goes, before anything is swapped (B954): on a
+        # stick the bundle unpacks on the disks, but the state lands on the
+        # stick's own partition.
+        if work_root and Path(work_root).resolve() != Path(state_dir).resolve():
+            need = sum(f.stat().st_size for f in (work / "state").rglob("*") if f.is_file() and not f.is_symlink()) if (work / "state").is_dir() else 0
+            try:
+                free = shutil.disk_usage(state_dir).free
+            except OSError:
+                free = need + (64 << 20)
+            if need + (64 << 20) > free:
+                return {"error": f"the moved state is {need >> 20} MB and {free >> 20} MB is free where it lands, so nothing here was "
+                                 "changed: untick the stores kept under the old controller's state, then land it again"}
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir / f".moved-{stamp}"
         # A landing within the same second as one before (a retry after a
@@ -1357,10 +1599,16 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
             except (OSError, shutil.Error) as e:
                 # A secrets folder that is root's takes nothing the dashboard
-                # writes (and root never reads what the dashboard's account
-                # left for it): the rest lands, and this is said (B728).
-                said.append(f"the old controller's secrets were not written into {secrets_dir} ({str(e)[:200]}): "
-                            "copy its *.env files and ssh/ there as root, then restart the controller")
+                # writes: the root helper places them, each *.env line held
+                # to a secret's name and a plain value, since root reads
+                # those files at the controller's start (B728). Where it
+                # cannot run, the rest lands and the copy is a person's.
+                placed = _land_carried(work / "secrets")
+                if placed:
+                    said += placed
+                else:
+                    said.append(f"the old controller's secrets were not written into {secrets_dir} ({str(e)[:200]}): "
+                                "copy its *.env files and ssh/ there as root, then restart the controller")
         swapped = False
         # The landing marked while the state is half old and half new, so a
         # power loss midway leaves a word of it for the next start (B622):
@@ -1372,6 +1620,13 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             # /config is a mount point (B594). A mountpoint under it (a stick's
             # logs on a RAM disk) stays where it is, the bundle's merged in.
             aside.mkdir(mode=0o700)
+            # From here no other thread's state file lands in this folder
+            # (R227 step 8): what those threads hold is the state being set
+            # aside, and one written into the folder half-way through the
+            # swap would be the old controller's record in the new one's
+            # state. Refused, never held, until the process restarts on the
+            # new state, or until the old one is back below.
+            statefile.landing_begins(state_dir)
             with contextlib.suppress(OSError):
                 marker.write_text(json.dumps({"at": int(time.time()), "stamp": stamp, "aside": str(aside),
                                               "from": m.get("from", ""), "kind": m.get("kind", "")}))
@@ -1381,6 +1636,19 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                     continue
                 with contextlib.suppress(OSError):
                     os.rename(p, aside / p.name)
+            # A bundle an older build packed carries its controller's
+            # process files: never put in place of this one's.
+            for p in (work / "state").glob(".server.*") if (work / "state").is_dir() else []:
+                with contextlib.suppress(OSError):
+                    p.unlink()
+            # The old controller's deploy keys, where this home keeps its own
+            # in a folder only the root helper writes (B966: every landing
+            # carrying one stopped there and went back): the helper keeps them.
+            carried_keys = None
+            dk_src, dk_dest = work / "state" / "deploy-keys", state_dir / "deploy-keys"
+            if dk_src.is_dir() and dk_dest.is_dir() and not os.access(dk_dest, os.W_OK) and place_deploy_keys:
+                carried_keys = work / "deploy-keys-carried"
+                os.rename(dk_src, carried_keys)
             _into(work / "state", state_dir)
             # The stores, where the restored records name them; one whose path
             # cannot be made on this machine lands under the state, and the
@@ -1400,6 +1668,19 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 why = install_landed_key((work / "install-key").read_bytes(), state_dir)
                 if why:
                     said.append(str(why))
+            else:
+                # ...and one that did not come is said too (B953): what the
+                # old install sealed stays locked until it is given.
+                said.append("the old install's key did not come with it, so what it sealed (sign-ins, git tokens, deploy keys, "
+                            "the home tunnel's token) stays locked until that key is given under Controller settings, Keys")
+            if carried_keys is not None:
+                said.append(place_deploy_keys(str(carried_keys)))
+            # A space whose folder is not here (B956): repositories left
+            # unticked with no shared or adopted folder stay behind.
+            missing = _spaces_missing(state_dir, workspace_dir)
+            if missing:
+                said.append(f"{len(missing)} of the moved spaces have no folder here ({', '.join(missing[:6])}{', and more' if len(missing) > 6 else ''}): "
+                            "pack the bundle again with the repositories ticked, or name the folder they are in as the spaces folder")
         except (OSError, shutil.Error) as e:
             with contextlib.suppress(OSError):
                 marker.unlink()
@@ -1417,6 +1698,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                             p.unlink()
                 _into(aside, state_dir)
                 shutil.rmtree(aside, ignore_errors=True)
+            statefile.landing_over()
             return {"error": f"the restore stopped ({e}); "
                              + ("the state that was here is back as it was" if swapped else "nothing of the state was changed")}
         # The move's own record, carried with the state: now the new home's,
@@ -1455,12 +1737,26 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         with contextlib.suppress(OSError):
             marker.unlink()
         # A bare-metal home keeps its own node and its stick's plan (above).
-        here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
+        here = carry_here(aside, state_dir, source_bare_metal=rec["source_bare_metal"]) if swapped and rec["here_bare_metal"] else []
         return {"ok": True, "moved_aside": str(aside), "counts": counts, "from": m.get("from", ""),
                 "nodes": list(m.get("nodes") or []), "kept_here": here, "said": said}
     finally:
         shutil.rmtree(work, ignore_errors=True)
         src.close()
+
+
+def _spaces_missing(state_dir, workspace_dir):
+    """The spaces the moved state has settings for whose folder is not under
+    `workspace_dir`, by name."""
+    try:
+        d = json.loads((Path(state_dir) / "claude-prefs.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    names = sorted((d.get("projects") or {}) if isinstance(d, dict) and isinstance(d.get("projects"), dict) else {})
+    ws = Path(workspace_dir) if workspace_dir else None
+    if not ws or not ws.is_dir():
+        return []
+    return [n for n in names if isinstance(n, str) and n and "/" not in n and not (ws / n).is_dir()]
 
 
 def _into(src, dest):
@@ -1507,7 +1803,25 @@ def _unpack(src, mode, work, counts):
     return ""
 
 
-def carry_here(aside, state_dir):
+# A token's state as the revoked column held it until the database's
+# migration 0008, which either of two stores met here may not have run yet.
+_TOKEN_STATES = {0: "live", 1: "revoked", 2: "pending", 3: "retired"}
+
+
+def _token_as(row, cols):
+    """A token's row from one store, in the columns of another: its state
+    said the way the other keeps it, whichever of the two is from before the
+    state had a column of its own."""
+    state = row.get("state") or _TOKEN_STATES.get(row.get("revoked"), "revoked")
+    out = {c: row[c] for c in cols if c in row and c not in ("state", "revoked")}
+    if "state" in cols:
+        out["state"] = state
+    if "revoked" in cols:
+        out["revoked"] = next(n for n, word in _TOKEN_STATES.items() if word == state)
+    return out
+
+
+def carry_here(aside, state_dir, source_bare_metal=True):
     """What belongs to this machine rather than to the controller that moved
     in, carried from the state set aside into the one put in place (the
     operator, 1 Nov: a stick that came with a plan and a node of its own,
@@ -1525,7 +1839,7 @@ def carry_here(aside, state_dir):
             try:
                 cols = lambda c, t: [r[1] for r in c.execute(f"PRAGMA table_info({t})")]  # noqa: E731
                 ncols = [x for x in cols(src, "nodes") if x in cols(dst, "nodes")]
-                tcols = [x for x in cols(src, "tokens") if x in cols(dst, "tokens")]
+                scols, dcols = cols(src, "tokens"), cols(dst, "tokens")
                 own = [r for r in src.execute(f"SELECT {', '.join(ncols)} FROM nodes WHERE state != 'retired'")
                        if (json.loads(r[ncols.index("config")] or "{}") or {}).get("own")] if "config" in ncols else []
                 for r in own:
@@ -1535,13 +1849,19 @@ def carry_here(aside, state_dir):
                     # The old home's own machine, where it was bare metal, is
                     # that machine's, not this one: retired here (step 5 of
                     # Moving a controller in docs/install.md).
-                    for oid, ocfg in dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall():
+                    # Only where the old home was bare metal: a container
+                    # install has no machine of its own, and a node it
+                    # holds is a node of its own to follow, never retired
+                    # and its spaces handed to this machine (the operator,
+                    # 10 Nov: a space's container listed here after a move).
+                    for oid, ocfg in (dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall() if source_bare_metal else []):
                         if (json.loads(ocfg or "{}") or {}).get("own"):
                             dst.execute("UPDATE nodes SET state = 'retired' WHERE id = ?", (oid,))
                             said += _own_node_handed_on(state_dir, oid, nid)
                     dst.execute(f"INSERT INTO nodes ({', '.join(ncols)}) VALUES ({', '.join('?' * len(ncols))})", r)
-                    for t in src.execute(f"SELECT {', '.join(tcols)} FROM tokens WHERE node_id = ? AND kind = 'node'", (nid,)):
-                        dst.execute(f"INSERT OR IGNORE INTO tokens ({', '.join(tcols)}) VALUES ({', '.join('?' * len(tcols))})", t)
+                    for t in src.execute(f"SELECT {', '.join(scols)} FROM tokens WHERE node_id = ? AND kind = 'node'", (nid,)):
+                        row = _token_as(dict(zip(scols, t, strict=True)), dcols)
+                        dst.execute(f"INSERT OR IGNORE INTO tokens ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})", list(row.values()))
                     said.append(f"this machine's own node ({r[ncols.index('name')]}) is the moved controller's too")
                 dst.commit()
             finally:
@@ -1552,7 +1872,7 @@ def carry_here(aside, state_dir):
     fb_old, fb_new = Path(aside) / "firstboot.json", Path(state_dir) / "firstboot.json"
     if fb_old.is_file() and not fb_new.exists():
         shutil.copyfile(str(fb_old), str(fb_new))
-        said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on This machine")
+        said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on the Nodes page")
     return said
 
 

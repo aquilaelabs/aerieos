@@ -4,7 +4,7 @@
 // `aerie roadmap`, and either can tick it off. The open items are appended to every
 // Claude session bb-tty starts, which is the whole point: something noticed
 // mid-task and left undone used to live in the conversation and die with it.
-import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, URL, DIR, closePage, nbGo, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, until, quiet as quietFor, settled as pageSettled, URL, DIR, closePage, nbGo, projectKey, section, pageCall } from './lib.mjs';
 // The add band unrolls the box in its place (R119 step 4): typing a line
 // presses Add to roadmap first, as a person does.
 const unroll = async pg => { if (await pg.$eval('#roadmapForm', f => f.hidden)) await pg.click('#roadmapShow'); };
@@ -27,7 +27,10 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 const rowOpen = async sel => {
   await page.evaluate(s => { const row = document.querySelector(s); const acts = row?.querySelector('.rowacts');
     if (acts?.hidden) row.querySelector('.dtog')?.click(); }, sel);
-  await page.waitForTimeout(300);
+  // Its actions on show and their slide over.
+  await page.waitForFunction(s => { const row = document.querySelector(s), acts = row?.querySelector('.rowacts');
+    return !acts || (!acts.hidden && !row.getAnimations({ subtree: true })
+      .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))); }, sel, { timeout: 10000 }).catch(() => {});
 };
 // A row's reword box is the one right under it (row.after(box)), and every
 // fill, read and press here goes to that one rather than the first
@@ -71,11 +74,7 @@ const saveList = async () => {
 const bbRoadmapEarly = (...a) => execFileSync(BB, ['roadmap', ...a],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
-const post = body => page.evaluate(async b => {
-  const r = await fetch('/api/roadmap', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, body);
+const post = body => pageCall(page, '/api/roadmap', body);
 const open = () => page.$$eval('#roadmapList .roadmap', ts => ts.map(t => ({
   id: t.dataset.id, step: t.dataset.step, text: t.querySelector('.txt').textContent,
   sent: t.classList.contains('sent'),
@@ -151,7 +150,7 @@ ok(await page.$$eval('#roadmapList .roadmap[data-step="-1"] .n',
 // echo and a step of a few hundred characters was reported typed but not
 // sent while sitting in the box whole. The placeholder counts as the echo.
 // notify.tell against a stand-in tmux, since no fixture here folds a paste.
-{
+await section("A long line lands in claude's input box folded into \"[Pasted text #1]\"", async () => {
   const out = execFileSync('python3', ['-c', `
 import sys; sys.path.insert(0, ${JSON.stringify(join(dirname(fileURLToPath(import.meta.url)), '..'))})
 import notify
@@ -173,7 +172,7 @@ r = notify.tell('claude-x', 'a step of ' + 'many words ' * 40, ['claude-x'])
 print(r.get('sent'), sum(1 for c in calls if c[1] == 'send-keys' and c[-1] == 'Enter'))
 `], { encoding: 'utf8' }).trim();
   ok(out === 'True 1', `a line the box folded into a paste placeholder counts as arrived, and Enter follows (${out})`);
-}
+});
 
 // ---- sending -----------------------------------------------------------
 // The fixture's claude-alpha is a plain shell, which is what makes this
@@ -310,7 +309,7 @@ ok((await page.$eval('#roadmapList .roadmap .go', g => saidOf(g))).includes('sav
 // dispatched rather than clicked: a real click cannot reach a disabled
 // button, and what wants proving is that even one that did lands nowhere.
 await page.dispatchEvent(`#roadmapList .roadmap[data-id="${mine.id}"] .go`, 'click');
-await page.waitForTimeout(200);
+await quietFor(200);
 ok(await page.$('.sendbox') === null,
    '...and no box opens, because there is nothing it could honestly send');
 
@@ -351,19 +350,26 @@ await page.waitForFunction(() => document.querySelectorAll('#roadmapList .roadma
 // A group is a fold now (the operator, 29 Sep): its row is the summary and
 // its steps open under it on a tap. Checked once, then every group is
 // opened as it is drawn, since the rest of this file reaches into steps.
-{
+await section("A group is a fold now", async () => {
   await page.waitForSelector('#roadmapList details.grp:has(.roadmap[data-step="1"])', { timeout: 15000 });
   const first = await page.$eval('#roadmapList details.grp:has(.roadmap[data-step="1"])', d => ({ open: d.open, steps: d.querySelectorAll('.roadmap[data-step]:not([data-step="-1"])').length,
     shown: [...d.querySelectorAll('.roadmap[data-step]:not([data-step="-1"])')].some(r => r.checkVisibility()) }));
   ok(!first.open && !first.shown, `a group starts folded, its steps out of sight (${JSON.stringify(first)})`);
   // A step's send lines up under its item's, off the card's edge (B51).
+  // Measured once the rows carry a send: one is drawn once the status read
+  // has said this account writes the space (projWriteWhy), which under a
+  // whole run's load came after the list (B834); when none comes, why.
+  const sends = await page.waitForSelector('#roadmapList details.grp:has(.roadmap[data-step="1"]) .roadmap .go',
+    { state: 'attached', timeout: 20000 }).then(() => '', () => page.evaluate(() =>
+      ` none drawn: read-only ${JSON.stringify(projWriteWhy('alpha') || '')}, ${
+        document.querySelectorAll('#roadmapList details.grp:has(.roadmap[data-step="1"]) .roadmap').length} rows`));
   const goes = await page.$eval('#roadmapList details.grp:has(.roadmap[data-step="1"])', d => {
     d.open = true;
     const r = [...d.querySelectorAll('.roadmap')].map(x => x.querySelector('.go')?.getBoundingClientRect().right).filter(Boolean);
     d.open = false;
     return r.map(Math.round);
   });
-  ok(goes.length > 1 && goes.every(x => Math.abs(x - goes[0]) <= 1), `a step's send is under its item's (${goes.join(', ')})`);
+  ok(goes.length > 1 && goes.every(x => Math.abs(x - goes[0]) <= 1), `a step's send is under its item's (${goes.join(', ')}${sends})`);
   // The send is the Claude mark among the row's own buttons on the right,
   // the caret is where the arrow was, and the words open the fold (the
   // pencil rewords a group).
@@ -381,7 +387,7 @@ await page.waitForFunction(() => document.querySelectorAll('#roadmapList .roadma
   await page.evaluate(() => new MutationObserver(() => document.querySelectorAll('#roadmapList details.grp:not([open])').forEach(d => { d.open = true; }))
     .observe(document.getElementById('roadmapList'), { childList: true, subtree: true }));
   await page.evaluate(() => document.querySelectorAll('#roadmapList details.grp:not([open])').forEach(d => { d.open = true; }));
-}
+});
 items = await open();
 const g = items.find(i => i.text === 'rework the picker');
 const s1 = items.find(i => i.text === 'widen the select');
@@ -538,7 +544,7 @@ await page.click(`${dropBox} .stop`);
 // loaded box lost once (B292); a Cancel that never closes the box still
 // fails here, and the line says which half it was. Still open, what the
 // page holds is said and Cancel is pressed once more (B415).
-{
+await section("Waited for rather than read in the same breath as the click, which a", async () => {
   const gone = () => page.waitForSelector(dropBox, { state: 'detached', timeout: 5000 }).then(() => true, () => false);
   let shut = await gone();
   if (!shut){
@@ -554,7 +560,7 @@ await page.click(`${dropBox} .stop`);
   const steps = read().projects.alpha.find(r => String(r.id) === c1.id).steps.length;
   ok(shut && steps === 2,
      `Cancel closes it and drops nothing (the box ${shut ? 'closed' : 'is still open'}, ${steps} steps on disk)`);
-}
+});
 
 await rowOpen(`#roadmapList .roadmap[data-id="${c1.id}"][data-step="0"]`);
 
@@ -964,31 +970,27 @@ execFileSync('tmux', ['send-keys', '-t', 'claude-alpha', 'Enter']);
 // running the tty is back to echoing. Under a whole run's load the send
 // landed in that gap, the kernel echoed it, and Enter followed. The line the
 // shell prints is its own line on the screen, never the command's echo.
-{
+await section("Waited for on what the shell printed after it ran stty", async () => {
   const cap = () => execFileSync('tmux', ['capture-pane', '-p', '-J', '-t', 'claude-alpha'], { encoding: 'utf8' });
   // Given as long as any wait here on a loaded box: fifteen seconds ran out
   // in a whole eight-worker run with the shell still to get to it.
-  let off = false;
-  for (const until = Date.now() + patience(40000); !off && Date.now() < until;){
-    off = cap().split('\n').some(l => l.trim() === 'ECHO-OFF-NOW');
-    if (!off) await new Promise(r => setTimeout(r, 100));
-  }
+  const off = await until(() => cap().split('\n').some(l => l.trim() === 'ECHO-OFF-NOW'), 40000, 100);
   ok(off, 'the stand-in session has run stty -echo before the send');
-}
+});
 // ...and the pane quiet: under a whole run's load a line sent earlier still
 // had its shell's "command not found" on the way, which repeats the line, and
 // it landed after the server's one-second settle and counted as this send's
 // echo (B609). Two captures a second apart, the same, before the send.
-{
+await section("and the pane quiet", async () => {
   const cap = () => execFileSync('tmux', ['capture-pane', '-p', '-t', 'claude-alpha'], { encoding: 'utf8' });
   let prev = cap();
   for (let i = 0; i < 15; i++){
-    await new Promise(r => setTimeout(r, 1000));
+    await quietFor(1000);
     const now = cap();
     if (now === prev) break;
     prev = now;
   }
-}
+});
 const quiet = await post({ action: 'send', project: 'alpha', id: Number(mine.id) });
 ok(quiet.status === 200 && quiet.body.typed && !quiet.body.sent,
    `a session that does not echo gets the line typed but not submitted (${quiet.status} ${JSON.stringify(quiet.body).slice(0, 120)})`);
@@ -1111,13 +1113,13 @@ ok(/\bdone\b/.test(afterDone) && /\bremove\b/.test(afterDone),
 // item's own, and "a gap means something was removed" only holds if nothing
 // is numbered twice. It used to be max(on the list)+1, so ticking the
 // newest items off gave their numbers to the next adds.
-{
+await section("and its number is never handed out again", async () => {
   const next = bbRoadmap('add', 'the number after a finished one');
   const nid = Number((next.match(/added R(\d+)/) || [])[1]);
   ok(nid > Number(finId),
      `a finished item's number is not reused: the next add is R${nid}, after R${finId}`);
   bbRoadmap('rm', String(nid), 'numbering fixture');
-}
+});
 ok(!bbRoadmap('--prompt').includes('a job to finish'),
    '...so the next session is not handed work that is already finished');
 
@@ -1234,7 +1236,7 @@ ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] 
 // typing is not staged until Save, so a session running `aerie roadmap add` in
 // the background deleted a half-written rewording under the finger holding
 // it. Bugs has skipped its redraw while a form is open since it was built.
-{
+await section("and a box open in the list is not taken apart by somebody else's write", async () => {
   await rowOpen(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"]`);
   await page.click(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] .ed`);
   rw = rewordBox(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"]`);
@@ -1250,7 +1252,8 @@ ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] 
   // fresh notebook answers every question with "nothing is open here".
   const tick = async () => {
     await page.evaluate(() => getNotebook('alpha').reload());
-    await new Promise(r => setTimeout(r, 300));
+    // The re-read has landed: time in which a draw it owed would have come.
+    await quietFor(300);
   };
   await tick(); await tick();
   ok(await page.$eval(`${rw} textarea`, t => t.value) === 'half a thought, still typing',
@@ -1266,7 +1269,7 @@ ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] 
       document.getElementById('roadmapList')?.textContent || ''));
   }
   ok(landed, '...and what arrived while it was open is drawn once the box is shut');
-}
+});
 await rowOpen(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"]`);
 await page.click(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] .ed`);
 rw = rewordBox(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"]`);
@@ -1312,13 +1315,13 @@ ok(read().projects.alpha.find(r => String(r.id) === plainId).info
 // needs them, so the prompt carries a pointer and `aerie roadmap show` carries
 // the text. On this repository that was 35KB of a 45KB block that every
 // conversation paid for whether or not it touched the roadmap.
-{
+await section("The details are the long half and only the session that picks the item up", async () => {
   const block = bbRoadmapEarly('--prompt');
   ok(!/lives in scripts\/dashboard\/roadmap\.py/.test(block) && /`aerie roadmap show R4` prints one whole/.test(block),
      'the prompt names where the details are rather than carrying them');
   ok(/lives in scripts\/dashboard\/roadmap\.py/.test(bbRoadmapEarly('show', plainId)),
      '...and that command prints them in full');
-}
+});
 
 await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForFunction(id => !!document.querySelector(
@@ -1829,11 +1832,11 @@ await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForFunction(id => !document.querySelector(`#roadmapList .roadmap[data-id="${id}"]`), widget.id);
 ok(!(await open()).some(i => i.text === 'ship the widget'),
    '...and the item is off the list');
-{
+await section("into the history as done, beside the step that finished it", async () => {
   const log = bbRoadmapEarly('history', '-n', '3');
   ok(/done-step.*step 3 of R\d+  paint it/.test(log) && new RegExp(`done +R${widget.id}  ship the widget`).test(log),
      '...into the history as done, beside the step that finished it');
-}
+});
 ok(/nothing dropped as R\d+ is in the history/.test(refusedBy('restore', widget.id)),
    '...and done cannot be put back; it is a session\'s word that the work happened');
 
@@ -1852,7 +1855,7 @@ ok(new RegExp(`removed R${dropped.id}; aerie roadmap restore R${dropped.id} puts
    'dropping names the way back');
 ok(new RegExp(`put back R${dropped.id}: a line dropped by mistake`).test(bbRoadmapEarly('restore', dropped.id)),
    'aerie roadmap restore puts it back under its own number');
-{
+await section("with its steps and its details as they were", async () => {
   const row = read().projects.alpha.find(r => String(r.id) === String(dropped.id));
   ok(row && row.steps.length === 2 && row.steps[1].text === 'second' && row.info === 'the details ride along',
      '...with its steps and its details as they were');
@@ -1861,7 +1864,7 @@ ok(new RegExp(`put back R${dropped.id}: a line dropped by mistake`).test(bbRoadm
      '...and the log says it was put back');
   ok(/is on the list/.test(refusedBy('restore', dropped.id)),
      '...and not twice');
-}
+});
 bbRoadmapEarly('rm', dropped.id, 'dropped again, for the pane');
 await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForFunction(id => !document.querySelector(`#roadmapList .roadmap[data-id="${id}"]`), dropped.id);
@@ -1883,7 +1886,7 @@ await page.waitForFunction(() => document.querySelector('.nbsheet').hidden, { ti
 // was out. Held open with a route so the race is deterministic: it hid for
 // weeks as a load-dependent flake (bug #13) precisely because a slow box is
 // what puts the reply on the wrong side of the typing.
-{
+await section("A reload that was already in flight must not take what was typed while it", async () => {
   let release, held = false;
   // Only the FIRST request waits. A handler that holds every one of them
   // would hang every later test in this file the moment it was released.
@@ -1891,7 +1894,7 @@ await page.waitForFunction(() => document.querySelector('.nbsheet').hidden, { ti
     if (!held){ held = true; await new Promise(r => { release = r; }); }
     await route.continue().catch(() => {});
   });
-  page.evaluate(() => notebooks.get('alpha').reload());   // held, so not awaited
+  const reread = page.evaluate(() => notebooks.get('alpha').reload()).catch(() => {});   // held, so not awaited yet
   await page.waitForFunction(() => true);
   await unroll(page); await page.fill('#roadmapText', 'typed while a reload was out');
   await page.keyboard.press('Enter');
@@ -1899,14 +1902,16 @@ await page.waitForFunction(() => document.querySelector('.nbsheet').hidden, { ti
     () => [...document.querySelectorAll('#roadmapList .roadmap .txt')]
             .some(e => e.textContent.includes('typed while a reload was out')));
   release();
-  // Long enough that a reply which was going to overwrite has done it,
-  // and that the released request has finished before the route goes.
-  await new Promise(r => setTimeout(r, patience(1500)));
+  // Until a reply which was going to overwrite has done it, and the
+  // released request has finished before the route goes: the re-read's own
+  // end, then the page's requests at rest.
+  await reread;
+  await pageSettled(page);
   await page.unroute('**/api/roadmap?*');
   ok(await page.$$eval('#roadmapList .roadmap .txt',
        es => es.some(e => e.textContent.includes('typed while a reload was out'))),
      'a reload landing after you type does not take what you typed');
-}
+});
 
 // ---- keeping up with the other writer ------------------------------------
 // The Bugs tab has re-read on a revision from the poll since it was built;
@@ -2081,7 +2086,7 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
 // B198: a batch its session never closes. Killed mid-way, or the container
 // restarted under it, it used to disable Save for every person on the project
 // for good, with no way out that did not need a shell.
-{
+await section("B198: a batch its session never closes", async () => {
   const call = (path, body) => page.evaluate(async ([p, b]) => {
     const r = await fetch(p, b === null ? {} : { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
@@ -2102,11 +2107,11 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   await page.click('#roadmapBatchClose');
   await page.waitForFunction(() => document.getElementById('roadmapBatch')?.hidden, null, { timeout: 20000 });
   ok(!read().batch?.alpha, 'an administrator closes it from the banner, which commits what the session wrote');
-}
+});
 
 // B199: a panel holding unsaved work stops re-reading, which is right, and
 // used to say nothing while it did.
-{
+await section("B199: a panel holding unsaved work stops re-reading, which is right, and", async () => {
   // Onto the Roadmap first: by this point in the file the notebook has been
   // closed and reopened, which lands it on the strip's first view, and the
   // add box is in the DOM there and not on screen.
@@ -2127,10 +2132,10 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   await saveList();
   ok(await page.evaluate(() => !/changed since/.test(document.getElementById('roadmapMoved')?.textContent || '')),
      '...and stops saying it once there is nothing unsaved');
-}
+});
 
 // ---- a target release, and the chips by it (the operator, 21 Oct) --------
-{
+await section("a target release, and the chips by it", async () => {
   const added = [];
   for (const [text, target] of [['ship the first', '0.6.0'], ['ship the second', '0.5.4'], ['ship the third', '']])
     added.push(await post({ action: 'add', project: 'ep.silon', text, ...(target ? { target } : {}) }));
@@ -2171,10 +2176,10 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   const listed = bbEps('--target', '0.6.0');
   ok(/ship the first\s+\[for 0\.6\.0\]/.test(listed) && /ship the third/.test(listed) && !/ship the second/.test(listed),
      `aerie roadmap --target lists what is meant for one release (${listed.trim().replace(/\n/g, ' / ')})`);
-}
+});
 
 // ---- a step's own release (R108, the operator, 22 Oct) ------------------
-{
+await section("a step's own release", async () => {
   const bbEps = (...a) => execFileSync(BB, ['roadmap', ...a],
     { env: { ...process.env, BB_ROADMAP_PROJECT: 'ep.silon', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).toString();
   const made = await post({ action: 'add', project: 'ep.silon', text: 'split across two', steps: ['now', 'later'], target: '0.6.0' });
@@ -2199,15 +2204,15 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   const listed = bbEps('--target', '0.8.0');
   ok(/goes with the item \(0\.6\.0\)/.test(said) && tag === 'for 0.8.0' && /split across two/.test(listed) && /2\. later\s+\[for 0\.8\.0\]/.test(listed),
      `a step's Reword box sets its own release: the step says it, a chip for it appears, and bb lists the item under it (${tag} | ${listed.trim().replace(/\n/g, ' / ')})`);
-}
+});
 
 // A project you may read and not change (an administrator who has not taken
 // it on) still shows what was finished on it: Finished is a read, as History
 // is (B297).
-{
+await section("A project you may read and not change", async () => {
   const me = await page.evaluate(async () => (await (await fetch('/api/users')).json()).users.find(u => u.name === 'test')?.projects || []);
   const setMine = ps => page.evaluate(async ps => (await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'projects', name: 'test', projects: ps }) })).status, ps);
+    body: JSON.stringify({ action: 'edit', name: 'test', projects: ps }) })).status, ps);
   // By project (R138): the list names alpha's project by its key.
   await setMine(me.filter(n => n !== projectKey('alpha')));
   const fin = await post({ action: 'finished', project: 'alpha' });
@@ -2218,11 +2223,11 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   page.errors.splice(seen, page.errors.length - seen, ...page.errors.slice(seen).filter(e => !/403/.test(e)));
   ok(fin.status === 200 && Array.isArray(fin.body.finished) && add.status === 403,
      `a space not taken on still lists its finished items, and stays closed to a change (${fin.status}, add ${add.status})`);
-}
+});
 
 // Steps between items (R168): Move to on a step's row, Split and Fold into
 // on an item's, each landing at once; a moved step says where it was.
-{
+await section("Steps between items", async () => {
   bbRoadmap('add', 'r168 a plan to cut up', '--step', 'keep this', '--step', 'move this', '--step', 'split this');
   bbRoadmap('add', 'r168 the other item', '--step', 'its own');
   const rows = read().projects.alpha;
@@ -2230,7 +2235,9 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   // The list as the checks above left it is narrowed and paged: the search
   // brings these two to the front, whatever chip is on.
   await page.evaluate(() => openNotebook('alpha', 'roadmap'));
-  await page.evaluate(() => { const n = getNotebook('alpha'); n.roadmapChip = ''; n.roadmapVer = ''; n.roadmapFind = 'r168'; });
+  // On the state object, the handle's nb: set on the handle itself the three
+  // did nothing and the list stayed unnarrowed (B911).
+  await page.evaluate(() => { const n = getNotebook('alpha').nb; n.roadmapChip = ''; n.roadmapVer = ''; n.roadmapFind = 'r168'; });
   await page.evaluate(() => getNotebook('alpha').reload());
   await page.waitForSelector(`#roadmapList .grp[data-id="${src}"]`, { timeout: 10000 });
   // A group's steps are behind its fold: opened outright, as a press would.
@@ -2279,7 +2286,7 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   const folded = read().projects.alpha.find(r => String(r.id) === dst).steps.map(s => s.text);
   ok(!read().projects.alpha.find(r => String(r.id) === String(cut.id)) && folded.join('|') === 'its own|move this|r168 the cut-off part|split this',
      `Fold into makes the item a step of the other, its own step following (${folded.join('|')})`);
-}
+});
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);

@@ -20,11 +20,12 @@ from xml.sax.saxutils import escape, quoteattr  # nosemgrep: python.lang.securit
 
 from . import lanbridge, vmhw
 from .base import _run
+from .names import VAR
 
 VIRSH = ["virsh", "-c", "qemu:///system"]
 # Where the VM host feature keeps the cached cloud images and each VM's disk,
 # its cloud-init seed and its XML: the jobs account's, made by the install.
-VM_DIR = os.environ.get("BUILDERBOT_VM_DIR", "/var/lib/builderbot/vms")
+VM_DIR = os.environ.get("BUILDERBOT_VM_DIR", VAR + "/vms")
 DOMAIN_RE = re.compile(r"bbvm-[a-z0-9][a-z0-9-]{0,62}")
 NETWORK_RE = re.compile(r"bbvm-[a-z0-9][a-z0-9-]{0,14}")
 IMAGE_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,40}")
@@ -85,11 +86,6 @@ def guest_facts(name):
             "fs": [[f["mountpoint"][:64], int(f["used-bytes"]) // 2**20, int(f["total-bytes"]) // 2**20]
                    for f in fs.values() if f.get("mountpoint") and f.get("used-bytes", "").isdigit()
                    and f.get("total-bytes", "").isdigit() and int(f["total-bytes"]) > 0][:16]}
-
-
-def guest_root(name):
-    """[used MB, total MB] of a running VM's root filesystem, or None."""
-    return next(([u, t] for m, u, t in guest_facts(name).get("fs", []) if m == "/"), None)
 
 
 def vm_memory():
@@ -585,6 +581,18 @@ class VmsMixin:
     def _vm_exists(self, name, who):
         return subprocess.run(VIRSH + ["dominfo", name], capture_output=True, check=False, **who).returncode == 0
 
+    @staticmethod
+    def _vm_state(name, who, timeout=15):
+        """A VM's state in virsh's words ("running", "shut off", "paused"),
+        or None where virsh has none to say: it knows no such VM, or it did
+        not answer within `timeout` seconds."""
+        try:
+            r = subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True, check=False,
+                               timeout=timeout, **who)
+        except subprocess.TimeoutExpired:
+            return None
+        return r.stdout.strip() if r.returncode == 0 else None
+
     def _vm_image(self, job, spec, who):
         """The cached base image for spec's OS, fetched and checked by the
         checksum file its publisher signs off on when it is not here yet."""
@@ -812,8 +820,7 @@ class VmsMixin:
         if not self._vm_exists(name, who):
             job.say(f"{name} is not on this machine\n")
             return "failed", 66
-        live = "running" in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                           check=False, **who).stdout
+        live = "running" in (self._vm_state(name, who) or "")
         argv = VIRSH + ["change-media", name, "sda", "--eject", "--config"] + (["--live"] if live else [])
         if self._vm_run(job, argv, who) != 0:
             return "failed", 70
@@ -831,8 +838,7 @@ class VmsMixin:
         if dev not in DISK_DEVS or not 2 <= gb <= MAX_DISK_GB:
             job.say("refused: a disk is vda to vdd and a size in GB\n")
             return "failed", 64
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: stop the VM first; a disk grows while it is off\n")
             return "failed", 75
         i = DISK_DEVS.index(dev)
@@ -855,8 +861,7 @@ class VmsMixin:
         if not 1 <= gb <= MAX_DISK_GB:
             job.say("refused: a disk is 1 GB to 4 TB\n")
             return "failed", 64
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: stop the VM first; a disk is added while it is off\n")
             return "failed", 75
         ddir = os.path.join(VM_DIR, "disks")
@@ -913,11 +918,10 @@ class VmsMixin:
         if not self._vm_exists(name, who):
             job.say(f"{name} is not on this machine\n")
             return "failed", 66
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: stop the VM first; its hardware changes while it is off\n")
             return "failed", 75
-        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True,
+        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                              check=False, **who).stdout
         m_v = re.search(r"<vcpu[^>]*>(\d+)</vcpu>", xml)
         cur = re.search(r"<currentMemory unit='KiB'>(\d+)</currentMemory>", xml) or re.search(r"<memory unit='KiB'>(\d+)</memory>", xml)
@@ -976,7 +980,18 @@ class VmsMixin:
         self.own_dir(iso_dir(), who)
         path = os.path.join(iso_dir(), fname)
         if os.path.isfile(path):
-            job.say(f"{fname} is here already\n")
+            # The same name is not the same file: ISOs are the node's, so one
+            # a person added from their own address answered another's ask
+            # for the official one with success (R247 step 5).
+            h = hashlib.sha256()
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            if h.hexdigest() != want:
+                job.say(f"refused: {fname} is here already as another file (SHA-256 {h.hexdigest()[:16]}…, not the "
+                        "one given): remove that one first, or give this one another name\n")
+                return "failed", 65
+            job.say(f"{fname} is here already, and is the file given\n")
             return "succeeded", 0
         part = path + ".part"
         if upload:
@@ -1044,7 +1059,7 @@ class VmsMixin:
         # where it is now before the VM starts, by its serial or its port.
         kept = usb_kept(name)
         if kept and self._vm_exists(name, who):
-            xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True,
+            xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                                  check=False, **who).stdout
             fresh = vmhw.usb_refresh(xml, kept, vmhw.host_hw()["usb"])
             if fresh:
@@ -1078,8 +1093,7 @@ class VmsMixin:
         host = vmhw.host_hw()
         dev = vmhw.usb_find(host["usb"], want)
         kept = usb_kept(name)
-        running = "running" in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                              check=False, **who).stdout
+        running = "running" in (self._vm_state(name, who) or "")
         if give:
             if not dev:
                 job.say(f"refused: {said} is not plugged into this machine now\n")
@@ -1146,14 +1160,14 @@ class VmsMixin:
         if self._vm_exists(name, who):
             job.say(f"refused: {name} is a VM here already\n")
             return "failed", 73
-        info = subprocess.run(VIRSH + ["domstate", src], capture_output=True, text=True, check=False, **who)
-        if info.returncode != 0:
+        state = self._vm_state(src, who)
+        if state is None:
             job.say(f"refused: {src} is not a VM on this node\n")
             return "failed", 66
-        if info.stdout.strip() not in ("shut off", "crashed"):
-            job.say(f"refused: {src} is {info.stdout.strip()}: shut it down first, so its disks are copied whole\n")
+        if state not in ("shut off", "crashed"):
+            job.say(f"refused: {src} is {state}: shut it down first, so its disks are copied whole\n")
             return "failed", 75
-        xml = subprocess.run(VIRSH + ["dumpxml", src, "--inactive"], capture_output=True, text=True, check=False, **who).stdout
+        xml = subprocess.run(VIRSH + ["dumpxml", src, "--inactive", "--security-info"], capture_output=True, text=True, check=False, **who).stdout
         try:
             dom = ET.fromstring(xml)
         except ET.ParseError:
@@ -1265,13 +1279,12 @@ class VmsMixin:
         """A UEFI VM made before 0.6.1 keeps its firmware variables raw, which
         libvirt will not snapshot: moved to qcow2 while it is off, the domain
         defined again on the new file. True when nothing is in the way."""
-        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True,
+        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                              check=False, **who).stdout
         m = re.search(r"<nvram([^>]*)>([^<]+)</nvram>", xml)
         if not m or "qcow2" in m.group(1):
             return True
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: this VM boots by UEFI and was made before its firmware's variables were kept in qcow2, "
                     "which a snapshot needs; stop it once and take the snapshot again, and they are moved while it is off\n")
             return False

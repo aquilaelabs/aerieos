@@ -5,13 +5,6 @@
 
 "use strict";
 
-async function postTrash(path, body){
-  try{
-    const r = await postJSON(path, body);
-    return await r.json();
-  }catch(e){ return {error: String(e)}; }
-}
-
 async function openTrash(){
   $("tmodal").hidden = false;
   await drawTrash();
@@ -19,18 +12,16 @@ async function openTrash(){
 
 async function drawTrash(){
   const el = $("tList");
-  el.innerHTML = `${skel("rows", 3)}`;
-  let j;
-  try{ j = await (await fetch("/api/trash")).json(); }
-  catch(e){ el.innerHTML = `<div class="hint bad">${esc(String(e))}</div>`; return; }
+  drawHTML(el, `${skel("rows", 3)}`);
+  const j = await getJSON("/api/trash");
   // A refusal is said, never read as an empty bin (B87).
-  if (j?.error){ el.innerHTML = `<div class="hint bad">${esc(j.error)}</div>`; return; }
+  if (j?.error){ drawHTML(el, `<div class="hint bad">${esc(j.error)}</div>`); return; }
   const items = j?.items || [];
   if (!items.length){
-    el.innerHTML = `<div class="empty">nothing deleted</div>`;
+    drawHTML(el, `<div class="empty">nothing deleted</div>`);
     return;
   }
-  el.innerHTML = items.map(t => `<div class="row trow" data-t="${esc(t.name)}">
+  drawHTML(el, items.map(t => `<div class="row trow" data-t="${esc(t.name)}">
       <div class="grow"><div class="name">${esc(t.was || t.name)}</div>
         <div class="sub">deleted ${esc(ago(t.at))}${t.project ? ` from ${esc(t.project)}` : ""}${t.was && t.was !== t.name
           ? ` · directory ${esc(t.name)}` : ""}${t.taken
@@ -42,18 +33,18 @@ async function drawTrash(){
             : "move it back to /workspace, as " + esc(t.was || t.name)}">Put back</button>
         <button type="button" class="ic danger" data-tpurge="${esc(t.name)}" aria-label="delete for good"
           title="delete it and every file in it, for good">${BIN}</button>
-      </span></div>`).join("");
+      </span></div>`).join(""));
   el.querySelectorAll("[data-trestore]").forEach(b => b.onclick = async () => {
     b.disabled = true;
-    let r = await postTrash("/api/trash-restore", {name: b.dataset.trestore});
+    let r = await postJSON("/api/trash-restore", {name: b.dataset.trestore});
     // Its project is gone (R138): which one it goes back into is asked.
     if (r?.pick){
-      const to = projectList().filter(c => c.may && !c.archived);
+      const to = projectList().filter(c => c.may);
       const got = to.length ? await askInline(b.closest(".trow"), {label: `Put ${b.dataset.trestore} back into`, ok: "Put back",
                                                                    options: to.map(c => c.name)}) : null;
       const c = got && to.find(x => x.name.toLowerCase() === got.toLowerCase());
       if (!c){ if (!to.length) notify(r.error, true); b.disabled = false; return; }
-      r = await postTrash("/api/trash-restore", {name: b.dataset.trestore, project: c.key});
+      r = await postJSON("/api/trash-restore", {name: b.dataset.trestore, project: c.key});
     }
     if (r?.error) notify(r.error, true);
     else notify(`${r.label || r.name} is back`);
@@ -73,14 +64,14 @@ function askPurge(name){
   // The type-to-confirm shape Reset AerieOS has: what goes, then the
   // word to type labeled over its field, then the drop box's Keep it and
   // the red verb.
-  box.innerHTML = `<div class="hint bad">This deletes every file in
+  drawHTML(box, `<div class="hint bad">This deletes every file in
       <b>${esc(name)}</b>. It is not moved anywhere and there is nothing to
       undo it with.</div>
     <label class="lbl" for="purgeWord">Type ${esc(name)} to confirm</label>
     <input id="purgeWord" autocomplete="off" placeholder="${esc(name)}">
     <div class="foot"><span class="sp"></span>
       <button type="button" class="stop">Keep it</button>
-      <button type="button" class="danger" disabled>Delete for good</button></div>`;
+      <button type="button" class="danger" disabled>Delete for good</button></div>`);
   row.appendChild(box);
   const input = box.querySelector("input"), go = box.querySelector(".danger");
   input.oninput = () => { go.disabled = input.value.trim() !== name; };
@@ -88,7 +79,7 @@ function askPurge(name){
   box.querySelector(".stop").onclick = () => box.remove();
   go.onclick = async () => {
     go.disabled = true;
-    const r = await postTrash("/api/trash-purge", {name, confirm: input.value.trim()});
+    const r = await postJSON("/api/trash-purge", {name, confirm: input.value.trim()});
     if (r?.error){ notify(r.error, true); go.disabled = false; return; }
     notify(`${name} is gone`);
     await drawTrash();
@@ -100,9 +91,9 @@ const BIN = `<svg viewBox="0 0 16 16" aria-hidden="true">
   <path d="M4.2 4.3l.7 8.3a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.7-8.3"/>
   <path d="M6.8 6.8v4"/><path d="M9.2 6.8v4"/></svg>`;
 
-// Every project, and the whole of each one. Home is a view of this filtered
-// to what is pinned, so a project that is not on Home has lost nothing but
-// its place there, which is the only promise a pin makes.
+// Every space, and the whole of each one. Home is a view of this filtered
+// to this person's favorites, so a space that is not on Home has lost
+// nothing but its place there, which is the only promise a favorite makes.
 function openProjectsTab(){
   openTab({kind: "projects", arg: "__projects", label: "Spaces"});
 }
@@ -122,31 +113,15 @@ function projectMatches(p, q){
   return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
 }
 
-// One project's card on the grid (R218 step 3): its color down the left
-// edge, the name (a press opens its page), the branch and the node, the
-// session's dot and word, the one notice, and the two actions with the
-// rest behind the menu, the same parts the project page's header draws.
-// A project's lock, said one way on its card, its page's header and Home
-// (consistency batch J: the header said locked where the card said
-// archived): locked when its owner or an administrator locked it (R119),
-// whomever it holds out, read-only when it is not this account's to change
-// (not taken on, or a role that reads it alone). Archived is said by where
-// the card sits, not by a mark.
-function lockMark(p){
-  const said = p.locked ? (p.locked_admin ? "locked by an administrator" : "locked") : writeWhy(p) ? "read-only" : "";
-  return said ? ` <span class="lockmark" title="${esc(p.locked ? lockedWhy(p) : said)}">${LOCK}${said}</span>` : "";
-}
-// A project's facts line, the same parts wherever it is drawn: its id, its
-// branch, that it may push, and the node it runs on.
-function projFacts(p){
-  const node = p.node_name || p.session_at || "";
-  return [p.pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
-          p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
-          esc(node)].filter(Boolean).join(" · ");
-}
 // A project's id as it is written (P3), as a roadmap item is R12 and a bug
 // B7: the registry's number, never reused, so it names one project for good.
 const projId = p => p?.pid ? `P${p.pid}` : "";
+// A space's id as every facts line carries it (P3, as written), with what it
+// is for under a pointer.
+const pidMark = pid => pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${esc(pid)} names it">${esc(pid)}</span>` : "";
+// A repository's branch and that it may push, or that it has no git: the
+// same words on a space's card, its notebook's header and Home's glance.
+const repoFacts = p => p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git";
 // A project (R138, the operator, 25 Oct) is made first, with a name alone,
 // and its repositories are added to it; every repository is in one. The
 // page reads the projects off the status read's `repos` and each one's
@@ -174,6 +149,14 @@ const projectName = n => state?.repos?.[reposOf(n)]?.name || projLabel(n);
 // The cards the Projects page shows, by key: which are turned over to their
 // controls (Edit). The page's while it is on show, never saved.
 const pjEditing = new Set();
+// The page's view, this browser's: every card whole (cards), or compact
+// (list), each card its name line until it is opened, one at a time.
+let pjView = (() => { try{ return localStorage.getItem("bb.pjview") === "list" ? "list" : "cards"; }catch(e){ return "cards"; } })();
+// The one card open in the compact view, by key; none on a fresh open.
+let pjOpen = "";
+// Whether a card is folded to its name line: in the compact view, all but
+// the one open and one turned over to its controls.
+const pjFolded = c => pjView === "list" && c.key !== pjOpen && !pjEditing.has(c.key);
 
 // One project's card (R138): the front is what is in it and who is working
 // there, the back the controls that change it. Edit turns it over in place,
@@ -182,20 +165,24 @@ const pjEditing = new Set();
 // the repositories' notebooks.
 function projectCard(c){
   const pc = colorAttrs(c.color), on = pjEditing.has(c.key);
-  return `<div class="pcard pflip${pc.cls}${on ? " flipped" : ""}" data-pkey="${esc(c.key)}"${c.first ? ` data-row="${esc(c.first.name)}"` : ""}${pc.style}>
+  return `<div class="pcard pflip${pc.cls}${on ? " flipped" : ""}${pjFolded(c) ? " compact" : ""}" data-pkey="${esc(c.key)}" data-key="${esc(c.key)}"${c.first ? ` data-row="${esc(c.first.name)}"` : ""}${pc.style}>
     <div class="pcface pcfront"${on ? " inert" : ""}>${cardFront(c)}</div>
     <div class="pcface pcback"${on ? "" : " inert"}>${cardBack(c)}</div>
   </div>`;
 }
-// A project's mark by its name: pressed in where it is set, a press setting
-// or clearing it. Archive and pin are a person's sight of it, so they sit
-// where the name is read.
+// A space's marks by its name: pressed in where it is set, a press setting
+// or clearing it. Favorite and archive are a person's sight of it, so they
+// sit where the name is read. A favorite is kept as the account's pin.
+// The Favorites chip's key on the Spaces page: no group a person names
+// can be called it.
+const PJ_FAV = "\u2605favorites";
 function cardMarks(c){
-  const pin = c.archived ? "" : `<button type="button" class="eye bare pcmark${c.pinned ? " on" : ""}" data-pmark="${esc(c.key)}" data-on="${c.pinned ? "0" : "1"}"
-      aria-pressed="${c.pinned}" aria-label="${c.pinned ? "Unpin" : "Pin"} ${esc(c.name)}" title="${c.pinned ? "pinned: on Home's glance; press to unpin" : "pin it to Home's glance"}">${PIN}</button>`;
+  const pin = `<button type="button" class="eye bare pcmark pcfav${c.pinned ? " on" : ""}" data-pmark="${esc(c.key)}" data-on="${c.pinned ? "0" : "1"}"
+      aria-pressed="${c.pinned}" aria-label="${c.pinned ? `Remove ${esc(c.name)} from your favorites` : `Make ${esc(c.name)} a favorite`}" title="${c.pinned
+        ? "a favorite of yours: on Home and under Favorites; press to remove it" : "make it a favorite: on Home and under Favorites"}">${STAR}</button>`;
   const arch = c.may_archive ? `<button type="button" class="eye bare pcmark${c.archived ? " on" : ""}" data-kmark="${esc(c.key)}" data-on="${c.archived ? "0" : "1"}"
       aria-pressed="${c.archived}" aria-label="${c.archived ? "Unarchive" : "Archive"} ${esc(c.name)}" title="${c.archived
-        ? "archived: folded at the foot of this page; press to bring it back" : "archive it: out of sight at the foot of this page, and working as before"}">${ARCHIVE}</button>` : "";
+        ? "archived for you: folded at the foot of this page; press to bring it back" : "archive it for you: in Archived at the foot of this page, and working as before"}">${ARCHIVE}</button>` : "";
   return pin + arch;
 }
 // The lock as the card says it: by whom, or read-only where it is not this
@@ -209,33 +196,37 @@ function cardFront(c){
   const first = c.first, cls = {error: "bad", warning: "warn", locked: "locked"};
   const node = first ? first.node_name || first.session_at || "" : "";
   const many = c.rows.length > 1;
-  return `<div class="pcname"><span class="name">${esc(c.name)}</span>${cardLock(c)}<span class="sp"></span>${cardMarks(c)}</div>
-    <div class="pcmeta"><span class="pcfacts">${[`<span class="pid" title="this space's id, which never changes">${esc(c.pid)}</span>`,
-      esc(node)].filter(Boolean).join(" · ")}</span>${first ? projectState(first) : ""}</div>
+  // In the compact view its name is the press that opens and folds it.
+  const name = pjView !== "list" ? `<span class="name">${esc(c.name)}</span>`
+    : `<button type="button" class="name namelink" data-pjopen="${esc(c.key)}" aria-expanded="${!pjFolded(c)}"
+        title="${pjFolded(c) ? "open it" : "fold it"}">${esc(c.name)}</button>`;
+  return `<div class="pcname">${name}${cardLock(c)}<span class="sp"></span>${cardMarks(c)}</div>
+    <div class="pcmeta"><span class="pcfacts">${[pidMark(c.pid), esc(node)].filter(Boolean).join(" · ")}</span>${first ? projectState(first) : ""}</div>
     <div class="pcrepos">${c.rows.length ? c.rows.map(p => `<div class="pcrepo">
       <button type="button" class="namelink" data-open="${esc(p.name)}" title="open ${esc(p.label || p.name)}'s notebook">${esc(p.label || p.name)}</button>
-      <span class="pcfacts">${p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git"}</span>
+      <span class="pcfacts">${repoFacts(p)}</span>
     </div>${p.issues.map(i => `<div class="pnote ${cls[i.level] || ""}">${many ? esc(p.label || p.name) + ": " : ""}${esc(i.text)}</div>`).join("")}`).join("")
       : first?.work ? `<div class="pnote dim">no repository: a session here builds containers and VMs${c.may ? "; Add repository makes it a coding space" : ""}</div>`
       : `<div class="pnote dim">no repository yet${c.may ? ": Add repository makes or clones one" : ""}</div>`}</div>
-    ${first ? cardNotes(c) : ""}
+    ${first ? projNotes(first) : ""}
     <div class="pcacts actbar">${first ? agentButton(first)
       : `<button type="button" disabled title="Add a repository first">Start agent</button>`}${
-      c.may && !c.archived && !state?.session && state?.can?.create !== false ? `<button type="button" data-repadd="${esc(c.key)}">Add repository</button>` : ""}
+      c.may && !state?.session && state?.can?.create !== false ? `<button type="button" data-repadd="${esc(c.key)}">Add repository</button>` : ""}
       <button type="button" data-pedit="${esc(c.key)}" aria-expanded="false">Edit</button></div>`;
 }
-// What the card says besides its repositories, from its first one, where a
-// session runs: mapping, a phone lent, tests running, the one notice.
-function cardNotes(c){
-  const p = c.first, m = state?.mapping?.[p.name];
+// What a space says besides its facts, from the repository a session runs
+// in: mapping, a phone lent, tests running, the one notice. Its card and its
+// notebook's header draw the same lines; the header's notice is a band.
+function projNotes(p, band = false){
+  const m = state?.mapping?.[p.name];
   return `${m ? (m.running ? `<div class="pnote dim">mapping the code<span class="dots"></span>${m.for > 4 ? ` · ${m.for}s` : ""}</div>`
         : m.error ? `<div class="pnote warn">the code map did not build: ${esc(m.error)}</div>`
         : `<div class="pnote dim">mapped ${m.files} file${m.files === 1 ? "" : "s"} in ${m.took}s</div>`) : ""}
     ${p.phone?.lease?.project === p.name ? `<div class="pnote dim">${esc(p.phone.model || "a phone")} lent here by ${
         esc(p.phone.lease.by_name || p.phone.owner)}${p.phone.lease.left != null ? `, ${Math.max(1, Math.round(p.phone.lease.left / 60))} min left` : ""}: each command asks ${
         p.phone.mine ? "you" : esc(p.phone.owner)}</div>` : ""}
-    ${p.testing ? `<div class="pnote dim">tests running, started ${esc(ago(p.testing.since))}</div>` : ""}
-    ${projectNote(p)}`;
+    ${p.testing ? `<div class="pnote dim ptesting">tests running, started ${esc(ago(p.testing.since))}</div>` : ""}
+    ${projectNote(p, band)}`;
 }
 // The back: the project's name with its pencil, each repository with the
 // icons that change it (a shell in it, its git host, rename, move to another
@@ -257,20 +248,23 @@ function cardBack(c){
   }).join("");
   // The foot is one line of icons at every width (the operator, 25 Oct: one
   // line on either side), each named for a screen reader and a pointer's
-  // hover; Pin and Archive are by the name on the front, a press away.
+  // hover; Favorite and Archive are by the name on the front, a press away.
   const fb = (attr, val, label, icon, extra = "") => `<button type="button" class="ic" ${attr}="${esc(val)}" aria-label="${esc(label)}" title="${esc(label)}"${extra}>${icon}</button>`;
   const tone = colorTone(c.color);
   const foot = [
     fb("data-pcolor", c.key, c.color ? `Color: ${c.color}` : "Color", SWATCH, tone ? ` data-sw data-style="--sw:${tone}"` : ""),
-    c.archived ? "" : fb("data-pgroup", c.key, c.group ? `Group: ${c.group}` : "Group", TAG),
+    fb("data-pgroup", c.key, c.group ? `Group: ${c.group}` : "Group", TAG),
     c.may_lock ? fb("data-lock", c.key, lockLabel(c), c.locked ? LOCK : LOCK_OPEN, ` data-on="${c.locked ? "0" : "1"}" aria-pressed="${!!c.locked}"`) : "",
     // No bug tracker on a project with no repository (R208).
     first && first.mine !== false && !first.work ? fb("data-bug", first.name, "Report bug", BUG) : "",
-    first ? fb("data-rn", first.name, "Settings", GEAR) : "",
     may && !c.rows.length ? fb("data-pdel", c.key, "Delete space", BIN, ' data-danger="1"') : "",
+    // Back to the front, the last of the row's icons; Settings is the gear
+    // at the top right, where the front's Edit stands (the operator, 18 Nov:
+    // the gear and Back trade places).
+    fb("data-pedit", c.key, "Back to the front", ICON_BACK, ' aria-expanded="true"'),
   ].filter(Boolean).join("");
   return `<div class="pcname"><span class="name">${esc(c.name)}</span>${may ? ic("data-prn", c.key, `Rename ${c.name}`, PENCIL) : ""}
-      <span class="sp"></span><span class="actbar"><button type="button" data-pedit="${esc(c.key)}" aria-expanded="true">Back</button></span></div>
+      <span class="sp"></span><span class="actbar">${first ? fb("data-rn", first.name, "Settings", GEAR) : ""}</span></div>
     <div class="pcrepos">${rows || `<div class="pnote dim">no repository yet</div>`}</div>
     <div class="pcacts actbar pcfoot">${foot}</div>`;
 }
@@ -286,11 +280,12 @@ function projectsShown(){
   drawProjects(state?.projects || []);
 }
 
-// A press on a card that changes what it holds (a mark, its color, its
-// group, a name) arms its fade: the next draw that changes that card fades
-// its face through (faceFade) rather than cutting to the new one. A press
-// that opens somewhere else does not.
-const PJ_ELSEWHERE = "[data-pedit],[data-open],[data-c],[data-s],[data-rn],[data-bug],[data-l],[data-ph],[data-tcinst],[data-repadd]";
+// A press on a card that changes what it holds (its color, its group, a
+// name) arms its fade: the next draw that changes that card fades its face
+// through (faceFade) rather than cutting to the new one. A press that opens
+// somewhere else does not, nor the star, which fills where it is, nor the
+// compact view's name, which opens the card in place.
+const PJ_ELSEWHERE = "[data-pedit],[data-open],[data-c],[data-s],[data-rn],[data-bug],[data-l],[data-ph],[data-tcinst],[data-repadd],[data-pmark],[data-pjopen]";
 let pjFade = null;               // {key, was: the card's markup at the press}
 // ...and the card a person last pressed on is the one the page follows when
 // it moves (the operator, 26 Oct), for a few seconds after the press: what
@@ -308,8 +303,7 @@ function pjFadeArm(e){
 // Turn a card over, or back, in place: the class moves and the faces trade
 // which one a press and a screen reader reach; the next paint draws it so.
 function flipCard(key){
-  const on = !pjEditing.has(key), c = projectList().find(x => x.key === key);
-  const was = c ? projectCard(c) : "";
+  const on = !pjEditing.has(key);
   // One card on its back at a time (the operator, 26 Oct): another turned
   // over goes back to its front, a box open on it canceled, as Back does.
   if (on) [...pjEditing].filter(k => k !== key).forEach(k => {
@@ -324,11 +318,11 @@ function flipCard(key){
   card.querySelector(".pcfront").inert = on;
   card.querySelector(".pcback").inert = !on;
   card.querySelectorAll("[data-pedit]").forEach(b => b.setAttribute("aria-expanded", String(on)));
-  // What paint() remembers says so too, so the next poll finds nothing
-  // changed and leaves the card, and a box open on its back (Group, a
-  // rename, a move), alone. Drawn again only where that cannot be said.
-  const grid = card.closest("#pjGrid");
-  if (c && grid && paintAdopt(grid, was, projectCard(c))) return;
+  // The grid is drawn again once the turn is over, which patches the card
+  // to what was done to it here and finds nothing else to change: the card,
+  // and a box open on its back (Group, a rename, a move), stay as they are
+  // (R244). Replacing the card as the turn ended flashed it in Firefox (the
+  // operator, 29 Oct).
   clearTimeout(flipCard.t);
   flipCard.t = setTimeout(() => drawProjects(state?.projects || []), 450);
 }
@@ -340,14 +334,12 @@ async function newProjectByName(){
                          text: "Spaces and punctuation are fine in its name. Its repositories are added on its card."});
   const got = said?.text?.trim();
   if (!got) return;
-  try{
-    const j = await (await postJSON("/api/repos", {action: "create", name: got})).json();
-    if (j.error){ notify(j.error, true); return; }
-    pjEditing.delete(j.key);
-    notify(`${j.name} made: Add repository on its card makes or clones its first one`);
-    await refresh();
-    showNewCard(j.key);
-  }catch(e){ notify("making the space failed: " + failWords(e), true); await refresh(); }
+  const j = await postJSON("/api/repos", {action: "create", name: got});
+  if (j.error){ notify(j.error, true); return; }
+  pjEditing.delete(j.key);
+  notify(`${j.name} made: Add repository on its card makes or clones its first one`);
+  await refresh();
+  showNewCard(j.key);
 }
 
 // A project just made: the page scrolls to its card wherever the order put
@@ -379,12 +371,10 @@ async function renameProjectCard(btn){
   const key = btn.dataset.prn, was = projectName(key);
   const got = await askInline(btn.closest(".pcname"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
-  try{
-    const j = await (await postJSON("/api/repos", {action: "rename", key, to: got})).json();
-    if (j.error){ notify(j.error, true); return; }
-    slideCards(key, () => applyNow((x, k) => { if (k === key && "members" in x) x.name = j.name || got; }));
-    notify(`${was} is now ${j.name || got}`);
-  }catch(e){ notify("renaming failed: " + failWords(e), true); }
+  const j = await postJSON("/api/repos", {action: "rename", key, to: got});
+  if (j.error){ notify(j.error, true); return; }
+  slideCards(key, () => applyNow((x, k) => { if (k === key && "members" in x) x.name = j.name || got; }));
+  notify(`${was} is now ${j.name || got}`);
   await refresh();
 }
 
@@ -395,11 +385,9 @@ async function renameRepository(btn){
   // card's back opens (the operator, 26 Oct): the label names the repository.
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
-  try{
-    const j = await (await postJSON("/api/rename", {name, to: got})).json();
-    if (j.error){ notify(j.error, true); return; }
-    notify(`${was} is now ${j.label || got}`);
-  }catch(e){ notify("renaming failed: " + failWords(e), true); }
+  const j = await postJSON("/api/rename", {name, to: got});
+  if (j.error){ notify(j.error, true); return; }
+  notify(`${was} is now ${j.label || got}`);
   await refresh();
 }
 
@@ -407,30 +395,25 @@ async function renameRepository(btn){
 // change; refused while a session runs on either.
 async function moveRepository(btn){
   const name = btn.dataset.rmove, from = reposOf(name);
-  const to = projectList().filter(c => c.key !== from && c.may && !c.archived);
+  const to = projectList().filter(c => c.key !== from && c.may);
   if (!to.length){ notify("there is no other space of yours to move it to: New space makes one", true); return; }
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Move ${projLabel(name)} to`, ok: "Move",
                                                        options: to.map(c => c.name)});
   if (!got) return;
   const c = to.find(x => x.name.toLowerCase() === got.toLowerCase());
   if (!c){ notify(`${got} is not a space it can move to`, true); return; }
-  let plan;
-  try{
-    plan = await (await postJSON("/api/repos", {action: "move-check", name, to: c.key})).json();
-  }catch(e){ notify("checking the move failed: " + failWords(e), true); return; }
+  const plan = await postJSON("/api/repos", {action: "move-check", name, to: c.key});
   if (plan.error){ notify(plan.error, true); return; }
   const picked = await moveConfirm(plan);
   if (picked === null) return;
-  try{
-    const j = await (await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give})).json();
-    if (j.error){ notify(j.error, true); return; }
-    const nn = id => plan.nodes.find(n => n.id === id)?.name || id;
-    notify(`${projLabel(name)} is in ${j.project}${
-      j.added?.length ? `, which now has ${j.added.map(nn).join(" and ")} too` : ""}${
-      j.readers?.length ? `; ${j.readers.join(", ")} now read${j.readers.length === 1 ? "s" : ""} it too` : ""}${
-      j.kept?.length ? `; ${plan.from} keeps ${j.kept.join(", ")}` : ""}`);
-    if (j.owner_errors?.length) notify(j.owner_errors.join("; "), true);
-  }catch(e){ notify("moving it failed: " + failWords(e), true); }
+  const j = await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give});
+  if (j.error){ notify(j.error, true); return; }
+  const nn = id => plan.nodes.find(n => n.id === id)?.name || id;
+  notify(`${projLabel(name)} is in ${j.project}${
+    j.added?.length ? `, which now has ${j.added.map(nn).join(" and ")} too` : ""}${
+    j.readers?.length ? `; ${j.readers.join(", ")} now read${j.readers.length === 1 ? "s" : ""} it too` : ""}${
+    j.kept?.length ? `; ${plan.from} keeps ${j.kept.join(", ")}` : ""}`);
+  if (j.owner_errors?.length) notify(j.owner_errors.join("; "), true);
   await refresh();
 }
 
@@ -459,7 +442,7 @@ function moveConfirm(plan){
     const offer = plan.nodes.filter(n => !n.have), had = plan.nodes.filter(n => n.have);
     const things = plan.things || [];
     const ctrs = things.filter(t => t.kind === "container"), vms_ = things.filter(t => t.kind === "vm");
-    m.innerHTML = `<div class="box"><h3 id="mvTitle">Move ${esc(plan.label)} to ${esc(plan.to)}?</h3>
+    drawHTML(m, `<div class="box"><h3 id="mvTitle">Move ${esc(plan.label)} to ${esc(plan.to)}?</h3>
       <div class="field"><p class="asksaid">It leaves ${esc(plan.from || "no space")}: from now on ${esc(plan.to)}'s node, people and settings apply to it. Its notebook goes with it.</p></div>
       ${plan.nodes.length ? `<div class="field"><div class="lbl">${esc(plan.from)}'s nodes</div>
         ${had.map(n => `<div class="ndcap dim">${esc(n.name)}: ${esc(plan.to)} has it already</div>`).join("")}
@@ -473,7 +456,7 @@ function moveConfirm(plan){
         ${vms_.map(t => `<div class="ndcap" data-mvvm="${esc(t.node)}" data-reach="${t.reach ? 1 : 0}">${esc(t.name)}<span class="dim"> (on ${esc(t.node_name)})</span><span class="sub warn" data-mvvmwhy hidden> ${esc(plan.to)} will not have ${esc(t.node_name)}: its sessions cannot reach it</span></div>`).join("")}</div>` : ""}
       ${plan.lose.length ? `<div class="field"><div class="sub warn">${esc(plan.lose.join(", "))} ${plan.lose.length === 1 ? "reaches" : "reach"} it through ${esc(plan.from)} alone and ${plan.lose.length === 1 ? "loses" : "lose"} it: a role on ${esc(plan.to)} keeps it.</div></div>` : ""}
       ${busy ? `<div class="field"><div class="sub warn">${esc(plan.busy.join(", "))} running on ${esc(plan.from)} or ${esc(plan.to)}: end ${plan.busy.length === 1 ? "it" : "them"} first, then move it.</div></div>` : ""}
-      ${dlgFoot(`<button type="button" id="mvCancel">Cancel</button>`, `<button type="button" class="primary" id="mvGo"${busy ? " disabled" : ""}>Move</button>`)}</div>`;
+      ${dlgFoot(`<button type="button" id="mvCancel">Cancel</button>`, `<button type="button" class="primary" id="mvGo"${busy ? " disabled" : ""}>Move</button>`)}</div>`);
     // A container or VM is in reach when the new project has its node, or
     // that node is ticked to bring along; out of reach, a container's box is
     // ghosted and unticked, and a VM says so.
@@ -510,16 +493,14 @@ function moveConfirm(plan){
 async function deleteProjectCard(key){
   const n = projectName(key);
   // What was given to it keeps running with no project (the operator, 26 Oct).
-  const own = await postJSON("/api/repos", {action: "owned", name: key}).then(r => r.json()).catch(() => ({}));
+  const own = await postJSON("/api/repos", {action: "owned", name: key});
   const left = own.containers?.length ? `\n\nThe container${own.containers.length === 1 ? "" : "s"} given to it, ${own.containers.join(", ")}, keep${
     own.containers.length === 1 ? "s" : ""} running, given to no space.` : "";
   if (!await askYes(`Delete the space ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
-  try{
-    const j = await (await postJSON("/api/repos", {action: "delete", key})).json();
-    if (j.error){ notify(j.error, true); return; }
-    pjEditing.delete(key);
-    notify(`${n} is gone`);
-  }catch(e){ notify("deleting the space failed: " + failWords(e), true); }
+  const j = await postJSON("/api/repos", {action: "delete", key});
+  if (j.error){ notify(j.error, true); return; }
+  pjEditing.delete(key);
+  notify(`${n} is gone`);
   await refresh();
 }
 
@@ -532,6 +513,34 @@ function wireProjectCards(grid){
   grid.querySelectorAll("[data-rmove]").forEach(b => b.onclick = () => moveRepository(b));
   grid.querySelectorAll("[data-pdel]").forEach(b => b.onclick = () => deleteProjectCard(b.dataset.pdel));
   grid.querySelectorAll("[data-pmark]").forEach(b => b.onclick = () => setProjectPinned(b.dataset.pmark, b.dataset.on === "1"));
+  // In the compact view a card's name opens it and folds the one open, or
+  // folds it again; a press anywhere on a folded card opens it too. The one
+  // opened grows from its name to its whole height and the one folded
+  // shrinks back, as a row on the Containers page slides open (the
+  // operator, 18 Nov): each measured before the draw and after it.
+  const openCard = key => {
+    const moving = [...new Set([pjOpen, key])].filter(Boolean);
+    const cardOf = k => document.querySelector(`.pane .doc.on .projtab .pcard[data-pkey="${CSS.escape(k)}"]`);
+    const was = new Map(moving.map(k => [k, cardOf(k)?.getBoundingClientRect().height || 0]));
+    pjOpen = pjOpen === key ? "" : key;
+    drawProjects(state.projects);
+    if (noMotion()) return;
+    for (const k of moving){
+      // A tween still running from the press before (a second press while
+      // the first card grew) holds the height where it is: measured under
+      // it, where it was and where it goes read the same and nothing moved.
+      // It is canceled and this one starts from where the card was seen.
+      const c = cardOf(k), from = was.get(k);
+      c?.getAnimations().filter(an => JSON.stringify(an.effect?.getKeyframes?.() || []).includes('"height"')).forEach(an => an.cancel());
+      const to = c?.getBoundingClientRect().height || 0;
+      if (!c || !from || Math.abs(from - to) < 2) continue;
+      c.animate([{height: `${from}px`, overflow: "hidden"}, {height: `${to}px`, overflow: "hidden"}],
+                {duration: 220, easing: "cubic-bezier(.2,.7,.2,1)"});
+    }
+  };
+  grid.querySelectorAll("[data-pjopen]").forEach(b => b.onclick = () => openCard(b.dataset.pjopen));
+  const openFolded = e => { if (!e.target.closest("button, a, input, select, textarea")) openCard(e.currentTarget.dataset.pkey); };
+  grid.querySelectorAll(".pcard[data-pkey]").forEach(c => { c.onclick = c.classList.contains("compact") ? openFolded : null; });
   grid.querySelectorAll("[data-kmark]").forEach(b => b.onclick = () => setArchived(b.dataset.kmark, b.dataset.on === "1"));
   grid.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openNotebook(b.dataset.open));
 }
@@ -548,15 +557,29 @@ function renderProjectsInto(i){
     const d = docSurface(i, "proj");
     d.setBar(`<input id="pjSearch" type="search" placeholder="name, branch or node" aria-label="narrow the spaces" autocomplete="off" spellcheck="false">
         <span class="sp"></span>
+        ${viewSeg("pjview", pjView, "every space's card whole", "each card its name line, opened one at a time", "", ["Full", "Compact"])}
         <span class="actbar"><button type="button" id="bTrashTab" aria-label="the trash" title="spaces you deleted: still on disk under .trash, and still recoverable">${BIN}</button>
-        <button type="button" class="primary" id="bNewProjTab" title="a space, by its name: its repositories are added on its card">New space</button></span>`);
-    d.list.innerHTML = `<div class="field pjjob" id="pjJob" hidden></div><div id="pjChips"></div><div class="field pgridband"><div id="pjGrid"></div></div>`;
+        <button type="button" class="primary" id="bNewProjTab" title="a space, by its name: its repositories are added on its card">${barSaid("New space", "New")}</button></span>`);
+    el.querySelector(".projtab .docbarrow")?.classList.add("pjbar");
+    drawHTML(d.list, `<div class="field pjjob" id="pjJob" hidden></div><div id="pjChips"></div><div class="field pgridband"><div id="pjGrid"></div></div>`);
     el.querySelector("#pjGrid").addEventListener("click", pjFadeArm, true);
     el.querySelector("#bNewProjTab").onclick = newProjectByName;
     el.querySelector("#bTrashTab").onclick = openTrash;
     const box = el.querySelector("#pjSearch");
     box.value = pjQuery;
-    box.oninput = () => { pjQuery = box.value; renderProjectsInto(i); };
+    onTyping(box, () => { pjQuery = box.value; renderProjectsInto(i); });
+    // Full or Compact, kept for the next open; Compact opens with every
+    // card folded.
+    el.querySelectorAll("[data-pjview]").forEach(b => b.onclick = () => {
+      pjView = b.dataset.pjview === "list" ? "list" : "cards";
+      pjOpen = "";
+      try{ localStorage.setItem("bb.pjview", pjView); }catch(e){ /* private mode */ }
+      el.querySelectorAll("[data-pjview]").forEach(x => {
+        x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+      // ...the cards faded through the change, as the Containers page's
+      // Full and Compact are (the operator, 18 Nov).
+      fadeThrough(".pane .doc.on .projtab #pjGrid .pcard[data-pkey]", () => renderProjectsInto(i));
+    });
   }
   const grid = el.querySelector("#pjGrid");
   // New project and the trash are not drawn for an account whose roles do
@@ -567,52 +590,55 @@ function renderProjectsInto(i){
   // The project job (a clone, a first push) running or failed, its own
   // band above the grid, where its result will appear.
   const jb = el.querySelector("#pjJob"), jh = projectJobHtml();
-  if (paint(jb, jh)) pJobWire();
+  if (patch(jb, jh)) pJobWire();
   setHidden(jb, !jh);
   // The empty case says what to do: an empty workspace is exactly where
   // somebody is about to make their first project.
   if (!ps.length){
-    paint(grid, `<div class="empty">${state.admin ? "no space yet: New space makes one"
+    patch(grid, `<div class="empty">${state.admin ? "no space yet: New space makes one"
                                        : "no spaces are yours yet: an administrator grants them on the Users page"}</div>`);
     return;
   }
-  // The pinned first, each part by name (the operator, 18 Oct, where on 7
-  // Oct it was by name alone): what is pinned is what is looked for. Sorted
-  // here rather than by the server, which reports the directory order every
-  // other reader wants; each group, and the ungrouped, keeps the order.
-  const shown = ps.filter(p => projectMatches(p, pjQuery))
-    .sort((a, b) => (b.pinned && !b.archived) - (a.pinned && !a.archived) || byProjectName(a, b));
+  // By name, a favorite where its name puts it: the Favorites chip is
+  // what finds them. Sorted here rather than by the server, which reports
+  // the directory order every other reader wants; each group, and the
+  // ungrouped, keeps the order.
+  const shown = ps.filter(p => projectMatches(p, pjQuery)).sort(byProjectName);
   // The ones in no group first, then each of this account's groups under
   // its name, by name (the operator, 18 Oct); and the archived ones apart,
   // folded at the foot, their own fold whatever group they were in.
-  // The chips count every project that is not archived, whatever the search
-  // says, so what the search hides is still counted (the chips rule); one
-  // in force narrows the grid to its group, and the archived fold is All's.
-  const all = ps.filter(p => !p.archived);
-  const chips = byProjectGroup(all).map(({group: g, list}) => ({key: g || "none", label: g || "No group", count: list.length}));
+  // The chips count every space, whatever the search says, so what the
+  // search hides is still counted (the chips rule): your favorites first,
+  // then each group; one in force narrows the grid and the Archived fold
+  // alike, an archived space being one like any other. A chip with nothing
+  // under it is not drawn, and with none to draw neither is the band.
+  const all = ps;
+  const favs = all.filter(p => p.pinned).length;
+  const groups = byProjectGroup(all).map(({group: g, list}) => ({key: g || "none", label: g || "No group", count: list.length}));
+  const chips = [...(favs ? [{key: PJ_FAV, label: "Favorites", count: favs}] : []), ...(groups.some(c => c.key !== "none") ? groups : [])];
   if (pjChip && !chips.some(c => c.key === pjChip)) pjChip = "";
   const cb = el.querySelector("#pjChips");
-  if (paint(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
+  if (patch(cb, chips.length ? chipBar(chips, pjChip, "data-pjchip", all.length) : ""))
     cb.querySelectorAll("[data-pjchip]").forEach(c => c.onclick = () =>
       // The cards and the groups' headings, never a group's box itself: a
       // card in a group that moved slid twice as far, and a group left out
       // was copied whole over the grid.
       chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid .pjgname",
                () => { pjChip = c.dataset.pjchip; pjChipMove = true; renderProjectsInto(i); pjChipMove = false; }));
-  const inChip = p => !pjChip || (pjChip === "none" ? !p.group : p.group === pjChip);
-  const live = shown.filter(p => !p.archived && inChip(p)), gone = pjChip ? [] : shown.filter(p => p.archived);
+  const inChip = p => !pjChip || (pjChip === PJ_FAV ? !!p.pinned : pjChip === "none" ? !p.group : p.group === pjChip);
+  const live = shown.filter(p => !p.archived && inChip(p)), gone = shown.filter(p => p.archived && inChip(p));
   const grid_ = list => `<div class="pgrid">${projectCards(list)}</div>`;
   const html = byProjectGroup(live).map(({group: g, list}) => {
         if (!g) return grid_(list);
         // The pencil renames the group for this account alone: a group is a
         // person's own label, so it is never anybody else's to move (R273).
-        return `<section class="pjgroup" data-group="${esc(g)}"><h3 class="pjgname">${esc(g)} <span class="dim">${list.length}</span>${
+        return `<section class="pjgroup" data-group="${esc(g)}" data-key="group:${esc(g)}"><h3 class="pjgname">${esc(g)} <span class="dim">${list.length}</span>${
           state.session ? "" : `<button type="button" class="eye bare" data-pjgrename="${esc(g)}" aria-label="Rename the group ${esc(g)}" title="Rename">${PENCIL}</button>`
         }</h3>${grid_(list)}</section>`;
       }).join("")
     + (gone.length ? docSection("projects", "archived", "Archived", `${gone.length} space${gone.length === 1 ? "" : "s"}`,
                                 grid_(gone), {open: false, cls: "dim", fold: true}) : "");
-  // Any rearrangement slides (the operator, 26 Oct): a rename, a pin, an
+  // Any rearrangement slides (the operator, 26 Oct): a rename, a favorite, an
   // archive, a group, a project made or gone, another person's change on
   // the poll. Each card's place is read before the grid is drawn again, and
   // each that lands elsewhere slides there from it while the rest close up.
@@ -628,18 +654,25 @@ function renderProjectsInto(i){
   const fade = fc && projectCard(fc) !== pjFade.was && was.indexOf(fc.key) === now.indexOf(esc(fc.key));
   if (fc && projectCard(fc) !== pjFade.was) pjFade = null;
   let drawn = false;
-  const draw = () => { drawn = paint(grid, html || `<div class="empty">nothing matches ${esc(pjQuery)}</div>`); };
+  const draw = () => { drawn = patch(grid, html || `<div class="empty">nothing matches ${esc(pjQuery)}</div>`); };
   if (fade) fadeThrough(() => grid.querySelectorAll(`.pcard[data-pkey="${CSS.escape(fc.key)}"] > .pcface:not([inert])`), draw);
   else draw();
   if (drawn && play) play();
   // The card pressed on, moved, is followed on screen to where it lands:
   // measured once its slide is over, since while it slides it is drawn at
   // the place it left and a scroll then went nowhere.
+  // A redraw during the slide (the poll's) starts a slide of its own and
+  // cancels this one, whose end then came while the card was still drawn
+  // where it left: each slide is waited out in turn, a few at most.
   if (drawn && moved && pjFollow && Date.now() < pjFollow.until && was.indexOf(pjFollow.key) !== now.indexOf(pjFollow.key)){
     const card = grid.querySelector(`.pcard[data-pkey="${CSS.escape(pjFollow.key)}"]`);
-    const go = () => card?.isConnected && card.scrollIntoView({block: "nearest", behavior: noMotion() ? "auto" : "smooth"});
-    const slide = card?.getAnimations().find(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])));
-    if (slide) slide.finished.then(go, go); else go();
+    const go = (left = 4) => {
+      if (!card?.isConnected) return;
+      const slide = card.getAnimations().find(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])));
+      if (slide && left > 0) slide.finished.then(() => go(left - 1), () => go(left - 1));
+      else card.scrollIntoView({block: "nearest", behavior: noMotion() ? "auto" : "smooth"});
+    };
+    go();
     pjFollow = null;
   }
   if (drawn){
@@ -661,12 +694,10 @@ async function renameProjectGroup(btn){
                                      also: {key: "delete", label: "Delete group"}});
   if (got === null || got === was) return;
   const gone = got?.also === "delete";
-  try{
-    const j = await (await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got})).json();
-    if (j.error){ notify(j.error, true); return; }
-    applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
-    notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
-  }catch(e){ notify("group: " + failWords(e), true); }
+  const j = await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got});
+  if (j.error){ notify(j.error, true); return; }
+  applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
+  notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
   refresh();
 }
 
@@ -817,8 +848,8 @@ function pDrawForge(){
   if ($("pForgeField").hidden) return;
   const sel = $("pForge");
   if (sel.dataset.built !== String(pForges.length)){
-    sel.innerHTML = `<option value="" hidden>from the address</option>` + pForges.map(f =>
-      `<option value="${esc(f.id)}">${f.dev ? devOpt(esc(f.name)) : esc(f.name)}</option>`).join("");
+    drawHTML(sel, `<option value="" hidden>from the address</option>` + pForges.map(f =>
+      `<option value="${esc(f.id)}">${f.dev ? devOpt(esc(f.name)) : esc(f.name)}</option>`).join(""));
     sel.dataset.built = String(pForges.length);
   }
   // One row under the address in both modes, always there, so nothing pops
@@ -921,7 +952,7 @@ function pFillGates(){
     const el = $(id);
     if (el.dataset.built !== "1"){
       // A report has nothing to hold for approval: auto or deny.
-      el.innerHTML = optionList((id === "pGateWiki" ? gateChoices("wiki") : GATE_MODES).filter(([v]) => id !== "pGateReport" || v !== "ask"));
+      drawHTML(el, optionList((id === "pGateWiki" ? gateChoices("wiki") : GATE_MODES).filter(([v]) => id !== "pGateReport" || v !== "ask")));
       el.dataset.built = "1";
     }
     el.value = P_GATE_DEFAULT[id] || "auto";
@@ -957,7 +988,7 @@ function pOpen(mode){
   // with a new /secrets/ssh, and a stale list here would offer a key the
   // agent no longer holds. The submit handler awaits pFetch directly, so an
   // early Create still judges auth on the real answer, not the defaults.
-  pFetch = fetch("/api/pubkeys").then(r => r.json()).catch(() => null);
+  pFetch = getJSON("/api/pubkeys");
   pFetch.then(j => {
     if (gen !== pGen || !j) return;
     pKeys = j.keys || []; pPat = !!j.pat;
@@ -965,8 +996,8 @@ function pOpen(mode){
     pForgeHosts = j.hosts || {};
     pTakenDirs = new Set(j.dirs || []);
     if (!pForges.some(f => f.id === pForgeId)) pForgeId = (pForges[0] || {}).id || "";
-    $("pKey").innerHTML = optionList([["", `none: ${pPat ? "use the configured access token" : "public repository"}`],
-                                      ...pKeys.map(k => k.name)]);
+    drawHTML($("pKey"), optionList([["", `none: ${pPat ? "use the configured access token" : "public repository"}`],
+                                      ...pKeys.map(k => k.name)]));
     pShowKey(); pDraw(); pNameShow();
   });
 }
@@ -987,9 +1018,9 @@ function pFillNode(){
   wrap.hidden = !shown;
   if (!shown){ sel.innerHTML = ""; return; }
   const was = sel.value;
-  sel.innerHTML = pick.map(n => `<option value="${esc(n.id)}">${esc(n.name)}${
+  drawHTML(sel, pick.map(n => `<option value="${esc(n.id)}">${esc(n.name)}${
       n.config?.own ? " (this machine)" : ""}${n.live === false ? " (quiet)" : ""}</option>`).join("")
-    + `<option value="">none: no builds, tests or sessions until one is picked</option>`;
+    + `<option value="">none: no builds, tests or sessions until one is picked</option>`);
   // Several: the node most projects are bound to, not none. A project born
   // with no node had nowhere to send its container and used to land on the
   // newest enrolled node instead (the operator, 25 Sep).
@@ -1082,7 +1113,7 @@ function repoOfUrl(url){
 // it on the next keystroke of the URL would fight whoever did it.
 let pNameTyped = false;
 
-// Create, clone or link: the dialog's one submit, wired to #pCreate in index.html.
+// Create, clone or link: the dialog's one submit, wired to #pCreate by page-boot.js.
 async function createProject() {
   // Captured at the click: the dialog can be closed, reopened and switched
   // to another mode while this request runs, and everything below must keep
@@ -1099,7 +1130,7 @@ async function createProject() {
   else if (!url) return fail("a repository address is required");
   $("pErrWrap").hidden = true;
   const b = $("pCreate");
-  busy(b, { init: "Creating", clone: "Starting", link: "Starting" }[mode]);
+  busyFor(b, mode);
   try{
     // A push has to authenticate somehow; catching this before the round-trip
     // spares typing a URL into a flow that cannot finish. Judged on the
@@ -1128,22 +1159,16 @@ async function createProject() {
     let archive = "";
     if (file){
       busy(b, "Uploading");
-      const u = await fetch("/api/upload-archive?name=" + encodeURIComponent(file.name),
-                            {method: "POST", body: file});
-      const uj = await u.json().catch(() => ({}));
-      if (!u.ok) return fail(uj.error || `upload failed (HTTP ${u.status})`);
+      const uj = await postFile("/api/upload-archive?name=" + encodeURIComponent(file.name), file);
+      if (uj.error) return fail(`upload failed: ${uj.error}`);
       archive = uj.id;
       busy(b, "Creating");
     }
-    const r = mode === "link"
-      ? await fetch("/api/link", {method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({name: linkName, url, forge,
+    const j = mode === "link"
+      ? await postJSON("/api/link", {name: linkName, url, forge,
                                 key: pLinkAuth === "key" ? key : "",
-                                token: linkToken})})
-      : await fetch("/api/create", {method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({name, mode, url, project: into, about: $("pAboutField").hidden ? "" : $("pAbout").value, archive,
+                                token: linkToken})
+      : await postJSON("/api/create", {name, mode, url, project: into, about: $("pAboutField").hidden ? "" : $("pAbout").value, archive,
                                 node: $("pNodeField").hidden ? "" : $("pNode").value,
                                 // A starting version, for a fresh tree only: a
                                 // clone keeps the history it came with.
@@ -1157,9 +1182,8 @@ async function createProject() {
                                 key: mode === "clone" ? key : "",
                                 forge: mode === "clone" ? forge : "",
                                 token: mode === "clone" ? $("pToken").value.trim() : "",
-                                push: mode === "clone" && $("pPush").checked})});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return fail(j.error || `${mode} failed (HTTP ${r.status})`);
+                                push: mode === "clone" && $("pPush").checked});
+    if (j.error) return fail(j.error);
     if (gen === pGen) closeNewProject();
     // Everything that touches the network is a background job now, and it is
     // accepted, not finished. The dialog gets out of the way and the Projects

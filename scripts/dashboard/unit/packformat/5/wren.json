@@ -1,0 +1,19 @@
+{
+  "name": "wren",
+  "label": "Wren",
+  "about": "Counts what a source tree holds: lines, files and languages, from scripts the pack carries.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Wren Tools",
+  "platforms": ["linux/*", "darwin/*"],
+  "terms": [{"label": "MIT", "url": "https://opensource.org/license/mit"}],
+  "install": {
+    "fetch": [],
+    "steps": [["sh", "{dir}/build.sh"]],
+    "verify": ["{dir}/bin/wren", "--version"]
+  },
+  "layout": {"bin": ["bin"], "tool": "bin/wren"},
+  "verbs": {
+    "count": {"about": "The lines and files of a directory, by language.", "usage": "DIR", "run": ["{dir}/bin/wren", "count", "{args}"]}
+  }
+}

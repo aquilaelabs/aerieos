@@ -262,9 +262,7 @@ def look(project):
                     newest = r
                 if r["conclusion"] != "success" and passed.get(r["name"], "") <= r["at"]:
                     found.append({"kind": "run", "sev": "bad", "where": f"run {r['id']}",
-                                  "text": f"The {r['name']} check {ended(r['conclusion'])} on {r['branch']}"
-                                          f" ({_when(r['at'])}). A session can read why with "
-                                          f"aerie ci-log {r['id']}.",
+                                  "text": f"The {r['name']} check {ended(r['conclusion'])} on {r['branch']} ({_when(r['at'])})",
                                   "url": r.get("url", "")})
             if newest:
                 run = {k: newest[k] for k in ("id", "name", "branch", "conclusion", "at")}

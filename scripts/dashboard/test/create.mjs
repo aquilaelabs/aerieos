@@ -4,7 +4,7 @@
 // clone path is tested up to its URL allow-list: the list is the thing under
 // test, and a real clone would need GitHub on the other end.
 import { launch, newPage, ok, done, ready, URL, DIR, animatedDuring, tmuxNew, tmuxKill,
-         refreshUntil, unfold, projectKey, holdPoll, freePoll } from './lib.mjs';
+         refreshUntil, unfold, projectKey, holdPoll, freePoll, settled, OWNER, asUser, section } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync, chmodSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +45,7 @@ const postJson = (body, api = '/api/create') => page.evaluate(async ([b, u]) => 
 // Off, the dialog's host list is the vetted hosts and the catch-all, and a
 // clone naming another is refused with the sentence that names the switch;
 // on, every host is listed and the unvetted ones carry `dev`.
-{
+await section("what is offered", async () => {
   const hosts = async () => (await page.evaluate(async () => (await (await fetch('/api/pubkeys')).json()))).forges || [];
   const off = await hosts();
   // Forgejo joined the proven ones on 13 Oct (lab-forge.mjs against the
@@ -62,7 +62,7 @@ const postJson = (body, api = '/api/create') => page.evaluate(async ([b, u]) => 
      && on[on.length - 1].name === 'Another git host',
      `on, every host is offered, the unproven three tagged dev, the catch-all still last (${on.map(f => f.name + (f.dev ? '*' : '')).join(', ')})`);
   await postJson({ set: { offer_unvetted: false } }, '/api/settings');
-}
+});
 
 // ---- the dialog --------------------------------------------------------
 await page.evaluate(() => openProjectsTab());
@@ -74,7 +74,14 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
 // New project asks for a name alone, spaces and punctuation kept, and makes
 // a project with nothing in it; its card's Add repository opens the dialog
 // into it, without the node and the dials, which are the project's.
-{
+await section("projects first", async () => {
+  // The settings dialog drawn and still: its opening scale over, and the
+  // reads it makes as it opens answered.
+  const rnAtRest = async () => {
+    await page.waitForFunction(() => !$('rnmodal').getAnimations({ subtree: true })
+      .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+    await settled(page);
+  };
   // The harness answers the page's questions (lib.mjs): this one with the
   // name typed, its title kept to check.
   let asked = null;
@@ -89,7 +96,9 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   // The page goes to it, and it wears a ring in the accent that fades
   // (the operator, 26 Oct).
   await page.waitForSelector(`${card}.pjnew`, { timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(800);
+  // The scroll to it is smooth: read once the card is inside the page's box.
+  await page.waitForFunction(c => { const el = document.querySelector(c), r = el.getBoundingClientRect(), d = el.closest('.doc').getBoundingClientRect();
+    return r.top >= d.top - 1 && r.bottom <= d.bottom + 1; }, card, { timeout: 10000 }).catch(() => {});
   const fresh = await page.$eval(card, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect();
     return { ring: c.classList.contains('pjnew'), seen: r.top >= d.top - 1 && r.bottom <= d.bottom + 1 }; });
   ok(fresh.ring && fresh.seen, `a new space's card is scrolled into sight and wears the new ring (${JSON.stringify(fresh)})`);
@@ -124,7 +133,7 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   ok(!await page.$(`${card} .pcback [data-bug]`), 'its back offers no Report bug: there is no tracker');
   await page.click(`${card} .pcback [data-rn]`);
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
-  await page.waitForTimeout(300);
+  await rnAtRest();
   const dlg = await page.evaluate(() => {
     const vis = sel => !!document.querySelector(sel)?.offsetParent;
     const box = document.querySelector('#rnmodal > .box');
@@ -151,7 +160,7 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   await page.waitForSelector(`${alpha}.flipped .pcback [data-rn]`, { timeout: 5000 });
   await page.click(`${alpha} .pcback [data-rn]`);
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
-  await page.waitForTimeout(300);
+  await rnAtRest();
   const adlg = await page.evaluate(() => {
     const vis = sel => !!document.querySelector(sel)?.offsetParent;
     const box = document.querySelector('#rnmodal > .box');
@@ -182,15 +191,17 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   // sets one apart, and the project's door draws no such choice.
   await page.evaluate(() => openNotebook('webshop', 'permissions'));
   await page.waitForFunction(() => document.querySelector('.nb[data-project="webshop"] .nbview[data-view="permissions"]:not([hidden]) #rnGateDocker option'), null, { timeout: 20000 });
-  await page.waitForTimeout(400);
+  // The dials filled for this repository, which is what is read next.
+  await page.waitForFunction(() => $('rnGateDocker').options[0]?.value === 'inherit' && $('rnGateDocker').value === 'inherit'
+    && $('rnGateRoadmap').value === 'inherit' && $('rnTestChange').value === 'inherit', null, { timeout: 10000 }).catch(() => {});
   const inh = await page.evaluate(() => ({ first: $('rnGateDocker').options[0].value, word: $('rnGateDocker').options[0].textContent,
     value: $('rnGateDocker').value, gate: $('rnGateRoadmap').value, tc: $('rnTestChange').value }));
   ok(inh.first === 'inherit' && /^as the space \(deny\)$/.test(inh.word) && inh.value === 'inherit' && inh.gate === 'inherit' && inh.tc === 'inherit',
      `a new repository's Permissions start on "as the space" with the space's word beside it (${JSON.stringify(inh)})`);
   // Set one apart, and the project's default stays what it was.
   const over = await page.evaluate(async () => {
-    const a = await (await postJSON('/api/prefs', { project: 'webshop', makevms: 'auto' })).json();
-    const b = await (await postJSON('/api/prefs', { project: 'webshop', scope: 'project', makevms: 'deny', installpacks: 'auto' })).json();
+    const a = await postJSON('/api/prefs', { project: 'webshop', makevms: 'auto' });
+    const b = await postJSON('/api/prefs', { project: 'webshop', scope: 'project', makevms: 'deny', installpacks: 'auto' });
     await refresh();
     const p = state.projects.find(x => x.name === 'webshop');
     return { a: a.error || a.overrides, b: b.error || b.makevms, makevms: p.prefs.makevms, over: p.prefs.overrides, dflt: p.prefs.project_dials.makevms, packs: p.prefs.installpacks };
@@ -208,7 +219,7 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   await page.waitForFunction(k => !state?.repos?.[k], key, { timeout: 15000 });
   ok(true, 'an empty space is deleted from its card\'s back');
   await page.evaluate(() => postJSON('/api/trash-purge', { name: 'webshop', confirm: 'webshop' }));
-}
+});
 
 await newProject();
 ok(await page.$eval('#pmodal', el => !el.hidden), 'the dialog opens');
@@ -219,7 +230,7 @@ ok(await page.$eval('#pmodal', el => !el.hidden), 'the dialog opens');
 // project starts on: auto where it lands in the notebook or the settings,
 // ask where it reaches past them (its container, a signed build, a key,
 // a published release: R138).
-{
+await section("The four gates are on the dialog", async () => {
   const g = await page.$$eval('#pGateField select', s => Object.fromEntries(s.map(x => [x.id, [x.value, x.options.length]])));
   const want = { pGateRoadmap: 'auto', pGateBugs: 'auto', pGateRules: 'auto', pGateDesign: 'auto', pGateWiki: 'auto', pGateSettings: 'auto',
                  pGateDocker: 'ask', pGateSign: 'ask', pGateRelease: 'ask', pGateKeys: 'ask', pGateReport: 'auto' };
@@ -232,16 +243,22 @@ ok(await page.$eval('#pmodal', el => !el.hidden), 'the dialog opens');
      && Object.entries(g).filter(([id]) => !['pGateReport', 'pGateWiki'].includes(id)).every(([, [, n]]) => n === 3)
      && await page.$eval('#pGateField', el => !el.hidden && el.querySelector('.prefrow').hidden && /defaults/.test(el.textContent)),
      `the eleven Claude gates ride a new space at their defaults, said in a line rather than asked (${JSON.stringify(g)})`);
-}
+});
 const idle = () => page.evaluate(() => document.activeElement?.tagName || '');
 ok(await idle() !== 'INPUT' && await idle() !== 'TEXTAREA',
    '...with the cursor in none of its fields');
 ok(await page.$eval('#pUrlField', el => el.hidden), 'local repo is the default; no URL field');
 const boxH = sel => page.$eval(sel, b => Math.round(b.getBoundingClientRect().height));
-await page.waitForTimeout(500);              // the dialog's own opening scale
+// Measured at rest: the dialog's own opening scale over, a field's slide ended, the box with a height.
+const pAtRest = () => page.waitForFunction(() => {
+  const m = document.getElementById('pmodal'), b = m.querySelector('.box');
+  return b.getBoundingClientRect().height > 0 && !m.getAnimations({ subtree: true })
+    .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime));
+}, null, { timeout: 10000 }).catch(() => {});
+await pAtRest();
 const localH = await boxH('#pmodal .box');
 const cloneSlide = await animatedDuring(page, () => page.click('#pClone'));
-await page.waitForTimeout(300);
+await pAtRest();
 ok(Math.abs(await boxH('#pmodal .box') - localH) <= 1, `the dialog keeps its size from a new repository to a clone (${localH} then ${await boxH('#pmodal .box')})`);
 ok(await page.$eval('#pUrlField', el => !el.hidden)
    && await page.$eval('#pClone', b => b.classList.contains('on')),
@@ -282,7 +299,7 @@ ok(await page.$eval('#pNamePreview', el => el.hidden),
 // says so before Create rather than leaving the -2 to be found (B63). The
 // list is the dialog's own fetch's; a deleted one is planted in it, since
 // purging a fixture here would take a project other blocks use.
-{
+await section("A folder a deleted project had is never handed out again, purged or not", async () => {
   const dirs = await page.evaluate(async () => (await (await fetch('/api/pubkeys')).json()).dirs || []);
   ok(dirs.includes('alpha') && dirs.includes('beta'),
      `the dialog's fetch lists the folders a new space may not have (${dirs.length})`);
@@ -304,7 +321,7 @@ ok(await page.$eval('#pNamePreview', el => el.hidden),
   ok(/in the folder held-2-2: held is in the folder held-2/.test(heldSaid) && !/deleted/.test(heldSaid),
      `...and a live space's folder is named as that space's, not a deleted one's (${heldSaid})`);
   await page.fill('#pName', 'plain');
-}
+});
 // Put the field back as it was found: a mode switch does not clear it, only
 // reopening does, and the refusal below needs the name genuinely empty or it
 // submits a valid one and closes the dialog out from under everything after.
@@ -345,18 +362,18 @@ ok(existsSync(`${DIR}/ws/zeta/.git`), 'zeta is a git repository');
 // Born with a starting version (the operator, 25 Sep): the tree as made is
 // the first commit and VERSION at 0.1.0 the second, so the Artifacts tab has
 // a version to move from the moment the project exists.
-{
+await section("Born with a starting version", async () => {
   const log = execFileSync('git', ['-C', `${DIR}/ws/zeta`, 'log', '--format=%s'], { encoding: 'utf8' }).trim().split('\n');
   ok(readFileSync(`${DIR}/ws/zeta/VERSION`, 'utf8').trim() === '0.1.0' && log.length === 2
      && log[0] === 'Add VERSION at 0.1.0' && log[1] === 'Start zeta',
      `a new space is committed and given its first version (${log.join(' | ')})`);
-}
+});
 // The brief is a task for the first session, not standing instructions:
 // not CLAUDE.md, which every session reads, but a file of AerieOS's that
 // the first Claude press offers in a dialog and that leaves the tree then
 // (brief.py). Out of git from the start, so the starting version's commit
 // does not take it and its leaving is not a deletion.
-{
+await section("The brief is a task for the first session, not standing instructions", async () => {
   const tracked = execFileSync('git', ['-C', `${DIR}/ws/zeta`, 'ls-files'], { encoding: 'utf8' });
   const st = execFileSync('git', ['-C', `${DIR}/ws/zeta`, 'status', '--porcelain'], { encoding: 'utf8' });
   ok(readFileSync(`${DIR}/ws/zeta/BUILDERBOT-BRIEF.md`, 'utf8').includes('A widget frobnicator')
@@ -366,7 +383,7 @@ ok(existsSync(`${DIR}/ws/zeta/.git`), 'zeta is a git repository');
      `...kept out of git, so the first commit does not take it (${JSON.stringify(st.trim())})`);
   ok(await page.evaluate(() => state.projects.find(p => p.name === 'zeta')?.brief === true),
      '...and the space row says a brief is waiting');
-}
+});
 
 // A project made after anything has been pinned is not pinned for anyone:
 // what Home shows is each person's to choose (the operator, 23 Oct). It is
@@ -395,7 +412,7 @@ await page.waitForFunction(
 // dropped, desktop junk skipped, and, because an archive is a list of
 // paths somebody else wrote, anything reaching outside the directory
 // refused whole rather than written.
-{
+await section("starting a local repo from an archive", async () => {
   const fx = `${DIR}/archives`;
   mkdirSync(`${fx}/app/src`, { recursive: true });
   writeFileSync(`${fx}/app/src/main.js`, 'console.log(1)\n');
@@ -552,7 +569,7 @@ with zipfile.ZipFile('${fx}/slip.zip', 'w') as z:
      'a file that is not an archive is refused at upload, naming the formats');
   await page.click('#pCancel');
   await page.waitForFunction(() => document.getElementById('pmodal').hidden);
-}
+});
 
 // ---- renaming ----------------------------------------------------------
 // A rename is the name shown (R154): the directory, and everything keyed by
@@ -599,12 +616,12 @@ ok(!existsSync(`${DIR}/ws/repo`), 'a refused clone leaves no directory behind');
 // nothing has had (the sanitized name, numbered) and is shown as Name-2.
 // Every one of these sanitizes to `alpha`, which exists.
 for (const name of ['alpha', '../alpha', 'alpha!', '.alpha', '_alpha'])
-{
+await section("the part at line 619", async () => {
   const r = await postJson({ name, mode: 'init' });
   ok(r.status === 200 && /^alpha-\d+$/.test(r.body.name || ''),
      `init named ${name} gets a directory of its own (${r.body.name || r.body.error})`);
   if (r.body.name) await postJson({ name: r.body.name }, '/api/trash');
-}
+});
 // ...and the one thing that is still refused outright: a name with nothing in
 // it to name a directory after.
 for (const name of ['', '   ', '---', '...', '/'])
@@ -617,7 +634,7 @@ ok(made.status === 200 && made.body.name === 'My-New-App',
    'a name with spaces and punctuation is created as GitHub would spell it');
 // ...and a gate picked on the dialog is written with the project, the same
 // write the settings dialog makes.
-{
+await section("and a gate picked on the dialog is written with the project, the same", async () => {
   const gated = await postJson({ name: 'Gated App', mode: 'init', gate: { roadmap: 'ask', bugs: 'deny' } });
   ok(gated.status === 200 && gated.body.name === 'Gated-App', 'a space is created with gates named');
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'Gated-App' && p.prefs?.gate?.roadmap === 'ask'), { timeout: 15000 });
@@ -638,37 +655,41 @@ ok(made.status === 200 && made.body.name === 'My-New-App',
   // ...and the signing and reporting dials, when one differs from the
   // default a project gets anyway.
   const signed = await postJson({ name: 'Signed App', mode: 'init', sign: 'auto', keys: 'deny', release: 'auto', report: 'deny' });
-  await refreshUntil(page, () => state?.projects?.some(p => p.name === 'Signed-App' && p.prefs?.sign === 'auto'), { timeout: 15000 });
-  const sp = await page.evaluate(() => (state?.projects || []).find(p => p.name === 'Signed-App')?.prefs || {});
+  // Read where the create wrote them, as Run its container is above: the
+  // page's copy is a status poll away, and under a whole run's load the
+  // polls ran past a 15 s wait (B916).
+  const signedKey = Object.entries(JSON.parse(readFileSync(`${DIR}/state/project-repos.json`, 'utf8')).projects || {})
+    .find(([, r]) => (r.members || []).includes('Signed-App'))?.[0];
+  const sp = JSON.parse(readFileSync(`${DIR}/state/claude-prefs.json`, 'utf8')).projects?.[signedKey] || {};
   ok(signed.status === 200 && sp.sign === 'auto' && sp.keys === 'deny' && sp.release === 'auto' && sp.report === 'deny',
      `Sign a build, Manage signing keys, Tag and publish a release and Report AerieOS bugs from the dialog land on the new space (${sp.sign}/${sp.keys}/${sp.release}/${sp.report})`);
   const bad = await postJson({ name: 'Gated Bad', mode: 'init', gate: { roadmap: 'maybe' } });
   ok(bad.status === 200 && /gates not set/.test(bad.body.note || ''),
      `a gate value that is not auto, ask or deny is refused in the note, and the space still exists (${bad.body.note})`);
-}
+});
 
 // The code map is built for the new project in the background (mapping.py)
 // and the row says so, then says how many files; .bb-map/ goes into the
 // repository's own exclude file, never its .gitignore.
-{
+await section("The code map is built for the new project in the background", async () => {
   await refreshUntil(page, () => state?.mapping?.['My-New-App'] && !state.mapping['My-New-App'].running, { timeout: 15000 });
   const m = await page.evaluate(() => state.mapping['My-New-App']);
   // Zero files is the true count: a fresh repo holds nothing the map
   // indexes. What is proved is that the build ran and wrote the index.
-  ok(!m.error && m.files === 0 && existsSync(`${DIR}/ws/My-New-App/.bb-map/map4.json`),
+  ok(!m.error && m.files === 0 && existsSync(`${DIR}/ws/My-New-App/.bb-map/map5.json`),
      `a new space is mapped as it is created, in the background (${m.files} files in ${m.took}s${m.error ? '; ' + m.error : ''})`);
   ok(/^\.bb-map\/$/m.test(readFileSync(`${DIR}/ws/My-New-App/.git/info/exclude`, 'utf8')),
      '...and .bb-map/ is excluded through .git/info/exclude, not the project\'s .gitignore');
   await page.evaluate(() => drawProjects(state.projects));
   ok(await page.$eval('.pgrid', el => /mapped \d+ files? in [\d.]+s/.test(el.textContent)),
      '...and the row says how many files it mapped');
-}
+});
 
 // The gate (mapping.py): while a project's map builds, a Claude session on
 // it is held with the reason, and the hold lifts when the build ends, error
 // or not. Driven in python with the build made slow, since a fixture
 // project maps in a tenth of a second.
-{
+await section("The gate (mapping.py)", async () => {
   const py = `
 import importlib.util, json, os, sys, tempfile, time
 spec = importlib.util.spec_from_file_location('mp', ${JSON.stringify(new globalThis.URL('../mapping.py', import.meta.url).pathname)})
@@ -695,7 +716,7 @@ print(json.dumps(out))
      `while the map builds, a session on the space is held with the reason (${r.held.slice(0, 50)}…)`);
   ok(r.after === '' && r.done.running === false && r.done.files === 1 && !r.done.error && /\.bb-map\//.test(r.excluded),
      `...and the hold lifts when it ends, with the count (${r.done.files} file in ${r.done.took}s)`);
-}
+});
 ok(existsSync(`${DIR}/ws/My-New-App/.git`),
    '...and that is the directory on disk');
 ok(await post({ name: 'q2', mode: 'sideways' }) === 400, 'unknown mode refused');
@@ -1083,8 +1104,8 @@ ok(true, 'the Spaces card shows the job where its result will appear');
 ok(await page.$eval('.pjjob .row.job .sub', el => /clon|start/.test(el.textContent))
    && await page.$('.pjjob .row.job .dots') !== null,
    '...saying what it is doing, with an ellipsis rather than a parsed percentage');
-ok(await page.$eval('#bNewProjTab', b => b.disabled),
-   '...and New project is dead while it runs: one job at a time');
+ok(!await page.$eval('#bNewProjTab', b => b.disabled),
+   '...and New space stays live while it runs: a second is queued behind it');
 ok(existsSync(`${DIR}/ws/slowclone`),
    'the directory is claimed up front, so a second request cannot take the name');
 ok(await page.$$eval('.projtab .name',
@@ -1237,7 +1258,7 @@ ok(await post({ name: 'beta', url: 'https://github.com/owner/beta' },
 //
 // alpha is the fixture with a remote and a seeded push grant. Its history is
 // what the assertions are really about: unlinking must not touch a commit.
-{
+await section("unlinking", async () => {
   const cfg = () => readFileSync(`${DIR}/ws/alpha/.git/config`, 'utf8');
   mkdirSync(`${DIR}/state/gitcreds`, { recursive: true });
   writeFileSync(`${DIR}/state/gitcreds/alpha`,
@@ -1308,7 +1329,7 @@ ok(await post({ name: 'beta', url: 'https://github.com/owner/beta' },
      'an unlinked space is offered to another host, and asked for a credential');
   execFileSync('git', ['-C', `${DIR}/ws/alpha`, 'remote', 'add', 'origin',
                        'git@github.com:owner/alpha.git']);
-}
+});
 
 // ---- linking to another host: what can be checked without one ----------
 // The Gitea, GitLab and Bitbucket paths cannot be exercised against a live
@@ -1316,7 +1337,7 @@ ok(await post({ name: 'beta', url: 'https://github.com/owner/beta' },
 // of them that is this code's rather than the host's: the credential line
 // git will read, which owner a repository is created under, and a host
 // remembered with its port.
-{
+await section("linking to another host", async () => {
   const out = execFileSync('python3', ['-c', `
 import json, os, sys, tempfile
 from pathlib import Path
@@ -1360,12 +1381,12 @@ print(json.dumps(out))
      `...and one under somebody else is refused with the reason, never created under the wrong owner (${r.other})`);
   ok(r.forge[0] === 'gitea' && r.forge[1] === 'gitea',
      'a self-hosted forge remembered with its port is still Gitea when the same host is named without one');
-}
+});
 
 // A rename that carries a new token in the same save: the token used to be
 // written with no host at all, which was a 500 on every such save. It is
 // stored for the remote's host and scheme, as a settings-only save does.
-{
+await section("A rename that carries a new token in the same save", async () => {
   const made = await postJson({ name: 'tokrn', mode: 'init' });
   ok(made.status === 200, `a space to rename (${made.status})`);
   execFileSync('git', ['-C', `${DIR}/ws/tokrn`, 'remote', 'add', 'origin',
@@ -1384,7 +1405,7 @@ print(json.dumps(out))
      `...and the token is stored for the remote's host, port and scheme (${line.replace(/:[^@]*@/, ':…@')})`);
   rmSync(`${DIR}/ws/tokrn`, { recursive: true, force: true });
   rmSync(`${DIR}/state/gitcreds/tokrn`, { force: true });
-}
+});
 
 // The refusals above are answered with 400s on purpose, the deploy-key
 // clone is made to fail with a 500, and the browser logs each as a failed
@@ -1473,13 +1494,13 @@ await page.waitForFunction(() => document.getElementById('tmodal').hidden);
 // every project and may change only those on their own list, and a new one
 // was not on it: read-only to the person who had just made it, and the node
 // the dialog picked was dropped for the same reason.
-{
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
-  const MAKER = { Authorization: 'Basic ' + Buffer.from('w.maker:w.maker-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+await section("an administrator's new project is theirs to work on", async () => {
+  const H = OWNER;
+  const MAKER = asUser('w.maker', 'w.maker-pass-1');
   const call = async (path, body, h) => { const r = await fetch(URL.replace(/\/$/, '') + path,
     { method: 'POST', headers: h, body: JSON.stringify(body) }); return { status: r.status, ...(await r.json().catch(() => ({}))) }; };
   await call('/api/users', { action: 'add', name: 'w.maker', password: 'w.maker-pass-1', role: 'admin' }, H);
-  await call('/api/users', { action: 'projects', name: 'w.maker', projects: [] }, H);
+  await call('/api/users', { action: 'edit', name: 'w.maker', projects: [] }, H);
   const madeBy = await call('/api/create', { name: 'maker-made', mode: 'init' }, MAKER);
   const listed = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.maker'].projects || [];
   const worked = await call('/api/prefs', { project: 'maker-made', color: 'teal' }, MAKER);
@@ -1490,20 +1511,20 @@ await page.waitForFunction(() => document.getElementById('tmodal').hidden);
   ok(madeBy.status === 200 && !!makerKey && listed.includes(makerKey) && worked.status === 200,
      `an administrator's new space goes on their own list, and they may work on it at once (${
        JSON.stringify(listed)}, ${worked.status}${worked.error ? ': ' + worked.error : ''})`);
-}
+});
 
 // A notebook on a project that is no longer there (a layout saved before
 // the project was deleted) is put away once the project list says so (B40).
-{
+await section("A notebook on a project that is no longer there", async () => {
   await page.evaluate(() => { tabs.push({ id: 't9001', kind: 'notebook', arg: 'gone-project', label: 'gone-project' }); drawPanes(); });
   await refreshUntil(page, () => !tabs.some(t => t.arg === 'gone-project'), { timeout: 15000 });
   ok(await page.evaluate(() => !tabs.some(t => t.arg === 'gone-project')),
      'a notebook tab on a space that is gone is put away at the next poll');
-}
+});
 // ...and one on show when its project goes (deleted from its Settings, or
 // elsewhere) gives way to Projects, not to the Profile (B94).
-{
-  const made = await page.evaluate(async () => (await (await postJSON('/api/create', { name: 'gone-front', mode: 'init' })).json()).name);
+await section("and one on show when its project goes", async () => {
+  const made = await page.evaluate(async () => (await postJSON('/api/create', { name: 'gone-front', mode: 'init' })).name);
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'gone-front'), { timeout: 15000 });
   await page.evaluate(() => openNotebook('gone-front', 'settings'));
   await page.waitForFunction(() => location.hash.startsWith('#/spaces/gone-front'), null, { timeout: 10000 });
@@ -1512,7 +1533,7 @@ await page.waitForFunction(() => document.getElementById('tmodal').hidden);
   const at = await page.waitForFunction(() => /^#\/spaces(\/projects)?$/.test(location.hash) && tabOf(panes[0])?.kind === 'projects',
     null, { timeout: 10000 }).then(() => true, () => false);
   ok(at, `a notebook on show whose space is deleted lands on Spaces (${await page.evaluate(() => location.hash + ' ' + tabOf(panes[0])?.kind)})`);
-}
+});
 
 const errs = page.errors.filter(e => !/status of (400|500)/.test(e));
 ok(errs.length === 0, `zero console errors${errs.length ? ': ' + errs.join(' | ') : ''}`);

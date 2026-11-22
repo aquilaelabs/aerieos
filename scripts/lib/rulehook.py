@@ -1,7 +1,7 @@
 """What a session's hooks keep between calls about the house rules (R200).
 
-Two small records, on the machine the session runs on, under the account's
-own cache beside bb-check-relay's stamp:
+Two small records, on the machine the session runs on, in the account's
+own folder for the space (scopedir.scope_dir) beside bb-check-relay's stamp:
 
   fired/<conversation id>  the named rules this conversation was told,
                            one name a line, so the SessionStart hook can
@@ -14,34 +14,67 @@ own cache beside bb-check-relay's stamp:
 Here rather than in the hooks themselves because three of them read and
 write it (bb-work-note, bb-prompt-relay, bb-rule-hook), and in scripts/lib
 because a node carries this directory and not the dashboard's modules.
-Every function swallows its own failures: a hook that cannot keep a note
-is never worth a turn.
+Every function of the records swallows its own failures: a hook that cannot
+keep a note is never worth a turn.
+
+And what those three share besides, each being a program of its own started
+for one call: on_node (which half of AerieOS this is), post_hook (a word to
+the controller's hook endpoint) and write_json (the writer the dashboard's
+modules are handed when a hook runs them on the controller).
 """
 import json
 import os
 import re
 import time
 
-import cmdmatch
+from scopedir import scope_dir
+
+# cmdmatch, the shell reader, is loaded by the two functions that read a
+# command (refused, search_patterns): four hooks load this module, and one
+# of them reads a command.
 
 GUARDS_FOR = 60                 # seconds a node's copy of the guards is used
 FIRED_FOR = 14 * 86400          # a conversation's record kept this long after its last write
 _ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
-def _uid():
-    return os.environ.get("BB_ACCOUNT_UID") or "_none"
+def on_node():
+    """True on a node, as common.sh's on_node answers the shell. There the
+    notebook, the rules and the feed are the controller's and a hook asks
+    for them with post_hook; on the controller it reads the store itself."""
+    return os.environ.get("BUILDERBOT_ROLE", "").lower() in ("node", "worker", "agent")
 
 
-def project_dir(project):
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.environ.get("HOME", "/tmp"), ".cache")
-    return os.path.join(base, "builderbot", "u", _uid(), "project", project)
+def post_hook(body, timeout=10):
+    """One word to the controller's hook endpoint, with the session's own
+    token: how a session on a node reaches the store it cannot read or write
+    (roadmap #24). The answer, or {} for anything that is not one. Every
+    word names which coding agent's session speaks (R95 step 7) and its slot
+    on the space (R143), which the launcher sets, because the controller
+    counts each one as heard from that session (hooks.verb)."""
+    # A hook runs under a timeout of its own: a call here never waits out a
+    # restarting controller (bbapi.request, R251), it says so at once.
+    os.environ["BB_CONTROLLER_WAIT"] = "0"
+    import bbapi
+    body = {**body, "agent": os.environ.get("BB_AGENT") or "claude", "slot": os.environ.get("BB_SLOT") or "1"}
+    r = bbapi.call("/api/v1/hook", body, auth="Bearer " + os.environ.get("BB_TOKEN", ""), timeout=timeout)
+    return r if isinstance(r, dict) else {}
+
+
+def write_json(p, d):
+    """A store's file written beside itself and moved into place: what a
+    hook hands the dashboard's modules (rules, roadmap, bugs, overlap, chat,
+    users) as their writer when it runs them on the controller."""
+    tmp = f"{p}.new"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, p)
 
 
 def _fired_file(project, conversation):
     if not _ID.match(str(conversation or "")) or not project:
         return ""
-    return os.path.join(project_dir(project), "fired", conversation)
+    return scope_dir(project, "fired", conversation)
 
 
 def remember(project, conversation, names):
@@ -86,7 +119,7 @@ def _prune(d):
 def cached_guards(project, stale=False):
     """The guards as last fetched, or None when there is no fresh copy;
     `stale` takes any copy, for when the controller does not answer."""
-    f = os.path.join(project_dir(project), "guards.json")
+    f = scope_dir(project, "guards.json")
     try:
         if not stale and time.time() - os.stat(f).st_mtime > GUARDS_FOR:
             return None
@@ -98,7 +131,7 @@ def cached_guards(project, stale=False):
 
 
 def keep_guards(project, guards):
-    f = os.path.join(project_dir(project), "guards.json")
+    f = scope_dir(project, "guards.json")
     try:
         os.makedirs(os.path.dirname(f), exist_ok=True)
         with open(f + ".new", "w") as out:
@@ -113,6 +146,7 @@ def refused(guards, command, background=False):
     None. `guards` is rules.guards()'s list, from the store or the
     controller; one marked `foreground` refuses only a call that is not run
     in the background."""
+    import cmdmatch
     for g in guards or []:
         if background and g.get("foreground"):
             continue
@@ -146,6 +180,23 @@ MAP_NAMES = 2
 MAP_LINES = 6
 
 
+def find_answers(names, out):
+    """[(name, its answer's lines)] out of one `aerie map find NAME...`: one
+    name's answer is the whole output, several each sit under the line that
+    asks for it (codemap.py's find)."""
+    lines = (out or "").strip().splitlines()
+    if len(names) == 1:
+        return [(names[0], lines)]
+    got, cur = {}, None
+    for ln in lines:
+        if ln.startswith("$ aerie map find "):
+            cur = ln[len("$ aerie map find "):]
+            got[cur] = []
+        elif cur is not None:
+            got[cur].append(ln)
+    return [(n, got.get(n, [])) for n in names]
+
+
 def _plain(pattern):
     """A regex as the words it looks for: anchors, word edges and the
     escapes a person types around a name taken out."""
@@ -172,6 +223,7 @@ def symbols(pattern):
 def search_patterns(command):
     """The patterns of the code searches a shell line runs: grep -r, rg and
     git grep, each's first pattern (or its -e ones)."""
+    import cmdmatch
     out = []
     for w in cmdmatch.commands(command):
         if w[:2] == ["git", "grep"]:
@@ -194,7 +246,7 @@ def search_patterns(command):
 # process, and once it ends its exit and output; bb-prompt-relay says a
 # failure on the next prompt, once.
 def _run_file(project):
-    return os.path.join(project_dir(project), "checked.run")
+    return scope_dir(project, "checked.run")
 
 
 def check_run(project):
@@ -210,7 +262,7 @@ def check_run(project):
 
 def _write_run(project, rec):
     try:
-        os.makedirs(project_dir(project), exist_ok=True)
+        os.makedirs(scope_dir(project), exist_ok=True)
         tmp = _run_file(project) + ".tmp"
         with open(tmp, "w") as f:
             json.dump(rec, f)

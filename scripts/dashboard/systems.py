@@ -13,32 +13,40 @@ import re
 from pathlib import Path
 
 import forges
+import labrecord
 
 FAMILIES_DIR = Path(__file__).resolve().parent.parent.parent / "nodes" / "families"
 
+# What lab-systems walks on each system it makes a node of (test/lab-systems.mjs).
+WALK = ("a VM made a node from its cloud image, enrolled; VM host installed and removed; a toolchain installed and "
+        "removed; nginx run as a container from a compose file; a space synced and a terminal opened through the "
+        "controller; Uninstall, the machine's own account kept")
+WALK_NO_VM_HOST = WALK.replace("VM host installed and removed; ", "")
+
+# An entry's "vetted" is typed where nothing dates it (a system in daily
+# use). One with "walked" is vetted by the lab's own record (labrecord.py,
+# R3 step 8): its line is what was walked, dated by the newest walk on
+# record whose machine said it was this system, and with no walk on record
+# it is not vetted. The dates were typed here by hand before, and stayed
+# as the provisioner changed under them.
 SYSTEMS = [
     {"id": "ubuntu", "name": "Ubuntu 24.04 or later", "family": "deb", "ids": ["ubuntu"],
      "vetted": "bb-sandbox and the dev pair's bb-dev-sandbox (Ubuntu 24.04 and 26.04), in daily use"},
     {"id": "rocky", "name": "Rocky Linux 9", "family": "rhel", "ids": ["rocky"],
-     "vetted": "2026-10-13: bb-dev-sandbox-rh (Rocky 9.8) on the dev pair: enroll, toolchains, storage, "
-               "a synced space, a container, nginx, a Gitea runner, a shell and an agent's session"},
-    {"id": "debian", "name": "Debian 12 or later", "family": "deb", "ids": ["debian", "raspbian"],
-     "vetted": "2026-10-21, R97 on the dev pair: a VM made a node from its cloud image, enrolled; VM host installed and removed; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (Debian 13)"},
-    {"id": "almalinux", "name": "AlmaLinux 9", "family": "rhel", "ids": ["almalinux"],
-     "vetted": "2026-10-21, R97 on the dev pair: a VM made a node from its cloud image, enrolled; VM host installed and removed; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (AlmaLinux 9.8)"},
+     "walked": "a machine of its own on the dev pair: enroll, toolchains, storage, a synced space, a container, "
+               "nginx, a Gitea runner, a shell and an agent's session"},
+    {"id": "debian", "name": "Debian 12 or later", "family": "deb", "ids": ["debian", "raspbian"], "walked": WALK},
+    {"id": "almalinux", "name": "AlmaLinux 9", "family": "rhel", "ids": ["almalinux"], "walked": WALK},
     {"id": "rhel", "name": "Red Hat Enterprise Linux 9", "family": "rhel", "ids": ["rhel"], "vetted": "",
      "why": "not walked: its image needs a Red Hat subscription. Rocky Linux and AlmaLinux are its rebuilds, and both are"},
-    {"id": "centos", "name": "CentOS Stream 9", "family": "rhel", "ids": ["centos"],
-     "vetted": "2026-10-21, R97 on the dev pair: a VM made a node from its cloud image, enrolled; VM host installed and removed; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (CentOS Stream 9)"},
-    {"id": "fedora", "name": "Fedora", "family": "rhel", "ids": ["fedora"],
-     "vetted": "2026-10-21, R97 on the dev pair: a VM made a node from its cloud image, enrolled; VM host installed and removed; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (Fedora 44)"},
-    {"id": "arch", "name": "Arch Linux", "family": "arch", "ids": ["arch", "archlinux", "manjaro"],
-     "vetted": "2026-10-21, R97 on the dev pair: a VM made a node from its cloud image, enrolled; VM host installed and removed; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (Arch, kernel 7.2)"},
+    {"id": "centos", "name": "CentOS Stream 9", "family": "rhel", "ids": ["centos"], "walked": WALK},
+    {"id": "fedora", "name": "Fedora", "family": "rhel", "ids": ["fedora"], "walked": WALK},
+    {"id": "arch", "name": "Arch Linux", "family": "arch", "ids": ["arch", "archlinux", "manjaro"], "walked": WALK},
     {"id": "opensuse", "name": "openSUSE Leap or Tumbleweed", "family": "suse",
      "ids": ["opensuse", "opensuse-leap", "opensuse-tumbleweed", "suse", "sles"],
-     "vetted": "2026-10-21, R97 on the dev pair: a VM made a node from its cloud image, enrolled; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (Leap 16.0 and Tumbleweed, 2026-10-22; VM host wants its full kernel, kernel-default, as its cloud image boots kernel-default-base)"},
+     "walked": WALK_NO_VM_HOST + "; VM host wants its full kernel, kernel-default, as its cloud image boots kernel-default-base"},
     {"id": "alpine", "name": "Alpine Linux", "family": "alpine", "ids": ["alpine"],
-     "vetted": "2026-10-22, R97 on the dev pair: a VM made a node from its cloud image, enrolled; a toolchain installed and removed; nginx run as a container from a compose file; a space synced and a terminal opened through the controller; Uninstall, the machine's own account kept (Alpine 3.24; a toolchain runs there only where it publishes a musl build, as Node does)"},
+     "walked": WALK_NO_VM_HOST + "; a toolchain runs there only where it publishes a musl build, as Node does"},
     {"id": "void", "name": "Void Linux", "family": "void", "ids": ["void"], "vetted": "",
      "why": "not walked: Void publishes no cloud image for a VM to be made from, so it is walked only on a machine of its own"},
     {"id": "gentoo", "name": "Gentoo", "family": "gentoo", "ids": ["gentoo"], "vetted": "",
@@ -75,6 +83,31 @@ def of_os(text):
     if "red" in words and "hat" in words:
         return "rhel"
     return next((s["id"] for s in SYSTEMS if any(i.replace("-", "") in words or i in words for i in s["ids"])), "")
+
+
+def vet(record=None):
+    """Each walked entry's vetted line read from the lab's record (`record`
+    a path, the shipped one by default): what was walked, dated by the
+    newest walk whose machine said it was this system, with the build it
+    ran against where the record has one; "" and a why with none on record."""
+    # Only a walk of a system as a node: the suite that makes one of each,
+    # or the same done by hand on a machine of its own. A suite that asks a
+    # node a question (lab-node) walks far less than the line says.
+    walks = [r for r in labrecord.rows(record or labrecord.FILE) if r["suite"] in ("lab-systems", "by-hand")]
+    for s in SYSTEMS:
+        if "walked" not in s:
+            continue
+        row = next((r for r in walks if of_os(r["said"]) == s["id"] or r["subject"] == s["id"]), None)
+        if row:
+            how = row["suite"].replace("by-hand", "by hand") + (f" at build {row['build']}" if row["build"] else "")
+            s["vetted"] = f"{row['at']}, {how}: {s['walked']} ({row['said']})"
+            s.pop("why", None)
+        else:
+            s["vetted"] = ""
+            s["why"] = "not vetted: the lab's record holds no walk of it (aerie tests lab writes one)"
+
+
+vet()
 
 
 def family_file(sid):

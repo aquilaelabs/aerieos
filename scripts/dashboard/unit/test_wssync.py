@@ -50,6 +50,9 @@ class Wire:
             out, code = ctl_sync.projects(self.nid), 200
         elif act == "state":
             out, code = ctl_sync.state(self.nid, project)
+        elif act == "gone":
+            self.gone_calls = getattr(self, "gone_calls", 0) + 1
+            out, code = ctl_sync.gone(self.nid, project, body.get("paths"))
         else:
             out, code = ctl_sync.since(self.nid, project, body.get("rev"))
         return code, json.loads(json.dumps(out))
@@ -194,7 +197,7 @@ class Sync(unittest.TestCase):
         stayed pending on every tick and every push from the node was
         refused as behind. The same bytes are already so; different ones
         that name a program are still refused."""
-        helper = b"[credential]\n\thelper = \n\thelper = store --file=/config/gitcreds/alpha\n"
+        helper = b"[credential]\n\thelper = \n\thelper = !/opt/aerieos/scripts/dashboard/git-credential-bb /config/gitcreds/alpha\n"
         os.makedirs(f"{self.ws}/alpha/.git", exist_ok=True)
         with open(f"{self.ws}/alpha/.git/config", "wb") as f:
             f.write(helper)
@@ -388,6 +391,81 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(self.at("n2", "src/new.py")), "new\n")
         self.assertFalse(os.path.exists(self.at("n2", "src/b.py")))
 
+    def test_a_whole_pass_opens_the_tree_as_its_owner_and_the_agents_records_as_root(self):
+        # The sync does a tree's file work as the tree's owner and its own
+        # records as root (R240). One place missed the second half (13 Nov):
+        # a removal goes up as an empty file kept beside the records, it was
+        # written as the owner, refused, and no removal reached the
+        # controller. A suite's node is not root, where the two brackets
+        # change nothing, so they are stood in for by ones that say which is
+        # in force, and every file opened on the node is held to it.
+        import builtins
+        import contextlib
+        from unittest import mock
+        self.turn()
+        now, wrong = ["root"], []
+
+        @contextlib.contextmanager
+        def bracket(who, _arg=None):
+            now.append(who)
+            try:
+                yield
+            finally:
+                now.pop()
+        tree = os.path.join(self.tmp, "n1", "workspace") + os.sep
+        records = os.path.join(self.tmp, "n1", "data") + os.sep
+        real = builtins.open
+
+        def held(path, mode="r", *a, **k):
+            where = os.fspath(path) if isinstance(path, (str, bytes, os.PathLike)) else ""
+            where = where.decode() if isinstance(where, bytes) else where
+            want = "owner" if where.startswith(tree) else "root" if where.startswith(records) else now[-1]
+            if want != now[-1]:
+                wrong.append(f"{where[len(self.tmp) + 1:]} ({mode}) opened as {now[-1]}")
+            return real(path, mode, *a, **k)
+        write(self.at("n1", "a.txt"), "two\n")
+        write(self.at("n1", "src/new.py"), "new\n")
+        os.remove(self.at("n1", "src/b.py"))
+        os.remove(self.at("n1", "b-link"))
+        os.symlink("src/new.py", self.at("n1", "b-link"))
+        write(f"{self.ws}/alpha/from-the-controller.txt", "down\n")
+        ctl_sync.changed("alpha")
+        self.n["n1"].nudge({"alpha": 0})
+        with mock.patch.object(node_sync, "fs_holds", lambda who: bracket("owner")), \
+                mock.patch.object(node_sync, "as_root", lambda: bracket("root")), \
+                mock.patch.object(builtins, "open", held):
+            self.turn("n1", times=3)
+        self.assertEqual(wrong, [])
+        self.assertFalse(os.path.exists(f"{self.ws}/alpha/src/b.py"), "the removal reached the controller")
+        self.assertEqual(os.readlink(f"{self.ws}/alpha/b-link"), "src/new.py")
+        self.assertEqual(read(self.at("n1", "from-the-controller.txt")), "down\n")
+
+    def test_a_nodes_own_save_leaves_it_at_the_controllers_revision(self):
+        # What a verb that acts on the tree waits for (lib/syncwait.py down):
+        # this copy at the controller's revision. A node's own change is at
+        # it as it lands, with no pull and no wait for the next ask.
+        self.turn()
+        n1 = self.n["n1"]
+        pulls = []
+        real = n1.pull
+        n1.pull = lambda p, top: (pulls.append(p.name), real(p, top))[1]
+        write(self.at("n1", "a.txt"), "two\n")
+        write(self.at("n1", "src/new.py"), "new\n")
+        self.turn("n1")
+        self.assertEqual(n1.status()["alpha"]["rev"], ctl_sync.rev_of("alpha"))
+        self.assertNotIn("alpha", pulls)
+        # ...and one that crossed another's change reads that change on the
+        # same tick, where it would have stayed a revision behind.
+        write(self.at("n1", "a.txt"), "three\n")
+        n1.step()                                # seen, held still for a tick
+        write(f"{self.ws}/alpha/other.txt", "from the controller\n")
+        ctl_sync.changed("alpha")
+        Nodes.hints.clear()                      # the hint is not what this is about
+        n1.step()
+        self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "three\n")
+        self.assertEqual(read(self.at("n1", "other.txt")), "from the controller\n")
+        self.assertEqual(n1.status()["alpha"]["rev"], ctl_sync.rev_of("alpha"))
+
     def test_a_write_on_the_controller_reaches_both_nodes(self):
         self.turn()
         write(f"{self.ws}/alpha/a.txt", "from vs code\n")
@@ -436,6 +514,73 @@ class Sync(unittest.TestCase):
         self.n["n1"] = again
         self.turn("n1", times=3)
         self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "offline\n")
+
+    def test_one_path_that_cannot_be_sent_stops_nothing_after_it_and_is_said(self):
+        # B806: an exception in one path's put ended the pass, the path was
+        # not counted, and every change sorted after it waited unsaid.
+        self.turn()
+        s = self.n["n1"]
+        real = s.put
+
+        def put(p, top, rel, e, base, sha):
+            if rel == "a.txt":
+                raise PermissionError(13, "Permission denied", rel)
+            return real(p, top, rel, e, base, sha)
+        s.put = put
+        write(self.at("n1", "a.txt"), "stuck\n")
+        write(self.at("n1", "z.txt"), "after it\n")
+        self.turn("n1", times=3)
+        self.assertEqual(read(f"{self.ws}/alpha/z.txt"), "after it\n")
+        self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "one\n")
+        st = s.status()["alpha"]
+        self.assertEqual(st["pending"], 1)
+        self.assertIn("a.txt", st["error"])
+        self.assertIn("PermissionError", st["error"])
+        # ...and once it can be sent, it goes and the error with it.
+        s.put = real
+        self.turn("n1", times=3)
+        self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "stuck\n")
+        self.assertEqual(s.status()["alpha"]["pending"], 0)
+        self.assertEqual(s.status()["alpha"]["error"], "")
+
+    def test_many_removals_go_up_in_one_call(self):
+        # B789: after a git gc a tick holds thousands of removals, one
+        # request each; they go together, and each is applied.
+        self.turn()
+        os.makedirs(self.at("n1", "src/many"), exist_ok=True)
+        for i in range(30):
+            write(self.at("n1", f"src/many/f{i}.txt"), f"{i}\n")
+        self.turn("n1", times=3)
+        self.assertTrue(os.path.exists(f"{self.ws}/alpha/src/many/f29.txt"))
+        uploads = []
+        real = self.n["n1"].agent.ctl.upload
+        self.n["n1"].agent.ctl.upload = lambda path, src, timeout=0: uploads.append(path) or real(path, src, timeout)
+        for i in range(30):
+            os.remove(self.at("n1", f"src/many/f{i}.txt"))
+        self.turn("n1", times=3)
+        self.assertFalse(any(os.path.exists(f"{self.ws}/alpha/src/many/f{i}.txt") for i in range(30)))
+        self.assertEqual(self.n["n1"].agent.ctl.gone_calls, 1)
+        self.assertEqual(uploads, [], "no removal went up on its own")
+        st = self.n["n1"].status()["alpha"]
+        self.assertEqual((st["pending"], st["error"]), (0, ""))
+        # ...and the other node takes them as it takes any change.
+        self.turn("n2", times=3)
+        self.assertFalse(os.path.exists(self.at("n2", "src/many/f0.txt")))
+
+    def test_a_controller_without_the_batch_is_sent_removals_one_at_a_time(self):
+        self.turn()
+        for i in range(3):
+            write(self.at("n1", f"old{i}.txt"), f"{i}\n")
+        self.turn("n1", times=3)
+        ctl = self.n["n1"].agent.ctl
+        real = ctl.call
+        ctl.call = lambda verb, body, timeout=0: ((400, {"error": "no such sync action: gone"})
+                                                  if body.get("action") == "gone" else real(verb, body, timeout))
+        for i in range(3):
+            os.remove(self.at("n1", f"old{i}.txt"))
+        self.turn("n1", times=3)
+        self.assertFalse(any(os.path.exists(f"{self.ws}/alpha/old{i}.txt") for i in range(3)))
+        self.assertEqual(self.n["n1"].status()["alpha"]["pending"], 0)
 
     def test_a_file_already_there_and_different_is_kept_not_overwritten(self):
         write(self.at("n1", "a.txt"), "was here first\n")

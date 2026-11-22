@@ -6,10 +6,13 @@
 # aerieos_agent package, which a node gets as one zip) may not change
 # against the branch's base without AGENT_VERSION's patch moving.
 #
-# The base is origin/main's merge point when there is one (a checkout with
-# history), origin/main itself on a shallow checkout that fetched it (CI),
-# the previous commit otherwise; a tree with no base to compare is said, not
-# passed. Run by `aerie lint` and by the lint workflow, so the two agree.
+# The base is the last commit that moved the number, so every change to the
+# agent after one bump needs the next: measured from origin/main's merge
+# point, one bump early on a long branch passed every change after it (the
+# audit of 13 Nov: fe36377 changed the agent with no bump, 226 commits into
+# a branch). Where history does not hold that commit (a shallow checkout),
+# the previous commit; a tree with no base to compare is said, not passed.
+# Run by `aerie lint` and by the lint workflow, so the two agree.
 # Exit 0 clean, 1 on a finding, 0 with [skip] when it cannot compare.
 set -eu
 f=scripts/agent
@@ -17,10 +20,8 @@ v=scripts/agent/aerieos_agent/__init__.py
 if [ ! -f "$v" ] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "  [skip] no agent here, or not a git tree"; exit 0
 fi
-base=""
-if git rev-parse --verify -q origin/main >/dev/null 2>&1; then
-    base="$(git merge-base origin/main HEAD 2>/dev/null || echo origin/main)"
-elif git rev-parse --verify -q HEAD~1 >/dev/null 2>&1; then
+base="$(git log -1 --format=%H -G'^AGENT_VERSION = ' -- "$v" 2>/dev/null || true)"
+if [ -z "$base" ] && git rev-parse --verify -q HEAD~1 >/dev/null 2>&1; then
     base="HEAD~1"
 fi
 if [ -z "$base" ]; then
@@ -29,7 +30,7 @@ fi
 short="$(git rev-parse --short "$base" 2>/dev/null || echo "$base")"
 # What a node runs: the entry and the package (not the ruff pin beside them).
 if git diff --quiet "$base" -- "$f/builderbot-agent.py" "$f/aerieos_agent" 2>/dev/null; then
-    echo "  [ok]   the agent is as it is on $short"; exit 0
+    echo "  [ok]   the agent is as it was when its version last moved ($short)"; exit 0
 fi
 now="$(grep '^AGENT_VERSION = ' "$v" | head -n 1)"
 # grep reads the whole stream: an early close under git show is SIGPIPE, and
@@ -41,5 +42,5 @@ then_="$(printf '%s\n' "$then_" | head -n 1)"
 if [ -n "$now" ] && [ "$now" != "$then_" ]; then
     echo "  [ok]   the agent changed and its version moved with it (${now#AGENT_VERSION = }, was ${then_#AGENT_VERSION = })"; exit 0
 fi
-echo "  [FAIL] the agent ($f) changed since $short and AGENT_VERSION (${now#AGENT_VERSION = }) did not: a node compares the file and the row names the number, so bump the patch"
+echo "  [FAIL] the agent ($f) changed since $short and AGENT_VERSION (${now#AGENT_VERSION = }) did not: a node compares the file and the row names the number, so bump the patch (measured from the commit that last moved it)"
 exit 1

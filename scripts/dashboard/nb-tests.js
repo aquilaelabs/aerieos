@@ -33,72 +33,38 @@ function nbTestsView({$, nb, project}){
     const t = tabOf(panes[active]);
     if (!t || t.kind !== "term"){
       unbusy(btn, "Open the run's output");
-      return notify("no shell tab opened; open one and run aerie tests log -f", true);
+      return notify("no shell tab opened, so the run's output is not shown", true);
     }
-    // Sent, and sent again while the shell is still coming up. The server
-    // asks tmux itself whether the session is there, so this does not wait
-    // on the page's own list of sessions, which arrives with the status
-    // poll every fifteen seconds and, for a shell on a node, only after the
-    // node's next heartbeat: waiting on that said "the shell did not come
-    // up" over a shell that was up.
+    // Sent once: the server waits for the shell to come up (`wait`), asking
+    // tmux, or the node, itself, rather than the page's own list of
+    // sessions, which arrives with the status poll and, for a shell on a
+    // node, only after the node's next heartbeat.
     const session = sessionOf(t.arg);
     let said = "";
-    for (let i = 0; i < 24; i++){
-      try{
-        const r = await postJSON("/api/send", {session, macro: "tests-log"});
-        const j = await r.json();
-        said = j.error || "";
-        if (!said || !/no such session/.test(said)) break;
-      }catch(e){ said = "could not send: " + e; break; }
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    try{
+      const j = await postJSON("/api/send", {session, macro: "tests-log", wait: 48});
+      said = j.error || "";
+    }catch(e){ said = "could not send: " + failWords(e); }
     if (said) notify(said, true);
     unbusy(btn, "Open the run's output");
   }
 
-  async function loadTests(again = false){
-    try{
-      const r = await fetch("/api/tests?project=" + encodeURIComponent(project));
-      const j = await r.json();
-      nb.tests = j.error ? {tests: [], suites: [], error: j.error} : j;
-    }catch(e){ nb.tests = {tests: [], suites: [], error: String(e)}; }
-    // The revision the ANSWER carried, never the page's token as of now: a
-    // write landing between the read and this line moved the token, and
-    // recording that marked the write as seen, so the row it made never
-    // showed (B201). The same rule the roadmap and memory halves keep.
-    // An answer that failed carries none, and the token stands in so the
-    // watch keeps asking rather than waiting on a number that never comes.
-    nb.testsRev = nb.tests.rev ?? revs[`tests:${project}`] ?? nb.testsRev;
-    drawTests();
-    // Already behind: a write landed while this answer was on its way, and
-    // the poll fired for it BEFORE this landed, so it will not fire again.
-    // Read once more now rather than wait for the next write. Once: an
-    // answer and a token that disagree for good must not become a loop.
-    if (!again && nb.tests.rev !== undefined && revs[`tests:${project}`] !== undefined
-        && revs[`tests:${project}`] !== nb.tests.rev) return loadTests(true);
+  // The registry's read (nbRevRead): a read that failed is an empty registry
+  // carrying the error, which drawTests says.
+  function loadTests(again = false){
+    return nbRevRead(nb, {
+      key: "tests", url: "/api/tests",
+      rev: [() => nb.testsRev, v => nb.testsRev = v],
+      put: (j, threw) => nb.tests = threw || j.error ? {tests: [], suites: [], error: j.error} : j,
+      draw: drawTests,
+    }, again);
   }
 
-  // Wrapped so the poll can tell this panel's own write from somebody
-  // else's while it is still out. See nbWriting.
-  async function postTests(body){ return nb.writing(() => postTestsDo(body)); }
-  async function postTestsDo(body){
-    if (nb.nbHeld()){
-      notify("a session is part-way through changing this notebook: "
-             + "check the banner at the top", true);
-      return null;
-    }
-    try{
-      const r = await postJSON("/api/tests", {project, ...body});
-      const j = await r.json();
-      if (j.error){ notify(j.error, true); return null; }
-      nb.tests = j;
-      // This panel's own write moved nothing the poll watches: describing a
-      // test does not ingest a run, but the row it changed is redrawn from
-      // the answer rather than refetched.
-      drawTests();
-      return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
-  }
+  // The registry's write (nbPoster), held by a session's batch whatever it
+  // is. This panel's own write moved nothing the poll watches: describing a
+  // test does not ingest a run, but the row it changed is redrawn from the
+  // answer rather than refetched.
+  const postTests = nbPoster(nb, "/api/tests", {ok: j => { nb.tests = j; drawTests(); }});
 
   // Durations read as seconds with one decimal up to a minute and as m:ss
   // past it, because "412.9s" is a number somebody has to divide.
@@ -111,15 +77,17 @@ function nbTestsView({$, nb, project}){
     const ob = $("tstOut");
     if (ob){ ob.onclick = openRunOutput; ob.hidden = !mayShell(); }
     if (j.error){
-      viewGlance($("tstHint"), [], esc("tests: " + j.error), "", "bad");
+      glanceBad($("tstHint"), "tests", j.error);
       $("tstList").innerHTML = ""; $("tstStats").hidden = true;
       $("tstBar").hidden = true; $("tstFolds").innerHTML = "";
       return;
     }
     const all = j.tests || [];
-    // A redraw comes from the poll as well as from this panel, and it
-    // replaces the list wholesale, so text somebody is part-way through
-    // typing has to come back with the row. Carried only where it DIFFERS
+    // A redraw comes from the poll as well as from this panel. It patches the
+    // list (R244), and a row's body is its own code's, filled again only when
+    // what it shows moved, so typing stays where it is; when it is filled
+    // again (another window described the test) the text somebody is part-way
+    // through typing has to come back with the row. Carried only where it DIFFERS
     // from what is about to be drawn, which settles the precedence without a
     // dirty flag to clear: their unsaved words beat the stored ones, a save
     // of their own leaves nothing to carry, and a row they never touched
@@ -155,7 +123,7 @@ function nbTestsView({$, nb, project}){
       // What the view is for, as its empty state, in one sentence as every
       // view's is (the a-notebook/views rule): a command box the page's
       // width read as a field to type in.
-      $("tstStats").innerHTML = `<div class="field"><div class="hint nbempty">Each test run a session records with <code>aerie tests run</code>, once there is one: what passed and failed, the tests that went flaky, and the ones with nothing saying what they protect.</div></div>`;
+      drawHTML($("tstStats"), `<div class="field"><div class="hint nbempty">Each test run a session records with <code>aerie tests run</code>, once there is one: what passed and failed, the tests that went flaky, and the ones with nothing saying what they protect.</div></div>`);
       $("tstList").innerHTML = ""; $("tstBar").hidden = true;
       $("tstFolds").innerHTML = "";
       return;
@@ -201,7 +169,7 @@ function nbTestsView({$, nb, project}){
     const nDrift = (d.n_added ?? (d.added || []).length)
                  + (d.n_gone ?? (d.gone || []).length)
                  + (d.n_renamed ?? (d.renamed || []).length);
-    $("tstFolds").innerHTML =
+    drawHTML($("tstFolds"),
       // Closed by default: the list sorted by duration is what this tab is
       // for, and a fold that opens over it is one somebody has to shut before
       // they can read the thing they came for. The status carries the number
@@ -214,17 +182,17 @@ function nbTestsView({$, nb, project}){
                     + (nDrift > driftRows.length
                        ? `<div class="sub dim">…and ${nDrift - driftRows.length} more</div>` : "")
                   : `<div class="sub">the list and the last run agree.</div>`,
-           {cls: nDrift ? "warn" : ""}) : "");
+           {cls: nDrift ? "warn" : ""}) : ""));
     wireSections($("tstFolds"));
     // ---- the filter --------------------------------------------------------
     const suites = [...new Set(all.map(t => t.suite))].sort();
     $("tstBar").hidden = false;
-    $("tstSuite").innerHTML = optionList([["", "all suites"], ...suites], nb.tstSuite);
+    patch($("tstSuite"), optionList([["", "all suites"], ...suites], nb.tstSuite));
     $("tstFlagged").checked = nb.tstFlagged;
     $("tstUndoc").checked = nb.tstUndoc;
     const shown = all.filter(t => (!nb.tstSuite || t.suite === nb.tstSuite)
                                   && (!nb.tstFlagged || t.suspect)
-                                  && (!nb.tstUndoc || !t.protects));
+                                  && (!nb.tstUndoc || !(t.described ?? t.protects)));
     // ---- the list ----------------------------------------------------------
     // What a row's editor is built FROM, when it is opened. Not at draw:
     // two textareas each is nothing until there are two thousand rows, and
@@ -238,7 +206,16 @@ function nbTestsView({$, nb, project}){
     // its folds by.
     const openRows = new Set([...$("tstList").querySelectorAll(".tst[open]")]
                              .map(e => e.dataset.key));
-    $("tstList").innerHTML = shown.length ? shown.map(t => `
+    // What a row's body shows, as one short word: its body is filled again
+    // only when this moves (a description saved, Edit pressed or let go).
+    const sigOf = t => { let h = 0;
+      for (const ch of JSON.stringify([t.protects, t.notes, t.accepted, t.sits_on, t.was, t.history, tstEditing.has(t.key)]))
+        h = (h * 31 + ch.charCodeAt(0)) | 0;
+      return String(h); };
+    // Only the rows on show are built, a page at a time (pageLimit, R228
+    // step 13): every row was built and all but 25 hidden.
+    const lim = pageLimit($("tstList"), "tstList", shown.length);
+    patch($("tstList"), shown.length ? shown.slice(0, lim).map(t => `
       <details class="tst${t.suspect ? " flagged" : ""}" data-key="${esc(t.key)}"${
         openRows.has(t.key) ? " open" : ""}>
         <summary>
@@ -254,17 +231,19 @@ function nbTestsView({$, nb, project}){
           ${t.after ? `<span class="tstafter">follows: ${esc(
              t.after.length > 120 ? t.after.slice(0, 118) + "…" : t.after)}</span>` : ""}
         </summary>
-        <div class="body"></div>
+        <div class="body" data-own></div>
       </details>`).join("")
-      : `<div class="empty">nothing matches the filters</div>`;
-    paginate($("tstList"), ":scope > .tst", {key: "tstList", noun: "tests"});
+      : `<div class="empty">nothing matches the filters</div>`);
+    paginate($("tstList"), ":scope > .tst", {key: "tstList", noun: "tests", total: shown.length, more: () => drawTests()});
     // The editor, built on the way open. Every row has one; there is a place
     // to describe every test in the project, but a row nobody has opened is
     // a summary line and an empty div until they do.
     const fill = box => {
       const t = byKey.get(box.dataset.key), body = box.querySelector(".body");
-      if (!t || !body || body.dataset.done) return;
-      body.dataset.done = "1";
+      if (!t || !body) return;
+      const sig = sigOf(t);
+      if (body.dataset.done === sig) return;
+      body.dataset.done = sig;
       const draft = drafts.get(box.dataset.key);
       // A role that reads the project and does not write it (B101): no
       // Edit, and the fields never out.
@@ -277,7 +256,7 @@ function nbTestsView({$, nb, project}){
       // Read first, the way a bug report is: the two sentences under their
       // labels and an Edit. The fields come only when Edit is pressed.
       if (ro || (!draft && !tstEditing.has(t.key))){
-        body.innerHTML = `${sub}
+        drawHTML(body, `${sub}
           ${t.protects || t.notes ? `
             <div class="bfield"><label>What it protects</label><div class="bval${t.protects ? "" : " dim"}">${
               esc(t.protects) || "not written yet"}</div></div>
@@ -286,13 +265,13 @@ function nbTestsView({$, nb, project}){
           : `<div class="bfield"><div class="bval dim">Not described yet: what breaks if this goes red, and what it exercises.</div></div>`}
           ${t.accepted ? `<div class="bfield"><label>The wait is the work</label><div class="bval">${esc(t.accepted)}</div></div>` : ""}
           ${ro ? "" : `<div class="actbar"><span class="sp"></span>
-            <button type="button" class="tstEdit">Edit</button></div>`}`;
+            <button type="button" class="tstEdit">Edit</button></div>`}`);
         if (!ro) body.querySelector(".tstEdit").onclick = () => {
           tstEditing.add(t.key); body.dataset.done = ""; fill(box);
         };
         return;
       }
-      body.innerHTML = `${sub}
+      drawHTML(body, `${sub}
         <label>What it protects</label>
         <textarea class="tstP" spellcheck="false"
           placeholder="the behavior that breaks if this goes red">${
@@ -310,7 +289,7 @@ function nbTestsView({$, nb, project}){
         <div class="actbar"><span class="sp"></span>
           <button type="button" class="stop tstCancel"
             title="discard what was typed">Cancel</button>
-          <button type="button" class="primary tstSave">Save</button></div>`;
+          <button type="button" class="primary tstSave">Save</button></div>`);
       const acc = body.querySelector(".tstAccept");
       if (acc) acc.onchange = () => { body.querySelector(".tstWhy").hidden = !acc.checked; };
       body.querySelector(".tstCancel").onclick = () => {
@@ -341,7 +320,7 @@ function nbTestsView({$, nb, project}){
         // Filled BEFORE the tween, which measures the height it is animating
         // to: an empty body would animate to nothing and then jump.
         if (!box.open) fill(box);
-        slideDetails(box, !box.open);
+        slideDetails(box, !foldOpen(box));
       };
     });
     // ...and the ones that came back open need their editor back with them.

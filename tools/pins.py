@@ -1,0 +1,1884 @@
+#!/usr/bin/env python3
+"""Moves the pins of what AerieOS ships: the toolchains (config/toolchains.json),
+the coding agents' recipes, the CI runners, the images its services run and
+the programs the controller's image takes from their vendors as it is built.
+
+Whatever a row fetches from somewhere else is held to something the row
+itself carries: the sha256 of the exact file, or, for a repository, a
+commit. An install takes the pin and asks nobody what is newest, so a newer
+version arrives as a change to the row, and this is what proposes it. How a
+newer version is found and how its digest is learned are the row's own data
+(source.version, checksum.found, a declared download's track and found,
+source.track), read with the resolvers of scripts/lib/sdkmeta.py: nothing
+here knows a vendor.
+
+What a package manager installs is held the same way. A row says what it
+asks pip or npm for (source.lock), the manager's own resolver says which
+exact files that is (uv for pip, npm for npm: both must be on the PATH),
+and each file becomes a declared download of the row under the lock's
+directory, with the requirements or the lock an install reads written into
+source.files. check says when a lock's resolution would change, and move
+replaces the lock's set whole, leaving the row's other downloads alone.
+
+    tools/pins.py check [NAME...]     what each pinned row is pinned to, what its own resolver finds
+                                      now, and whether a pinned file that has no resolver still
+                                      answers the pinned bytes. Reads the network, writes nothing.
+                                      Exit 0 when nothing would move, 3 when something would, 1 on
+                                      an error. A newer release that is not out for every platform
+                                      a row names holds the row where it is: said, and not a move.
+                                      With nothing named and no table named, everything this tree
+                                      ships that carries a pin: the toolchains, the coding agents'
+                                      recipes, the CI runners, the services' images and the
+                                      image's own tools, so a release's pass is this one command.
+                                      A row held by its publisher's signature is asked the same
+                                      way for the version it carries, and one carrying none is said
+                                      as something that would move.
+    tools/pins.py move [NAME...]      writes the new version and digests into the table for the rows
+                                      named (every pinned row with none named), every platform a row
+                                      names or none of them, raises the row's rev by one, and runs
+                                      tools/packs-export.py --write. Prints what moved, old to new.
+    tools/pins.py pin NAME            a row not pinned yet: its origin-checked download becomes a pin
+                                      at the version its resolver finds now, the old checksum kept as
+                                      found; a repository's commit is pinned by its source.track; and
+                                      each download it declares with no digest yet (a row written with
+                                      its address, its track and no sha256) is given the version its
+                                      track finds now and its digest; and each lock with no downloads
+                                      yet is resolved to its first set. A row held by its
+                                      publisher's signature keeps it as the check and is given the
+                                      version its resolver finds now, once every platform's file at
+                                      it answers with its signature or is named in a signed list.
+    tools/pins.py verify [NAME...]    downloads each pinned file and holds it to its pin, for this
+                                      machine's platform; --platform P for another, --all for every
+                                      one. A file is streamed and hashed, never kept. Exit 1 naming
+                                      each file that is not its pin.
+
+The coding agents' install recipes are held the same way and are rows here too, each under the
+name its row in the Library has. A recipe's declared downloads are read from the one file that holds them
+(scripts/dashboard/agent-recipes.json, which the agent table reads), and a move writes the new
+version and digest back there and raises the recipe's rev: an installer with a version in its
+address moves with its track, a program a platform moves as one set, and a vendor's one moving
+script, which has nothing to track, is asked for the bytes it answers today.
+
+Two things of the controller's image are pinned where they lie, and are rows here too. The
+programs it takes from npm (config/image-npm, a folder a program: its package.json names the one
+version asked for, and its package-lock.json every package under it with the address of its
+tarball and its integrity, which is what `npm ci` installs by and holds each tarball to): check
+asks npm what each program's newest version is and what the lock for it would be, and move writes
+both files. And the image it is built FROM, named in the Dockerfile by its tag and the digest of
+its list (name:tag@sha256:DIGEST): its FROM line is a row of images like any other.
+
+A container image is held the same way, by the digest of what is pulled: name:tag@sha256:DIGEST.
+A row that names images (the services AerieOS deploys, scripts/dashboard/service-images.json) is
+asked through the registry each image names, by the registry protocol and its anonymous token
+(scripts/dashboard/imageregistry.py, one client whatever the host): check says where a tag
+serves another digest than the one pinned, move writes the digest the tag serves now, pin gives
+an image written with its tag alone its first digest, and verify reads each pinned manifest by
+its digest and holds its bytes to it. The digest is the manifest list's where the image is built
+for several platforms, which covers each of them; a row may name the platforms it needs
+(platforms), and a tag whose list lacks one holds the row where it is.
+
+    --file PATH     another table than config/toolchains.json. The official packs are written only
+                    for the shipped one, and the coding agents' recipes are read beside it alone.
+                    A table lists its rows under toolchains, under runners, under services or
+                    under tools: the CI runners a node installs are pinned the same way, in
+                    scripts/dashboard/runner-pins.json, the images of AerieOS's own services
+                    in scripts/dashboard/service-images.json, and the programs the controller's
+                    image takes from their vendors' releases as it is built (cloudflared, the
+                    linters, uv and mise) in config/image-tools.json, which the Dockerfile reads;
+                    --file with any of those paths checks, moves, pins and verifies them. A move
+                    of the shipped services' images writes packs/services again. Two paths are
+                    read as what they are: a Dockerfile, as one row of the images its FROM lines
+                    name (image-base), and a folder of npm programs (config/image-npm), a row
+                    a program (npm-NAME).
+    --compose FILE  the images a compose file names, in the table's place: a Docker app's
+                    compose.yml in the catalog. The file is one row, named for its folder, and a
+                    move or a pin rewrites its image lines and nothing else of it.
+    --catalog DIR   a checkout of the catalog, in the table's place: every folder under its packs/
+                    is a row, named as its manifest names it. A pack's bbtool.json gives what it
+                    declares (install.fetch) and what it asks a package manager for (install.lock,
+                    whose requirements or lock are files of the pack's own folder); a shipped
+                    toolchain's pack its whole recipe (shipped), a coding agent's its install recipe
+                    (agent.install), a service's the images it runs (images); and a Docker app's
+                    compose.yml the images its lines name, held for the platforms its bbapp.json
+                    names. check, move, pin and verify read and write those files where they lie, a
+                    manifest written back in the layout it had, so the catalog's scheduled pass is
+                    one command too. What moved is the catalog's to commit and pin in its index
+                    (tools/packs-export.py --catalog DIR --entry FOLDER).
+    --agents PATH   another file of the coding agents' recipes than the shipped one.
+    --version V     with pin or move and one NAME: that version, not the one the resolver finds (a
+                    release whose files for every platform are not out yet).
+
+Where a publisher states a sha256 the tool takes it, and says from where.
+Where it states another digest (a sha1, a sha512) or none, the tool
+downloads the file, hashes it, and holds it to what the publisher does
+state. A row moves whole: one platform's file that cannot be learned leaves
+the row as it was, said by name.
+"""
+import base64
+import copy
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
+sys.path.insert(0, os.path.join(ROOT, "scripts", "dashboard"))
+import agents  # noqa: E402
+import catalogrows  # noqa: E402
+import imageregistry  # noqa: E402
+import packformat  # noqa: E402
+import sdkmeta  # noqa: E402
+
+TABLE = os.path.join(ROOT, "config", "toolchains.json")
+# The coding agents' install recipes, the one copy of them (agents.py RECIPES).
+AGENTS = os.path.join(ROOT, "scripts", "dashboard", "agent-recipes.json")
+# A digest its publisher states that is no sha256 is checked while the file
+# is hashed, by these.
+ALSO = ("sha1", "sha512")
+# The images AerieOS's own services run, the one copy of them (services.py).
+SERVICES = os.path.join(ROOT, "scripts", "dashboard", "service-images.json")
+# The CI runners a node installs, the one copy of them (runners.py).
+RUNNERS = os.path.join(ROOT, "scripts", "dashboard", "runner-pins.json")
+# The programs the controller's image takes from their vendors' releases as
+# it is built, the one copy of them (the Dockerfile, scripts/lib/pin-fetch).
+IMAGE_TOOLS = os.path.join(ROOT, "config", "image-tools.json")
+# What the controller's image takes from npm, a folder a program, and the
+# Dockerfile whose FROM line names the image it is built on.
+IMAGE_NPM = os.path.join(ROOT, "config", "image-npm")
+DOCKERFILE = os.path.join(ROOT, "Dockerfile")
+# Everything this tree ships that carries a pin: each table, and the file
+# of the coding agents' recipes read beside the toolchains'; then what is
+# pinned where it lies, each path read as what it is (path_doc): the
+# image's npm programs and the Dockerfile's base image.
+SHIPPED = ((TABLE, AGENTS), (RUNNERS, ""), (SERVICES, ""), (IMAGE_TOOLS, ""))
+SHIPPED_WHERE_IT_LIES = (IMAGE_NPM, DOCKERFILE)
+# The name a table's document lists its rows under: the toolchains', the
+# CI runners' (scripts/dashboard/runner-pins.json) and the image's own
+# tools' (config/image-tools.json), whose rows are written as a toolchain's
+# source is, or the services', whose rows name images.
+LISTS = ("toolchains", "runners", "services", "tools")
+
+
+class Refused(Exception):
+    """Why something of a row could not be learned."""
+
+
+def _die(msg):
+    raise Refused(str(msg))
+
+
+class As:
+    """sdkmeta answering for the platform `plat` names, as a row keys one
+    ("" is this machine's own), and answering what it cannot read with a
+    Refused: it ends its own process on that, and here it is one row's
+    answer, with the next row still asked. Everything asked of sdkmeta is
+    asked inside one."""
+
+    def __init__(self, plat=""):
+        self.plat = plat
+
+    def __enter__(self):
+        self.was = (sdkmeta.AS_PLATFORM, sdkmeta.die)
+        sdkmeta.AS_PLATFORM, sdkmeta.die = self.plat, _die
+
+    def __exit__(self, *exc):
+        sdkmeta.AS_PLATFORM, sdkmeta.die = self.was
+
+
+def hashed(url, also=""):
+    """{"sha256": ..., also: ..., "bytes": n} for what `url` answers,
+    streamed: nothing is kept. `also` is a second digest to work out on the
+    way, for a publisher that states that one."""
+    req = urllib.request.Request(sdkmeta._web(url), headers=sdkmeta.UA)
+    sums = {"sha256": hashlib.sha256(), **({also: hashlib.new(also)} if also in ALSO else {})}
+    n = 0
+    with urllib.request.urlopen(req, timeout=120) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        for chunk in iter(lambda: r.read(1 << 20), b""):
+            n += len(chunk)
+            for h in sums.values():
+                h.update(chunk)
+    return {**{k: h.hexdigest() for k, h in sums.items()}, "bytes": n}
+
+
+def said(e):
+    """An error as one line."""
+    if isinstance(e, urllib.error.HTTPError):
+        return f"{e.url} answered {e.code}"
+    if isinstance(e, urllib.error.URLError):
+        return f"it could not be reached: {e.reason}"
+    if isinstance(e, subprocess.TimeoutExpired):
+        return f"{os.path.basename(str(e.cmd[0] if isinstance(e.cmd, (list, tuple)) and e.cmd else e.cmd))} did not answer in time"
+    if isinstance(e, StopIteration):
+        return "its resolver found no version"
+    if isinstance(e, KeyError):
+        return f"its resolver names no {e}"
+    return " ".join(str(e).split()) or type(e).__name__
+
+
+ERRORS = (Refused, OSError, ValueError, KeyError, StopIteration, subprocess.TimeoutExpired)
+
+
+def digest_of(row, url, version, found):
+    """(sha256, how it was learned) for the file `url` answers: its
+    publisher's own sha256 where `found` reads one, with nothing
+    downloaded; otherwise the file downloaded and hashed here, held to
+    whatever other digest the publisher states."""
+    kind = (found or {}).get("from")
+    if kind and kind not in ("none", "signature"):
+        algo, want, where = sdkmeta.checksum(row, url, version, found)
+        if algo == "sha256":
+            return want, f"stated by {where}"
+        if algo in ALSO:
+            got = hashed(url, algo)
+            if got[algo] != want:
+                raise Refused(f"{url} answers a file whose {algo} is {got[algo]}, and {where} states {want}")
+            return got["sha256"], f"downloaded and hashed here ({got['bytes']} bytes), its {algo} matching {where}"
+    got = hashed(url)
+    return got["sha256"], f"downloaded and hashed here ({got['bytes']} bytes): its publisher states no digest for it"
+
+
+# ---- a row's own download -----------------------------------------------------
+def platforms(row):
+    """The platforms a row's own download differs by, as the row keys
+    them: its address's, its pin's digests', its resolver's assets'. [""]
+    for a row whose one file serves every platform."""
+    src = row.get("source") or {}
+    pin = sdkmeta.pin_of(row) or {}
+    for v in (src.get("url"), pin.get("sha256"), (src.get("version") or {}).get("asset")):
+        if isinstance(v, dict) and v:
+            return list(v)
+    return [""]
+
+
+def address(row, version, plat):
+    """The address of a row's download at `version` for `plat`: its own
+    template filled in."""
+    src = row.get("source") or {}
+    with As(plat):
+        url = sdkmeta.fill(sdkmeta.for_platform(src.get("url")) or "", {"version": version}) if src.get("url") else ""
+    if not url:
+        raise Refused(f"it names no address for {plat or 'its download'}")
+    return url
+
+
+def learned(row, version=""):
+    """What a row's pin would be now: {"version", "supplied" (whether its
+    resolver gives the address itself), "files": {platform: {"url",
+    "sha256", "how"}}}. Every platform the row names, or a Refused that
+    says which could not be learned. `version` in the resolver's place
+    where one is named."""
+    src = row.get("source") or {}
+    found = (src.get("checksum") or {}).get("found") if sdkmeta.pin_of(row) else src.get("checksum")
+    out = {"version": None, "supplied": False, "files": {}}
+    for plat in platforms(row):
+        try:
+            with As(plat):
+                v, url = (version, "") if version else sdkmeta.newest(row)
+            if out["version"] not in (None, v):
+                raise Refused(f"its resolver finds {v} where it found {out['version']} for another platform: a pin is one version")
+            out["version"] = v
+            if url:
+                out["supplied"] = True
+            else:
+                url = address(row, v, plat)
+            with As(plat):
+                digest, how = digest_of(row, url, v, found)
+        except ERRORS as e:
+            raise Refused(f"{plat or 'its download'} could not be learned ({said(e)})") from e
+        out["files"][plat] = {"url": url, "sha256": digest, "how": how}
+    return out
+
+
+def pinned_files(row, plats=None):
+    """{platform: (address, sha256)} as a row's pin has them now."""
+    pin = sdkmeta.pin_of(row)
+    out = {}
+    for plat in platforms(row) if plats is None else plats:
+        with As(plat):
+            digest = sdkmeta.pinned_digest(row)
+        if not digest:
+            raise Refused(f"its pin names no digest for {plat or 'this machine'}")
+        out[plat] = (address(row, str(pin.get("version") or ""), plat), digest)
+    return out
+
+
+# ---- a row held by its publisher's signature ------------------------------------
+# A signature says who published a file and not which release it is, so such a
+# row carries the version it installs (source.checksum.version) as a pinned row
+# carries its pin's, and its resolver stays as how a newer one is found. A move
+# writes the newer version once every platform's file at it is answered with
+# its signature, or named in its publisher's signed list; the signature stays
+# the check an install makes.
+def signed_row(row):
+    """Whether a row's own download is held by its publisher's signature:
+    the download signed itself, or its list of digests signed."""
+    ck = (row.get("source") or {}).get("checksum")
+    return isinstance(ck, dict) and (ck.get("from") == "signature" or (ck.get("from") == "file" and isinstance(ck.get("signed"), dict)))
+
+
+def answers(url):
+    """That `url` answers a file now: its first byte asked for, nothing kept."""
+    req = urllib.request.Request(sdkmeta._web(url), headers={**sdkmeta.UA, "Range": "bytes=0-0"})
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        r.read(1)
+
+
+def signed_learned(row, version):
+    """{platform: {"url", "how"}} for a signed row's files at `version`:
+    every platform the row names, each answered with its signature beside
+    it or named in its publisher's signed list, or a Refused that says
+    which is not."""
+    out = {}
+    for plat in platforms(row):
+        try:
+            url = address(row, version, plat)
+            answers(url)
+            with As(plat):
+                algo, where, by = sdkmeta.checksum(row, url, version)
+            if algo == "gpg":
+                answers(where)
+                how = f"answered, signed beside it under {by}"
+            else:
+                how = f"named in {by}"
+        except ERRORS as e:
+            raise Refused(f"{plat or 'its download'} could not be learned ({said(e)})") from e
+        out[plat] = {"url": url, "how": how}
+    return out
+
+
+def signed_part(row, version=""):
+    """plan's part for a signed row: the version it carries, and the one its
+    resolver finds now (`version` in its place where one is named)."""
+    old_v = sdkmeta.signed_version(row)
+    with As(platforms(row)[0]):
+        new_v = version or sdkmeta.newest(row)[0]
+    if new_v == old_v:
+        return {"what": "its version", "old": old_v, "new": old_v, "note": "its resolver finds the version it carries"}
+    try:
+        signed_learned(row, new_v)
+    except Refused as e:
+        if version:
+            raise
+        held = f"its resolver finds {new_v}, and {e}"
+        return {"what": "its version", "old": old_v, "new": old_v, "held": held, "note": f"{held}: it stays where it is"}
+    return {"what": "its version", "old": old_v, "new": new_v, "note": "its publisher's signature is the check an install makes",
+            "apply": lambda r, v=new_v: r["source"]["checksum"].update({"version": v})}
+
+
+def write_pin(row, got, found):
+    """The pin `got` (learned) written into `row`: the version, a digest a
+    platform in the shape its address has, the address too where the
+    resolver supplies it, and `found` as how the next one is learned."""
+    src = row["source"]
+    files = got["files"]
+    one = list(files) == [""]
+    pin = {"from": "pin"}
+    if got["version"]:
+        pin["version"] = got["version"]
+    pin["sha256"] = files[""]["sha256"] if one else {p: f["sha256"] for p, f in files.items()}
+    if isinstance(found, dict) and found.get("from") not in (None, "none", "pin"):
+        pin["found"] = found
+    src["checksum"] = pin
+    if got["supplied"]:
+        src["url"] = files[""]["url"] if one else {p: f["url"] for p, f in files.items()}
+
+
+# ---- a repository -------------------------------------------------------------
+def git_learned(row):
+    """{"name", "commit", "tag"} for a repository's commit to pin, by its
+    source.track: the tag it is at where the track is by tag."""
+    src = row.get("source") or {}
+    if not isinstance(src.get("track"), dict):
+        raise Refused("it says no source.track: how the commit to pin is found")
+    try:
+        with As():
+            name, commit = sdkmeta.git_newest(row)
+    except ERRORS as e:
+        raise Refused(f"its commit could not be learned ({said(e)})") from e
+    if not packformat.COMMIT.fullmatch(commit):
+        raise Refused(f"its repository answered {commit[:60]!r}, which is no commit")
+    return {"name": name, "commit": commit, "tag": name if src["track"].get("resolver") == "git-tag" else ""}
+
+
+# ---- declared downloads --------------------------------------------------------
+def fetch_rows(row):
+    rows = (row.get("source") or {}).get("fetch")
+    return [f for f in rows if isinstance(f, dict) and f.get("url")] if isinstance(rows, list) else []
+
+
+def fetch_said(f):
+    """A declared download as a line names it: the file it is kept as, and
+    the platform it is for."""
+    return f"{f.get('to')}{' for ' + f['platform'] if f.get('platform') else ''}"
+
+
+def fetch_held(f):
+    """Whether a declared download is held to something yet: a sha256, or
+    its publisher's signature. One written with neither is waiting for its
+    first pin."""
+    return bool(f.get("sha256")) or isinstance(f.get("signed"), dict)
+
+
+def unheld(row):
+    """The downloads a row declares that are held to nothing yet."""
+    return [f for f in fetch_rows(row) if not fetch_held(f)]
+
+
+def fetch_of(row, to, plat):
+    """The declared download of `row` kept as `to` for `plat`: a part is
+    written into a copy of the row by what it is, not by where it stands in
+    the list, since the rows beside it may have moved."""
+    return next(f for f in fetch_rows(row) if f.get("to") == to and str(f.get("platform") or "") == plat)
+
+
+def fetch_write(f, changed):
+    """What moved written into a declared download, its keys left in the
+    order a row writes them: the address, the version, the digest, then
+    where it is kept and how the next one is found."""
+    f.update(changed)
+    for k in ("to", "platform", "signed", "track", "found"):
+        if k in f:
+            f[k] = f.pop(k)
+
+
+def fetch_learned(row, f, cache):
+    """What a declared download would be now: {"version", "url", "sha256",
+    "how"}. One that says track is asked for its newest version, once for
+    every download that says the same track; one that says none has
+    nothing to track, and its address is asked for the bytes it answers
+    today. A file in a repository is tracked by the repository: its
+    version is the newest tag (with the track's trims off), or the commit a
+    branch is at. A tracked download that is at the version found already
+    is as its entry pins it, and is not asked for again."""
+    track = f.get("track") if isinstance(f.get("track"), dict) else None
+    plat = str(f.get("platform") or "")
+    version, url = str(f.get("version") or ""), ""
+    with As(plat):
+        if track:
+            key = json.dumps(track, sort_keys=True) + "\0" + plat
+            if key not in cache:
+                if track.get("resolver") in packformat.GIT_RESOLVERS:
+                    name, commit = sdkmeta.git_newest({**row, "source": {"url": track.get("url")}}, track)
+                    cache[key] = (commit if track["resolver"] == "git-branch" else sdkmeta.trimmed(name, track), "")
+                else:
+                    cache[key] = sdkmeta.newest(row, track)
+            version, url = cache[key]
+        url = url or sdkmeta.declared_address({**f, "version": version})
+        if isinstance(f.get("signed"), dict):
+            return {"version": version, "url": url, "sha256": "", "how": "held by its publisher's signature"}
+        if track and f.get("sha256") and version == f.get("version") and url == sdkmeta.declared_address(f):
+            return {"version": version, "url": url, "sha256": f["sha256"], "how": "its track finds the version it is pinned to"}
+        digest, how = digest_of(row, url, version, f.get("found"))
+    return {"version": version, "url": url, "sha256": digest, "how": how}
+
+
+# ---- what a package manager installs -------------------------------------------
+# A row says what it asks a package manager for (source.lock), and the
+# manager's own resolver says which exact files that is today. Each file
+# becomes a declared download of the row, kept under the lock's directory,
+# and the small files the manager installs by (its requirements with their
+# hashes, its lock) go into source.files beside them. The install step
+# then installs from that directory with no index and no network.
+#
+# One function a manager turns what its resolver says into those rows
+# (pip_locked, npm_locked), and one asks the resolver (pip_resolved,
+# npm_resolved), which is the only part that runs a program and reaches
+# the network: a test stands in for it. A lock's set is replaced whole
+# when it moves, and the row's other downloads are left alone.
+def locks(row):
+    got = (row.get("source") or {}).get("lock")
+    return [lk for lk in got if isinstance(lk, dict) and lk.get("to")] if isinstance(got, list) else []
+
+
+def lock_rows(row, lk):
+    """The declared downloads of `row` a lock owns: the ones kept under
+    its directory."""
+    return [f for f in fetch_rows(row) if str(f.get("to") or "").startswith(lk["to"] + "/")]
+
+
+def lock_files(row, lk):
+    """The files `row` carries that a lock owns, {path: text}."""
+    files = (row.get("source") or {}).get("files")
+    return {p: t for p, t in files.items() if p.startswith(lk["to"] + "/")} if isinstance(files, dict) else {}
+
+
+def unlocked(row):
+    """The locks of a row with no downloads yet: waiting for a first pin."""
+    return [lk for lk in locks(row) if not lock_rows(row, lk)]
+
+
+def _tool(name, what):
+    path = shutil.which(name)
+    if not path:
+        raise Refused(f"there is no {name} here to resolve {what} with")
+    return path
+
+
+def _ran(argv, cwd, what):
+    """Run a resolver, or a Refused with the end of what it said."""
+    p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=900, check=False)
+    if p.returncode:
+        raise Refused(f"{what}: {' '.join((p.stderr or p.stdout).split())[-400:] or 'it failed'}")
+
+
+def pip_resolved(requirements, python, target):
+    """What `requirements` resolve to for a Python and a platform, as the
+    packages of the pylock.toml uv writes: each {name, version, wheels:
+    [{url, hashes: {sha256}}]}, the wheels the ones that fit the platform.
+    The index states each file's sha256, so nothing is downloaded to learn
+    one, and nothing is built: a source distribution's own code does not
+    run here either."""
+    uv = _tool("uv", "what pip is asked for")
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "requirements.in"), "w", encoding="utf-8") as f:
+            f.write("".join(r + "\n" for r in requirements))
+        _ran([uv, "pip", "compile", "requirements.in", "--python-version", python, "--python-platform", target, "--no-build",
+              "--format", "pylock.toml", "-o", "pylock.toml", "--no-header", "-q"], d, f"uv could not resolve {', '.join(requirements)} for {target}")
+        with open(os.path.join(d, "pylock.toml"), "rb") as f:
+            return tomllib.load(f).get("packages") or []
+
+
+def wheel_rank(name):
+    """How closely a wheel is built for a machine, to pick one among those
+    a resolver says fit it: one built for the interpreter before one for
+    the stable ABI before a pure one, the newest interpreter it names, and
+    the newest baseline of the system."""
+    stem = name.removesuffix(".whl").split("-")
+    py, abi, plat = stem[-3:] if len(stem) >= 5 else ("", "", "")
+
+    def baseline(tag):
+        """The system baseline a platform tag names, as numbers: a glibc
+        or a musl version, a macOS release; the three old names by theirs."""
+        for old, was in (("manylinux1_", [2, 5]), ("manylinux2010_", [2, 12]), ("manylinux2014_", [2, 17])):
+            if tag.startswith(old):
+                return was
+        m = re.match(r"(?:manylinux|musllinux|macosx)_(\d+)_(\d+)_", tag)
+        return [int(m.group(1)), int(m.group(2))] if m else [0, 0]
+
+    newest = max(([int(n) for n in re.findall(r"\d+", tag)] for tag in py.split(".")), default=[])
+    return (abi not in ("abi3", "none"), abi == "abi3", newest, plat != "any", max(baseline(tag) for tag in plat.split(".")), name)
+
+
+# A platform as a requirements file's marker says it, for a lock resolved
+# for several: a package only some of them need, or need another version of.
+MARKERS = {"linux": "sys_platform == 'linux'", "linux-musl": "sys_platform == 'linux'", "darwin": "sys_platform == 'darwin'"}
+MACHINES = {("linux", "amd64"): "x86_64", ("linux", "arm64"): "aarch64", ("linux-musl", "amd64"): "x86_64", ("linux-musl", "arm64"): "aarch64",
+            ("darwin", "amd64"): "x86_64", ("darwin", "arm64"): "arm64"}
+
+
+def marker(plat):
+    system, _, arch = plat.partition("/")
+    return MARKERS[system] + (f" and platform_machine == '{MACHINES[(system, arch)]}'" if arch != "*" else "")
+
+
+def pip_locked(row, lk, have):
+    """A pip lock as the row holds it: {"fetch", "files", "said"}. For each
+    platform the lock names, what its requirements resolve to and the one
+    wheel of each package that fits it best; every wheel a declared
+    download, named for its platform where not every one takes it; and
+    requirements.txt, each package at its version with the sha256 of each
+    wheel, which the install step requires. A package with no wheel for a
+    platform is refused by name."""
+    plats, chosen = lk.get("for") or {}, {}
+    for plat, target in plats.items():
+        chosen[plat] = {}
+        for pkg in pip_resolved(lk["requirements"], lk["python"], target):
+            name, version = str(pkg.get("name") or ""), str(pkg.get("version") or "")
+            wheels = [w for w in pkg.get("wheels") or [] if isinstance(w, dict) and w.get("url") and packformat.SHA256.fullmatch(str((w.get("hashes") or {}).get("sha256") or ""))]
+            if not wheels:
+                raise Refused(f"{name} {version} has no wheel for {plat}: a source distribution runs its own code at install, and is not taken")
+            best = max(wheels, key=lambda w: wheel_rank(sdkmeta._name_of(w["url"])))
+            chosen[plat][name] = {"version": version, "url": best["url"], "sha256": best["hashes"]["sha256"], "file": sdkmeta._name_of(best["url"])}
+    # Each wheel once, for every platform or for the ones that take it.
+    wheels = {}
+    for plat in plats:
+        for c in chosen[plat].values():
+            wheels.setdefault(c["url"], (c, []))[1].append(plat)
+    fetch = []
+    for url, (c, takes) in wheels.items():
+        base = {"url": url, "sha256": c["sha256"], "to": f"{lk['to']}/{c['file']}"}
+        fetch += [base] if len(takes) == len(plats) else [{**base, "platform": p} for p in takes]
+    # The requirements: a line a package and version, with the platforms
+    # that take it where that is not every one.
+    lines_, said_ = [], {}
+    for name in sorted({n for p in plats for n in chosen[p]}):
+        by_version = {}
+        for plat in plats:
+            if name in chosen[plat]:
+                by_version.setdefault(chosen[plat][name]["version"], []).append(plat)
+        said_[name] = ", ".join(by_version)
+        for version, takes in by_version.items():
+            sums = sorted({chosen[p][name]["sha256"] for p in takes})
+            only = "" if len(takes) == len(plats) else " ; " + " or ".join(f"({marker(p)})" for p in takes)
+            lines_.append(f"{name}=={version}{only}" + "".join(f" --hash=sha256:{s}" for s in sums))
+    return {"fetch": sorted(fetch, key=lambda f: (f["to"], f.get("platform", ""))), "said": said_,
+            "files": {f"{lk['to']}/requirements.txt": "".join(ln + "\n" for ln in lines_)}}
+
+
+def pip_said(files, lk):
+    """{package: version} as a pip lock's carried requirements say it."""
+    out = {}
+    for ln in str(files.get(f"{lk['to']}/requirements.txt") or "").splitlines():
+        name, eq, rest = ln.partition("==")
+        if eq:
+            out[name] = ", ".join(v for v in (out.get(name), rest.split()[0]) if v)
+    return out
+
+
+def npm_resolved(requirements):
+    """(package.json, package-lock.json) as npm writes them for a project
+    that asks for `requirements`, both as objects, with nothing installed
+    and nobody's script run: the lock names every package's tarball and its
+    integrity."""
+    npm = _tool("npm", "what npm is asked for")
+    with tempfile.TemporaryDirectory() as t:
+        # The lock is named for its directory, so the directory is always this one.
+        d = os.path.join(t, "entry")
+        os.mkdir(d)
+        with open(os.path.join(d, "package.json"), "w", encoding="utf-8") as f:
+            f.write('{"private": true}\n')
+        _ran([npm, "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error", "--", *requirements], d,
+             f"npm could not resolve {', '.join(requirements)}")
+        return load(os.path.join(d, "package.json")), load(os.path.join(d, "package-lock.json"))
+
+
+def _allows(listed, value):
+    """Whether a lock's `os`, `cpu` or `libc` list takes `value`: named, or
+    not ruled out where the list only rules out (a leading !)."""
+    listed = [str(x) for x in listed] if isinstance(listed, list) else []
+    yes = [x for x in listed if not x.startswith("!")]
+    return "!" + value not in listed and (not yes or value in yes)
+
+
+def npm_platforms(pkg, named):
+    """The platforms of a row, as it keys them, that a package of an npm
+    lock is for: None for one that is for every platform, [] for one that
+    is for none the row names (it is left out), else the keys, a system's
+    two processors as "<os>/*"."""
+    if not any(pkg.get(k) for k in ("os", "cpu", "libc")):
+        return None
+
+    def covered(system, arch):
+        """Whether the row names this machine: a musl one is a linux one."""
+        system = system.replace("linux-musl", "linux")
+        return any(str(n).replace("linux-musl/", "linux/") in (f"{system}/{arch}", f"{system}/*") for n in named)
+
+    out = []
+    for system, npm_os, libc in (("linux", "linux", "glibc"), ("linux-musl", "linux", "musl"), ("darwin", "darwin", "")):
+        fits = [arch for cpu, arch in (("x64", "amd64"), ("arm64", "arm64"))
+                if _allows(pkg.get("os"), npm_os) and _allows(pkg.get("cpu"), cpu) and (not libc or _allows(pkg.get("libc"), libc)) and covered(system, arch)]
+        out += [f"{system}/*"] if len(fits) == 2 else [f"{system}/{a}" for a in fits]
+    # A musl machine takes what is named for linux too: named once.
+    return [k for k in out if not (k.startswith("linux-musl/") and (k.replace("linux-musl/", "linux/") in out or "linux/*" in out))]
+
+
+def npm_hashed(url, integrity):
+    """The sha256 of a package's tarball, downloaded and hashed here and
+    held to the integrity its lock states (a sha512, or a sha1 on an old
+    one): the registry states no sha256."""
+    for one in str(integrity).split():
+        algo, _, b64 = one.partition("-")
+        if algo in ALSO:
+            want = base64.b64decode(b64).hex()
+            got = hashed(url, algo)
+            if got[algo] != want:
+                raise Refused(f"{url} answers a file whose {algo} is {got[algo]}, and its lock states {want}")
+            return got["sha256"]
+    raise Refused(f"{url} is held by {str(integrity)[:40]!r} in its lock, which is no digest read here")
+
+
+def npm_locked(row, lk, have):
+    """An npm lock as the row holds it: {"fetch", "files", "said"}. Every
+    package of the lock npm writes a declared download, its tarball hashed
+    here and held to the lock's integrity (`have` is the digests the row
+    holds already, by address: a tarball is not fetched twice), one for a
+    system or a processor named for that platform; and package.json with
+    package-lock.json, which the install step installs by."""
+    manifest, lock = npm_resolved(lk["requirements"])
+    fetch, said_ = {}, {}
+    for path, pkg in (lock.get("packages") or {}).items():
+        if not path or not isinstance(pkg, dict) or pkg.get("link") or pkg.get("inBundle"):
+            continue
+        name = str(pkg.get("name") or path.rsplit("node_modules/", 1)[-1])
+        said_[path.removeprefix("node_modules/")] = str(pkg.get("version") or "")
+        url, integrity = str(pkg.get("resolved") or ""), pkg.get("integrity")
+        if not url.startswith("https://") or not integrity:
+            raise Refused(f"{name} is not a tarball its lock holds: it names {url[:80] or 'no address'}" + ("" if integrity else " and no integrity"))
+        plats = npm_platforms(pkg, row.get("platforms") or [])
+        if plats == []:
+            continue
+        to = f"{lk['to']}/{name.lstrip('@').replace('/', '-')}-{pkg.get('version')}.tgz"
+        digest = have.get(url) or npm_hashed(url, integrity)
+        for plat in plats or [""]:
+            if fetch.get((to, plat), {"url": url})["url"] != url:
+                raise Refused(f"two packages of its lock would be kept as {to}")
+            fetch[(to, plat)] = {"url": url, "sha256": digest, "to": to, **({"platform": plat} if plat else {})}
+    return {"fetch": [fetch[k] for k in sorted(fetch)], "said": said_,
+            "files": {f"{lk['to']}/package.json": json.dumps(manifest, indent=2) + "\n",
+                      f"{lk['to']}/package-lock.json": json.dumps(lock, separators=(",", ":")) + "\n"}}
+
+
+def npm_said(files, lk):
+    """{package: version} as an npm lock's carried package-lock.json says it."""
+    try:
+        packages = json.loads(files.get(f"{lk['to']}/package-lock.json") or "{}").get("packages") or {}
+    except ValueError:
+        return {}
+    return {p.removeprefix("node_modules/"): str(v.get("version") or "") for p, v in packages.items() if p and isinstance(v, dict) and not v.get("link")}
+
+
+# A package manager: what turns its resolver's answer into the row's
+# downloads and files, and what reads the versions back out of the files.
+LOCKS = {"pip": (pip_locked, pip_said), "npm": (npm_locked, npm_said)}
+
+
+def write_lock(row, lk, got):
+    """A lock's set written into `row` whole: its downloads in the place of
+    the ones it owned, after the row's others, and its files likewise."""
+    src = row["source"]
+    under = lk["to"] + "/"
+    src["fetch"] = [f for f in src.get("fetch") or [] if not (isinstance(f, dict) and str(f.get("to") or "").startswith(under))] + got["fetch"]
+    src["files"] = {**{p: t for p, t in (src.get("files") or {}).items() if not p.startswith(under)}, **got["files"]}
+
+
+def lock_parts(row, waiting=False):
+    """plan's parts for what a row asks its package managers for, a part a
+    lock: what its resolver finds now against the set the row holds. With
+    `waiting`, only the locks with no downloads yet."""
+    parts = []
+    for lk in locks(row):
+        mine, kind = lock_rows(row, lk), str(lk.get("kind"))
+        if waiting and mine:
+            continue
+        if kind not in LOCKS:
+            raise Refused(f"its lock for {lk['to']} is of kind {kind}, which is none of {', '.join(LOCKS)}")
+        locked, said_of = LOCKS[kind]
+        what = f"its {kind} lock ({lk['to']})"
+        try:
+            got = locked(row, lk, {sdkmeta.declared_address(f): f["sha256"] for f in mine if f.get("sha256")})
+        except ERRORS as e:
+            raise Refused(f"{what} could not be resolved ({said(e)})") from e
+        key = lambda f: (f.get("to"), f.get("platform") or "", f.get("url"), f.get("sha256"))  # noqa: E731
+        files = lock_files(row, lk)
+        old = f"{len(mine)} file(s)" if mine else ""
+        part = {"what": what, "old": old, "new": f"{len(got['fetch'])} file(s)"}
+        if sorted(map(key, mine)) != sorted(map(key, got["fetch"])) or files != got["files"]:
+            was = said_of(files, lk)
+            moved_ = [f"{n} {was[n]} to {v}" if n in was else f"{n} {v} added" for n, v in got["said"].items() if was.get(n) != v]
+            moved_ += [f"{n} {v} gone" for n, v in was.items() if n not in got["said"]]
+            if mine and moved_:
+                part["note"] = "; ".join(moved_[:8]) + (f"; and {len(moved_) - 8} more" if len(moved_) > 8 else "")
+            part["apply"] = lambda r, lk=lk, got=got: write_lock(r, lk, got)
+        else:
+            part["new"], part["note"] = old, "its resolver finds the set it holds"
+        parts.append(part)
+    return parts
+
+
+# ---- the images a row runs -------------------------------------------------------
+# A row that names images (`images`: each under a name of the row's own, or,
+# for a compose file, under the reference its line had) is held by each
+# one's digest. What a tag serves now is its registry's to say, asked by
+# the protocol every registry speaks: nothing here knows one from another.
+def image_rows(row):
+    refs = row.get("images")
+    return list(refs.items()) if isinstance(refs, dict) else []
+
+
+def image_said(row, key):
+    """An image of a row as a line names it: by the row's name for it, or,
+    in a compose file, by the image itself."""
+    return f"its image {key}" if not row.get("compose") else (packformat.image_parts(key) or {}).get("name") or key
+
+
+def image_learned(row, ref):
+    """What an image's pin would be now: {"ref", "how", "held"}. Its tag is
+    asked of its registry; a digest that is the pinned one is as its entry
+    pins it and nothing more is read. Another is read by that digest, for
+    the platforms it names: a list that lacks one the row needs holds the
+    row where it is."""
+    parts = packformat.image_parts(ref)
+    if not parts or not parts["tag"]:
+        raise Refused(f"{ref} names no tag: there is nothing to ask its registry about")
+    tagged = f"{parts['name']}:{parts['tag']}"
+    digest, err = imageregistry.digest_of(tagged)
+    if err:
+        raise Refused(err)
+    if digest == parts["digest"]:
+        return {"ref": ref, "how": "its registry serves the digest it is pinned to", "held": ""}
+    _, doc, err = imageregistry.manifest_of(f"{tagged}@{digest}", by_digest=True)
+    if err:
+        raise Refused(err)
+    plats, need = imageregistry.platforms_of(doc), [p for p in row.get("platforms") or [] if isinstance(p, str)]
+    lacks = [p for p in need if p not in plats] if plats else (need if len(need) > 1 else [])
+    how = f"read from its registry: a list for {', '.join(plats)}" if plats else "read from its registry: one image's own manifest"
+    held = f"{tagged} is served for {', '.join(plats) or 'one platform'} now, and not for {', '.join(lacks)}" if lacks else ""
+    return {"ref": f"{tagged}@{digest}", "how": how, "held": held}
+
+
+def image_parts(row, waiting=False):
+    """plan's parts for the images a row names, a part an image. With
+    `waiting`, only the ones with no digest yet: what a first pin fills in."""
+    parts = []
+    for key, ref in image_rows(row):
+        have = packformat.image_parts(ref) or {}
+        if waiting and have.get("digest"):
+            continue
+        what = image_said(row, key)
+        try:
+            got = image_learned(row, ref)
+        except ERRORS as e:
+            raise Refused(f"{what} could not be learned ({said(e)})") from e
+        new = packformat.image_parts(got["ref"])
+        old = f"{have.get('tag')} {have.get('digest', '')[7:19]}".strip() if have.get("digest") else ""
+        part = {"what": what, "old": old, "new": f"{new['tag']} {new['digest'][7:19]}", "note": got["how"]}
+        if got["held"]:
+            part.update(new=old, held=got["held"], note=f"{got['held']}: it stays where it is")
+        elif got["ref"] != ref:
+            part["apply"] = lambda r, key=key, to=got["ref"]: r["images"].__setitem__(key, to)
+        else:
+            part["new"] = old
+        parts.append(part)
+    return parts
+
+
+def row_refused(row):
+    """Why a row is not one its format takes, or "": its source, or the
+    images it names."""
+    if row.get("npm"):
+        return npm_refused(row)
+    if image_rows(row) or "images" in row:
+        loose = [ref for _, ref in image_rows(row) if not packformat.image_digest(ref)]
+        return f"{loose[0]} names no digest" if loose else ("" if image_rows(row) else "it names no image")
+    src = row.get("source")
+    # A pack's lock's files are files of its own folder, as large as they
+    # are: what a row may carry (source.files) is a shipped row's limit.
+    if isinstance(row.get("pack"), dict) and isinstance(src, dict):
+        src = {k: v for k, v in src.items() if k != "files"}
+    return packformat.source_refused(src)
+
+
+# ---- the programs the image takes from npm ------------------------------------
+# A folder of config/image-npm is one program: package.json names it at one
+# exact version, and package-lock.json every package that version brings,
+# each with the address of its tarball and its integrity. `npm ci` installs
+# by the lock and nothing else, holds each tarball to its integrity, and
+# with --ignore-scripts runs nobody's code, so an image built again holds
+# the same files until the lock moves. A row here is that folder: {"name":
+# "npm-FOLDER", "npm": {"dir", "manifest", "lock"}}.
+def npm_wanted(row):
+    """{package: version} a program's package.json asks for."""
+    deps = (row["npm"].get("manifest") or {}).get("dependencies")
+    return {str(k): str(v) for k, v in deps.items()} if isinstance(deps, dict) else {}
+
+
+def npm_packages(lock):
+    """{path: (version, address, integrity)} for every package a lock names."""
+    packages = lock.get("packages") if isinstance(lock, dict) else None
+    return {p: (str(v.get("version") or ""), str(v.get("resolved") or ""), str(v.get("integrity") or ""))
+            for p, v in (packages or {}).items() if p and isinstance(v, dict) and not v.get("link")}
+
+
+def npm_refused(row):
+    """Why a program's two files do not hold what npm installs, or "": each
+    package it asks for at one exact version, the lock written for that
+    package.json, and every package of the lock a tarball over https with a
+    sha512 beside it."""
+    want, lock = npm_wanted(row), row["npm"].get("lock") or {}
+    if not want:
+        return "its package.json asks for nothing"
+    loose = [f"{n}@{v}" for n, v in want.items() if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", v)]
+    if loose:
+        return f"its package.json asks for {loose[0]}, which is no one version"
+    packages = npm_packages(lock)
+    if not packages:
+        return "it has no package-lock.json"
+    if ((lock.get("packages") or {}).get("") or {}).get("dependencies") != want:
+        return "its package-lock.json was not written for its package.json"
+    for path, (_version, url, integrity) in packages.items():
+        if not url.startswith("https://") or not integrity.startswith("sha512-"):
+            return f"{path.removeprefix('node_modules/')} is held to nothing in its lock: no https address, or no sha512"
+    return ""
+
+
+def npm_newest(name):
+    """The newest version of a package its registry names, as npm reads it."""
+    p = subprocess.run([_tool("npm", "what npm is asked for"), "view", "--json", "--", name, "version"], capture_output=True, text=True, timeout=120, check=False)
+    try:
+        got = json.loads(p.stdout)
+    except ValueError:
+        got = None
+    if p.returncode or not isinstance(got, str) or not got:
+        raise Refused(f"npm could not say what the newest {name} is: {' '.join((p.stderr or p.stdout).split())[-200:] or 'it failed'}")
+    return got
+
+
+def npm_project(manifest):
+    """package-lock.json as npm writes it for a project whose package.json
+    is `manifest`, with nothing installed and nobody's script run."""
+    npm = _tool("npm", "what npm is asked for")
+    with tempfile.TemporaryDirectory() as t:
+        d = os.path.join(t, "project")
+        os.mkdir(d)
+        with open(os.path.join(d, "package.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(manifest, indent=2) + "\n")
+        _ran([npm, "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"], d,
+             f"npm could not resolve {', '.join(f'{n}@{v}' for n, v in (manifest.get('dependencies') or {}).items())}")
+        return load(os.path.join(d, "package-lock.json"))
+
+
+def npm_parts(row, version="", stay=False):
+    """plan's parts for a program npm installs: each package it asks for,
+    at the version held against the newest its registry names (or
+    `version`; with `stay`, the version it asks for now, which is a first
+    pin's), and its lock, the set held against the one npm writes for what
+    it would ask for then."""
+    want = npm_wanted(row)
+    if version and len(want) != 1:
+        raise Refused("--version names one package's version, and its package.json asks for several")
+    parts, new = [], dict(want)
+    for name, have in want.items():
+        new[name] = version or (have if stay else npm_newest(name))
+        part = {"what": name, "old": have, "new": new[name]}
+        if new[name] != have:
+            part["apply"] = lambda r, name=name, to=new[name]: r["npm"]["manifest"]["dependencies"].__setitem__(name, to)
+        parts.append(part)
+    lock = npm_project({**row["npm"]["manifest"], "dependencies": new})
+    was, now = npm_packages(row["npm"].get("lock") or {}), npm_packages(lock)
+    part = {"what": "its lock", "old": f"{len(was)} package(s)" if was else "", "new": f"{len(now)} package(s)"}
+    if was != now or new != want:
+        short = lambda p: p.rsplit("node_modules/", 1)[-1]  # noqa: E731
+        moved_ = [f"{short(p)} {was[p][0]} to {v[0]}" if p in was else f"{short(p)} {v[0]} added" for p, v in now.items() if was.get(p) != v]
+        moved_ += [f"{short(p)} {v[0]} gone" for p, v in was.items() if p not in now]
+        if was and moved_:
+            part["note"] = "; ".join(moved_[:8]) + (f"; and {len(moved_) - 8} more" if len(moved_) > 8 else "")
+        part["apply"] = lambda r, lock=lock: r["npm"].__setitem__("lock", lock)
+    else:
+        part["new"], part["note"] = part["old"], "npm writes the lock it holds"
+    return parts + [part]
+
+
+def npm_doc(root):
+    """A folder of npm programs in a table's place: every folder of it that
+    holds a package.json is a row, read from its two files and written
+    back to them."""
+    rows = []
+    for folder in sorted(os.listdir(root)):
+        d = os.path.join(root, folder)
+        if not os.path.isfile(os.path.join(d, "package.json")):
+            continue
+        lock = os.path.join(d, "package-lock.json")
+        rows.append({"name": f"npm-{folder}", "npm": {"dir": d, "manifest": load(os.path.join(d, "package.json")),
+                                                     "lock": load(lock) if os.path.isfile(lock) else {}}})
+    if not rows:
+        raise ValueError("no folder of it holds a package.json")
+    return {LISTS[3]: rows, "_list": LISTS[3], "_npm": root, "_file": root, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set()}
+
+
+def npm_written(doc):
+    """Each program's two files as its row holds them now."""
+    for row in table(doc):
+        for name, what in (("package.json", row["npm"]["manifest"]), ("package-lock.json", row["npm"]["lock"])):
+            with open(os.path.join(row["npm"]["dir"], name), "w", encoding="utf-8") as f:
+                f.write(json.dumps(what, indent=2, ensure_ascii=False) + "\n")
+
+
+# ---- the image a Dockerfile is built FROM --------------------------------------
+# A Dockerfile's FROM lines, read and written as text so the file keeps
+# everything else: each names an image, held by its digest as any image is.
+FROM_LINE = re.compile(r"^(?P<head>FROM[ \t]+(?:--platform=\S+[ \t]+)?)(?P<ref>[^\s#]+)(?P<tail>(?:[ \t]+[Aa][Ss][ \t]+\S+)?[ \t]*)$", re.M)
+
+
+def dockerfile_doc(path, plats=("linux/amd64",)):
+    """A Dockerfile in a table's place: one row, image-base, of the images
+    its FROM lines name, each under the reference its line had, held for
+    `plats` (the platform the image is built for)."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    stages = {m.group("tail").split()[-1].lower() for m in FROM_LINE.finditer(text) if m.group("tail").strip()}
+    refs = list(dict.fromkeys(m.group("ref") for m in FROM_LINE.finditer(text) if m.group("ref").lower() not in ({"scratch"} | stages)))
+    if not refs:
+        raise ValueError("it is built FROM no image")
+    row = {"name": "image-base", "compose": True, "images": {ref: ref for ref in refs}, "platforms": list(plats)}
+    return {LISTS[2]: [row], "_list": LISTS[2], "_dockerfile": path, "_text": text, "_file": path, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set()}
+
+
+def dockerfile_repinned(text, moved_):
+    """A Dockerfile with each FROM line's image in `moved_` ({old: new})
+    written as its new one, and nothing else of it changed."""
+    return FROM_LINE.sub(lambda m: m.group("head") + moved_.get(m.group("ref"), m.group("ref")) + m.group("tail"), text)
+
+
+def path_doc(path, recipes=""):
+    """What a path is read as in a table's place: a Dockerfile, a folder of
+    npm programs, or a table."""
+    if os.path.isdir(path):
+        return npm_doc(path)
+    if os.path.basename(path).startswith("Dockerfile"):
+        return dockerfile_doc(path)
+    return table_doc(path, recipes)
+
+
+def shipped_docs():
+    """Every document of this tree that carries a pin: the tables, the
+    image's npm programs and the image it is built FROM."""
+    return [table_doc(path, recipes) for path, recipes in SHIPPED] + [path_doc(path) for path in SHIPPED_WHERE_IT_LIES]
+
+
+# ---- what a row is, and what would move ---------------------------------------
+def is_pinned(row):
+    """Whether a row has anything pinned for check and move to ask about. A
+    row with a download still waiting for its first pin is `pin`'s."""
+    if row.get("npm"):
+        return not npm_refused(row)
+    if image_rows(row):
+        return all(packformat.image_digest(ref) for _, ref in image_rows(row))
+    src = row.get("source") or {}
+    held = bool(sdkmeta.pin_of(row) or sdkmeta.signed_version(row) or (src.get("kind") == "git" and src.get("commit"))
+                or any(fetch_held(f) for f in fetch_rows(row)))
+    return held and not unheld(row) and not unlocked(row) and not unversioned(row)
+
+
+def unversioned(row):
+    """Whether a row held by its publisher's signature carries no version:
+    every release the publisher ever signed would pass it, so it is `pin`'s."""
+    return signed_row(row) and not sdkmeta.pin_of(row) and not sdkmeta.signed_version(row)
+
+
+def plan(row, version=""):
+    """What would move in a row, with nothing written: a list of
+    {"what", "old", "new", "apply", "note"}, each one part of the row (its
+    own download, its commit, a declared download). `apply` writes the part
+    into a copy of the row. A part that is as its entry pins it is listed
+    with old and new alike."""
+    if row.get("npm"):
+        return npm_parts(row, version)
+    if image_rows(row):
+        return image_parts(row)
+    src = row.get("source") or {}
+    parts = []
+    pin = sdkmeta.pin_of(row)
+    if pin is not None:
+        tracked = bool(src.get("version")) or bool(version)
+        old_v = str(pin.get("version") or "")
+        if tracked:
+            with As(platforms(row)[0]):
+                new_v = version or sdkmeta.newest(row)[0]
+            got, held = None, ""
+            if new_v != old_v or version:
+                try:
+                    got = learned(row, version)
+                except Refused as e:
+                    # A version named by hand that cannot be learned is an
+                    # error. One its resolver finds is a release that is not
+                    # out for every platform the row names yet: the row
+                    # stays where it is until it is, and says so.
+                    if version:
+                        raise
+                    held = f"its resolver finds {new_v}, and {e}"
+            if got and got["version"] == old_v:
+                # The version it has, named again: a move only where its
+                # publisher's file is no longer the pinned one.
+                have = pinned_files(row)
+                if all(have[p] == (f["url"], f["sha256"]) for p, f in got["files"].items()):
+                    got = None
+            if held:
+                parts.append({"what": "its download", "old": old_v, "new": old_v, "held": held, "note": f"{held}: it stays where it is"})
+            elif got is None:
+                parts.append({"what": "its download", "old": old_v, "new": old_v, "note": "its resolver finds the version it is pinned to"})
+            else:
+                parts.append({"what": "its download", "old": old_v, "new": got["version"], "files": got["files"],
+                              "apply": lambda r, got=got: write_pin(r, got, (r["source"]["checksum"] or {}).get("found"))})
+        else:
+            # Nothing says how a newer one is found: a file with no version
+            # in its address, or one nobody tracks. Its address is asked for
+            # the bytes it answers today.
+            have = pinned_files(row)
+            got = {"version": old_v, "supplied": False, "files": {}}
+            for plat, (url, digest) in have.items():
+                try:
+                    now = hashed(url)["sha256"]
+                except ERRORS as e:
+                    raise Refused(f"{plat or 'its download'} could not be fetched ({said(e)})") from e
+                got["files"][plat] = {"url": url, "sha256": now, "how": "downloaded and hashed here", "was": digest}
+            moved = [p for p, f in got["files"].items() if f["sha256"] != f["was"]]
+            if moved:
+                parts.append({"what": "its download", "old": "the pinned bytes", "new": "other bytes", "files": got["files"],
+                              "note": "its vendor changed the file at " + ", ".join(got["files"][p]["url"] for p in moved),
+                              "apply": lambda r, got=got: write_pin(r, got, (r["source"]["checksum"] or {}).get("found"))})
+            else:
+                parts.append({"what": "its download", "old": old_v or "the pinned bytes", "new": old_v or "the pinned bytes",
+                              "note": "its address still answers the pinned bytes"})
+    elif sdkmeta.signed_version(row):
+        parts.append(signed_part(row, version))
+    if src.get("kind") == "git" and src.get("commit"):
+        if isinstance(src.get("track"), dict):
+            got = git_learned(row)
+            old = f"{src.get('tag') or ''} {str(src['commit'])[:12]}".strip()
+            new = f"{got['tag']} {got['commit'][:12]}".strip()
+            part = {"what": "its commit", "old": old, "new": new}
+            if got["commit"] != src["commit"] or (got["tag"] and got["tag"] != src.get("tag")):
+                part["apply"] = lambda r, got=got: r["source"].update({"commit": got["commit"], **({"tag": got["tag"]} if got["tag"] else {})})
+            else:
+                part["new"] = old
+            parts.append(part)
+        else:
+            parts.append({"what": "its commit", "old": str(src["commit"])[:12], "new": str(src["commit"])[:12], "note": "it says no source.track: nothing to ask"})
+    return parts + declared_parts(row) + lock_parts(row)
+
+
+def declared_parts(row, waiting=False):
+    """plan's parts for what a row declares, a part a download. Each is
+    asked by its own track, so a row of several tools moves the ones that
+    have a newer release and leaves the others, and downloads that say one
+    track move together. With `waiting`, only the downloads held to
+    nothing yet: what a first pin fills in."""
+    parts, cache = [], {}
+    for f in fetch_rows(row):
+        # A lock's downloads are its lock's to move, as one set (lock_parts).
+        if (waiting and fetch_held(f)) or packformat.lock_of(locks(row), f.get("to")):
+            continue
+        what = fetch_said(f)
+        try:
+            got = fetch_learned(row, f, cache)
+        except ERRORS as e:
+            raise Refused(f"{what} could not be learned ({said(e)})") from e
+        old = f"{f.get('version') or ''} {str(f.get('sha256') or '')[:12]}".strip() if fetch_held(f) else ""
+        new = f"{got['version']} {got['sha256'][:12]}".strip()
+        part = {"what": what, "old": old, "new": new, "note": got["how"]}
+        changed = {k: got[k] for k in ("version", "sha256") if got[k] and got[k] != f.get(k)}
+        if got["url"] != sdkmeta.declared_address({**f, "version": got["version"]}):
+            changed["url"] = got["url"]
+        if changed:
+            key = (f.get("to"), str(f.get("platform") or ""))
+            part["apply"] = lambda r, key=key, changed=changed: fetch_write(fetch_of(r, *key), changed)
+        else:
+            part["new"] = old
+        parts.append(part)
+    return parts
+
+
+def moved(row, parts):
+    """`row` with every part that moves applied and its rev raised by one,
+    or None where nothing moves. Refused where the result is no row the
+    format takes."""
+    todo = [p for p in parts if p.get("apply")]
+    if not todo:
+        return None
+    new = copy.deepcopy(row)
+    for p in todo:
+        p["apply"](new)
+    new["rev"] = catalogrows.rev_of(row) + 1
+    why = row_refused(new)
+    if why:
+        raise Refused(f"what it would become is refused: {why}")
+    return new
+
+
+def lines(name, parts):
+    """What a row's parts say, a line each, with a line a platform under a
+    download that moves."""
+    out = []
+    for p in parts:
+        same = not p.get("apply")
+        now = p["new"] or "the bytes its address answers today"
+        head = f"{name}: {p['what']} " + (f"is at {p['old'] or 'its pin'}" if same else f"{p['old']} to {now}" if p["old"] else f"pinned at {now}")
+        out.append(head + (f" ({p['note']})" if p.get("note") else ""))
+        for plat, f in (p.get("files") or {}).items() if not same else ():
+            out.append(f"    {plat or 'every platform'}  sha256 {f['sha256']}  {f['how']}")
+            out.append(f"    {' ' * len(plat or 'every platform')}  {f['url']}")
+    return out
+
+
+# ---- the verbs ----------------------------------------------------------------
+def load(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def table(doc):
+    """The rows of a table's document, under whichever name it lists them."""
+    return doc[doc.get("_list") or LISTS[0]]
+
+
+def save(path, doc):
+    """The table as it is laid out, so a move's diff is the lines that
+    changed and no others."""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+
+
+# ---- the coding agents' recipes --------------------------------------------------
+# A coding agent's install recipe declares its downloads in the shape a
+# row's source does, so it is read here as a row: its name the one its row
+# in the Library has, its source the recipe as the format reads one
+# (packformat.agent_source). The rows are kept beside the table's, never in
+# it, and a row that moved is written back into the recipes' own file.
+def agent_rows(recipes):
+    """[row] for the recipes of a recipes file's document, in its order.
+    One that says no steps declares nothing: it is a row with nothing
+    pinned, which check says by name."""
+    names = {a.id: a.tool or a.id for a in agents.TABLE}
+    # A source says only what the recipe says: no keys, no sentence, where it has none.
+    return [{"name": names.get(aid, aid), "agent": aid, "rev": catalogrows.rev_of(r),
+             "source": {k: v for k, v in packformat.agent_source(r).items() if v not in ({}, "", False)}}
+            for aid, r in recipes.items() if isinstance(r, dict)]
+
+
+# What this tool keeps in the table's document beside the table: the
+# agents' rows, the file they came from, which of the two files moved, and
+# the name the table lists its rows under.
+BESIDE = ("_agents", "_recipes", "_moved", "_list", "_compose", "_text", "_file", "_agents_file", "_pack", "_npm", "_dockerfile")
+
+
+def agents_written(doc):
+    """The recipes file's document with what each agent's row holds now
+    written into its recipe: the downloads and the rev, the rest as it was.
+    Refused where a recipe would no longer be one."""
+    out = copy.deepcopy(doc["_recipes"])
+    for row in doc["_agents"]:
+        r = out["recipes"][row["agent"]]
+        if isinstance(r.get("fetch"), list):
+            r["fetch"], r["rev"] = row["source"]["fetch"], row["rev"]
+            why = agents.install_checked(r)[1]
+            if why:
+                raise Refused(f"{row['name']}: what its recipe would become is refused: {why}")
+    return out
+
+
+def put(doc, row, new):
+    """`new` in `row`'s place, in the table or among the agents' rows."""
+    rows = doc["_agents"] if row.get("agent") else table(doc)
+    rows[rows.index(row)] = new
+    doc.setdefault("_moved", set()).add("agents" if row.get("agent") else "table")
+
+
+def chosen(doc, names):
+    """The rows named, in the table's order and then the coding agents';
+    every one with none named."""
+    rows = table(doc) + doc.get("_agents", [])
+    have = {r.get("name") for r in rows}
+    missing = [n for n in names if n not in have]
+    if missing:
+        what = (doc.get("_list") or LISTS[0]).removesuffix("s")
+        raise Refused(f"no {what}{' or coding agent' if doc.get('_agents') else ''} named {', '.join(missing)} in the table")
+    return [r for r in rows if not names or r.get("name") in names]
+
+
+def check_rows(doc, names, opts, out):
+    """What each row named would move to, said: (how many rows would move,
+    how many could not be asked, how many wait for a release that is not
+    out for every platform they name)."""
+    would, failed, waiting = 0, 0, 0
+    for row in chosen(doc, names):
+        name = row["name"]
+        if unversioned(row):
+            # Said whether named or not: it reads pinned and installs
+            # whatever its publisher signed last.
+            out(f"{name}: held by its publisher's signature and carrying no version: tools/pins.py pin {name} writes the one its resolver finds")
+            would += 1
+            continue
+        if not is_pinned(row):
+            if names or row.get("compose"):
+                out(f"{name}: not pinned ({row_refused(row) if image_rows(row) else packformat.held(row)[1]})")
+            continue
+        try:
+            parts = plan(row)
+        except ERRORS as e:
+            out(f"{name}: could not be asked: {said(e)}")
+            failed += 1
+            continue
+        for line in lines(name, parts):
+            out(line)
+        # A release that is not out for every platform holds its row
+        # whole: nothing of that row would move.
+        if any(p.get("held") for p in parts):
+            waiting += 1
+        else:
+            would += any(p.get("apply") for p in parts)
+    return would, failed, waiting
+
+
+def checked(counts, out):
+    """check's last line and its exit, for the rows of one table or of several."""
+    would, failed, waiting = (sum(c[i] for c in counts) for i in range(3))
+    out((f"{would} row(s) would move" if would else "nothing would move")
+        + (f"; {waiting} row(s) wait for a release that is not out for every platform they name" if waiting else ""))
+    return 1 if failed else 3 if would else 0
+
+
+def cmd_check(doc, names, opts, out):
+    return checked([check_rows(doc, names, opts, out)], out)
+
+
+def cmd_move(doc, names, opts, out):
+    changed, failed = 0, 0
+    for row in chosen(doc, names):
+        name = row["name"]
+        if not is_pinned(row):
+            if names:
+                out(f"{name}: not pinned: tools/pins.py pin {name} pins it")
+                failed += 1
+            continue
+        try:
+            parts = plan(row, opts.get("version", ""))
+            # A row moves whole: a part held back holds every part of it.
+            held = next((p["held"] for p in parts if p.get("held")), "")
+            if held:
+                raise Refused(held)
+            new = moved(row, parts)
+        except ERRORS as e:
+            out(f"{name}: left as it was: {said(e)}")
+            failed += 1
+            continue
+        if new is None:
+            out(f"{name}: nothing to move")
+            continue
+        for line in lines(name, [p for p in parts if p.get("apply")]):
+            out(line)
+        if has_rev(doc, row):
+            out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
+        put(doc, row, new)
+        changed += 1
+    return finish(doc, opts, out, changed, failed)
+
+
+def cmd_pin(doc, names, opts, out):
+    # A compose file is one row: it needs no naming.
+    names = names or [r["name"] for r in table(doc) if r.get("compose")]
+    if len(names) != 1:
+        raise Refused("pin takes one NAME")
+    row = chosen(doc, names)[0]
+    try:
+        return pin_row(doc, row, opts, out)
+    except Refused as e:
+        raise Refused(f"{row['name']} is left as it was: {e}") from e
+
+
+def pin_row(doc, row, opts, out):
+    name, src = row["name"], row.get("source") or {}
+    new = copy.deepcopy(row)
+    # A program npm installs, with no lock yet: the lock npm writes for
+    # the version its package.json asks for.
+    if row.get("npm"):
+        if is_pinned(row):
+            raise Refused(f"it is pinned already: tools/pins.py move {name} --file {os.path.dirname(row['npm']['dir'])} moves it")
+        parts = npm_parts(row, opts.get("version", ""), stay=True)
+        for p in parts:
+            if p.get("apply"):
+                p["apply"](new)
+        why = row_refused(new)
+        if why:
+            raise Refused(f"what it would become is refused: {why}")
+        for line in lines(name, [p for p in parts if p.get("apply")]):
+            out(line)
+        put(doc, row, new)
+        return finish(doc, opts, out, 1, 0)
+    # The images it names with no digest yet: every one of them, or the
+    # row is left as it was.
+    if image_rows(row) or "images" in row:
+        parts = image_parts(row, waiting=True)
+        if not parts:
+            raise Refused(f"it is pinned already: tools/pins.py move {name} moves it" if image_rows(row) else "it names no image")
+        held = next((p["held"] for p in parts if p.get("held")), "")
+        if held:
+            raise Refused(held)
+        for p in parts:
+            p["apply"](new)
+        for line in lines(name, parts):
+            out(line)
+        new["rev"] = catalogrows.rev_of(row) + 1
+        put(doc, row, new)
+        if has_rev(doc, row):
+            out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
+        return finish(doc, opts, out, 1, 0)
+    # Its own source, where that is not pinned yet: a repository's commit,
+    # a tarball's or a script's file.
+    kind = src.get("kind")
+    # A row held by its publisher's signature keeps it as the check, and is
+    # given the version it installs.
+    signed = signed_row(row) and not sdkmeta.pin_of(row)
+    own = (kind == "git" and not src.get("commit")) or (kind in ("tarball", "script") and not sdkmeta.pin_of(row) and not signed)
+    waiting = unheld(row) or unlocked(row) or unversioned(row)
+    if not own and not waiting:
+        if kind in ("git", "tarball", "script") or fetch_rows(row):
+            raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
+        raise Refused(f"it has no download of its own to pin, and declares none: its source is of kind {kind}")
+    if own and kind == "git":
+        got = git_learned(row)
+        new["source"].update({"commit": got["commit"], **({"tag": got["tag"]} if got["tag"] else {})})
+        out(f"{name}: its commit pinned at {got['tag']} {got['commit']}".replace("  ", " "))
+    elif own:
+        got = learned(row, opts.get("version", ""))
+        write_pin(new, got, src.get("checksum"))
+        for line in lines(name, [{"what": "its download", "old": "", "new": got["version"], "files": got["files"], "apply": True}]):
+            out(line)
+    # What it declares and holds to nothing yet, and what it asks a
+    # package manager for and has no files for yet: every one of them, or
+    # the row is left as it was.
+    if waiting:
+        parts = ([signed_part(row, opts.get("version", ""))] if unversioned(row) else []) \
+            + declared_parts(row, waiting=True) + lock_parts(row, waiting=True)
+        held = next((p["held"] for p in parts if p.get("held")), "")
+        if held:
+            raise Refused(held)
+        for p in parts:
+            p["apply"](new)
+        for line in lines(name, parts):
+            out(line)
+    new["rev"] = catalogrows.rev_of(row) + 1
+    why = row_refused(new)
+    if why:
+        raise Refused(f"what it would become is refused: {why}")
+    put(doc, row, new)
+    word, why = packformat.held(new)
+    out(f"{name}: " + (f"rev {catalogrows.rev_of(row)} to {new['rev']}; " if has_rev(doc, row) else "") + f"it reads {word}" + (f" ({why})" if word == "open" else ""))
+    return finish(doc, opts, out, 1, 0)
+
+
+def has_rev(doc, row):
+    """Whether a row carries a rev that a move raises: a table's row, a
+    recipe. A compose file has none, nor a pack that is pinned by the
+    commit it is at."""
+    return not (row.get("compose") or row.get("npm") or (doc.get("_pack") or {}).get("kind") in ("pack", "service"))
+
+
+def finish(doc, opts, out, changed, failed):
+    """Write the table where a row of it changed, the coding agents'
+    recipes where one of theirs did, and the official packs from them where
+    either is the shipped one (the toolchains' table, or the services'
+    images); a compose file where the row is one; a catalog pack's
+    manifest where the row is that."""
+    if changed and doc.get("_pack"):
+        try:
+            pack_written(doc)
+        except Refused as e:
+            out(f"{doc['_pack']['name']}: its manifest is left as it was: {e}")
+            failed += 1
+        return 1 if failed else 0
+    if changed and doc.get("_npm"):
+        npm_written(doc)
+        return 1 if failed else 0
+    if changed and doc.get("_dockerfile"):
+        # A Dockerfile: its FROM lines rewritten, and nothing else of it.
+        with open(doc["_dockerfile"], "w", encoding="utf-8") as f:
+            f.write(dockerfile_repinned(doc["_text"], table(doc)[0]["images"]))
+        return 1 if failed else 0
+    if changed and doc.get("_compose"):
+        # A compose file: its image lines rewritten, and nothing else of it.
+        row = table(doc)[0]
+        with open(doc["_compose"], "w", encoding="utf-8") as f:
+            f.write(packformat.compose_repinned(doc["_text"], row["images"]))
+        return 1 if failed else 0
+    if changed:
+        shipped = False
+        if "agents" in doc.get("_moved", ()):
+            try:
+                save(doc["_agents_file"], agents_written(doc))
+                shipped = os.path.abspath(doc["_agents_file"]) == os.path.abspath(AGENTS)
+            except Refused as e:
+                out(f"the coding agents' recipes are left as they were: {e}")
+                failed += 1
+        if "table" in doc.get("_moved", ("table",)):
+            save(doc["_file"], {k: v for k, v in doc.items() if k not in BESIDE})
+            shipped = shipped or os.path.abspath(doc["_file"]) in (os.path.abspath(TABLE), os.path.abspath(SERVICES))
+        if shipped:
+            p = subprocess.run([sys.executable, os.path.join(HERE, "packs-export.py"), "--write"], capture_output=True, text=True, check=False)
+            out((p.stdout + p.stderr).strip())
+            failed += bool(p.returncode)
+    return 1 if failed else 0
+
+
+def verify_rows(doc, names, opts, out):
+    """Each pinned file of the rows named held to its pin, said: (how many
+    are not their pin, how many were asked for)."""
+    bad, seen = 0, 0
+    for row in chosen(doc, names):
+        name, src = row["name"], row.get("source") or {}
+        if not is_pinned(row):
+            continue
+        # An image is read by the digest it is pinned to, and its bytes held
+        # to it: what a node that pulls it is answered.
+        for key, ref in image_rows(row):
+            seen += 1
+            what = image_said(row, key)
+            digest, mdoc, err = imageregistry.manifest_of(ref, by_digest=True)
+            plats = imageregistry.platforms_of(mdoc)
+            want = [opts["platform"]] if opts.get("platform") else [p for p in row.get("platforms") or [] if isinstance(p, str)]
+            lacks = [p for p in want if p not in plats] if plats else []
+            if err:
+                out(f"{name}: NOT VERIFIED: {what}, {ref}: {err}")
+                bad += 1
+            elif lacks:
+                out(f"{name}: NOT ITS PIN: {what}, {ref} is a list for {', '.join(plats)}, and not for {', '.join(lacks)}")
+                bad += 1
+            else:
+                out(f"{name}: {what} is its pin ({'a list for ' + ', '.join(plats) if plats else 'one image'}, sha256 {digest[7:19]})")
+        if image_rows(row):
+            continue
+        if row.get("npm"):
+            # Every tarball its lock names, held to the integrity beside it:
+            # what npm ci does as it installs.
+            for path, (version, url, integrity) in npm_packages(row["npm"]["lock"]).items():
+                seen += 1
+                try:
+                    npm_hashed(url, integrity)
+                except ERRORS as e:
+                    out(f"{name}: NOT ITS PIN: {path.rsplit('node_modules/', 1)[-1]} {version}: {said(e)}")
+                    bad += 1
+            out(f"{name}: its lock's {len(npm_packages(row['npm']['lock']))} package(s) asked for")
+            continue
+        files = []
+        try:
+            if sdkmeta.pin_of(row):
+                plats = platforms(row) if opts.get("all") else [opts.get("platform", "")]
+                with As(plats[0]):
+                    there = sdkmeta.pinned_digest(row)
+                if not there and not opts.get("all"):
+                    out(f"{name}: it names no download for {plats[0] or sdkmeta.this_platform()}")
+                    plats = []
+                files += [(f"its download{' for ' + p if p else ''}", u, d) for p, (u, d) in pinned_files(row, plats).items()]
+            elif sdkmeta.signed_version(row):
+                out(f"{name}: its download at {sdkmeta.signed_version(row)} is held by its publisher's signature, which an install checks: not hashed here")
+            for f in fetch_rows(row):
+                plat = str(f.get("platform") or "")
+                with As(opts.get("platform", "")):
+                    mine = opts.get("all") or sdkmeta.on_platform(plat)
+                if not mine:
+                    continue
+                if not f.get("sha256"):
+                    out(f"{name}: {f.get('to')} is held by its publisher's signature, which an install checks: not hashed here")
+                    continue
+                files.append((f"{f.get('to')}{' for ' + plat if plat else ''}", sdkmeta.declared_address(f), f["sha256"]))
+            if src.get("kind") == "git" and src.get("commit") and src.get("tag"):
+                # A commit is held by its own hash at the fetch; what can
+                # move under a row is the tag it names beside it.
+                with As():
+                    got = sdkmeta.git_newest(row, {"resolver": "git-tag", "match": "^" + re.escape(src["tag"]) + "$"})
+                seen += 1
+                if got[1] != src["commit"]:
+                    out(f"{name}: NOT ITS PIN: the tag {src['tag']} of {src['url']} is at {got[1]}, and the row pins {src['commit']}")
+                    bad += 1
+                else:
+                    out(f"{name}: the tag {src['tag']} is at the pinned commit {src['commit'][:12]}")
+        except ERRORS as e:
+            out(f"{name}: could not be verified: {said(e)}")
+            bad += 1
+            continue
+        for what, url, want in files:
+            seen += 1
+            try:
+                got = hashed(url)
+            except ERRORS as e:
+                out(f"{name}: NOT VERIFIED: {what}, {url}: {said(e)}")
+                bad += 1
+                continue
+            if got["sha256"] != want:
+                out(f"{name}: NOT ITS PIN: {what}, {url} answers sha256 {got['sha256']}, and the row pins {want}")
+                bad += 1
+            else:
+                out(f"{name}: {what} is its pin ({got['bytes']} bytes, sha256 {want[:12]})")
+    return bad, seen
+
+
+def verified(counts, out):
+    """verify's last line and its exit, for the rows of one table or of several."""
+    bad, seen = (sum(c[i] for c in counts) for i in range(2))
+    out(f"{bad} of {seen} pinned file(s) are not their pin" if bad else f"every one of the {seen} pinned file(s) asked for is its pin")
+    return 1 if bad else 0
+
+
+def cmd_verify(doc, names, opts, out):
+    return verified([verify_rows(doc, names, opts, out)], out)
+
+
+VERBS = {"check": cmd_check, "move": cmd_move, "pin": cmd_pin, "verify": cmd_verify}
+
+
+# ---- the tables a run reads ------------------------------------------------------
+def table_doc(path, recipes=""):
+    """A table's document as the verbs read it: its rows under the name it
+    lists them by, the file it came from, and beside it the coding agents'
+    rows from `recipes`, the file of their install recipes, where one is
+    named."""
+    doc = load(path)
+    doc["_list"] = next((k for k in LISTS if isinstance(doc.get(k), list)), "")
+    if not doc["_list"]:
+        raise ValueError(f"it has no list of {' or '.join(LISTS)}")
+    doc.update(_file=path, _agents=[], _recipes={"recipes": {}}, _moved=set())
+    if recipes:
+        doc["_recipes"] = load(recipes)
+        if not isinstance(doc["_recipes"].get("recipes"), dict):
+            raise ValueError(f"{recipes} has no recipes")
+        doc.update(_agents=agent_rows(doc["_recipes"]["recipes"]), _agents_file=recipes)
+    return doc
+
+
+def compose_doc(path, plats=()):
+    """A compose file in a table's place: one row of the images its lines
+    name, each under the reference it had, held for `plats`."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    refs = packformat.compose_images(text)
+    if not refs:
+        raise ValueError("it names no image")
+    row = {"name": os.path.basename(os.path.dirname(os.path.abspath(path))) or path, "compose": True,
+           "images": {ref: ref for ref in refs}, **({"platforms": list(plats)} if plats else {})}
+    return {LISTS[2]: [row], "_list": LISTS[2], "_compose": path, "_text": text, "_file": path, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set()}
+
+
+# ---- a checkout of the catalog -----------------------------------------------------
+# Every folder under the catalog's packs/ is a row here, read from the file
+# that holds its pins and written back to it: a pack's bbtool.json or an
+# app's compose.yml. What a manifest is says which part of it carries pins
+# (a shipped toolchain's recipe, a coding agent's install recipe, the
+# images a service runs, a pack's own declared install), and nothing here
+# knows one pack from another.
+MANIFEST, APP, COMPOSE = "bbtool.json", "bbapp.json", "compose.yml"
+# The small files a lock installs by are a pack's own, kept in its folder.
+LOCK_FILE_MAX = 4 << 20
+
+
+def laid_out(text, doc):
+    """How a JSON file is laid out, as what json.dumps takes to write it
+    the same way: the indent and the key order that give back its text, so
+    a move's diff is the lines that changed. One laid out by hand is
+    written with its own indent and its keys in the order they were."""
+    for indent in (1, 2, 4, "\t"):
+        for sort in (True, False):
+            kw = {"indent": indent, "sort_keys": sort, "ensure_ascii": False}
+            if json.dumps(doc, **kw) + "\n" == text:
+                return kw
+    m = re.search(r"^([ \t]+)\S", text, re.M)
+    lead = m.group(1) if m else " "
+    return {"indent": "\t" if lead[0] == "\t" else len(lead), "sort_keys": False, "ensure_ascii": False}
+
+
+def pack_source(m, folder):
+    """A pack's own install as the source a row has: what it declares, the
+    keys it carries, its sentence, what it asks a package manager for, and
+    the files a lock installs by, read from its folder."""
+    inst = m.get("install") if isinstance(m.get("install"), dict) else {}
+    src = {"kind": "command", **{k: inst[k] for k in ("fetch", "keyring", "online", "lock") if inst.get(k)}}
+    files = {}
+    for lk in inst.get("lock") if isinstance(inst.get("lock"), list) else []:
+        under = os.path.join(folder, str(lk.get("to") or "")) if isinstance(lk, dict) and packformat.REL.fullmatch(str(lk.get("to") or "")) else ""
+        for base, _dirs, names in os.walk(under) if under and os.path.isdir(under) else ():
+            for name in sorted(names):
+                path = os.path.join(base, name)
+                if os.path.getsize(path) <= LOCK_FILE_MAX:
+                    with open(path, encoding="utf-8") as f:
+                        files[os.path.relpath(path, folder)] = f.read()
+    if files:
+        src["files"] = files
+    return src
+
+
+def catalog_docs(root, plat=""):
+    """A document for every folder under the catalog's packs/ that carries
+    a pin's file, in the folders' order: (docs, what could not be read).
+    `plat` is the one platform an app's images are held for, in the place
+    of the ones its manifest names."""
+    docs, bad = [], []
+    top = os.path.join(root, "packs")
+    for group in sorted(os.listdir(top)) if os.path.isdir(top) else []:
+        for name in sorted(os.listdir(os.path.join(top, group))) if os.path.isdir(os.path.join(top, group)) else []:
+            folder = os.path.join(top, group, name)
+            rel = os.path.relpath(folder, root)
+            try:
+                if os.path.isfile(os.path.join(folder, APP)) and os.path.isfile(os.path.join(folder, COMPOSE)):
+                    # A Docker app: its compose's images, held for the
+                    # platforms its manifest names one by one.
+                    meta = load(os.path.join(folder, APP))
+                    plats = [p for p in meta.get("platforms") or [] if isinstance(p, str) and "*" not in p] if isinstance(meta, dict) else []
+                    docs.append(compose_doc(os.path.join(folder, COMPOSE), [plat] if plat else plats))
+                    continue
+                path = os.path.join(folder, MANIFEST)
+                if not os.path.isfile(path):
+                    continue
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+                m = json.loads(text)
+                if not isinstance(m, dict) or not isinstance(m.get("name"), str):
+                    raise ValueError("it is no manifest")
+                pack = {"path": path, "folder": folder, "manifest": m, "text": text, "name": m["name"]}
+                doc = {LISTS[0]: [], "_list": LISTS[0], "_file": path, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set(), "_pack": pack}
+                install = (m.get("agent") or {}).get("install") if isinstance(m.get("agent"), dict) else None
+                if isinstance(m.get("shipped"), dict):
+                    pack["kind"] = "shipped"
+                    doc[LISTS[0]] = [catalogrows.row_of(m)]
+                elif m.get("tier") == "official" and isinstance(install, dict):
+                    pack["kind"] = "agent"
+                    doc["_recipes"] = {"recipes": {m["name"]: install}}
+                    doc["_agents"] = agent_rows(doc["_recipes"]["recipes"])
+                    pack["name"] = doc["_agents"][0]["name"]
+                elif isinstance(m.get("images"), dict):
+                    pack["kind"] = "service"
+                    doc[LISTS[0]] = [{"name": m["name"], "platforms": m.get("platforms") or [], "images": dict(m["images"])}]
+                else:
+                    pack["kind"] = "pack"
+                    # `pack` says the keys a signed download is checked with are the pack's own (packformat.held).
+                    doc[LISTS[0]] = [{"name": m["name"], "platforms": m.get("platforms") or [], "source": pack_source(m, folder), "pack": {}}]
+                docs.append(doc)
+            except (OSError, ValueError, AttributeError, TypeError) as e:
+                bad.append(f"{rel}: {said(e)}")
+    return docs, bad
+
+
+def pack_written(doc):
+    """A catalog pack's manifest written with what its row holds now, in
+    the layout it had, and a pack's lock's files into its folder. Refused,
+    with nothing written, where the manifest would no longer be one an
+    install takes."""
+    import toolpacks  # noqa: PLC0415 (the validator, and all it loads, for a catalog's manifest alone)
+    pack = doc["_pack"]
+    m = copy.deepcopy(pack["manifest"])
+    files = {}
+    if pack["kind"] == "shipped":
+        m = catalogrows.manifest_of(table(doc)[0])
+    elif pack["kind"] == "agent":
+        m["agent"]["install"] = agents_written(doc)["recipes"][pack["manifest"]["name"]]
+    elif pack["kind"] == "service":
+        m["images"] = dict(table(doc)[0]["images"])
+    else:
+        src = table(doc)[0]["source"]
+        m["install"] = {**m["install"], "fetch": src.get("fetch") or []}
+        files = src.get("files") or {}
+    errors = toolpacks.validate(m, (), official=m.get("tier") == "official")[1]
+    if errors:
+        raise Refused("what it would become is refused: " + "; ".join(errors))
+    # A lock's files: the set it installs by now, in the place of the one it had.
+    had = pack_source(pack["manifest"], pack["folder"]).get("files") or {}
+    for rel in had:
+        if rel not in files:
+            os.remove(os.path.join(pack["folder"], rel))
+    for rel, text in files.items():
+        if had.get(rel) != text:
+            os.makedirs(os.path.dirname(os.path.join(pack["folder"], rel)), exist_ok=True)
+            with open(os.path.join(pack["folder"], rel), "w", encoding="utf-8") as f:
+                f.write(text)
+    with open(pack["path"], "w", encoding="utf-8") as f:
+        f.write(json.dumps(m, **laid_out(pack["text"], pack["manifest"])) + "\n")
+
+
+# ---- a run over several tables -------------------------------------------------------
+def names_of(doc):
+    return [r.get("name") for r in table(doc) + doc.get("_agents", [])]
+
+
+def run(verb, docs, names, opts, out, what="row"):
+    """One verb over several documents (the tables this tree ships, the
+    folders of a catalog): each is asked for the rows of it that are named,
+    every one with none named, and the verb answers once for all of them."""
+    missing = [n for n in names if not any(n in names_of(d) for d in docs)]
+    if missing:
+        raise Refused(f"no {what} named {', '.join(missing)}")
+    mine = [(d, [n for n in names if n in names_of(d)]) for d in docs]
+    mine = [(d, ns) for d, ns in mine if ns or not names]
+    if verb == "check":
+        return checked([check_rows(d, ns, opts, out) for d, ns in mine], out)
+    if verb == "verify":
+        return verified([verify_rows(d, ns, opts, out) for d, ns in mine], out)
+    if verb == "pin":
+        if len(names) != 1 or len(mine) != 1:
+            raise Refused("pin takes one NAME")
+        return cmd_pin(mine[0][0], names, opts, out)
+    return max([cmd_move(d, ns, opts, out) for d, ns in mine], default=0)
+
+
+def main(argv, out=print):
+    opts, names = {}, []
+    args = list(argv)
+    while args:
+        a = args.pop(0)
+        if a in ("--file", "--version", "--platform", "--agents", "--compose", "--catalog"):
+            if not args:
+                out(f"{a} takes a value")
+                return 1
+            opts[a[2:]] = args.pop(0)
+        elif a == "--all":
+            opts["all"] = True
+        elif a.startswith("-"):
+            out(__doc__.strip())
+            return 0 if a in ("-h", "--help") else 1
+        else:
+            names.append(a)
+    if not names or names[0] not in VERBS:
+        out(__doc__.strip())
+        return 1
+    verb, names = names[0], names[1:]
+    if opts.get("version") and (verb not in ("pin", "move") or len(names) != 1):
+        out("--version goes with pin or move and one NAME")
+        return 1
+    if opts.get("platform") and not packformat.PLATFORM_KEY.fullmatch(opts["platform"]):
+        out(f"{opts['platform']} is no platform a row names: linux/amd64, linux/arm64, linux-musl/amd64, darwin/arm64, ...")
+        return 1
+    reading = ""
+    if sum(k in opts for k in ("file", "compose", "catalog")) > 1:
+        out("--file, --compose and --catalog each name what is read in the table's place: one of them")
+        return 1
+    try:
+        if opts.get("catalog"):
+            # A checkout of the catalog: every folder of its packs/ a row.
+            if not os.path.isdir(os.path.join(opts["catalog"], "packs")):
+                out(f"pins: cannot read {opts['catalog']}: it is no checkout of the catalog (no packs/)")
+                return 1
+            docs, bad = catalog_docs(opts["catalog"], opts.get("platform", ""))
+            for line in bad:
+                out(f"pins: cannot read {line}")
+            code = run(verb, docs, names, opts, out, "pack or app of the catalog")
+            return 1 if bad else code
+        if verb == "check" and not names and not any(k in opts for k in ("file", "compose", "agents")):
+            # Everything this tree ships that carries a pin: the toolchains
+            # with the coding agents' recipes, the CI runners, the services'
+            # images, the image's own tools, what it takes from npm and the
+            # image it is built FROM.
+            return run(verb, shipped_docs(), names, opts, out)
+    except (OSError, ValueError, AttributeError) as e:
+        out(f"pins: cannot read {reading or opts.get('catalog') or 'what this tree ships'}: {said(e)}")
+        return 1
+    except ERRORS as e:
+        out(f"pins: {said(e)}")
+        return 1
+    opts.setdefault("file", opts.get("compose") or TABLE)
+    try:
+        if opts.get("compose"):
+            # A compose file in the table's place: one row of the images its
+            # lines name, each under the reference it had.
+            doc = compose_doc(opts["compose"], [opts["platform"]] if opts.get("platform") else ())
+        else:
+            doc = path_doc(opts["file"])
+    except (OSError, ValueError, AttributeError) as e:
+        out(f"pins: cannot read {opts['file']}: {said(e)}")
+        return 1
+    # The coding agents' recipes beside the table: the shipped ones beside
+    # the shipped table, or the file named. Another table alone has none.
+    if "agents" not in opts and os.path.abspath(opts["file"]) == os.path.abspath(TABLE):
+        opts["agents"] = AGENTS
+    if opts.get("agents"):
+        try:
+            doc["_recipes"] = load(opts["agents"])
+            if not isinstance(doc["_recipes"].get("recipes"), dict):
+                raise ValueError("it has no recipes")
+            doc.update(_agents=agent_rows(doc["_recipes"]["recipes"]), _agents_file=opts["agents"])
+        except (OSError, ValueError, AttributeError) as e:
+            out(f"pins: cannot read {opts['agents']}: {said(e)}")
+            return 1
+    try:
+        return VERBS[verb](doc, names, opts, out)
+    except ERRORS as e:
+        out(f"pins: {said(e)}")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

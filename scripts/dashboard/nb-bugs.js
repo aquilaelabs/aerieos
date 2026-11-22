@@ -4,34 +4,43 @@
 
 "use strict";
 
+// A press handler set, not added (R244): a row drawn again is kept, and a
+// listener added on every draw would answer each press once per draw.
+function onPress(root, sel, fn){ const b = root.querySelector(sel); if (b) b.onclick = fn; }
+
 // Whether a report answers a search (R254 step 1): its number (B12 or 12)
 // or any of its words, case aside. An empty search is all.
 function bugMatch(b, q){
-  if (!q) return true;
-  if (q === "b" + b.id || q === String(b.id)) return true;
-  return ["title", "area", "repro", "expected", "actual", "notes", "status_note"]
-    .some(k => String(b[k] || "").toLowerCase().includes(q));
+  return idOrWords("b", b.id, () => ["title", "area", "repro", "expected", "actual", "notes", "status_note"].map(k => b[k]), q);
 }
 
 // What a report knows (R254 step 3), as facts in place of a dotted line:
 // who reported it and when, the build it was seen in and on, when and how
 // it was closed, the build that closed it and the release that shipped
 // the fix (shippedIn, from the CHANGELOG's dated headings).
-function bugFacts(b, rel, words, refs){
-  const who = x => x === "claude" ? "Claude" : x === "you" ? "you" : x || "";
+function bugFacts(b, rel, words, refs, untie = false){
   const closed = b.status !== "open";
   const shipped = closed && b.status === "fixed" ? shippedIn(b.closed_at, rel) : "";
   return factGrid([
-    ["Reported", `${b.at ? rmDay(b.at) : ""}${b.by ? `, by ${who(b.by)}` : ""}`],
+    ["Reported", `${b.at ? rmDay(b.at) : ""}${b.by ? `, by ${byWho(b.by, b)}` : ""}`],
     ["Seen in", b.seen_in || ""], ["Seen on", b.seen_on || ""],
     // Whether its steps show it (R124), from "not tried" up.
     ["Happens", REPRO_WORDS[b.reproduces || "untried"] || ""],
+    // The agent a report names is the one that reported it; which agent's
+    // session closed it is not stored, so that one reads as Claude.
     ["Closed", closed ? `${words[b.status] || b.status}${b.closed_at ? ", " + rmDay(b.closed_at) : ""}${
-      b.status_by ? `, by ${who(b.status_by)}` : ""}${b.status_note ? `: ${b.status_note}` : ""}` : ""],
-    ["Fixed in", closed ? b.fixed_in || "" : ""],
+      b.status_by ? `, by ${byWho(b.status_by)}` : ""}${b.status_note ? `: ${b.status_note}` : ""}` : ""],
+    // The commits that fixed it (R255), or the build it was closed in
+    // where none is named.
+    ["Fixed in", closed ? (b.commits || []).join(", ") || b.fixed_in || "" : ""],
     ["Shipped in", shipped === null ? "not yet: planned for the next release" : shipped || ""],
-    ["Changelog", clRefs(refs), {html: true}]]);
+    ["Changelog", clRefs(refs, untie), {html: true}]]);
 }
+
+// A fixed bug's answer for the release check (R255): a tied line, a line
+// naming its fix commit, or its notes saying why it needs none.
+const BUG_ANSWER = /(?:^|\n)(?:\[[^\]\n]*\]\s*)?Changelog:\s*(.+)/;
+const bugOwed = (b, refs) => b.status === "fixed" && !(refs || []).length && !BUG_ANSWER.test(b.notes || "");
 
 // Whether a report's steps reproduce it (R124), in the order a reader
 // weighs them: every time first, the ones nobody has tried last.
@@ -47,58 +56,43 @@ function nbBugsView({$, nb, project}){
   nb.bugs = null;
   nb.bugRev = null;      // the tracker's revision as of the last read
 
-  async function loadBugs(again = false){
-    try{
-      const r = await fetch("/api/bugs?project=" + encodeURIComponent(project));
-      const j = await r.json();
-      nb.bugs = j.error ? {bugs: [], error: j.error} : j;
-    }catch(e){ nb.bugs = {bugs: [], error: String(e)}; }
-    // The answer's own revision, not the page's token as of now (B201); an
-    // answer that failed carries none, and the token stands in.
-    nb.bugRev = nb.bugs.rev ?? revs[`bug:${project}`] ?? nb.bugRev;
-    drawBugs();
-    reposAlso($("bugRepos"), project, "bugs");
-    // Already behind (see nb-tests.js): read once more now.
-    if (!again && nb.bugs.rev !== undefined && revs[`bug:${project}`] !== undefined
-        && revs[`bug:${project}`] !== nb.bugs.rev) return loadBugs(true);
+  // The tracker's read (nbRevRead): a read that failed is an empty tracker
+  // carrying the error, which drawBugs says.
+  function loadBugs(again = false){
+    return nbRevRead(nb, {
+      key: "bugs", token: "bug", url: "/api/bugs",
+      rev: [() => nb.bugRev, v => nb.bugRev = v],
+      put: (j, threw) => nb.bugs = threw || j.error ? {bugs: [], error: j.error} : j,
+      draw: () => { drawBugs(); reposAlso($("bugRepos"), project, "bugs"); },
+    }, again);
   }
 
-  // Wrapped so the poll can tell this panel's own write from somebody
-  // else's while it is still out. See nbWriting.
-  async function postBug(body){ return nb.writing(() => postBugDo(body)); }
-  async function postBugDo(body){
-    // The batch guard reaches here too: a report would survive a session's
-    // commit untouched (different file), but "held" has to mean the notebook,
-    // or the banner is a lie about its other tabs. Reading is never held.
-    if (nb.nbHeld() && body.action !== "history"){
-      notify("a session is part-way through changing this notebook: "
-             + "check the banner at the top", true);
-      return null;
-    }
-    try{
-      const r = await postJSON("/api/bugs", {project, ...body});
-      const j = await r.json();
-      // Somebody else edited this report first (roadmap #26). The tracker
-      // that came back with the refusal is drawn; it is what the report now
-      // says, but the FORM is left alone, holding what was typed, and the
-      // caller keeps the new revision so pressing Save again writes over
-      // theirs deliberately rather than by accident.
-      if (j.conflict){
-        notify(j.error + ": what was typed is still in the form; "
-               + "Save again to write it over theirs", true);
-        if (j.bugs){ nb.bugs = j; if (nb.bugRev !== null) nb.bugRev += 1; }
-        return j;
-      }
-      if (j.error){ notify(j.error, true); return null; }
+  // The tracker's write (nbPoster). The batch guard reaches here too: a
+  // report would survive a session's commit untouched (different file), but
+  // the hold is the notebook's.
+  const postBug = nbPoster(nb, "/api/bugs", {
+    holdExcept: "history",
+    // Somebody else edited this report first (roadmap #26). The tracker
+    // that came back with the refusal is drawn; it is what the report now
+    // says, but the FORM is left alone, holding what was typed, and the
+    // caller keeps the new revision so pressing Save again writes over
+    // theirs deliberately rather than by accident.
+    conflict: j => {
+      notify(j.error + ": what was typed is still in the form; "
+             + "Save again to write it over theirs", true);
+      if (j.bugs){ nb.bugs = j; if (nb.bugRev !== null) nb.bugRev += 1; }
+      return j;
+    },
+    // `keepOpen`: the first of two writes from one form, which stays drawn.
+    ok: (j, {keepOpen = false} = {}) => {
       nb.bugs = j;
       // This panel's own write moved the revision. Left unmarked, the next
       // poll reads it as somebody else's and reloads on top of the answer
       // just received.
       if (nb.bugRev !== null) nb.bugRev += 1;
-      drawBugs(true);
-      return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
-  }
+      if (!keepOpen) drawBugs(true);
+    },
+  });
 
   const SEVS = ["low", "medium", "high", "critical"];
 
@@ -171,6 +165,9 @@ function nbBugsView({$, nb, project}){
           <textarea class="bfActual proseline" rows="1" maxlength="1000"
             >${v("actual")}</textarea></div>
       </div>
+      ${b?.status === "fixed" ? `<label>Fixed in<span class="help" data-help="the commits that fixed it, by their hash; one commit may fix several bugs" tabindex="0">?</span></label>
+      <input class="bfCommits" spellcheck="false" autocomplete="off" value="${esc((b.commits || []).join(", "))}"
+        placeholder="2d591be, 0d90688">` : ""}
       <label>Notes<span class="help" data-help="cause, analysis, fix plan" tabindex="0">?</span></label>
       <textarea class="bfNotes" spellcheck="false"
         placeholder="what is known about why; mostly the agent's half">${v("notes")}</textarea>
@@ -216,7 +213,7 @@ function nbBugsView({$, nb, project}){
       btn.setAttribute("aria-expanded", "true");
       swapBox(box, () => {
         box.hidden = false;
-        box.innerHTML = bugForm(null);
+        drawHTML(box, bugForm(null));
         reprPick(box);
         box.querySelector(".bfCancel").onclick = shut;
         box.querySelector(".bfGo").onclick = async () => {
@@ -244,11 +241,11 @@ function nbBugsView({$, nb, project}){
     const list = $("bugList"), hint = $("bugHint");
     if (!nb.bugs){
       // Waiting as it lands: Report a bug above the list, which needs no list.
-      glanceWaiting(hint); list.innerHTML = skel("rows");
+      glanceWaiting(hint); drawHTML(list, skel("rows"));
       drawBugAdd();
       return;
     }
-    if (nb.bugs.error){ viewGlance(hint, [], esc("bugs: " + nb.bugs.error), "", "bad"); return; }
+    if (nb.bugs.error){ glanceBad(hint, "bugs", nb.bugs.error); return; }
     if (!force && list.querySelector(".dropbox, .bugform")) return;
     if (nb.bugs.releases !== undefined) nb.bugReleases = nb.bugs.releases;
     const rows = sortedBugs();
@@ -270,21 +267,23 @@ function nbBugsView({$, nb, project}){
     setHidden($("bugFind"), rows.length < 2 && !nb.bugFind);
     // Narrowed by a chip (All, Open, Closed) and the search (R254 step 1).
     nb.bugChip = ["", "open", "closed"].includes(nb.bugChip) ? nb.bugChip : "";
-    if (paint($("bugChips"), chipButtons([{key: "open", label: "Open", count: open},
-                                          {key: "closed", label: "Closed", count: rows.length - open}], nb.bugChip, "data-bgchip"), true))
-      $("bugChips").querySelectorAll("[data-bgchip]").forEach(b => b.onclick = () => chipMove(() => $("bugList")?.closest(".nbview"), "#bugList details.bug", () => { nb.bugChip = b.dataset.bgchip; drawBugs(true); }));
+    // A press on any of the three bands moves the reports in this view.
+    const view = () => $("bugList")?.closest(".nbview"), reports = "#bugList details.bug";
+    chipBand($("bugChips"), chipButtons([{key: "open", label: "Open", count: open},
+                                         {key: "closed", label: "Closed", count: rows.length - open}], nb.bugChip, "data-bgchip"),
+             "data-bgchip", view, reports, k => { nb.bugChip = k; drawBugs(true); });
     const q = (nb.bugFind || "").trim().toLowerCase();
     // ...and by the release a report was seen in (the operator, 21 Oct).
     const vers = versionChips(rows, b => b.seen_in, "Unknown");
     if (nb.bugVer && !vers.some(v => v.key === nb.bugVer)) nb.bugVer = "";
-    if (paint($("bugVers"), chipButtons(vers, nb.bugVer, "data-bgver", undefined, "Any version"), true))
-      $("bugVers").querySelectorAll("[data-bgver]").forEach(b => b.onclick = () => chipMove(() => $("bugList")?.closest(".nbview"), "#bugList details.bug", () => { nb.bugVer = b.dataset.bgver; drawBugs(true); }));
+    chipBand($("bugVers"), chipButtons(vers, nb.bugVer, "data-bgver", undefined, "Any version"),
+             "data-bgver", view, reports, k => { nb.bugVer = k; drawBugs(true); });
     // ...and by whether it reproduces (R124).
     const reprN = k => rows.filter(b => (b.reproduces || "untried") === k).length;
     if (!REPRO_ORDER.includes(nb.bugRepr)) nb.bugRepr = "";
-    if (paint($("bugRepro"), chipButtons(REPRO_ORDER.map(k => ({key: k, label: REPRO_LABELS[k], count: reprN(k)})),
-                                         nb.bugRepr, "data-bgrepr", undefined, "However often"), true))
-      $("bugRepro").querySelectorAll("[data-bgrepr]").forEach(b => b.onclick = () => chipMove(() => $("bugList")?.closest(".nbview"), "#bugList details.bug", () => { nb.bugRepr = b.dataset.bgrepr; drawBugs(true); }));
+    chipBand($("bugRepro"), chipButtons(REPRO_ORDER.map(k => ({key: k, label: REPRO_LABELS[k], count: reprN(k)})),
+                                        nb.bugRepr, "data-bgrepr", undefined, "However often"),
+             "data-bgrepr", view, reports, k => { nb.bugRepr = k; drawBugs(true); });
     const shown = b => (!nb.bugChip || (nb.bugChip === "open") === (b.status === "open"))
       && inRelease(b.seen_in, nb.bugVer) && (!nb.bugRepr || (b.reproduces || "untried") === nb.bugRepr) && bugMatch(b, q);
     // Which were open before this redraw, so acting on one does not fold it.
@@ -297,7 +296,7 @@ function nbBugsView({$, nb, project}){
     // A role that reads the project and does not write it (B86): a report
     // carries no verbs, and Report a bug says why above the list.
     const ro = projWriteWhy(project);
-    list.innerHTML = vis.slice(0, lim).map(b => `
+    drawHTML(list, vis.slice(0, lim).map(b => `
       <details class="bug chev" data-id="${b.id}"${held.has(String(b.id)) ? " open" : ""}>
         <summary>
           <span class="tag sev ${esc(b.severity)}">${esc(b.severity)}</span>
@@ -309,7 +308,9 @@ function nbBugsView({$, nb, project}){
         <div class="body">
           ${["area", "repro", "expected", "actual", "notes"].map(k => b[k]
             ? `<div class="bfield"><label>${k}</label><div class="bval">${esc(b[k])}</div></div>` : "").join("")}
-          ${bugFacts(b, nb.bugReleases, STATUS_WORDS, (nb.bugs.changelog || {})["B" + b.id])}
+          ${bugFacts(b, nb.bugReleases, STATUS_WORDS, (nb.bugs.changelog || {})["B" + b.id], !ro)}
+          ${bugOwed(b, (nb.bugs.changelog || {})["B" + b.id]) ? `<div class="hint bowed">No changelog line answers this fix yet:
+            tie it to one, write one, or say why it needs none, from ⋯ below. A release waits for it.</div>` : ""}
           ${ro ? "" : `<div class="actbar macts">
             <span class="sp"></span>
             <button type="button" class="bSend"${b.status === "open" ? "" : " disabled"}
@@ -327,6 +328,13 @@ function nbBugsView({$, nb, project}){
                  ${actMore([`<button type="button" class="bWont">Won't fix</button>`,
                    `<button type="button" class="bNa" title="it was real and stopped applying: the feature went away">Not applicable</button>`,
                    `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`])}`
+              : b.status === "fixed"
+              // What the changelog says of it (R255) under More, Remove last.
+              ? `<button type="button" class="bReopen">Reopen</button>
+                 ${actMore([`<button type="button" class="bTie"${(nb.bugs.lines || []).length ? "" : ` disabled title="nothing is unreleased to tie it to"`}>Tie to a line</button>`,
+                   `<button type="button" class="bLine">Write a line</button>`,
+                   `<button type="button" class="bNoLine" title="a release never had it, or nobody using it meets it">Needs no line</button>`,
+                   `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`])}`
               : `<button type="button" class="bReopen">Reopen</button>
                  <!-- Last, because it is the one that cannot be undone. -->
                  <button type="button" class="danger bRm"
@@ -335,7 +343,7 @@ function nbBugsView({$, nb, project}){
         </div>
       </details>`).join("")
       // What the tracker is for, as its empty state (R119 step 4).
-      || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this space.</div>`);
+      || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this space.</div>`));
     paginate(list, ":scope > .bug", {key: "bugList", noun: "reports", total: vis.length, more: () => drawBugs()});
     wireMore(list);
     list.querySelectorAll(".bug").forEach(d => {
@@ -344,7 +352,7 @@ function nbBugsView({$, nb, project}){
       // the summary rather than the details' toggle event, because toggle
       // fires after the browser has already snapped it open.
       const sum = d.querySelector("summary");
-      if (sum) sum.onclick = e => { e.preventDefault(); slideDetails(d, !d.open); };
+      if (sum) sum.onclick = e => { e.preventDefault(); slideDetails(d, !foldOpen(d)); };
       // The closing note typed in the row (R254 step 6), the box the Delete
       // below and the roadmap's drop open, not the browser's prompt: one
       // shape for every question this view asks, and one a phone lays out.
@@ -355,22 +363,75 @@ function nbBugsView({$, nb, project}){
         dropBox(body, {q, sub: ": kept on the bug", placeholder: "a commit, a word", verb,
                        go: note => postBug({action: "status", id, status, note}), cancel: () => drawBugs(true)});
       };
-      d.querySelector(".bFix")?.addEventListener("click",
+      onPress(d, ".bFix",
         () => ask("fixed", "What fixed it?", "Close as fixed"));
-      d.querySelector(".bWont")?.addEventListener("click",
+      onPress(d, ".bWont",
         () => ask("wontfix", "Why not?", "Close: won't fix"));
-      d.querySelector(".bNa")?.addEventListener("click",
+      onPress(d, ".bNa",
         () => ask("na", "What stopped it applying?", "Close: not applicable"));
-      d.querySelector(".bReopen")?.addEventListener("click",
+      onPress(d, ".bReopen",
         () => postBug({action: "status", id, status: "open", note: ""}));
+      // The changelog's half of a fixed bug (R255): kept in the notebook,
+      // the public line naming its commits alone.
+      d.querySelectorAll("[data-untie]").forEach(x => x.onclick = () =>
+        postBug({action: "untie", id, line: x.dataset.untie}));
+      onPress(d, ".bTie", () => {
+        closeMore();
+        const body = d.querySelector(".body");
+        if (body.querySelector(".tiebox")) return;
+        const lines = nb.bugs.lines || [];
+        const cats = [...new Set(lines.map(l => l.cat))];
+        const box = document.createElement("div");
+        box.className = "dropbox ctlown tiebox";
+        drawHTML(box, `<div class="q">Which line says this was fixed?<span>: kept in the notebook; the public line names its commits</span></div>
+          <select aria-label="an unreleased changelog line">${cats.map(c => `<optgroup label="${esc(c || "no category")}">${
+            lines.filter(l => l.cat === c).map(l => `<option value="${esc(l.words)}">${esc(l.words.length > 110 ? l.words.slice(0, 108) + "…" : l.words)}</option>`).join("")
+          }</optgroup>`).join("")}</select>
+          <div class="actbar"><button type="button" class="stop">Cancel</button>
+            <button type="button" class="primary" data-tiego>Tie it</button></div>`);
+        body.appendChild(box);
+        arriveBox(box);
+        box.querySelector(".stop").onclick = () => { box.remove(); drawBugs(true); };
+        box.querySelector("[data-tiego]").onclick = () => {
+          const line = box.querySelector("select").value;
+          box.remove();
+          if (line) postBug({action: "tie", id, line});
+        };
+      });
+      onPress(d, ".bLine", () => {
+        closeMore();
+        const body = d.querySelector(".body");
+        if (body.querySelector(".dropbox")) return;
+        const b = (nb.bugs.bugs || []).find(x => x.id === id);
+        const box = dropBox(body, {q: "The changelog's line for this fix", sub: ": what a person upgrading now finds right, filed under Fixed with its commits",
+                                   placeholder: "A move lands on a stick that keeps deploy keys", verb: "Add the line", max: 300,
+                                   cancel: () => drawBugs(true),
+                                   go: async text => {
+                                     const j = await postJSON("/api/changelog", {project, action: "line", text, cat: "Fixed",
+                                                                                 shas: b?.commits || [], bugs: [id]});
+                                     if (j?.error){ notify(j.error, true); drawBugs(true); return; }
+                                     loadBugs(true);
+                                   }});
+        const ta = box.querySelector("textarea");
+        ta.value = b?.title || "";
+        ta.dispatchEvent(new Event("input"));
+      });
+      onPress(d, ".bNoLine", () => {
+        closeMore();
+        const body = d.querySelector(".body");
+        if (body.querySelector(".dropbox")) return;
+        dropBox(body, {q: "Why does it need no line?", sub: ": kept in its notes, which the release check reads",
+                       placeholder: "no release had it; nobody using it meets it", verb: "Needs no line",
+                       cancel: () => drawBugs(true), go: why => postBug({action: "noline", id, why})});
+      });
       // Handing a bug over. Same box the roadmap opens under a step, opened
       // under the report instead; it asks the same question and the pickers
       // behind it are the same two.
-      d.querySelector(".bSend")?.addEventListener("click", () => {
+      onPress(d, ".bSend", () => {
         const body = d.querySelector(".body");
         if (body.querySelector(".sendbox")) { nb.shutSendBoxes(); return; }
         nb.shutSendBoxes();
-        nb.sendNoteText = "";            // see nb.pickRoadmap: a note is not carried over
+        nb.sendNoteText = "";            // see nbRmPick: a note is not carried over
         nb.roadmapSel = null;               // and only one thing is armed at a time
         nb.drawSendBox(!!nb.roadmapSession);
         // Same session the roadmap sends into, and the same reason it has to
@@ -392,14 +453,7 @@ function nbBugsView({$, nb, project}){
             const j = await postBug({action: "send", id, note: nb.sendNoteText, session: to});
             unbusy(go, "Send");
             if (!j) return;
-            if (!j.sent){
-              notify(j.switching
-                ? `Not sent: the session is busy with the /${j.switching} line. `
-                  + "Clear its tab and send the bug again."
-                : "Not sent: the session is busy. Press Enter in its tab when it is free.",
-                true);
-              return;
-            }
+            if (!sendOutcome(j, "bug")) return;
             nb.sendNoteText = "";
             nb.shutSendBoxes();
             openSentTo(project, j.session);   // land in the tab it went to
@@ -411,7 +465,7 @@ function nbBugsView({$, nb, project}){
       // Same box the roadmap's bin opens, for the same reason: nothing here
       // can be undone, so the only thing between a deleted report and its
       // being filed again is a note saying why it went.
-      d.querySelector(".bRm")?.addEventListener("click", () => {
+      onPress(d, ".bRm", () => {
         closeMore();
         const body = d.querySelector(".body");
         if (body.querySelector(".dropbox")) return;
@@ -422,10 +476,10 @@ function nbBugsView({$, nb, project}){
                        verb: "Remove it", tone: "danger", cancel: () => drawBugs(true),
                        go: why => postBug({action: "remove", id, why})});
       });
-      d.querySelector(".bEdit")?.addEventListener("click", () => {
+      onPress(d, ".bEdit", () => {
         const body = d.querySelector(".body");
         const b = (nb.bugs.bugs || []).find(x => x.id === id);
-        body.innerHTML = bugForm(b);
+        drawHTML(body, bugForm(b));
         reprPick(body);
         // The revision this form was opened over, so a write that would go
         // over somebody else's is refused rather than applied. On the form
@@ -438,6 +492,20 @@ function nbBugsView({$, nb, project}){
         // away is the thing that would otherwise hold the redraw off.
         body.querySelector(".bfCancel").onclick = () => drawBugs(true);
         body.querySelector(".bfGo").onclick = async () => {
+          // Fixed in (R255): the commits added and taken off, written first
+          // so a refused hash leaves the form open to put right.
+          const field = body.querySelector(".bfCommits");
+          if (field){
+            const was = b?.commits || [], now = field.value.split(/[\s,]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+            const add = now.filter(x => !was.some(w => w.startsWith(x) || x.startsWith(w)));
+            const drop = was.filter(w => !now.some(x => w.startsWith(x) || x.startsWith(w)));
+            if (add.length || drop.length){
+              const c = await postBug({action: "commits", id, add, drop}, {keepOpen: true});
+              if (!c || c.error) return;
+              // ...which moved the report's revision: the edit is over that.
+              form.dataset.rev = (c.bugs || []).find(x => x.id === id)?.rev ?? form.dataset.rev;
+            }
+          }
           const j = await postBug({action: "edit", id, rev: form.dataset.rev || undefined,
                                    ...readBugForm(body)});
           if (j?.conflict) form.dataset.rev = j.conflict.rev;

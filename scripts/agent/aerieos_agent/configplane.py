@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
+from . import names
 from .base import (
     daemon_json_with_ip,
     ROOT_BUNDLE_DIR,
@@ -14,6 +15,8 @@ from .base import (
     DIAL_BACK_S,
     NEEDRESTART_DIR,
     RUNNER_DIR,
+    NETCUT_BIN,
+    NETCUT_SUDOERS,
     SANDBOX_BIN,
     SESSION_BIN,
     SESSION_CONF,
@@ -23,25 +26,31 @@ from .base import (
     UNIT_DROPIN,
     _run,
     log,
+    log_once,
+    write_atomic,
+    write_json,
 )
 from .stores import (
     _can_chown,
+    console_said,
     dir_bytes,
     make_store,
     mount_covering,
     prune_made,
     save_state,
     store_here,
+    path_plain,
     store_path_ok,
     tc_root,
 )
 from .backends import net_backend
-from .toolchains import extract_sandbox_tool
+from .controller import address_ok
+from .toolchains import extract_sandbox_tool, netcut_sudoers
 from .sessnet import session_conf, session_sudoers
 from .runners import runner_dirs, runner_slot
 from .census import FEATURES, _os_release, boot_id, export_gaps, mounts_now, network_now, services_now
 from .disks import disks_now
-from .jobs import Job, pump
+from .jobs import watched
 
 
 # The journal kept across boots (R185) and kept to a gigabyte: journald's own
@@ -59,93 +68,92 @@ SPINDOWN_MINUTES = (0, 5, 10, 15, 20, 30, 60, 120)
 SPINDOWN_CODE = {0: 0, 5: 60, 10: 120, 15: 180, 20: 240, 30: 241, 60: 242, 120: 244}
 
 
+# What a network job names, each the one shape it is taken in: the
+# controller sends these shapes (nodes._clean_config), and root writes them
+# into the network's own files.
+NET_IFACE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}")
+NET_IP = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
+NET_CIDR = re.compile(r"\d{1,3}(\.\d{1,3}){3}/\d{1,2}")
+
+
 class ConfigPlaneMixin:
     """Agent's configuration plane: one of the parts class Agent (agent.py) is made of."""
 
     # -- the configuration plane (docs/nodes.md §12, phase 5) -----------------
+    # Every apply a system job can name: the method it reaches, whether it
+    # needs bb-sandbox, and what the method is handed after the job ("cfg"
+    # for the job's config, "what" for the apply's own name, "" for nothing
+    # more). Needing the sandbox is per verb, not one stamp for all of them
+    # (roadmap #23): storage and network edit fstab and netplan, which only
+    # a machine provisioned as a sandbox (a MANAGED node) hands over. A
+    # runner needs only its tarball and a funnel only tailscale, and a
+    # container node (this image in the node role) or a guest machine has
+    # neither the stamp nor any reason to be refused either of those.
+    APPLIES = {
+        "root": ("_apply_root", True, "cfg"),
+        "storage": ("_apply_storage", True, "cfg"),
+        "network": ("_apply_network", True, "cfg"),
+        "runner": ("_apply_runner", False, "cfg"),
+        "funnel": ("_apply_funnel", False, "cfg"),
+        "uninstall": ("_apply_uninstall", False, "cfg"),
+        "reboot": ("_apply_power", False, "what"),
+        "poweroff": ("_apply_power", False, "what"),
+        "gpu": ("_apply_gpu", True, ""),
+        "door": ("_apply_door", False, "cfg"),
+        "lockdown": ("_apply_lockdown", False, ""),
+        "feature": ("_apply_feature", True, "cfg"),
+        "controller-update": ("_apply_controller_update", False, "cfg"),
+        "storage-share": ("_apply_storage_share", False, "cfg"),
+        "storage-pool": ("_apply_storage_pool", False, "cfg"),
+        "storage-snapshot": ("_apply_storage_snapshot", False, "cfg"),
+        "storage-array": ("_apply_storage_array", False, "cfg"),
+        # A way in at the console of AerieOS (console.py, R194).
+        "console": ("_apply_console", False, "cfg"),
+        # Another NAS's array and pools taken as they are (adopt.py).
+        "storage-adopt": ("_apply_storage_adopt", False, "cfg"),
+        "host-update": ("_apply_host_update", False, "cfg"),
+        "storage-backup": ("_apply_storage_backup", False, "cfg"),
+        "machine": ("_apply_machine", False, "cfg"),
+        # A stick's system pool (R161 step 10, osimage.py).
+        "system-pool": ("_apply_system_pool", False, "cfg"),
+        # An older version kept: boot it once, or remove it (R201).
+        "os-kept": ("_apply_os_kept", False, "cfg"),
+        # A folder on the machine's disks as the projects folder (R163).
+        "projects-folder": ("_apply_projects_folder", False, "cfg"),
+        # AerieOS: the next image into the other slot (osimage.py).
+        "os-update": ("_apply_os_update", False, "cfg"),
+        "gpu-off": ("_apply_gpu_off", True, ""),
+    }
+
     def system(self, job, spec):
         """Apply the desired storage or network config the controller holds
-        for this node: the one root-privileged thing the agent does. Not
-        dropped to the enrolled account, because mounts and addresses are
-        root's; offered by the controller only to nodes that enrolled as a
-        sandbox, and refused here without bb-sandbox, which is the stamp."""
+        for this node. Not dropped to the enrolled account, because mounts
+        and addresses are root's; offered by the controller only to nodes
+        that enrolled as a sandbox, and refused here without bb-sandbox,
+        which is the stamp."""
         what = spec.get("apply")
         self.refresh_sandbox_tool(job)
-        # Per verb, not one stamp for all of them (roadmap #23): storage and
-        # network edit fstab and netplan, which only a machine provisioned
-        # as a sandbox (a MANAGED node) hands over. A runner needs only its
-        # tarball and a funnel only tailscale, and a container node (this
-        # image in the node role) or a guest machine has neither the stamp
-        # nor any reason to be refused either of those.
-        if what in ("storage", "network", "root", "gpu", "gpu-off", "feature") and not os.access(SANDBOX_BIN, os.X_OK):
+        # Only a word can be in the table: anything else the spec carries
+        # is unknown, and refused as that below.
+        entry = self.APPLIES.get(what) if isinstance(what, str) else None
+        method, sandbox, takes = entry or (None, False, "")
+        if sandbox and not os.access(SANDBOX_BIN, os.X_OK):
             job.say(f"refused: {what} edits this machine's own configuration, and this node "
                     f"was not provisioned as an AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
             return "failed", 77
+        if method is None:
+            job.say(f"refused: unknown system job {what!r}\n")
+            return "failed", 64
         cfg = spec.get("config") if isinstance(spec.get("config"), dict) else {}
-        if what == "root":
-            return self._apply_root(job, cfg)
-        if what == "storage":
-            return self._apply_storage(job, cfg)
-        if what == "network":
-            return self._apply_network(job, cfg)
-        if what == "runner":
-            return self._apply_runner(job, cfg)
-        if what == "funnel":
-            return self._apply_funnel(job, cfg)
-        if what == "uninstall":
-            return self._apply_uninstall(job, cfg)
-        if what in ("reboot", "poweroff"):
-            return self._apply_power(job, what)
-        if what == "gpu":
-            return self._apply_gpu(job)
-        if what == "door":
-            return self._apply_door(job, cfg)
-        if what == "lockdown":
-            return self._apply_lockdown(job)
-        if what == "feature":
-            return self._apply_feature(job, cfg)
-        if what == "controller-update":
-            return self._apply_controller_update(job, cfg)
-        if what == "storage-share":
-            return self._apply_storage_share(job, cfg)
-        if what == "storage-pool":
-            return self._apply_storage_pool(job, cfg)
-        if what == "storage-snapshot":
-            return self._apply_storage_snapshot(job, cfg)
-        if what == "storage-array":
-            return self._apply_storage_array(job, cfg)
-        if what == "console":
-            # A way in at the console of AerieOS (console.py, R194).
-            return self._apply_console(job, cfg)
-        if what == "storage-adopt":
-            # Another NAS's array and pools taken as they are (adopt.py).
-            return self._apply_storage_adopt(job, cfg)
-        if what == "host-update":
-            return self._apply_host_update(job, cfg)
-        if what == "storage-backup":
-            return self._apply_storage_backup(job, cfg)
-        if what == "machine":
-            return self._apply_machine(job, cfg)
-        if what == "system-pool":
-            # A stick's system pool (R161 step 10, osimage.py).
-            return self._apply_system_pool(job, cfg)
-        if what == "os-kept":
-            # An older version kept: boot it once, or remove it (R201).
-            return self._apply_os_kept(job, cfg)
-        if what == "projects-folder":
-            # A folder on the machine's disks as the projects folder (R163).
-            return self._apply_projects_folder(job, cfg)
-        if what == "os-update":
-            # AerieOS: the next image into the other slot (osimage.py).
-            return self._apply_os_update(job, cfg)
-        if what == "gpu-off":
-            # The emulator off the card (R102): the display's unit stopped,
-            # the driver left alone; then a hello, as the set-up sends.
-            rc = self._sh(job, [SANDBOX_BIN, "gpu-off"], timeout=120)
-            self.hello_again("the GPU was switched off")
-            return ("succeeded", 0) if rc == 0 else ("failed", rc)
-        job.say(f"refused: unknown system job {what!r}\n")
-        return "failed", 64
+        handed = {"cfg": (cfg,), "what": (what,), "": ()}[takes]
+        return getattr(self, method)(job, *handed)
+
+    def _apply_gpu_off(self, job):
+        """The emulator off the card (R102): the display's unit stopped,
+        the driver left alone; then a hello, as the set-up sends."""
+        rc = self._sh(job, [SANDBOX_BIN, "gpu-off"], timeout=120)
+        self.hello_again("the GPU was switched off")
+        return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def apply_ports_local(self, on):
         """Published ports bound to 127.0.0.1 by default on this node (R190,
@@ -171,10 +179,7 @@ class ConfigPlaneMixin:
         if new is None:
             return
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path + ".new", "w", encoding="utf-8") as f:
-                f.write(new)
-            os.replace(path + ".new", path)
+            write_atomic(path, new, makedirs=True)
         except OSError as e:
             log(f"published ports: {path} could not be written ({e})")
             return
@@ -205,9 +210,7 @@ class ConfigPlaneMixin:
                 return
             os.makedirs(os.path.dirname(f), exist_ok=True)
             os.makedirs("/var/log/journal", exist_ok=True)
-            with open(f + ".new", "w", encoding="utf-8") as out:
-                out.write(JOURNAL_DROPIN)
-            os.replace(f + ".new", f)
+            write_atomic(f, JOURNAL_DROPIN)
         except OSError as e:
             log(f"journal: could not keep it across boots ({e})")
             return
@@ -474,12 +477,8 @@ class ConfigPlaneMixin:
             return
         if not want or want == have:
             return
-        tmp = SANDBOX_BIN + ".new"
         try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(want)
-            os.chmod(tmp, 0o750)
-            os.replace(tmp, SANDBOX_BIN)
+            write_atomic(SANDBOX_BIN, want, mode=0o750)
         except OSError as e:
             job.say(f"could not refresh {SANDBOX_BIN} from the bundle: {e}\n")
             return
@@ -524,7 +523,7 @@ class ConfigPlaneMixin:
             return []
         did = []
         want = "[Service]\nKillMode=process\n"
-        if run(["systemctl", "show", "-p", "KillMode", "--value", "builderbot-agent"]) != "process":
+        if run(["systemctl", "show", "-p", "KillMode", "--value", names.unit()]) != "process":
             try:
                 os.makedirs(os.path.dirname(UNIT_DROPIN), exist_ok=True)
                 with open(UNIT_DROPIN, "w", encoding="utf-8") as f:
@@ -539,7 +538,7 @@ class ConfigPlaneMixin:
             conf = os.path.join(NEEDRESTART_DIR, "conf.d", "builderbot.conf")
             body = ("# Written by the AerieOS agent (B538): a restart of the agent after a\n"
                     "# library upgrade ended every Claude session on the node.\n"
-                    "$nrconf{override_rc}{qr(^builderbot-agent\\.service$)} = 0;\n")
+                    "$nrconf{override_rc}{qr(^(aerieos|builderbot)-agent\\.service$)} = 0;\n")
             try:
                 with open(conf, encoding="utf-8") as f:
                     same = f.read() == body
@@ -579,16 +578,69 @@ class ConfigPlaneMixin:
                 tool = f.read()
         except OSError:
             return
-        wrote = []
         # Accounts as their own users (R125), once the agent has made the
         # group and bb-session is there to hold each to its own account.
         ready = getattr(self, "account_users_ready", None)
         accounts = {"controller": self.ctl.url, "pin": self.state.get("pin", ""),
                     "bundle": os.path.join(ROOT_BUNDLE_DIR, "current")} if ready and ready() else None
-        for path, text, mode, sudoers in ((SESSION_BIN, tool, 0o755, False),
-                                          (SESSION_CONF, session_conf(self.state, user, self.sessnet.conf_on, accounts),
-                                           0o644, False),
-                                          (SESSION_SUDOERS, session_sudoers(user, bool(accounts)), 0o440, True)):
+        wrote = self._write_root_files(((SESSION_BIN, tool, 0o755, False),
+                                        (SESSION_CONF, session_conf(self.state, user, self.sessnet.conf_on, accounts),
+                                         0o644, False),
+                                        (SESSION_SUDOERS, session_sudoers(user, bool(accounts)), 0o440, True)))
+        if wrote:
+            log(f"the session's view: {', '.join(wrote)} written from the bundle")
+
+    def refresh_netcut_tool(self):
+        """The helper that cuts the network for a declared pack's install
+        steps kept installed (R234): bb-netcut from root's own copy of the
+        bundle and the job account's sudo rule for it, on a node set up as a
+        sandbox whose agent is root and whose jobs run as an account of their
+        own. The installer reaches for it only where that account cannot make
+        a network namespace itself (sdk.sh sdk_net_cut); a node without it
+        installs such a pack with the network and says so. Written as the
+        session's tool is, the rule checked by visudo first."""
+        user = str(self.state.get("user") or "")
+        if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not user or user == "root":
+            return
+        try:
+            with open(os.path.join(TOOLS_DIR, "current", "nodes", "bb-netcut"), encoding="utf-8") as f:
+                tool = f.read()
+        except OSError:
+            return
+        with self.tool_lock:
+            wrote = self._write_root_files(((NETCUT_BIN, tool, 0o755, False),
+                                            (NETCUT_SUDOERS, netcut_sudoers(user, NETCUT_BIN), 0o440, True)))
+        if wrote:
+            log(f"cutting the network for a pack's install: {', '.join(wrote)} written from the bundle")
+
+    def refresh_virtiofsd_wrap(self):
+        """AerieOS's virtiofsd wrapper kept as the bundle's provisioner writes
+        it, where the VM host feature put one: it checks a shared folder at
+        every start (R247 step 5), and a node that turned the feature on
+        before would otherwise keep the old one until the feature was
+        applied again by hand."""
+        from .vmhw import VIRTIOFSD_WRAP
+        if os.geteuid() != 0 or not os.path.isfile(VIRTIOFSD_WRAP):
+            return
+        try:
+            with open(os.path.join(TOOLS_DIR, "current", "nodes", "provision-linux.sh"), encoding="utf-8") as f:
+                prov = f.read()
+        except OSError:
+            return
+        m = re.search(r"cat > \"\$VIRTIOFSD_WRAP\" <<'WRAP'\n(.*?\n)WRAP\n", prov, re.S)
+        if not m:
+            return
+        with self.tool_lock:
+            wrote = self._write_root_files(((VIRTIOFSD_WRAP, m.group(1), 0o755, False),))
+        if wrote:
+            log(f"a VM's shared folder: {', '.join(wrote)} written from the bundle")
+
+    @staticmethod
+    def _write_root_files(rows):
+        """Each (path, text, mode, sudoers) written as root's own where it
+        differs from what is there; the paths that changed."""
+        wrote = []
+        for path, text, mode, sudoers in rows:
             try:
                 with open(path, encoding="utf-8") as f:
                     if f.read() == text:
@@ -615,8 +667,7 @@ class ConfigPlaneMixin:
                 log(f"could not write {path}: {e}")
                 with contextlib.suppress(OSError):
                     os.unlink(tmp)
-        if wrote:
-            log(f"the session's view: {', '.join(wrote)} written from the bundle")
+        return wrote
 
     def _apply_uninstall(self, job, cfg=None):
         """Take AerieOS off this machine, from the Nodes page. The runners
@@ -695,54 +746,33 @@ class ConfigPlaneMixin:
         job.say("it is still running; this agent goes with it, so this is its last word\n")
         return "succeeded", 0
 
-    def _sh(self, job, argv, cwd=None, timeout=300):
-        """One command, its output into the job's log, its exit code back.
+    def _sh(self, job, argv, cwd=None, timeout=300, pass_fds=()):
+        """One command, its output into the job's log, its exit code back;
+        `pass_fds` the descriptors it is handed at their own numbers.
 
         `cwd` matters more than it looks: the runner's own svc.sh resolves
         everything relative to where it is invoked and refuses with "Must run
         from runner root or install is corrupt" anywhere else, which is
         exactly what a registered-but-serviceless runner came from.
 
-        Streamed, the way Job.exec and _apply_root are: its output pumped
-        as it comes and the log posted on a clock. It used to run the command
-        to the end and post nothing meanwhile, so the NVIDIA rows on the
-        Toolchains page (the Installed page's since R172) never said installing (the step rides a log post) and
-        the job sat at assigned for as long as apt took (30 Sep).
+        Streamed, the way Job.exec and _apply_root are (jobs.watched): its
+        output pumped as it comes and the log posted on a clock, so the
+        NVIDIA rows on the Installed page say installing while apt runs (the
+        step rides a log post). A job that cannot post or be canceled (a
+        check's own stand-in, a test's) still runs the command and hears its
+        output.
         """
-        # A job that cannot post or be canceled (a check's own stand-in, a
-        # test's) still runs the command and hears its output.
-        flush = getattr(job, "flush", None) or (lambda: True)
-        stopped = lambda: bool(getattr(job, "canceled", False))  # noqa: E731
         job.say("$ " + " ".join(argv) + "\n")
-        flush()                          # the step and the command, now
+        (getattr(job, "flush", None) or (lambda: True))()   # the step and the command, now
         began = time.monotonic()
         try:
             p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT, start_new_session=True)
+                                 stderr=subprocess.STDOUT, start_new_session=True, pass_fds=tuple(pass_fds))
         except OSError as e:
             job.say(f"{argv[0]}: {e}\n")
             return 1
-        with contextlib.suppress(AttributeError):
-            job.proc = p
-        if stopped():
-            Job._kill(p)
-
-        reader = pump(job, p.stdout, keep_blank=False)
-        deadline, killed = time.monotonic() + timeout, False
-        while reader.is_alive():
-            reader.join(0.5)
-            if getattr(job, "pending", None):
-                flush()
-            if time.monotonic() > deadline and not killed:
-                job.say(f"timed out after {int(timeout)}s, killing it\n")
-                Job._kill(p)
-                killed = True
-        p.wait()
-        with contextlib.suppress(OSError):
-            p.stdout.close()
-        with contextlib.suppress(AttributeError):
-            job.proc = None
-        if stopped():
+        rc, killed, stopped = watched(job, p, timeout, keep_blank=False)
+        if stopped:
             job.say("stopped\n")
             return 130
         # A slow step says how slow (B243): an apply that took a minute to
@@ -750,7 +780,7 @@ class ConfigPlaneMixin:
         took = time.monotonic() - began
         if took >= 3:
             job.say(f"   (took {took:.0f}s)\n")
-        return 124 if killed else p.returncode
+        return 124 if killed else rc
 
     def _apply_root(self, job, cfg):
         """One command as root, that a person allowed (roadmap R38). The
@@ -764,18 +794,23 @@ class ConfigPlaneMixin:
         if not argv:
             job.say("refused: nothing to run\n")
             return "failed", 64
+        # This machine's own word first (R227 step 2), read from the file
+        # its console writes: the allowing was done on the controller, and
+        # whoever holds the controller can say a person allowed anything.
+        if console_said().get("root_off") is True:
+            job.say("refused: this machine runs no root command the controller sends; that was switched off at its own "
+                    f"console, and is switched back on there: sudo {names.command()} root-asks on\n")
+            return "failed", 77
         job.say(f"# root on this node, allowed by {cfg.get('by') or 'the operator'}: "
                 f"{cfg.get('why') or '(no reason given)'}\n")
         try:
             timeout = max(1, min(int(cfg.get("timeout") or 600), 3600))
         except (TypeError, ValueError):
             timeout = 600
-        # The same shape as Job.exec (its own process group, output pumped
-        # as it comes, the log posted on a clock so a cancel can arrive and
-        # land), minus the drop to the enrolled account, which is the point.
-        # Not _sh: that blocks until the command ends with nothing posted,
-        # so a cancel had nothing to reach and a timeout killed only the
-        # direct child.
+        # Seen to its end as Job.exec's is (jobs.watched: its own process
+        # group, output pumped as it comes, the log posted on a clock so a
+        # cancel can arrive and land), minus the drop to the enrolled
+        # account, which is the point.
         job.say("$ " + " ".join(argv) + "\n")
         job.flush()
         try:
@@ -784,28 +819,13 @@ class ConfigPlaneMixin:
         except OSError as e:
             job.say(f"could not start {argv[0]}: {e}\n")
             return "failed", 126
-        job.proc = p
-        if job.canceled:
-            job._kill(p)
-
-        reader = pump(job, p.stdout)
-        deadline, killed = time.monotonic() + timeout, False
-        while reader.is_alive():
-            reader.join(0.5)
-            if job.pending:
-                job.flush()
-            if time.monotonic() > deadline and not killed:
-                job.say(f"timed out after {timeout}s, killing it\n")
-                job._kill(p)
-                killed = True
-        p.wait()
-        job.proc = None
-        if job.canceled:
+        rc, killed, stopped = watched(job, p, timeout)
+        if stopped:
             job.say("stopped\n")
             return "canceled", 130
         if killed:
             return "failed", 124
-        return ("succeeded" if p.returncode == 0 else "failed"), p.returncode
+        return ("succeeded" if rc == 0 else "failed"), rc
 
     SESSION_PROFILE = "/etc/profile.d/builderbot-session.sh"
 
@@ -821,15 +841,39 @@ class ConfigPlaneMixin:
         who = self.session_account()
         root = tc_root(self.state)
         ctl = (self.ctl.url or "").rstrip("/")
+        # A login shell reads this file, so nothing goes into it but words
+        # of a known shape, each in single quotes: an account's name, a
+        # store's path (path_plain), the controller's address (address_ok).
+        # One this node's record holds in another shape is left out and
+        # said: the node keeps its store and its controller, and a shell at
+        # its console is without that line.
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}", who or ""):
+            log_once("profile-who", f"{self.SESSION_PROFILE} is left as it is: the session account's name is not a plain one")
+            return
+        if root and not path_plain(root):
+            log_once("profile-store", f"{self.SESSION_PROFILE} names no store: this node's toolchain store is at a path that is "
+                                      "not letters, digits and . _ / + @ - alone")
+            root = ""
+        if ctl and not address_ok(ctl):
+            log_once("profile-ctl", f"{self.SESSION_PROFILE} names no controller: this node's is at an address that is not "
+                                    "http(s)://host[:port] alone")
+            ctl = ""
+        # The controller's key where this node pinned it, so a shell at the
+        # console holds the controller to it as a session does. Only that
+        # form: it is made of base64's characters, and it outlives the
+        # controller's certificates, which a pinned certificate would not.
+        pin = str(self.state.get("pin") or "")
+        pin = pin if re.fullmatch(r"sha256//[A-Za-z0-9+/]{43}=", pin) else ""
         text = (
             "# Written by AerieOS's agent. A session on this node, at a console.\n"
             'case "$(id -un)" in\n'
             f"    {who})\n"
             "        export BUILDERBOT_ROLE=node WORKSPACE=/workspace\n"
             '        export BB_NODE="$(hostname)"\n'
-            + (f'        export BB_CONTROLLER="{ctl}"\n' if ctl else "")
-            + (f'        [ -d "{root}/.bb/current/scripts" ] \\\n'
-               f'            && PATH="{root}/.bb/current/scripts:$PATH"\n' if root else "")
+            + (f"        export BB_CONTROLLER='{ctl}'\n" if ctl else "")
+            + (f"        export BB_CONTROLLER_PIN='{pin}'\n" if ctl and pin else "")
+            + (f"        [ -d '{root}/.bb/current/scripts' ] \\\n"
+               f"            && PATH='{root}/.bb/current/scripts':\"$PATH\"\n" if root else "")
             + '        PATH="$HOME/.local/bin:$PATH"\n'
             "        ;;\n"
             "esac\n")
@@ -941,12 +985,9 @@ class ConfigPlaneMixin:
             with contextlib.suppress(OSError, ValueError):
                 with open(f) as fh:
                     was = json.load(fh)
-            tmp = f + ".new"
-            with open(tmp, "w") as fh:
-                json.dump({"what": "storage", "node": self.state.get("name") or "",
-                           "said": said, "since": int(was.get("since") or now), "updated": now}, fh)
-            os.chmod(tmp, 0o644)
-            os.replace(tmp, f)
+            write_json(f, {"what": "storage", "node": self.state.get("name") or "",
+                           "said": said, "since": int(was.get("since") or now), "updated": now},
+                       mode=0o644)
         except OSError:
             pass
 
@@ -966,7 +1007,9 @@ class ConfigPlaneMixin:
             for role, path in stores.items():
                 if role not in DEFAULT_STORES:
                     continue
-                why = store_path_ok(path)
+                # A new place is held to a store's one shape; where the
+                # store already is, it stays whatever its path.
+                why = store_path_ok(path, shape=mine.get(role) != path)
                 if why:
                     job.say(f"refused {role} store: {why}\n")
                     bad += 1
@@ -1227,6 +1270,19 @@ class ConfigPlaneMixin:
         mode = "static" if net.get("mode") == "static" else "dhcp"
         addr, gw = str(net.get("address") or ""), str(net.get("gateway") or "")
         dns = [str(d) for d in (net.get("dns") or []) if str(d)]
+        # Each is written into the backend's own file (an interfaces
+        # stanza, a file named for the interface) and handed to its tools,
+        # so each is held to what it is before any of that: a name, an
+        # address with its prefix, addresses.
+        if not NET_IFACE.fullmatch(iface):
+            job.say("refused: that is not an interface's name\n")
+            return "failed", 65
+        if mode == "static" and addr and not NET_CIDR.fullmatch(addr):
+            job.say("refused: a static address is written with its prefix, like 10.0.0.12/24\n")
+            return "failed", 65
+        if any(not NET_IP.fullmatch(x) for x in ([gw] if gw else []) + dns):
+            job.say("refused: a gateway and a resolver are each an address\n")
+            return "failed", 65
         # Static routes (the operator, 7 Oct), in either mode: a network
         # beyond this one and the router that reaches it.
         routes = [{"to": str(r.get("to") or ""), "via": str(r.get("via") or "")}

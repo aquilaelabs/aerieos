@@ -14,7 +14,7 @@ back; the pools carry no such parity, so they are writable either way. A ZFS
 pool is imported without -f and never upgraded; one the old system did not export
 is refused with the reason, not forced.
 
-What the person picked is a record (/etc/builderbot/adopted.json); the
+What the person picked is a record (/etc/aerieos/adopted.json); the
 fstab lines are rendered from it under their own mark, the merged trees by
 mergerfs with the read-only disks marked so in the branch list, so a new
 file lands on a pool. Release unmounts all of it and forgets it, every disk
@@ -22,6 +22,7 @@ as it was.
 """
 import contextlib
 import glob
+import ipaddress
 import json
 import os
 import re
@@ -31,8 +32,10 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from typing import Callable
+from .base import env_or, read_json, write_atomic, write_json
+from .names import ETC, VAR
 
-RECORD = "/etc/builderbot/adopted.json"
+RECORD = ETC + "/adopted.json"
 FSTAB = "/etc/fstab"
 MARK = "# builderbot-adopted"
 FS = ("xfs", "btrfs", "zfs")
@@ -48,10 +51,6 @@ NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array"
 NO_REPLAY = {"xfs": "norecovery", "btrfs": "rescue=nologreplay"}
 # What blkid calls each filesystem.
 BLK = {"xfs": "xfs", "btrfs": "btrfs", "zfs": "zfs_member"}
-
-
-def _env(k, d):
-    return os.environ.get(k) or d
 
 
 def blkid(name):
@@ -105,7 +104,7 @@ def holding(d, fs, blk):
 def mnt():
     """Where the old paths go: /mnt, or under BB_ADOPT_ROOT for a proof
     that must not touch the machine's own."""
-    return _env("BB_ADOPT_ROOT", "") + "/mnt"
+    return env_or("BB_ADOPT_ROOT", "") + "/mnt"
 
 
 def plan(want, disks, blk=blkid):
@@ -278,7 +277,7 @@ def render_fstab(p):
         # behind the old parity's back (the proof of 1 Nov caught an XFS
         # image changed by a plain ro mount). These write nothing; a disk
         # whose journal needs replaying then refuses to mount and says so.
-        opts = (f"ro,{NO_REPLAY.get(m['fs'], '')}," if m.get("ro") else "") + "defaults,nofail,noatime"
+        opts = (f"ro,{NO_REPLAY.get(m['fs'], '')}," if m.get("ro") else "") + "defaults,nofail,noatime,nosuid,nodev"
         opts = opts.replace(",,", ",")
         lines.append(f"{m['what']} {m['where']} {m['fs']} {opts} 0 0 {MARK}\n")
     for where, branches in (p.get("merged") or {}).items():
@@ -286,13 +285,13 @@ def render_fstab(p):
         # over and each share lands where its folder is (array.py _landing).
         create = (p.get("user_create") if p.get("user_create") in ("ff", "epff") else "ff") if where.endswith("/user") else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={b.split('=')[0]}" for b in branches)
-        lines.append(f"{':'.join(branches)} {where} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,"
+        lines.append(f"{':'.join(branches)} {where} fuse.mergerfs defaults,nofail,nosuid,nodev,allow_other,use_ino,cache.files=off,"
                      f"dropcacheonclose=true,category.create={create},moveonenospc=true,minfreespace=10G,fsname=adopted-{os.path.basename(where)},{req} 0 0 {MARK}\n")
     return "".join(lines)
 
 
 def write_fstab(p):
-    path = _env("BB_ADOPT_FSTAB", FSTAB)
+    path = env_or("BB_ADOPT_FSTAB", FSTAB)
     try:
         with open(path, encoding="utf-8") as f:
             kept = [ln for ln in f.read().splitlines(True) if not ln.rstrip().endswith(MARK)]
@@ -301,33 +300,22 @@ def write_fstab(p):
     text = "".join(kept)
     if text and not text.endswith("\n"):
         text += "\n"
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        f.write(text + (render_fstab(p) if p else ""))
-    os.chmod(path + ".new", 0o644)
-    os.replace(path + ".new", path)
+    write_atomic(path, text + (render_fstab(p) if p else ""), mode=0o644)
 
 
 def read_record():
-    try:
-        with open(_env("BB_ADOPT_RECORD", RECORD), encoding="utf-8") as f:
-            rec = json.load(f)
-        return rec if isinstance(rec, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(env_or("BB_ADOPT_RECORD", RECORD), {})
 
 
 def write_record(rec):
-    path = _env("BB_ADOPT_RECORD", RECORD)
+    path = env_or("BB_ADOPT_RECORD", RECORD)
     if not rec:
         try:
             os.unlink(path)
         except OSError:
             pass
         return
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(rec, f, indent=1)
-    os.replace(path + ".new", path)
+    write_json(path, rec, indent=1, makedirs=True)
 
 
 def adopted_now():
@@ -366,9 +354,9 @@ def top_folders(root):
 # ran by digest, and each VM's definition, whether it starts with the
 # machine and its UEFI variables. Nothing in either file is changed, and
 # neither is ever run.
-APPS = "/var/lib/builderbot/adopted-apps.json"
-NVRAM_KEPT = "/var/lib/builderbot/adopted-nvram"
-TPM_KEPT = "/var/lib/builderbot/adopted-tpm"
+APPS = VAR + "/adopted-apps.json"
+NVRAM_KEPT = VAR + "/adopted-nvram"
+TPM_KEPT = VAR + "/adopted-tpm"
 SWTPM_DIR = "/var/lib/libvirt/swtpm"
 NVRAM_DIR = "/var/lib/libvirt/qemu/nvram"
 VM_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}")
@@ -400,6 +388,7 @@ def read_docker_root(root, autostart_name=""):
                 if "@sha256:" in ref:
                     digests.setdefault(iid, ref)
     cdir = os.path.join(root, "containers")
+    found = []
     for cid in sorted(os.listdir(cdir)) if os.path.isdir(cdir) else []:
         try:
             with open(os.path.join(cdir, cid, "config.v2.json"), encoding="utf-8") as f:
@@ -409,9 +398,172 @@ def read_docker_root(root, autostart_name=""):
         name = str(c.get("Name") or "").lstrip("/")
         if not name:
             continue
+        found.append((cid, name, c))
         out["containers"][name] = {"image": str((c.get("Config") or {}).get("Image") or ""),
                                    "digest": digests.get(str(c.get("Image") or ""), "")}
+    # Each one's settings, for a compose file of it (the operator, 10 Nov:
+    # a zip of compose files to import rather than containers made here).
+    names = {cid: name for cid, name, _ in found}
+    out["specs"] = {}
+    for cid, name, c in found[:256]:
+        try:
+            with open(os.path.join(cdir, cid, "hostconfig.json"), encoding="utf-8") as f:
+                h = json.load(f)
+        except (OSError, ValueError):
+            h = {}
+        out["specs"][name] = container_spec(cid, c, h if isinstance(h, dict) else {},
+                                            image_config(root, str(c.get("Image") or "")), names)
+        out["specs"][name]["digest"] = out["containers"][name]["digest"]
     return out
+
+
+def on_lan(subnet, lan, run=subprocess.run):
+    """Whether a network's subnet is the LAN's: it holds an address of the
+    interface the machine reaches the LAN by. A LAN of no address read is
+    taken as the LAN's, as every such network was before."""
+    if not lan:
+        return True
+    try:
+        out = run(["ip", "-j", "-4", "addr", "show", "dev", lan], capture_output=True, text=True, timeout=10, check=False).stdout
+        addrs = [a.get("local") for x in json.loads(out or "[]") for a in x.get("addr_info") or [] if a.get("local")]
+        net = ipaddress.ip_network(subnet, strict=False)
+    except (OSError, ValueError, subprocess.SubprocessError, AttributeError, TypeError):
+        return True
+    if not addrs:
+        return True
+    return any(ipaddress.ip_address(a) in net for a in addrs)
+
+
+def image_config(root, image_id):
+    """The image's own settings (its env, command, labels, user), which a
+    container repeats without anyone having set them: {} when not found."""
+    hexid = image_id.partition(":")[2] if ":" in image_id else image_id
+    if not re.fullmatch(r"[0-9a-f]{64}", hexid):
+        return {}
+    for f in glob.glob(os.path.join(root, "image", "*", "imagedb", "content", "sha256", hexid)):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                got = json.load(fh).get("config") or {}
+            return got if isinstance(got, dict) else {}
+        except (OSError, ValueError, AttributeError):
+            continue
+    return {}
+
+
+def _strs(v, n=256, size=4096):
+    return [str(x)[:size] for x in v[:n]] if isinstance(v, list) else []
+
+
+def container_spec(cid, c, h, img, names):
+    """One container's settings as its compose file says them: what it was
+    given beyond its image's own, its ports, paths, networks and the rest of
+    how it was run. `names` maps a container's id to its name, for one that
+    shared another's network."""
+    cfg = c.get("Config") if isinstance(c.get("Config"), dict) else {}
+    s: dict = {"image": str(cfg.get("Image") or "")[:300]}
+    img_env = set(_strs(img.get("Env")))
+    env = [e for e in _strs(cfg.get("Env"), 400) if e not in img_env and "=" in e]
+    if env:
+        s["environment"] = env
+    for key, mine in (("command", "Cmd"), ("entrypoint", "Entrypoint")):
+        v = cfg.get(mine)
+        if isinstance(v, list) and v and v != img.get(mine):
+            s[key] = _strs(v, 64)
+    for key, mine in (("user", "User"), ("working_dir", "WorkingDir")):
+        if cfg.get(mine) and cfg.get(mine) != img.get(mine):
+            s[key] = str(cfg[mine])[:200]
+    # A hostname Docker made up is the container's id, cut short.
+    if cfg.get("Hostname") and not cid.startswith(str(cfg["Hostname"])):
+        s["hostname"] = str(cfg["Hostname"])[:200]
+    img_labels = img.get("Labels") if isinstance(img.get("Labels"), dict) else {}
+    labels = {str(k)[:200]: str(v)[:2000] for k, v in (cfg.get("Labels") or {}).items()
+              if isinstance(cfg.get("Labels"), dict) and img_labels.get(k) != v}
+    if labels:
+        s["labels"] = dict(list(labels.items())[:100])
+    for key, mine in (("tty", "Tty"), ("stdin_open", "OpenStdin")):
+        if cfg.get(mine) is True:
+            s[key] = True
+    vols = _strs(h.get("Binds"), 128, 1024)
+    for m in h.get("Mounts") or [] if isinstance(h.get("Mounts"), list) else []:
+        if isinstance(m, dict) and m.get("Type") in ("bind", "volume") and m.get("Source") and m.get("Target"):
+            vols.append(f"{m['Source']}:{m['Target']}{':ro' if m.get('ReadOnly') else ''}"[:1024])
+    if vols:
+        s["volumes"] = vols
+    if isinstance(h.get("Tmpfs"), dict) and h["Tmpfs"]:
+        s["tmpfs"] = [f"{k}:{v}" if v else str(k) for k, v in list(h["Tmpfs"].items())[:16]]
+    ports = []
+    for cport, binds in (h.get("PortBindings") or {}).items() if isinstance(h.get("PortBindings"), dict) else []:
+        num, _, proto = str(cport).partition("/")
+        for b in binds or [] if isinstance(binds, list) else []:
+            if not isinstance(b, dict):
+                continue
+            ip = str(b.get("HostIp") or "")
+            ports.append(f"{ip + ':' if ip and ip not in ('0.0.0.0', '::') else ''}{b.get('HostPort') or ''}{':' if b.get('HostPort') else ''}{num}"
+                         + (f"/{proto}" if proto and proto != "tcp" else ""))
+    if ports:
+        s["ports"] = sorted(set(ports))[:128]
+    mode = str(h.get("NetworkMode") or "bridge")
+    if mode.startswith("container:"):
+        other = mode.partition(":")[2]
+        mode = "container:" + names.get(other, next((n for i, n in names.items() if i.startswith(other)), other))
+    s["network_mode"] = "bridge" if mode == "default" else mode[:200]
+    nets = (c.get("NetworkSettings") or {}).get("Networks") if isinstance(c.get("NetworkSettings"), dict) else {}
+    for net, x in (nets or {}).items() if isinstance(nets, dict) else []:
+        if net in ("bridge", "host", "none") or not isinstance(x, dict):
+            continue
+        ipam = x.get("IPAMConfig") if isinstance(x.get("IPAMConfig"), dict) else {}
+        one = {}
+        if ipam.get("IPv4Address"):
+            one["ipv4_address"] = str(ipam["IPv4Address"])
+        if x.get("IPAddress") and x.get("IPPrefixLen"):
+            try:
+                one["subnet"] = str(ipaddress.ip_network(f"{x['IPAddress']}/{int(x['IPPrefixLen'])}", strict=False))
+            except ValueError:
+                pass
+        if x.get("Gateway"):
+            one["gateway"] = str(x["Gateway"])
+        s.setdefault("networks", {})[str(net)[:64]] = one
+    for key, mine in (("privileged", "Privileged"), ("init", "Init")):
+        if h.get(mine) is True:
+            s[key] = True
+    for key, mine in (("cap_add", "CapAdd"), ("cap_drop", "CapDrop"), ("extra_hosts", "ExtraHosts"), ("dns", "Dns"),
+                      ("security_opt", "SecurityOpt"), ("group_add", "GroupAdd")):
+        if _strs(h.get(mine), 64, 300):
+            s[key] = _strs(h.get(mine), 64, 300)
+    devs = [f"{d.get('PathOnHost')}:{d.get('PathInContainer') or d.get('PathOnHost')}"
+            + (f":{d['CgroupPermissions']}" if d.get("CgroupPermissions") and d["CgroupPermissions"] != "rwm" else "")
+            for d in (h.get("Devices") or [])[:64] if isinstance(d, dict) and d.get("PathOnHost")] if isinstance(h.get("Devices"), list) else []
+    if devs:
+        s["devices"] = devs
+    for r in h.get("DeviceRequests") or [] if isinstance(h.get("DeviceRequests"), list) else []:
+        if isinstance(r, dict) and any("gpu" in (cap or []) for cap in r.get("Capabilities") or []):
+            ids, count = r.get("DeviceIDs"), r.get("Count")
+            s["gpus"] = _strs(ids, 16, 64) if ids else count if isinstance(count, int) and count > 0 else "all"
+    if h.get("Runtime") and h["Runtime"] != "runc":
+        s["runtime"] = str(h["Runtime"])[:64]
+    rp = h.get("RestartPolicy") if isinstance(h.get("RestartPolicy"), dict) else {}
+    if rp.get("Name") and rp["Name"] != "no":
+        s["restart"] = str(rp["Name"]) + (f":{rp['MaximumRetryCount']}" if rp["Name"] == "on-failure" and rp.get("MaximumRetryCount") else "")
+    if isinstance(h.get("ShmSize"), int) and h["ShmSize"] and h["ShmSize"] != 64 * 1024 * 1024:
+        s["shm_size"] = h["ShmSize"]
+    if isinstance(h.get("Sysctls"), dict) and h["Sysctls"]:
+        s["sysctls"] = {str(k): str(v) for k, v in list(h["Sysctls"].items())[:32]}
+    lc = h.get("LogConfig") if isinstance(h.get("LogConfig"), dict) else {}
+    if lc.get("Config") or lc.get("Type") not in (None, "", "json-file"):
+        s["logging"] = {"driver": str(lc.get("Type") or "json-file"),
+                        **({"options": {str(k): str(v) for k, v in lc["Config"].items()}} if isinstance(lc.get("Config"), dict) and lc["Config"] else {})}
+    if isinstance(h.get("Memory"), int) and h["Memory"] > 0:
+        s["mem_limit"] = h["Memory"]
+    if isinstance(h.get("NanoCpus"), int) and h["NanoCpus"] > 0:
+        s["cpus"] = round(h["NanoCpus"] / 1e9, 3)
+    if h.get("CpusetCpus"):
+        s["cpuset"] = str(h["CpusetCpus"])[:64]
+    for key, mine in (("pid", "PidMode"), ("ipc", "IpcMode")):
+        if h.get(mine) and h[mine] not in ("private", "shareable", ""):
+            s[key] = str(h[mine])[:64]
+    if cfg.get("MacAddress"):
+        s["mac_address"] = str(cfg["MacAddress"])[:32]
+    return s
 
 
 def read_libvirt_root(root):
@@ -546,6 +698,122 @@ def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan, nets=None):
     return ET.tostring(dom, encoding="unicode"), said
 
 
+# What an adopted domain or network may carry (R247 step 5, B843): its XML
+# is a backup's, which anybody could have written, and libvirt runs what it
+# says as root. What is optional (the old system's extra QEMU settings, a
+# shared folder, an ISO, a console to a file, dnsmasq's options) is left out
+# and said; what the VM cannot run without, when it is not on the adopted
+# disks or this machine's own firmware, keeps that VM from being defined.
+ADOPTED = "/mnt/"
+FIRMWARE = ("/usr/share/", "/usr/lib/")
+KEPT_PATHS = ("/var/lib/libvirt/", "/run/libvirt/")
+
+
+def _under(path, roots):
+    real = os.path.realpath(path)
+    return any(real.startswith(r) for r in roots) and ".." not in path.split("/")
+
+
+def _mounted_from():
+    """The devices this machine has mounted, by their real paths."""
+    out = set()
+    with contextlib.suppress(OSError):
+        with open("/proc/self/mounts") as f:
+            for line in f:
+                dev = line.split(" ", 1)[0]
+                if dev.startswith("/dev/"):
+                    out.add(os.path.realpath(dev))
+    return out
+
+
+def _drop_foreign(root, said, what):
+    """Elements and attributes in a namespace of their own taken out of the
+    tree, but for a <metadata>'s, which libvirt keeps and never acts on."""
+    skip = {id(e) for m in root.iter("metadata") for e in m.iter()}
+    for parent in list(root.iter()):
+        if id(parent) in skip:
+            continue
+        for child in list(parent):
+            if isinstance(child.tag, str) and child.tag.startswith("{"):
+                parent.remove(child)
+                skip.update(id(e) for e in child.iter())
+                said.append(f"left out: {child.tag.split('}', 1)[1]} ({what})")
+        for k in [k for k in parent.attrib if k.startswith("{")]:
+            del parent.attrib[k]
+    return root
+
+
+def vet_domain(xml):
+    """An adopted domain, rewritten, as it may be defined here: (xml, [what
+    was left out], "" or why it is not defined at all)."""
+    dom = ET.fromstring(xml)
+    said = []
+    _drop_foreign(dom, said, "a setting the old system's QEMU was given")
+    dev = dom.find("devices")
+    taken = None
+    for disk in dev.findall("disk") if dev is not None else []:
+        src = disk.find("source")
+        if src is None:
+            continue
+        if disk.get("type") == "network":
+            return xml, said, "a disk on the network, which is not adopted"
+        if src.get("file"):
+            if _under(src.get("file"), (ADOPTED,)):
+                continue
+            if disk.get("device") in ("cdrom", "floppy"):
+                disk.remove(src)
+                said.append(f"its {disk.get('device')} {src.get('file')} is ejected: it is not on the adopted disks")
+                continue
+            return xml, said, f"its disk {src.get('file')} is not on the adopted disks"
+        if src.get("dev"):
+            path = src.get("dev")
+            taken = _mounted_from() if taken is None else taken
+            real = os.path.realpath(path)
+            if not path.startswith("/dev/disk/by-id/") or any(m == real or m.startswith(real) for m in taken):
+                return xml, said, f"its disk {path} is not a whole disk named by its id that this machine leaves alone"
+            continue
+        if src.get("dir") and not _under(src.get("dir"), (ADOPTED,)):
+            return xml, said, f"its disk {src.get('dir')} is not on the adopted disks"
+    for fs in dev.findall("filesystem") if dev is not None else []:
+        src = fs.find("source")
+        where = (src.get("dir") or src.get("file") or src.get("name") or "") if src is not None else ""
+        real = os.path.realpath(where) if where else ""
+        if not where or not _under(where, (ADOPTED,)) or real.rstrip("/") == ADOPTED.rstrip("/"):
+            dev.remove(fs)
+            said.append(f"its shared folder {where or '(none named)'} is left out: only a folder on the adopted disks is shared")
+    for kind in ("serial", "console", "channel", "parallel"):
+        for el in dev.findall(kind) if dev is not None else []:
+            src = el.find("source")
+            path = src.get("path", "") if src is not None else ""
+            if path and not _under(path, KEPT_PATHS):
+                dev.remove(el)
+                said.append(f"its {kind} to {path} is left out")
+    for tag in ("loader", "nvram", "kernel", "initrd", "dtb"):
+        el = dom.find(f"os/{tag}")
+        path = (el.text or "").strip() if el is not None else ""
+        if not path:
+            continue
+        ok = _under(path, FIRMWARE) if tag in ("loader", "dtb") else \
+            _under(path, KEPT_PATHS) if tag == "nvram" else _under(path, (ADOPTED,))
+        if not ok:
+            return xml, said, f"its {tag} {path} is not this machine's own" + ("" if tag in ("kernel", "initrd") else " (no UEFI firmware here to boot it with)")
+    return ET.tostring(dom, encoding="unicode"), said, ""
+
+
+def vet_network(xml):
+    """An adopted network as it may be defined here: dnsmasq's options (a
+    dhcp-script runs as root) and a TFTP root (a folder served to the LAN)
+    left out. (xml, [what was left out])."""
+    net = ET.fromstring(xml)
+    said = []
+    _drop_foreign(net, said, "an option the old system gave dnsmasq")
+    for ip in net.findall("ip"):
+        for t in ip.findall("tftp"):
+            ip.remove(t)
+            said.append(f"left out: its TFTP root {t.get('root', '')}")
+    return ET.tostring(net, encoding="unicode"), said
+
+
 def domain_networks(xml, bybridge, names):
     """The old system's libvirt networks a domain's interfaces are on."""
     out = set()
@@ -566,8 +834,14 @@ def ensure_network(runner, job, virsh, net):
     machine where it was. What happened, in words."""
     name = net["name"]
     if subprocess.run(virsh + ["net-info", name], capture_output=True, timeout=30, check=False).returncode != 0:
+        try:
+            xml, left = vet_network(net["xml"])
+        except ET.ParseError as e:
+            return f"the network {name} is not one this machine can read ({e}): not defined"
+        for x in left:
+            job.say(f"the network {name}: {x}\n")
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as f:
-            f.write(net["xml"])
+            f.write(xml)
         try:
             rc = runner._sh(job, virsh + ["net-define", f.name], timeout=60)
         finally:
@@ -634,7 +908,7 @@ def carry_tpm(x, here, swtpm_dir=None):
     uuid = (ET.fromstring(x["xml"]).findtext("uuid") or "").strip().lower()
     state = x.get("tpm") or ""
     if state and os.path.isdir(state) and UUID_RE.fullmatch(uuid):
-        dest = os.path.join(swtpm_dir or _env("BB_SWTPM_DIR", SWTPM_DIR), uuid)
+        dest = os.path.join(swtpm_dir or env_or("BB_SWTPM_DIR", SWTPM_DIR), uuid)
         if not os.path.exists(dest):
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             shutil.copytree(state, dest, symlinks=True)
@@ -643,12 +917,7 @@ def carry_tpm(x, here, swtpm_dir=None):
 
 
 def read_apps():
-    try:
-        with open(_env("BB_ADOPT_APPS", APPS), encoding="utf-8") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(env_or("BB_ADOPT_APPS", APPS), {})
 
 
 def apps_now():
@@ -660,7 +929,9 @@ def apps_now():
     return {"docker": {"autostart": list(dk.get("autostart") or [])[:256],
                        "digests": {k: str(v.get("digest") or "")[:200] for k, v in list((dk.get("containers") or {}).items())[:256]}},
             "vms": [{"name": v["name"], "autostart": bool(v.get("autostart")), "nvram": bool(v.get("nvram"))} for v in d.get("vms") or []][:64],
-            "said": [str(x)[:300] for x in d.get("said") or []][:16]}
+            "said": [str(x)[:300] for x in d.get("said") or []][:16],
+            # ...and when, so the page fetches the containers' rows again.
+            "at": int(d.get("at") or 0)}
 
 
 def branches_mounted(branches):
@@ -685,13 +956,13 @@ class AdoptMixin:
                 self._zfs_import(None, z)
         for m in p.get("mounts") or []:
             if not os.path.ismount(m["where"]) and os.path.isdir(m["where"]):
-                subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], capture_output=True, timeout=60, check=False)
+                subprocess.run(["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), m["where"]], capture_output=True, timeout=60, check=False)
         for where, branches in (p.get("merged") or {}).items():
             # Only over every branch mounted: a disk missing at boot leaves
             # its empty folder, which mergerfs would take as the disk, its
             # files gone from the tree and new ones written to memory (B718).
             if not os.path.ismount(where) and os.path.isdir(where) and branches_mounted(branches):
-                subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
+                subprocess.run(["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
 
     def _zfs_import(self, job, z):
         """Import one pool as it is: no -f, never upgraded; read-only where
@@ -712,7 +983,7 @@ class AdoptMixin:
             job.say(f"{img} holds {fs or 'nothing blkid knows'}, not the btrfs, XFS or ext4 an image file is\n")
             return ""
         d = tempfile.mkdtemp(prefix="bb-adopt-")
-        opts = "loop,ro," + {"xfs": "norecovery", "btrfs": "rescue=nologreplay", "ext4": "noload"}[fs]
+        opts = "loop,ro,nosuid,nodev,noexec," + {"xfs": "norecovery", "btrfs": "rescue=nologreplay", "ext4": "noload"}[fs]
         if self._sh(job, ["mount", "-o", opts, img, d], timeout=60) != 0:
             os.rmdir(d)
             return ""
@@ -726,6 +997,25 @@ class AdoptMixin:
                 os.rmdir(d)
             except OSError:
                 pass
+
+    def _hand_specs(self, job, specs, autostart):
+        """The containers' settings, to the controller for their compose
+        files: one upload while the read runs. Said in the job's log when
+        taken; what the page says when not, else ""."""
+        if not specs:
+            return "Docker: no container's settings to hand over"
+        fd, path = tempfile.mkstemp(prefix="bb-oldapps-", suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump({"specs": specs, "autostart": list(autostart)}, f)
+            st, r = self.ctl.upload(f"oldapps-put?job={job.job['id']}", path, timeout=120)
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(path)
+        if st == 200 and not (r or {}).get("error"):
+            job.say(f"Docker: each container's settings handed to the controller for its compose file ({len(specs)})\n")
+            return ""
+        return f"Docker: the controller did not take the containers' settings ({(r or {}).get('error') or st}), so it has no compose files of them"
 
     def _apply_apps(self, job, action, cfg):
         """read-apps, define-vms and docker-network (R163 steps 10, 11)."""
@@ -747,6 +1037,12 @@ class AdoptMixin:
                         got["docker"] = read_docker_root(d, str(spec.get("autostart_file") or ""))
                         n = len(got["docker"]["containers"])
                         said.append(f"Docker: {n} container{'' if n == 1 else 's'} ran, {len(got['docker']['autostart'])} started with the machine")
+                        # Their settings go to the controller, which writes
+                        # their compose files; kept nowhere here, since an
+                        # env holds passwords.
+                        handed = self._hand_specs(job, got["docker"].pop("specs", {}), got["docker"]["autostart"])
+                        if handed:
+                            said.append(handed)
                     else:
                         doms = read_libvirt_root(d)
                         os.makedirs(NVRAM_KEPT, exist_ok=True)
@@ -773,11 +1069,8 @@ class AdoptMixin:
                 finally:
                     self._unmount_image(job, d)
             got["said"] = said
-            path = _env("BB_ADOPT_APPS", APPS)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path + ".new", "w", encoding="utf-8") as f:
-                json.dump(got, f)
-            os.replace(path + ".new", path)
+            got["at"] = int(time.time())
+            write_json(env_or("BB_ADOPT_APPS", APPS), got, makedirs=True)
             for line in said:
                 say(line + "\n")
             self.hello_again("the old system's containers and VMs were read")
@@ -801,6 +1094,14 @@ class AdoptMixin:
                 return "succeeded", 0
             from .vms import lan_iface
             lan = lan_iface()
+            # A network that is not the LAN's (one the old system's Docker
+            # made of its own, for its containers to find each other) is
+            # made the same way here: a bridge of its own.
+            if not on_lan(subnet, lan):
+                rc = self._sh(job, ["docker", "network", "create", "--subnet", subnet, *(["--gateway", gw] if gw else []), name], timeout=60)
+                if rc == 0:
+                    say(f"the network {name}: {subnet}, a bridge of this machine's Docker as it was on the old system's\n")
+                return ("succeeded", 0) if rc == 0 else ("failed", rc)
             if not lan:
                 say("refused: this machine has no wired interface for a network of fixed addresses on the LAN\n")
                 return "failed", 65
@@ -843,6 +1144,15 @@ class AdoptMixin:
                 continue
             nv = os.path.join(NVRAM_DIR, re.sub(r"[^A-Za-z0-9._-]", "_", n) + "_VARS.fd")
             xml, said = rewrite_domain(x["xml"], emulator, pair, nv, lan, bybridge)
+            try:
+                xml, left, why = vet_domain(xml)
+            except ET.ParseError as e:
+                left, why = [], f"its definition does not read ({e})"
+            if why:
+                say(f"{n}: not defined here: {why}\n")
+                bad.append(n)
+                continue
+            said += left
             if "<tpm" in xml and not vmhw.tpm_here():
                 # libvirt refuses a TPM it cannot emulate at define: the VM
                 # is defined without it rather than not at all.
@@ -873,7 +1183,7 @@ class AdoptMixin:
             for w in why:
                 say(w + "\n")
         if pci_wanted and not glob.glob("/sys/kernel/iommu_groups/*"):
-            say("the IOMMU is off on this machine, so a VM given a PCI device will not start: This machine, Features, IOMMU, then restart\n")
+            say("the IOMMU is off on this machine, so a VM given a PCI device will not start: the Nodes page, Features, IOMMU, then restart\n")
         self.hello_again("VMs were defined")
         return ("succeeded", 0) if not bad else ("failed", 1)
 
@@ -947,7 +1257,7 @@ class AdoptMixin:
                 say(f"{z['pool']} was not imported (above): a pool the old system did not export says it was in use on another system, "
                     "and it is not forced\n")
         for m in p["mounts"]:
-            if self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], timeout=60) != 0:
+            if self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), m["where"]], timeout=60) != 0:
                 failed.append(m["where"])
                 if m.get("ro"):
                     say(f"{m['where']} did not mount read-only (above). A disk the old system did not shut down cleanly may need its "
@@ -955,7 +1265,7 @@ class AdoptMixin:
         for where, branches in p["merged"].items():
             # Never over a branch that did not mount: its empty folder would
             # stand in for the disk (B718).
-            if not branches_mounted(branches) or self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
+            if not branches_mounted(branches) or self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
                 failed.append(where)
         if failed:
             say(f"adopted, but not mounted yet: {', '.join(failed)}; tried again every minute, and Release undoes all of it\n")

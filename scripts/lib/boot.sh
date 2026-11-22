@@ -51,9 +51,22 @@ export BB_SHIELDED="${SECRET_VARS[*]}"
 # the controller's account reads, in /run (never the state, so a copy of the
 # state holds nothing that opens what is sealed there), written fresh each
 # start. On a bare-metal install it is among what the wall covers (R90).
+# Where the install key's file and the one before it are, kept for root in
+# its own run folder: the deploy-key helper seals the deploy keys under the
+# same key (R243), and is run through sudo, which hands it none of this
+# environment. Two lines, the key's path and the previous key's; no file
+# where the install seals nothing.
+install_key_where() {
+    mkdir -p "$BB_RUN_DIR" && chmod 700 "$BB_RUN_DIR" || return 0
+    rm -f "$BB_RUN_DIR/install-key.where"
+    [ -n "${1:-}" ] || return 0
+    ( umask 077; printf '%s\n%s\n' "$1" "${2:-}" > "$BB_RUN_DIR/install-key.where" ) || true
+}
+
 install_key_file() {
     local f=/run/builderbot-key key="${INSTALL_KEY:-}"
     rm -f "$f" /run/builderbot-signing
+    install_key_where ""
     if [ -z "$key" ] && [ -n "${SIGNING_SECRET:-}" ]; then
         key="$SIGNING_SECRET"
         warn "SIGNING_SECRET is INSTALL_KEY now: rename it in your secrets folder, since the old name is read for this release only"
@@ -78,6 +91,7 @@ install_key_file() {
         ( umask 077; printf '%s' "$prev" > "$f-previous" )
         chown "$BB_ACCOUNT" "$f-previous" 2>/dev/null || true
     fi
+    install_key_where "$f" "$f-previous"
     install_key_adopt "$key" "$prev"
 }
 
@@ -174,6 +188,7 @@ install_key_made() {
     fi
     export BB_INSTALL_KEY_DIR="$dir" BB_INSTALL_KEY_IN="$in"
     export BB_SIGNING_SECRET_FILE="$dir/key" BB_INSTALL_KEY_PREVIOUS_FILE="$dir/key-previous"
+    install_key_where "$dir/key" "$dir/key-previous"
 }
 
 # as_account CMD...: CMD as the controller's account, with its groups. gosu
@@ -187,6 +202,44 @@ as_account() {
     fi
 }
 
+# One *.env file of the secrets folder read as words, never run. This start
+# is root, and the file used to be sourced whole: a line that set PATH left
+# the controller in a restart loop ('chmod: command not found'), and any
+# command in one ran as root (B779). A line is NAME=value, with or without
+# export, the value bare, in single quotes, or in double quotes with nothing
+# in it that a shell would expand; it is exported as it stands. Anything else
+# is said and left out, and so is a name the start itself runs by.
+secrets_env_read() {
+    local f="$1" shown line name val n=0
+    shown="$(basename "$f")"
+    while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n + 1))
+        line="${line%$'\r'}"
+        [[ "$line" =~ ^[[:space:]]*(#.*)?$ ]] && continue
+        if [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            name="${BASH_REMATCH[2]}"; val="${BASH_REMATCH[3]}"
+            case "$name" in
+                PATH|IFS|ENV|BASH_ENV|SHELLOPTS|BASHOPTS|PS4|HOME|USER|LOGNAME|SHELL|LD_*)
+                    warn "secrets: ${shown} line ${n} sets ${name}, which a secrets file does not set: left out"
+                    continue ;;
+            esac
+            if [[ "$val" =~ ^\'([^\']*)\'[[:space:]]*(#.*)?$ ]]; then
+                val="${BASH_REMATCH[1]}"
+            elif [[ "$val" =~ ^\"([^\"\$\`\\]*)\"[[:space:]]*(#.*)?$ ]]; then
+                val="${BASH_REMATCH[1]}"
+            elif [[ "$val" =~ ^([^][:space:]\$\`\\\"\'\;\&\|\<\>\(\)]*)([[:space:]]+#.*)?[[:space:]]*$ ]]; then
+                val="${BASH_REMATCH[1]}"
+            else
+                warn "secrets: ${shown} line ${n} (${name}) is not a plain value, so it was not read: a secrets file is read as words and never run; write the value out in full, in single quotes"
+                continue
+            fi
+            export "${name}=${val}"
+        else
+            warn "secrets: ${shown} line ${n} is not a NAME=value line, so it was not read: a secrets file is read as words and never run"
+        fi
+    done < "$f"
+}
+
 stash_secrets() {
     mkdir -p "$BB_RUN_DIR"
     chmod 700 "$BB_RUN_DIR"
@@ -195,11 +248,8 @@ stash_secrets() {
     if [ -d "$BB_SECRETS_DIR" ]; then
         local f
         for f in "$BB_SECRETS_DIR"/*.env; do
-            [ -e "$f" ] || continue
-            set -a
-            # shellcheck disable=SC1090
-            . "$f"
-            set +a
+            [ -f "$f" ] || continue
+            secrets_env_read "$f"
         done
     fi
 
@@ -279,7 +329,8 @@ setup_ssh_agent() {
         fi
     done
 
-    added=$((added + $(/opt/aerieos/scripts/deploy-key --load 2>/dev/null || echo 0)))
+    # The deploy keys are loaded by load_deploy_keys, after install_key_file:
+    # they are sealed under the install key, whose place is not settled yet.
 
     # ssh-agent rejects any client whose uid differs from its own (root is the
     # sole exception), so the builder user cannot talk to it directly no matter
@@ -412,13 +463,7 @@ record_image() {
 }
 
 banner() {
-    cat <<'EOF'
-  ___        _  _     _            ___       _
- | _ ) _  _ (_)| | __| | ___  _ _ | _ ) ___ | |_
- | _ \| || || || |/ _` |/ -_)| '_|| _ \/ _ \|  _|
- |___/ \_,_||_||_|\__,_|\___||_|  |___/\___/ \__|
-  Claude Code workstation + GitHub Actions runner
-EOF
+    printf '%s\n' "AerieOS: the controller, whose dashboard every node and session answers to"
 }
 
 seed_home() {
@@ -428,21 +473,6 @@ seed_home() {
     # credentials and settings survive an image upgrade.
     if [ -d /opt/aerieos/skel ]; then
         cp -rn /opt/aerieos/skel/. "$BUILDER_HOME"/ 2>/dev/null || true
-    fi
-    # ...and a .bashrc a BuilderBot image seeded greets with the name and the
-    # command of today rather than bb, which is gone. Only that exact line,
-    # never anything a person wrote; the dash in it is written as its bytes.
-    local old new dash
-    dash="$(printf '\342\200\224')"
-    old="    echo \"BuilderBot ${dash} 'bb status' for an overview, 'claude' to start a session.\""
-    new="    echo \"AerieOS: 'aerie status' for an overview, 'claude' to start a session.\""
-    if [ -f "$BUILDER_HOME/.bashrc" ] && grep -qxF -- "$old" "$BUILDER_HOME/.bashrc" 2>/dev/null; then
-        python3 - "$BUILDER_HOME/.bashrc" "$old" "$new" <<'PY' 2>/dev/null || true
-import sys
-f, old, new = sys.argv[1:]
-lines = open(f, encoding="utf-8").read().split("\n")
-open(f, "w", encoding="utf-8").write("\n".join(new if ln == old else ln for ln in lines))
-PY
     fi
 
     mkdir -p \
@@ -658,6 +688,21 @@ boot_ready() {
 state_gate() {
     python3 /opt/aerieos/scripts/dashboard/stateversion.py check "${DASHBOARD_STATE:-/config}" \
         || die "${DASHBOARD_STATE:-/config} is not one this build may start on; nothing was changed"
+}
+
+# The deploy keys made or pasted in a space's settings, into the agent
+# setup_ssh_agent started: after install_key_file, since they are sealed
+# under the install key (R243) and the helper is told where that is by
+# install_key_file. Loaded from setup_ssh_agent, which runs first, a new
+# container found no key to open them with and loaded none: seen on the dev
+# instance the first time the helper's words reached the log. What the
+# helper says of a key goes to that log: a plain one it sealed at this
+# start, one it could not load.
+load_deploy_keys() {
+    local n
+    [ "$(id -u)" -eq 0 ] && [ -S "$BB_RUN_DIR/ssh-agent.sock" ] || return 0
+    n="$(/opt/aerieos/scripts/deploy-key --load || echo 0)"
+    case "$n" in ''|*[!0-9]*|0) ;; *) log "ssh-agent: ${n} deploy key(s) loaded" ;; esac
 }
 
 # Build the command the boot will exec, honoring the container CMD.

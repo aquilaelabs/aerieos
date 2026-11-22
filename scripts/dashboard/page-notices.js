@@ -17,34 +17,23 @@
 "use strict";
 
 let noticesData = null;          // the account's notices, or null before the first read
-let noticesRev = 0;
 let noticesErr = "";
 let noticesChip = "";            // the chip in force: "", a kind, or "bad" for failures
-let noticesFetching = false;
 
 function openNotices(){
   openTab({kind: "notices", arg: "__notices", label: "Notifications"});
 }
 
-async function loadNotices(){
-  if (noticesFetching) return;
-  noticesFetching = true;
-  try{
-    const j = await (await fetch("/api/notices")).json();
-    noticesErr = j.error || "";
-    noticesData = j.notices || [];
-  }catch(e){
-    noticesErr = "could not read the notices: " + e;
-    noticesData = noticesData || [];
-  }finally{
-    noticesFetching = false;
-  }
-  noticesRev++;
-  drawPanes();
+function loadNotices(){
+  return reading("notices", async () => {
+    const j = await getJSON("/api/notices");
+    noticesErr = j.error ? "could not read the notices: " + j.error : "";
+    noticesData = j.notices || noticesData || [];
+  });
 }
 
 async function noticesAct(body){
-  const j = await (await postJSON("/api/notices", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/notices", body);
   if (j.error) notify(j.error, true);
   await loadNotices();
 }
@@ -65,7 +54,7 @@ function noticesAskRows(){
         <div class="name">${askTag(a)}</div>
         <div class="sub">${esc(a.why || "")}</div>
         <div class="bcmd">${askCmd(a)}</div>
-        ${body ? `<details class="ntlong"${sectAttr("notices:ask:" + a.id)}><summary>${esc(what)}</summary><pre class="ntbox">${esc(body)}</pre></details>` : ""}
+        ${body ? `<details class="ntlong chev"${sectAttr("notices:ask:" + a.id)}><summary>${esc(what)}</summary><pre class="ntbox">${esc(body)}</pre></details>` : ""}
         <div class="sub dim">${a.asker ? esc(a.asker) + "'s session · " : ""}${askLeft(a)}</div>
       </div>
       <div class="actbar">${askActs(a, {deny: "data-ntdeny", allow: "data-ntallow"})}</div>
@@ -99,11 +88,13 @@ function renderNoticesInto(i){
     // Its template (R218 step 16): the History section and its name are the
     // page's own; what was kept is on its way.
     d.setBar(`<span class="dim">${skv(4)}</span>`);
-    d.list.innerHTML = skTpl(docSection("notices", "history", "History", "", skRows(5)));
-    if (!noticesFetching) loadNotices();
+    drawHTML(d.list, skTpl(docSection("notices", "history", "History", "", skRows(5))));
+    if (!readBusy("notices")) loadNotices();
     return;
   }
   const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows();
+  // Only the rows on show are built, a page at a time (pageLimit, R228 step 13).
+  const lim = pageLimit(d.list, "ntList", rows.length);
   const groups = [...Object.entries(NOTICE_KINDS).map(([k, label]) => ({key: k, label, count: all.filter(n => n.kind === k).length})),
                   {key: "bad", label: "Failures", count: all.filter(n => n.level === "bad").length}];
   // In an action bar as every page's bar action is, which keeps it at the
@@ -119,7 +110,7 @@ function renderNoticesInto(i){
     + docSection("notices", "history", "History", String(rows.length),
                  // Failures overlap the kinds, so All is what is kept.
                  chipBar(groups, noticesChip, "data-ntchip", all.length)
-                 + (rows.length ? `<div class="ntlist">${rows.map(n => `<div class="row ntrow ${esc(n.level)}" data-nt="${esc(n.id)}">
+                 + (rows.length ? `<div class="ntlist">${rows.slice(0, lim).map(n => `<div class="row ntrow ${esc(n.level)}" data-nt="${esc(n.id)}">
                        <span class="tic">${TOAST_ICONS[n.level] || TOAST_ICONS.info}</span>
                        <span class="grow"><span class="nttext">${esc(n.text)}</span>
                          <span class="sub dim">${esc(NOTICE_KINDS[n.kind] || n.kind)} · ${esc(ago(n.at))}</span></span>
@@ -128,9 +119,9 @@ function renderNoticesInto(i){
                      </div>`).join("")}</div>`
                    : `<div class="hint">${all.length ? "none of this kind" : "nothing yet: what the page tells you is kept here"}</div>`),
                  {prime: !waiting.length});
-  if (!paint(d.list, html)) return;
+  if (!patch(d.list, html)) return;
   const list = d.list.querySelector(".ntlist");
-  if (list) paginate(list, ":scope > .ntrow", {key: "ntList", noun: "notices"});
+  if (list) paginate(list, ":scope > .ntrow", {key: "ntList", noun: "notices", total: rows.length, more: () => renderNoticesInto(i)});
   wireNotices(d.el);
 }
 
@@ -143,14 +134,14 @@ function wireNotices(root){
     noticesAct({action: "clear", kind});
   };
   root.querySelectorAll("[data-ntchip]").forEach(b => b.onclick = () =>
-    chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; noticesRev++; drawPanes(); }));
+    chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; readMoved("notices"); drawPanes(); }));
   root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () => noticesAct({action: "delete", id: b.dataset.ntdel}));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));
   root.querySelectorAll("[data-ntdeny]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntdeny), false));
   root.querySelectorAll("[data-ntinvite]").forEach(b => b.onclick = async () => {
     const yes = b.dataset.yes === "1";
-    const j = await (await postJSON("/api/members", {action: yes ? "accept" : "decline", id: Number(b.dataset.ntinvite)})).json().catch(() => ({}));
+    const j = await postJSON("/api/members", {action: yes ? "accept" : "decline", id: Number(b.dataset.ntinvite)});
     notify(j.error || (yes ? `you are on ${projLabel(j.project)} now` : `declined ${projLabel(j.project)}`), !!j.error, {kind: "ask"});
     refresh();
   });

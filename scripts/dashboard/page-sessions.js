@@ -2,8 +2,8 @@
 // the tab each is in, and ending one.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -62,7 +62,7 @@ function renderSessionsInto(i){
   const ss = state?.sessions;
   if (!ss){
     d.setBar("");
-    paint(d.list, skTpl(skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
+    patch(d.list, skTpl(skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
     return;
   }
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name))), claudes = agentSs.length;
@@ -90,23 +90,30 @@ function renderSessionsInto(i){
         esc(names.get(s.name) || s.name)}</span>${t && panes.indexOf(t.id) !== -1 ? ` <span class="pill ok">on screen</span>` : ""}${task}`,
       proj ? esc(projLabel(proj)) : `<span class="dim">workspace</span>`,
       s.node ? esc(s.node) : `<span class="dim">this controller</span>`,
-      s.created ? esc(ago(s.created)) : "",
-      `<div class="actbar">${t ? (claude ? "" : `<button type="button" data-min="${esc(t.id)}"
+      // A clock: it moves with time, not with news (uniform's quiet read).
+      s.created ? `<span class="ago">${esc(ago(s.created))}</span>` : "",
+      `<div class="actbar">${t ? (claude ? "" : `<button type="button" data-min="${esc(s.name)}"
           title="take its tab off the strip; it keeps running">Minimize</button>`)
         : `<button type="button" data-a="${esc(s.name)}" title="reopen its tab">Open</button>`}
-        <button type="button" class="danger" data-k="${esc(s.name)}" data-kn="${esc(s.node_id || "")}"
+        <button type="button" class="caution" data-k="${esc(s.name)}" data-kn="${esc(s.node_id || "")}"
           title="${claude ? "end this session: the transcript is kept" : "end this session and what runs in it"}">End</button></div>`])}</div>`;
   }).join("");
   const html = ss.length ? glance + tblWrap(SESS_COLS, rows, "sesstbl")
     : `<div class="empty">nothing is running: a terminal or an agent's session you open is listed here</div>`;
-  if (!paint(d.list, html)) return;
+  if (!patch(d.list, html)) return;
   // Kept from the pane under the page: its click makes the page's pane the
   // active one, and the terminal just opened in the dock would lose the
   // keys and the commands to a page that cannot take them.
   const goTo = (e, name) => { e.stopPropagation(); openTab({kind: "term", arg: argForSession(name), label: name}); };
   d.list.querySelectorAll("[data-a]").forEach(b => b.onclick = e => goTo(e, b.dataset.a));
   d.list.querySelectorAll("[data-go]").forEach(n => n.onclick = e => goTo(e, n.dataset.go));
-  d.list.querySelectorAll("[data-min]").forEach(b => b.onclick = () => hideTab(b.dataset.min));
+  // The session's tab as it is at the press: one drawn into the row before
+  // the tab was made again named an id nothing held, and the press did
+  // nothing (B825).
+  d.list.querySelectorAll("[data-min]").forEach(b => b.onclick = () => {
+    const t = tabs.find(x => sessionOf(x.arg) === b.dataset.min);
+    if (t) hideTab(t.id);
+  });
   d.list.querySelectorAll("[data-k]").forEach(b => b.onclick = () => killSession(b.dataset.k, b.dataset.kn));
 }
 
@@ -140,9 +147,8 @@ async function killSession(name, node = ""){
 
 // End a session, no questions asked. killSession is this with the dialog in
 // front of it.
-async function endSession(name, node = ""){
-  const r = await postJSON("/api/session", {action:"kill", session:name, node});
-  return r.json();
+async function endSession(name, node = "", wait = false){
+  return postJSON("/api/session", {action:"kill", session:name, node, ...(wait ? {wait: true} : {})});
 }
 
 // ---- who has a session on a project ----
@@ -168,23 +174,25 @@ const othersOn = p => withMe(p).filter(n => n !== state?.me);
 // `live` moves: a session starting, ending or turning to work shows within
 // a few seconds, where the status poll runs git for every project and
 // stays at fifteen (the operator, 25 Sep).
-async function liveRefresh(){
-  let j;
-  try{ j = await (await fetch("/api/live")).json(); }catch(e){ return; }
-  if (!state || !j || j.error) return;
-  // Your own sessions starting or ending are what the cards' Manage agent,
-  // a project's header and its settings read off the status read's session
-  // list, which this light read does not carry and keeps putting off: so a
-  // change in yours reads it at once (the operator, 17 Oct: Start agent
-  // stayed until a reload).
-  const yours = w => Object.entries(w || {}).filter(([, ns]) => (ns || []).includes(state.me)).map(([k]) => k).sort().join(",");
-  const moved = yours(j.claude_with) !== yours(state.claude_with);
-  state.claude_with = j.claude_with || {};
-  state.claude_busy = j.claude_busy || {};
-  state.claude_asking = j.claude_asking || {};
-  state.claude_where = j.claude_where || {};
-  drawProjects(state.projects);
-  if (moved) refresh();
+function liveRefresh(){
+  return reading("live", async () => {
+    let j;
+    try{ j = await getJSON("/api/live"); }catch(e){ return; }
+    if (!state || !j || j.error) return;
+    // Your own sessions starting or ending are what the cards' Manage agent,
+    // a project's header and its settings read off the status read's session
+    // list, which this light read does not carry and keeps putting off: so a
+    // change in yours reads it at once (the operator, 17 Oct: Start agent
+    // stayed until a reload).
+    const yours = w => Object.entries(w || {}).filter(([, ns]) => (ns || []).includes(state.me)).map(([k]) => k).sort().join(",");
+    const moved = yours(j.claude_with) !== yours(state.claude_with);
+    state.claude_with = j.claude_with || {};
+    state.claude_busy = j.claude_busy || {};
+    state.claude_asking = j.claude_asking || {};
+    state.claude_where = j.claude_where || {};
+    drawProjects(state.projects);
+    if (moved) refresh();
+  });
 }
 function sessionRows(proj){
   const all = withMe(proj);

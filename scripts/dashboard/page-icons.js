@@ -3,8 +3,8 @@
 // weight, so the controls on a row read as one set.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -47,10 +47,9 @@ const LOCK = `<svg viewBox="0 0 16 16" aria-hidden="true">${LOCK_BODY}
   <path d="M5 7.2V4.9a3 3 0 0 1 6 0v2.3"/></svg>`;
 const LOCK_OPEN = `<svg viewBox="0 0 16 16" aria-hidden="true">${LOCK_BODY}
   <path d="M5 7.2V4.9a3 3 0 0 1 6 0"/></svg>`;
-// A pushpin: its head, the body widening to its rim, and the needle, beside
-// a pinned project's name on its card (the operator, 19 Oct: a pin where it
-// is pinned, rather than the word on every card that is not).
-const PIN = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2h5M6.5 2v4L4.5 9h7l-2-3V2M8 9v5"/></svg>`;
+// A five-pointed star by a space's name on its card: filled while the space
+// is one of this person's favorites, an outline while it is not.
+const STAR = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9l1.85 3.85 4.2.55-3.05 2.95.75 4.2L8 11.45l-3.75 2 .75-4.2-3.05-2.95 4.2-.55z"/></svg>`;
 // A box with its lid and a handle, by a project's name on its card: Archive,
 // pressed in where it is archived (R138).
 const ARCHIVE = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="3" width="11.6" height="3" rx=".8"/>
@@ -85,6 +84,16 @@ const SPARK = `<svg viewBox="0 0 16 16" aria-hidden="true">
   <path d="M4 4l8 8"/><path d="M12 4l-8 8"/></svg>`;
 
 // A prompt, for a plain terminal: the chevron and the line you type on.
+// Side-view thumbtack: cap, body, needle. Filled when pinned, so the state
+// reads at a glance without a second icon to learn.
+const TACK = `<svg viewBox="0 0 16 16" aria-hidden="true">
+  <path d="M5 1.6h6"/>
+  <path d="M6.4 1.6v4.1c0 .9-.5 1.4-1.3 1.9-.7.5-1.2 1-1.2 1.6h8.2c0-.6-.5-1.1-1.2-1.6
+           -.8-.5-1.3-1-1.3-1.9V1.6"/>
+  <path d="M8 9.2v5.2"/></svg>`;
+const PENCIL = `<svg viewBox="0 0 16 16" aria-hidden="true">
+  <path d="M11.3 2.2 13.8 4.7 5.6 12.9 2.4 13.6 3.1 10.4z"/>
+  <path d="M9.9 3.6 12.4 6.1"/></svg>`;
 const TERM = `<svg viewBox="0 0 16 16" aria-hidden="true">
   <path d="M3.2 4.6 6.6 8l-3.4 3.4"/><path d="M8.4 11.8h4.4"/></svg>`;
 

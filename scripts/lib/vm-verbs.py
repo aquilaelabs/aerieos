@@ -5,8 +5,8 @@ administrators on their bell, auto does it now. A new VM is made from an OS
 in the catalog (aerie vm os) and lets in the session's own ssh key, made here
 when the session has none.
 
-BB_VM_AUTH is the auth header and BB_VM_PROJECT the project; the rest is
-argv: the verb, then its words.
+BB_PROJECT is the project; the rest is argv: the verb, then its words. The
+auth header is bbapi's own (BB_AUTH_HEADER, from aerie).
 """
 import os
 import re
@@ -16,9 +16,9 @@ import time
 
 import bbapi
 import waits
+from say import die
 
-AUTH = os.environ.get("BB_VM_AUTH", "")
-PROJECT = os.environ.get("BB_VM_PROJECT", "")
+PROJECT = os.environ.get("BB_PROJECT", "")
 USAGE = """usage: aerie vm [list]
        aerie vm os
        aerie vm new NAME --os OS [--vcpus N] [--mem 4G] [--disk 20] [--disks 100,500] [--node NODE] [--key FILE]
@@ -33,13 +33,8 @@ USAGE = """usage: aerie vm [list]
        aerie vm ip NAME | ssh NAME [COMMAND...]"""
 
 
-def die(msg):
-    print(f"[builderbot] ERROR: {msg}", file=sys.stderr)
-    sys.exit(1)
-
-
 def read():
-    d = bbapi.call("/api/vms", auth=AUTH)
+    d = bbapi.call("/api/vms")
     if d.get("error"):
         die(d["error"])
     return d
@@ -122,7 +117,7 @@ def own_key(path):
 
 
 def post(body):
-    return bbapi.call("/api/vms", {"project": PROJECT, **body}, auth=AUTH)
+    return bbapi.call("/api/vms", {"project": PROJECT, **body})
 
 
 def answered(r, what):
@@ -132,7 +127,7 @@ def answered(r, what):
     if r.get("id") and not r.get("job"):
         print(f"[builderbot] asked {r.get('to') or 'the administrators'} (#{r['id']}): {what} is on their bell, "
               "waiting up to 15 minutes for Allow (Make VMs is ask)", file=sys.stderr)
-        o = waits.outcome(AUTH, r["id"], "denied on the dashboard; nothing ran")
+        o = waits.outcome("", r["id"], "denied on the dashboard; nothing ran")
         if o.get("code"):
             die(o.get("out") or "refused")
         print(f"[builderbot] allowed: {o.get('out')}")

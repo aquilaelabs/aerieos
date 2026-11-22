@@ -10,8 +10,37 @@
 # caught it. The files: the branch against its base, plus the working
 # tree; or --files given outright; --dry only prints the plan.
 
+# Each flake onto its bug as it happens (R250 step 2): the check it failed
+# and what it waited for, noted on the open bug whose title names the suite,
+# or filed when none does, so the next session finds the sighting where it
+# looks and not only in this gate's scroll.
+flakes_to_bugs() {
+    local ff="${BB_REPO:-$PWD}/.bb-map/flakes.tsv" bl s b said commit
+    bl="$(mktemp)"
+    bash "$0" bug list > "$bl" 2>/dev/null || { rm -f "$bl"; return 0; }
+    commit="$(git rev-parse --short HEAD 2>/dev/null || true)"
+    for s in "$@"; do
+        said="$(python3 "$BB_LIB/flakes.py" said --file "$ff" --commit "$commit" "$s" 2>/dev/null)" || continue
+        b="$(python3 "$BB_LIB/flakes.py" bug-for --bugs "$bl" "$s" 2>/dev/null || true)"
+        if [ -n "$b" ]; then
+            bash "$0" bug note "$b" "$said" > /dev/null 2>&1 && printf '  NOTE  %s flaked: noted on %s\n' "$s" "$b"
+        else
+            b="$(bash "$0" bug add "test/$s.mjs fails under a whole gate's load and passes alone: $said" --sev low \
+                    --area "test/$s.mjs" --repro "aerie tests preflight${commit:+ at $commit}; aerie dashboard test $s --loaded runs it under that load on demand" \
+                    --reproduces sometimes 2>/dev/null | sed -n 's/^filed \(B[0-9]*\):.*/\1/p')"
+            [ -z "$b" ] || printf '  NOTE  %s flaked: filed %s\n' "$s" "$b"
+        fi
+    done
+    rm -f "$bl"
+}
+
 cmd_tests_preflight() {
     local dry="" base="" files=() f suites=() checks=() all_dash="" own=() mapped=() named=""
+    # harness: the suites' own library or runner changed, so every suite
+    # runs; whole: the change itself reaches every suite (server.py with no
+    # covered run to place it by). touched: what the change reaches by
+    # itself, kept when every suite runs only for the harness.
+    local harness="" whole="" harness_only="" touched=()
     while [ $# -gt 0 ]; do
         case "$1" in
             --dry) dry=1; shift ;;
@@ -24,7 +53,14 @@ cmd_tests_preflight() {
         git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git tree: aerie tests preflight --files F... names the files instead"
         local defaulted=""
         if [ -z "$base" ]; then
-            base="$(git rev-parse --verify -q origin/main >/dev/null 2>&1 && echo origin/main || echo main)"
+            # What the branch has pushed (R228 step 20): a push adds what is
+            # past it, and measured from origin/main a long branch was every
+            # file it ever touched and every suite on every gate. A branch
+            # never pushed is measured from main. A whole gate still comes
+            # before a release (CI runs every suite on its tag) and whenever
+            # the harness changes.
+            base="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" || base=""
+            [ -n "$base" ] || base="$(git rev-parse --verify -q origin/main >/dev/null 2>&1 && echo origin/main || echo main)"
             defaulted=1
         fi
         local mb; mb="$(git merge-base "$base" HEAD 2>/dev/null || echo "$base")"
@@ -60,10 +96,10 @@ cmd_tests_preflight() {
     local by="" mb_ref="${mb:-HEAD}"
     for f in "${files[@]}"; do
         case "$f" in
-            scripts/dashboard/test/lib.mjs|scripts/dashboard/test/run.sh) all_dash=1 ;;
+            scripts/dashboard/test/lib.mjs|scripts/dashboard/test/run.sh) all_dash=1; harness=1 ;;
             # Named outright (--files), there are no changed lines to place
             # it by, and server.py whole is every suite (B472).
-            scripts/dashboard/server.py) [ -z "$named" ] && [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && mapped+=("$f") || all_dash=1 ;;
+            scripts/dashboard/server.py) [ -z "$named" ] && [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && mapped+=("$f") || { all_dash=1; whole=1; } ;;
             scripts/dashboard/test/*.mjs) own+=("$(basename "$f" .mjs)") ;;
             # The unit tier runs every one of these first, whatever changed;
             # handed to the map, a changed one came back as a browser suite
@@ -72,7 +108,7 @@ cmd_tests_preflight() {
             *) mapped+=("$f") ;;
         esac
     done
-    if [ -n "$all_dash" ]; then
+    if [ -n "$whole" ] || { [ -n "$all_dash" ] && [ -z "$harness" ]; }; then
         suites=(ALL)
     else
         suites=("${own[@]}")
@@ -130,6 +166,21 @@ cmd_tests_preflight() {
         done
         suites=("${kept[@]}")
     fi
+    # The harness itself changed: every suite runs, and what the change
+    # reaches by itself is kept beside that. A flake fails the gate in a
+    # suite the change touches (R7 step 3); where every suite runs only
+    # because the library or the runner under them changed, a flake in one
+    # of the others is recorded and named and does not (the operator, 14
+    # Nov: four gates in a row each flaked on a different three or four of
+    # fifty, and no harness change could be pushed until a whole run had
+    # none).
+    if [ -n "$harness" ]; then
+        if [ "${suites[*]:-}" != ALL ]; then
+            touched=("${suites[@]}")
+            harness_only=1
+        fi
+        suites=(ALL)
+    fi
     # The checks the house rules ask for before handing back.
     # design is uniform.mjs whole, about four minutes. It runs when a file
     # that carries style changed (the stylesheet lives in index.html, the
@@ -143,13 +194,26 @@ cmd_tests_preflight() {
     local cov_ok=""; [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && cov_ok=1
     for f in "${files[@]}"; do
         case "$f" in
-            scripts/dashboard/index.html|scripts/dashboard/static/*|docs/design-language.md|scripts/dashboard/test/uniform.mjs)
+            scripts/dashboard/index.html|scripts/dashboard/*.css|scripts/dashboard/static/*|docs/design-language.md|scripts/dashboard/test/uniform*.mjs)
                 checks+=(design); break ;;
             scripts/dashboard/*) [ -n "$cov_ok" ] || { checks+=(design); break; } ;;
         esac
     done
+    # The design check is uniform's three parts, a, b and c, run among the
+    # suites rather than after them (B987): as the rule's check it was part a
+    # alone, leaving the contrast in each scheme, the phone pass and the
+    # dialogs unchecked, and it ran by itself once the suites were done; the
+    # stylesheets (page-*.css since 16 Nov) set it off at all only through
+    # the line above, since no map sees a CSS rule.
+    if [[ " ${checks[*]} " == *" design "* ]] && [ "${suites[*]:-}" != ALL ]; then
+        local u
+        for u in uniform uniform-b uniform-c; do
+            case " ${suites[*]:-} " in *" $u "*) ;; *) suites+=("$u") ;; esac
+        done
+    fi
     printf '  files:   %s\n' "${files[*]}"
     printf '  suites:  %s\n' "${suites[*]:-none}"
+    [ -z "$harness_only" ] || printf '  flakes:  every suite runs because the harness changed; one fails the gate only in %s\n' "${touched[*]:-none of them (the change touches no suite by itself)}"
     printf '  checks:  %s\n' "${checks[*]}"
     # The account, when the covered run chose: which function and which
     # drawn thing named each suite, and what fell back to a file.
@@ -198,8 +262,13 @@ cmd_tests_preflight() {
     # still lets the suites run, so one gate says everything that is wrong.
     local unit="${BB_REPO:-$PWD}/scripts/dashboard/unit"
     if [ -d "$unit" ]; then
-        printf '== unit: python3 -m unittest (scripts/dashboard/unit)\n'
-        if python3 -m unittest discover -s "$unit" -t "$unit" -q 2>&1; then
+        # Across the cores, as aerie tests unit runs it (unitpar.py): one
+        # process a core, each module dealt by the seconds it last took. In
+        # one process the tier was minutes of a gate that is otherwise idle
+        # while it runs.
+        printf '== unit: scripts/dashboard/unit, across the cores\n'
+        if python3 "$BB_LIB/unitpar.py" "$unit" "${BB_REPO:-$PWD}/.bb-map/unit-times.tsv" \
+                "${BB_TEST_WORKERS:-$(nproc 2>/dev/null || echo 1)}" 2>&1; then
             printf '  PASS  unit (exit 0)\n'
         else
             printf '  FAIL  unit\n'; rc=1
@@ -238,10 +307,36 @@ cmd_tests_preflight() {
         elif BB_TEST_WAIT_LOCK="${BB_TEST_WAIT_LOCK:-1200}" bash "$here" "${suites[@]}" 2>&1 | tee -a "$rl"; then :; else rc=1; fi
     fi
     [ "${#unplaced[@]}" -eq 0 ] || rc=1
+    # A flake in a suite this gate ran fails it (R7 step 3; the operator, 14
+    # Nov). The harness calls a suite flaky when it failed in the run and
+    # passed run again, and exits 0; a gate runs the suites the change
+    # touches, so one of them flaking is the change's to settle before a
+    # push, where a release's tag still counts it as passed.
+    local flk="" flk_all=""
+    [ "$rl" = /dev/null ] || flk="$(python3 "$BB_LIB/flakes.py" of-log "$rl" 2>/dev/null || true)"
+    flk_all="$flk"
+    if [ -n "$flk" ] && [ -n "$harness_only" ]; then
+        local fk="" fo="" x
+        for x in $flk; do
+            case " ${touched[*]:-} " in *" $x "*) fk="$fk $x" ;; *) fo="$fo $x" ;; esac
+        done
+        [ -z "$fo" ] || printf '  NOTE  flaky, recorded and not failed:%s. Every suite ran because the harness itself changed, and the change touches none of these by itself; aerie tests flakes counts them\n' "$fo" | tee -a "$rl"
+        flk="${fk# }"
+    fi
+    if [ -n "$flk" ]; then
+        printf '  FAIL  flaky in this gate: %s. Each failed in the run and passed when run again, and a gate runs the suites the change touches: aerie dashboard test SUITE runs one by itself, aerie tests flakes says how often each has flaked\n' "$flk" | tee -a "$rl"
+        rc=1
+    fi
+    # shellcheck disable=SC2086  # suite names, no spaces of their own
+    [ -z "$flk_all" ] || flakes_to_bugs $flk_all 2>&1 | tee -a "$rl"
     local c
     for c in "${checks[@]}"; do
-        # design is uniform.mjs, already in the run when it is listed
-        case "$c" in design) case " ${suites[*]:-} " in *" uniform "*|*" ALL "*) continue ;; esac ;; esac
+        # design is uniform's three parts, already in the run when they are
+        # listed (above, whenever design is), or when every suite ran
+        if [ "$c" = design ]; then
+            case " ${suites[*]:-} " in *" ALL "*) continue ;; esac
+            case " ${suites[*]:-} " in *" uniform "*) case " ${suites[*]} " in *" uniform-b "*) case " ${suites[*]} " in *" uniform-c "*) continue ;; esac ;; esac ;; esac
+        fi
         if bash "$0" rules check "$c" 2>&1 | tee -a "$rl"; then :; else rc=1; fi
     done
     # A run refused for another one holding the lock ran no suite at all,

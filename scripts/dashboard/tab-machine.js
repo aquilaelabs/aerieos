@@ -1,25 +1,28 @@
 "use strict";
-// This machine (R90 step 8, R56 step 8): the controller's own machine on a
-// bare-metal install, a page of its own in the Controller rail group and
-// not a row among Machines' nodes. Its head says what the machine is (its
-// name, system, cores and memory, the release this install runs and how
-// long it has been up, its agent, the wall); under it the Updates section
-// (Controller settings' own, R90 step 5) and the own node's row as the
-// Nodes page draws any node's (tab-nodes.js ndRowHtml): its health, the
-// projects on it, its sessions, GPU, USB, router, features, storage,
-// network and the advanced verbs (reboot and power off among them). The
-// container edition has no own machine and says so if the page is opened.
+// This controller (R90 step 8, split the operator, 9 Nov): on a bare-metal
+// install, what is the controller's and not the node's, in the Controller
+// rail group: the head (the release this install runs, how long it has been
+// up, a held start's Start), the Updates section (Controller settings' own,
+// R90 step 5) and the older versions kept to boot. The machine as a node is
+// the Nodes page's row like any node's, with the sections only it carries
+// (machineNodeSections). The container edition has no own machine and says
+// so if the page is opened.
 // Chrome from docSurface(); the hard rules are uniform.mjs's.
 
 function openMachineTab(what){
   if (what) sectOpen["nodes:" + what] = true;
-  openTab({kind: "machine", arg: "__machine", label: "This machine"});
+  openTab({kind: "machine", arg: "__machine", label: "This controller"});
   loadNodes();
 }
 
 // The own machine's row, or null before the node list lands.
 function ownMachine(){
   return (nodesList || []).find(n => n.config?.own && n.state !== "retired") || null;
+}
+
+// The own node's row on the Nodes page, as an address.
+function ownNodeAt(){
+  return `#/machines/nodes/${encodeURIComponent(ownMachine()?.id || "")}`;
 }
 
 function machineHead(n){
@@ -33,7 +36,7 @@ function machineHead(n){
   // check runs after the start, never holding it; an old system's array
   // adopted as it is waits until it is taken over, its parity not ours.
   const ar = r.array || {}, oldParity = (state?.firstboot?.adopt?.want?.parity || []).length;
-  const verify = !h.held ? "" : (ar.data || []).length && "verify" in ar
+  const verify = !h.held ? "" : (ar.data || []).length
     ? `<label class="ndcap"><input type="checkbox" id="heldVerify"> Check parity once the array is up</label>`
     : oldParity ? `<label class="ndcap"><input type="checkbox" disabled> Check parity <span class="sub dim">waits until the array is taken over: its parity is the old system's until then</span></label>` : "";
   const actions = h.held ? `${verify}<button type="button" class="primary" data-heldstart title="${esc((h.why || []).join("; "))}">Start</button>` : "";
@@ -45,7 +48,8 @@ function machineHead(n){
     ...(r.os_image?.version ? [["Image", `AerieOS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}`]] : []),
     ["Up", shortUptime(state?.uptime || 0)],
     ...(r.timezone ? [["Time zone", r.timezone]] : []),
-    ["Sessions kept apart", wall]]});
+    ["Sessions kept apart", wall],
+    ["As a node", pageLink("nodes", `${n.name} on the Nodes page`, ownNodeAt()), {html: true}]]});
 }
 
 function renderMachineInto(i){
@@ -53,36 +57,35 @@ function renderMachineInto(i){
   if (!d) return;
   d.setBar("");
   if (!state?.bare_metal){
-    d.list.innerHTML = `<div class="empty">This machine is a bare-metal install's page: the machine the controller runs on, its system, its updates and what it runs as a node. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`;
+    drawHTML(d.list, `<div class="empty">This controller is a bare-metal install's page: the release it runs on its own computer and that computer's updates. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`);
     return;
   }
   if (nodesList === null){
-    d.list.innerHTML = skTpl(`<div class="row stack2 ndrow"><div class="grow"><div class="name">${skv(7)}</div>${ndFacts(null)}</div>
-      <div class="ndsections">${ND_SECTS.filter(([k]) => k !== "gpu" && k !== "usb").map(([k, t], j) => docSection("nodes", k, t, "", skRows(j ? 1 : 3))).join("")}</div></div>`);
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["System", GHOST], ["Release", GHOST], ["Up", GHOST]]})
+      + docSection("nodes", "updates", "Updates", "", skRows(2))));
     loadNodes();
     return;
   }
   const n = ownMachine();
   if (!n){
-    d.list.innerHTML = `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`;
+    drawHTML(d.list, `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`);
     return;
   }
-  const inflight = t => (n.jobs || []).some(j => j.type === t || j.apply === t);
-  d.list.innerHTML = machineHead(n) + ndRowHtml(n, ""
+  patch(d.list, machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
-    + olderVersionsSection(n)
-    + stickSection(n)
-    + machineConsoleSection(n)
-    + firstbootSection()
-    + adoptSection(n)
-    + adoptBackSection(n)
-    + adoptAppsSection(n));
+    + olderVersionsSection(n));
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
   wireUpdates(d.el);
   wireOlderVersions(d.el);
   wireHeld(d.el);
-  void inflight;
+}
+
+// What only the controller's own machine carries, among its sections on the
+// Nodes page: where it keeps things, its screen, what its stick prepared and
+// the disks and apps it took over from an old system.
+function machineNodeSections(n){
+  return stickSection(n) + machineConsoleSection(n) + firstbootSection() + adoptSection(n) + adoptBackSection(n) + adoptAppsPointer(n);
 }
 
 // Hold the next start (R56 step 9, R161 step 11): a checkbox beside Restart
@@ -97,9 +100,9 @@ function wireHoldNext(root){
   root.querySelectorAll("[data-holdnextbox]").forEach(c => c.onchange = async () => {
     const on = c.checked;
     c.disabled = true;
-    const j = await (await postJSON("/api/v1/nodes", {action: "hold-next", on})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (on ? "the next start is held: nothing runs after the restart until Start is pressed on This machine" : "the next start runs as usual"), !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/v1/nodes", {action: "hold-next", on},
+      on ? "the next start is held: nothing runs after the restart until Start is pressed on This controller" : "the next start runs as usual",
+      () => { readMoved("nodes"); return refresh(); });
   });
 }
 
@@ -122,14 +125,13 @@ function olderVersionsSection(n){
 function wireOlderVersions(root){
   root.querySelectorAll("[data-oskeptdo]").forEach(b => b.onclick = () => pressing(b, async () => {
     const verb = b.dataset.oskeptdo, version = b.closest("[data-oskept]")?.dataset.oskept || "";
-    if (!await askYes(verb === "next"
-        ? `Boot ${version} next?\n\nOnce, at the next restart; the boot after is this version again. Nothing restarts until you do.`
-        : `Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
-        {title: verb === "next" ? "Boot it next?" : "Remove it?", verb: verb === "next" ? "Boot it next" : "Remove", danger: verb !== "next"})) return;
-    busy(b, verb === "next" ? "Setting" : "Removing");
-    const j = await (await postJSON("/api/v1/nodes", {action: "os-kept", id: ownMachine()?.id || "", verb, version})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (verb === "next" ? `${version} boots next, once: restart from Advanced` : `removing ${version}`), !!j.error);
-    await loadNodes();
+    // Boot it next asks nothing (R265: a press asks only where its yes costs something): it is once, at the next
+    // restart, and nothing restarts until the person does. Remove deletes
+    // the version's files, and asks.
+    if (verb !== "next" && !await askYes(`Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
+        {title: "Remove it?", verb: "Remove", danger: true})) return;
+    await sayPost(b, verb === "next" ? "Setting" : "Removing", "/api/v1/nodes", {action: "os-kept", id: ownMachine()?.id || "", verb, version},
+      verb === "next" ? `${version} boots next, once: restart from Advanced` : `removing ${version}`, () => loadNodes());
   }));
 }
 
@@ -140,7 +142,7 @@ function wireOlderVersions(root){
 // stick and what it has written, in the facts voice.
 const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces", secrets: "the secrets and the install key"};
 // The system pool's picker: The stick's own, and the first-run walk's.
-function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here."){
+function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here.", row = false){
   // An adopted pool counts whatever its filesystem (B663): the census's
   // pools are zpools alone. A data disk does not: it carries the old parity.
   const seen = new Set((n.reported?.pools || []).map(p => p.mount));
@@ -152,11 +154,17 @@ function stickPoolPick(n, s, none = "No pool or array here yet: make one on the 
   const admin = !!state?.can?.admin;
   const why = !mounts.length ? none
     : !n.live ? "Its agent is not dialing in." : busy ? "Moving to the pool now: docker and the VMs are stopped until it ends." : "";
-  const pick = admin ? `<div class="actbar"><label class="pick"><span class="pickw">System pool</span><select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
-      optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select></label><span class="sp"></span>
-      <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
-      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}<div class="sub warn" id="stickPoolOther"${stickPoolOther(s, s.pool || "") ? "" : " hidden"}>${STICK_OTHER}</div>` : "";
-  return pick;
+  if (!admin) return "";
+  const sel = `<select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
+      optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select>`;
+  const go = `<button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button>`;
+  const under = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}<div class="sub warn" id="stickPoolOther"${stickPoolOther(s, s.pool || "") ? "" : " hidden"}>${STICK_OTHER}</div>`;
+  // A field of the setup walk's picks (setpicks): its label over it, the
+  // control and its one verb on one line, what is said under them.
+  if (row) return `<div class="setpick"><label class="pickw" for="stickPool">System pool</label><div class="setpickline">${sel}${go}</div>${under}</div>`;
+  return `<div class="actbar"><label class="pick"><span class="pickw">System pool</span>${sel}</label><span class="sp"></span>
+      ${go}</div>
+      ${under}`;
 }
 // A pool holding another install's folder (the operator, 8 Nov): never taken,
 // set aside beside it when picked, for a person to delete once sure.
@@ -189,7 +197,7 @@ function stickSection(n){
 // controller moved here without its repositories takes the folder its
 // projects already sit in on the adopted disks, nothing copied. Offered
 // where those disks are: the plan's shares, then the merged views.
-function projectsFolderField(n, s, admin){
+function projectsFolderField(n, s, admin, row = false){
   if (!admin) return "";
   const ad = n.reported?.adopted || {};
   const roots = Object.keys(ad.merged || {}).filter(k => ad.merged[k]);
@@ -199,11 +207,15 @@ function projectsFolderField(n, s, admin){
   const offer = [...new Set([...shares, ...roots.map(r => `${r}/projects`)])];
   const busy = (n.jobs || []).some(j => j.apply === "projects-folder");
   const why = !n.live ? "Its agent is not dialing in." : busy ? "Taking the folder now: the controller restarts on it when it ends." : "";
-  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Spaces folder</span><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
-      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}></label>
-      <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist></div>
-    <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
-      <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
+  const input = `<input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off" aria-label="spaces folder"
+      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}>
+      <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist>`;
+  const acts = `${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
+      <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button>`;
+  // The walk's row: the step's own words say what the folder is for.
+  if (row) return `<div class="setpick"><label class="pickw" for="projFolder">Spaces folder</label><div class="setpickline">${input}${acts}</div>${why ? `<div class="sub dim">${esc(why)}</div>` : ""}</div>`;
+  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Spaces folder</span>${input}</label></div>
+    <div class="actbar"><span class="sp"></span>${acts}</div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
     <div class="hint">Only if the spaces already sit on these disks: the controller works there, and nothing is copied${
       helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
@@ -216,10 +228,8 @@ function wireStick(root){
         ? "Let the spaces folder go?\n\nThe controller restarts on the pool's spaces folder (or the stick's). The folder and its files stay where they are, given back to who had them."
         : `Take ${path} as the spaces folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: the system that had it can no longer read it until it is given back. Who had it is kept in the folder, in ${path}/.aerieos-give-back.sh: Let it go runs that, and so can root on that system. Their owner changes, nothing in them does, and a share of this folder stops serving other people.`,
         {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
-    busy(pb, release ? "Letting go" : "Taking it");
-    const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "taking the folder: the job says which spaces it found, and the controller restarts on it", !!j.error);
-    await loadNodes();
+    await sayPost(pb, release ? "Letting go" : "Taking it", "/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release},
+      "taking the folder: the job says which spaces it found, and the controller restarts on it", () => loadNodes());
   }));
   const b = root.querySelector("[data-stickpool]"), sel = root.querySelector("#stickPool");
   if (!b || !sel) return;
@@ -231,10 +241,8 @@ function wireStick(root){
     if (!path) return notify("pick a pool first", true);
     if (!await askYes(`${aside ? `${path} holds another AerieOS install's folder. It is renamed to ${path}/aerieos-system.old (or .old-2 and on) and nothing in it is read, taken or deleted: delete it yourself once nothing in it is wanted.\n\n` : ""}Put docker, the VMs, the toolchains, the spaces and the secrets on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, the install key and the secrets live there, and the stick keeps the configuration alone.`,
         {title: aside ? "Set it aside and use this pool?" : "Use this pool?", verb: aside ? "Set aside and move" : "Move"})) return;
-    busy(b, "Moving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "moving to the pool: This machine says when it is done", !!j.error);
-    await loadNodes();
+    await sayPost(b, "Moving", "/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside},
+      "moving to the pool: the Nodes page says when it is done", () => loadNodes());
   });
 }
 
@@ -264,10 +272,8 @@ function wireMachineConsole(root){
     if (!clear && pw !== pw2) return notify("the two passwords differ", true);
     if (clear && !await askYes("Take the console password away?\n\nNobody can log in at the screen as admin until one is set again; the boot menu's Rescue entry still opens a root shell there.",
         {title: "Take it away?", verb: "Take it away", danger: true})) return;
-    busy(b, clear ? "Taking it away" : "Setting");
-    const j = await (await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", ...(clear ? {clear: true} : {password: pw})})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (clear ? "taking the console password away" : "setting it: log in at the screen as admin"), !!j.error);
-    await loadNodes();
+    await sayPost(b, clear ? "Taking it away" : "Setting", "/api/v1/nodes", {action: "console", id: n?.id || "", ...(clear ? {clear: true} : {password: pw})},
+      clear ? "taking the console password away" : "setting it: log in at the screen as admin", () => loadNodes());
   }));
 }
 
@@ -321,6 +327,14 @@ function adoptBackSection(n){
 
 // What the section says, apart from its fold: the first-run walk draws the
 // same body in its own card.
+// The old array degraded (B940): a disk its old system marked disabled or
+// missing, whose files may live only in the parity, so nothing writes to
+// the array until that system has rebuilt it.
+const adoptDegraded = () => (state?.firstboot?.adopt?.degraded || []).length > 0;
+function adoptDegradedSaid(){
+  const d = state?.firstboot?.adopt?.degraded || [];
+  return `The old system's array is degraded: ${d.slice(0, 4).map(x => `${x.slot || x.id} (${x.status})`).join(", ")}. Its files may live only in the parity, so nothing writes to the array until that disk is rebuilt or replaced on the old system and the stick made again.`;
+}
 function adoptParts(n, {take = true} = {}){
   const had = n.reported?.adopted;
   if (had && (had.mounts || []).length){
@@ -332,12 +346,12 @@ function adoptParts(n, {take = true} = {}){
     // agent that has it, where the old parity disk is here.
     // The first-run walk leaves it out (the operator, 8 Nov): the parity
     // is built after the walk, from here, and the bell says so until it is.
-    const canTake = take && "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
+    const canTake = take && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length && !adoptDegraded();
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."
         : had.writable && !take
-        ? "Writable: the shares are served, and the old parity disk is left alone until the array is taken over. That comes after this walk, under Adopted disks on This machine, where Take the array over builds SnapRAID's parity in the background; the bell says so until it is done."
+        ? "Writable: the shares are served, and the old parity disk is left alone until the array is taken over. That comes after this walk, under Adopted disks on the Nodes page, where Take the array over builds SnapRAID's parity in the background; the bell says so until it is done."
         : had.writable
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
@@ -346,7 +360,7 @@ function adoptParts(n, {take = true} = {}){
           (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}${
           had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`
           : `<button type="button" class="danger" data-adopt="release">Release</button>`}</div></div>
-        ${canTake ? adoptTakeField() : ""}
+        ${canTake ? adoptTakeField() : adoptDegraded() && !had.taken ? `<div class="field"><div class="hint warn">${esc(adoptDegradedSaid())} The array is not taken over until it is.</div></div>` : ""}
         ${adoptFoldersField(n)}`};
   }
   const a = state?.firstboot?.adopt;
@@ -361,123 +375,167 @@ function adoptParts(n, {take = true} = {}){
     ...(w.pools || []).map(p => [p.name, `${p.fs} pool, writable`]),
     ...(a.skipped || []).map(x => [x.slot || "disk", `${x.id} · ${x.why}`, {cls: "warn"}])];
   const missing = (w.data || []).filter(x => !found(x.id)).length;
-  return {id: "adopt", title: "The old system's disks", status: missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
+  const deg = adoptDegraded();
+  if (deg) adoptWritable = false;
+  return {id: "adopt", title: "The old system's disks", status: deg ? "degraded" : missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
     body: `<div class="field">${factGrid(rows, "adfacts")}
+      ${deg ? `<div class="hint warn">${esc(adoptDegradedSaid())} Read only is safe meanwhile.</div>` : ""}
       <div class="adpick">
         <label class="ndcap"><input type="radio" name="adoptMode" value="ro"${adoptWritable ? "" : " checked"}> Read only: the old system's parity stays good, and new files land on a pool</label>
-        <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}> Writable: going back to the old system then takes a parity sync</label>
+        <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}${deg ? " disabled" : ""}> Writable: going back to the old system then takes a parity sync${deg ? " (not while the array is degraded)" : ""}</label>
       </div>
       <div class="hint">Each disk is mounted as it is, at the path it had, and never formatted.</div>
       <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, opts: {open: true}};
 }
 
 // The containers and VMs the old system ran (R163 steps 10 and 11): read
-// from its Docker and libvirt image files once the disks are adopted, the
-// containers made again here as Containers page containers with the exact
-// image each ran, the VMs defined in this machine's libvirt, each started
-// with the machine where it was. The list of what would be made is the
+// from its Docker and libvirt image files once the disks are adopted. The
+// containers come back as compose files in a zip, each imported from New
+// container (the operator, 10 Nov: rather than made here on a press); the
+// VMs are defined in this machine's libvirt, each started with the machine
+// where it was. The containers' rows and their networks are the
 // controller's (adopt-apps plan), fetched once a read lands.
-let adoptPlan = null, adoptPlanFor = "";
-// What the person unticked, kept across redraws: "c:NAME" a container, "v:NAME"
-// a VM (the operator, 1 Nov: pick which to bring back, not all of them).
+let adoptPlan = null, adoptNets = {}, adoptPlanFor = "";
+// The VMs the person unticked, kept across redraws: "v:NAME" (the operator,
+// 1 Nov: pick which to bring back, not all of them).
 const adoptSkip = new Set();
+// Where the old system's Docker and VMs kept what ran: the stick's plan's
+// words when it was made with one, else their usual places on the adopted
+// disks (the operator, 10 Nov: a stick made with no plan had no way to bring
+// its containers back at all). A guess the read says plainly when it misses.
+function oldAppsFrom(n){
+  const from = state?.firstboot?.apps_from;
+  if (from) return from;
+  const ad = n?.reported?.adopted || {};
+  const root = Object.keys(ad.merged || {}).filter(k => ad.merged[k]).find(k => /^\/mnt\/user$/.test(k)) || Object.keys(ad.merged || {}).find(k => ad.merged[k]);
+  if (!root) return null;
+  return {docker: {image: `${root}/system/docker/docker.img`, autostart_file: ""}, vms: {image: `${root}/system/libvirt/libvirt.img`, vfio: []}, networks: {}, guessed: true};
+}
+// The old system's containers and VMs (R163 steps 10, 11), drawn on the
+// Containers page of the controller's own machine, where they are looked
+// for (the operator, 10 Nov: it was on the Nodes page and never found).
 function adoptAppsSection(n){
-  const had = n.reported?.adopted, from = state?.firstboot?.apps_from;
+  const had = n.reported?.adopted, from = oldAppsFrom(n);
   if (!had || !(had.mounts || []).length || !from) return "";
   const apps = had.apps;
   const btn = (attr, word, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} ${attr}>${word}</button>`;
   if (!apps){
-    return docSection("nodes", "adoptapps", "Containers and VMs from the old system", "not read yet",
-      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run.</div>
+    return docSection("docker", "oldapps", "Containers and VMs from the old system", "not read yet",
+      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks${from.guessed ? ", read from where they usually are" : ""} (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run. A VM that was one of your nodes comes back as that node once it runs here.</div>
         <div class="actbar">${btn('data-adoptapp="read"', "Read what ran", "primary")}</div></div>`);
   }
-  const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r");
+  // A new read (its time) or other disks fetch the rows again.
+  const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r") + (apps.at || "");
   if (adoptPlanFor !== key){ adoptPlanFor = key; adoptPlan = null; loadAdoptPlan(); }
-  // Each a tick, ticked unless the person took it off; what cannot be made
-  // is said and has none.
-  const pick = (key, label, said, on, warn = false) => `<label class="ndcap adrow"><input type="checkbox" data-adpick="${esc(key)}"${on ? " checked" : ""}${on === null ? " disabled" : ""}>
-      <b>${esc(label)}</b> <span class="sub${warn ? " warn" : ""}">${esc(said)}</span></label>`;
-  const rows = (adoptPlan || []).map(a => pick(`c:${a.name}`, a.name,
-    `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}`,
-    a.ok ? !adoptSkip.has(`c:${a.name}`) : null, a.notes.length > 0)).join("");
+  // Each container a row: where it joins and what will not work as written.
+  const rows = (adoptPlan || []).map(a => `<div class="ndcap adrow"><b>${esc(a.name)}</b> <span class="sub${a.notes.length || !a.ok ? " warn" : ""}">${esc(
+    a.ok ? `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}` : a.notes.join("; "))}</span></div>`).join("");
+  // Each VM a tick, ticked unless the person took it off.
+  const pick = (key, label, said, on) => `<label class="ndcap adrow"><input type="checkbox" data-adpick="${esc(key)}"${on ? " checked" : ""}>
+      <b>${esc(label)}</b> <span class="sub">${esc(said)}</span></label>`;
   const other = Object.fromEntries((n.reported?.vms_other || []).map(v => [v.name, v]));
-  const vms = (apps.vms || []).map(v => { const here = other[v.name];
-    return here ? `<div class="ndcap adrow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${here.state}${here.autostart ? " · starts with the machine" : ""}`)}</span></div>`
-      : pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`)); }).join("");
-  const nC = (adoptPlan || []).filter(a => a.ok && !adoptSkip.has(`c:${a.name}`)).length;
+  // The VMs not defined here yet, each a tick, Define acting on them right
+  // under them (B750: it sat under the last defined VM's buttons, as if it
+  // were that VM's).
+  const toDefine = (apps.vms || []).filter(v => !other[v.name]);
+  const ticks = toDefine.map(v => pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`))).join("");
+  const nOk = (adoptPlan || []).filter(a => a.ok).length;
   const nV = (apps.vms || []).filter(v => !other[v.name] && !adoptSkip.has(`v:${v.name}`)).length;
-  const nets = Object.entries(from.networks || {});
-  const vmActs = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name];
-    return `<div class="actbar"><span class="grow">${esc(v.name)}</span>${s.state === "running"
+  // The networks a container joined: the read's, then a stick plan's.
+  const nets = Object.entries({...adoptNets, ...(from.networks || {})}).filter(([k]) => (adoptPlan || []).some(a => a.network === k));
+  // Each one defined here a row of its own: its name and state once with
+  // its buttons beside them, why Clone waits said on the row, and whether
+  // it starts with the machine a tick of its own under them (a yes or no).
+  const vmRows = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name], off = ["stopped", "shut off", "crashed"].includes(s.state);
+    return `<div class="vmrow"><div class="actbar"><span class="grow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${s.state}${off ? "" : " · shut it down to clone it"}`)}</span></span><span class="vmacts">${s.state === "running"
       ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
-      btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}${
       // Made AerieOS's own (R163 step 12): its disks copied, the original kept.
-      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${["stopped", "shut off", "crashed"].includes(s.state) ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
-  return docSection("nodes", "adoptapps", "Containers and VMs from the old system",
+      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${off ? "" : " disabled"}`, "Clone into a space…")}</span></div>
+      <label class="ndcap"><input type="checkbox" data-adoptvmauto="${esc(v.name)}"${s.autostart ? " checked" : ""}> Starts with the machine</label></div>`; }).join("");
+  return docSection("docker", "oldapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
-    `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
-      ${adoptPlan === null ? skRows(2) : `<div class="adpick">${rows}</div>`}
-      <div class="hint">Each is made with the exact image it ran and its paths as they were, so it finds its files where they were. A container or VM made new here goes where AerieOS keeps its own.</div>
-      <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway)}"`, `Make the ${esc(k)} network`)).join("")}
-        ${btn(`data-adoptapp="make"${nC ? "" : " disabled"}`, `Make and start ${nC === (adoptPlan || []).filter(a => a.ok).length ? "the containers" : nC ? `the ${nC} ticked` : "the ticked"}`, "primary")}</div>
-      ${(apps.vms || []).length ? `<div class="sub">The VMs</div><div class="adpick">${vms}</div>${vmActs}
-        <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === (apps.vms || []).filter(v => !other[v.name]).length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary") : ""}</div>` : ""}
+    `<div class="field"><div class="actbar"><span class="grow">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}</span>${btn('data-adoptapp="read"', "Read again")}</div>
+      ${adoptPlan === null ? skRows(2) : rows ? `<div class="adpick">${rows}</div>` : `<div class="hint">No container's settings were read: Read what ran again.</div>`}
+      <div class="hint">Each is a compose file with the image, settings and paths it ran with, so it finds its files where they were. Import one with New container: Compose, Import a compose file${nets.length ? "; a container that joins a network needs that network made first" : ""}.</div>
+      <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway || "")}"`, `Make the ${esc(k)} network`)).join("")}
+        ${btn(`data-adoptapp="zip"${nOk ? "" : " disabled"}`, "Download compose files", "primary")}</div>
+      ${(apps.vms || []).length ? `<div class="sub">The VMs</div>${toDefine.length ? `<div class="adpick">${ticks}</div>
+        <div class="actbar"><span class="grow hint">Each keeps its disks where they are, and one that started with the machine there does here.</span>${
+          btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === toDefine.length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary")}</div>` : ""}${vmRows}` : ""}
     </div>`);
 }
 
-async function loadAdoptPlan(){
-  const j = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""})).json().catch(() => ({error: "no answer"}));
-  adoptPlan = j.apps || [];
-  nodesRev++; drawPanes();
+// On the Nodes page, where it was: one line to the Containers page.
+function adoptAppsPointer(n){
+  if (!adoptAppsSection(n)) return "";
+  return docSection("nodes", "adoptapps", "Containers and VMs from the old system", "on the Containers page",
+    `<div class="field"><div class="actbar"><span class="grow sub">Read what the old system ran, download its containers' compose files and define its VMs, on this machine's Containers page.</span>
+      <button type="button" data-oldapps>Containers page</button></div></div>`);
+}
+function loadAdoptPlan(){
+  return reading("adoptplan", async () => {
+    const j = await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""});
+    adoptPlan = j.apps || [];
+    adoptNets = j.networks || {};
+    readMoved("nodes");
+  });
+}
+
+// The zip of their compose files, saved where the browser saves: fetched
+// rather than navigated to, so a refusal is said on the page.
+async function downloadOldCompose(b){
+  busy(b, "Writing");
+  try{
+    const r = await fetch("/api/old-compose");
+    if (!r.ok){ const j = await r.json().catch(() => ({})); notify(j.error || `the compose files: ${r.status}`, true); return; }
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement("a"), {href: url, download: "old-system-compose.zip"});
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    notify("saved old-system-compose.zip: import each with New container, Compose, Import a compose file");
+  }catch(e){ notify("the compose files: " + failWords(e), true); }
+  finally{ unbusy(b, "Download compose files"); }
 }
 
 function wireAdoptApps(root){
+  root.querySelectorAll("[data-oldapps]").forEach(b => b.onclick = () => openDockerOn(ownMachine()?.id || ""));
   root.querySelectorAll("[data-vmclone]").forEach(b => b.onclick = () => pressing(b, () => vmCloneAsk(b.dataset.vmclone, b.dataset.vmfrom)));
   const n = ownMachine();
   root.querySelectorAll("[data-adpick]").forEach(c => c.onchange = () => {
     if (c.checked) adoptSkip.delete(c.dataset.adpick); else adoptSkip.add(c.dataset.adpick);
-    nodesRev++; drawPanes();
+    readMoved("nodes"); drawPanes();
   });
   root.querySelectorAll("[data-adoptapp]").forEach(b => b.onclick = () => pressing(b, async () => {
-    const act = b.dataset.adoptapp, from = state?.firstboot?.apps_from || {};
+    const act = b.dataset.adoptapp, from = oldAppsFrom(n) || {};
+    if (act === "zip") return downloadOldCompose(b);
     if (act === "read"){
-      busy(b, "Reading");
-      const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || "reading: the containers and VMs it ran are listed here when it is done", !!j.error);
+      await sayPost(b, "Reading", "/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms},
+        "reading: the containers and VMs it ran are listed here when it is done");
     } else if (act === "define"){
       const other = new Set((n.reported?.vms_other || []).map(v => v.name));
       const names = (n.reported?.adopted?.apps?.vms || []).map(v => v.name).filter(x => !other.has(x) && !adoptSkip.has(`v:${x}`));
       if (!await askYes(`Define ${names.length} VM${names.length === 1 ? "" : "s"} in this machine's libvirt?\n\n${names.join(", ")}\n\nEach keeps its disks where they are; its network bridge becomes the LAN through this machine's interface, and those that started with the machine there do here.`,
           {title: "Define the VMs?", verb: "Define"})) return;
-      busy(b, "Defining");
-      const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || "defining: its job says each VM's changes", !!j.error);
-    } else {
-      const names = (adoptPlan || []).filter(a => a.ok && !adoptSkip.has(`c:${a.name}`)).map(a => a.name);
-      busy(b, "Making");
-      const m = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "make", id: n.id, names})).json().catch(() => ({error: "no answer"}));
-      if (m.error){ notify(m.error, true); return; }
-      const go = (m.made || []).filter(x => x.autostart);
-      const asks = go.filter(x => x.risks.length).map(x => `${x.name}: ${x.risks.slice(0, 4).join("; ")}`);
-      if (go.length && (!asks.length || await askYes(`Start the ${go.length} that started with the machine there?\n\nWhat they ask for beyond their own folder, acknowledged by this press:\n${asks.join("\n")}`,
-          {title: "Start them?", verb: "Start"}))){
-        const s = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "start", id: n.id, rows: go.map(x => ({slug: x.slug, ack: x.ack}))})).json().catch(() => ({error: "no answer"}));
-        notify(s.error || `made ${(m.made || []).length}, starting ${(s.started || []).length}${(s.failed || []).length ? `; not ${s.failed.map(x => x.slug).join(", ")}` : ""}${(m.skipped || []).length ? `; skipped ${m.skipped.map(x => x.name).join(", ")}` : ""}: the Containers page shows each`, !!(s.error || (s.failed || []).length));
-      } else notify(`made ${(m.made || []).length}${(m.skipped || []).length ? `; skipped ${m.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}: start each from the Containers page`);
+      await sayPost(b, "Defining", "/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names}, "defining: its job says each VM's changes");
     }
     await loadNodes();
   }));
   root.querySelectorAll("[data-adoptnet]").forEach(b => b.onclick = () => pressing(b, async () => {
-    busy(b, "Making");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "docker-network", name: b.dataset.adoptnet, subnet: b.dataset.subnet, gateway: b.dataset.gateway})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `making the ${b.dataset.adoptnet} network`, !!j.error);
-    await loadNodes();
+    await sayPost(b, "Making", "/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "docker-network", name: b.dataset.adoptnet, subnet: b.dataset.subnet, gateway: b.dataset.gateway},
+      () => `making the ${b.dataset.adoptnet} network`, () => loadNodes());
   }));
-  root.querySelectorAll("[data-adoptvm]").forEach(b => b.onclick = () => pressing(b, async () => {
-    busy(b, "Asking");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name: b.dataset.vmname, op: b.dataset.adoptvm})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `${b.dataset.vmname}: ${b.dataset.adoptvm.replace("-", " ")}`, !!j.error);
+  root.querySelectorAll("[data-adoptvmauto]").forEach(c => c.onchange = async () => {
+    const name = c.dataset.adoptvmauto, on = c.checked;
+    c.disabled = true;
+    const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name, op: on ? "autostart-on" : "autostart-off"});
+    notify(j.error || `${name}: ${on ? "starts" : "does not start"} with the machine`, !!j.error);
+    if (j.error) c.checked = !on;
+    c.disabled = false;
     await loadNodes();
+  });
+  root.querySelectorAll("[data-adoptvm]").forEach(b => b.onclick = () => pressing(b, async () => {
+    await sayPost(b, "Asking", "/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name: b.dataset.vmname, op: b.dataset.adoptvm},
+      () => `${b.dataset.vmname}: ${b.dataset.adoptvm.replace("-", " ")}`, () => loadNodes());
   }));
 }
 
@@ -542,19 +600,17 @@ function wireAdopt(root){
     if (!n) return;
     let confirm = "";
     if (!dry){
-      const typed = await askText("Take the array over?\n\nThe data disks become writable where they are, nothing on them formatted. The old parity disk's partition is given a filesystem for SnapRAID's parity, so the old system's parity is gone: going back to it takes its own parity sync. The first sync builds the new parity from nothing, and the array is unprotected until it ends, hours for a large one.",
-                                  {verb: "Take it over", label: "Type parity to go on"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== "parity"){ notify("the word typed is not parity; nothing taken over", true); return; }
+      if (!await askTyped("Take the array over?\n\nThe data disks become writable where they are, nothing on them formatted. The old parity disk's partition is given a filesystem for SnapRAID's parity, so the old system's parity is gone: going back to it takes its own parity sync. The first sync builds the new parity from nothing, and the array is unprotected until it ends, hours for a large one.",
+                          "parity", {verb: "Take it over", label: "Type parity to go on", refused: "the word typed is not parity; nothing taken over"})) return;
       confirm = "parity";
     }
     busy(b, dry ? "Checking" : "Taking over");
     const moves = adoptMovesNow();
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm, ...(moves.length ? {moves} : {})})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm, ...(moves.length ? {moves} : {})});
     // The mover's schedule, as picked, once the takeover is on its way.
     let sched = "";
     if (!j.error && !dry && moves.some(m => m.from) && adoptMoverCron){
-      const k = await (await postJSON("/api/schedules", {action: "save", name: "Array mover", cron: adoptMoverCron, node: n.id, on: true, system: {apply: "storage-array", config: {array: "mover"}}})).json().catch(() => ({error: "no answer"}));
+      const k = await postJSON("/api/schedules", {action: "save", name: "Array mover", cron: adoptMoverCron, node: n.id, on: true, system: {apply: "storage-array", config: {array: "mover"}}});
       sched = k.error ? `; the mover's schedule was not made (${k.error}): make it on the Storage page` : `; the mover runs ${String(k.schedule?.words || "on its schedule").toLowerCase()}`;
     }
     notify(j.error || (dry ? "checking the takeover: its job says each step, changing nothing" : `taking the array over: the first sync builds the parity, its progress on the Storage page${sched}`), !!j.error || /not made/.test(sched));
@@ -566,18 +622,16 @@ function wireAdopt(root){
     if (!names.length) { notify("tick the folders to serve first", true); return; }
     const rows = names.map(name => ({name, path: `/mnt/user/${name}`,
       smb: {on: true, guest: true, ro: false, tm: false, users: [], readers: []}, nfs: {on: false, ro: false, clients: []}}));
-    busy(b, "Serving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `serving ${rows.length - (j.skipped || []).length} folder${rows.length === 1 ? "" : "s"}${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`, !!j.error);
-    await loadNodes();
+    await sayPost(b, "Serving", "/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows},
+      j => `serving ${rows.length - (j.skipped || []).length} folder${rows.length === 1 ? "" : "s"}${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`,
+      () => loadNodes());
   }));
   root.querySelectorAll("[data-adoptshares]").forEach(b => b.onclick = () => pressing(b, async () => {
     const n = ownMachine(), rows = state?.firstboot?.shares?.rows || [];
     if (!n || !rows.length) return;
-    busy(b, "Serving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `serving ${rows.length - (j.skipped || []).length} shares${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`, !!j.error);
-    await loadNodes();
+    await sayPost(b, "Serving", "/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows},
+      j => `serving ${rows.length - (j.skipped || []).length} shares${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`,
+      () => loadNodes());
   }));
   root.querySelectorAll('input[name="adoptMode"]').forEach(r => r.onchange = () => { adoptWritable = r.value === "rw"; });
   root.querySelectorAll("[data-adopt]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -587,11 +641,21 @@ function wireAdopt(root){
         {title: "Release the disks?", verb: "Release", danger: true})) return;
     if (act === "adopt" && adoptWritable && !await askYes("Adopt the data disks writable?\n\nA file written to one is a write the old system's parity did not see: going back to it then takes a parity sync, which leaves its array unprotected until it ends.",
         {title: "Writable?", verb: "Adopt writable"})) return;
-    busy(b, act === "dry" ? "Checking" : act === "adopt" ? "Adopting" : "Releasing");
-    const want = act === "release" ? undefined : {...(state?.firstboot?.adopt?.want || {}), writable: adoptWritable};
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: This machine shows each mount as it lands" : "releasing"), !!j.error);
-    await loadNodes();
+    // A planned data disk not on this machine (replaced, or dead) no longer
+    // holds the rest back (B947): read only, the others adopt and its files
+    // are missing from the merged tree until it is found; writable waits
+    // for every disk, since the parity covers them all.
+    const plan = state?.firstboot?.adopt?.want || {};
+    const gone = act === "release" ? [] : (plan.data || []).filter(x => !adoptFound(n, x.id));
+    if (gone.length && adoptWritable && act !== "dry"){
+      notify(`${gone.map(x => x.slot).join(", ")} ${gone.length === 1 ? "is" : "are"} not on this machine: adopt read only until ${gone.length === 1 ? "it is" : "they are"} found, or rebuild on the old system`, true);
+      return;
+    }
+    if (gone.length && act === "adopt" && !await askYes(`Adopt without ${gone.map(x => x.slot).join(", ")}?\n\n${gone.length === 1 ? "It is" : "They are"} not on this machine. The other disks are adopted read only, and the files on the missing ${gone.length === 1 ? "disk" : "disks"} are not in the merged shares until ${gone.length === 1 ? "it is" : "they are"} found; nothing is written to any disk.`,
+        {title: "Adopt the rest?", verb: "Adopt the rest"})) return;
+    const want = act === "release" ? undefined : {...plan, data: (plan.data || []).filter(x => !gone.includes(x)), writable: adoptWritable};
+    await sayPost(b, act === "dry" ? "Checking" : act === "adopt" ? "Adopting" : "Releasing", "/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})},
+      act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: the Nodes page shows each mount as it lands" : "releasing", () => loadNodes());
   }));
 }
 
@@ -599,11 +663,11 @@ function wireHeld(root){
   root.querySelectorAll("[data-heldstart]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Starting");
     const check = !!root.querySelector("#heldVerify")?.checked;
-    const j = await (await postJSON("/api/v1/nodes", {action: "start-held"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "start-held"});
     let v = null;
     if (!j.error && check){
       const n = ownMachine();
-      v = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n?.id, array: "verify", correct: false})).json().catch(() => ({error: "no answer"}));
+      v = await postJSON("/api/v1/nodes", {action: "storage-array", id: n?.id, array: "verify", correct: false});
     }
     notify(j.error || `started: sessions run again${v ? v.error ? `; the parity check did not start: ${v.error}` : "; the parity check runs now, its result on the bell" : ""}`, !!(j.error || v?.error));
     await refresh();

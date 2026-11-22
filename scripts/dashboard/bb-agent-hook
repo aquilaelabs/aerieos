@@ -7,6 +7,9 @@
     bb-agent-hook --pack-agent AGENT             a pack agent's adapter, as JSON
     bb-agent-hook --pack-hooks AGENT             its hooks file written in its shape
     bb-agent-hook --pack-launch AGENT            its launcher's lines, for bb-tty
+    bb-agent-hook --allow AGENT                  what its session's start does so it need
+                                                 not ask about the aerie verbs the controller
+                                                 decides (agents.allow_plan), as JSON
 
 Codex CLI and Copilot CLI each carry hooks of their own now (Codex's
 PreToolUse, UserPromptSubmit, Stop, PermissionRequest and PostCompact;
@@ -38,8 +41,17 @@ config/toolpacks.json: its event names, its payload's shape (snake as
 Claude's and Codex's, camel as Grok's and Copilot's) and tool names, and its
 hooks file's shape, grouped answering as Claude does and flat as Copilot
 does.
+
+An agent whose hooks are none of those is held from data too (R234 step 3):
+its adapter says where its payload keeps each thing (hooks.payload as
+paths), how its hooks file is laid out (hooks.document) and how each answer
+is written (hooks.answers, a JSON object on stdout for a refusal, a pass,
+words for the model and an approval), so a protocol nobody has met yet is a
+manifest and no line here. grouped, flat, snake and camel are those same
+descriptions under a name (DOCUMENTS, PAYLOADS).
 """
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -49,6 +61,11 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# The bundle this file is in, with its links followed: a hook may be reached
+# through one, and what it reads beside itself is where the link leads.
+BUNDLED = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(BUNDLED, "..", "lib"))
+import agentids  # noqa: E402
 
 # The tools each agent runs a command or edits a file with, by the names
 # its hooks hand over.
@@ -60,11 +77,7 @@ GREP = {"grep", "Grep", "search_file_content"}
 PATCH_FILE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
 
 
-SHIPPED = ("claude", "codex", "copilot", "grok", "open")
-
-
-def packs_file():
-    return os.environ.get("BB_TOOLPACKS_JSON") or os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "config", "toolpacks.json")
+SHIPPED = agentids.SHIPPED
 
 
 def pack_adapter(agent):
@@ -72,12 +85,7 @@ def pack_adapter(agent):
     (a shipped agent's name is never a pack's)."""
     if agent in SHIPPED or not re.fullmatch(r"[a-z][a-z0-9]{1,15}", str(agent or "")):
         return None
-    try:
-        with open(packs_file(), encoding="utf-8") as f:
-            rows = json.load(f).get("toolchains") or []
-    except (OSError, ValueError, AttributeError):
-        return None
-    for r in rows if isinstance(rows, list) else []:
+    for r in agentids.pack_rows(BUNDLED):
         if isinstance(r, dict) and r.get("name") == agent and isinstance(r.get("agent"), dict):
             return r["agent"]
     return None
@@ -85,11 +93,44 @@ def pack_adapter(agent):
 
 def protocol(agent):
     """How the agent reads a hook's answer: "copilot" (a permissionDecision
-    on stdout before a tool) or "claude" (exit 2 and the reason on stderr)."""
+    on stdout before a tool), "answers" (a JSON object on stdout for every
+    event, written from its adapter's own templates) or "claude" (exit 2
+    and the reason on stderr)."""
     if agent == "copilot":
         return "copilot"
     a = pack_adapter(agent) if agent not in SHIPPED else None
-    return "copilot" if a and (a.get("hooks") or {}).get("shape") == "flat" else "claude"
+    hooks = (a.get("hooks") or {}) if a else {}
+    if isinstance(hooks.get("answers"), dict) and hooks["answers"]:
+        return "answers"
+    return "copilot" if hooks.get("shape") == "flat" else "claude"
+
+
+# The payload shapes that have a name, each as the paths an adapter may
+# write out for one that has none: where the conversation's id, the folder,
+# the tool, its arguments, the prompt and the mark of a stop already refused
+# are. A path is dotted (toolCall.name); several are tried in order.
+PAYLOADS = {
+    "snake": {"session": "session_id", "cwd": "cwd", "tool": "tool_name", "input": "tool_input", "prompt": "prompt",
+              "stop_active": "stop_hook_active", "transcript": "transcript_path"},
+    "camel": {"session": "sessionId", "cwd": "cwd", "tool": "toolName", "input": "toolInput", "prompt": ["prompt", "userPrompt"],
+              "stop_active": "stopHookActive", "transcript": "transcriptPath"},
+}
+
+
+def _at(d, paths):
+    """What a payload holds at the first of these dotted paths that holds
+    anything, or None."""
+    for path in ([paths] if isinstance(paths, str) else paths or []):
+        cur = d
+        for key in str(path).split("."):
+            cur = cur.get(key) if isinstance(cur, dict) else None
+        if cur not in (None, ""):
+            return cur
+    return None
+
+
+def _names(v):
+    return [v] if isinstance(v, str) else [x for x in v or [] if isinstance(x, str)]
 
 
 def as_claude(agent, raw):
@@ -99,6 +140,18 @@ def as_claude(agent, raw):
     tools = (pack.get("hooks") or {}).get("tools") or {} if pack else {}
     if pack and (pack.get("hooks") or {}).get("payload") == "camel":
         agent = "grok"
+    # A payload its adapter describes by paths (R234 step 3): read where it
+    # says each thing is, and its tools' arguments by its own names for a
+    # command, a file and a search.
+    where = (pack.get("hooks") or {}).get("payload") if pack else None
+    argnames = {}
+    if isinstance(where, dict):
+        args = _at(d, where.get("input"))
+        d = {"session_id": str(_at(d, where.get("session")) or ""), "cwd": str(_at(d, where.get("cwd")) or ""),
+             "tool_name": str(_at(d, where.get("tool")) or ""), "tool_input": args if isinstance(args, (dict, str)) else {},
+             "prompt": str(_at(d, where.get("prompt")) or ""), "stop_hook_active": bool(_at(d, where.get("stop_active"))),
+             "transcript_path": str(_at(d, where.get("transcript")) or "")}
+        argnames = where.get("args") if isinstance(where.get("args"), dict) else {}
     if agent == "grok":
         # Grok Build's camelCase, its tool's input an object.
         args = d.get("toolInput")
@@ -130,7 +183,7 @@ def as_claude(agent, raw):
     # A pack agent's own tool names, beside the usual ones.
     shell, edit, grep = SHELL | set(tools.get("shell") or ()), EDIT | set(tools.get("edit") or ()), GREP | set(tools.get("grep") or ())
     if name in shell:
-        cmd = spec.get("command") if isinstance(spec, dict) else spec
+        cmd = _at(spec, ["command", *_names(argnames.get("command"))]) if isinstance(spec, dict) else spec
         if isinstance(cmd, list):
             # Codex hands a command as its argv, with `bash -lc SCRIPT` the
             # usual shape: the script is what a rule reads.
@@ -139,7 +192,7 @@ def as_claude(agent, raw):
     elif name in edit:
         path = ""
         if isinstance(spec, dict):
-            path = spec.get("file_path") or spec.get("path") or spec.get("filePath") or ""
+            path = _at(spec, ["file_path", "path", "filePath", *_names(argnames.get("file"))]) or ""
             if not path:
                 m = PATCH_FILE.search(str(spec.get("input") or spec.get("patch") or ""))
                 path = m.group(1).strip() if m else ""
@@ -148,7 +201,7 @@ def as_claude(agent, raw):
             path = m.group(1).strip() if m else ""
         out["tool_name"], out["tool_input"] = "Edit", {"file_path": path}
     elif name in grep:
-        pat = spec.get("pattern") or spec.get("query") or "" if isinstance(spec, dict) else str(spec or "")
+        pat = _at(spec, ["pattern", "query", *_names(argnames.get("pattern"))]) or "" if isinstance(spec, dict) else str(spec or "")
         out["tool_name"], out["tool_input"] = "Grep", {"pattern": str(pat)}
     return out
 
@@ -175,8 +228,9 @@ def keep(agent, raw):
         # Where its adapter says it keeps a conversation, by the id its
         # payload carries, inside that folder and nowhere else.
         tr = pack.get("transcripts") or {}
-        key = tr.get("session_key") or ("sessionId" if (pack.get("hooks") or {}).get("payload") == "camel" else "session_id")
-        sid = str(d.get(key) or "")
+        where = (pack.get("hooks") or {}).get("payload")
+        key = tr.get("session_key") or (where.get("session") if isinstance(where, dict) else "sessionId" if where == "camel" else "session_id")
+        sid = str(_at(d, key) or "")
         base = os.path.realpath(os.path.join(home, tr.get("dir") or ""))
         src = os.path.realpath(os.path.join(base, (tr.get("file") or "").replace("{session}", sid))) if tr.get("dir") and tr.get("file") else ""
         if not src.startswith(base + os.sep):
@@ -226,8 +280,16 @@ def settle(agent, raw):
     Build can write a turn's first words after the rest, so a copy taken
     only at the hook missed them until the next turn ended."""
     try:
-        if os.fork():
-            return
+        # Python warns of a fork where it counts more than one thread, on
+        # stderr, which is where an agent reads this hook's refusal from: the
+        # warning came out ahead of the sentence now and then (seen in a
+        # whole test run, 12 Nov). The child here only sleeps and copies a
+        # file, so the warning has nothing to say of it.
+        import warnings                                         # noqa: PLC0415
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            if os.fork():
+                return
     except OSError:
         return
     try:
@@ -275,6 +337,60 @@ def run(argv, payload, timeout):
         return p.returncode, p.stdout, p.stderr
     except (OSError, subprocess.SubprocessError):
         return 0, "", ""
+
+
+def run_here(argv, payload):
+    """A step's script run inside this process, as run() runs it in a
+    process of its own (R228 step 17): before every tool call each guard
+    was a python of its own, two of them a shell call's, about half of the
+    100 ms the call waited. The script is run as `python3 SCRIPT` runs it
+    (runpy, as __main__), with the step's argv and stdin and what it prints
+    captured, and ends as that process would: its exit's number, 0 when it
+    returns, 1 when it raises."""
+    import io                                                    # noqa: PLC0415 (only on this path)
+    import runpy                                                 # noqa: PLC0415
+    import warnings                                              # noqa: PLC0415
+    was = sys.argv, sys.stdin, sys.stdout, sys.stderr
+    out, err = io.StringIO(), io.StringIO()
+    sys.argv, sys.stdin, sys.stdout, sys.stderr = list(argv), io.StringIO(json.dumps(payload)), out, err
+    try:
+        # ...with a fresh process's quiet about unclosed files, which its
+        # stderr would never have carried.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            runpy.run_path(argv[0], run_name="__main__")
+        code = 0
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) and not isinstance(e.code, bool) else (0 if e.code is None else 1)
+    except Exception:                                           # noqa: BLE001 (as its own process would end)
+        code = 1
+    finally:
+        sys.argv, sys.stdin, sys.stdout, sys.stderr = was
+    return code, out.getvalue(), err.getvalue()
+
+
+def refusal(code, out, err):
+    """Why a hook refused, or "". A guard says no in one of the two ways
+    Claude Code reads, since Claude Code runs each of them itself: exit 2
+    with the reason on stderr (bb-gate), or an answer on stdout with exit 0,
+    a tool denied (bb-rule-hook's permissionDecision) or a stop sent back to
+    work (bb-check-relay's decision block). Every other agent is told from
+    here, so both are read here."""
+    if code == 2:
+        return err.strip() or "refused by an AerieOS guard"
+    try:
+        d = json.loads(out)
+    except ValueError:
+        return ""
+    if not isinstance(d, dict):
+        return ""
+    h = d.get("hookSpecificOutput") if isinstance(d.get("hookSpecificOutput"), dict) else {}
+    for said in (h, d):
+        if said.get("permissionDecision") == "deny":
+            return str(said.get("permissionDecisionReason") or "").strip() or "refused by an AerieOS guard"
+    if d.get("decision") == "block":
+        return str(d.get("reason") or "").strip() or "refused by an AerieOS guard"
+    return ""
 
 
 # THE ONE LIST of AerieOS's hooks: for each event, the scripts a session
@@ -333,6 +449,25 @@ def plan(event, call, proj, who):
     return steps
 
 
+# What a session is told when its gate cannot be run at all.
+GUARD_GONE = ("AerieOS's guard could not be run in this session, so nothing runs here: its tools are gone "
+              "from this node or damaged. Start the session again from its space; if that does not bring "
+              "it back, the node's row says what is wrong.")
+
+
+def closed(command):
+    """A gate's command that refuses when the gate itself cannot be run
+    (B1009). A shell answers 127 for a program that is not there and 126 for
+    one it may not run, which Claude Code reads as a hook that failed and
+    passes over: a session whose hooks' folder had gone ran on for hours
+    with no gate, no refused commands and no notices, saying only that a
+    hook failed. Either code becomes the refusal a gate gives, exit 2 with
+    the reason, so no tool runs and the session says why. Every other code
+    is the gate's own and goes through as it is."""
+    return (f"{command}; r=$?; if [ $r -eq 126 ] || [ $r -eq 127 ]; then "
+            f"echo {shlex.quote(GUARD_GONE)} >&2; exit 2; fi; exit $r")
+
+
 def claude_settings(proj, who, where):
     """Claude Code's `hooks` settings from the same list, each command under
     `where` (bb-tty's directory by the name that outlives a bundle): one
@@ -344,7 +479,10 @@ def claude_settings(proj, who, where):
         groups = out.setdefault(name, [])
         every = {"hooks": []} if matcher is None else {"matcher": matcher, "hooks": []}
         for script, args, timeout, tools, status in spec["steps"]:
-            hook = {"type": "command", "command": shlex.join(_argv(script, args, proj, who, where)), "timeout": timeout}
+            command = shlex.join(_argv(script, args, proj, who, where))
+            if script == "bb-gate" and args == [P, W]:
+                command = closed(command)
+            hook = {"type": "command", "command": command, "timeout": timeout}
             if status:
                 hook["statusMessage"] = status
             if tools:
@@ -359,6 +497,10 @@ def claude_settings(proj, who, where):
 # How long each event's call is given, for an agent whose hooks file names
 # one (a pack agent's): the other agents' own.
 TIMEOUTS = {"pre": 120, "prompt": 900, "stop": 3600, "recall": 30, "asking": 15}
+# A conversation's start, for an agent that is handed the briefing by its
+# hook (briefing.how hook): not one of AerieOS's guards, so it is no row of
+# HOOKS, and it runs nothing but the hand-over.
+START_TIMEOUT = 30
 
 
 def agent_events(agent):
@@ -367,13 +509,66 @@ def agent_events(agent):
     pack = pack_adapter(agent)
     if pack:
         evs = (pack.get("hooks") or {}).get("events") or {}
-        return [[evs[ev], ev, TIMEOUTS[ev]] for ev in HOOKS if ev in evs and ev in TIMEOUTS]
+        return [[evs[ev], ev, TIMEOUTS[ev]] for ev in HOOKS if ev in evs and ev in TIMEOUTS] \
+            + ([[evs["start"], "start", START_TIMEOUT]] if evs.get("start") else [])
     return [[spec[agent][0], ev, spec[agent][1]] for ev, spec in HOOKS.items() if agent in spec]
 
 
+# The hooks file's shapes that have a name, each as the layout an adapter
+# may write out for one that has none (hooks.document):
+#   under    the keys down to the object that maps an event to its entries
+#   with     keys the file carries at its top, as they are
+#   keep     true where the file is not AerieOS's alone: what else it holds
+#            is kept and only the object `under` names is replaced
+#   handler  one hook, with {command} for this script's call and {seconds}
+#            for the time it is given
+#   entry    an event's value, with {handler} where the hook goes; entries
+#            gives one of AerieOS's events (pre, prompt, ...) its own
+DOCUMENTS = {
+    "grouped": {"under": ["hooks"], "handler": {"type": "command", "command": "{command}", "timeout": "{seconds}"},
+                "entry": [{"hooks": ["{handler}"]}]},
+    "flat": {"under": ["hooks"], "with": {"version": 1}, "handler": {"type": "command", "bash": "{command}", "timeoutSec": "{seconds}"},
+             "entry": ["{handler}"]},
+}
+
+
+def _fill(t, subs):
+    """A template with its placeholders filled: a string that is one
+    placeholder becomes what it stands for, whole (a hook's object, a
+    number of seconds, a reason's text); every other value is kept."""
+    if isinstance(t, str):
+        return subs.get(t, t)
+    if isinstance(t, list):
+        return [_fill(x, subs) for x in t]
+    if isinstance(t, dict):
+        return {k: _fill(v, subs) for k, v in t.items()}
+    return t
+
+
+def hooks_document(layout, evs, cmd, was=None):
+    """The hooks file as a layout says it: every event this agent raises
+    calling this script, in a file started afresh or, where the layout
+    keeps what is there, in the one read before (`was`)."""
+    doc = dict(was) if layout.get("keep") and isinstance(was, dict) else {}
+    doc.update(layout.get("with") or {})
+    events = {}
+    for name, ev, seconds in evs:
+        hook = _fill(layout.get("handler") or {}, {"{command}": f"{cmd} {ev}", "{seconds}": seconds})
+        events[name] = _fill((layout.get("entries") or {}).get(ev) or layout.get("entry") or ["{handler}"], {"{handler}": hook})
+    cur, under = doc, list(layout.get("under") or ["hooks"])
+    for key in under[:-1]:
+        if not isinstance(cur.get(key), dict):
+            cur[key] = {}
+        cur = cur[key]
+    cur[under[-1]] = events
+    return doc
+
+
 def pack_hooks(agent, home, cmd):
-    """A pack agent's hooks file, written in its shape under `home`: AerieOS's
-    own, so it is replaced whole at each start. The path it wrote, or ""."""
+    """A pack agent's hooks file, written in its shape under `home`: a
+    named shape's layout or the adapter's own. AerieOS's own, so it is
+    replaced whole at each start, but for a layout that keeps the rest of a
+    file a person's hooks are in too. The path it wrote, or ""."""
     pack = pack_adapter(agent)
     if not pack:
         return ""
@@ -382,11 +577,16 @@ def pack_hooks(agent, home, cmd):
     path = os.path.realpath(os.path.join(base, h.get("file") or ""))
     if not h.get("file") or not path.startswith(base + os.sep):
         return ""
-    evs = agent_events(agent)
-    if h.get("shape") == "flat":
-        doc = {"version": 1, "hooks": {n: [{"type": "command", "bash": f"{cmd} {ev}", "timeoutSec": t}] for n, ev, t in evs}}
-    else:
-        doc = {"hooks": {n: [{"hooks": [{"type": "command", "command": f"{cmd} {ev}", "timeout": t}]}] for n, ev, t in evs}}
+    layout = h.get("document") if isinstance(h.get("document"), dict) else DOCUMENTS.get(h.get("shape")) or DOCUMENTS["grouped"]
+    was = None
+    if layout.get("keep"):
+        # A file that does not read is started again: nothing in it loads.
+        try:
+            with open(path, encoding="utf-8") as f:
+                was = json.load(f)
+        except (OSError, ValueError):
+            was = None
+    doc = hooks_document(layout, agent_events(agent), cmd, was)
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     tmp = path + ".new"
     with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
@@ -413,6 +613,10 @@ def pack_launch(agent):
         out.append(f'if [ -n "${{bf:-}}" ] && [ -s "$bf" ]; then extra+=({q(b["flag"])} "$bf"); fi')
     elif b.get("how") == "env-file" and b.get("env"):
         out.append(f'if [ -n "${{bf:-}}" ] && [ -s "$bf" ]; then export {b["env"]}="$bf"; fi')
+    elif b.get("how") == "hook":
+        # Handed over by its hooks (briefed): the file's place is all the
+        # launcher says.
+        out.append('if [ -n "${bf:-}" ] && [ -s "$bf" ]; then export BB_BRIEFING_FILE="$bf"; fi')
     if pack.get("models") and pack.get("model_flag"):
         out.append(f'case " {" ".join(q(m) for m in pack["models"])} " in *" ${{am:-}} "*) ;; *) am="" ;; esac')
         out.append(f'[ -z "${{am:-}}" ] || extra+=({q(pack["model_flag"])} "$am")')
@@ -433,6 +637,12 @@ def main(argv):
         if not a:
             return 1
         print(json.dumps(a))
+        return 0
+    if argv[:1] == ["--allow"] and len(argv) == 2:
+        sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+        import agents                                           # noqa: PLC0415 (beside this file)
+        pack = None if agents.get(argv[1]) else pack_adapter(argv[1])
+        print(json.dumps(agents.allow_plan(argv[1], (pack or {}).get("allow"))))
         return 0
     if argv[:1] == ["--pack-hooks"] and len(argv) == 2:
         here = os.path.dirname(os.path.abspath(__file__))
@@ -458,13 +668,29 @@ def main(argv):
     except ValueError:
         raw = {}
     call = as_claude(agent, raw)
+    proto = protocol(agent)
+    if proto == "answers":
+        # Every answer a JSON object from its adapter's templates, and a
+        # failure of this script's own the answer that lets the call
+        # through, as the others' silence does.
+        try:
+            out = answered(agent, event, raw, call, proj, who)
+        except Exception:                                       # noqa: BLE001 (a guard is never worth an agent that cannot work)
+            out = _answer(pack_adapter(agent) or {}, event, "pass")
+        print(json.dumps(out))
+        return 0
+    sid = call.get("session_id") or ""
     if event == "stop":
         keep(agent, raw)
         settle(agent, raw)
+        # A stop a check sent back once is let go the next time: by the
+        # agent's own word where its payload has one, by the mark where it
+        # has none, so no agent is sent back for ever by a check that fails.
+        if mark_read(agent, sid, "stop") is not None:
+            call["stop_hook_active"] = True
     said = []
     why = wall((call.get("tool_input") or {}).get("file_path", ""), call.get("cwd") or "") \
         if event == "pre" and call.get("tool_name") == "Edit" else ""
-    proto = protocol(agent)
     if why:
         if proto == "copilot":
             print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": why}))
@@ -472,16 +698,24 @@ def main(argv):
         print(why, file=sys.stderr)
         return 2
     for cmd, timeout in plan(event, call, proj, who):
-        code, out, err = run(cmd, call, timeout)
-        if out.strip():
+        # Before a tool, the guards run here: the call waits on them, and
+        # each is quick. The other events' steps (a turn waited for, the
+        # checks at a stop) keep their own process and its time limit.
+        code, out, err = run_here(cmd, call) if event == "pre" else run(cmd, call, timeout)
+        reason = refusal(code, out, err)
+        if out.strip() and not reason:
             said.append(out.strip())
-        if code == 2:
-            reason = err.strip() or "refused by an AerieOS guard"
+        if reason:
             if proto == "copilot" and event == "pre":
                 print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": reason}))
                 return 0
+            if event == "stop" and not mark_write(agent, sid, "stop", "1"):
+                # No conversation to remember it by: let go, never looped.
+                return 0
             print(reason, file=sys.stderr)
             return 2
+    if event == "stop":
+        mark_drop(agent, sid, "stop")
     # What a hook had to say to the model (a rule's text, a note), passed on
     # where the agent reads a hook's output; Copilot's before a tool reads
     # only a decision, so nothing goes there.
@@ -489,6 +723,204 @@ def main(argv):
         print(json.dumps({"hookSpecificOutput": {"hookEventName": EVENTS.get(event, event),
                                                  "additionalContext": context(said)}}))
     return 0
+
+
+# ---- an agent answered from its adapter's templates (R234 step 3, R233) --------
+# An agent that reads a hook's stdout and nothing else is answered in its
+# own words, which its adapter carries as templates (hooks.answers), one set
+# an event:
+#   refuse   a guard said no: {reason} is why (a tool denied, a prompt not
+#            taken, a stop sent back to work)
+#   pass     nothing to say: the call goes on ({} when the adapter gives none)
+#   say      words for the model: {text} is a rule's text, a note, the
+#            briefing; without one the words are dropped and it passes
+#   approve  before a tool, an aerie verb the controller decides: no asking
+# What an agent has no event or field for is kept in a few small marks under
+# the account's cache, one set a conversation:
+#   turn   the turn in hand, by what the person last said, for an agent
+#          whose prompt event is raised before every call to its model
+#          (hooks.prompt_fires each-call): a prompt's hooks run once a turn
+#   stop   a stop this script refused, where the payload has no word for
+#          it, so the next one in the same turn is told so (Claude's
+#          stop_hook_active) and a check cannot loop
+#   brief  the briefing this conversation was last handed, by its hash
+def marks_dir():
+    return os.path.join(os.environ.get("HOME", ""), ".cache", "builderbot", "turns")
+
+
+def _mark(agent, sid, kind):
+    return os.path.join(marks_dir(), f"{agent}-{sid}.{kind}") if SID.fullmatch(str(sid or "")) else ""
+
+
+def mark_read(agent, sid, kind):
+    """What a mark holds, or None when there is none."""
+    try:
+        with open(_mark(agent, sid, kind), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def mark_write(agent, sid, kind, text):
+    path = _mark(agent, sid, kind)
+    if not path:
+        return False
+    try:
+        os.makedirs(marks_dir(), mode=0o700, exist_ok=True)
+        with open(os.open(path + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(path + ".new", path)
+        return True
+    except OSError:
+        return False
+
+
+def mark_drop(agent, sid, kind):
+    with contextlib.suppress(OSError):
+        os.unlink(_mark(agent, sid, kind))
+
+
+def marks_sweep(days=60):
+    """The marks of conversations nobody has turned in two months, gone."""
+    with contextlib.suppress(OSError):
+        old = time.time() - days * 86400
+        for name in os.listdir(marks_dir()):
+            path = os.path.join(marks_dir(), name)
+            with contextlib.suppress(OSError):
+                if os.path.getmtime(path) < old:
+                    os.unlink(path)
+
+
+def turn_opens(agent, raw, call):
+    """Whether this call to the model opens a turn: the conversation's
+    first, the first after its stop, the first after the person said
+    something else, or the one the agent itself numbers 0 (its payload's
+    `call`, where its adapter names one). A conversation
+    whose id does not read is taken as opening one each time: a prompt's
+    hooks run too often before they run never."""
+    sid = call.get("session_id")
+    said = hashlib.sha256(str(call.get("prompt") or "").encode("utf-8", "replace")).hexdigest()[:24]
+    where = ((pack_adapter(agent) or {}).get("hooks") or {}).get("payload")
+    first = isinstance(where, dict) and where.get("call") and _at(raw if isinstance(raw, dict) else {}, where["call"]) == 0
+    if mark_read(agent, sid, "turn") == said and not first:
+        return False
+    mark_write(agent, sid, "turn", said)
+    mark_drop(agent, sid, "stop")
+    return True
+
+
+def briefed(agent, sid, always=False):
+    """The briefing, when this conversation has not been handed the one the
+    session started with: at its start, and again on the first prompt after
+    a restart changed it (a conversation resumed keeps what it was told).
+    "" when it has it, or when there is none."""
+    path = os.environ.get("BB_BRIEFING_FILE", "")
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read(1 << 20).strip()
+    except OSError:
+        return ""
+    if not text:
+        return ""
+    mark = hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()
+    if mark_read(agent, sid, "brief") == mark:
+        return ""
+    # With no mark kept (an id that does not read), handed over at a start
+    # alone, never on every prompt.
+    return text if mark_write(agent, sid, "brief", mark) or always else ""
+
+
+_SHELL_ACTS = re.compile(r"[$`\\\n\r]")
+
+
+def own_verb(cmd):
+    """Whether a command is one aerie verb the controller decides, typed
+    alone (agents.OWN_VERBS): nothing a shell would expand, join or send
+    elsewhere, so approving it approves that verb and nothing beside it."""
+    cmd = str(cmd or "").strip()
+    if not cmd or _SHELL_ACTS.search(cmd):
+        return False
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return False
+    if len(words) < 2 or any(w and set(w) <= set("();<>|&") for w in words):
+        return False
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+    import agents                                               # noqa: PLC0415 (beside this file)
+    return words[0] in agents.OWN_NAMES and words[1] in agents.OWN_VERBS
+
+
+def _answer(pack, event, kind, **words):
+    """One answer from the adapter's templates: `kind` for this event, a
+    pass where it gives none, {} where it gives neither."""
+    mine = ((pack.get("hooks") or {}).get("answers") or {}).get(event) or {}
+    t = mine.get(kind)
+    if t is None:
+        t = mine.get("pass") or {}
+    return _fill(t, {"{" + k + "}": v for k, v in words.items()})
+
+
+def answered(agent, event, raw, call, proj, who):
+    """The answer to one event of an agent that reads JSON: the same hooks
+    in the same order as every agent's, said from its adapter's templates."""
+    pack = pack_adapter(agent) or {}
+    hooks = pack.get("hooks") or {}
+    answers = hooks.get("answers") or {}
+    sid = call.get("session_id") or ""
+    by_hook = (pack.get("briefing") or {}).get("how") == "hook"
+    if event == "start":
+        marks_sweep()
+        text = briefed(agent, sid, always=True) if by_hook else ""
+        return _answer(pack, event, "say", text=text) if text else _answer(pack, event, "pass")
+    if event == "prompt" and hooks.get("prompt_fires") == "each-call" and not turn_opens(agent, raw, call):
+        return _answer(pack, event, "pass")
+    if event == "stop":
+        keep(agent, raw)
+        settle(agent, raw)
+        # Told by the agent where its payload has the word, by the mark
+        # where it has none.
+        where = hooks.get("payload")
+        if isinstance(where, dict) and not where.get("stop_active"):
+            call["stop_hook_active"] = mark_read(agent, sid, "stop") is not None
+    said, refused = [], ""
+    if event == "pre" and call.get("tool_name") == "Edit":
+        refused = wall((call.get("tool_input") or {}).get("file_path", ""), call.get("cwd") or "")
+    if not refused:
+        for cmd, timeout in plan(event, call, proj, who):
+            code, out, err = run(cmd, call, timeout)
+            refused = refusal(code, out, err)
+            if refused:
+                break
+            if out.strip():
+                said.append(out.strip())
+    if event == "prompt" and by_hook and not refused:
+        # The briefing again, ahead of what the hooks said, when a restart
+        # changed it or the conversation's start handed over none.
+        brief = briefed(agent, sid)
+        if brief:
+            said.insert(0, brief)
+    text = context(said)
+    if refused:
+        if event == "stop":
+            mark_write(agent, sid, "stop", "1")
+        elif event == "prompt":
+            # The prompt is not taken, and the next thing sent opens a turn.
+            mark_drop(agent, sid, "turn")
+        return _answer(pack, event, "refuse", reason=refused)
+    if event == "stop":
+        mark_drop(agent, sid, "stop")
+        mark_drop(agent, sid, "turn")
+    if event == "pre" and "approve" in (answers.get("pre") or {}) and (pack.get("allow") or {}).get("how") == "hook" \
+            and call.get("tool_name") == "Bash" and own_verb((call.get("tool_input") or {}).get("command")):
+        # What it need not ask about (its adapter's allow, how hook): an
+        # aerie verb the controller decides, approved in its own word since
+        # it has no rule AerieOS can hand it without writing the person's
+        # own settings.
+        return _answer(pack, event, "approve")
+    return _answer(pack, event, "say", text=text) if text and "say" in (answers.get(event) or {}) else _answer(pack, event, "pass")
 
 
 # Claude's event names, which a merged answer is given under.

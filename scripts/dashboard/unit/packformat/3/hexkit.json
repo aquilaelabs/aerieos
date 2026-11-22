@@ -1,0 +1,23 @@
+{
+  "name": "hexkit",
+  "label": "Hex kit",
+  "about": "Looks inside binaries: dumps, strings, headers.",
+  "format": 3,
+  "framework": "3.1",
+  "maker": "Hexkit Project",
+  "platforms": ["linux/amd64", "linux/arm64"],
+  "terms": [{"label": "MIT", "url": "https://opensource.org/license/mit"}],
+  "install": {
+    "fetch": [
+      {"url": "https://github.com/hexkit/hexkit/releases/download/v1.4.2/hexkit-linux.tar.gz",
+       "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+       "to": "dl/hexkit-linux.tar.gz"}
+    ],
+    "steps": [["sh", "{dir}/install.sh"]],
+    "verify": ["{dir}/bin/hexkit", "--version"]
+  },
+  "layout": {"bin": ["bin"], "tool": "bin/hexkit"},
+  "verbs": {
+    "dump": {"about": "A file's bytes as hex.", "usage": "FILE", "run": ["{dir}/bin/hexkit", "dump", "{args}"]}
+  }
+}

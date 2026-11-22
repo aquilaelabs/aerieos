@@ -30,6 +30,34 @@ class StandIn(unittest.TestCase):
         os.chmod(f, os.stat(f).st_mode | stat.S_IEXEC)
 
 
+class AmdCard(unittest.TestCase):
+    """An AMD card is known by its PCI vendor id (B767): the words 'VGA
+    compatible' hold 'ati', so every display adapter read as AMD's."""
+
+    def lspci(self, text):
+        m = next(m for m in agent._mods if m.__name__.endswith(".gpu"))
+        was = (m._run, m.SYS_ROOT)
+        self.addCleanup(lambda: (setattr(m, "_run", was[0]), setattr(m, "SYS_ROOT", was[1])))
+        m._run = lambda argv, **k: text if argv[:1] == ["lspci"] else ""
+        m.SYS_ROOT = "/sys"
+        return m._gpu_amd()
+
+    def test_a_vm_s_adapter_an_intel_one_and_an_nvidia_card_are_not_amd_s(self):
+        for line in ("00:01.0 VGA compatible controller [0300]: Device [1234:1111] (rev 02)",
+                     "00:02.0 VGA compatible controller [0300]: Intel Corporation UHD Graphics 770 [8086:4680] (rev 0c)",
+                     "01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3070 Ti] [10de:2482] (rev a1)",
+                     "00:02.0 VGA compatible controller [0300]: Red Hat, Inc. Virtio 1.0 GPU [1af4:1050] (rev 01)"):
+            self.assertEqual(self.lspci("00:00.0 Host bridge [0600]: Intel Corporation Device [8086:29c0]\n" + line), "", line)
+
+    def test_an_amd_card_and_an_apu_are(self):
+        card = "03:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Navi 21 [Radeon RX 6800] [1002:73bf] (rev c1)"
+        self.assertIn("[1002:73bf]", self.lspci(card))
+        apu = "06:00.0 Display controller [0380]: Advanced Micro Devices, Inc. [AMD/ATI] Rembrandt [1002:1681] (rev c8)"
+        self.assertIn("Rembrandt", self.lspci(apu))
+        # AMD's audio and USB functions on the same card are not a display.
+        self.assertEqual(self.lspci("03:00.1 Audio device [0403]: Advanced Micro Devices, Inc. [AMD/ATI] Navi 21 HDMI Audio [1002:ab28]"), "")
+
+
 class GpuName(StandIn):
     def test_a_driver_that_answers_names_the_card(self):
         self.stand_in('echo "NVIDIA GeForce RTX 3070 Ti"')

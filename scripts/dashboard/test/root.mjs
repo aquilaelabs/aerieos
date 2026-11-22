@@ -8,22 +8,10 @@
 // and whose system job runs the allowed command as the suite's own user:
 // this file proves the asking, the routing and the answering; the real
 // agent's own file proves the running and the guest-node refusal.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, URL, DIR, asUser, OWNER as owner, asSession, call as api, mint, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
+import { join } from 'node:path';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
@@ -50,7 +38,7 @@ execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--rol
   { input: 'visitorpass1\nvisitorpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const other = asUser('visitor', 'visitorpass1');
-await api('/api/users', { action: 'projects', name: 'visitor', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'visitor', projects: ['alpha'] });
 
 // ---- the ask, and who sees it ------------------------------------------------
 const asked = await api('/api/phone', { action: 'ask', kind: 'root', why: 'load the binder module for the emulator',
@@ -108,11 +96,8 @@ await page.waitForFunction(() => !document.querySelector('.ndask'), null, { time
 // Allow answers at once and the command runs on a thread, so the outcome is
 // polled the way the session polls it.
 let out;
-for (let i = 0; i < 80; i++){
-  out = await api('/api/phone', { action: 'outcome', id: asked.body.id });
-  if (out.body.state === 'done') break;
-  await new Promise(r => setTimeout(r, 250));
-}
+await until(async () => { out = await api('/api/phone', { action: 'outcome', id: asked.body.id });
+  return out.body.state === 'done'; }, 30000, 250);
 ok(out.body.state === 'done' && /root-ran-here/.test(out.body.out || ''),
    `Allow runs it on the node as a system job and the output comes back (${out.body.state}: ${(out.body.out || '').trim().split('\n').slice(-2).join(' / ')})`);
 ok(/^# root on this node, allowed by test: load the binder module/.test(out.body.out || ''),
@@ -123,17 +108,17 @@ ok(sysjob && sysjob.state === 'succeeded',
    `the run is a system job on that node, finished (${sysjob?.state || 'no system job found'})`);
 
 // ---- a node locked to its console refuses the ask itself -----------------------
-{
+await section("a node locked to its console refuses the ask itself", async () => {
   await api('/api/v1/nodes', { action: 'lock', id: sandbox.id });
   const lk = await api('/api/phone', { action: 'ask', kind: 'root', why: 'while locked', cmd: ['true'], project: 'alpha' });
   ok(/locked to its own console/.test(lk.body.error || ''),
      `a node whose system changes are locked refuses the ask outright, with the reason (${(lk.body.error || '').slice(0, 60)})`);
   await api('/api/v1/nodes', { action: 'unlock', id: sandbox.id });
-}
+});
 // ---- ...and a node whose sessions may not ask for root at all ------------------
 // The switch in its Sessions section (the operator, 24 Sep): root asks alone,
 // where the lock above takes storage and network with them.
-{
+await section("and a node whose sessions may not ask for root at all", async () => {
   const off = await api('/api/v1/nodes', { action: 'root-asks', id: sandbox.id, on: false });
   const no = await api('/api/phone', { action: 'ask', kind: 'root', why: 'while off', cmd: ['true'], project: 'alpha' });
   ok(off.body.ok && off.body.on === false && /root commands from sessions are off on sandbox/.test(no.body.error || ''),
@@ -145,7 +130,7 @@ ok(sysjob && sysjob.state === 'succeeded',
   const yes = await api('/api/phone', { action: 'ask', kind: 'root', why: 'while on again', cmd: ['true'], project: 'alpha' });
   ok(on.body.on === true && yes.body.id > 0, '...and on again, the ask goes to a person as before');
   await api('/api/phone', { action: 'deny', id: yes.body.id });
-}
+});
 
 // ---- Deny says no, once ------------------------------------------------------
 const denied = await api('/api/phone', { action: 'ask', kind: 'root', why: 'reboot it',
@@ -160,20 +145,11 @@ ok((await api('/api/phone', { action: 'allow', id: denied.body.id })).body.error
    '...and an answered request cannot be answered again: a second command is a second question');
 
 // ---- a session's own token can ask, and reads only its own outcome ----------------
-{
-  const mint = (proj, who = '') => execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-uid = u.load()["users"]["${who}"]["uid"] if "${who}" else ""
-print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
-  const alpha = { Authorization: 'Bearer ' + mint('alpha'), 'Content-Type': 'application/json' };
+await section("a session's own token can ask, and reads only its own outcome", async () => {
+  const alpha = asSession(mint('alpha'));
   // A USER's session asks: they may not allow root on a shared machine, so
   // the request goes to every administrator, and not back to them.
-  const vsess = { Authorization: 'Bearer ' + mint('alpha', 'visitor'), 'Content-Type': 'application/json' };
+  const vsess = asSession(mint('alpha', 'visitor'));
   const vask = await api('/api/phone', { action: 'ask', kind: 'root', why: 'from a user session', cmd: ['true'] }, vsess);
   ok(vask.status === 200 && /administrators/.test(vask.body.to || ''),
      `a user's session may ask, and is told the request went to the administrators (${vask.body.to})`);
@@ -185,7 +161,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
   await api('/api/phone', { action: 'deny', id: vask.body.id }, ops);
   ok((await api('/api/phone', { action: 'outcome', id: vask.body.id }, vsess)).body.state === 'denied',
      '...while any administrator can answer it');
-  const beta = { Authorization: 'Bearer ' + mint('beta'), 'Content-Type': 'application/json' };
+  const beta = asSession(mint('beta'));
   const sess = await api('/api/phone', { action: 'ask', kind: 'root', why: 'from a session', cmd: ['true'] }, alpha);
   ok(sess.status === 200 && sess.body.id > 0, `a session token may ask for root on its space's node (${sess.status})`);
   const mine = (await api('/api/phone', undefined, alpha)).body.asks || [];
@@ -196,14 +172,14 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
   ok((await api('/api/phone', { action: 'outcome', id: sess.body.id }, beta)).body.error,
      "...and another space's session cannot read its outcome");
   await api('/api/phone', { action: 'deny', id: sess.body.id });
-}
+});
 
 // ---- a machine log off the node, which is the same root job ----------------
 // `aerie logs --node X --agent|--runner|--terminal` and the Debug grant behind
 // it. Here rather than in nodes.mjs because the gate is only half of it: past
 // the grant this IS root_wait, so proving WHICH command it runs needs a node
 // that runs one, and this file's stub is the only one that does.
-{
+await section("a machine log off the node, which is the same root job", async () => {
   const readLog = (stream) => api('/api/nodelog',
     { node: sandbox.name, stream, lines: 5, project: 'alpha' });
   // The argv off the job the read queued, which is the exact question; the
@@ -229,12 +205,10 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
     if (unit === null) rmSync(f, { force: true });
     else writeFileSync(f, JSON.stringify({ services: { runners: [{
       installed: true, active: true, unit }] } }));
-    for (let i = 0; i < 120; i++){
+    return until(async () => {
       const n = ((await api('/api/v1/nodes')).body.nodes || []).find(x => x.id === sandbox.id);
-      if (((n?.reported?.services?.runners || [])[0]?.unit || '') === (unit || '')) return true;
-      await new Promise(r => setTimeout(r, 250));
-    }
-    return false;
+      return ((n?.reported?.services?.runners || [])[0]?.unit || '') === (unit || '');
+    }, 45000, 250);
   };
 
   ok(await census('actions.runner.example.sandbox.service'),
@@ -257,7 +231,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
   // The other two streams are one shape each and have nowhere to differ.
   {
     const a = await ranArgv(await readLog('agent'));
-    ok(/journalctl -u builderbot-agent --no-pager -n 5;/.test(a) && /tail -n 5 \/var\/log\/builderbot-agent\.log/.test(a),
+    ok(/journalctl -u aerieos-agent -u builderbot-agent --no-pager -n 5;/.test(a) && /aerieos-agent\.log 2>\/dev\/null \| tail -n 5/.test(a),
        `...the agent's own log is its journal, or the file its service writes where there is none (${a.slice(0, 80)})`);
   }
   // The terminals are the agent's own (R133), in its journal: there is no
@@ -284,7 +258,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
 
   await census(null);
   await api('/api/prefs', { project: 'alpha', log_from: [] });
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
 if (page.errors.length) console.log(page.errors);

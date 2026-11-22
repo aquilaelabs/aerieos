@@ -108,7 +108,7 @@ function dockBar(){
   const waiting = Object.values(state?.chat?.unread || {}).reduce((a, b) => a + b, 0);
   // A project's terminal wears its color, as its tab on the strip did.
   const tabsHtml = terms.map(t => { const pc = colorAttrs(projectColor(tabProject(t)));
-    return `<span class="dtab${t.id === cur ? " on" : ""}${pc.cls}"${pc.style} data-id="${esc(t.id)}">
+    return `<span class="dtab${t.id === cur ? " on" : ""}${pc.cls}"${pc.style} data-id="${esc(t.id)}" data-key="${esc(t.id)}">
       <button type="button" class="dlbl" data-dock="${esc(t.id)}" role="tab" aria-selected="${t.id === cur && dockUp}" title="${esc(tabTitle(t))}">${
         isClaude(t) ? stateDot(claudeOf(sessionOf(t.arg))) : ""}${esc(names.get(t.id) || tabLabel(t))}${dockSpend(t)}</button>
       <button type="button" class="ic dx" data-min="${esc(t.id)}" aria-label="minimize ${esc(names.get(t.id) || tabLabel(t))}"
@@ -159,8 +159,11 @@ function wireDockBar(bar){
   });
   // A tab held and dragged takes a new place on the line (the strip's
   // gesture, kept when the dock took its place: the operator, 17 Oct).
+  // Set rather than added, as every handler here is: a redraw patches the
+  // line and keeps its tabs (R244), and one added again at each would
+  // start a drag twice.
   bar.querySelectorAll(".dtab[data-id] .dlbl").forEach(b =>
-    b.addEventListener("pointerdown", e => dockDragStart(e, b.closest(".dtab").dataset.id)));
+    b.onpointerdown = e => dockDragStart(e, b.closest(".dtab").dataset.id));
   // A middle click on a terminal's tab ends its session, asked first, as it
   // did on the strip; auxclick with the default suppressed, or the browser
   // arms its autoscroll cursor first.
@@ -177,9 +180,10 @@ function wireDockBar(bar){
     const t = tabOf(b.dataset.pop);
     if (t?.popped) reattachTab(t.id, e); else popOut(b.dataset.pop, e);
   });
-  bar.querySelector("[data-dchat]")?.addEventListener("click", e => { e.stopPropagation(); openChatTab(true); });
-  bar.querySelector("[data-dnew]")?.addEventListener("click", e => { e.stopPropagation(); newShell(""); });
-  bar.querySelector("[data-dtoggle]")?.addEventListener("click", e => { e.stopPropagation(); dockToggle(); });
+  const press = (sel, fn) => { const b = bar.querySelector(sel); if (b) b.onclick = e => { e.stopPropagation(); fn(); }; };
+  press("[data-dchat]", () => openChatTab(true));
+  press("[data-dnew]", () => newShell(""));
+  press("[data-dtoggle]", dockToggle);
   // The dock's top edge is its handle: dragged, the height follows the
   // finger and is kept for this browser.
   bar.onpointerdown = e => {
@@ -229,7 +233,7 @@ function dockDragStart(ev, id){
 }
 
 // Once a tab is lifted the line must not scroll under the finger: the move
-// itself is refused (wired at load in index.html).
+// itself is refused (wired at load by page-boot.js).
 function dockNoScroll(e){ if (ddrag?.armed) e.preventDefault(); }
 
 function dockHeld(on){
@@ -368,7 +372,7 @@ function dockDress(){
   if (dockH) el.style.setProperty("--dock-h", dockH + "px");
   else if (up){
     if (!dockAuto.h || dockAuto.vh !== innerHeight){
-      const under = [$("mobar"), $("keys")].reduce((n, x) => n + (x ? x.getBoundingClientRect().height : 0), 0);
+      const under = [$("mobar")].reduce((n, x) => n + (x ? x.getBoundingClientRect().height : 0), 0);
       dockAuto = {h: Math.round((el.getBoundingClientRect().height + under) / 2), vh: innerHeight};
     }
     if (el.style.getPropertyValue("--dock-h") !== dockAuto.h + "px") el.style.setProperty("--dock-h", dockAuto.h + "px");

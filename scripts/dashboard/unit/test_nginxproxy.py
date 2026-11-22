@@ -12,6 +12,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import nginxproxy as npx  # noqa: E402
+import services  # noqa: E402
 
 
 def write_json(path, d):
@@ -91,7 +92,7 @@ class Routes(unittest.TestCase):
     def test_the_compose_file_carries_it_all_inline(self):
         npx.save_routes("n1", [{"host": "*", "path": "/", "port": "3000"}])
         text = npx.compose_text("n1", npx.record("n1"))
-        self.assertIn("image: nginx:1.27-alpine", text)
+        self.assertIn(f"image: {services.images('nginx')['nginx']}", text, "the image its entry names, by its digest")
         self.assertIn("network_mode: host", text)
         self.assertIn("nginx_conf:\n    content: |\n", text)
         self.assertIn("      location / { proxy_pass http://127.0.0.1:3000; }", text)
@@ -273,9 +274,9 @@ class WideNames(unittest.TestCase):
 
 
 class Image(unittest.TestCase):
-    """The image kept up to date (R192): the registry's tag list read into
-    the newest release line's alpine tag and its digest, a node pinned to
-    it when deployed or updated, and behind until it is."""
+    """The image a node runs (R192): the one nginx's entry names by its tag
+    and its digest, a node pinned to it when deployed or updated, and
+    behind when the entry names another. No registry is asked."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -284,71 +285,79 @@ class Image(unittest.TestCase):
                       {"id": "n2", "name": "box", "kind": "agent", "state": "online"}]
         npx.configure(state=self.tmp, write_json=write_json, node_list=lambda: self.nodes,
                       node_name=lambda nid: {"n1": "vps", "n2": "box"}.get(nid, nid), taken_ports=lambda *a: [])
-        self.was = npx.TAGS_URL
-        self.addCleanup(setattr, npx, "TAGS_URL", self.was)
-        npx.TAGS_URL = f"file://{self.tmp}/tags.json"
-        self.tags({"1.27-alpine": "a", "1.29-alpine-slim": "c", "1.29-alpine": "b", "stable-alpine": "d", "1.28-alpine": "e"})
+        self.addCleanup(setattr, services, "IMAGES_FILE", services.IMAGES_FILE)
+        services.IMAGES_FILE = f"{self.tmp}/service-images.json"
+        self.entry("1.29-alpine", "b")
 
-    def tags(self, named):
-        write_json(f"{self.tmp}/tags.json",
-                   {"results": [{"name": n, "digest": "sha256:" + d * 64} for n, d in named.items()]})
+    def entry(self, tag, d):
+        """nginx's entry naming that tag at that digest."""
+        write_json(services.IMAGES_FILE, {"services": [{"name": "nginx", "images": {"nginx": f"nginx:{tag}@sha256:{d * 64}"}}]})
 
-    def test_the_check_keeps_the_newest_line_and_a_node_is_behind_until_pinned(self):
-        self.assertEqual(npx.latest_image(), {}, "nothing before a check")
-        self.assertEqual(npx.image_ref({}), "nginx:1.27-alpine", "the line's tag alone, unpinned")
-        self.assertEqual(npx.behind({}), "", "nothing to be behind yet")
-        lt = npx.check_image()
-        self.assertEqual((lt["tag"], lt["digest"], lt["error"]), ("1.29-alpine", "sha256:" + "b" * 64, ""),
-                         "the newest X.Y-alpine, not -slim, stable- or an older line")
-        self.assertGreater(lt["at"], 0)
-        self.assertEqual(npx.behind(npx.record("n1")), "1.29-alpine", "unpinned is behind whatever is newest")
+    def test_a_node_runs_the_image_its_entry_names_and_is_behind_when_the_entry_moves(self):
+        self.assertEqual(npx.latest_image(), {"name": "nginx", "tag": "1.29-alpine", "digest": "sha256:" + "b" * 64})
+        self.assertEqual(npx.image_ref({}), "nginx:1.29-alpine@sha256:" + "b" * 64, "a record that names none takes the entry's, digest and all")
+        self.assertEqual(npx.behind({}), "")
         self.assertEqual(npx.pin_latest("n1"), {"tag": "1.29-alpine", "digest": "sha256:" + "b" * 64})
         rec = npx.record("n1")
         self.assertEqual(npx.image_ref(rec), "nginx:1.29-alpine@sha256:" + "b" * 64)
-        self.assertEqual(npx.behind(rec), "", "pinned to the newest: not behind")
+        self.assertEqual(npx.behind(rec), "", "pinned to the entry's: not behind")
         self.assertIn("    image: nginx:1.29-alpine@sha256:" + "b" * 64, npx.compose_text("n1", rec),
                       "the compose file pulls exactly that")
-        # The line moves: the node is behind again, to the new digest.
-        self.tags({"1.29-alpine": "f"})
-        npx.check_image()
+        # The entry names another digest under the same tag: the node is behind, to that digest.
+        self.entry("1.29-alpine", "f")
         self.assertEqual(npx.behind(npx.record("n1")), "1.29-alpine")
+        self.assertIn("image: nginx:1.29-alpine@sha256:" + "b" * 64, npx.compose_text("n1", npx.record("n1")), "and still runs what it is pinned to")
         rows = npx.attention(lambda nid: nid == "n1")
         self.assertEqual([(r["kind"], r["node"], r["id"], r["digest"]) for r in rows],
                          [("nginx", "vps", "n1", "sha256:" + "f" * 64)], "the bell's row, for the deployed one alone")
-        self.assertIn("1.29-alpine (" + "b" * 12 + ")", rows[0]["from"])
-        self.assertIn("1.29-alpine (" + "f" * 12 + ")", rows[0]["to"])
-        self.assertTrue(rows[0]["rebuild"], "the same tag built again is said as a newer build (B27)")
-        self.assertEqual(npx.behind_named("nginx-box"), "1.29-alpine", "the Docker row's flag, by the container's name")
+        self.assertEqual((rows[0]["from"], rows[0]["to"]), ("nginx:1.29-alpine", "nginx:1.29-alpine"), "named by tag, never by digest")
+        self.assertTrue(rows[0]["rebuild"], "the same tag under another digest is said as a newer build (B27)")
+        self.assertEqual(npx.behind_named("nginx-vps"), "a newer build of nginx:1.29-alpine",
+                         "the Containers row's flag, by the container's name, said as a newer build of the tag it runs")
         self.assertEqual(npx.behind_named("radarr"), "", "...and nothing for another row")
-        # A registry that does not answer keeps the last answer and says why.
-        npx.TAGS_URL = f"file://{self.tmp}/nope.json"
-        lt = npx.check_image()
-        self.assertIn("could not reach the registry", lt["error"])
-        self.assertEqual(lt["tag"], "1.29-alpine", "the last answer kept")
         view = npx.view(FakeDevapp({"nginx-vps"}), lambda *a: {})
-        self.assertEqual(view["latest"]["tag"], "1.29-alpine")
-        self.assertEqual((view["nodes"][0]["image"]["ref"], view["nodes"][0]["behind"]),
-                         ("nginx:1.29-alpine@sha256:" + "b" * 64, "1.29-alpine"))
+        self.assertEqual((view["latest"]["tag"], view["image"]), ("1.29-alpine", "nginx:1.29-alpine"))
+        self.assertEqual((view["nodes"][0]["image"]["ref"], view["nodes"][0]["behind"]), ("nginx:1.29-alpine@sha256:" + "b" * 64, "1.29-alpine"))
+        self.assertNotIn("behind_digest", view["nodes"][0])
+        # A newer line is another tag in the entry.
+        self.entry("1.31-alpine", "e")
+        self.assertEqual(npx.behind(npx.record("n1")), "1.31-alpine")
+        self.assertFalse(npx.attention(lambda nid: nid == "n1")[0]["rebuild"])
+        self.assertFalse(hasattr(npx, "check_image"), "nothing asks a registry what is newest")
 
     def test_update_pins_and_rebuilds_and_deploy_pins_a_new_one(self):
         dv, ct, da = FakeDevapp({"nginx-vps"}), FakeContainers(), FakeDevactions()
         self.assertIn("not deployed", npx.update("n2", ct, da, dv)["error"])
-        # No check yet: Update reads the registry itself.
-        r = npx.update("n1", ct, da, dv)
-        self.assertEqual((r["ok"], r["to"], r["job"]), (True, "1.29-alpine", "j-1"), r)
-        self.assertIn("image: nginx:1.29-alpine@sha256:" + "b" * 64, ct.written["nginx-vps"])
-        self.assertEqual(da.rebuilt, ["nginx-vps"])
+        npx.pin_latest("n1")
         r = npx.update("n1", ct, da, dv)
         self.assertTrue(r.get("same") and "already runs" in r["note"], "nothing to move to is said, not rebuilt")
-        self.assertEqual(da.rebuilt, ["nginx-vps"])
-        # A new one is pinned to the newest line as it is written.
+        self.assertEqual(da.rebuilt, [])
+        self.entry("1.31-alpine", "e")
+        # A Save writes what the node is pinned to, whatever the entry names now.
+        npx.apply("n1", ct, da, dv)
+        self.assertIn("image: nginx:1.29-alpine@sha256:" + "b" * 64, ct.written["nginx-vps"])
+        r = npx.update("n1", ct, da, dv)
+        self.assertEqual((r["ok"], r["to"]), (True, "1.31-alpine"), r)
+        self.assertIn("image: nginx:1.31-alpine@sha256:" + "e" * 64, ct.written["nginx-vps"])
+        self.assertEqual(da.rebuilt, ["nginx-vps", "nginx-vps"])
+        # A new one is pinned to the entry's image as it is written.
         class Making(FakeContainers):
             def create_container(self, name, text, env, node="", for_project=""):
                 self.written[name] = text
                 return {"ok": True}
         mk = Making()
-        self.assertEqual(npx.deploy("n2", mk, da, FakeDevapp(set()))["job"], "j-2")
-        self.assertIn("image: nginx:1.29-alpine@sha256:" + "b" * 64, mk.written["nginx-box"])
+        self.assertTrue(npx.deploy("n2", mk, da, FakeDevapp(set()))["job"])
+        self.assertIn("image: nginx:1.31-alpine@sha256:" + "e" * 64, mk.written["nginx-box"])
+        self.assertEqual(npx.record("n2")["image"], {"tag": "1.31-alpine", "digest": "sha256:" + "e" * 64})
+
+    def test_one_whose_record_names_no_image_is_pinned_as_its_file_is_written(self):
+        dv, ct, da = FakeDevapp({"nginx-vps"}), FakeContainers(), FakeDevactions()
+        self.assertNotIn("image", npx.record("n1"))
+        npx.apply("n1", ct, da, dv)
+        self.assertIn("image: nginx:1.29-alpine@sha256:" + "b" * 64, ct.written["nginx-vps"])
+        self.assertEqual(npx.record("n1")["image"], {"tag": "1.29-alpine", "digest": "sha256:" + "b" * 64})
+        self.entry("1.31-alpine", "e")
+        self.assertEqual(npx.behind(npx.record("n1")), "1.31-alpine", "and from then on the entry moving is an Update, never a Save")
 
     def test_deploy_takes_the_name_of_an_uninstalled_node_s_nginx(self):
         class Making(FakeContainers):

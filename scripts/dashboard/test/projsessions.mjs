@@ -3,14 +3,11 @@
 // A session is its account's (B172): nobody presses a key or types into
 // another person's, administrators included, and that still holds. Ending
 // one is the single exception, and an administrator's alone.
-import { launch, newPage, ok, done, ready, tmuxNew, tmuxKill, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser, section, REPO } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-            'Content-Type': 'application/json' };
 const call = async (path, body, h = H) => {
   const r = await fetch(base + path, body ? { method: 'POST', headers: h, body: JSON.stringify(body) }
                                           : { headers: h });
@@ -20,10 +17,9 @@ const call = async (path, body, h = H) => {
 // w.sess has sessions on alpha; w.watch is a plain account given alpha.
 await call('/api/users', { action: 'add', name: 'w.sess', password: 'w.sess-pass-1', role: 'user' });
 await call('/api/users', { action: 'add', name: 'w.watch', password: 'w.watch-pass-1', role: 'user' });
-await call('/api/users', { action: 'projects', name: 'w.watch', projects: ['alpha'] });
+await call('/api/users', { action: 'edit', name: 'w.watch', projects: ['alpha'] });
 const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.sess'].uid;
-const PLAIN = { Authorization: 'Basic ' + Buffer.from('w.watch:w.watch-pass-1').toString('base64'),
-                'Content-Type': 'application/json' };
+const PLAIN = asUser('w.watch', 'w.watch-pass-1');
 
 // w.sess's Claude session and a shell on alpha here, a Claude session on beta,
 // and a shell on alpha on a node, reported the way an agent reports one.
@@ -89,7 +85,7 @@ ok(!((await call('/api/project-sessions?project=alpha')).sessions || []).some(r 
 // the bare name the status read them as unowned: an account given the
 // project listed the owner's Claude as one of its own, on Sessions and in
 // Sign out's count (the operator, 16 Oct).
-{
+await section("the owner's Claude on a node is the owner's alone", async () => {
   const ustate = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users;
   const ownerUid = Object.values(ustate).find(u => u.role === 'owner').uid;
   const sample = extra => fetch(base + '/api/v1/agent/work', { method: 'POST',
@@ -103,7 +99,7 @@ ok(!((await call('/api/project-sessions?project=alpha')).sessions || []).some(r 
   ok(!watch.length && own.includes('claude-alpha'),
      `the owner's Claude session on a node is listed for the owner, bare, and for nobody else given the space (owner ${JSON.stringify(own)}, w.watch ${JSON.stringify(watch)})`);
   await sample([]);
-}
+});
 
 // ---- the dialog: at its foot, for an administrator -----------------------------
 const browser = await launch();
@@ -137,10 +133,12 @@ const plainPage = await newPage(browser, { viewport: { width: 1280, height: 900 
 await plainPage.goto(URL);
 await ready(plainPage);
 await plainPage.evaluate(() => renameProject('alpha'));
-await plainPage.waitForTimeout(1000);
+await plainPage.waitForFunction(() => !document.getElementById('rnmodal').hidden, null, { timeout: 15000 }).catch(() => {});
 // The section is not drawn for it (R255 step 4; the operator, 21 Oct: what
-// a role does not give is not shown), so nobody's sessions and no End.
-await plainPage.waitForTimeout(1000);
+// a role does not give is not shown), so nobody's sessions and no End:
+// read once everything the dialog asked for at its opening has landed,
+// which is when the section would have been drawn.
+await settled(plainPage, { quiet: 400, cap: 8000 });
 const plainSess = await plainPage.evaluate(() => { const f = document.getElementById('rnSessField');
   return { shown: !!f && !f.hidden, ends: f ? f.querySelectorAll('button').length : 0 }; });
 ok(!plainSess.shown && plainSess.ends === 0,
@@ -151,7 +149,7 @@ ok(!plainSess.shown && plainSess.ends === 0,
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 // A project with a session open on a node cannot be deleted from under it
 // (B242): Delete read only this container's tmux, where no session runs now.
-{
+await section("A project with a session open on a node cannot be deleted from under it", async () => {
   const onNode = `${uid}~codex-gamma`;
   const r = await fetch(base + '/api/v1/agent/work', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + agent.token },
@@ -161,7 +159,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
   ok(r.ok && del.status === 409 && del.error?.includes(onNode),
      `a space with a session running on a node is refused Delete, naming the session (${del.status} ${del.error})`);
   await beat();
-}
+});
 
 // Nothing left for the next file: the sessions, and the node, retired the
 // way auth.mjs retires its own.

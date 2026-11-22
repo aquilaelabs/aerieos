@@ -3,16 +3,21 @@ import contextlib
 import hashlib
 import hmac
 import os
+import re
+import shutil
 import signal
 import subprocess
 import sys
 import threading
 import time
-from . import AGENT_VERSION
+import traceback
+from . import AGENT_VERSION, files
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, RUNNER_DIAG_KEEP, cap_file, log, log_once, own_digest, own_path, prune_dir
-from .controller import Controller
-from .stores import load_state, save_state, use_scope
+from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
+from .base import FS_REFUSED, NotHeld, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
+from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
+from .controller import CA_PIN, KEY_PIN, Controller, address_ok
+from .stores import STATE_LOCK, console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -23,7 +28,7 @@ from .wssync import WorkspaceSync
 from .claudesync import ClaudeMirror
 from .screen import ScreenRelay
 from .sessions import SessionWatch, SessionsMixin
-from .accounts import AccountsMixin
+from .accounts import AccountsMixin, kept_lookup
 from .tokens import TokensMixin
 from .workspace import WorkspaceMixin
 from .work import WorkMixin
@@ -44,26 +49,69 @@ from . import http80
 from . import storage
 
 
-def follow(state, url="", expect=""):
+# A key's pin, whole: KEY_PIN and the base64 of a sha256.
+KEY_PIN_WHOLE = re.compile(re.escape(KEY_PIN) + r"[A-Za-z0-9+/]{43}=")
+
+
+def follow(state, url="", expect="", pin=""):
     """The knock (R90 step 12, R175 step 3): `state["move"]` names where and
     what to expect, or `url` and `expect` do (the follow verb, run by hand
-    on a node that outlived the old controller). The new address is asked,
-    with the node's own token, for the answer only a holder of the move
-    key gives; right, the state takes the controller there (its address
-    and TLS pin) and is written. (True, "") or (False, why); an empty why
-    is nothing to knock on."""
+    on a node that outlived the old controller, which may name the new
+    home's key with `pin`). The new address is asked, with the node's own
+    token, for the answer only a holder of the move key gives; right, the
+    state takes the controller there (its address and TLS pin) and is
+    written. (True, "") or (False, why); an empty why is nothing to knock on.
+
+    A node that holds its controller to a key never knocks without one, and
+    never over plain http: its token, and on a refusal the tokens it held
+    before, go only to whoever answers a handshake under the key the move
+    named (the hello that armed it came down the pinned channel) or, with
+    none named, under the key this node holds, which a controller takes to
+    its new home with the rest of its state. An address the move names as
+    http is asked over TLS on the same port. From the answer such a node
+    takes an https address of the one shape and a key's pin, and nothing
+    else: no plain http and no other kind of pin is written into it. A node
+    reached through a public hostname knocks and stays under the system's
+    authorities. A node on plain http, or one from before key pins that
+    was named none, knocks as it did."""
     mv = dict(state.get("move") or {})
     if url and expect:
-        mv = {"url": str(url), "expect": str(expect)}
+        mv = {"url": str(url), "expect": str(expect), "pin": str(pin or "")}
     to = str(url or mv.get("url") or "").rstrip("/")
     if not to or not mv.get("expect"):
         return False, ""
+    held = str(state.get("pin") or "")
+    named = mv.get("pin") if isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]) else ""
+    under = ""
+    if held == CA_PIN:
+        under = CA_PIN
+    elif held.startswith(KEY_PIN):
+        under = named or held
+    elif named and (to.startswith("https://") or held):
+        # The key the move named, for a node that pinned a certificate
+        # before keys were pinned or holds no pin yet.
+        under = named
+    if under:
+        if to.startswith("http://") and under != CA_PIN:
+            to = "https://" + to.split("://", 1)[1]
+        if not address_ok(to, https=True):
+            return False, f"the move's new address {to[:120]} is not https://host[:port], and this node knocks only under its pin: it stays"
     try:
-        ctl = Controller(to, state["token"], "")
+        ctl = Controller(to, state["token"], under)
         st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
+        # A token handed out after the bundle was packed is one the new
+        # home never saw (B935): this node taken back there by one it held
+        # before, as a hello does at a restored controller, and asked again.
+        if st == 401 and _recover_at(ctl, state):
+            st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
     except Exception as e:                                   # noqa: BLE001 (a knock that fails is tried again)
         return False, f"the move's new address {to} did not answer: {e}"
+    if st == 401:
+        return False, f"the move's new address {to} does not know this node by any token it holds: run the line its Nodes page gives it there"
     if st != 200 or not isinstance(r, dict):
+        if not st and under:
+            why = str(r.get("error") or "") if isinstance(r, dict) else ""
+            return False, f"the move's new address {to} did not answer under the pin this node knocks with ({why[:160]})"
         return False, f"the move's new address {to} answered {st}: not the controller yet"
     # The proof: the challenge the old controller told this node to
     # expect, which only a holder of the move key (the controller once
@@ -71,12 +119,65 @@ def follow(state, url="", expect=""):
     got = str(r.get("answer") or "")
     if not got or not hmac.compare_digest(got, str(mv.get("expect") or "")):
         return False, f"{to} answered the knock with the wrong answer: not the controller that moved"
-    state["controller"] = str(r.get("url") or to).rstrip("/") or to
-    if r.get("pin"):
-        state["pin"] = str(r.get("pin"))
-    state.pop("move", None)
-    save_state(state)
+    said = str(r.get("url") or "").rstrip("/")
+    # The new address, its pin and the move's end written as one change
+    # with their save (stores.STATE_LOCK): no other save lands half of it.
+    with STATE_LOCK:
+        if under:
+            # Knocked under a pin: only an https address of the one shape is
+            # taken from the answer, and only a key's pin; with neither, the
+            # address knocked at and the pin knocked under are kept.
+            state["controller"] = said if said and address_ok(said, https=True) else to
+            if under == CA_PIN:
+                state["pin"] = CA_PIN
+            else:
+                answered = r.get("pin") if isinstance(r.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(r["pin"]) else ""
+                state["pin"] = answered or under
+        else:
+            state["controller"] = said if said and address_ok(said) else to
+            if r.get("pin"):
+                state["pin"] = str(r.get("pin"))
+            elif not r.get("url"):
+                # The address knocked at is kept (B936), so its certificate is the
+                # one just met there, which answered the challenge; plain http has
+                # none.
+                seen = getattr(ctl, "seen_pin", "") or ""
+                if seen:
+                    state["pin"] = seen
+                else:
+                    state.pop("pin", None)
+        state.pop("move", None)
+        save_state(state)
     return True, ""
+
+
+def _recover_at(ctl, state):
+    """This node taken back at `ctl` by a token it held before (its
+    current one first, then the month's past ones, newest first), the
+    fresh token answered written into `state` as a rotation's is. True
+    when it was."""
+    nid = state.get("node_id") or ""
+    held = [state.get("token") or ""] + [p[0] for p in (state.get("past_tokens") or [])
+                                         if isinstance(p, list) and p and isinstance(p[0], str)]
+    held = [t for i, t in enumerate(held) if t and t not in held[:i]]
+    if not nid or not held:
+        return False
+    for i in range(0, len(held), RECOVER_CHUNK):
+        st, r = ctl.call("recover", {"node": nid, "tokens": held[i:i + RECOVER_CHUNK]}, timeout=30)
+        if st == 200 and isinstance(r.get("token"), str) and r["token"].startswith("bbn_"):
+            now = int(time.time())
+            with STATE_LOCK:
+                old = state.get("token") or ""
+                past = [p for p in (state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != old]
+                state["past_tokens"] = ([[old, now]] if old else []) + past[:PAST_MOST - 1]
+                state["token"] = r["token"]
+                save_state(state)
+            ctl.token = r["token"]
+            log("the move's new address knew this node by a token from before its newest: taken back there")
+            return True
+        if st != 401:
+            return False
+    return False
 
 
 
@@ -85,6 +186,44 @@ def follow(state, url="", expect=""):
 PAST_KEEP_S = 30 * 86400
 PAST_MOST = 9000
 RECOVER_CHUNK = 200
+
+# What a call says when nobody is listening at the controller's port yet: a
+# restart under way (B760).
+RESTARTING = re.compile(r"ConnectionRefused|RemoteDisconnected|ConnectionReset|Connection refused")
+
+
+def turn_part(turn, name, fn, *a):
+    """One part of the agent's turn, run and timed into `turn` (B841). One
+    that raises is that part's alone (B979): logged once an hour with where,
+    and None, as a part with nothing to say, so the other passes and the
+    work poll still run."""
+    t0 = time.monotonic()
+    try:
+        return fn(*a)
+    except Exception as e:                                   # noqa: BLE001 (logged; the rest of the turn goes on)
+        log_once(f"turn-{name}", f"{name}: {type(e).__name__}: {e}\n"
+                                 + traceback.format_exc(limit=8).rstrip())
+        return None
+    finally:
+        ms = int((time.monotonic() - t0) * 1000)
+        if ms >= 20:
+            turn[name] = turn.get(name, 0) + ms
+
+
+def keep_turning(turns, pause=5):
+    """turns() taken up again whenever it raises, after `pause` seconds, and
+    the fault logged (B979): one exception in the loop's own code ended the
+    agent with no bye, its running jobs orphaned and read lost, and a fault
+    that came back restarted it every five seconds with a census each start.
+    SystemExit and KeyboardInterrupt still end it, as a stop should."""
+    while True:
+        try:
+            turns()
+        except Exception as e:                               # noqa: BLE001 (logged, the next turn taken)
+            log_once("turn", f"a turn failed: {type(e).__name__}: {e}\n"
+                             + traceback.format_exc(limit=8).rstrip())
+            time.sleep(pause)
+
 
 class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, ConsoleMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
             TokensMixin, ScanMixin):
@@ -104,6 +243,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.census_asked = False         # a hello asked for again has its census on the way
         self.census_stale = False         # ...and was asked for once more meanwhile
         self.controller_digest = ""
+        self.controller_sig = ""          # the release's signature over that digest, where the build has one
+        self.controller_keys = []         # the release keys the controller's build names (release.first_pin)
+        self.controller_spare = None      # the release key's signed word for its spare (release.spare_pin)
         self.warned_caps = False
         # The session half (roadmap #24): whether its terminals are set up,
         # the bundle they run bb-tty from, and when the last start was tried.
@@ -111,6 +253,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.term_kinds = {}
         self.session_bundle = ""          # the digest the terminals run from
         self.session_digest = ""          # the digest bundle() last fetched
+        self.bundle_named = ""            # the digest the controller's last hello named for its bundle
+        self.bundle_refused = None        # a bundle refused (release.may_keep_bundle): {digest, trust, why, cause}
         self.session_tried = 0
         self.session_stale = ""           # a newer bundle's directory, for the loop to restart onto
         self.session_bound = ""           # the address the relay was bound to, to notice it moving
@@ -151,6 +295,16 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             env.setdefault("HOME", self.job_home())
         return who
 
+    def docker_by_root(self):
+        """Whether docker work here is the root agent's own (B743): the
+        controller's machine, where the job and session accounts stay out of
+        the docker group because docker is root over the controller, so
+        docker runs from this process, as this machine's VMs do."""
+        try:
+            return os.geteuid() == 0 and os.path.getsize(SESSION_WALL) > 0
+        except OSError:
+            return False
+
     def job_home(self):
         """A home a job run as this agent's own account can write: its own,
         or one under the data store where it has none. Run as a uid with no
@@ -177,7 +331,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         except KeyError as e:
             raise RuntimeError(f"enrolled account {user!r} does not exist here") from e
         env.update({"HOME": pw.pw_dir, "USER": user, "LOGNAME": user})
-        groups = [g.gr_gid for g in grp.getgrall() if user in g.gr_mem]
+        # Every group read once a minute, not once a job (accounts.kept_lookup).
+        groups = kept_lookup(("groups", user), lambda: [g.gr_gid for g in grp.getgrall() if user in g.gr_mem])
         return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": groups}
 
     def take_token(self, new):
@@ -189,22 +344,27 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return
         # Written first and used only once it is: a node.json that kept the
         # old token past a restart would present a retired one, which reads
-        # as a stolen copy and revokes this node.
+        # as a stolen copy and revokes this node. Under STATE_LOCK from the
+        # copy to the record's own change, so no other save writes the old
+        # token over the new between the two.
         # The tokens of the last month kept, newest first: a controller
         # restored from a backup knows one of them (the operator, 6 Nov).
         now = int(time.time())
-        old = self.state.get("token") or ""
-        past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2
-                and isinstance(p[0], str) and isinstance(p[1], int) and now - p[1] < PAST_KEEP_S]
-        past = ([[old, now]] if old else []) + past
-        try:
-            save_state(dict(self.state, token=new, past_tokens=past[:PAST_MOST]))
-        except OSError as e:
-            log(f"the controller's next token was not kept, so the current one stays: {e}")
-            return
-        self.prev_token = (old, time.monotonic())
-        self.state["token"] = new
-        self.state["past_tokens"] = past[:PAST_MOST]
+        with STATE_LOCK:
+            old = self.state.get("token") or ""
+            past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2
+                    and isinstance(p[0], str) and isinstance(p[1], int) and now - p[1] < PAST_KEEP_S]
+            # A token already among them (the one token_back went back to)
+            # keeps its place: the newer one it stood in for stays ahead of it.
+            past = ([[old, now]] if old and old not in [p[0] for p in past] else []) + past
+            try:
+                save_state(dict(self.state, token=new, past_tokens=past[:PAST_MOST]))
+            except OSError as e:
+                log(f"the controller's next token was not kept, so the current one stays: {e}")
+                return
+            self.prev_token = (old, time.monotonic())
+            self.state["token"] = new
+            self.state["past_tokens"] = past[:PAST_MOST]
         self.ctl.token = new
 
     def recover_token(self):
@@ -240,13 +400,22 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         prev, _ = getattr(self, "prev_token", None) or ("", 0)
         if not prev or prev == self.state.get("token"):
             return False
-        try:
-            save_state(dict(self.state, token=prev))
-        except OSError as e:
-            log(f"the token before was not kept, so the newest stays: {e}")
-            return False
+        # The newest is kept among the past, ahead of the one gone back to:
+        # a controller that refused it may not be the one that issued it (a
+        # move's new home, B759), and the one that did takes this node back
+        # by it once it is here again.
+        with STATE_LOCK:
+            newest = self.state.get("token") or ""
+            past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != newest]
+            past = ([[newest, int(time.time())]] if newest else []) + past
+            try:
+                save_state(dict(self.state, token=prev, past_tokens=past[:PAST_MOST]))
+            except OSError as e:
+                log(f"the token before was not kept, so the newest stays: {e}")
+                return False
+            self.state["past_tokens"] = past[:PAST_MOST]
+            self.state["token"] = prev
         log("the controller does not know this node's newest token; the one it handed out before is tried")
-        self.state["token"] = prev
         self.ctl.token = prev
         self.prev_token = None
         return True
@@ -260,7 +429,14 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             share_images((self.state.get("stores") or {}).get("toolchains") or "")
         except OSError as e:
             log(f"toolchain store: could not share the images ({e})")
-        return census(self.state)
+        # The relay's certificate, asked for again while there is none, so
+        # it is in this census once the machine can make one.
+        if getattr(self, "screen", None) is not None:
+            self.screen.again()
+        said = census(self.state)
+        # The roots the file explorer may be asked for are this census's own.
+        files.note_roots(said)
+        return said
 
     def hello_step(self):
         """The loop's ten-minute hello, with its census taken on a thread
@@ -368,14 +544,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                                         "digest": own_digest(),
                                         "running": self.running_ids(),
                                         "keep": self.keep_report(),
+                                        # An update this node would not run and went
+                                        # back from (R241), until one it keeps.
+                                        **({"back": back_note()} if back_note() else {}),
                                         # A fresh token each hello (R135 step 4).
                                         "rotates": True}, timeout=30)
         if st == 200:
             self.take_token(r.get("token"))
+            # The controller answered: an update on trial is kept (R241).
+            if not getattr(self, "hello_said", False) and trial_note() is not None and trial_passed():
+                log("the updated agent reached its controller: it is kept")
             self.hello_at = time.monotonic()
             self.hello_said = True           # the first is said on the loop; the rest beside it
             self.poll = int(r.get("poll") or 25)
-            self.controller_digest = (r.get("agent") or {}).get("digest") or ""
+            self.shipped_named(r.get("agent"))
             # Where toolchains land, from the controller's catalog. Kept on the
             # record so a job started before the next hello still has it, and
             # only replaced when the controller has one: none (a catalog that
@@ -426,6 +608,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # controller goes quiet or says it moved, the node knocks there.
             mv = r.get("move") if isinstance(r.get("move"), dict) else {}
             want = {"url": str(mv.get("url") or ""), "expect": str(mv.get("expect") or "")} if mv.get("url") and mv.get("expect") else None
+            # ...and the new home's key, where the hello names it: this
+            # hello came down the channel this node holds its controller to.
+            if want and isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]):
+                want["pin"] = mv["pin"]
             if want != self.state.get("move"):
                 if want:
                     self.state["move"] = want
@@ -465,14 +651,16 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if isinstance(r.get("pool_keys"), list):
                 self.pool_keys_want(r["pool_keys"])
             # The coding agents' sign-ins sealed (R126): the controller's
-            # switch, and each account's public key here, kept in node.json.
-            ts, pubs = bool(r.get("token_seal")), r.get("token_pubs") if isinstance(r.get("token_pubs"), dict) else {}
-            # ...and the X25519 publics a seal is made with here (R158 step 3).
+            # switch, and each account's X25519 public here (R158 step 3),
+            # kept in node.json. The format before's publics are not kept.
+            ts = bool(r.get("token_seal"))
             pubs2 = r.get("token_pubs2") if isinstance(r.get("token_pubs2"), dict) else {}
-            if ts != bool(self.state.get("token_seal")) or pubs != (self.state.get("token_pubs") or {}) \
-                    or pubs2 != (self.state.get("token_pubs2") or {}):
-                self.state["token_seal"], self.state["token_pubs"], self.state["token_pubs2"] = ts, pubs, pubs2
-                save_state(self.state)
+            if ts != bool(self.state.get("token_seal")) or pubs2 != (self.state.get("token_pubs2") or {}) \
+                    or "token_pubs" in self.state:
+                with STATE_LOCK:
+                    self.state["token_seal"], self.state["token_pubs2"] = ts, pubs2
+                    self.state.pop("token_pubs", None)
+                    save_state(self.state)
                 if ts != bool(self.state.get("token_seal_said")):
                     self.state["token_seal_said"] = ts
                     log("the coding agents' sign-ins are kept sealed here" if ts else "sign-ins are no longer sealed here")
@@ -537,6 +725,14 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # store this process cannot write is a node with no sessions,
             # not a node with no agent.
             before = self.session_bundle
+            # ...and a bundle this node refused is not fetched again while
+            # this still names the same one (bundle()).
+            self.bundle_named = r.get("bundle") or ""
+            # ...and one refused that the controller no longer serves is no
+            # longer said: the bundle named now is fetched below, and
+            # refused or taken on its own.
+            if REFUSED.get("digest") and self.bundle_named and REFUSED["digest"] != self.bundle_named:
+                REFUSED.clear()
             self.session_try(r.get("bundle") or "")
             # The helper the new bundle carries goes in with the bundle. The
             # loop refreshes it before its hello and the bundle arrives after,
@@ -544,7 +740,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # started by the new launcher under the old helper (B377).
             if self.session_bundle != before:
                 self.refresh_session_tool()
+                self.refresh_virtiofsd_wrap()
             self.runner_env_sync()
+            # The channel itself, last, once the bundle and root's tools
+            # are the ones this controller ships: over TLS under the
+            # controller's key where it names one (channel_move).
+            self.channel_move(r.get("tls"))
             # A bundle that moved carries a catalog that may have moved with
             # it, and the census read that catalog before the fetch: one more
             # hello now, so the row does not show the old answer until the
@@ -570,7 +771,13 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if out.startswith("/") and os.path.isfile(out):
                 files.append(out)
         cut = [f for f in files if cap_file(f)]
-        trimmed = sum(prune_dir(os.path.join(d, "_diag"), RUNNER_DIAG_KEEP) for d, _ in runner_dirs())
+        # Each runner's _diag is the jobs account's, and pruned as it: a CI
+        # job that made it a link had root delete through it (R247 step 5).
+        # Left as they are where this machine does not do that as the
+        # account (fs_holds says why in the log): the hello goes on.
+        trimmed = 0
+        with contextlib.suppress(NotHeld), fs_holds(self.drop_privileges({})):
+            trimmed = sum(prune_dir(os.path.join(d, "_diag"), RUNNER_DIAG_KEEP) for d, _ in runner_dirs())
         if cut or trimmed:
             log(f"logs: kept to size: {', '.join(os.path.basename(f) for f in cut) or 'nothing'} cut, "
                 f"{trimmed} old runner diagnostics removed")
@@ -585,10 +792,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return False
         if not isinstance(fresh, dict) or not fresh.get("controller") or fresh.get("controller") == self.state.get("controller"):
             return False
-        self.state["controller"] = fresh["controller"]
-        if fresh.get("pin"):
-            self.state["pin"] = fresh["pin"]
-        self.state.pop("move", None)
+        with STATE_LOCK:
+            self.state["controller"] = fresh["controller"]
+            if fresh.get("pin"):
+                self.state["pin"] = fresh["pin"]
+            self.state.pop("move", None)
         self.ctl = Controller(self.state["controller"], self.state["token"], self.state.get("pin", ""))
         self.quiet = 0
         self.hello_at = 0
@@ -602,7 +810,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         was taken."""
         if not isinstance(mv, dict) or not mv.get("url") or not mv.get("expect") or self.state.get("move"):
             return False
-        self.state["move"] = {"url": str(mv["url"]), "expect": str(mv["expect"])}
+        # Made whole before it is in the record: a dump never meets it growing.
+        move = {"url": str(mv["url"]), "expect": str(mv["expect"])}
+        if isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]):
+            move["pin"] = mv["pin"]
+        self.state["move"] = move
         save_state(self.state)
         log(f"the controller moved to {mv['url']} and handed this node its challenge: knocking there")
         return True
@@ -671,6 +883,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return
         self.reexec()
 
+    def trial_over(self):
+        """The time an updated agent has to reach its controller is up (the
+        operator, 13 Nov: ten minutes): one that has not gives way to the
+        agent before it, which the entry puts back as this process starts
+        again. A controller that was away that long costs a press of Update
+        agent; an agent that cannot reach it at all costs nothing more."""
+        if getattr(self, "hello_said", False) or trial_note() is None:
+            return
+        why = f"ran {TRIAL_S // 60} minutes and never reached its controller"
+        if not trial_give_way(why):
+            return
+        log(f"this updated agent {why}: giving way to the one before it")
+        self.reexec()
+
     def cancel(self, ids):
         with self.lock:
             hit = [self.jobs[i] for i in ids if i in self.jobs]
@@ -683,8 +909,24 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 j.cancel_said = True
             j.cancel()
 
+    def console_moved(self):
+        """Whether what this machine's console said (the release key,
+        unsigned builds, root commands) changed since the last turn. It is
+        the census's, and the controller holds a root ask by it before a
+        person is asked, so a change is told at the next turn rather than at
+        the next hello up to ten minutes on (R227 step 2). A file of a few
+        hundred bytes, read once a turn; the first read is no change."""
+        said_here = console_said()
+        moved = said_here != getattr(self, "console_was", said_here)
+        self.console_was = said_here
+        return moved
+
     def loop(self):
-        delay = wdelay = 1
+        # An update on trial gets TRIAL_S to reach its controller (R241).
+        if trial_note() is not None:
+            t = threading.Timer(TRIAL_S, self.trial_over)
+            t.daemon = True
+            t.start()
         # The hourly walk of the disks, on its own thread (storage.py).
         storage.start(lambda: self.state)
         # What is THIS process's to end, ended by it: a stop of the unit is
@@ -734,6 +976,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # fetch and the hello alike, and the hello that eventually succeeds
         # starts the sessions then.
         self.refresh_session_tool()
+        # The sign-ins' pass before anything here waits on the controller
+        # (B1043): a refresh written while the agent before this one was
+        # giving way is sealed now, not after the bundle and the first hello.
+        turn_part({}, "tokens", self.token_pass_early)
         self.quiet_distro_ttyd()
         self.keep_sessions_through_restart()
         self.session_try()
@@ -746,20 +992,39 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.wssync.start()
         self.claudesync.start()
         self.screen.start()
+        test_lock_ready()
+        # The other mounts on a thread of their own (B980): a share that
+        # stopped answering held the turn, and the work poll behind it, for
+        # minutes at a time.
+        self.ext_mounts_start()
+        # A turn that raises is logged and the next one taken, never the end
+        # of the agent (B979): one exception left the process with no bye,
+        # its running jobs orphaned and read lost, and a fault that came back
+        # restarted it every five seconds with a census at each start.
+        keep_turning(self.turns)
+
+    def turns(self):
+        """The agent's turns, one after another: a hello when one is due,
+        the passes, the sample and the work poll, and what the poll hands
+        back. loop() takes the next one up again when one raises."""
+        delay = wdelay = 1
+        refused_since = 0.0     # when the controller began refusing connections (B760)
         while True:
             # How long each part of a turn took before its poll (B841): a job
             # queued while the agent is between polls waits for all of it,
             # and what the turn spends is said in the next heartbeat.
             turn = {}
             def timed(name, fn, *a, _turn=turn):
-                t0 = time.monotonic()
-                try:
-                    return fn(*a)
-                finally:
-                    ms = int((time.monotonic() - t0) * 1000)
-                    if ms >= 20:
-                        _turn[name] = _turn.get(name, 0) + ms
+                return turn_part(_turn, name, fn, *a)
             turn_t0 = time.monotonic()
+            # The sign-ins' pass ahead of a hello (B1043): the first one's
+            # census is taken on the loop, a minute on a busy node, and a
+            # controller that does not answer one sends the turn round again
+            # before any pass below is reached. It keeps its own ten seconds,
+            # so the one below runs only after a hello that took longer.
+            timed("tokens", self.token_pass_early)
+            if self.console_moved():
+                self.hello_at = 0
             # The monotonic clock: a clock step killed a running job as timed
             # out and stopped hello for the size of the step (B286). Zero
             # means due now, whichever clock.
@@ -815,8 +1080,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             timed("account_users", self.account_users_pass)
             timed("array", self.array_pass)
             timed("adopted", self.adopt_pass)
+            timed("hostid", self.hostid_pass)
             timed("pools-imported", self.pools_pass)
-            timed("ext_mounts", self.ext_mounts_pass)
+            timed("backup-dirs", self.backup_dirs_pass)
             timed("spindown", self.spindown_pass)
             timed("tokens", self.token_pass)
             timed("idle_reap", self.session_idle_reap)
@@ -831,7 +1097,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # seconds of the census landing and not a whole poll after it,
             # which is what the retry a refusal asked for is waiting on.
             wait = min(self.poll, 3) if getattr(self, "census_asked", False) else self.poll
-            sample = timed("sample", self.sampler.sample, self.state, n)
+            sample = timed("sample", self.sampler.sample, self.state, n) or {}
             # The sessions this node runs ride the heartbeat (roadmap #24),
             # so the dashboard's Sessions card lists them beside its own.
             if self.session_up:
@@ -881,6 +1147,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                                   timeout=wait + 15)
             if st in (200, 204):
                 wdelay = 1
+                refused_since = 0.0
             if st == 204:
                 continue
             if st == 200 and r.get("cancel"):
@@ -942,7 +1209,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if st:
                 self.hello_again(f"the work poll failed ({st})")
             time.sleep(wdelay)
-            wdelay = min(wdelay * 2, 60)
+            # A controller that refuses the connection, or a proxy in front
+            # of it saying it is down, is a controller restarting (an update
+            # takes a minute): asked again every few seconds for its first
+            # ten minutes, so the node is back within seconds of it rather
+            # than up to a minute after and read as quiet meanwhile (B760).
+            # Anything else, and a controller gone longer, backs off to a
+            # minute as before.
+            down = (st == 0 and bool(RESTARTING.search(str(r.get("error") or "")))) or st in (502, 503, 530)
+            if down and not refused_since:
+                refused_since = time.monotonic()
+            elif not down:
+                refused_since = 0.0
+            soon = down and time.monotonic() - refused_since < 600
+            wdelay = min(wdelay * 2, 4 if soon else 60)
 
     def take(self, job):
         with self.lock:
@@ -953,6 +1233,150 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         log(f"job {job['id']}: {job.get('type')} "
             f"{' '.join((job.get('spec') or {}).get('argv') or [])[:80]}")
         j.start()
+
+    # -- the channel over TLS, under the controller's key ----------------------
+    def channel_reads_key(self):
+        """Whether every copy here of what dials the controller for a
+        session reads a key's pin: the bundle's client the terminals run
+        (bbapi.py), root's copy of it, and the installed bb-session. Each
+        says so in a line of its own (KEY_PIN = ...). A copy from before
+        this does not, and would refuse the controller under a pin it
+        takes for a certificate's digest; one that is not on this node
+        dials nothing. The name of the first that does not, or ""."""
+        store = tc_root(self.state)
+        files = [os.path.join(store, ".bb", "current", "scripts", "lib", "bbapi.py")] if store else []
+        files += [os.path.join(ROOT_BUNDLE_DIR, "current", "scripts", "lib", "bbapi.py"), SESSION_BIN]
+        mark = f'KEY_PIN = "{KEY_PIN}"'.encode()
+        for path in files:
+            try:
+                with open(path, "rb") as f:
+                    if mark not in f.read():
+                        return path
+            except OSError:
+                continue
+        return ""
+
+    def channel_move(self, named):
+        """This node's channel taken to TLS under the controller's key, by
+        itself: `named` is what the controller's hello says of its TLS,
+        {"pin": the pin of its own key}. A node on plain http asks the same
+        address over https, with that pin, whether it is this node's
+        controller (its own `beat`, with its token): answered, the address
+        and the pin are kept in node.json and used from here on, and
+        nothing here ever writes http back. A node already on https that
+        pinned the certificate itself moves its pin to the key when the
+        certificate it just met is over the key named, which is the same
+        trust said so that a renewal passes. Not answered (a proxy in
+        front that speaks only http to the controller, a port that does
+        not pass TLS), the node stays as it is and says why in its census.
+        Nothing moves for a node reached through a public hostname, whose
+        certificate is the name's and is checked by the system's
+        authorities, nor while a copy of the session tools here is from
+        before a key's pin. Whether it moved."""
+        pin = named.get("pin") if isinstance(named, dict) else ""
+        if not isinstance(pin, str) or not re.fullmatch(re.escape(KEY_PIN) + r"[A-Za-z0-9+/]{43}=", pin):
+            CHANNEL.clear()
+            return False
+        if self.ctl.pin == Controller.CA or self.state.get("reach") == "public" or self.ctl.pin == pin:
+            CHANNEL.clear()
+            return False
+        old = self.channel_reads_key()
+        if old:
+            CHANNEL.update(why="its session tools are from before a pinned channel")
+            log_once("channel", f"the channel stays as it is for now: {old} is from before a key's pin; "
+                                "it moves once the controller's bundle is the one here")
+            return False
+        if self.ctl.scheme == "https":
+            CHANNEL.clear()
+            # The certificate pinned is over the key named: the key is pinned
+            # in its place, so the controller's next certificate passes.
+            if self.ctl.pin.startswith("sha256:") and getattr(self.ctl, "seen_key", "") == pin:
+                return self.channel_keep(self.ctl.url, pin, "the controller's key is pinned in place of its certificate: "
+                                                            "a renewed certificate over the same key is taken")
+            return False
+        url = "https://" + self.ctl.url.split("://", 1)[1]
+        probe = Controller(url, self.state.get("token") or "", pin)
+        st, r = probe.call("beat", {}, timeout=10)
+        if st != 200:
+            why = "its controller's address does not answer over TLS" if st == 0 else f"its controller answered {st} over TLS"
+            CHANNEL.update(why=why)
+            log_once("channel", f"the channel stays plain http: {url} did not answer as this node's controller under the "
+                                f"key it names ({(r or {}).get('error') or st}); asked again at the next hello")
+            return False
+        CHANNEL.clear()
+        return self.channel_keep(url, pin, f"this node's channel is {url} now, under the controller's key: "
+                                           "it does not go back to plain http by itself")
+
+    def channel_keep(self, url, pin, words):
+        """The controller's address and pin written into node.json and used
+        from here on, and handed to what starts a session's terminal (its
+        environment, bb-session's layout file, the console shell's
+        profile), so a session dials as the agent does."""
+        self.state.update({"controller": url, "pin": pin, "scheme": "https"})
+        save_state(self.state)
+        self.ctl = Controller(url, self.state.get("token") or "", pin)
+        log(words)
+        for kind in (getattr(self, "term_kinds", None) or {}).values():
+            if isinstance(kind.get("env"), dict) and "BB_CONTROLLER" in kind["env"]:
+                kind["env"].update({"BB_CONTROLLER": self.ctl.url, "BB_CONTROLLER_PIN": pin})
+        # Each never fatal: a file that could not be rewritten now is
+        # rewritten at the next hello or the next start.
+        for step in (self.tty_env_write, self.refresh_session_tool, self.write_session_profile):
+            try:
+                step()
+            except Exception as e:  # noqa: BLE001 (the channel moved; what follows it is retried)
+                log(f"the channel moved, and {step.__name__} did not follow it yet: {type(e).__name__}: {e}")
+        self.hello_again("the channel to the controller moved to TLS")
+        return True
+
+    def shipped_named(self, named):
+        """What a hello's answer says of the agent its controller ships,
+        kept for the update that follows: its digest, the release's
+        signature over it, the release keys the build names, and the
+        release key's own word for its spare where the build carries one.
+        A node that holds that key and no spare pins the spare here, on
+        the hello itself, and says hello again so its row reads it."""
+        named = named if isinstance(named, dict) else {}
+        self.controller_digest = named.get("digest") or ""
+        self.controller_sig = named.get("sig") or ""
+        self.controller_keys = named.get("release_keys") or []
+        self.controller_spare = named.get("release_spare_sig")
+        if self.take_spare(self.controller_spare):
+            self.hello_again("the release key's spare was pinned")
+
+    def take_spare(self, said, job=None):
+        """The release key's spare pinned here on the release key's own
+        word for it (release.spare_pin): `said` is the statement a release's
+        build signed with the key this node pinned, as the controller's
+        hello or an update's spec carries it. Read against the file, which
+        the console writes, and written under its lock (pin_spare). Said
+        once, in this node's log and in `job`'s where one asked; whether
+        the spare was pinned. A statement that pins nothing says nothing: a
+        build with none, a node that has a spare, one that pinned no key or
+        chose to pin none, and a statement under any other key."""
+        from . import release
+        if not isinstance(said, dict):
+            return False
+        try:
+            trust = load_state()
+        except SystemExit:
+            return False
+        key = release.spare_pin(trust, said)
+        if not key:
+            return False
+        first = release.pinned(trust)
+        try:
+            if not pin_spare(first, key):
+                return False
+        except (OSError, ValueError) as e:
+            log_once("spare-pin", f"the release key's spare could not be pinned here ({e}); it is tried again at the next hello")
+            return False
+        words = (f"pinned the release key's spare ({key[:16]}…), named by the release key this node pinned ({first[:16]}…): "
+                 "from here this node takes updates signed by either")
+        log(words)
+        if job is not None:
+            job.say(words + "\n")
+        return True
 
     # -- self-update (door 4) ------------------------------------------------
     def self_update(self, job, spec):
@@ -998,11 +1422,116 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if got == own_digest():
             job.say("already current\n")
             return "succeeded", 0
+        # AerieOS's own release, where this node pinned its key (release.py):
+        # the digest above is the controller's word, the signature is not.
+        # Read from the file, which the console writes, not this process's copy.
+        from . import release
+        # The spare first, where the update names it under the key pinned
+        # here: the update is then judged by both.
+        self.take_spare(spec.get("release_spare_sig") or getattr(self, "controller_spare", None), job)
+        try:
+            trust = load_state()
+        except SystemExit:
+            trust = self.state
+        sig = spec.get("sig") or getattr(self, "controller_sig", "")
+        # The release keys the controller's build carries, named beside the
+        # update: read only by a node that trusts no key, which pins them
+        # when this update's signature is under one (release.first_pin).
+        named = spec.get("release_keys") or getattr(self, "controller_keys", None)
+        ok, said = release.may_install(trust, got, sig, named, body)
+        if said:
+            job.say(said + "\n")
+        if not ok:
+            # The job's error is the cause alone, one phrase: a page draws
+            # a row from it. The whole of it is in the job's log above and
+            # in this node's own.
+            job.why = getattr(said, "cause", "") or said
+            log(f"the agent update {got[:19]}… was not installed. {said}")
+            return "failed", 77
+        pin = release.first_pin(trust, got, sig, named)
+        # One this node already went back from is not taken again by itself
+        # (the operator, 13 Nov): Update agent, a person's press, asks again.
+        went = back_note()
+        if went and went["digest"] == got and not spec.get("again"):
+            job.why = (f"this node went back from this build already ({went['why'] or 'it did not start here'}): "
+                       "press Update agent to try it again")
+            job.say(job.why + "\n")
+            return "failed", 79
         me = own_path()
         tmp = me + ".new"
         with open(tmp, "wb") as f:
             f.write(body)
         os.chmod(tmp, 0o755)
+        # The new file asked to load itself here, before it is the one this
+        # node runs (R241): one that cannot, or that has no way to be asked,
+        # is never installed, since nothing would put the old one back.
+        ok, said = selfcheck(tmp)
+        if not ok:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            # One that would refuse the work this one does (base.fs_holds) is
+            # kept off this node the same way: said as that, its why on a
+            # line of its own and in the log.
+            fs = ok is False and FS_REFUSED in said
+            job.why = ("the new agent cannot check itself here, so it was not installed" if ok is None
+                       else f"{FS_REFUSED}, so the new agent was not installed" if fs
+                       else f"the new agent does not start on this node, so it was not installed: {said}")
+            if fs:
+                job.say(said + "\n")
+            job.say(job.why + "\n")
+            log(f"the agent update {got[:19]}… was not installed: {said if fs else job.why}")
+            return "failed", 78
+        # ...and the file it replaces kept beside it, with the note that the
+        # new one is on trial: the entry puts the old one back when the new
+        # one cannot be loaded or never reaches its controller.
+        try:
+            shutil.copy2(me, me + ".prev.w")
+            os.replace(me + ".prev.w", me + ".prev")
+            trial_begin(got, own_digest())
+        except OSError as e:
+            for x in (tmp, me + ".prev.w"):
+                with contextlib.suppress(OSError):
+                    os.unlink(x)
+            job.why = f"the agent this would replace could not be kept beside it ({e}), so nothing was installed"
+            job.say(job.why + "\n")
+            return "failed", 73
+        job.say(said + "\n")
+        # A node that trusted no key pins the release's on this, its first
+        # signed update, as the last thing before the file is the one it
+        # runs: a pin that cannot be written installs nothing, and takes
+        # the trial's note with it, since the agent here is still the old one.
+        if pin:
+            def undo(why, code):
+                for x in (tmp, me + ".trial"):
+                    with contextlib.suppress(OSError):
+                        os.unlink(x)
+                job.why = getattr(why, "cause", "") or why
+                job.say(why + "\n")
+                return "failed", code
+            try:
+                pinned = pin_release(pin)
+            except (OSError, ValueError) as e:
+                return undo(f"AerieOS's release key could not be pinned here ({e}), so nothing was installed", 73)
+            if pinned:
+                said = (f"pinned AerieOS's release key on this first signed update ({pin[0][:16]}…)"
+                        ": from here this node takes only agent updates signed by it")
+                job.say(said + "\n")
+                log(said)
+                # ...and its spare, where the update carries the pinned
+                # key's own statement of one: the one way a spare is taken.
+                self.take_spare(spec.get("release_spare_sig") or getattr(self, "controller_spare", None), job)
+            else:
+                # A person pinned or added a key at the console while this
+                # was checked, or chose there to pin none: theirs stands,
+                # and the update is theirs to judge.
+                try:
+                    trust = load_state()
+                except SystemExit:
+                    trust = self.state
+                allowed, said = release.may_install(trust, got, sig, named, body)
+                if not allowed:
+                    return undo(said, 77)
+                job.say(said + "\n")
         os.replace(tmp, me)
         # Only a file actually installed restarts the agent: "already current"
         # above did too, and a second update queued behind the first ended

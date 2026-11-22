@@ -51,3 +51,16 @@ docker_install() {
             pkg $(pkg_names docker) \
                 || warn "docker did not install from the distribution's packages, so this machine is not a Docker host until it does"
 }
+# door_install NAME: a door's program (cloudflared, tailscale) from
+# Gentoo's own tree, which carries both: Portage holds what it fetches to
+# the tree's manifests, and a binary package to the binary host's keys. Its
+# service is tailscaled under systemd and tailscale under OpenRC. 2 where
+# this system has no verified source for it, DOOR_WHY saying why.
+door_install() {
+    case "$1" in
+        cloudflared) pkg net-vpn/cloudflared || return 1 ;;
+        tailscale)   pkg net-vpn/tailscale || return 1
+                     if [ "${INIT:-}" = systemd ]; then svc_enable tailscaled; else svc_enable tailscale; fi ;;
+        *) return 2 ;;
+    esac
+}

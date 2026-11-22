@@ -15,7 +15,7 @@
 set -euo pipefail
 LIB="${BB_OS_LIB:-/usr/lib/aerieos-os}"
 MARK="${BB_CONSOLE_OPEN:-/var/lib/aerieos-os/console-open}"
-HASH="${BB_CONSOLE_HASH:-/var/lib/builderbot/console-hash}"
+HASH="${BB_CONSOLE_HASH:-$( [ -d /var/lib/aerieos ] && echo /var/lib/aerieos || echo /var/lib/builderbot )/console-hash}"
 OWN="${BB_OWN_NODE:-/etc/aerieos-controller/own-node}"
 SUDOERS="${BB_CONSOLE_SUDOERS:-/etc/sudoers.d/aerieos-console-open}"
 CMDLINE="${BB_CMDLINE:-/proc/cmdline}"

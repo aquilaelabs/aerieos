@@ -110,14 +110,27 @@ class Snap(unittest.TestCase):
         self.assertEqual(len(self.objects()), n - 1, "and the object only it named")
         self.keep["alpha"] = 0
         snapshots.daily()
-        self.assertEqual(snapshots.days("alpha"), [], "0 keeps none")
+        # 0 days is no snapshot taken, and what a repository has stays (the
+        # operator, 13 Nov): it removed them all at the next daily look.
+        had = snapshots.days("alpha")
+        self.assertTrue(had)
+        for f in (paths.of("project-snapshots") / "days" / "alpha").glob("*.json"):
+            d = json.loads(f.read_text())
+            d["at"] = int(time.time()) - 400 * 86400
+            f.write_text(json.dumps(d))
+        snapshots.daily()
+        self.assertEqual([d["day"] for d in snapshots.days("alpha")], [d["day"] for d in had], "0 takes none and removes none")
+        self.assertTrue(self.objects())
+        # Some days kept again: the ones past them go, and the next look takes one.
+        self.keep["alpha"] = 7
+        snapshots.daily()
+        self.assertEqual(snapshots.days("alpha"), [])
         self.assertEqual(self.objects(), [])
+        snapshots.daily()
+        self.assertEqual(len(snapshots.days("alpha")), 1)
 
 
-    def test_a_pinned_day_outlives_the_days_kept_and_off_takes_none(self):
-        on = {"alpha": True}
-        snapshots.configure(workspace=self.ws, days=lambda p: self.keep[p], names=lambda: ["alpha"],
-                            audit_fn=lambda *row: None, on=lambda p: on[p])
+    def test_a_pinned_day_outlives_the_days_kept_and_none_kept_takes_none(self):
         snapshots.daily()
         day = snapshots.days("alpha")[0]["day"]
         self.assertTrue(snapshots.pin("alpha", day).get("ok"))
@@ -125,21 +138,25 @@ class Snap(unittest.TestCase):
         self.assertIn("already", snapshots.pin("alpha", day)["error"])
         self.assertIn("not kept", snapshots.pin("alpha", "1999-01-01")["error"])
         self.assertIn("not a day", snapshots.pin("alpha", "../x")["error"])
-        self.keep["alpha"] = 0
+        # Older than the days kept: pinned, it stays.
+        f = paths.of("project-snapshots") / "days" / "alpha" / f"{day}.json"
+        d = json.loads(f.read_text())
+        d["at"] = int(time.time()) - 30 * 86400
+        f.write_text(json.dumps(d))
+        self.keep["alpha"] = 7
         snapshots.daily()
-        self.assertEqual([d["day"] for d in snapshots.days("alpha")], [day], "0 days keeps a pinned one")
+        self.assertEqual([d["day"] for d in snapshots.days("alpha")], [day], "a pinned day outlives the days kept")
         self.assertTrue(self.objects(), "and the objects it names")
         self.assertTrue(snapshots.pin("alpha", day, False).get("ok"))
         snapshots.daily()
         self.assertEqual(snapshots.days("alpha"), [], "unpinned, it goes with the rest")
-        # Switched off: none is taken, whatever the days kept.
-        self.keep["alpha"], on["alpha"] = 14, False
+        # No days kept: none is taken.
+        self.keep["alpha"] = 0
         snapshots.daily()
-        self.assertEqual(snapshots.days("alpha"), [], "off takes none")
-        on["alpha"] = True
+        self.assertEqual(snapshots.days("alpha"), [], "0 days takes none")
+        self.keep["alpha"] = 14
         snapshots.daily()
-        self.assertEqual(len(snapshots.days("alpha")), 1, "on again, one a day")
-
+        self.assertEqual(len(snapshots.days("alpha")), 1, "days kept again, one a day")
 
 if __name__ == "__main__":
     unittest.main()

@@ -129,6 +129,14 @@ class Passkey(Base):
         self.assertTrue(mfa.ecdsa_p256_verify(self.key.x, self.key.y, b"hello", sig))
         self.assertFalse(mfa.ecdsa_p256_verify(self.key.x, self.key.y, b"hellp", sig))
         self.assertFalse(mfa.ecdsa_p256_verify(self.key.x, self.key.y + 1, b"hello", sig))
+        # The check is the cryptography library's (R243), not arithmetic written here: what is
+        # not a signature, not a point or not a number is no, never an error.
+        for bad in (b"", b"\x30\x00", sig[:-3], b"not a signature at all"):
+            self.assertFalse(mfa.ecdsa_p256_verify(self.key.x, self.key.y, b"hello", bad))
+        self.assertFalse(mfa.ecdsa_p256_verify(0, 0, b"hello", sig))
+        self.assertFalse(mfa.ecdsa_p256_verify("x", None, b"hello", sig))
+        for gone in ("_mul", "_add", "_on_curve", "_der_sig", "_G"):
+            self.assertFalse(hasattr(mfa, gone), f"{gone}: the curve is the library's")
 
     def _client(self, kind, chal, origin=ORIGIN):
         return mfa.b64u(json.dumps({"type": kind, "challenge": chal, "origin": origin}).encode())

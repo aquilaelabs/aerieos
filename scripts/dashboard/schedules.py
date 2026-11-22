@@ -13,10 +13,6 @@ The timer (tick) fires a schedule's job on the minute it is due; one run of
 a schedule at a time, so one still going when the next falls due is said
 and that run skipped; and a run the controller was down for is run once
 when it comes back and said, never once per minute it missed.
-
-The static analysis scan was the first built-in schedule; since 0.9.0 it
-is the Scanners page's own (R145, scanners.py), and migration 0016 moved
-an install's scan schedule there.
 """
 import calendar
 import json
@@ -32,9 +28,9 @@ _lock = threading.Lock()
 
 MAX = 64                     # schedules kept
 SCRIPT_MAX = 64 * 1024
-# A run is stopped after a day unless its schedule says less (the scan's
-# four hours): the form asks nothing about it (the operator, 26 Oct), and a
-# hung script holds its node's job slot no longer than that.
+# A run is stopped after a day unless its schedule says less: the form asks
+# nothing about it (the operator, 26 Oct), and a hung script holds its
+# node's job slot no longer than that.
 TIMEOUT_MAX = 24 * 3600
 TIMEOUT_DEFAULT = TIMEOUT_MAX
 # A tick later than this past a run's minute is a controller that was down
@@ -58,7 +54,6 @@ def system_timeout(sysj):
     if sysj.get("apply") == "storage-array" and (sysj.get("config") or {}).get("array") == "verify":
         return 172800
     return SYSTEM_TIMEOUT.get(sysj.get("apply"), 900)
-SCAN_ID = "scan"           # the row the built-in scan kept before 0.9.0, unlisted now (migration 0016)
 DAYS = ("Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays")
 DAY_NAMES = {d[:3].lower(): i for i, d in enumerate(DAYS)}
 MONTH_NAMES = {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
@@ -248,12 +243,8 @@ def _save(d):
 
 
 def listing():
-    """Every schedule, the built-in scan first, each with its words and its
-    next run."""
-    # The scan's own row, the one built in before 0.9.0, is the Scanners
-    # page's now (migration 0016); one left behind is not listed.
-    d = {k: v for k, v in _load()["schedules"].items() if k != SCAN_ID}
-    rows = d
+    """Every schedule, each with its words and its next run."""
+    rows = _load()["schedules"]
     now = time.time()
     out = []
     for s in rows.values():
@@ -337,9 +328,9 @@ def save(req, by):
             sid = next((k for k, r in rows.items() if r.get("node") == req.get("node") and (r.get("system") or {}).get("apply") == "storage-array"
                         and ((r.get("system") or {}).get("config") or {}).get("array") == verb), "")
         if sid:
-            was = rows.get(sid) if sid != SCAN_ID else None
+            was = rows.get(sid)
             if not was:
-                return {"error": "no such schedule" if sid != SCAN_ID else "the scan is the Scanners page's now"}
+                return {"error": "no such schedule"}
         else:
             if len(rows) >= MAX:
                 return {"error": f"{MAX} schedules are kept, the most there may be"}
@@ -368,8 +359,6 @@ def save(req, by):
 def remove(sid):
     with _lock:
         d = _load()
-        if sid == SCAN_ID:
-            return {"error": "the scan is the Scanners page's now"}
         if d["schedules"].pop(sid, None) is None:
             return {"error": "no such schedule"}
         _save(d)
@@ -392,10 +381,7 @@ def _record(sid, **fields):
 
 def _argv(s):
     """What the job runs: the script, by bash."""
-    script = s.get("script") or ""
-    env = s.get("env") or {}
-    pre = "".join(f"export {k}={json.dumps(v)}\n" for k, v in env.items() if v)
-    return ["bash", "-c", pre + script]
+    return ["bash", "-c", s.get("script") or ""]
 
 
 def fire(s, by, queue, late="", at=None):

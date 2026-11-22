@@ -11,15 +11,15 @@ kind for the census, and the storage-snapshot job: one taken of the pool's
 every dataset (the oldest of its kind pruned past what is kept), a dataset
 rolled back to one, or one destroyed.
 """
-import json
 import os
 import re
 import shutil
 import subprocess
 import time
 
-from .base import log
+from .base import log, read_json, run_out, write_json
 from .disks import disks_now, moved
+from .names import ETC
 
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}")
 # A pool mounts at /mnt/NAME, so a name is not one of the folders there that
@@ -33,18 +33,15 @@ ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy", "import")
 # under /mnt by their own mountpoints (altroot /mnt, as a NAS that mounts its
 # pools there does), which zpool.cache does not keep, so each is imported
 # again from this record at the agent's minute pass after a reboot.
-IMPORTED = "/etc/builderbot/pools-imported.json"
+IMPORTED = ETC + "/pools-imported.json"
 MOUNT_ROOT = "/mnt"
 SNAP_KINDS = ("hourly", "daily", "weekly", "manual")
 SNAP_RE = re.compile(r"bb-(hourly|daily|weekly|manual)-(\d{8})-(\d{4})")
 DATASET_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}(/[A-Za-z0-9_.-]{1,64}){0,8}")
 
 
-def _out(argv, timeout=60):
-    try:
-        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False).stdout
-    except (OSError, subprocess.SubprocessError):
-        return ""
+# Under this name the unit tests stand in for it.
+_out = run_out
 
 
 def by_id(name):
@@ -138,38 +135,77 @@ def importable_now():
             continue
         k, v = m.group(1), m.group(2).strip()
         if k == "pool":
-            cur = {"name": v[:64], "id": "", "state": "", "said": ""}
+            cur = {"name": v[:64], "id": "", "state": "", "said": "", "elsewhere": False}
             out.append(cur)
         elif cur is not None and k == "id" and v.isdigit():
             cur["id"] = v[:24]
         elif cur is not None and k == "state":
             cur["state"] = v.lower()[:16]
-        elif cur is not None and k in ("action", "status") and not cur["said"]:
-            cur["said"] = v[:200]
+        elif cur is not None and k in ("action", "status"):
+            # Last used by another system and never exported (B938): a
+            # machine whose stick died meets its own pools so, under the
+            # new stick's host id.
+            if "another system" in v or "'-f'" in v:
+                cur["elsewhere"] = True
+            if not cur["said"]:
+                cur["said"] = v[:200]
     return [x for x in out if POOL_RE.fullmatch(x["name"]) and x["id"]][:16]
 
 
 def _imported():
-    try:
-        with open(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), encoding="utf-8") as f:
-            d = json.load(f)
-        return [x for x in d if isinstance(x, dict) and POOL_RE.fullmatch(str(x.get("name") or ""))] if isinstance(d, list) else []
-    except (OSError, ValueError):
-        return []
+    rows = read_json(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), [], kind=list)
+    return [x for x in rows if isinstance(x, dict) and POOL_RE.fullmatch(str(x.get("name") or ""))]
 
 
 def _imported_set(rows):
-    path = os.environ.get("BB_POOLS_IMPORTED", IMPORTED)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(rows, f)
-    os.replace(path + ".new", path)
+    write_json(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), rows, makedirs=True)
 
 
-def import_argv(zpool, name, pid):
-    """A pool imported as it is: no -f, never upgraded, its mountpoints
-    under /mnt, kept out of zpool.cache (the minute pass imports it again)."""
-    return [zpool, "import", "-o", f"altroot={MOUNT_ROOT}", "-o", "cachefile=none", pid or name, name]
+def controller_account():
+    """The controller's account on this machine, as its environment file
+    names it (BB_ACCOUNT, aerieos when unsaid): (uid, gid), or None where
+    there is no such account (a machine that is not the controller's)."""
+    import pwd
+    name = "aerieos"
+    try:
+        with open(os.environ.get("BB_CONTROLLER_ENV", "/etc/aerieos-controller/controller.env"), encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("BB_ACCOUNT="):
+                    name = line.split("=", 1)[1].strip().strip('"') or name
+    except OSError:
+        return None
+    try:
+        pw = pwd.getpwnam(name)
+    except KeyError:
+        return None
+    return pw.pw_uid, pw.pw_gid
+
+
+def give_backup_dir(top, acct):
+    """`top`/.builderbot/backup made, the account's alone (0700), with
+    .builderbot itself root's and walkable; a link where either should be
+    is left alone."""
+    base, back = os.path.join(top, ".builderbot"), os.path.join(top, ".builderbot", "backup")
+    try:
+        if os.path.islink(base) or os.path.islink(back):
+            return
+        os.makedirs(base, mode=0o711, exist_ok=True)
+        os.makedirs(back, mode=0o700, exist_ok=True)
+        st = os.lstat(back)
+        if (st.st_uid, st.st_gid) != acct:
+            os.chown(back, *acct, follow_symlinks=False)
+        if st.st_mode & 0o777 != 0o700:
+            os.chmod(back, 0o700)
+    except OSError as e:
+        log(f"the backup folder on {top} could not be given to the controller's account: {e}")
+
+
+def import_argv(zpool, name, pid, force=False):
+    """A pool imported as it is: never upgraded, its mountpoints under /mnt,
+    kept out of zpool.cache (the minute pass imports it again). Not by force
+    when a person imports it; again by the minute pass it is, since this
+    machine imported it before and its disks are in no other machine."""
+    return [zpool, "import", *(["-f"] if force else []), "-o", f"altroot={MOUNT_ROOT}", "-o", "cachefile=none", pid or name, name]
 
 
 def _snapshots():
@@ -254,6 +290,52 @@ class PoolsMixin:
             log(f"pools: {p['name']} unlocked")
             self.hello_again(f"the pool {p['name']} unlocked")
 
+    def _import_forced(self, job, zpool, name, pid):
+        """A pool last used by another system imported anyway, as it is: held
+        unmounted first, so where its datasets go is read before they go
+        anywhere. One AerieOS made (mounted under /mnt by its own setting)
+        is this machine's pool from before (a stick that died): back where it
+        was and kept for every boot. Any other is imported under /mnt, as
+        an import of another machine's pool is, and imported again by the
+        minute pass. The exit code."""
+        say = job.say
+        zfs = shutil.which("zfs") or "zfs"
+        say(f"pool import {name}: last used by another system, imported anyway as it is (never upgraded)\n")
+        rc = self._sh(job, [zpool, "import", "-f", "-N", "-o", "cachefile=none", pid or name, name], timeout=600)
+        if rc != 0:
+            return rc
+        mp = _out([zfs, "get", "-H", "-o", "value", "mountpoint", name], timeout=30).strip()
+        if mp.startswith(MOUNT_ROOT + "/"):
+            say(f"{name} mounts at {mp}: this machine's own pool from before, back where it was and imported at every boot\n")
+            self._sh(job, [zpool, "set", "cachefile=", name], timeout=60)
+            return self._sh(job, [zfs, "mount", "-a"], timeout=600)
+        say(f"{name} mounts at {mp or 'its own place'}: another machine's, imported again under {MOUNT_ROOT}\n")
+        self._sh(job, [zpool, "export", name], timeout=600)
+        rc = self._sh(job, import_argv(zpool, name, pid, force=True), timeout=600)
+        if rc == 0:
+            _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid}])
+        return rc
+
+    def backup_dirs_pass(self):
+        """Once a minute: on each pool and the array here, the folder the
+        controller keeps copies of its configuration in, made its account's
+        (B937): a pool's top is root's, so the copies were written nowhere
+        but the stick, and a stick that died took them with it."""
+        if os.geteuid() != 0:
+            return
+        acct = controller_account()
+        if not acct:
+            return
+        from .array import array_now
+        tops = [p["mount"] for p in pools_now() if p.get("mount")]
+        arr = array_now()
+        if arr.get("mount") and arr.get("mounted"):
+            tops.append(arr["mount"])
+        for top in tops:
+            if not os.path.ismount(top):
+                continue
+            give_backup_dir(top, acct)
+
     def pools_pass(self):
         """Once a minute: a pool imported from another machine that is not
         imported now (after a reboot) imported again, as it was."""
@@ -264,7 +346,7 @@ class PoolsMixin:
         have = {p["name"] for p in pools_now()}
         for x in rows:
             if x["name"] not in have:
-                subprocess.run(import_argv(zpool, x["name"], str(x.get("id") or "")), capture_output=True, timeout=120, check=False)
+                subprocess.run(import_argv(zpool, x["name"], str(x.get("id") or ""), force=True), capture_output=True, timeout=120, check=False)
 
     def _apply_storage_snapshot(self, job, cfg):
         say = job.say
@@ -449,10 +531,18 @@ class PoolsMixin:
             if pid and not re.fullmatch(r"\d{1,24}", pid):
                 say("refused: a pool's id is its number, as zpool import lists it\n")
                 return "failed", 64
-            say(f"pool import {name}: as it is, never upgraded, its datasets under {MOUNT_ROOT}; a pool another machine did not export is refused, not forced\n")
-            rc = self._sh(job, import_argv(zpool, name, pid), timeout=600)
-            if rc == 0:
-                _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid}])
+            if cfg.get("force") is True:
+                # One last used by another system (B938): forced only with its
+                # name typed again; never upgraded either way.
+                if str(cfg.get("confirm") or "") != name:
+                    say("refused: importing a pool another system used last takes its name typed again\n")
+                    return "failed", 64
+                rc = self._import_forced(job, zpool, name, pid)
+            else:
+                say(f"pool import {name}: as it is, never upgraded, its datasets under {MOUNT_ROOT}; a pool another machine did not export is refused, not forced\n")
+                rc = self._sh(job, import_argv(zpool, name, pid), timeout=600)
+                if rc == 0:
+                    _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid}])
         else:
             if name not in have:
                 say(f"refused: no pool called {name} here\n")

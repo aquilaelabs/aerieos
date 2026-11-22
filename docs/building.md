@@ -44,7 +44,10 @@ each test protects, and what the suite actually spends its time on.
 
 The first half is written by hand, in the same change as the test: what
 breaks if it goes red, and what it really exercises (which fixtures, which
-stubs, what is real and what is faked). The second half is not written by hand
+stubs, what is real and what is faked). A test named as a sentence of four
+words or more already says what it protects, and counts as described with
+nothing written; one named tersely (`test_login`) is counted undescribed until
+`aerie tests note KEY "..."` gives it its line. The second half is not written by hand
 at all: `aerie tests ingest` parses a run's own output, because a self-reported
 estimate is a guess that ages and reads exactly like a measurement.
 
@@ -58,7 +61,12 @@ workers** in the Sessions section of its page under Nodes, 0 for the
 machine's cores, handed to every test job there as `BB_TEST_WORKERS` for
 the space's own test command to read (`pytest -n`, `--test-concurrency`,
 `--max-workers`) and read by this harness as the most suites it runs at once
-(roadmap R81). Under that ceiling its workers take suites from one queue,
+(roadmap R81), which is never more than half the machine's cores: a suite
+is a server, a browser and its node beside each other, and on sixteen cores
+a whole run at eight workers took 9 minutes with nothing failed, at ten 14
+with three suites run again, at sixteen 40 with ten
+(`BB_TEST_SUITES_AT_ONCE=N` is the harness's own number for a run that wants
+another). Under that ceiling its workers take suites from one queue,
 longest first, each taking the next only while the machine has room (1.5 GB
 of memory free and a load under one and a half times its cores; the suites
 run at the lowest priority, so their own load does not hold the next back),
@@ -76,10 +84,16 @@ once (spaces, accounts, the stub node, the store), keeps a copy, and before
 each file stops the server and the stub agent, puts the copy back and starts
 both again, about a second and a half per file. What one file creates (a
 node, an account, a setting, a job, anything the server keeps in memory)
-cannot reach the next. A file that fails in a whole run is run once more,
-alone, in a world of its own: if it passes it is reported as **flaky**, by
+cannot reach the next. A file that fails in a whole run is run once more
+in a world of its own, without the whole run's load (three such at a time
+where several failed): if it passes it is reported as **flaky**, by
 name, above the verdict, and never folded into a pass; if it fails again it
-is a failure. The registry records the first run's timings, not the
+is a failure. Each flake is kept on record with the first check that failed
+in the run (`.bb-map/flakes.tsv`, this node's own), `aerie tests flakes` counts
+them by suite, and `aerie tests preflight` fails on one in a suite it ran: a
+gate runs the suites the change touches, so a flake there is the change's
+to settle before a push. A release's tag still counts a flaky suite as
+passed. The registry records the first run's timings, not the
 retry's.
 
 A test is keyed on **where the runner puts it** (`<file>#<ordinal>`) rather
@@ -114,13 +128,35 @@ removing), above the chosen node's runner section, where one is installed,
 started or removed, with the `runs-on` line that pins a job to its node. A
 row picks its node.
 
+**A runner on a public repository takes a stranger's pull request.** On a
+host where anybody may open a pull request from a fork, that request can
+carry its own workflow, and a self-hosted runner runs it: on the node, as
+its jobs account, which reaches Docker there and through it the whole
+machine. A runner's row says so when its repository is public (asked of
+GitHub once an hour). What holds: on GitHub, Settings, Actions, General,
+"Approval for running fork pull request workflows", set to require approval
+for all external contributors, and reading what a request changes under
+`.github/workflows` before approving its run. A check written in the
+workflow file itself does not hold, since the fork's copy of the file is
+the one that runs; this repository's own carry one all the same, for a
+request that leaves them as they are.
+
 **CI runners per node, one per git host.** The runner section lists the
 node's runners and adds one with its host, address and token (kept root-only on
 the controller): GitHub's runner and Gitea's `act_runner` (published as gitea-runner since it moved to gitea/runner) side by side,
 each registered with labels `builderbot, self-hosted, linux, <arch>, <node
 name>` plus any extra, so a workflow's `runs-on` names the node it should
 land on whichever host its repository is on. Each row says whether its
-runner is listening or busy; Remove deregisters it first. `aerie ci-labels` lists every label the registry knows
+runner is listening or busy; Remove deregisters it first. A runner's
+program is the version this build of AerieOS pins, with the sha256 of the
+exact file for the node's platform (`scripts/dashboard/runner-pins.json`,
+for 64-bit Intel and ARM): the controller hands the node the pin with the
+install, the node downloads that file and unpacks or runs nothing unless
+it is those bytes, and a file that is not says both digests and leaves
+nothing behind. GitHub's runner then updates itself from GitHub once it
+runs, which is its own channel and not one AerieOS holds. The runner
+Gitea and Forgejo share does not update itself: it moves when a newer
+AerieOS pins a newer one and the runner is installed again. `aerie ci-labels` lists every label the registry knows
 and `--write` regenerates `.github/actionlint.yaml` from them, so the lint
 checks `runs-on` against runners that exist. This container runs no runner
 of its own.
@@ -378,7 +414,21 @@ builds the release APK unsigned (no `signingConfig` for the release build
 type) and uploads it as a workflow artifact named `bb-release-apk-TAG`, kept a
 few days. The controller that made the release (Release on the version row)
 looks for that artifact every few minutes for twelve hours, and once an hour
-otherwise; it fetches it with the space's GitHub token and hands each APK
+otherwise, in the runs that passed and in the ones still going: a workflow
+that builds the APK and makes the release in one run hands the APK over
+long before its release exists, and it is left until the release is there,
+which is not a failure. Only the release's own run is signed from: the one
+the tag itself started (its push, or its release published), on that tag and
+on the commit the tag names on GitHub, a run of a workflow in the space's
+tree that uploads the artifact or calls the one that does, with its commit
+from the repository itself. A pull request's run, a fork's, a branch's, a run
+started by hand, one of another workflow and one on another commit are each
+refused with the reason, which `aerie sign release` says run by run, and a
+release the controller waits for whose only APK came from such a run is a
+red bell row. And a release is signed once: a later run for a tag whose
+release carries its signed APK is left alone, until `aerie sign release
+--again TAG --why "..."` asks the space's owner to have it signed again and
+replaced. It fetches it with the space's GitHub token and hands each APK
 in it to a job on the space's node, which reads its package, is handed the
 sideload key that package maps to, and signs it with its own tools (the same
 steps a sign job takes: `zipalign`, `apksigner` with the proof of a rotation,
@@ -397,6 +447,23 @@ the tag with the reason unless it adds `--without-apk`. A session reads the
 same with `aerie sign status [TAG]` and asks for the look again with `aerie sign
 release --why "..."`, under **Agents may: Sign a build**. GitHub only: a Gitea
 or GitLab workflow's artifacts are not fetched.
+
+**A workflow that waits for the signed APK is started once it is attached.**
+A release whose files are listed and signed can have that list made only
+when the APK is on it, which is after the tag's own run has ended. So once
+the controller has attached a release's signed APK, it starts each workflow
+in the space's tree that can be started by hand (`workflow_dispatch`) and
+names `bb-release-seal-` outside a comment, the way AerieOS's own
+`seal-release.yml` names its concurrency group
+(`group: bb-release-seal-${{ inputs.tag }}`): on the tag's ref, with the tag
+as its `tag` input, using the space's token, which needs to be allowed to
+start workflows. The look's row says which were started. One that could not
+be started is said there and is a red bell row, with what to do instead:
+start it by hand from the repository's Actions page, from the tag, with the
+tag as its input. GitHub starts a workflow only once the default branch
+carries it, so a release is refused before its tag while the default
+branch lacks one of these, since it would stay a draft. A space with no
+such workflow is unaffected.
 
 **Several apps, several keys.** A space keeps as many named keys as it needs,
 each with both slots; the first is **default**, which is where keys from
@@ -447,9 +514,16 @@ session never holds (R138). It is its own dial, **Agents may: Tag and
 publish a release**, named apart from signing, which makes a build rather
 than a release: auto releases at once, **ask** (the default) puts the tag
 and the commit it would mark in front of the space's owner in their bell
-and the app, and deny refuses naming the setting. A release that could not
-happen (no version, a tag already there, uncommitted changes) is refused
-before anybody is asked. From a branch other than the one builds ship
+and the app, and deny refuses naming the setting. A release is of the
+commit that is pushed: the head of the branch on the remote, which has to
+be the commit the space is on, and its version, changelog and snapshot are
+read from that commit, never from the files in the space's directory, so a
+change nobody committed is neither in it nor in its way. A release that
+could not happen (no version, a tag already there, commits not pushed, a
+remote that has moved on) is refused before anybody is asked, with what
+puts it right. A stable release or a named pre-release (a candidate) is cut
+only from a commit that is on the branch builds come from; a dev build is
+tagged on the branch it was built on. From a branch other than the one builds ship
 from, a session's release is the dev build's (`--dev`, a pre-release on
 the dev channel) unless `--stable` says otherwise, and its first line
 names the channel it lands on (R190).
@@ -457,15 +531,26 @@ names the channel it lands on (R190).
 **Rehearsing one.** `aerie version rehearse` runs every build a release's tag
 runs (the controller bundle packed, the OS image built and booted, the
 Android app, the companion and the VS Code extension built) on the pushed
-branch, publishing nothing, its summary listing the files the release would
-carry; a release is then tagged once. GitHub starts it only once the
+branch, publishing nothing, with the checks a tag is held to; its last job
+gathers what was built as a tag's does, and its summary says which of the
+files the release must carry were built. That job also seals what was
+built, dry: the Android app signed with a key made in the job, as the
+controller signs a release's, and the seal's own check of it run on the
+runner's apksigner, so a change in what apksigner prints is met here and
+not by a tag's seal. A release is then tagged once. GitHub starts it only once the
 repository's default branch carries `.github/workflows/release-rehearsal.yml`.
 
 **The files a release carries.** `.release-files` at the tree's root lists
 them, one a line with `@VER@` for the version. The controller checks each
-release it made against the list at its own tag once CI has had three
-hours, and a release short of a file is a red row on the bell naming the
-file and why (an unsigned APK, a file CI did not attach).
+release it made against the list at its own tag as the runs the tag started
+on GitHub end (after three hours where they cannot be read): a release
+short of a file is a red row on the bell naming the file and why (an
+unsigned APK, the run that failed), and one with every file is said
+complete, once, to the space's owner, with whether it is published or still
+a draft. A draft is published from the Artifacts view's **Drafts**, which
+holds one back, saying why on its row, while a file is missing, while its
+tag is not on the git host, or while its notes are the placeholder CI
+writes when the changelog had nothing for the version.
 
 **The forge's release.** Once the tag is pushed, Release makes the forge's
 own release beside it: titled with the version, the changelog's section for

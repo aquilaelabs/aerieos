@@ -4,8 +4,10 @@ A session on a space runs a coding agent in a terminal on a node: Claude
 (Anthropic's Claude Code), ChatGPT (OpenAI's Codex CLI), Copilot (GitHub's
 Copilot CLI), Grok (xAI's Grok Build) or Any model (OpenCode, through a
 node's model router), each used the same way and held to the same briefing
-and guards. This page says what each agent is to AerieOS, where it is
-installed and signed in to, and how each is wired.
+and guards. A pack from the vetted catalog can bring another: Gemini
+(Google's Antigravity CLI) is the first, [below](#an-agent-a-pack-brings-gemini).
+This page says what each agent is to AerieOS, where it is installed and
+signed in to, and how each is wired.
 
 ## One table of agents
 
@@ -40,9 +42,12 @@ node it shows (a picker where the space works on several):
 - **Start.** A line for each agent installed on that node, the space's own
   first: **New** starts a conversation, or **Sign in** where you have no
   sign-in to it there, which opens that agent's own page on the node, at its sign-in.
-- **Resume.** Your conversations on the space, newest first, each with its
-  agent, when it was and its first words; one running in a session of yours
-  is marked so and not offered, since two sessions would write over it.
+- **Resume.** Your conversations on the space in one pulldown, newest
+  first, each named by the label you gave it, or by its first words, with
+  its agent and when it was; **Resume** beside it goes on with the one
+  picked, and its note shows under it. One running in a session of yours
+  says so and is not offered, since two sessions would write over it. A
+  link under them opens all of them in the space's Sessions view.
 
 While one of yours runs, the button reads **Manage agent**.
 
@@ -97,7 +102,7 @@ While one of yours runs, the button reads **Manage agent**.
 **Build, then Library** has a card per coding agent under Coding agents,
 for the node picked in the Build group's header
 ([toolchains.md](toolchains.md#the-library)): what it is, its version
-against the latest, and Install or Update. **Machines, then Installed**
+against the latest, and Install or Software update. **Machines, then Installed**
 holds what that node has: a row per agent installed there, which opens on
 your sign-in, what you added to the agent and Remove.
 
@@ -108,22 +113,28 @@ your sign-in, what you added to the agent and Remove.
   after the controller starts, weekly, when a node starts, and on Check for
   updates in the Library. A node behind is a row in the bell, which
   opens the Library on that node.
-- **Install, Update, Remove.** Install and Update on the Library's card,
+- **Install, Software update, Remove.** Install and Software update on the Library's card,
   Remove on the Installed page's row; an administrator's, or whoever may install
   toolchains on that node. Each ends that agent's sessions on the node
-  first, then runs the vendor's own installer as the session account
-  (`claude.ai/install.sh`, `chatgpt.com/codex/install.sh`,
-  `gh.io/copilot-install`, `x.ai/cli/install.sh`), and where the node's agent is root copies the
+  first, then runs the agent's install recipe as the session account
+  ([below](#where-an-agent-s-install-recipe-comes-from)): what the recipe
+  downloads is fetched and held to a sha256 the recipe carries before
+  anything of it runs. Where the node's agent is root it then copies the
   binary somewhere the account cannot write, so an update typed in a
   session changes nothing that runs. Nothing installs or updates by itself:
-  Copilot's and Grok's own updaters are switched off in a session. Grok's
-  installer checks its download against nothing published.
+  Copilot's and Grok's own updaters are switched off in a session.
 - **Your sign-in on that node.** A sign-in is one account's on one node and
   never travels to another. Claude's flow prints a link and waits for the
   code the page gives back. Codex's, Copilot's and Grok's are device flows: the
   row shows the link and a one-time code, which you enter on OpenAI's,
   GitHub's or xAI's page; nothing is pasted back. Codex's device login has to be
-  switched on in the ChatGPT account's security settings first.
+  switched on in the ChatGPT account's security settings first. Each
+  agent's sign-in is described as data, the same way a pack's agent
+  describes its own ([A sign-in from the page](tool-packs.md#a-sign-in-from-the-page)):
+  how its link starts, where its code is, how it ends, the file the
+  sign-in is kept in and where who is signed in is read. One driver on the
+  node runs every agent's from that, so what goes up the job's log is the
+  link and the code, never the program's screen.
 
 - **Your plugins and MCP servers.** Each agent's own page on a node (Open on
   its Installed row) lists what you added to that agent on the node, as the node last said: Claude Code's plugins, and
@@ -134,6 +145,131 @@ The Nodes page keeps one line per node saying which agents are installed
 there and which you are signed in to. A space's Start sends a person to
 that agent's own page on its node, at its sign-in, when they have no
 sign-in there.
+
+### Where an agent's install recipe comes from
+
+How each of the five is installed is a recipe in its pack's manifest
+(`packs/agents/NAME/bbtool.json`, the `agent.install` block), which the
+controller hands to the node with every install, update and removal. A
+recipe is held like any entry's install
+([Declared downloads](tool-packs.md#declared-downloads)): whatever it
+fetches is held to something the recipe itself carries, and nothing reaches
+a shell from the network as it arrives.
+
+```json
+"install": {
+  "rev": 2,
+  "fetch": [
+    {"url": "https://raw.githubusercontent.com/anomalyco/opencode/v{version}/install",
+     "version": "1.19.6",
+     "sha256": "a2dd59522b9a091b6cdb2e4870c0f2135f7da09807cd5a7e04222d4316925b72",
+     "to": "dl/install",
+     "track": {"resolver": "github-release", "repo": "anomalyco/opencode", "trim_prefix": "v"}}
+  ],
+  "online": "Its installer downloads the OpenCode build for this machine from github.com/anomalyco/opencode's releases, and checks it against nothing.",
+  "steps": [["bash", "{dir}/dl/install", "--no-modify-path"]],
+  "pin": ["VERSION", "{v}"],
+  "env": {},
+  "bin": ".opencode/bin/opencode",
+  "also": [".local/bin/opencode"],
+  "fresh": ""
+}
+```
+
+| Key | What it says |
+|---|---|
+| `rev` | A whole number, one more with each change to the recipe. |
+| `fetch` | What it downloads, each a declared download as every entry writes one: its `https` address, the file it is kept as, its `sha256` (or `signed`, its publisher's signature under a key in `keyring`), the `platform` it is for, the `version` it is, and for the tool that moves pins how a newer one is found (`track`, `found`). |
+| `keyring` | The publisher's armored public keys a `signed` download is checked with, by name. |
+| `online` | One sentence, where its pinned installer downloads the rest by itself: what, from where, and what it checks. With it the steps keep the network; without it they run with none. |
+| `steps` | What runs once the downloads are held, each a list of plain words and never a line a shell reads: a file the recipe fetched (`{dir}/...`), `sh` or `bash` on one, or one of `mkdir`, `tar`, `unzip`, `install`, `ln` and `chmod`. `{dir}` is where the downloads landed, `{home}` the account's home, `{version}` the version the downloads say. |
+| `pin` | The variable a version is handed to an installer through and how it is written (`["VERSION", "v{v}"]`), or `null` for a recipe that takes none. |
+| `env` | Up to eight of the installer's own variables, with `{home}` for the account's home. Each name is held to [the one rule for a variable an entry sets](tool-packs.md#a-variable-an-entry-sets): never `PATH`, `HOME`, the account's name, a loader's, a shell's or an interpreter's start-up names, or one of AerieOS's own. |
+| `bin` | Where the program is left, under the account's home. |
+| `also` | Other places a removal clears, under the account's home. |
+| `fresh` | The folder a named version is read from, with `{v}` (Claude Code's `versions` folder), or empty. |
+
+**What a node does with one.** It fetches each download over `https`,
+holds it to its sha256 or its signature, and only then runs the steps, as
+the session account. The fetching, the holding and the cut are the ones a
+toolchain's install goes through (`scripts/lib/held-run.sh` in the node's
+bundle runs them), so there is one mechanism and one place to read it. A
+file that is not the pinned bytes runs nothing and leaves nothing behind:
+the job names both digests and says the vendor changed the file since
+AerieOS pinned it, and an install is refused until the pin moves. With
+`online`, the job says the recipe's sentence and the steps keep the
+network.
+
+Without `online` the steps run with no network, and the job says so
+(`its steps run with no network`). Who makes the cut depends on the node,
+since the steps run as the session account and that account has one way to
+root, its session's view, and is given no second:
+
+- **A managed node, whose agent is root** (agent 0.9.481 or newer): the
+  agent makes the cut. The install is two runs as the session account: the
+  first, with the network, fetches and holds the downloads; the second is
+  started by the agent through its root helper, `bb-netcut`, which makes a
+  network namespace holding nothing, covers `/run` with an empty folder so
+  no daemon's socket there is reached, becomes the session account for good
+  with no group but its own, and only then starts the steps. No sudo rule is involved. The account is
+  the one the node's own enrollment names for sessions, never a word of the
+  job's, and the second run checks for itself that it has no network before
+  it runs anything.
+- **A node whose agent is not root** (a guest node, a container): the
+  account makes the namespace itself where the machine lets an account do
+  that. Where it does not, the agent installed all the same, its steps with
+  the network, and the job says that it could not cut.
+
+**What each of the five is held to.** The Library's card says it in one
+word, from the recipe alone (`held` on the agent's row, with its
+`downloads`):
+
+| Agent | Word | What is pinned | What a person notices |
+|---|---|---|---|
+| Copilot CLI | pinned | The program: its release's tarball for each platform, at the sha256 GitHub states for it, unpacked into `~/.local/bin` with no network. | It installs the pinned version, which may be one behind its vendor's until the pin moves. |
+| Grok Build | pinned | The program: its vendor's binary for each platform, at the sha256 of the file as it was when the pin was made (its vendor states none, and its installer checks none), put in `~/.grok/downloads` with the command a link to it. | The same. Its vendor's installer is not run, so its shell completions and its `agent` command are not there. |
+| Codex CLI | installer | Its vendor's installer as each release carries it, at the sha256 GitHub states. It downloads the package itself and checks it against GitHub's digest. | Software update brings the newest version; the installer is the one of the pinned release. |
+| Any model (OpenCode) | installer | Its vendor's installer as its repository has it at the release's tag. It downloads the build for the machine and checks it against nothing. | The same. |
+| Claude Code | installer | Its vendor's installer, a file with no version in its address. It downloads the program and checks it against the sha256 its release's manifest states. | The day its vendor edits that file, an install is refused until the pin moves. |
+
+A pinned row's `latest` is the version its recipe pins (`pinned`), since
+that is what an install brings; `vendor_latest` is the newest its vendor
+names. A node is behind, and Software update is offered, against the
+first.
+
+**How a pin moves.** `tools/pins.py` reads the five recipes as it reads
+the toolchains' rows ([Moving a pin](toolchains.md#moving-a-pin)), each
+under its Library name: `check` says what would move, `move` writes the
+new version and digest into `scripts/dashboard/agent-recipes.json`, the
+one file that holds the recipes, raises the recipe's `rev` and rewrites
+the packs. The agent table reads that file, so nothing is copied.
+
+A vendor's installer over https handed to `sh` or `bash` as it arrives
+(`script`, in the place of `fetch` and `steps`, as a recipe before pack
+format 5 was written) is no recipe: nothing in it holds what arrives, so a
+manifest that says one is refused and the controller hands no node one.
+
+A release carries each recipe, so an install with no network works as
+before. The catalog's signed index says each agent's recipe `rev` beside
+its pin (`install_rev`). Where that is higher than the release's, the
+controller fetches the pack at the pinned commit, checks its archive's
+sha256 and the recipe's shape, and hands the node the catalog's recipe
+instead: the job's first line then says `by the catalog's recipe (rev N)`.
+It is read once per commit, behind the Library as the page opens, so a
+press on Software update does not wait for it; where nothing is newer, which is
+nearly always, nothing is fetched at all. So when a vendor changes its
+installer, or a pin should move, the answer is a catalog commit and a
+maintainer's signature, and no install waits for a release. A catalog that
+does not answer, a pack that is refused, or one no newer than the release
+leaves the release's recipe in place. So does a newer one held to less
+than the release's: a recipe that reads `pinned` is replaced only by one
+that reads `pinned`, one that reads `installer` by either, and one that
+reads `open` replaces nothing. A recipe taken is a line in the audit, by
+`catalog`, with the revs it moved between. The node holds what it is handed to
+the same shape and refuses anything else without running it. Its agent
+keeps no installer of its own: every controller that ships agent 0.9.479
+or newer hands the recipe over, and an install asked for with none is
+refused.
 
 ## The guards
 
@@ -159,6 +295,42 @@ Copilot's searches are in the shell, out of the code map's hint's reach.
 Grok has no hook for its permission prompt alone, so its dot is never
 asking, and it does not pass a prompt hook's words on to the model, so a
 house rule named in a prompt is not said to it then.
+
+## What an agent need not ask about
+
+Every coding agent has a permission check of its own, and none of them knows
+a space's Agents may: Claude Code's rules and, in its auto mode, a
+classifier; Codex CLI's execpolicy; Copilot CLI's and Grok Build's allow
+lists. Left to itself each judges an `aerie` command by its own lights, so a
+release a space lets its sessions cut could run one day and be refused the
+next. AerieOS is what decides those commands: each is checked on the
+controller against the space's Agents may, its pushing rules and its git
+host's permit, or waits on the bell for a person's answer. So each session
+starts with its agent told, in the agent's own words, that these need no
+asking, and the answer is the controller's alone.
+
+Which commands: `aerie` followed by `version`, `changelog`,
+`roadmap`, `bug`, `rules`, `design`, `wiki`, `memory`, `report`, `git`,
+`forge`, `devapp`, `container`, `vm`, `tool`, `sign`, `pc`, `root`, `phone`,
+`settings` or `tidy`. Never the whole command: `aerie run`, `build`, `test`,
+`emu` and `gpu run` run a command of the session's own, which the agent's
+check judges as it would the command typed bare.
+
+How each is told is its manifest's `allow` (the table in `agents.py` for the
+agents AerieOS ships, a pack's `agent.allow` for one a pack brings,
+[tool-packs.md](tool-packs.md)): Claude Code by rules in the settings file
+its session starts with, where a rule is decided before its classifier is
+asked; Grok Build and Copilot CLI by an option on their command line; Codex
+CLI by a rules file under the account's home, written at each start;
+OpenCode is started with every command allowed already; a pack's agent
+whose rules live in the person's own settings file by its hook's answer
+before a tool, which approves one of these verbs typed alone and nothing
+joined to it. A session picks
+this up when it starts: one already running keeps the rules it began with
+until it is restarted. Claude Code's rule form is its documentation's and
+Codex CLI's was checked with its own `execpolicy check`; Grok Build's and
+Copilot CLI's are as their own help gives them and not yet walked in a
+session.
 
 ## In the dock, the bell and the turn limit
 
@@ -196,9 +368,51 @@ in as: Claude Code's account from `.claude.json`, Codex CLI's from the id
 token in `~/.codex/auth.json` (the account it names and its plan, never a
 token), Copilot CLI's from the GitHub login its config remembers, Grok
 Build's from `~/.grok/auth.json` (the email its token names, never the
-token). The
+token), each read from where the agent's sign-in data says it is. The
 controller keeps that per account, per node, per agent, and holds no
 credential of any of them.
+
+## An agent a pack brings: Gemini
+
+A coding agent need not ship with AerieOS. A pack in the vetted catalog
+can bring one, its adapter written in the pack's manifest
+([tool-packs.md](tool-packs.md)): its command, how its hooks file is laid
+out, where its payload keeps each thing and how each answer is written. So
+a new agent is a signed entry in the catalog, with no release of AerieOS.
+
+Gemini is Google's Antigravity CLI (`agy`): by Google, Packaged by Aerie. Its card is
+under Coding agents on the Library; **Install** shows what it fetches (the
+program from Google's storage, held to its sha512) and its terms, and
+keeps it; then install it on a node from the same card and tick it under
+a space's **Settings, Toolchains**. Start agent then offers Gemini there.
+It needs AerieOS 0.9.0-dev.5284 or later to be held as the others are.
+
+- **Signing in.** With a Google account, from its page: open Gemini's row
+  on the Installed page with the node picked, and under **Your sign-in**
+  press **Sign in**. The page shows Google's link and a field; sign in to
+  Google there and paste the code it gives back. This works on a phone.
+  The other way is its own session's terminal, which a session that is
+  not signed in opens on: the link there runs over many rows, so use it at
+  a desk, where it can be copied whole. Either way the sign-in is kept in
+  your home on that node
+  (`~/.gemini/antigravity-cli/antigravity-oauth-token`), sealed there where
+  the node seals sign-ins, and a later session starts signed in. **Sign
+  out** on the same page removes it. Signing in from the page needs an
+  AerieOS release after 0.9.0-dev.5284; on that one the terminal is the
+  way.
+- **Its first run.** Once, it asks for a color scheme and shows Google's
+  terms with its data-use choice, and once a space it asks whether you trust
+  the folder. Each is yours to answer: AerieOS answers none of them.
+- **What holds it.** The briefing is handed over before its first call to
+  the model, and again when a restart changed it. Its hooks call the same
+  guards as every agent's: a command a house rule refuses is refused in the
+  rule's words, an edit outside the session's tree is walled, and an
+  `aerie` verb the controller decides is approved without its own prompt.
+- **In the dock.** Working and waiting, as the others. It has no event for
+  its own permission prompt, so the dock says working while it asks.
+- **Not yet.** Its conversations are not listed under Your conversations,
+  and Start offers no choice of model for it: it runs its own default. The
+  page names a signed-in Gemini as a Google account, not by its address.
 
 ## Any model, through a router
 

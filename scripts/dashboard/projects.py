@@ -49,6 +49,7 @@ import membership
 # alternative was this module carrying a second copy of the URL rules.
 import forges
 import registry
+import statefile
 
 # A personal access token belonging to ONE project.
 #
@@ -136,7 +137,7 @@ def forget_token(project):
 def unscope(dest):
     """Take the credential helper back off a repository.
 
-    The other half of forgetting a token: `store --file=...` naming a file that
+    The other half of forgetting a token: a helper naming a token file that
     is no longer there does not fail loudly, it finds no credentials and lets
     git fall through to asking, which on a headless box is a push that hangs
     or fails with a message about a terminal. Reset it and https simply has no
@@ -158,27 +159,6 @@ def _scope_to_token(dest, helper):
          "--replace-all", "credential.helper", ""], timeout=15)
     run(["git", "-C", str(dest), "config", "--local",
          "--add", "credential.helper", helper], timeout=15)
-
-
-def rescope_store_helpers():
-    """Each checkout whose credential.helper still names git's own store on
-    its project's token file, from before tokens were sealed (R135) and kept
-    in a person's store (R154), pointed at AerieOS's helper instead: git's
-    store reads neither, so a push with the tree's own config (a release's
-    tag) went with no credential. At start; returns the projects moved."""
-    moved = []
-    try:
-        dirs = [d for d in WORKSPACE.iterdir() if d.is_dir() and (d / ".git").exists()]
-    except OSError:
-        return moved
-    for d in dirs:
-        if not gitcreds.path(d.name).is_file():
-            continue
-        vals = run(["git", "-C", str(d), "config", "--local", "--get-all", "credential.helper"], timeout=15)["out"]
-        if f"store --file={gitcreds.path(d.name)}" in vals:
-            _scope_to_token(d, gitcreds.helper(d.name))
-            moved.append(d.name)
-    return moved
 
 
 def keyname_ok(req):
@@ -426,17 +406,16 @@ def rename(req):
 PUSH_FILE = None            # set in configure(), beside the rest
 
 
+# Read once while the same file (R228 step 1).
+_push = statefile.Store(lambda: STATE / "push-rights.json", write=lambda: write_json, cached=True)
+
+
 def load_push():
-    try:
-        with open(STATE / "push-rights.json") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return _push.load()
 
 
 def save_push(d):
-    write_json(STATE / "push-rights.json", d)
+    _push.save(d)
 
 
 def repo_path_of(url):
@@ -655,6 +634,25 @@ def _key_helper(argv, text=None):
         said = (p.stderr or p.stdout).strip().splitlines()
         return "", re.sub(r"^\[builderbot\] ERROR: ", "", said[-1] if said else f"exit {p.returncode}")[:200]
     return p.stdout.strip(), ""
+
+
+def deploy_keys_seal_all(again=False):
+    """The pass an install key's change runs over the deploy keys (R243),
+    as it does over every store sealed under it (installkey.configure):
+    the root helper seals again, under today's key, each one the key before
+    sealed. How many it moved; an error raised, so the key before is kept
+    and the pass runs again at the next start. Nothing to do at a start
+    with no change (the helper's own load at boot seals what was plain)."""
+    # Where the helper is not installed there is no deploy key to seal: an
+    # install with any has it, since it is what made them. One that is
+    # there and fails is said, never passed over: the key before would be
+    # let go with deploy keys still sealed under it.
+    if not again or not os.path.exists(KEY_HELPER):
+        return 0
+    out, err = _key_helper(["--reseal"])
+    if err:
+        raise OSError(f"the deploy keys were not sealed again: {err}")
+    return int(out) if out.isdigit() else 0
 
 
 def deploy_key(project, action, text=""):
@@ -1143,13 +1141,12 @@ _job = {"running": False, "kind": "", "name": "", "step": "", "at": 0.0,
         "error": "", "note": "", "aborting": False}
 _lock = threading.Lock()
 _proc = None                  # the git process, so an abort can reach it
-_dest = None                  # the directory this job made, if it made one
 
 
 def job():
     """The job record for the status payload."""
     with _lock:
-        j = dict(_job)
+        j = dict(_job, waiting=[w[1] for w in _waiting], earlier=list(_earlier))
     j["for"] = int(time.time() - j["at"]) if j["at"] else 0
     return j
 
@@ -1184,6 +1181,7 @@ def dismiss():
         if _job["running"]:
             return {"error": "it is still running"}
         _job.update(error="", note="", kind="", name="", at=0.0)
+        _earlier.clear()
     return {"ok": True}
 
 
@@ -1211,15 +1209,91 @@ def _finish(error="", note=""):
                     aborting=False)
 
 
+# The space jobs pressed while one runs, each started once the one before
+# has ended: (kind, name, fn); and the failures of those that ended with
+# another starting behind them, kept until dismissed as the last one's is.
+_waiting = []
+_earlier = []
+
+
+def _waiting_file():
+    return STATE / "space-jobs-waiting.json"
+
+
+def _waiting_keep():
+    """Which jobs wait, on disk: a job waiting is a closure over what the
+    request carried (a token among it), which is not kept, so a controller
+    that restarts cannot start them; what it can do is say so and take back
+    what each had claimed (dropped_at_restart). Under _lock."""
+    try:
+        if _waiting:
+            write_json(_waiting_file(), {"waiting": [{"kind": k, "name": n} for k, n, _ in _waiting]})
+        else:
+            _waiting_file().unlink(missing_ok=True)
+    except (OSError, TypeError):
+        pass
+
+
+def dropped_at_restart():
+    """At start: the space jobs that were waiting behind another when the
+    controller last stopped. Each clone's claimed folder and record are
+    taken back, so the name is free, and the Spaces page says which were
+    not started, kept until dismissed as a failure is."""
+    try:
+        d = json.loads(_waiting_file().read_text())
+    except (OSError, ValueError):
+        return []
+    names = []
+    for w in (d.get("waiting") or [])[:20] if isinstance(d, dict) else []:
+        kind, name = str(w.get("kind") or ""), str(w.get("name") or "")
+        if not name:
+            continue
+        if kind == "clone":
+            dest = WORKSPACE / name
+            # Only a folder the clone never reached: claimed and still empty.
+            with contextlib.suppress(OSError):
+                if dest.is_dir() and not any(dest.iterdir()):
+                    dest.rmdir()
+                    with contextlib.suppress(Exception):       # tidying after a job that never ran
+                        forget_token(name)
+                    _unmade(name)
+        names.append(name)
+        _earlier.append({"name": name, "error": f"the controller restarted while this {'clone' if kind == 'clone' else 'job'} "
+                                                "waited behind another, so it was not started: press it again"})
+    with contextlib.suppress(OSError):
+        _waiting_file().unlink(missing_ok=True)
+    del _earlier[:-10]
+    return names
+
+
 def _start(kind, name, fn):
-    """Hand one job to a thread. The caller has already validated everything."""
+    """Hand one job to a thread, or queue it behind the one running (the
+    operator, 10 Nov: a press is never refused for another job). The caller
+    has already validated everything. True."""
     with _lock:
         if _job["running"]:
-            return False
+            _waiting.append((kind, name, fn))
+            _waiting_keep()
+            return True
         _job.update(running=True, kind=kind, name=name, step="starting",
                     at=time.time(), error="", note="", aborting=False)
     threading.Thread(target=_wrap, args=(fn,), daemon=True).start()
     return True
+
+
+def _next():
+    """The next queued space job started, once the one before has ended."""
+    with _lock:
+        if _job["running"] or not _waiting:
+            return
+        if _job.get("error"):
+            _earlier.append({"name": _job.get("name", ""), "error": _job["error"]})
+            del _earlier[:-10]
+        kind, name, fn = _waiting.pop(0)
+        _waiting_keep()
+        _job.update(running=True, kind=kind, name=name, step="starting",
+                    at=time.time(), error="", note="", aborting=False)
+    threading.Thread(target=_wrap, args=(fn,), daemon=True).start()
 
 
 def _wrap(fn):
@@ -1232,6 +1306,7 @@ def _wrap(fn):
     finally:
         _register(None)
     _finish(error, note)
+    _next()
 
 
 def _aborted():
@@ -1416,18 +1491,11 @@ def create(req, env=None):
                 body["note"] = f"{r['files']} files from {r['name']}; {body.get('note') or 'ready'}"
             return body, code
         return _init(dest, name, about, _field(req, "version"), env)
-    global _dest
-    _dest = dest
     cred_scheme = "http" if mode == "clone" and addr["scheme"] == "http" else "https"
     helper = (write_token(name, token, addr["host"], cred_scheme,
                           forges.cred_user(forge, addr["host"], token, cred_scheme), uid=str(req.get("_uid") or ""))
               if mode == "clone" and token else "")
-    if not _start("clone", name,
-                  lambda: _clone(dest, key_url or url, helper, want_push)):
-        shutil.rmtree(dest, ignore_errors=True)             # made a moment ago
-        forget_token(name)                                  # written a moment ago
-        _unmade(name)
-        return {"error": "another space job is already running"}, 409
+    _start("clone", name, lambda: _clone(dest, key_url or url, helper, want_push))
     if want_push:
         grant_push(name, addr["host"], repo_id, "token" if token else "key")
     return {"ok": True, "name": name, "started": True}, 200
@@ -1831,11 +1899,9 @@ def link(req):
         return {"error": "no deploy key was picked and no access token given; "
                          "a push has to authenticate somehow"}, 400
     forges.remember(host, forge["id"])
-    if not _start("link", name,
-                  lambda: _link(dest, name, forge, host, path, remote,
-                                bool(keyname), pat, helper=helper, token=token,
-                                scheme=addr["scheme"], user=user)):
-        return {"error": "another space job is already running"}, 409
+    _start("link", name, lambda: _link(dest, name, forge, host, path, remote,
+                                       bool(keyname), pat, helper=helper, token=token,
+                                       scheme=addr["scheme"], user=user))
     return {"ok": True, "name": name, "started": True}, 200
 
 
@@ -2113,20 +2179,31 @@ def _pins_file():
     return STATE / "pinned-projects.json"
 
 
-def _load_pins():
-    """Every account's pinned set, {uid: [names]}. The file was one flat list
-    for everybody until 27 Sep; read as everyone's default under "*" once,
-    and written back keyed by account the first time anybody pins."""
-    try:
-        v = json.loads(_pins_file().read_text())
-    except (OSError, ValueError):
-        return {}
-    if isinstance(v, list):
+def _load_user_sets(path, legacy_list=False):
+    """Every account's set of names kept in `path`, {uid: [names]}, sorted.
+    `legacy_list` reads a file that is one flat list for everybody as
+    everyone's default under "*"."""
+    v = statefile.read_json(path)            # read once while the same file (R228 step 1)
+    if legacy_list and isinstance(v, list):
         return {"*": sorted({x for x in v if isinstance(x, str)})}
     if not isinstance(v, dict):
         return {}
     return {k: sorted({x for x in names if isinstance(x, str)})
             for k, names in v.items() if isinstance(k, str) and isinstance(names, list)}
+
+
+def _rename_in_sets(path, sets, old, new):
+    """`old` kept as `new` in every account's set of `path`, written when
+    any of them holds it."""
+    if any(old in (v or []) for v in sets.values()):
+        write_json(path, {u: sorted({new if x == old else x for x in (v or [])}) for u, v in sets.items()})
+
+
+def _load_pins():
+    """Every account's pinned set, {uid: [names]}. The file was one flat list
+    for everybody until 27 Sep; read as everyone's default under "*" once,
+    and written back keyed by account the first time anybody pins."""
+    return _load_user_sets(_pins_file(), legacy_list=True)
 
 
 def load_project_pins(uid, fresh=False):
@@ -2223,10 +2300,7 @@ def _projects_here():
 
 
 def _marks(kind):
-    try:
-        d = json.loads((STATE / MARK_FILES[kind]).read_text())
-    except (OSError, ValueError):
-        return {}
+    d = statefile.read_json(STATE / MARK_FILES[kind])   # read once while the same file (R228 step 1)
     return d if isinstance(d, dict) else {}
 
 
@@ -2344,11 +2418,8 @@ def _archived_file():
 
 
 def _names(f):
-    try:
-        v = json.loads(f.read_text())
-        return sorted({x for x in v if isinstance(x, str)}) if isinstance(v, list) else []
-    except (OSError, ValueError):
-        return []
+    v = statefile.read_json(f)               # read once while the same file (R228 step 1)
+    return sorted({x for x in v if isinstance(x, str)}) if isinstance(v, list) else []
 
 
 def rekey(old, new):
@@ -2356,9 +2427,7 @@ def rekey(old, new):
     under `old` (a repository, before it was put in a project) kept under
     its project `new` instead (R138), as migration 0010 moves them."""
     with lock:
-        pins = _load_pins()
-        if any(old in (v or []) for v in pins.values()):
-            write_json(_pins_file(), {u: sorted({new if x == old else x for x in (v or [])}) for u, v in pins.items()})
+        _rename_in_sets(_pins_file(), _load_pins(), old, new)
         for kind in MARK_FILES:
             d = _marks(kind)
             if any(isinstance(v, dict) and old in v for v in d.values()):
@@ -2366,9 +2435,7 @@ def rekey(old, new):
                     if isinstance(v, dict) and old in v:
                         v.setdefault(new, v.pop(old))
                 write_json(STATE / MARK_FILES[kind], d)
-        arch = _names(_archived_file())
-        if old in arch:
-            write_json(_archived_file(), sorted({new if x == old else x for x in arch}))
+        _rename_in_sets(_archived_file(), _load_archives(), old, new)
         try:
             locks = json.loads(_locks_file().read_text())
         except (OSError, ValueError):
@@ -2380,18 +2447,22 @@ def rekey(old, new):
 
 def load_locks():
     """{name: {by, admin}}: every locked project and whose lock it is."""
-    try:
-        v = json.loads(_locks_file().read_text())
-    except (OSError, ValueError):
-        return {}
+    v = statefile.read_json(_locks_file())   # read once while the same file (R228 step 1)
     if not isinstance(v, dict):
         return {}
     return _keyed({k: {"by": str(r.get("by") or ""), "admin": bool(r.get("admin"))}
                    for k, r in v.items() if isinstance(k, str) and isinstance(r, dict)})
 
 
-def load_archived():
-    return sorted({_key(x) for x in _names(_archived_file())})
+def _load_archives():
+    """Every account's archived spaces, {uid: [names]}."""
+    return _load_user_sets(_archived_file())
+
+
+def load_archived(uid):
+    """The spaces this account has archived: each person's own, folded away
+    under Archived on their Spaces page and nowhere else."""
+    return sorted({_key(x) for x in _load_archives().get(str(uid or ""), [])})
 
 
 # What a locked project refuses, in one place: every write and every session
@@ -2429,7 +2500,7 @@ def app_flags(name, uid):
     Files API, which carry neither otherwise. `locked_why` is the refusal
     when the lock holds this account out, "" when it does not."""
     held = locked_out(name, uid)
-    return {"archived": _key(name) in set(load_archived()), "locked": _key(name) in load_locks(),
+    return {"archived": _key(name) in set(load_archived(uid)), "locked": _key(name) in load_locks(),
             "locked_why": (held or {}).get("error", "")}
 
 
@@ -2453,17 +2524,20 @@ def lock_verb(name, on, by="", admin=False):
     return {"locked": name in locks, "admin": bool(locks.get(name, {}).get("admin"))}, 200
 
 
-def archive_verb(name, on):
-    """Archive or unarchive a project, once the server has let this person:
-    out of sight, and nothing else. (payload, status)."""
+def archive_verb(uid, name, on):
+    """Archive or unarchive a space for one account: folded away under
+    Archived on that person's Spaces page, and nothing else, for nobody
+    else. (payload, status)."""
     if not _here(name):
         return {"error": f"unknown space: {name}"}, 400
     name = _key(name)
     with lock:
-        names = set(load_archived())
+        d = _load_archives()
+        names = set(d.get(str(uid or ""), []))
         names.add(name) if on else names.discard(name)
+        d[str(uid or "")] = sorted(names)
         try:
-            write_json(_archived_file(), sorted(names))
+            write_json(_archived_file(), d)
         except OSError as e:
             return {"error": f"could not save: {e}"}, 500
     return {"archived": name in names}, 200

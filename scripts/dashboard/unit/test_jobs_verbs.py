@@ -42,7 +42,7 @@ class JobsList(unittest.TestCase):
         self.addCleanup(srv.server_close)
         self.addCleanup(srv.shutdown)
         env = {k: v for k, v in os.environ.items() if k != "BB_CONTROLLER_PIN"}
-        env.update(BB_CONTROLLER=f"http://127.0.0.1:{port}", BB_JOBS_AUTH="Bearer x", PYTHONPATH=LIB,
+        env.update(BB_CONTROLLER=f"http://127.0.0.1:{port}", BB_AUTH_HEADER="Bearer x", PYTHONPATH=LIB,
                    BB_CONTROLLER_WAIT="0", BB_PROJECT="")
         out = subprocess.run([sys.executable, SCRIPT, "5"], env=env, capture_output=True, text=True, check=False).stdout
         self.assertIn('tell u_1~claude-alpha: "AerieOS is back after an update. Pick up"', out)

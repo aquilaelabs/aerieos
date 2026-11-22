@@ -23,7 +23,7 @@ controller can; nobody else reads anything whole.
 | **Root on a node** | the machine: every session there, every token file on it | the controller: a node has no credential to the controller beyond its own enrollment, which reaches its own space's work and nothing of another node's |
 | **Root on the controller** | everything the controller can read, the install key included | nothing is kept from root on the running controller; this is the host's own trust (`docker exec`, the machine's console) |
 | **A copy of a disk** (a backup, a stolen drive, a copy of `/config`) | nothing | the sealed stores open without the install key (kept outside `/config`), the node's sealed sign-ins open without the controller, the signing keys and git tokens are ciphertext |
-| **Someone on the LAN** | nothing | reading or changing what the page, the agent channel and the terminal relay carry: the channel and the relay are signed by their own keys either way; the page's traffic is theirs to read where the dashboard is served over http (step 2 below) |
+| **Someone on the LAN** | nothing | changing what the agent channel carries, or opening a terminal, a file request or a VM's screen on a node: each is signed with that node's own key, and a request to a node's relay is taken once. Reading what the relay carries (a shell's keys and output, a file, a VM's screen): it crosses in TLS to a certificate the node made for itself and reported over its channel, the only one the controller takes there; a node that could not make one (it has neither Python's cryptography library nor `openssl`) has no terminal, file or screen opened on it, and its page says so. The page's own traffic is theirs to read where the dashboard is served over http (step 2 below), and so is the channel of a node whose row says it is over plain http ([a node's channel](#a-nodes-channel-to-its-controller)) |
 | **The page's own code** | drawing what the controller answers and asking it to act | holding a key: the page never holds a key (a key of a person's own is a passkey's or a companion's, R157), keeps no secret in local or session storage, and under the CSP of step 4 runs no script it did not ship |
 
 ## What each store protects, and what it does not
@@ -39,11 +39,17 @@ opens it; while that pool is not mounted the folder is held empty and the
 controller starts with nothing sealed or opened, then starts again when the
 pool mounts. Everything the controller keeps sealed is sealed under a key
 derived from it: the accounts' keys, the signing keys, two-factor secrets,
-the deploy keys' passphrases, a space's own git line from before 0.8.0.
+the deploy keys, a space's own git line from before 0.8.0.
 
-- Protects against: a copy of `/config` (ciphertext alone), a backup
-  restored on another machine (refused until the key is given), an
-  operator of the share the state lives on.
+- Protects against: a copy of `/config` (ciphertext alone), a move's
+  bundle landed on another machine without the key ticked (what is sealed
+  stays locked until the key is given), an operator of the share the state
+  lives on.
+- The configuration's own backup (Controller settings, Backup) carries the
+  install key inside, sealed with the rest under the backup password, so
+  the password alone restores a copy whole: a copy is a sealed file to
+  whoever lacks the password, and everything the controller keeps to
+  whoever has both. Choose that password as you would the owner's.
 - Does not protect against: root on the running controller, who reads the
   key where the controller does; the stick and its pool's disks taken
   together; a secrets folder copied along with
@@ -96,21 +102,43 @@ this boot.
 **The signing keys and the deploy keys** (`/config/signing`, `/config/deploy-keys`;
 sealed, root-only). A signing is a job on the space's node handed the key
 over the agent's channel for that job; a push with a deploy key goes
-through the shielded ssh agent.
+through the shielded ssh agent. A deploy key made or pasted in a space's
+settings is kept by a root-only helper as `NAME.sealed`, sealed under the
+install key, and is opened only into that agent: no private key file is on
+the disk. One from before is sealed at the first start of a build that
+seals them. An install with no install key keeps a deploy key as a plain
+file and says so when it is made; a key an operator places by hand in the
+secrets folder's `ssh/` is theirs, plain, and outside `/config`.
 
 - Protects against: a session reading, printing or committing a key; a copy
-  of `/config`.
+  of `/config`, root's folders in it included.
 - Does not protect against: root on the node during the job that holds the
-  key.
+  key; root on the running controller, which holds the install key.
 
-**The cryptography itself.** Today every seal is HMAC-SHA256 in counter
-mode with a second HMAC as its tag, and the node's key pair is
-Diffie-Hellman in RFC 3526's 2048-bit group, built from the standard
-library because the image carried nothing else. It is sound by
-construction and reviewed by nobody outside. Step 3 moves every seal to
-X25519 and ChaCha20-Poly1305 (or AES-GCM) with HKDF from a vetted library,
-reseals what was sealed the old way, and reads the old format for one
-release; step 7 is the outside review.
+**A share's password** (`users.json`, on a controller that serves shares).
+Samba takes the NT hash of a password, MD4, which is far weaker than the
+sign-in's own hash and opens the shares as the password does. It is kept
+for an account an SMB share names and for nobody else: made as that person
+next signs in or changes their password, taken away when no share names
+them. A person may set a separate share password on Profile, which is then
+the one kept.
+
+- Protects against: every account's password being guessable from a copy of
+  `users.json`, as it was while the hash was kept for all of them.
+- Does not protect against: a copy of `users.json` for the people a share
+  names: use a separate share password where that matters.
+
+**The cryptography itself.** Every seal is ChaCha20-Poly1305 under a key
+HKDF derives, and a node's key pair is X25519, from the `cryptography`
+library; a passkey's signature and its point on P-256 are checked by the
+same library. Where the library is missing the controller seals nothing
+and says why, never with a cipher of its own. What is still written here:
+MD4 for a share's NT hash on a machine whose OpenSSL withholds it (the
+library has none; it is held to the RFC's answers), the reader for a
+passkey's CBOR, which parses and decides nothing, and the seals of the
+format before, which are opened and never made. A node that has not the
+library seals no sign-in, says so on its row, and leaves them as they are.
+Step 7 is the outside review.
 
 ## What an unlock gives up
 
@@ -174,19 +202,477 @@ nothing, and on a node the agent that opens a seal is apart from the
 sessions, which run as their account's own user in a view of their own
 (R125, `bb-session`), so a session reaches no key the agent holds.
 
+**Root's work in an account's folder is done as that account.** A node's
+agent is root, and much of what it writes and reads is in folders an
+account owns: a space's tree, a job's workspace, an account's
+conversations. Root opening a path there follows whatever the account left
+at that path, so the agent takes the account's file identity for that work
+(for the calling thread alone: `setfsuid`, `setfsgid` and the thread's own
+groups; `base.acting_as` in the agent). The kernel then checks every path
+as that account, with none of root's file capabilities, and a planted link
+leads nowhere the account could not have gone itself. The agent tries this
+on the machine before relying on it and says in its log which it is, and
+the node's row says so where it does not hold. Where a machine does not
+hold it, that work is refused, never done as root: a try that failed is
+made again a minute later, and the work goes on once one holds. A new
+agent tries it too before it is installed, and is not installed where it
+does not hold, so an update never leaves a node refusing work the agent
+before it did; the controller then sends that build again by itself once
+an hour.
+A folder the agent makes for an account above that account's own (a
+space's top, an account's conversations folder) is still root's to make,
+and nothing is made under a link on the way.
+
+This is proved as root, where it is true or not: the root tier
+(`scripts/dashboard/roottier`, `aerie tests root`) plants a link where the
+agent downloads, syncs, writes a compose file, hands a folder over and
+reads a job's artifacts, and where the session helper keeps its grants and
+makes a worktree, and sees that a file only root reads and a folder only
+root writes are as they were. It runs as root in a throwaway container, on
+every pull request and on every release before anything is published: the
+other suites run as an ordinary account, where acting as another changes
+nothing.
+
 ## The lines the hardening closes
 
 | Step of R158 | The line it closes |
 |---|---|
-| 2, TLS | someone on the LAN reading the page's traffic, a session cookie or a token typed into a form; http stays a choice for an install with no CA, said on the page with what then crosses in the clear |
+| 2, TLS | someone on the LAN reading the page's traffic, a session cookie or a token typed into a form; http stays a choice for an install with no CA, said on the page with what then crosses in the clear. A node's channel is over TLS whatever that choice ([a node's channel](#a-nodes-channel-to-its-controller)) |
 | 3, vetted cryptography | the hand-built seal and key exchange, replaced with a library somebody else has reviewed |
 | 4, the page hardened | a tampered or injected script on the page, a secret parked in the browser's storage, a cookie sent cross-site, a change posted with the cookie from another origin of the same site (an app this install routes): a cookie's POST is taken only from the dashboard's own page |
 | 5, an unlock that gives up less | the controller holding a person's whole store open while they are signed in |
 | 6, memory and process | a core dump, swap or a neighboring process reading a key the controller holds |
 | 7, outside review | this page and the cryptography being right by their authors' word alone |
-| 8, sign-in hardened | a stolen cookie used from another device; guessing a password at any way in (the sign-in page, the command line, the app, file access), where an address is held after 100 wrong in a quarter of an hour and an account only slowed; what was done to the host read back by person and machine |
+| 8, sign-in hardened | a stolen cookie used from another device; guessing a password at any way in (the sign-in page, the command line, the app, file access), where an address is held after 100 wrong in a quarter of an hour and an account only slowed, the address being each visitor's own behind the install's tunnel or a reverse proxy named in Settings and never the proxy's, which is everybody's; what was done to the host read back by person and machine |
 
 What no step closes: root on the running controller, and a person's own
 agent acting as them on their own spaces, which is what it is for. The
 dials (Agents may) bound what it may do; the record (the audit, the
 notebook's history, the forge's log under their own token) says what it did.
+
+## What is held in one place
+
+**Who may reach a route.** Every route of the dashboard's API is one line
+of one record (`ROUTES` in `server.py`), and names there what it asks of
+its caller (the dispatcher's `ROUTE_GATES`, read off the record), which the
+dispatcher holds before the handler runs: the owner's alone, a person's own
+sign-in and never a session's token, or the handler's own check where it
+depends on what the request names (which space, which node, which action).
+A route that names nothing is not served, and the auth suite fails on one,
+so a new route cannot be reached before somebody has said who may reach it.
+Most routes are still the handler's own; each one moved onto its line is
+one fewer place to forget.
+
+**What a session's token reaches.** A coding agent's session is not a
+person with fewer rights: it is another kind of caller, and the dispatcher
+refuses it on every route but the ones whose line of the same record says a
+session's (`SESSION_ROUTES`, read off it too): the routes its own verbs and
+hooks call, about forty of the hundred and eighty. A route in that table
+still holds its own scope (the session's own space, the action, the space's
+dials); a route outside it cannot be reached by a session whatever its
+handler checks or forgets. So the accounts, the controller's settings, the
+page's own reads, a person's chat, tabs and other sessions are not a
+session's to ask for, and neither is the page: a session's token opens
+none of the dashboard, its terminals, a VM's screen or the metrics, and
+`aerie capture` sends that token to no page. The unit tier holds that
+every path a session-side script names is in the table, and the auth
+suite asks every other route with a session's token and expects the
+refusal, so a new route is closed to sessions until somebody names it.
+Where only some of a route's actions are a session's (asking for a phone
+and not pairing one, installing a pack from the catalog and not removing
+one), the same table names the actions and the dispatcher holds them once
+the request is read. And a session carries no account's id and no role of
+a person's: what the controller keeps by a caller's id (a layout, a key
+store, a sign-in) it keeps nothing of for a session, and the routes that
+do act for the person a session works for (their memories and
+conversations on the space, their git token for a push, the phone lent to
+them) ask for that person by name. What a session may ask of the
+permissions at all is a list of four (read its space, work in it, write
+to it, and the relayed verbs), each still held to the account behind it.
+
+**A request from another site.** A change, and a read of `/api/`, sent with
+the browser's cookie is taken from the dashboard's own page alone
+(`Sec-Fetch-Site`), since some reads do things and another origin of the
+same site is sent the cookie. The cookie is marked Secure where TLS ends
+here or at a proxy in front that says so.
+
+**What a node is told.** A node's word about the sessions it runs earns a
+session's token only for a space that works on that node and an account
+that may work on that space; it is handed nothing for a session it merely
+names.
+
+## A node's channel to its controller
+
+**Over TLS, under the controller's own key, from enrollment on.** The
+controller holds a certificate of its own in every Connection mode, http
+among them, and its one port answers a TLS handshake under it while
+serving plain http to whoever speaks that (`scripts/dashboard/tls.py`).
+What a node pins is the key and not the certificate: the sha256 of the
+key's public half, the form `curl --pinnedpubkey` takes. The Enroll script
+and the Nodes page's token-only commands name the controller as https at
+the address given and carry that pin, for a node on the LAN or behind
+WireGuard: the provisioner makes every fetch from the controller under it,
+so the enroll token and the first agent go to nobody else, and the agent
+pins it as it enrolls (`--pin`) and refuses any other key before it sends
+anything. The controller checks first that its own port answers a
+handshake at that address; where it does not (a proxy in front that
+speaks only http to the controller) the words are the plain http ones. A
+node reached through a public hostname is unchanged: the name's
+certificate, by the system's authorities.
+
+**A node enrolled over plain http moves by itself.** The controller's
+hello names the pin; the agent asks the same address over https under it,
+with its own token, and once that answers it keeps https and the pin in
+`node.json`, hands them to what its sessions dial with, and never writes
+http back. That first naming is trust on first use, of a controller the
+node already took everything from over the same network. Where the
+address does not answer over TLS the node stays as it is, and its row
+says `over plain http` after where it dials in from. An agent from before
+this keeps working over http until it has updated, and the update does not
+wait for the move.
+
+**What plain http exposes.** On a node whose row says so, whoever can read
+that network reads the node's token and everything the channel carries
+(the jobs and their logs, a session's token on its way to a terminal),
+and whoever can change traffic there can answer as the controller. Two
+things hold even then: an agent update, root's tools and the bundle's
+files are taken only under the release key the node pinned (below), and a
+terminal, a file request or a VM's screen on the node's relay is signed
+and crosses in TLS of the node's own. A browser at `http://` is what the
+Connection section says, and is not changed by any of this.
+
+**A renewed certificate, and a replaced key.** The controller remakes its
+own certificate a month before it ends, and when a name is added, over the
+same key, so a node that pinned the key sees nothing. In the `acme` mode the name's certificate
+answers a handshake that asks for the name and the install's own answers
+every other, so a hostname added later cuts off no node that dials an
+address. The key is sealed under the install key and sealed again when
+that changes. A key file that is there and cannot be opened (a start
+without the install key it was sealed under, a file cut short) is kept as
+it is and never replaced: the controller answers no handshake under it,
+the Doctor says so, and the nodes that pinned it wait and come back when
+it opens again. A key is made only where there is no key file at all, the
+first start; each file of the pair is written whole and renamed into
+place, so a full disk or a start cut short leaves the pair that was there.
+With the install key lost for good, the key is lost with it: removing
+`tls/key.pem` from `/config` has a new one made at the next start, and
+every node then comes back when its Enroll script is run on it again.
+
+## What a node takes on its controller's word
+
+**Its agent's updates, once it has pinned the release key, it does not.**
+AerieOS has a release key (`config/aerieos-release.pub` names its public
+half; the private half is the release build's secret and no controller's).
+The Enroll script carries the public half and the agent pins it as the
+node enrolls (`aerieos-agent release-key` shows it, and pins one on a
+node enrolled before, at its console). Where the file names a spare on a
+second line, the script carries both and the node pins both: an update
+signed by either is taken ([the signing keys](#the-signing-keys-and-replacing-one)). From then on the node takes an agent
+update only when the release build's signature over the update's digest
+comes with it (`scripts/agent/agent.sig`, made by `tools/sign-agent.py` in
+the release's builds and passed on by the controller, which checks nothing
+itself). A controller built from a branch ships an unsigned agent, which a
+pinned node refuses, saying so on the update's job; a machine its owner
+uses for such builds says `sudo aerieos-agent unsigned on` at its own
+console. Somebody who builds the controller themselves and signs those
+builds with a key of their own adds its public half there instead (`sudo
+aerieos-agent release-key add HEX`, four at most, and `release-key drop
+HEX` takes one away): the node then takes what that key signed beside what
+the release signed, and the update's job says which key it was. The key
+is made once on the machine that builds (`tools/sign-agent.py
+--builder-keygen FILE`, which prints the command for a node's console), and
+each build is signed with it before its image is made (`tools/sign-agent.py
+--builder FILE` writes `scripts/agent/agent.sig` for the tree as it
+stands, which the image's build takes with the rest). It is kept on the
+building machine, out of the repository and out of the container's reach:
+a controller that could sign its own agent would make the nodes' check
+worth nothing. These
+choices are a person's at the machine: they take root and a
+terminal, the running agent never writes over them, and nothing the
+controller sends in the channel changes them. A pinned node that meets an
+unsigned controller stays on the agent it has, and since a controller
+sends a node whose agent is behind nothing but that update, it takes no
+other job either until the controller runs a signed build or the node's
+console allows unsigned ones: closed, on purpose, and said on the update's
+job and on the node's row. A node's row says which it
+is under Updates. The file is read one way (`scripts/lib/releasepub.py`), by
+the Enroll script, the build's signer and `aerie lint`, which fails when it
+does not name one key or two: a file that does not parse is a red build,
+never a node that quietly pinned nothing.
+
+**Nor the first agent, nor one a provisioner fetches later.** Every way of
+enrolling carries the key: the Enroll script, the token-only commands the
+Nodes page shows, a Mac's provisioner and the controller's own node on a
+bare-metal install. With it they carry the digest of the agent the
+controller shipped when the script or the command was made and, where its
+build has one, the release's signature over that digest. The provisioner
+holds the agent it fetches to the digest it was handed, where it had only
+the digest the same answer named, and checks the signature under the key
+before any of the agent runs (Python's cryptography library, OpenSSL 3, or
+Swift's CryptoKit on a Mac); another agent, a signature that is not the
+key's and one the machine cannot check are each refused with the reason,
+and so is an answer with no digest at all. A build with no signature
+enrolls on the digest alone and says so, with the key pinned for what
+comes later. A script made before any of this, or a command somebody saved,
+still enrolls, held to the digest the controller sends, and says what was
+not checked. A provisioner run again on an enrolled node asks the installed
+agent before it replaces it (`aerieos-agent check-update`, which decides as
+an update is decided), and leaves it in place on a refusal; where the
+installed agent is too old to answer, or is gone, a node that pinned a key
+gets the newer one only when the provisioner itself can check the release's
+signature under the key the node pinned, and a node that pinned none
+updates as it did.
+
+A node that has no key, one enrolled before there was one or by a script
+that named none, takes what its controller sends, and the update's job says
+that nothing was checked. It pins on its first signed update: the
+controller names the release keys its own build carries beside every
+update, and when the update's signature is under one of them the node
+installs it and pins them, saying so on the job. That is trust on first
+use, of a controller the node already took everything from, and it closes
+the door behind a release rather than waiting for a person to run the
+Enroll script again. An update with no signature, or one under another
+key, is taken as before and pins nothing; a node that has any key, the
+release's or one added at its console, is never offered one this way. Nor
+is a node where a person dropped the release key (`sudo aerieos-agent
+release-key none`): that choice is kept as the console's word, the node
+takes what its controller sends and its updates' jobs say it was the
+console's choice, and it pins no key by itself until a person pins one
+there again (`release-key HEX`, or the Enroll script).
+
+`aerieos-agent check-update FILE [SIG]` is the same rule, for whatever
+replaces an agent from outside it (a provisioner run on a machine that has
+one) to ask first: it says in one line whether this node would take that
+file with that signature, exits 0 when it would and 77 when it refuses,
+and writes nothing.
+
+**The tools root installs from the bundle, it does not either.** The
+provisioner with the machine's own helper in it, the helper that builds a
+session's view and the one that cuts a pack's install off the network reach
+a node in the bundle of `aerie` the controller serves, whose digest moves
+with a person's tool packs and is the controller's word. A release's build
+signs the list of those files, each with its digest, and a pinned node
+keeps a copy of them for root only under that signature: otherwise root
+goes on with the copy it has, the job saying why, and a machine whose
+console allows unsigned builds takes them from a branch's build as it takes
+that build's agent. A key added at the console counts here as it does for
+the agent: root's tools signed by it are kept.
+
+**Nor the other files a release ships in that bundle.** `aerie` itself and
+its library (the toolchain installer and its checksum logic are in it, and a
+script the agent runs as root to list sign-ins where accounts own their
+homes), the shipped catalog, the publishers' keys a download is checked
+against, the terminal's launcher and the hooks a session is handed all ride
+in the same bundle. The bundle carries the list of them, a line a file with
+its sha256 (`nodes/bundle.list`, made one way by
+`scripts/lib/bundleparts.py` for the build's signer and the controller
+alike), and the release's signature over that list (`nodes/bundle.sig`, the
+third part of `scripts/agent/agent.sig`). A pinned node unpacks a bundle
+only when that signature is under a key it trusts and every file in the
+bundle is the one the list names: none changed, none missing, no link, and
+none beside them except what a controller adds of its own. A bundle that
+fails is unpacked nowhere, in the job account's store or in root's copies:
+the node goes on with the bundle it has, names the first file that was
+wrong in the job's log and its own, and does not fetch that bundle again
+until its console's trust changes or the controller offers another. While
+the refusal stands the node reports it with its hello, and whoever manages
+nodes sees it: a row on the bell for that node, saying it refused this
+controller's bundle and what was wrong in one phrase, and the same under
+Sessions on the node's page; both leave when the node takes a bundle or the
+controller serves another. Which keys the node takes, and the two commands
+its console has for that (`release-key add`, `unsigned on`), are in the
+job's log and the node's own, not on the page. A container's shell on such a node
+opens from the bundle it kept, with no wait for one it will not take. A
+machine whose console allows unsigned builds takes a branch's bundle as it
+takes that build's agent, and a key added at the console counts as it does
+there. A controller whose own files are not the ones its build signed (one
+edited in place) says so once in its log, and one whose dashboard is served
+from a checkout (`aerie dashboard dev`) packs that checkout's files, which
+no build signed: either way its pinned nodes stay on the bundle they have.
+To hold an install against a checkout, an administrator's
+read of the Nodes page (`/api/v1/nodes`) carries the list's digest as `files`
+with whether the build signed it as `files_signed`, and `tools/sign-agent.py
+--digests` prints the same digest for a tree.
+
+What a controller adds beside those files is still its word, and no
+release can sign it: the tool packs a person added and the ones made on
+that install (`config/toolpacks.json`, `config/toolpacks/NAME.bundle`), and
+the vetted catalog's newer rows for the shipped toolchains
+(`config/toolchains.catalog.json`, which a node reads in the shipped
+catalog's place where the bundle carries it; the shipped file itself goes
+as the release signed it). So whoever holds a controller can still hand a
+pinned node a recipe of their own: what a recipe downloads and runs, it
+runs as the jobs account, and the system packages it names are installed
+by root from that machine's own repositories.
+
+**What a recipe downloads is held to what the recipe says.** A row of the
+shipped catalog, which the release signs, or of the vetted catalog, whose
+index is signed, can carry what each of its downloads is: the sha256 of
+the exact file (a pin), its publisher's signature under a key the row
+carries or the release ships, or a commit. A row that does is not at the
+mercy of the place it downloads from; one that asks that place what the
+file should be on the day of the install still is, and its entry says
+which: pinned, installer (its pinned installer downloads the rest, and
+says from where) or open
+([Declared downloads](tool-packs.md#declared-downloads)).
+
+**A door's program comes from a source the machine's package manager
+verifies.** A node enrolled with a door in for SSH has cloudflared or
+Tailscale installed by root. It comes from its vendor's own package
+repository, held to the vendor's signing key the provisioner itself
+carries (`door_key` in `nodes/provision-linux.sh`, which a release signs
+with root's other tools) and never to a key fetched while installing, or
+from the distribution's own package where its repositories carry one;
+which, on each system, is in [nodes.md](nodes.md). A system with neither
+is told so and nothing is downloaded. What this does not hold: the key
+says a package is its vendor's, not which version it is, so a door is the
+version its repository offers that day, as any package of the system's
+is. Cloudflare signs its rpm repository's index with an older key than
+the one it publishes, so there each package is held to the key and the
+index is not. The NVIDIA container toolkit's source on a node is held the
+same way: its key is the provisioner's own copy (`nvct_key`), and its one
+source line is written there, with nothing fetched until apt reads it. So
+is Docker's own package source, on the systems that take Docker from it
+(Debian and Ubuntu by apt, the RHEL family by dnf): the key each is held
+to is the provisioner's copy (`docker_key`, one key for Docker's apt
+repositories and another for its rpm ones), and the RHEL family's
+repository file is written there with its `gpgkey` naming that copy,
+where Docker's own file names an address to fetch the key from.
+
+**What the controller's image is built from, and what each part is held
+to.** The build takes five kinds of thing from somewhere else, and the
+bare-metal installer takes the same ones the same way, but for uv, mise
+and cloudflared where the machine has one already: that copy is kept as
+found (its own package, or one installed before), and only one the
+machine lacks is fetched and held to its pin:
+
+| What | Held to |
+|---|---|
+| The base image (`FROM` in the Dockerfile) | its tag and the digest of its list, `ubuntu:24.04@sha256:...`: the registry is asked for those bytes, whatever the tag serves that day |
+| The programs from their vendors' GitHub releases (cloudflared for the home tunnel, the linters hadolint, yq, actionlint and ruff, uv and mise) and noVNC's source at its release's tag | a version this tree names with the sha256 of the exact file for each architecture, one row each of `config/image-tools.json`; `scripts/lib/pin-fetch` keeps a file only when it is those bytes and asks nobody what is newest |
+| The two programs from npm (Playwright, web-ext) | a committed lock each (`config/image-npm`): the one version asked for, and every package under it with its tarball's address and its sha512. `npm ci --ignore-scripts` installs exactly that set, refuses a tarball that is not its integrity, and runs nobody's install script |
+| The three package sources the image adds (NodeSource for Node.js, GitHub CLI, Docker's CLI) | each publisher's key as the tree carries it (`config/apt-keys`), never a key fetched as the image is built: apt takes only packages signed under it |
+| The distribution's own packages | the distribution's keys, which the base image carries |
+
+So an image built again from one commit starts from the same base, holds
+the same tools and the same npm trees, and differs only in what apt
+installs: `tools/pins.py check` says what would move in the first three
+rows of the table (with the toolchains, the agents' recipes, the runners
+and the services' images, one command), and `move` proposes it for a
+person to review. What this does not hold: a key says a package is its
+publisher's, not which version it is, so each apt package, from the
+distribution's sources and the three added, is the version its source
+offers the day of the build. And Playwright's browsers are not in the
+image and are not npm's: at the first start Playwright downloads, for each
+browser, the build its own version names, from its own download service
+over https, so the lock that holds Playwright holds which builds are asked
+for, and nothing here holds the archives' bytes.
+
+**The Android app a release carries is built from files held to their
+bytes.** Its Gradle build resolves its plugins and libraries from Google's
+repository and Maven Central, and `apps/android/gradle/verification-metadata.xml`
+names the sha256 of every file the release build resolves, so Gradle
+refuses one that is not those bytes before the build runs it, on a hosted
+runner and on a node alike. The Gradle distribution is held to the sha256
+in `apps/android/gradle/wrapper/gradle-wrapper.properties`. A dependency
+added or moved is the file written again in the same change
+([companion-app.md](companion-app.md)).
+
+**A CI runner's program is held to a pin.** The runner a node installs
+(GitHub's Actions runner, or the one Gitea and Forgejo share) is a
+version this build names, with the sha256 of the exact file for each
+platform, in one table the release ships
+(`scripts/dashboard/runner-pins.json`). The controller hands the pin to
+the node with the job that installs the runner; the agent downloads the
+address it names and unpacks or makes executable nothing unless the file
+is those bytes, saying both digests when it is not, and an install handed
+no pin is refused, not fetched unchecked. So the pin is as good as the
+controller that hands it, as a recipe is: a pinned node's own release
+key does not cover it. What it does not hold: GitHub's runner updates
+itself from GitHub once it runs, which is that runner's own channel, and
+a runner's folder is the jobs account's, so a CI job run there can change
+the runner it ran under.
+
+**The rest, it still does, unless its console says otherwise.** The agent
+runs as root; a root command an administrator approves is run as given
+(which, on a node provisioned as a sandbox, could also undo the pin); and
+the jobs account's Docker is root's on a node that runs containers. So
+whoever holds the controller (a copy of its state with the install key, an
+administrator's sign-in) still holds those nodes: the signatures close the
+update, root's own tools and the files a release ships in the bundle as
+ways in, not the others. What bounds them
+on the controller's side: **Lock system changes** on a node's row has the
+controller refuse storage, network and root changes there, and every root
+command is on the record with who approved it. Two things are held by the
+node itself. On the controller's own machine the root agent runs docker for
+the controller and nothing else under that mark. And a machine's own
+console can switch root commands off: after `sudo aerieos-agent root-asks
+off` there, that node refuses every root command the controller sends
+(`aerie root run`, a schedule as root), whoever allowed it, and the
+controller says so before anybody is asked; its row says it is off, and
+only `sudo aerieos-agent root-asks on` at that machine turns it back on.
+What AerieOS does as root by name (storage, updates, its own tools) goes
+on, and where the machine runs containers, Docker there is still root's:
+the switch closes the free-form command, which is the widest of them.
+
+## The signing keys, and replacing one
+
+What an install takes from outside is checked against a key it already
+holds, never one that arrives with the thing itself:
+
+| What is checked | The public half an install holds | Where the private half is |
+|---|---|---|
+| The catalog's index | `config/catalog.pub`, shipped in the release | the catalog repository's secret `CATALOG_SIGNING_KEY`, used by its `sign` workflow |
+| A node's agent update, root's tools and the files of the bundle it fetches | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY`, read by two jobs on a `v*` tag alone ([versions.md](versions.md#the-release-key-on-github)) |
+| A release's list of its files (`SHA256SUMS`), for a dev build | `config/release-signers`, its `aerieos-dev` lines: the release key and its spare again, as OpenSSH keys | the release build's secret `AERIEOS_RELEASE_KEY` |
+| A release's list of its files, for a stable release | `config/release-signers`, its `aerieos-release` line | offline, on the stable key holder's own machine |
+
+The third and fourth rows are one file, which the image carries and a
+bare-metal release is laid out with, and one rule: every file an install
+takes from a release (the controller's bundle, AerieOS's image, a stick's
+image, the apps the Library offers) is held to the release's signed list,
+and the release's tag says who may have signed it. A pre-release
+(`vX.Y.Z-dev.N`, `-rc.N`) takes a list signed in either namespace; a stable
+release (`vX.Y.Z`) takes `aerieos-release` alone, so the key CI holds, which
+signs dev builds as they publish themselves, can never sign a stable
+release, and a stable release waits for its holder's signature. A release
+with no signed list, or one signed by somebody its tag may not have, is
+refused with the reason; until a stable signer's line is in the file, a
+stable release is refused in those words.
+
+**What a changed key costs.** An install trusts only what a key it holds
+signed, so a new key cuts off whatever still holds the old one. For the
+catalog that is every install on an older release: it keeps the index it
+last read and takes no newer one until it is updated; what a release
+ships itself (the toolchains, the coding agents), what is installed and a
+pack added by its own address go on working. For the release key it is
+every node that pinned the old one: it takes no agent update, and so no
+other job, until a person pins the new key at that machine (its Enroll
+script again, or `aerieos-agent release-key` at its console). A key that
+is lost costs the same as one that is changed.
+
+**The spare.** So each of the first two files may name a second key, its
+spare: a pair made the same way, whose private half is kept apart from
+the first (never in the same secrets) and signs nothing while the first is
+in use. An install reads an index signed by either, and a node that pinned
+both takes an update signed by either. When the first key is lost or has
+to go, the spare signs in its place and nothing is cut off; the next
+release then names the spare as its first key and a new spare beside it.
+Two is the most either file names: every key held is one more that can
+sign. A node enrolled before a spare was named pins it by itself: a build
+the release key signed carries that key's own statement of which key is
+its spare, with the build that said it (`tools/sign-agent.py` writes it
+into `scripts/agent/agent.sig` under a line of its own, and the controller
+passes it on with its hello and with an update), and a node that holds the
+release key and no spare pins the one named when the statement is signed
+by the key it pinned and its build is not older than the agent the node
+runs, so an older statement cannot be sent again once its spare is
+retired. A
+controller's word alone adds no key, a statement under any other key pins
+nothing (a key added at the console among them), and a node that has a
+spare, or whose console chose to pin no key, is left as it is. Its row
+says no spare is pinned under Updates until then.
+`config/release-signers` was a list from the start, and its dev lines are
+written from the release key and its spare (`tools/release-signers.py`,
+held by `aerie lint`), so a build signed by either is taken.
+

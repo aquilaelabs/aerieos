@@ -7,11 +7,16 @@ finds the name wherever the package defines it; agent.NAME = value sets it
 in every module that holds it, which is where the code under test looks it
 up (a module that did `from .base import log` has its own `log`).
 """
+import hashlib
 import importlib
 import importlib.util
+import io
 import itertools
+import json
 import os
+import re
 import sys
+import zipfile
 
 PKG = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "agent", "aerieos_agent"))
 _seq = itertools.count()
@@ -35,6 +40,39 @@ class Agent:
     def module(self, name):
         """One module of the package (base, census, sessions, ...)."""
         return next(m for m in self._mods if m.__name__.rsplit(".", 1)[-1] == name)
+
+
+def version():
+    """The agent's version as this tree's package says it."""
+    with open(os.path.join(PKG, "__init__.py"), encoding="utf-8") as f:
+        return re.search(r'^AGENT_VERSION = "([0-9.]+)"', f.read(), re.M).group(1)
+
+
+def an_agent(said=None, note=""):
+    """An agent's zip as a node is sent one, as small as one can be: the
+    line a program starts with, the package's __init__.py saying its
+    version (`said`; this tree's when none is given), and a start check
+    that passes, so a node takes it as it takes a build that loads. `note`
+    makes two of them differ."""
+    buf = io.BytesIO()
+    buf.write(b"#!/usr/bin/env python3\n")
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("__main__.py", f"# {note}\nimport sys\nif sys.argv[1:] == [\"selfcheck\"]:\n    print(\"selfcheck ok\")\n")
+        z.writestr("aerieos_agent/__init__.py", f'AGENT_VERSION = "{said or version()}"\n')
+        z.writestr("aerieos_agent/cli.py", '# answers "selfcheck" in __main__\n')
+    return buf.getvalue()
+
+
+def seal_the_way_before(ts, pub, data, about=None):
+    """A seal of the format before (BBTOK1, the 2048-bit group), made as a
+    node made one before tokenseal stopped making them, so a test can hold
+    one where a node may still hold one. `ts` is a loaded tokenseal."""
+    A = ts.element(pub)
+    r = int.from_bytes(os.urandom(32), "big") % (ts.Q - 1) + 1
+    R = pow(ts.G, r, ts.P)
+    k = hashlib.sha256(ts._b(pow(A, r, ts.P)) + ts._b(R) + ts._b(A)).digest()
+    head = json.dumps(dict(about or {}, R=format(R, "x")), sort_keys=True).encode()
+    return ts._close(k, ts.MAGIC1, head, data)
 
 
 def load(tag="agent"):

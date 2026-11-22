@@ -7,7 +7,7 @@
 // a page is named by the rows on it and never by a number. What is tested
 // here is that the helper is wired to every list, that a short list is left
 // whole, and that turning a page never drops rows or their behavior.
-import { launch, newPage, ok, done, ready, URL, DIR, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, nbGo, section } from './lib.mjs';
 import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 
 // alpha's tracker, made long enough to page. Written straight to the state
@@ -68,8 +68,14 @@ ok(await page.$eval('#bugList:visible .bug:nth-of-type(30)', e => e.open),
 
 // Redrawing keeps what was shown rather than cutting back to the first page:
 // a list that repaints under a poll must not take the reader's place.
-await page.evaluate(() => getNotebook('alpha').reloadBugs());
-await page.waitForTimeout(500);
+await page.evaluate(() => {
+  for (const r of [...document.querySelectorAll('#bugList')].find(x => x.offsetParent).querySelectorAll(':scope > .bug')) r.__before = true;
+  return getNotebook('alpha').reloadBugs();
+});
+// Drawn anew from that read: no row of the list is one from before it.
+await page.waitForFunction(() => { const l = [...document.querySelectorAll('#bugList')].find(x => x.offsetParent);
+  const rows = l ? [...l.querySelectorAll(':scope > .bug')] : [];
+  return rows.length > 0 && !rows.some(r => r.__before); }, null, { timeout: 15000 }).catch(() => {});
 st = await state();
 ok(st.shown === 40 && st.total === 40, 'a redraw keeps what had been shown');
 
@@ -101,7 +107,7 @@ const src = ['../index.html', ...readdirSync(new globalThis.URL('..', import.met
 for (const [what, call] of [
   // Less what the list's band leaves out (R254 step 1), so a page holds
   // what is shown.
-  ['the roadmap', 'paginate($("roadmapList"), ":scope > .grp:not(.off)"'],
+  ['the roadmap', 'paginate($("roadmapList"), ":scope > .grp", {key: "roadmapList", noun: "items", total: vis.length'],
   ['memory', 'paginate($("memList"), ":scope > .mem"'],
   ['bugs', 'paginate(list, ":scope > .bug", {key: "bugList", noun: "reports", total: vis.length'],
   // ...in the Files section's body, since the files are a section (6 Oct).
@@ -117,11 +123,11 @@ for (const [what, call] of [
 // ...and the Jobs tab, which lives in its own file. It is the list that grows
 // without bound (every compose action, exec and agent update stays on it),
 // so it was the one most in need of paging and the one that had none.
-{
+await section("and the Jobs tab, which lives in its own file", async () => {
   const jsrc = readFileSync(new globalThis.URL('../tab-jobs.js', import.meta.url), 'utf8');
   ok(jsrc.includes('paginate(tbl, ":scope > .jbrow"'),
      'jobs are paged, by the rows the tab really renders');
-}
+});
 
 // ---- one bucket per notebook, not one for all of them ----------------------
 // A notebook is a CLONE of one template, so every id inside it belongs to
@@ -131,7 +137,7 @@ for (const [what, call] of [
 // wiped a long one's page in another, and the reported symptom was paging
 // not working: it turned, then snapped back on the next redraw, a second
 // or two later.
-{
+await section("one bucket per notebook, not one for all of them", async () => {
   mkdirSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true });
   for (let i = 1; i <= 34; i++)
     writeFileSync(`${DIR}/ws/alpha/dist/pagemany/f-${i}.bin`, 'x');
@@ -140,8 +146,10 @@ for (const [what, call] of [
   await page.evaluate(() => { openNotebook('alpha'); openNotebook('beta'); });
   await page.waitForSelector('.nb[data-project="beta"]', { timeout: 20000 });
   await page.evaluate(() => { for (const p of ['alpha', 'beta']) getNotebook(p)?.view('artifacts'); });
-  await page.waitForFunction(() => (document.querySelectorAll(
-    '.nb[data-project="alpha"] .nbview[data-view="artifacts"] .artrow') || []).length > 25,
+  // A page of rows built and the rest offered (R228 step 13: the rows past
+  // a page are not built until they are asked for).
+  await page.waitForFunction(() => document.querySelector(
+    '.nb[data-project="alpha"] .nbview[data-view="artifacts"] .pagemore .next'),
     null, { timeout: 20000 });
   const shown = () => page.evaluate(() => {
     const rows = [...document.querySelectorAll(
@@ -154,14 +162,20 @@ for (const [what, call] of [
   ok(opened === 34, `Show more brings the rest, all 34 files (${opened} rows)`);
   // beta's SHORT list redraws, which is all a poll does on a box where
   // another project's view keeps moving.
-  await page.evaluate(() => { const n = getNotebook('beta'); n?.view('bugs'); n?.view('artifacts'); });
+  await page.evaluate(() => {
+    for (const r of document.querySelectorAll('.nb .nbview[data-view="artifacts"] [data-sect="artifacts:files"] > .body > .artrow')) r.__before = true;
+    const n = getNotebook('beta'); n?.view('bugs'); n?.view('artifacts'); });
   await page.evaluate(() => getNotebook('alpha')?.view('artifacts'));
-  await page.waitForTimeout(400);
+  // Both lists drawn anew from the reads those started: neither holds a row
+  // from before them.
+  await page.waitForFunction(() => ['alpha', 'beta'].every(p => {
+    const rows = [...document.querySelectorAll(`.nb[data-project="${p}"] .nbview[data-view="artifacts"] [data-sect="artifacts:files"] > .body > .artrow`)];
+    return rows.length > 0 && !rows.some(r => r.__before); }), null, { timeout: 20000 }).catch(() => {});
   ok(await shown() === opened,
      `...and a short list in another notebook does not turn it back (${await shown()} of ${opened})`);
   rmSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true, force: true });
   rmSync(`${DIR}/ws/beta/dist`, { recursive: true, force: true });
-}
+});
 
 ok((await page.errors).length === 0, 'no console errors from paging');
 await done(browser);

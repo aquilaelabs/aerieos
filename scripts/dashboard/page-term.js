@@ -53,8 +53,152 @@ function xtermReady(){
 // The slot a tab of ours is drawn in: the terminal's box, the line that
 // says why it ended, and the console bar a read-only tab carries.
 function termSlot(t){
-  return `<div class="slot ownterm"><div class="xhost" aria-label="${esc(tabLabel(t))}"></div>
+  return `<div class="slot ownterm"><div class="xhost" aria-label="${esc(tabLabel(t))}"></div>${termHotBar(t)}
     <div class="xend" hidden><span class="xwhy"></span><button type="button" class="xagain">Reconnect</button></div>${consoleBar(t)}</div>`;
+}
+
+// The hot bar (the operator, 12 Nov): the keys a terminal is most often
+// reached for, a press each, so they are there without a keyboard that has
+// them. At a desk it floats over the terminal's bottom right corner,
+// slightly translucent; on a phone it is the band at the terminal's foot,
+// where Keys and Commands alone used to be (page-keys.js drawKeys draws it
+// there from the same list). Which keys is by what the tab is: a coding
+// agent's (Esc to interrupt, Shift+Tab for its mode, the arrows and Enter
+// for its menus), a shell's (Tab to complete, ^C, ^D), and for every
+// terminal the page up and down and Links, which lists the links on its
+// screen to open or copy (a link a terminal prints could be neither on a
+// phone), a press with the chain's picture that is always there and says
+// so when the terminal shows none. A log takes no keys and has the page
+// keys and Links alone, as an account with no shell
+// has on a session it only reads. Static per tab: what is folded is the
+// browser's and is put on after the draw (termHotWire), so the slot is
+// never drawn again for it.
+const TERM_HOT = {
+  agent: [["escape", "Esc", "interrupt, or back out of a menu"], ["backtab", "⇧Tab", "Shift+Tab: its next mode"], ["up", "↑", "up"], ["down", "↓", "down"],
+          ["enter", "⏎", "Enter"], ["ctrl-c", "^C", "Ctrl+C"]],
+  shell: [["escape", "Esc", "Escape"], ["tab", "Tab", "complete"], ["up", "↑", "the line before"], ["down", "↓", "the line after"],
+          ["ctrl-c", "^C", "Ctrl+C: stop what is running"], ["ctrl-d", "^D", "Ctrl+D: end of input"]],
+  every: [["pgup", "PgUp", "a page back"], ["pgdn", "PgDn", "a page on"]],
+};
+// A tab's keys, each [key, what it shows, what it says].
+function termHotKeys(t){
+  const types = !termLog(t) && mayShell();
+  return [...(types ? TERM_HOT[agentOfArg(t.arg) ? "agent" : "shell"] : []), ...TERM_HOT.every];
+}
+// ...as buttons; `more` adds the keys a phone's line carries past them.
+function termHotButtons(t, more = []){
+  return [...termHotKeys(t), ...more].map(([k, l, says]) => `<button type="button" data-hk="${esc(k)}" title="${esc(says || l)}" aria-label="${esc(says || l)}">${esc(l)}</button>`).join("");
+}
+// Links: one press with the chain's picture, always there (the operator, 12
+// Nov), which lists what the terminal shows or says it shows none.
+const TERM_LINKS_SAYS = "the links this terminal shows, to open or copy";
+function termHotBar(t){
+  return `<div class="xhot" role="toolbar" aria-label="terminal keys">
+    <span class="xhotkeys">${termHotButtons(t)}</span><button
+      type="button" class="ic xhlinks" data-hlinks aria-expanded="false" aria-label="${TERM_LINKS_SAYS}" title="${TERM_LINKS_SAYS}">${LINK}</button><button
+      type="button" class="xhottog" aria-expanded="true" aria-label="hide these keys" title="hide these keys">›</button>
+    <div class="xlinks" hidden></div></div>`;
+}
+
+// The links a terminal shows, drawn into `box` as a list, each a link to
+// open and a press to copy; `shut` puts the list away once one is opened.
+function termLinksFill(rec, box, shut){
+  const found = termLinks(rec);
+  drawHTML(box, `<div class="xlhead">Links on this terminal</div>` + (found.length
+    ? found.map((u, i) => `<div class="xlrow"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u.length > 64 ? u.slice(0, 44) + "…" + u.slice(-16) : u)}</a><button
+        type="button" data-hcopy="${i}">Copy</button></div>`).join("")
+    : `<div class="xlnone">None on its screen or in the lines before it.</div>`));
+  box.querySelectorAll("[data-hcopy]").forEach(b => b.onclick = async () => { await termCopyText(found[+b.dataset.hcopy]); notify("Copied"); });
+  box.querySelectorAll("a").forEach(a => a.onclick = () => shut());
+}
+
+// Whether the bar is folded to its handle: this browser's choice, kept on
+// the device, and a desk's alone: on a phone the keys are the band at the
+// terminal's foot, with nothing to fold.
+const TERM_HOT_KEY = "bb-term-hot";
+function termHotFolded(){
+  let v = null;
+  try{ v = localStorage.getItem(TERM_HOT_KEY); }catch(e){ /* no storage: the default */ }
+  return v === "0";
+}
+
+function termHotWire(rec){
+  const bar = rec.el.querySelector(".xhot");
+  if (!bar) return;
+  const tog = bar.querySelector(".xhottog"), links = bar.querySelector(".xlinks"), lb = bar.querySelector("[data-hlinks]");
+  const fold = folded => {
+    bar.classList.toggle("folded", folded);
+    tog.textContent = folded ? "‹" : "›";
+    tog.setAttribute("aria-expanded", String(!folded));
+    const says = folded ? "show the terminal's keys" : "hide these keys";
+    tog.setAttribute("aria-label", says);
+    if (folded) shut();
+  };
+  const shut = () => { links.hidden = true; lb.setAttribute("aria-expanded", "false"); };
+  fold(termHotFolded());
+  // A press on the bar leaves the keyboard where it is: the terminal keeps
+  // the focus it had, and a phone's keyboard does not fold away under a key.
+  bar.onpointerdown = e => { if (e.target.closest("button")) e.preventDefault(); };
+  tog.onclick = () => {
+    const folded = !bar.classList.contains("folded");
+    try{ localStorage.setItem(TERM_HOT_KEY, folded ? "0" : "1"); }catch(e){ /* this browser only, this time */ }
+    // Every terminal on the page wears the same choice.
+    for (const r of TERMS.values()) if (r !== rec) termHotWire(r);
+    fold(folded);
+  };
+  bar.querySelectorAll("[data-hk]").forEach(b => b.onclick = () => { shut(); termKey(rec.t, b.dataset.hk); });
+  lb.onclick = () => {
+    if (!links.hidden) return shut();
+    termLinksFill(rec, links, shut);
+    links.hidden = false;
+    lb.setAttribute("aria-expanded", "true");
+  };
+  bar.onkeydown = e => { if (e.key === "Escape" && !links.hidden){ e.stopPropagation(); shut(); } };
+}
+
+// The links a terminal shows, newest first: on its screen and in the lines
+// before it. A link that runs to a row's last column goes on in the next
+// row, whether the terminal wrapped it or the program broke it there itself
+// (a sign-in link drawn at the pane's width), so it is read whole; a row is
+// more of it while it starts with a link's own characters and fills the row.
+const TERM_URL_CHARS = "[A-Za-z0-9%._~:/?#\\[\\]@!$&'()*+,;=-]";
+function termLinks(rec, back = 400){
+  const term = rec.term, buf = term?.buffer?.active;
+  if (!buf) return [];
+  const cols = term.cols, end = buf.length, from = Math.max(0, end - back), rows = [];
+  for (let i = from; i < end; i++) rows.push(buf.getLine(i)?.translateToString(false) || "");
+  const more = new RegExp("^" + TERM_URL_CHARS + "+"), seen = new Set(), out = [];
+  for (let i = 0; i < rows.length; i++){
+    const re = new RegExp("https?://" + TERM_URL_CHARS + "+", "g");
+    let m;
+    while ((m = re.exec(rows[i]))){
+      let url = m[0], j = i, full = m.index + m[0].length >= cols;
+      while (full && j + 1 < rows.length){
+        const part = (more.exec(rows[j + 1]) || [""])[0];
+        if (!part) break;
+        url += part; j++;
+        full = part.length >= cols;
+      }
+      // What ends a sentence is not the link's: its last full stop or bracket.
+      url = url.replace(/[.,;:!?)\]'"]+$/, "");
+      if (url.length > 10 && !seen.has(url)){ seen.add(url); out.push(url); }
+    }
+  }
+  return out.slice(-12).reverse();
+}
+
+// Text put on the clipboard, by the page's way where the browser allows it
+// and through a field where it does not (a page not served over TLS).
+async function termCopyText(text){
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.append(ta); ta.select();
+    try{ document.execCommand("copy"); }catch(e2){ /* nothing more to try */ }
+    ta.remove();
+  }
 }
 
 // The URL the socket opens: the tab's words, boot stamp and all, and the
@@ -128,14 +272,6 @@ function termPreview(theme, look = {}){
   </div>`;
 }
 
-// The project a terminal's argument is about, for its person's colors there.
-function termProject(arg){
-  const a = String(arg || "");
-  const ag = agentOfArg(a);
-  if (ag) return ag.project;
-  const m = /^(?:sh:\d+:|shell:|vm:)([^:]+)/.exec(a);
-  return m ? m[1] : "";
-}
 
 // This person's look for this tab: their Profile's, for every space alike
 // (R223: a space's own colors went, its card's color telling spaces apart).
@@ -167,6 +303,7 @@ function termMount(el, t, key){
   rec = {t, el, key, term: null, fit: null, ws: null, ended: ""};
   TERMS.set(key, rec);
   el.querySelector(".xagain").onclick = () => termConnect(rec);
+  termHotWire(rec);
   xtermReady().then(() => {
     if (TERMS.get(key) !== rec) return;
     const term = new window.Terminal({
@@ -307,8 +444,8 @@ function termSelectDraw(rec){
   if (!layer){
     layer = document.createElement("div");
     layer.className = "xsel";
-    layer.innerHTML = `<span class="xgrip" data-end="a"></span><span class="xgrip" data-end="b"></span>
-      <span class="xselbar"><button type="button" class="xcopy">Copy</button><button type="button" class="xdone">Done</button></span>`;
+    drawHTML(layer, `<span class="xgrip" data-end="a"></span><span class="xgrip" data-end="b"></span>
+      <span class="xselbar"><button type="button" class="xcopy">Copy</button><button type="button" class="xdone">Done</button></span>`);
     host.append(layer);
     layer.querySelector(".xcopy").onclick = () => termCopy(rec);
     layer.querySelector(".xdone").onclick = () => termSelectEnd(rec);
@@ -358,16 +495,7 @@ function termSelText(rec){
 async function termCopy(rec){
   if (!rec.sel) return;
   const text = termSelText(rec);
-  try{
-    await navigator.clipboard.writeText(text);
-  }catch(e){
-    // Not a secure page, or no permission: the old way, through a field.
-    const ta = document.createElement("textarea");
-    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
-    document.body.append(ta); ta.select();
-    try{ document.execCommand("copy"); }catch(e2){ /* nothing more to try */ }
-    ta.remove();
-  }
+  await termCopyText(text);
   notify("Copied");
   termSelectEnd(rec);
 }
@@ -415,7 +543,7 @@ function termConnect(rec){
   // there, which a store under a key of their own gives only while it is
   // unlocked (R157 step 2): asked for first, once, and the terminal then
   // opens with it; declined, it opens as a terminal with no sign-in.
-  if (state?.store?.own && state.store.locked && !rec.unlockAsked && typeof keyStoreUnlock === "function"){
+  if (state?.store?.own && state.store.locked && !rec.unlockAsked){
     rec.unlockAsked = true;
     keyStoreUnlock("Unlock your key store so this terminal opens your sign-ins?").then(() => termConnect(rec));
     return;
@@ -427,7 +555,7 @@ function termConnect(rec){
   const ws = new WebSocket(termUrl(rec.t, rec.term.cols, rec.term.rows));
   ws.binaryType = "arraybuffer";
   rec.ws = ws;
-  ws.onmessage = e => { if (rec.ws === ws && !rec.gone) rec.term.write(new Uint8Array(e.data)); };
+  ws.onmessage = e => { if (rec.ws === ws && !rec.gone) termOut(rec, new Uint8Array(e.data)); };
   ws.onclose = e => {
     if (rec.ws !== ws) return;
     termEnded(rec, e.reason || (e.code === 1006 ? "the connection dropped" : "the terminal ended"));
@@ -453,12 +581,25 @@ function termDrop(key){
   rec.gone = true;
   try{ rec.ws?.close(); }catch(e){ /* gone */ }
   rec.ro?.disconnect();
-  try{ rec.term?.dispose(); }catch(e){ /* gone */ }
+  // Disposed two frames on, not now: xterm runs a frame it had already
+  // asked for (a first draw still pending when a slow start's terminal is
+  // closed) after dispose() and reads a renderer that is gone (B802, the
+  // same "reading 'dimensions'"). Frames run in the order they were asked
+  // for, so the ones it has pending, and the one those ask for, come
+  // first; nothing new reaches it meanwhile, since it is marked gone, its
+  // socket closed and its observer off. A page that draws no frames (a
+  // hidden tab) disposes it by the clock.
+  const term = rec.term;
+  if (!term) return;
+  let done = false;
+  const drop = () => { if (done) return; done = true; try{ term.dispose(); }catch(e){ /* gone */ } };
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(drop, 0)));
+  setTimeout(drop, 1000);
 }
 
 // The keys bar's keys as a keyboard sends them (R133 step 5): a table, as
 // everything the page can make happen is, never text from elsewhere.
-const TERM_KEYS = {escape: "\x1b", tab: "\t", left: "\x1b[D", down: "\x1b[B", up: "\x1b[A", right: "\x1b[C",
+const TERM_KEYS = {escape: "\x1b", tab: "\t", backtab: "\x1b[Z", left: "\x1b[D", down: "\x1b[B", up: "\x1b[A", right: "\x1b[C",
   home: "\x1b[H", end: "\x1b[F", enter: "\r", bspace: "\x7f", pipe: "|", tilde: "~", slash: "/", backslash: "\\",
   dash: "-", under: "_", dollar: "$", star: "*", lt: "<", gt: ">", amp: "&", caret: "^", "brace-l": "{", "brace-r": "}"};
 
@@ -489,8 +630,47 @@ function termKey(t, key){
 function termSweep(){
   for (const [key, rec] of TERMS){
     if (!rec.el.isConnected) termDrop(key);
-    else termRestyle(rec);
+    else { termRestyle(rec); termShow(rec, rec.el.classList.contains("on") && !!rec.el.offsetParent); }
   }
+}
+
+// A terminal not on show draws nothing (R228 step 14): what its session
+// writes meanwhile is kept, in order, and written when it is shown again;
+// hidden but still laid out, xterm drew every byte a busy session sent. Its
+// box is never hidden, so its size and its session's stay as they were.
+// Past TERM_HOLD_MAX it keeps nothing more and opens again when shown,
+// which has tmux draw its screen whole.
+const TERM_HOLD_MAX = 4 << 20;
+// ...but a question the terminal answers (who it is, where its cursor is,
+// its colors), which tmux asks as it attaches, is answered as it comes, with
+// what came before it: held until shown, the answer reached tmux after it
+// had stopped waiting and was typed into the shell as "1;2c0;276;0c".
+const TERM_ASKS = /\x1b\[[>=?]?\d*c|\x1b\[[56]n|\x1b\][0-9]+;\?/;
+const termLatin = new TextDecoder("latin1");
+function termOut(rec, bytes){
+  if (!rec.away){ rec.term.write(bytes); return; }
+  if (!rec.held) return;
+  if (bytes.includes(27) && TERM_ASKS.test(termLatin.decode(bytes))){
+    rec.held.forEach(b => rec.term.write(b));
+    rec.term.write(bytes);
+    rec.held = []; rec.heldN = 0;
+    return;
+  }
+  rec.held.push(bytes);
+  rec.heldN += bytes.length;
+  if (rec.heldN > TERM_HOLD_MAX) rec.held = null;
+}
+function termShow(rec, on){
+  if (!on){
+    if (!rec.away){ rec.away = true; rec.held = []; rec.heldN = 0; }
+    return;
+  }
+  if (!rec.away) return;
+  rec.away = false;
+  const held = rec.held;
+  rec.held = null;
+  if (held) held.forEach(b => rec.term.write(b));
+  else if (rec.term && !rec.ended) termConnect(rec);
 }
 
 // The page back in view, or its panes resized: every terminal sized to its

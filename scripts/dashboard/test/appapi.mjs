@@ -5,16 +5,13 @@
 // that is renamed, or a number moved on one side and not the others fails
 // here, before the app finds out by drawing blanks. Moving the surface is
 // fine; moving it without the app is what this catches.
-import { ok, done, URL, DIR, pinBreaks } from './lib.mjs';
+import { ok, done, URL, DIR, pinBreaks, OWNER as H, section, REPO } from './lib.mjs';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, utimesSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const base = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const get = async p => { const r = await fetch(base + p, { headers: H }); return { status: r.status, body: await r.json() }; };
 
 const surface = JSON.parse(readFileSync(join(REPO, 'apps', 'android', 'api-surface.json'), 'utf8'));
@@ -41,7 +38,7 @@ ok(typeof meta.body.built === 'string',
 // AerieOS's own project is the one whose origin is its repository, whatever
 // its folder is called (B4): a folder named AerieOS with no such remote,
 // holding a newer signed build, is not where the app is sent.
-{
+await section("Where a newer app would be is a SIGNED build when there is one, however", async () => {
   const self = `${DIR}/ws/bb-public`, d = `${self}/dist`;
   mkdirSync(d, { recursive: true });
   mkdirSync(`${self}/.git`, { recursive: true });
@@ -62,14 +59,14 @@ ok(typeof meta.body.built === 'string',
   ok(meta.apk === signed, `the app is offered the signed build, not a newer unsigned one (${meta.apk})`);
   ok(meta.apk_sha256 === createHash('sha256').update('signed').digest('hex'),
      `...read from the space whose origin is AerieOS's repository, not a folder named AerieOS (${meta.apk_sha256})`);
-}
+});
 
 // ---- a row in each list the app reads ----------------------------------------------
 // A row's types are held only where there is a row, and the fixture leaves
 // most of these lists empty, so a type changed on one went unseen (B107).
 // Each list the notebook or the tree fills gets a row here, through the verbs
 // a session or a person uses; the world is put back before the next file.
-{
+await section("a row in each list the app reads", async () => {
   const ENV = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
                 WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ROADMAP_PROJECT: 'alpha', BB_BUG_PROJECT: 'alpha',
                 BB_TESTS_PROJECT: 'alpha' };
@@ -90,7 +87,7 @@ ok(typeof meta.body.built === 'string',
     pages: [...(was.pages || []), { name: 'a page the contract types', platform: 'web', frame: 'desktop', template: 'blank', blocks: [] }] });
   writeFileSync(`${DIR}/contract-run.log`, '[dashboard-test] == contract.mjs ==\nPASS  [+0.2s] a test the contract types\n1 passed, 0 failed in 1.0s\n');
   bb('tests', 'ingest', `${DIR}/contract-run.log`);
-}
+});
 
 // ---- every GET the app makes answers with the fields it reads ------------------------
 // Against the fixture project alpha, which has a roadmap, bugs, rules and a

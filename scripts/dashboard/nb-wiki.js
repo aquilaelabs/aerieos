@@ -188,19 +188,19 @@ function nbWikiView({$, nb, project}){
 
   // Whether something typed would be lost by a redraw from the server.
   const wikiDirty = () => !!nb.wkEdit || !!(nb.wkAdding && (nb.wkAdding.name || nb.wkAdding.text));
-  nb.wikiDirty = wikiDirty;
-  nb.wikiClear = () => { nb.wkEdit = null; nb.wkAdding = null; };
+  const wikiClear = () => { nb.wkEdit = null; nb.wkAdding = null; };
+  // For the notebook's leave and close questions.
+  nb.stage("wiki", {count: () => (wikiDirty() ? 1 : 0), revert: wikiClear});
 
   const pages = () => nb.wkData?.pages || [];
   const articles = () => pages().filter(p => !SPECIAL.includes(p.name));
   const byName = n => pages().find(p => p.name.toLowerCase() === String(n).replace(/ /g, "-").toLowerCase());
 
-  let inFlight = null;
+  // A read on its way is shared by whoever asks while it is out.
   function loadWiki(){
-    if (inFlight) return inFlight;
-    inFlight = (async () => {
-      try{ nb.wkData = await (await fetch("/api/wiki" + q)).json(); }
-      catch(e){ nb.wkData = {error: String(e), pages: []}; }
+    return reading(`${project}:wiki`, async () => {
+      nb.wkData = await getJSON("/api/wiki" + q);
+      if (nb.wkData.error) nb.wkData = {error: nb.wkData.error, pages: []};
       nb.wkRev = nb.wkData.rev ?? nb.wkRev;
       // A page that moved is read again.
       const now = new Map(pages().map(p => [p.name, p.rev]));
@@ -211,13 +211,12 @@ function nbWikiView({$, nb, project}){
       drawWiki();
       const want = [nb.wkCur, ...SPECIAL.filter(n => now.has(n))].filter(n => n && !nb.wkPages[n]);
       await Promise.all(want.map(readPage));
-    })().finally(() => { inFlight = null; });
-    return inFlight;
+    }, {join: Infinity});
   }
 
   async function readPage(name){
     try{
-      const r = await (await fetch("/api/wiki" + q + "&page=" + encodeURIComponent(name))).json();
+      const r = await getJSON("/api/wiki" + q + "&page=" + encodeURIComponent(name));
       nb.wkPages[name] = r.error ? {error: r.error} : r;
     }catch(e){ nb.wkPages[name] = {error: String(e)}; }
     drawWiki();
@@ -227,7 +226,7 @@ function nbWikiView({$, nb, project}){
     const p = byName(name);
     if (!p){ notify(`no page called ${name} yet: New page makes it`); return; }
     if (wikiDirty() && !await askYes("Leave the page you are editing? What you typed is not saved.")) return;
-    nb.wikiClear();
+    wikiClear();
     // A history entry (R256 step 3): the address names the page, and Back
     // returns to the one before.
     navPush(() => { nb.wkCur = p.name; shellSync(); });
@@ -247,17 +246,17 @@ function nbWikiView({$, nb, project}){
     const n = articles().length;
     const rem = d.remote;
     // The glance (R109): its pages, none while it has none, whose empty
-    // state is said where the article would be.
-    viewGlance($("wkHint"), [{label: n === 1 ? "page" : "pages", value: n, omit: !n}], d.error ? esc("wiki: " + d.error) : "", "", d.error ? "bad" : "");
+    // state is said where the article would be; its status line, on the
+    // control row's slot, where it goes, or why it could not be read.
+    // An empty wiki is its empty state, not a fault: the line says its
+    // buttons wait for a page, in the bar's voice, not in red.
+    viewGlance($("wkHint"), [{label: n === 1 ? "page" : "pages", value: n, omit: !n}],
+      d.error ? esc("wiki: " + d.error) : esc((rem?.label ? `${rem.label}'s wiki` : "no remote: Export is how it leaves")
+        + (pages().length ? "" : rem?.label ? "; Export and Push wait for a page" : "; it waits for a page")), "", d.error ? "bad" : "");
     $("wkNew").hidden = !!projWriteWhy(project);
     $("wkNew").setAttribute("aria-expanded", String(!!nb.wkAdding));
     $("wkExport").disabled = !pages().length;
     $("wkPull").hidden = $("wkPush").hidden = !rem?.label;
-    // An empty wiki is its empty state, not a fault: the bar's own line
-    // says its buttons wait for a page, in the bar's voice, not in red.
-    // In the control row's slot, a note as every view's status line is.
-    paint($("wkNetState"), `<div class="notice note">${esc((rem?.label ? `${rem.label}'s wiki` : "no remote: Export is how it leaves")
-      + (pages().length ? "" : rem?.label ? "; Export and Push wait for a page" : "; it waits for a page"))}</div>`);
     // A role that reads the project and does not write it (B101): Pull and
     // Push dead, and that is the reason said under them.
     const ro = projWriteWhy(project);
@@ -325,7 +324,7 @@ function nbWikiView({$, nb, project}){
     head();
     const d = nb.wkData;
     if (!d){ box.innerHTML = ""; return; }
-    if (d.error){ box.innerHTML = `<div class="field"><div class="hint bad">${esc(d.error)}</div></div>`; return; }
+    if (d.error){ drawHTML(box, `<div class="field"><div class="hint bad">${esc(d.error)}</div></div>`); return; }
     const ro = projWriteWhy(project);
     const a = ro ? null : nb.wkAdding;
     const add = a
@@ -342,8 +341,12 @@ function nbWikiView({$, nb, project}){
         : `<span class="dim">nothing yet</span>`}</div>`;
     // The add band is the first band under the head, above where the wiki
     // goes (B457); the rest is the body.
-    $("wkAddBox").innerHTML = add;
-    box.innerHTML = log + `<div class="field wkreader">${articles().length ? nav() : ""}${article()}</div>`;
+    // Patched (R244): a page's name and Markdown being typed, here or in a
+    // page's editor, stay as they are when the wiki is read again.
+    patch($("wkAddBox"), add);
+    patch(box, log + `<div class="field wkreader">${articles().length ? nav() : ""}${article()}</div>`);
+    // The log a page of changes at a time, newest first.
+    paginate(box.querySelector(".wklog"), ":scope > .wklogrow", {key: "wklog", noun: "changes"});
     wire(box);
     wire($("wkAddBox"));
   }
@@ -351,10 +354,8 @@ function nbWikiView({$, nb, project}){
   function failed(msg){ notify(msg, true); }
 
   async function post(body){
-    const r = await postJSON("/api/wiki", {project, ...body});
-    let j = {};
-    try{ j = await r.json(); }catch{ j = {error: `the controller answered ${r.status}`}; }
-    if (!r.ok || j.error){ failed(j.error || `the controller answered ${r.status}`); return null; }
+    const j = await postJSON("/api/wiki", {project, ...body});
+    if (j.error){ failed(j.error); return null; }
     return j;
   }
 
@@ -421,6 +422,9 @@ function nbWikiView({$, nb, project}){
   // The control row's and the status line's controls: wired once, they
   // live in the markup.
   // New page, the control row's primary: its form unrolls under the row.
+  // New page waits on the control row where it lands, for a role that
+  // writes the space, which is known before the wiki is read.
+  $("wkNew").hidden = !!projWriteWhy(project);
   $("wkNew").onclick = () => {
     if (!nb.wkAdding) nb.wkAdding = {name: articles().length ? "" : "Home", text: ""};
     drawWiki(); $("wkNewName")?.focus();
@@ -435,17 +439,17 @@ function nbWikiView({$, nb, project}){
                                     : "took in the forge's wiki's changes"); nb.wkPages = {}; loadWiki(); }
   };
   $("wkPush").onclick = async ev => {
-    if (wikiDirty() && !await askYes("Push what is saved?\n\nA page is being edited and is not saved; its edits stay here.", {verb: "Push"})) return;
+    // A page being edited is not in the push and stays as typed: said, not
+    // asked (R265: a press asks only where its yes costs something).
+    if (wikiDirty()) notify("pushing what is saved: the page being edited is not in it, and its edits stay here");
     busy(ev.target, "Pushing");
-    const r = await postJSON("/api/wiki", {project, action: "push"});
-    let j = await r.json().catch(() => ({}));
+    let j = await postJSON("/api/wiki", {project, action: "push"});
     // The forge has something this wiki has not: most often the one page
     // GitHub makes you save before a wiki exists. Replacing it is offered,
     // said for what it is.
     if (j.error && /has not taken in/.test(j.error)
         && await askYes(`${j.error}.\n\nReplace the forge's wiki with this one? Pages there that are not here are removed from it (its own history keeps them). Cancel, then Pull, to merge instead.`)){
-      const r2 = await postJSON("/api/wiki", {project, action: "push", replace: true});
-      j = await r2.json().catch(() => ({}));
+      j = await postJSON("/api/wiki", {project, action: "push", replace: true});
     }
     unbusy(ev.target, "Push");
     if (j.error) failed(j.error); else if (j.to) notify(`pushed the wiki to ${j.to}`);
@@ -456,5 +460,5 @@ function nbWikiView({$, nb, project}){
   // the notebook's watch asks this while the view is on screen.
   const wikiNews = k => !!nb.wkData && revs[k] !== nb.wkRev && !wikiDirty();
 
-  return {loadWiki, wikiDirty, wikiNews};
+  return {loadWiki, wikiNews};
 }

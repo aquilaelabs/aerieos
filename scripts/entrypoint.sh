@@ -105,6 +105,7 @@ main() {
     # (lib/boot.sh), before the hooks: hook 15 starts the dashboard, which
     # reads the key as it starts (B388).
     install_key_file
+    load_deploy_keys
     run_hooks
     log "hooks done (+${SECONDS}s from start)"
     boot_ready

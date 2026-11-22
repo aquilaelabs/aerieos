@@ -11,6 +11,8 @@ and a line pass for shell. `aerie map languages` says which files are read.
 
     aerie map                       what is indexed, and the verbs
     aerie map find NAME             where NAME is defined
+    aerie map show NAME|FILE:LINE   the definition itself, whole: each one called NAME (--first for one),
+                                 or the one holding that line, headed by where it is and its comment
     aerie map who-calls NAME        every call of NAME, with the caller, and every place NAME is
                                  passed by name without a call (handed to a draw, assigned, listed)
     aerie map calls NAME            what NAME calls
@@ -42,8 +44,8 @@ is the question a session otherwise spends thirty greps on, and it says so
 in its output where it is guessing (an anonymous callback is attributed to
 the nearest named function around it).
 
-The index lives at .bb-map/map3.json under the tree, the number being its
-format. Building it keeps .bb-map/ out of git through the repository's own
+The index lives at .bb-map/map5.json under the tree, the number being its
+format, with the calls a few questions need in map5-calls.json beside it. Building it keeps .bb-map/ out of git through the repository's own
 exclude file, never the project's .gitignore, which is the project's to write.
 """
 import ast
@@ -64,8 +66,15 @@ INDEX_DIR = ".bb-map"
 # bb a session runs while the controller's build lagged the tree. The file
 # is named for the format too, so two bb builds on one tree keep to their
 # own files during the window when both exist.
-FORMAT = 4
+FORMAT = 5
 INDEX_FILE = f"map{FORMAT}.json"
+# ...and in a file of their own since format 5 (R228 step 16), what each
+# file calls and the functions it passes by name: 85% of the index's bytes,
+# read by who-calls, coverage and preflight, and by none of the lookups a
+# session makes most (find, defs, draws), which read the rest in a tenth of
+# the time. Joined on the first question that asks for them (Index).
+CALLS_FILE = f"map{FORMAT}-calls.json"
+LAZY = ("calls", "passed")
 # vendor: libraries a project carries as they were published (the dashboard's
 # xterm.js, Go's vendor/), minified or not, and not its own code.
 SKIP_DIRS = {".git", "node_modules", "dist", "__pycache__", ".bb-map", "scratchpad", "vendor",
@@ -324,9 +333,11 @@ def handler_calls(text):
 API_PATH = re.compile(r"(/api/[\w/.-]+)")
 TREE_FILE = re.compile(r"(?<![\w/])((?:scripts|config|tools|docs)/[\w./-]+)")
 # The server's route table: a kind, an API path and the handler's name, on
-# one line. How a python change reaches a suite: the module's functions are
-# called from a handler, the handler answers a path, and the suite asks it.
-ROUTE = re.compile(r"""\(\s*"\w+"\s*,\s*"(/api/[^"]+)"\s*,\s*"(\w+)"\s*\)""")
+# one line, as a tuple of the three or inside a longer record that goes on
+# (a Route with its method before them and its gate after). How a python
+# change reaches a suite: the module's functions are called from a handler,
+# the handler answers a path, and the suite asks it.
+ROUTE = re.compile(r"""[(,]\s*"\w+"\s*,\s*"(/api/[^"]+)"\s*,\s*"(\w+)"\s*[,)]""")
 
 
 def strings_draw(s):
@@ -949,12 +960,18 @@ class JSScanner:
             self.fn_generic -= 1
             self.last_sig = ">"
             return
-        mm = getattr(self, "maybe_method", None)
+        mm, mm_depth = getattr(self, "maybe_method", None), getattr(self, "mm_depth", 0)
         self._punct(c)
-        if c == "(" and mm and self.parens - 1 > mm[2]:
+        now = self.maybe_method
+        if c == "(" and mm and self.parens - 1 > mm[2] and not (now is not None and now is not mm and self.depth > mm_depth):
             # a paren inside a method's own parameters, `(number | null)[]`
-            # or a default `x = f()`, does not undo the method's header
-            self.maybe_method = mm
+            # or a default `x = f()`, does not undo the method's header.
+            # Unless a brace has opened inside those parentheses since and
+            # the name stands where a method does: `walk(tree, {Program(p){`
+            # is a call handed an object, and Program is that object's method.
+            self.maybe_method, self.mm_depth = mm, mm_depth
+        elif now is not None and now is not mm:
+            self.mm_depth = self.depth
 
     def _punct(self, c):
         s = self.s
@@ -1294,8 +1311,11 @@ class JSScanner:
         self._prop = bool(m) and m.start(1) > 0 and head[m.start(1) - 1] == "."
         if m and m.group(1) not in self.kw:
             return m.group(1)
-        # `name: (...) =>` in an object
-        m = re.search(r"([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?" + self.params + r"\s*=>\s*$", head)
+        # `name: (...) =>` in an object: a key after the brace or a comma
+        # that opens its entry, as OBJ_KEY_ARROW reads one, and never the
+        # word before a conditional's colon (`x ? null : e => {`, B922).
+        m = re.search(r"(?:^|[{,])\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?" + self.params + r"\s*=>\s*$",
+                      head, re.M)
         if m:
             return m.group(1)
         return ""
@@ -1924,6 +1944,8 @@ def build(root, prior=None):
     which is every first question after an edit; this is a tenth of that.
     The flat lists the questions read are joined at load and not written."""
     root = Path(root)
+    if isinstance(prior, Index):
+        prior.join_calls(rebuild=False)
     kept = (prior or {}).get("files", {})
     files, scanned, fresh = {}, 0, {}
     for p, lang in sources(root):
@@ -1934,7 +1956,7 @@ def build(root, prior=None):
             continue
         old = kept.get(rel)
         if old and old.get("mtime") == mtime and old.get("lang") == lang and "defs" in old \
-                and old.get("scan") == SCANNER:
+                and "calls" in old and old.get("scan") == SCANNER:
             files[rel] = old
             continue
         try:
@@ -1984,13 +2006,21 @@ def build(root, prior=None):
     try:
         out.mkdir(exist_ok=True)
         exclude(root)
-        tmp = out / (INDEX_FILE + ".tmp")
-        tmp.write_text(json.dumps(idx))
-        tmp.replace(out / INDEX_FILE)
+        # Two files, the calls first: a core written beside the calls of an
+        # older build names another `built` than they do, and the first
+        # question that asks for the calls builds again rather than read them.
+        core = {k: v for k, v in idx.items() if k != "files"}
+        core["files"] = {rel: {k: v for k, v in e.items() if k not in LAZY} for rel, e in files.items()}
+        calls = {"built": idx["built"], "files": {rel: {k: e.get(k, []) for k in LAZY} for rel, e in files.items()}}
+        for name, body in ((CALLS_FILE, calls), (INDEX_FILE, core)):
+            tmp = out / (name + ".tmp")
+            tmp.write_text(json.dumps(body))
+            tmp.replace(out / name)
         # The index an older reader wrote stays behind otherwise, and two of
         # them were sitting beside this one at seven megabytes each.
         for old in out.glob("*.json"):
-            if old.name != INDEX_FILE and (old.name == "index.json" or re.fullmatch(r"map\d+\.json", old.name)):
+            if old.name not in (INDEX_FILE, CALLS_FILE) and (
+                    old.name == "index.json" or re.fullmatch(r"map\d+(-calls)?\.json", old.name)):
                 old.unlink(missing_ok=True)
         idx["kept"] = True
     except OSError:
@@ -2160,14 +2190,64 @@ def exclude(root):
         return False               # the map still builds; only the exclude is lost
 
 
+class Index(dict):
+    """The index as load and build hand it. idx["calls"] and idx["passed"]
+    are joined from CALLS_FILE on the first question that asks for them
+    (R228 step 16): a lookup of a definition reads a tenth of the bytes."""
+
+    def __missing__(self, key):
+        if key in LAZY:
+            self.join_calls()
+            return dict.__getitem__(self, key)
+        raise KeyError(key)
+
+    def get(self, key, default=None):
+        if key in LAZY and not dict.__contains__(self, key):
+            self.join_calls()
+        return dict.get(self, key, default)
+
+    def join_calls(self, rebuild=True):
+        """Each file's calls and passed names onto its entry, and the two
+        flat lists made. From the calls file beside the index when it is
+        this build's; otherwise the tree is scanned again (`rebuild`), or,
+        for a build about to rescan anyway, the entries are left without
+        them and so are rescanned."""
+        files = self["files"]
+        if any("calls" not in e for e in files.values()):
+            got = None
+            try:
+                got = json.loads((Path(self["root"]) / INDEX_DIR / CALLS_FILE).read_text())
+            except (OSError, ValueError, KeyError):
+                got = None
+            if not isinstance(got, dict) or got.get("built") != self.get("built") \
+                    or not isinstance(got.get("files"), dict):
+                if not rebuild:
+                    return
+                whole = build(Path(self["root"]))
+                files = whole["files"]
+                dict.__setitem__(self, "files", files)
+                for k in ("defs", "draws", "routes", "built"):
+                    dict.__setitem__(self, k, dict.__getitem__(whole, k))
+            else:
+                for rel, e in files.items():
+                    have = got["files"].get(rel) or {}
+                    for k in LAZY:
+                        e.setdefault(k, have.get(k, []))
+        for k in LAZY:
+            dict.__setitem__(self, k, [x for f in files.values() for x in f.get(k, [])])
+
+
 def flat(idx):
     """The per-file index with the lists the questions read joined on, and
     each definition's ordinal among the definitions of its name in its file,
     which is what coverage is keyed on: a line number moves with every edit
     above it, and after one section left the page every count read as
-    unreached."""
-    for k in ("defs", "calls", "draws", "routes", "passed"):
+    unreached. The calls and passed names wait for a question that asks."""
+    idx = idx if isinstance(idx, Index) else Index(idx)
+    for k in ("defs", "draws", "routes"):
         idx[k] = [x for f in idx["files"].values() for x in f.get(k, [])]
+    if all("calls" in e for e in idx["files"].values()):
+        idx.join_calls()
     for entry in idx["files"].values():
         seen = {}
         for d in entry.get("defs", []):
@@ -2177,10 +2257,11 @@ def flat(idx):
 
 
 def usable(prior):
-    """An index this reader wrote: its format, and every file entry whole."""
+    """An index this reader wrote: its format, and every file entry whole
+    (its calls are in CALLS_FILE)."""
     return (isinstance(prior, dict) and prior.get("format") == FORMAT
             and isinstance(prior.get("files"), dict)
-            and all(isinstance(v, dict) and "defs" in v and "calls" in v and "mtime" in v
+            and all(isinstance(v, dict) and "defs" in v and "mtime" in v
                     for v in prior["files"].values()))
 
 
@@ -2195,6 +2276,9 @@ def load(root, force=False):
             prior = None
     if not usable(prior):
         return build(root)
+    prior = Index(prior)
+    # Its calls are found beside it in this tree, wherever it was built.
+    dict.__setitem__(prior, "root", str(root))
     have = prior.get("files", {})
     now, langs = {}, {}
     for p, lang in sources(root):
@@ -2372,6 +2456,63 @@ def value_decls(idx, root, name, limit=20):
                             return out
         except OSError:
             continue
+    return out
+
+
+# A definition longer than this is printed to here, and the rest named.
+SHOW_LINES = 400
+
+
+def q_show(idx, name, root, first=False):
+    """`aerie map show`: each definition called NAME printed whole, or with
+    FILE:LINE the innermost definition holding that line; each headed by
+    where it is, what kind it is and its comment, then its lines numbered."""
+    m = re.match(r"^(.+):(\d+)$", name)
+    in_file = (lambda d, f: d["file"] == f or d["file"].endswith("/" + f))
+    if m and any(in_file(d, m.group(1)) for d in idx["defs"]):
+        f, ln = m.group(1), int(m.group(2))
+        held = [d for d in idx["defs"] if in_file(d, f) and d["line"] <= ln <= max(d["end"], d["line"])]
+        if not held:
+            return [f"nothing the map holds is around {name}: it is at its file's top level; "
+                    f"aerie map sections {f} reads the file by its parts"]
+        rows = [min(held, key=lambda d: max(d["end"], d["line"]) - d["line"])]
+    else:
+        rows = [d for d in idx["defs"] if d["name"] == name]
+    if not rows:
+        found = q_find(idx, name, root)
+        if found and not found[0].startswith("nothing "):
+            return found + ["(not a definition with a body: aerie map find says where it is declared)"]
+        import difflib
+        near = difflib.get_close_matches(name, sorted({d["name"] for d in idx["defs"]}), n=5, cutoff=0.75)
+        return [f"nothing defines {name}" + (f"; the nearest: {', '.join(near)}" if near else "")]
+    if first:
+        rows = rows[:1]
+    out = []
+    texts = {}
+    for d in rows:
+        end = max(d["end"], d["line"])
+        out.append(f"== {d['file']}:{d['line']}" + (f" to {end}" if end > d["line"] else "")
+                   + f"  {d['kind']}" + (f"  in {d['parent']}" if d["parent"] else ""))
+        # Its comment, where that sits above it; a python docstring is in
+        # the body printed below.
+        said = "" if d["file"].endswith(".py") else said_by(root, d)
+        if said:
+            out.append(f"   says: {said}")
+        if d["file"] not in texts:
+            try:
+                texts[d["file"]] = (Path(root) / d["file"]).read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                texts[d["file"]] = None
+        lines = texts[d["file"]]
+        if lines is None:
+            out.append("   (the file cannot be read)")
+            continue
+        body = lines[d["line"] - 1:end]
+        out += [f"{d['line'] + i:>6}  {t}" for i, t in enumerate(body[:SHOW_LINES])]
+        if len(body) > SHOW_LINES:
+            out.append(f"   ...and {len(body) - SHOW_LINES} more lines, to {end}")
+    if len(rows) > 1:
+        out.append(f"({len(rows)} definitions called {name}; --first prints the first alone)")
     return out
 
 
@@ -2640,6 +2781,14 @@ def _decorated(f, line):
 
 
 _STYLE = re.compile(r"<style[^>]*>(.*?)</style>", re.S)
+_LINKED = re.compile(r'<link rel="stylesheet" href="([\w./-]+\.css)">')
+
+
+def _read(p):
+    try:
+        return Path(p).read_text(errors="replace")
+    except OSError:
+        return ""
 _CSS_NOTE = re.compile(r"/\*.*?\*/", re.S)
 _CSS_PRELUDE = re.compile(r"([^{}]*)\{")   # a rule's selector, or an @media's condition
 _CSS_CLASS = re.compile(r"\.(-?[A-Za-z_][\w-]*)")
@@ -2664,10 +2813,17 @@ def unused_classes(idx, path=None, root="."):
             text = (Path(root) / f).read_text(errors="replace")
         except OSError:
             continue
-        if Path(f).suffix in (".html", ".htm") and (not path or f == path or f.endswith("/" + path)):
-            css = _CSS_NOTE.sub("", "\n".join(_STYLE.findall(text)))
-            if css.strip():
-                sheets.append((f, set(_CSS_CLASS.findall(" ".join(_CSS_PRELUDE.findall(css))))))
+        if Path(f).suffix in (".html", ".htm"):
+            # Its own <style>, and the stylesheets beside it that it links
+            # (the dashboard's, a file a cascade layer since R9 step 4), each
+            # said by its own file.
+            linked = [(str(Path(f).parent / h), Path(root) / Path(f).parent / h) for h in _LINKED.findall(text)]
+            for name, css in [(f, "\n".join(_STYLE.findall(text)))] + [(n, _read(q)) for n, q in linked]:
+                if path and not (f == path or f.endswith("/" + path) or name == path or name.endswith("/" + path)):
+                    continue
+                css = _CSS_NOTE.sub("", css)
+                if css.strip():
+                    sheets.append((name, set(_CSS_CLASS.findall(" ".join(_CSS_PRELUDE.findall(css))))))
         text = _STYLE.sub("", text)
         words.update(re.findall(r"[\w-]+", text))
         heads.update(_TPL_HEAD.findall(text))
@@ -2683,10 +2839,10 @@ def unused_classes(idx, path=None, root="."):
 
 
 def q_unused(idx, path=None, root="."):
-    css = [] if path and not path.endswith((".html", ".htm")) else unused_classes(idx, path, root)
+    css = [] if path and not path.endswith((".html", ".htm", ".css")) else unused_classes(idx, path, root)
     css_out = [f"{len(css)} class{'es' if len(css) != 1 else ''} the stylesheet styles and nothing names,"
                " whole or as a template's head or tail:"] + [f"  {f}  .{c}" for f, c in css] if css else []
-    if path and path.endswith((".html", ".htm")):
+    if path and path.endswith((".html", ".htm", ".css")):
         return css_out or [f"nothing in this page's stylesheet is unused by this measure ({path})"]
     out = q_functions_unused(idx, path, root)
     return out + css_out
@@ -2786,6 +2942,12 @@ def coverage_ingest(root, idx, files, strip=""):
     "counts": {"abs/path:firstline:name": n}}, matched to the map's own
     definitions by file and name, nearest line."""
     cov = coverage_load(root) or {"format": COVERAGE_FORMAT, "suites": {}}
+    # A suite this run counted is what this run saw of it, the counts of its
+    # runs before put away (R228 step 20): added to for good, what a suite
+    # stopped reaching, a function renamed and a folder moved (the agent's,
+    # 495 keys under its old name) stayed on it and planned it. Its files in
+    # one run (the page's, the server's, a rerun's) still add up.
+    fresh = set()
     py_by = {}
     for d in idx["defs"]:
         if idx["files"][d["file"]]["lang"] == "py" and d["kind"] == "def":
@@ -2796,7 +2958,10 @@ def coverage_ingest(root, idx, files, strip=""):
         except (OSError, ValueError):
             continue
         suite = got.get("suite") or Path(f).stem
-        counts = cov["suites"].setdefault(suite, {})
+        if suite not in fresh:
+            fresh.add(suite)
+            cov["suites"][suite] = {}
+        counts = cov["suites"][suite]
         for key, n in (got.get("counts") or {}).items():
             if "#" in key:
                 # the page's own key: file:name#k, from the instrumenter
@@ -2880,11 +3045,31 @@ def changed_ranges(root, base, files):
     return out
 
 
+# A function nearly every suite reaches (the status read, the page's draw)
+# is passed through by each on its way to what it tests, and a change to one
+# planned all of them: one that 70 of 85 suites reach was a whole gate (R228
+# step 20). Past MOST_SHARE of the covered suites, the MOST_TAKE that run it
+# most often stand for them. A whole gate still runs before a release, on
+# its tag, and when the harness changes.
+MOST_SHARE = 0.75
+MOST_TAKE = 12
+
+
+def most_reached(by, total):
+    """The suites to plan for a function `by` ({suite: count}) says reach
+    it: all of them, or past MOST_SHARE of `total` the MOST_TAKE that run it
+    most, the order of their names settling a tie."""
+    if total and len(by) > MOST_TAKE and len(by) >= MOST_SHARE * total:
+        return dict(sorted(by.items(), key=lambda kv: (-kv[1], kv[0]))[:MOST_TAKE])
+    return by
+
+
 def affected(idx, cov, ranges, root=None):
     """{suite stem: set of reasons}, plus the account: for each changed file,
     the functions and the drawn things its changed lines fall in, the suites
     coverage or the map say reach them, and what fell back to the file."""
     hit = covered_ids(cov) if cov else {}
+    total = len((cov or {}).get("suites", {}))
     suites, notes, unknown = {}, [], []
     every = False
     # How each changed function was placed, for preflight to say: measured
@@ -2938,7 +3123,7 @@ def affected(idx, cov, ranges, root=None):
                     if cd.get("end", cd["line"]) - cd["line"] >= 0.5 * max(
                             (x.get("end", x["line"]) for x in entry["defs"]), default=1):
                         continue
-                    got.update(hit.get(fid(cd)) or {})
+                    got.update(most_reached(hit.get(fid(cd)) or {}, total))
                 if not got:
                     got = through_callers(cn, hops - 1, seen, f, by_name, entry)
                 for s_ in got:
@@ -2947,7 +3132,11 @@ def affected(idx, cov, ranges, root=None):
         for d in fns:
             by = hit.get(fid(d))
             if by:
-                for s_ in by:
+                most = most_reached(by, total)
+                if len(most) < len(by):
+                    notes.append(f"{f}:{d['line']} {d['name']}: reached by {len(by)} of {total} suites, "
+                                 f"planned by the {len(most)} that run it most")
+                for s_ in most:
                     suites.setdefault(s_, set()).add(f"{d['name']}()")
                 found.add(d["name"])
                 LAST_ACCOUNT["measured"] += 1
@@ -3508,7 +3697,7 @@ def q_sections(idx, path, cov=None):
 
 # Every verb a person asks, in one line: what bare `aerie map` ends with, and
 # what bb's own usage names (B546: the two had drifted apart).
-VERBS = ("aerie map find NAME | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
+VERBS = ("aerie map find NAME | show NAME|FILE:LINE | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
          "state [FILE] | sections FILE | unused [FILE] | addresses [FILE...] | coverage | covered NAME | "
          "uncovered [FILE] | affected --base REF FILES... | languages | build; aerie map help says what each does")
 LANG_WORDS = {"py": "python", "c": "C and C++", "js": "brace scanner (C-shaped languages)",
@@ -3652,6 +3841,16 @@ def main(argv):
     if verb == "uncovered":
         print("\n".join(q_uncovered(idx, coverage_load(root), rest[0] if rest else None)))
         return 0
+    if verb == "show":
+        names = [r for r in rest if r != "--first"]
+        if not names:
+            print("aerie map show NAME|FILE:LINE [--first]", file=sys.stderr)
+            return 2
+        out = []
+        for n in names:
+            out += ([f"$ aerie map show {n}"] if len(names) > 1 else []) + q_show(idx, n, root, "--first" in rest)
+        print("\n".join(out))
+        return 0
     need = {"find": 1, "who-calls": 1, "calls": 1, "defs": 1, "draws": 1, "suites": 1}
     if verb not in need:
         print(f"aerie map: no verb called {verb}; aerie map -h lists them", file=sys.stderr)
@@ -3670,6 +3869,15 @@ def main(argv):
         else:
             rows = [d for d in idx["defs"] if d["file"] == name or d["file"].endswith("/" + name)]
         sys.stdout.write(records.dump(records.document("map", rows, Path(root).name), fmt))
+        return 0
+    if verb == "find" and len(rest) > 1:
+        # Several names in one process (R228 step 16), each answer under the
+        # line that asks it: the rule hook asks all of one grep's names at
+        # once, where each was a process and a load of the index.
+        out = []
+        for n in rest:
+            out += [f"$ aerie map find {n}", *q_find(idx, n, root)]
+        print("\n".join(out))
         return 0
     if verb == "find":
         lines = q_find(idx, rest[0], root)

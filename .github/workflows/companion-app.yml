@@ -7,12 +7,29 @@
 # version, for every controller on that version to fetch, check and offer
 # on its card in the Library (apps.py).
 #
-# Only when build-image.yml starts it for a tag's draft, or by hand for a release that exists: a
-# hosted Windows runner bills twice a Linux one's minutes, and a build on
-# every push kept as an artifact is what filled the account's Actions
-# storage once already (B669). Signed when the repository holds a
-# code-signing certificate (BB_WIN_CERT_PFX_B64 and BB_WIN_CERT_PASSWORD);
-# built unsigned and said so in the log where it does not.
+# Only as a job of a tag's own run (build-image.yml calls it, and its files
+# are handed to that run's last job, which makes the release), in a
+# rehearsal, or by hand for a release that exists, where it attaches them
+# itself: a hosted Windows runner bills twice a Linux one's minutes, and a
+# build on every push kept as an artifact is what filled the account's
+# Actions storage once already (B669). Signed where the run is a tag's and
+# the windows-signing environment holds a code-signing certificate
+# (BB_WIN_CERT_PFX_B64 and BB_WIN_CERT_PASSWORD): the Windows job names that
+# environment on a tag's ref alone, and the environment admits v* tags and
+# nothing else, so a run by hand from a branch, a rehearsal, or a branch's
+# own rewrite of this file is handed no certificate. Built unsigned and said
+# so in the log where it is not handed one.
+#
+# Each file built for a release carries a build attestation, made by the
+# job that built it (R199): the release's list of its files is signed only
+# over files whose attestation verifies (tools/release-sign.py seal
+# --attested), and these four had none. The attestation's certificate names
+# this file at the ref the run is on, also where a tag's run calls it, so
+# the seal takes a companion file from this workflow run on the release's
+# tag and from nothing else. A run by hand for a release is its tag's only
+# when started from the tag (Use workflow from: the tag); from a branch its
+# files are attested as that branch's and the seal refuses them. A rehearsal
+# names no release and attests nothing.
 name: companion app
 
 on:
@@ -21,21 +38,30 @@ on:
       tag:
         description: "the release to attach the .exe to"
         required: true
-  # A release rehearsed (release-rehearsal.yml, R190 step 2): built with no
-  # tag, named for the branch's version, and attached to nothing.
+  # Called by a tag's run (build-image.yml, R206 step 1): named for the tag
+  # and handed on as that run's artifacts, for its last job to put on the
+  # release it makes. And a release rehearsed (release-rehearsal.yml, R190
+  # step 2): built with no tag, named for the branch's version, handed on
+  # the same way and attached to nothing.
   workflow_call:
     inputs:
       tag:
         type: string
         default: ""
+      hand-on:
+        type: boolean
+        default: false
+    # No secret is handed in: the certificate is the windows-signing
+    # environment's, read by the Windows job on a tag's ref alone.
 
 permissions:
   contents: write
 
 # One group per release, and one per branch for a push or a rehearsal: a
-# rehearsal must never cancel a release's own build.
+# rehearsal must never cancel a release's own build, and a run by hand for
+# a tag is not the tag's own run (the workflow's name is the caller's).
 concurrency:
-  group: companion-app-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  group: companion-app-${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,52 +69,113 @@ jobs:
   portable:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # The release it attaches to when run by hand, and the attestation of
+    # what it builds.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    # The version every file here is named for: the tag's, or with no tag
+    # (a rehearsal) aerie version's of this checkout. Said once, here, for
+    # the Windows job too: aerie version does not load on Windows, and a
+    # rehearsal's .exe failed asking it there (14 Nov).
+    outputs:
+      version: ${{ steps.name.outputs.v }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
           fetch-depth: 0   # a rehearsal's name is aerie version's, which counts commits
 
-      - name: Build the .pyz and the .vsix
+      - name: The version the files are named for
+        id: name
         run: |
           set -eo pipefail
           v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
+          [ -n "$v" ] || { echo "::error::no version to name the files for"; exit 1; }
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build the .pyz and the .vsix
+        env:
+          VER: ${{ steps.name.outputs.v }}
+        run: |
+          set -eo pipefail
+          v="$VER"
           python3 tools/companion-build.py --version "$v" --out "dist/aerieos-companion-$v.pyz"
           python3 tools/vscode-vsix.py --version "$v" --out "dist/aerieos-vscode-$v.vsix"
 
-      - name: Attach them to the release with their sha256
+      - name: Write each one's sha256 beside it
+        run: |
+          set -eo pipefail
+          cd dist
+          for f in aerieos-companion-*.pyz aerieos-vscode-*.vsix; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      # For a release alone: a rehearsal's files are no release's.
+      - name: Attest the .pyz and the .vsix
         if: env.TAG != ''
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            dist/aerieos-companion-*.pyz
+            dist/aerieos-vscode-*.vsix
+
+      - name: Attach them to the release that exists
+        if: env.TAG != '' && !inputs.hand-on
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
-          cd dist
-          files=()
-          for f in aerieos-companion-*.pyz aerieos-vscode-*.vsix; do
-            sha256sum "$f" > "$f.sha256"
-            files+=("$f" "$f.sha256")
-          done
-          bash ../tools/release-attach.sh "$TAG" "${files[@]}"
+          bash tools/release-attach.sh "$TAG" dist/aerieos-companion-*.pyz dist/aerieos-companion-*.pyz.sha256 \
+            dist/aerieos-vscode-*.vsix dist/aerieos-vscode-*.vsix.sha256
+
+      # A day, the shortest there is: read by the last job of the same run.
+      - name: Hand them to the run's last job
+        if: inputs.hand-on
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-apps-portable
+          path: |
+            dist/aerieos-companion-*.pyz
+            dist/aerieos-companion-*.pyz.sha256
+            dist/aerieos-vscode-*.vsix
+            dist/aerieos-vscode-*.vsix.sha256
+          if-no-files-found: error
+          retention-days: 1
 
   build:
+    needs: portable
     runs-on: windows-2025
     timeout-minutes: 30
+    # The code-signing certificate's environment, named on a tag's ref
+    # alone (no environment, and no certificate, on any other); it admits
+    # v* tags, so a job a branch rewrites to name it is refused by GitHub.
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'windows-signing' || '' }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     defaults:
       run:
         shell: bash
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      VER: ${{ needs.portable.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
-        with:
-          fetch-depth: 0   # aerie version counts commits
 
       - name: Build the .exe
         run: |
           set -eo pipefail
-          python -m pip install --disable-pip-version-check --quiet pyinstaller
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
+          # PyInstaller and what it needs, each at one version and each
+          # file held to its sha256 (tools/companion-requirements.txt):
+          # this job signs the two .exe with the Windows certificate and
+          # attests them, and took whatever PyPI served that day.
+          python -m pip install --disable-pip-version-check --quiet --require-hashes --only-binary :all: \
+            -r tools/companion-requirements.txt
+          v="$VER"
           printf '%s\n' "$v" > apps/windows/bbcompanion/VERSION
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"
           python -m PyInstaller --noconfirm --onefile --windowed --name "aerieos-companion-$v" \
@@ -109,19 +196,19 @@ jobs:
       - name: Build the USB Maker
         run: |
           set -eo pipefail
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
+          v="$VER"
           python -m PyInstaller --noconfirm --onefile --windowed --uac-admin --name "aerieos-usb-maker-$v" \
             --add-data "tools/aerieos-stick.py;." --distpath dist tools/aerieos-usb-maker.py
           echo "USBEXE=dist/aerieos-usb-maker-$v.exe" >> "$GITHUB_ENV"
 
-      - name: Sign it where the repository holds a certificate
+      - name: Sign it where a tag's run is handed the certificate
         env:
           BB_WIN_CERT_PFX_B64: ${{ secrets.BB_WIN_CERT_PFX_B64 }}
           BB_WIN_CERT_PASSWORD: ${{ secrets.BB_WIN_CERT_PASSWORD }}
         run: |
           set -eo pipefail
           if [ -z "$BB_WIN_CERT_PFX_B64" ]; then
-            echo "no code-signing certificate in this repository's secrets: the .exe is unsigned, and Windows says so on first run"
+            echo "no code-signing certificate for this run (a tag's run reads it from the windows-signing environment): the .exe is unsigned, and Windows says so on first run"
             exit 0
           fi
           printf '%s' "$BB_WIN_CERT_PFX_B64" | base64 -d > "$RUNNER_TEMP/cert.pfx"
@@ -130,15 +217,40 @@ jobs:
             //tr http://timestamp.digicert.com //td sha256 "$EXE" "$USBEXE"
           rm -f "$RUNNER_TEMP/cert.pfx"
 
-      - name: Attach it to the release with its sha256
+      - name: Write each one's sha256 beside it
+        run: |
+          set -eo pipefail
+          for f in "$EXE" "$USBEXE"; do
+            sha256sum "$f" | sed 's|dist/||' > "$f.sha256"
+          done
+
+      # After the code signing, which changes the bytes: what is attested
+      # is the file a person downloads. For a release alone.
+      - name: Attest the two .exe
         if: env.TAG != ''
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            dist/aerieos-companion-*.exe
+            dist/aerieos-usb-maker-*.exe
+
+      - name: Attach them to the release that exists
+        if: env.TAG != '' && !inputs.hand-on
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
-          files=()
-          for f in "$EXE" "$USBEXE"; do
-            sha256sum "$f" | sed 's|dist/||' > "$f.sha256"
-            files+=("$f" "$f.sha256")
-          done
-          bash tools/release-attach.sh "$TAG" "${files[@]}"
+          bash tools/release-attach.sh "$TAG" "$EXE" "$EXE.sha256" "$USBEXE" "$USBEXE.sha256"
+
+      - name: Hand them to the run's last job
+        if: inputs.hand-on
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-apps-windows
+          path: |
+            dist/aerieos-companion-*.exe
+            dist/aerieos-companion-*.exe.sha256
+            dist/aerieos-usb-maker-*.exe
+            dist/aerieos-usb-maker-*.exe.sha256
+          if-no-files-found: error
+          retention-days: 1

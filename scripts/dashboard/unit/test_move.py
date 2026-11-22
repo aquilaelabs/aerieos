@@ -5,6 +5,7 @@ moved, and what the new home answers a node's knock; and the second pass
 (R175): the move armed with no life and the bundle packed fresh, a late
 node handed its challenge after the move, the landing told both ways under
 the move key, the pull's proof, the pieces, and the nodes not yet here."""
+import contextlib
 import io
 import json
 import os
@@ -46,7 +47,7 @@ class Move(unittest.TestCase):
     def configure(self, state, bare, url="https://old.example/"):
         self.audits = []
         move.configure(state=state, workspace=self.ws, secrets_dir=str(self.secrets), write_json_fn=write_json,
-                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 19, build_version_fn=lambda: "0.9.0",
+                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 27, build_version_fn=lambda: "0.9.0",
                        install_key_fn=lambda: b"k" * 32, store_paths_fn=lambda: {"gitrelay": str(self.store), "logs": str(self.tmp / "logs")},
                        page_url_fn=lambda: url, node_ids_fn=lambda: ["n_1", "n_2"], bare_metal_fn=lambda: bare,
                        node_name_fn=lambda nid: {"n_1": "alpha", "n_2": "beta"}.get(nid, nid),
@@ -54,7 +55,7 @@ class Move(unittest.TestCase):
 
     def _land(self, path, token):
         return move.restore(str(path), token, state_dir=self.tmp / "new-config", workspace_dir=self.tmp / "new-ws",
-                            secrets_dir=self.tmp / "new-secrets", build_state_version=19, here_bare_metal=False)
+                            secrets_dir=self.tmp / "new-secrets", build_state_version=27, here_bare_metal=False)
 
     def _pieces(self, path):
         """The bundle's head (its two lines) and its pieces, each with its
@@ -79,7 +80,7 @@ class Move(unittest.TestCase):
         head, pieces = self._pieces(path)
         self.assertEqual(json.loads(head.split(b"\n")[1])["format"], 2)
         self.assertGreater(len(pieces), 10)
-        bad = self.tmp / "bad.bbmove"
+        bad = self.tmp / "bad.aeriemove"
         for why, body in (("a piece dropped", pieces[:3] + pieces[4:]), ("two pieces swapped", [pieces[1], pieces[0]] + pieces[2:]),
                           ("the last piece missing", pieces[:-1]), ("junk after the last", pieces + [b"junk"])):
             bad.write_bytes(head + b"".join(body))
@@ -134,7 +135,7 @@ class Move(unittest.TestCase):
         # one its content does not hold) and line endings.
         blob = (os.urandom((1 << 20) - 7) + b"\r\n--XY" + b"\r\n" * 9 + os.urandom(3 << 20)).replace(b"XYZ", b"XYQ") * 2
         form = (b"--XYZ\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n tok-1 \r\n"
-                b"--XYZ\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"b.bbmove\"\r\n"
+                b"--XYZ\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"b.aeriemove\"\r\n"
                 b"Content-Type: application/octet-stream\r\n\r\n" + blob + b"\r\n"
                 b"--XYZ\r\nContent-Disposition: form-data; name=\"from\"\r\n\r\n\r\n--XYZ--\r\n")
         src, dest = self.tmp / "form", self.tmp / "file"
@@ -155,22 +156,33 @@ class Move(unittest.TestCase):
         with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=2 << 30)):
             why = move.room_for(5 << 30, self.tmp)
         self.assertIn("without the repositories", why)
-        self.assertIn("spaces folder on This machine", why)
+        self.assertIn("spaces folder on the Nodes page", why)
         with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=20 << 30)):
             self.assertEqual(move.room_for(5 << 30, self.tmp), "")
 
-    def test_a_bundle_of_the_format_before_still_lands(self):
+    def test_a_bundle_from_before_the_held_manifest_is_refused(self):
+        # A bundle of the format before, one whose body carries no mark, and
+        # one whose manifest names no state: each refused, nothing changed.
         r = move.prepare("user:ann", "https://new.example")
         token = r["token"]
         raw, counts = move.pack()
-        m = {"format": 1, "version": "0.9.0", "state_version": 19, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
+        m = {"format": 1, "version": "0.9.0", "state_version": 27, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
              "to": "https://new.example", "repos": False, "carries_key": False, "nodes": ["n_1"], "bare_metal": False, "counts": counts,
              "token_hash": move.token_hash(token)}
-        old = self.tmp / "old.bbmove"
+        old = self.tmp / "old.aeriemove"
         old.write_bytes(move.HEADER + json.dumps(m).encode() + b"\n" + signing.seal(raw, move.key_of(token)))
-        got = self._land(old, token)
-        self.assertTrue(got.get("ok"), got)
-        self.assertTrue((self.tmp / "new-config" / "users.json").is_file())
+        self.assertIn("format this build does not read", self._land(old, token).get("error", ""))
+        with mock.patch.object(move, "MANIFEST_MARK", "elsewhere.json"):
+            r = move.prepare("user:ann", "https://new.example")
+        got = self._land(move.bundle_path(), r["token"])
+        self.assertIn("too old to land here", got.get("error", ""))
+        with mock.patch.object(move, "state_version", lambda: 0):
+            r = move.prepare("user:ann", "https://new.example")
+        self.assertEqual(json.loads(move.bundle_path().read_bytes().split(b"\n")[1])["state_version"], 0)
+        got = self._land(move.bundle_path(), r["token"])
+        self.assertIn("nothing updates from", got.get("error", ""))
+        self.assertFalse((self.tmp / "new-config" / "users.json").exists(), "nothing here changed")
+        self.assertEqual([p.suffix for p in (self.state / "move").iterdir()], [".aeriemove"], "the bundle before went with the next")
 
     def test_a_manifest_changed_after_the_bundle_was_made_is_refused(self):
         # B724: the plain line's origin, kind and versions were believed.
@@ -183,7 +195,7 @@ class Move(unittest.TestCase):
                           ("mac taken off", lambda x: x.pop("mac"))):
             changed = dict(m)
             edit(changed)
-            bad = self.tmp / f"bad-{len(why)}.bbmove"
+            bad = self.tmp / f"bad-{len(why)}.aeriemove"
             bad.write_bytes(head + b"\n" + json.dumps(changed).encode() + b"\n" + body)
             got = self._land(bad, r["token"])
             self.assertIn("outer details were changed", got.get("error", ""), why)
@@ -241,7 +253,13 @@ class Move(unittest.TestCase):
         self.configure(new_state, bare=True, url="https://new.example/")
         nh = move.not_yet_here()
         self.assertEqual([x["name"] for x in nh], ["alpha", "beta"])
-        self.assertEqual(nh[0]["line"], f"builderbot-agent follow https://new.example/ {fn['expect']}")
+        self.assertEqual(nh[0]["line"], f"aerieos-agent follow https://new.example {fn['expect']}", "the address the move named (B936)")
+        move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
+        try:
+            self.assertTrue(move.not_yet_here()[1]["line"].startswith("aerieos-agent follow https://aerie.example.com "),
+                            "a node at the public hostname is followed there")
+        finally:
+            move.tunnel_host = lambda nid: ""
         move.node_here("n_1")
         move.node_here("n_9")
         self.assertEqual([x["id"] for x in move.not_yet_here()], ["n_2"], "a hello here takes a node off the list; a stranger is nobody's")
@@ -253,6 +271,27 @@ class Move(unittest.TestCase):
         fn2 = move.challenge(move.key_of(token), "n_2")
         self.assertEqual(move.for_node("n_2"), {"url": "https://new.example", "expect": fn2})
         self.assertEqual(move.answer_for("n_2"), "", "the old home answers no knock")
+        # Its 410 to a late node names the key to knock under, this
+        # controller's own, which went with its state: a node that pinned a
+        # certificate before keys were pinned knocked with no pin at all.
+        pin = "sha256//" + "A" * 43 + "="
+        self.assertEqual(move.moved_answer("n_2", pin), {"error": "this controller moved", "moved": True, "to": "https://new.example",
+                                                         "move": {"url": "https://new.example", "expect": fn2, "pin": pin}})
+        self.assertEqual(move.moved_answer("n_2", "")["move"], {"url": "https://new.example", "expect": fn2}, "a port under no key names none")
+        self.assertEqual(move.moved_answer("", pin), {"error": "this controller moved", "moved": True, "to": "https://new.example"},
+                         "a caller it does not know is told where, and nothing of a node's")
+        with open(os.path.join(os.path.dirname(__file__), "..", "server.py"), encoding="utf-8") as f:
+            self.assertIn('self._json(move.moved_answer(late.get("node") or "", tls.key_pin()), 410)', f.read())
+        # A node enrolled at the home tunnel's public hostname is told that
+        # hostname, never the new home's local address (the operator, 10 Nov:
+        # a server elsewhere could not follow a move to a LAN address).
+        move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
+        try:
+            self.assertEqual(move.for_node("n_2")["url"], "https://aerie.example.com")
+            self.assertEqual(move.for_node("n_1")["url"], "https://new.example")
+            self.assertEqual(move.node_url("n_2", "http://192.168.1.15:7680"), "https://aerie.example.com")
+        finally:
+            move.tunnel_host = lambda nid: ""
         self.assertIn("moved already", move.prepare("user:ann", "https://x.example")["error"])
         self.assertIn("not withdrawn", move.forget("user:ann")["error"])
 
@@ -438,12 +477,16 @@ class Move(unittest.TestCase):
         c = move.cut_landing(new_state)
         self.assertTrue(c and c["stamp"], c)
         self.assertTrue(Path(c["aside"]).is_dir() and (Path(c["aside"]) / "fresh.json").is_file(), "what was here, kept whole aside")
-        with mock.patch.object(move, "STATE", new_state):
+        out = io.StringIO()
+        with mock.patch.object(move, "STATE", new_state), contextlib.redirect_stdout(out):
             rows = move.cut_landing_rows()
+            again = move.cut_landing_rows()
         self.assertEqual(len(rows), 1)
-        self.assertIn("cut midway", rows[0]["why"])
-        self.assertIn(os.path.basename(c["aside"]), rows[0]["why"])
-        self.assertIn("Land the same bundle again", rows[0]["why"])
+        self.assertRegex(rows[0]["why"], r"^A move's landing was cut midway on [^.]*: landing the same bundle again with its token, "
+                                         r"from Controller settings, finishes it$", "one sentence")
+        self.assertEqual(again, rows)
+        # ...where what was here is kept, in the log, once.
+        self.assertEqual(out.getvalue().count(c["aside"]), 1, out.getvalue())
         # The same bundle again, with its token: the landing finishes and the mark goes.
         move._into = real_into
         got = move.restore(bundle, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
@@ -466,7 +509,7 @@ class Move(unittest.TestCase):
         os.chmod(parent, 0o555)
         self.addCleanup(os.chmod, parent, 0o755)
         got = move.restore(path, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets",
-                           build_state_version=19, here_bare_metal=False)
+                           build_state_version=27, here_bare_metal=False)
         self.assertTrue(got.get("ok"), got)
         self.assertTrue((new_state / "users.json").is_file())
         self.assertTrue((Path(got["moved_aside"]) / "fresh.json").is_file(), "set aside, never deleted")
@@ -481,27 +524,93 @@ class Move(unittest.TestCase):
         blocker.write_text("not a folder")
         with mock.patch.object(move, "store_paths", lambda: {"gitrelay": str(blocker / "gitrelay")}):
             got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws",
-                               secrets_dir=self.tmp / "new-secrets", build_state_version=19, here_bare_metal=False)
+                               secrets_dir=self.tmp / "new-secrets", build_state_version=27, here_bare_metal=False)
         self.assertTrue(got.get("ok"), got)
         self.assertTrue((new_state / "gitrelay" / "alpha.git" / "HEAD").is_file())
         self.assertNotIn("gitrelay", json.loads((new_state / "paths.json").read_text()))
 
-    def test_a_state_this_build_no_longer_upgrades_from_is_refused(self):
+    def test_a_state_this_build_does_not_read_is_refused(self):
         # B600: before it lands, not at the next start.
         r = move.prepare("user:ann", "https://new.example")
         with mock.patch.object(move.stateversion, "SUPPORTED_FROM", 99):
             got = self._land(self.tmp / "config" / "move" / r["bundle"], r["token"])
-        self.assertIn("upgrades from 99 on", got.get("error", ""))
+        self.assertIn("which nothing updates from, so it cannot land here", got.get("error", ""))
 
     def test_what_a_landing_sets_aside_is_never_carried(self):
-        for name in (".moved-1", ".move-upload-2", ".reset-3"):
+        # ...nor the state's own copies (copies of copies: 2.1 GB of the dev
+        # instance's 2.2 GB bundle, 18 Nov).
+        for name in (".moved-1", ".move-upload-2", ".reset-3", "backups", "backup"):
             (self.state / name).mkdir()
             (self.state / name / "big").write_text("x")
         move.prepare("user:ann", "https://new.example")
         import tarfile
         raw, _ = move.pack()
         with tarfile.open(fileobj=__import__("io").BytesIO(raw)) as t:
-            self.assertEqual([n for n in t.getnames() if ".mov" in n or ".reset" in n], [])
+            self.assertEqual([n for n in t.getnames() if ".mov" in n or ".reset" in n or "/backup" in n], [])
+
+    def test_the_running_dashboards_own_files_are_never_carried_nor_swapped(self):
+        # The supervisor watches .server.pid and the lock keeps one server on
+        # the folder: a landing that swapped in the old controller's had a
+        # second dashboard started on the half-swapped state (walked 18 Nov).
+        (self.state / ".server.pid").write_text("4242\n")
+        (self.state / ".server.lock").write_text("")
+        r = move.prepare("user:ann", "https://new.example")
+        import tarfile
+        raw, _ = move.pack()
+        with tarfile.open(fileobj=__import__("io").BytesIO(raw)) as t:
+            self.assertEqual([n for n in t.getnames() if ".server." in n], [])
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        (new_state / ".server.pid").write_text("777\n")
+        (new_state / ".server.lock").write_text("")
+        self.configure(new_state, bare=False)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual((new_state / ".server.pid").read_text(), "777\n", "the running dashboard's pid stays in place")
+        self.assertTrue((new_state / ".server.lock").is_file())
+        self.assertFalse((Path(got["moved_aside"]) / ".server.pid").exists(), "never set aside with the old state")
+
+    def test_deploy_keys_go_to_the_helper_where_this_home_cannot_write_them(self):
+        # B966: the home's deploy-keys folder is the root helper's; a landing
+        # that merged into it stopped there and went back whole.
+        dk = self.state / "deploy-keys"
+        dk.mkdir()
+        (dk / "web-deploy.sealed").write_text("sealed")
+        (dk / "web-deploy.pub").write_text("ssh-ed25519 AAAA web-deploy")
+        r = move.prepare("user:ann", "https://new.example")
+        new_state = self.tmp / "new-config"
+        (new_state / "deploy-keys").mkdir(parents=True)
+        os.chmod(new_state / "deploy-keys", 0o500)
+        self.addCleanup(os.chmod, new_state / "deploy-keys", 0o700)
+        self.configure(new_state, bare=False)
+        handed = []
+
+        def keep(folder):
+            handed.append(sorted(os.listdir(folder)))
+            return "1 deploy keys came with it, loaded"
+        with mock.patch.object(move, "place_deploy_keys", keep):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual(handed, [["web-deploy.pub", "web-deploy.sealed"]])
+        self.assertIn("1 deploy keys came with it, loaded", got["said"])
+        self.assertEqual(os.listdir(new_state / "deploy-keys"), [], "nothing written there by the landing itself")
+
+    def test_a_landing_says_a_key_left_behind_and_spaces_with_no_folder(self):
+        # B953, B956: what stays locked, and the spaces whose repositories
+        # did not come, said in the landing's result.
+        (self.state / "claude-prefs.json").write_text(json.dumps({"projects": {"alpha": {}, "gone": {}}}))
+        r = move.prepare("user:ann", "https://new.example")
+        new_state, new_ws = self.tmp / "new-config", self.tmp / "new-ws"
+        new_state.mkdir()
+        (new_ws / "alpha").mkdir(parents=True)
+        self.configure(new_state, bare=False)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=new_ws, secrets_dir=self.tmp / "new-secrets")
+        said = " | ".join(got.get("said") or [])
+        self.assertIn("the old install's key did not come with it", said)
+        self.assertIn("1 of the moved spaces have no folder here (gone)", said)
 
     def test_a_prepared_move_is_forgotten_and_a_bad_address_refused(self):
         self.assertIn("http://", move.prepare("user:ann", "new.example")["error"])

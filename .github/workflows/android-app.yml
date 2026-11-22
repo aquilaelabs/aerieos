@@ -1,6 +1,11 @@
-# The companion app, built on a node. The node's runner carries the JDK and
-# the Android SDK from its toolchain store (the same environment every bb
-# job gets), so the build is `gradlew` and nothing else. The build is an
+# The companion app, built on a node, and a release's on a hosted runner.
+# The node's runner carries the JDK and the Android SDK from its toolchain
+# store (the same environment every bb job gets), so the build is `gradlew`
+# and nothing else. A release's own build, the one the controller signs and
+# the release carries, runs on a hosted runner instead: the node's runner
+# is the machine a pull request's lint and suites run on, and what one job
+# leaves behind there (a Gradle cache, a file on its PATH) the next would
+# build with. The build is an
 # UNSIGNED release APK, always: no key, alias or password is a GitHub secret
 # (R106, the operator 22 Oct: four hand-set secrets failed three ways and one
 # put a password in a public log). It lands in AerieOS's own dist/ on the
@@ -29,35 +34,59 @@ on:
   # ...and for each release, handed to the controller to sign and attach
   # under the release's version with its sha256, for every controller on
   # that version to fetch and offer (R272 step 2, apps.py).
-  # A release whose APK did not land (v0.5.0's, B117) is built again from
-  # its tag and handed over by naming the tag here; left empty, a plain build.
+  # A release's tag named here builds its tree again, for dist/ and aerie
+  # sign; left empty, a plain build. The controller signs a release's APK
+  # only from the tag's own run (releasesign.py), so a release whose APK
+  # did not land (v0.5.0's, B117) gets it by that run's Re-run all jobs,
+  # and what a run by hand uploads is refused there, saying so.
+  # `hosted` builds on the hosted runner a tag's own run builds on, so the
+  # build a release carries is proved before a tag needs it.
   workflow_dispatch:
     inputs:
       tag:
-        description: "a release to build from its tag and hand to the controller to sign (empty: a plain build)"
+        description: "a release to build again from its tag, for dist/ (empty: a plain build); the controller signs only the tag's own run"
         required: false
         default: ""
-  # A release rehearsed (release-rehearsal.yml, R190 step 2): a plain build
-  # of the branch, handed to nobody.
+      hosted:
+        description: "build on the hosted runner a tag's run builds on, not the node"
+        type: boolean
+        default: false
+  # Called by a tag's run (build-image.yml, R206 step 1) with the tag, as a
+  # release's own build; and a release rehearsed (release-rehearsal.yml,
+  # R190 step 2): a plain build of the branch on the hosted runner a tag's
+  # run builds on, handed to nobody but the rehearsal's own dry seal
+  # (`rehearse`), which signs it with a key of its own and seals it as a
+  # release's signed APK is sealed.
   workflow_call:
     inputs:
       tag:
         type: string
         default: ""
+      hosted:
+        type: boolean
+        default: false
+      rehearse:
+        type: boolean
+        default: false
 
 # Read only: the controller attaches the signed APK with its own token.
 permissions:
   contents: read
 
 # One group per release, and one per branch for a push or a rehearsal: a
-# rehearsal must never cancel a release's own build.
+# rehearsal must never cancel a release's own build, and a run by hand for
+# a tag is not the tag's own run (the workflow's name is the caller's).
 concurrency:
-  group: android-app-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  group: android-app-${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: [self-hosted, bb-sandbox]
+    # A tag's own run on a hosted runner, which starts clean and which no
+    # pull request's job has touched, and so a rehearsal or a run by hand
+    # that asks for it (hosted); every other build (a push to main, a run
+    # by hand for dist/) on the node.
+    runs-on: ${{ fromJSON(((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.hosted) && '["ubuntu-24.04"]' || '["self-hosted", "bb-sandbox"]') }}
     timeout-minutes: 40
     # bash with pipefail (the default `bash -e` has it too, said here because
     # every step below pipes into tee, and a tee's success must not be the
@@ -121,6 +150,15 @@ jobs:
             echo "code=${c:-1}"
           } >> "$GITHUB_OUTPUT"
 
+      # On a hosted runner the JDK is the image's own 17, named for Gradle,
+      # and the Android SDK the one ANDROID_HOME names there.
+      - name: The hosted runner's JDK 17
+        if: runner.environment == 'github-hosted'
+        run: |
+          [ -n "${JAVA_HOME_17_X64:-}" ] || { echo "::error::this runner names no JDK 17 (JAVA_HOME_17_X64)"; exit 1; }
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+
       # Unsigned, always (R106): the release build type has no signing
       # config, so Gradle writes app-release-unsigned.apk, which installs
       # nowhere until it is signed. A debug build is never made here (B274:
@@ -156,6 +194,7 @@ jobs:
           fi
 
       - name: Land it in AerieOS's dist/ where the share is mounted
+        if: runner.environment == 'self-hosted'
         run: |
           exec > >(tee -a "$CI_LOG") 2>&1
           echo "== Land it in AerieOS's dist/"
@@ -190,6 +229,17 @@ jobs:
           name: bb-release-apk-${{ steps.name.outputs.tag }}
           path: release-apk/*.apk
           retention-days: 3
+          if-no-files-found: error
+
+      # A rehearsal's: the unsigned APK to its own dry seal, under a name the
+      # controller never fetches, for a day.
+      - name: Hand the unsigned APK to the rehearsal's dry seal
+        if: inputs.rehearse && steps.name.outputs.tag == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2, pinned by commit (B274)
+        with:
+          name: rehearsal-apk
+          path: ${{ steps.name.outputs.file }}
+          retention-days: 1
           if-no-files-found: error
 
       - name: Close the log

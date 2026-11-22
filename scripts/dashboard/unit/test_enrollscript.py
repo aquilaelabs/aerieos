@@ -233,7 +233,7 @@ class HostingFirewall(unittest.TestCase):
 
     def test_the_rules_hold_docker_s_ports_too(self):
         text = open(self.PROV, encoding="utf-8").read()
-        m = re.search(r"^ *cat > /etc/builderbot/hosting-fw\.nft <<NFT\n(.*?)^NFT$", text, re.S | re.M)
+        m = re.search(r"^ *cat > /etc/aerieos/hosting-fw\.nft <<NFT\n(.*?)^NFT$", text, re.S | re.M)
         rules = m.group(1)
         self.assertIn("hook input priority -5; policy drop;", rules)
         self.assertIn("tcp dport { 80, 443 } accept", rules)

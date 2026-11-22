@@ -1,0 +1,194 @@
+{
+ "about": "Google's coding agent, Antigravity CLI (agy), as a session's agent beside the ones AerieOS ships: handed the briefing and held by the same guards through its own hooks. It signs in with a Google account in its own terminal, or runs on a Gemini API key.",
+ "agent": {
+  "allow": {
+   "how": "hook"
+  },
+  "briefing": {
+   "how": "hook"
+  },
+  "command": "agy",
+  "first_prompt": {
+   "flag": "-i",
+   "how": "flag"
+  },
+  "hooks": {
+   "answers": {
+    "pre": {
+     "approve": {
+      "decision": "auto_approve"
+     },
+     "pass": {
+      "decision": "allow"
+     },
+     "refuse": {
+      "decision": "deny",
+      "reason": "{reason}"
+     },
+     "say": {
+      "decision": "allow",
+      "reason": "{text}"
+     }
+    },
+    "prompt": {
+     "refuse": {
+      "injectSteps": [
+       {
+        "errorMessage": {
+         "userMessage": "{reason}"
+        }
+       }
+      ],
+      "terminationBehavior": "terminate"
+     },
+     "say": {
+      "injectSteps": [
+       {
+        "systemMessage": {
+         "systemMessage": "{text}"
+        }
+       }
+      ]
+     }
+    },
+    "start": {
+     "say": {
+      "injectSteps": [
+       {
+        "systemMessage": {
+         "systemMessage": "{text}"
+        }
+       }
+      ]
+     }
+    },
+    "stop": {
+     "pass": {
+      "decision": "allow"
+     },
+     "refuse": {
+      "decision": "continue",
+      "reason": "{reason}"
+     }
+    }
+   },
+   "document": {
+    "entries": {
+     "pre": [
+      {
+       "hooks": [
+        "{handler}"
+       ],
+       "matcher": "*"
+      }
+     ]
+    },
+    "entry": [
+     "{handler}"
+    ],
+    "handler": {
+     "command": "{command}",
+     "timeout": "{seconds}",
+     "type": "command"
+    },
+    "keep": true,
+    "under": [
+     "aerieos"
+    ]
+   },
+   "events": {
+    "pre": "PreToolUse",
+    "prompt": "PreInvocation",
+    "start": "SessionStart",
+    "stop": "Stop"
+   },
+   "file": ".gemini/config/hooks.json",
+   "payload": {
+    "args": {
+     "command": "CommandLine",
+     "file": "TargetFile",
+     "pattern": "Query"
+    },
+    "call": "invocationNum",
+    "cwd": [
+     "cwd",
+     "toolCall.args.Cwd"
+    ],
+    "input": "toolCall.args",
+    "prompt": "lastUserInput",
+    "session": "conversationId",
+    "tool": "toolCall.name",
+    "transcript": "transcriptPath"
+   },
+   "prompt_fires": "each-call",
+   "tools": {
+    "edit": [
+     "write_to_file",
+     "replace_file_content",
+     "multi_replace_file_content"
+    ],
+    "grep": [
+     "grep_search"
+    ],
+    "shell": [
+     "run_command"
+    ]
+   }
+  },
+  "name": "Gemini",
+  "product": "Antigravity CLI",
+  "provider": "Google",
+  "respawn": [
+   "--continue"
+  ],
+  "signin": {
+   "login": [
+    "agy"
+   ]
+  },
+  "transcripts": {
+   "dir": ".gemini/antigravity/brain",
+   "file": "{session}/.system_generated/logs/transcript.jsonl",
+   "session_key": "conversationId"
+  }
+ },
+ "format": 2,
+ "install": {
+  "steps": [
+   [
+    "sh",
+    "{dir}/install.sh"
+   ]
+  ],
+  "verify": [
+   "sh",
+   "{dir}/verify.sh"
+  ]
+ },
+ "label": "Gemini",
+ "layout": {
+  "bin": [
+   "bin"
+  ],
+  "tool": "bin/agy"
+ },
+ "name": "gemini",
+ "platforms": [
+  "linux/amd64",
+  "linux/arm64"
+ ],
+ "terms": [
+  {
+   "label": "Google Antigravity Additional Terms of Service",
+   "url": "https://antigravity.google/terms"
+  }
+ ],
+ "touches": {
+  "hosts": [
+   "storage.googleapis.com"
+  ]
+ },
+ "works_with": [
+  "0.9"
+ ]
+}

@@ -3,11 +3,10 @@
 // no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
 // against a repository on disk: the harness has no forge.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const P = 'alpha';
 const NB = `.nb:has(#memTitle:text-is("Notebook: ${P}"))`;
 const browser = await launch();
@@ -99,8 +98,8 @@ ok(zip.status === 200 && zip.pk && /alpha-wiki\.zip/.test(zip.cd), `Export is a 
 // ---- a session, through aerie wiki, under each setting ------------------------------
 const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', P, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'wiki', ...a], { encoding: 'utf8',
-  env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
+const bb = (...a) => aerie(['wiki', ...a], {
+  env: { BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
          XDG_CACHE_HOME: `${DIR}/cache-wiki` } });
 const bbErr = (...a) => { try { bb(...a); return ''; } catch (e) { return String(e.stderr); } };
 const src = `${DIR}/wiki-page.md`;
@@ -134,10 +133,18 @@ ok(await page.$eval(`${NB} .wkpick`, l => { const w = l.querySelector(':scope > 
 await page.setViewportSize({ width: 1280, height: 1000 });
 // Rename asks in a box under the article's tabs, not the browser's prompt
 // (R256 step 4): the name to change in it, Enter to rename, Escape to leave.
-{
+await section("Rename asks in a box under the article's tabs, not the browser's prompt", async () => {
   // Home links to the page about to be renamed: the rename moves the link.
   const h = await api(`/api/wiki?project=${P}&page=Home`);
+  // The view reads the wiki again when a page of it is saved, and draws
+  // itself again at the desk's width just set: both over before the box is
+  // asked for, since a redraw under it takes the box and what was typed
+  // (under load one landed between the typing and Enter, and nothing was
+  // renamed: the gate of 14 Nov).
+  const reread = page.waitForResponse(r => /\/api\/wiki\b/.test(r.url()) && r.request().method() === 'GET', { timeout: 10000 }).catch(() => {});
   await api('/api/wiki', { project: P, action: 'save', name: 'Home', text: 'See [[Build and test]].', base: h.rev });
+  await reread;
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const nd = page.dialogs.length;
   await page.click(`${NB} #wkRename`);
   await page.waitForSelector(`${NB} .askline input`, { timeout: 5000 });
@@ -154,7 +161,7 @@ await page.setViewportSize({ width: 1280, height: 1000 });
   ok(after.text === 'See [[Building it]].\n', `...and a link to it on another page follows it (${JSON.stringify(after.text)})`);
   ok(await page.evaluate(() => /links to it on 1 page now use its new name/.test(document.body.textContent)),
      '...and the page says how many pages it changed');
-}
+});
 await api('/api/prefs', { project: P, gate: { wiki: 'ask' } });
 ok(/held for the operator's approval/.test(bb('save', 'Faq', src)) && /no page called/.test(bbErr('show', 'Faq')),
    'under ask a session\'s page is held, not written');

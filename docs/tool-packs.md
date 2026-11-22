@@ -39,16 +39,537 @@ at the end, shows.
    **Toolchains**, and tick it. A pack starts off in every space, so
    adding one hands it to nobody by itself.
 
-To update a pack, open its row's **Edit**. For a repository's pack it looks
+To update a pack you added yourself, open its card's **Edit**. For a repository's pack it looks
 at the repository's head as it opens; for a pack made here it opens on its
 `bbtool.json`, to change in place, or takes an upload of a new version, and
 **Look** reads what you gave. Either way the form marks every command the
-new version adds, changes (with what it was) or removes, and **Update**
+new version adds, changes (with what it was) or removes, and **Manifest update**
 keeps it. Where the pack is installed, uninstall it and install it again to
 take the new version.
 **Remove** takes it out of the catalog. It is refused while a node's store
 holds the pack, naming the node: uninstall it there first, since a pack gone
 from the catalog leaves no row to uninstall its files from.
+
+### An install's receipt
+
+A pack is kept at a commit, and that pins the pack's own files: its
+manifest, its install script, its verbs. What the install script then
+downloads comes from wherever it says, and the commit says nothing about
+it. So every install of a pack on a node leaves a receipt: the manifest
+commit it was installed from, when, and the sha256 of every file that
+landed, with one hash over them all. The pack's page on **Installed** says
+it (`Installed 13 Nov from manifest 1a2b3c4d5e6f: 214 files, 48.0 MB,
+receipt 9f8e7d6c5b4a`), the whole list is beside the pack on the node
+(`.bb-receipt` in its directory), and the node's store keeps a line for
+every install it has made (`.bb-receipts`), which a remove and a reinstall
+leave alone. A toolchain AerieOS ships leaves one too when its row
+[declares its downloads](#declared-downloads), under the sha256 its own
+download was held to in the commit's place.
+
+The page says three more things when the receipt shows them:
+
+- **The copy is from an earlier manifest** than the one kept now: a
+  Manifest update was taken and this node still holds what the earlier one
+  installed. Remove it there and install it again.
+- **The same manifest left other files there the time before**: something
+  its install fetches has changed since.
+- **The same manifest left other files on another node**: something its
+  install fetches is not pinned, the latest of something being the usual
+  reason.
+
+A receipt leaves out git's own directory, AerieOS's marks and compiled
+python, which carries the moment it was compiled. It records what landed;
+it does not stop an install. A pack installed before receipts were kept
+has none until it is installed again.
+
+### Declared downloads
+
+A receipt says what landed. An entry can also say beforehand what it will
+download, and then nothing else can arrive. One rule covers everything
+AerieOS installs from somewhere else, a toolchain it ships and anybody's
+pack alike:
+
+**Whatever an entry fetches is held to something the entry itself
+carries.** The entry is held in turn by the commit it is kept at, the
+catalog's signed index or the signed release, so what holds a download is
+never the word of the place it comes from on the day of the install. It is
+one of three things: the sha256 of the exact file, its publisher's
+signature under a key the entry carries, or, for a repository, a commit.
+Nothing in AerieOS knows a vendor by name; a download that moves is moved
+in the entry.
+
+In a manifest each download is a row of `install.fetch`: the address it
+comes from, the file inside the pack it is kept as, and what holds it.
+
+A download lands inside the pack's own directory, on the node's toolchain
+store. A step that puts one in its place moves it (`mv`) or unpacks it; it
+does not copy it (`cp`) to another place in the same directory. A store is
+often a network share, and on some of them a copy made from one file of the
+share to another leaves both held open on the file server for a while, so
+the step's own clean-up, or a later removal, ends on a directory that is
+not empty.
+
+**A pinned download, one per platform.** The sha256 of what the address
+answers, and the platform the file is for:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [
+    {"url": "https://github.com/quill-prose/quill/releases/download/v3.1.0/quill-3.1.0-linux-x64.tar.gz",
+     "sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+     "to": "dl/quill.tar.gz",
+     "platform": "linux/amd64"},
+    {"url": "https://github.com/quill-prose/quill/releases/download/v3.1.0/quill-3.1.0-linux-arm64.tar.gz",
+     "sha256": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9",
+     "to": "dl/quill.tar.gz",
+     "platform": "linux/arm64"}
+  ],
+  "steps": [["sh", "{dir}/install.sh"]]
+}
+```
+
+A download that names a `platform` is fetched on that platform alone:
+`linux/amd64`, `linux/arm64`, `darwin/arm64`, or `linux/*` for any
+architecture of a system. One that names none is for every platform. Two
+whose platforms can never be the same machine may be kept under one name,
+as above, so the install script reads one path. A download with a `sha256`
+and no `platform` is all pack format 3 asks for; `platform` is format 5's.
+
+**A download held by its publisher's signature.** Where a publisher signs
+its releases, the signature holds the file in the sha256's place, and the
+pack carries the key:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [
+    {"url": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz",
+     "to": "dl/tern.tar.xz",
+     "signed": {"sig": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz.sig", "keys": "tern.asc"}}
+  ],
+  "keyring": {
+    "tern.asc": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEaw...\n-----END PGP PUBLIC KEY BLOCK-----\n"
+  },
+  "steps": [["sh", "{dir}/install.sh"]]
+}
+```
+
+A row says exactly one of `sha256` and `signed`. `sig` is the address of
+the detached signature and `keys` a plain file name in `install.keyring`,
+which maps up to four names to an armored public key of at most 32 KB
+each. AerieOS checks the file with `gpgv` against that key and no other,
+never a keyring of the machine's. A publisher's key that changes is a new
+commit of the pack, and no release of AerieOS.
+
+**An installer that keeps the network.** Some installers download the rest
+by themselves: a language's own installer fetching its compiler, a package
+manager fetching packages. The installer is pinned like any download, and
+the pack says in one sentence what it then downloads and from where:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [
+    {"url": "https://get.kestrel.example.org/1.8.0/kestrel-up.sh",
+     "sha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+     "to": "dl/kestrel-up.sh"}
+  ],
+  "online": "Its installer, kestrel-up, downloads the compiler and the standard library for this machine from releases.kestrel.example.org.",
+  "steps": [["sh", "{dir}/dl/kestrel-up.sh", "--prefix", "{dir}", "--version", "1.8.0"]]
+}
+```
+
+With `online`, what the pack declares is still fetched and checked first,
+and its steps then keep the network; the job, the receipt (`.bb-receipt`,
+and `.bb-net` beside it) and the pack's entry say so in the pack's own
+sentence. Without it, a pack that declares its downloads runs its steps
+with no network. `online` is the one way to keep it. A node tells the
+controller that an install kept the network, with the sentence.
+
+**A pack that downloads nothing.** A pack whose steps only build from what
+its repository carries says so with an empty list, and its steps and its
+verify then run with no network like any other declared pack's:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [],
+  "steps": [["sh", "{dir}/build.sh"]]
+}
+```
+
+That is pack format 5's. Before it an empty list declared nothing, and a
+manifest of an earlier format that has one means what it meant: its steps
+run with the network. A pack that leaves `fetch` out says nothing of what
+its steps download.
+
+**What a package manager installs.** A step that runs `pip install` or
+`npm install` downloads whatever the manager resolves that day, which is
+held to nothing. So the files it would install are declared like any
+other download, and the step installs from where they landed, with no
+index and no network. Two things make that practical. The manifest says
+what it asks the manager for, as data (`install.lock`), so the set can be
+found again when it moves; and the downloads of that set are kept under a
+directory of the lock's own (`to`), so they are replaced whole and the
+pack's other downloads are left alone.
+
+For pip, resolve once for each platform, with hashes, and for wheels
+alone: a source distribution runs its own code at install, so a package
+with no wheel for a platform is one to leave out or to build yourself.
+`uv` does it without downloading anything, since the index states each
+file's sha256:
+
+```bash
+uv pip compile requirements.in --python-version 3.12 \
+   --python-platform x86_64-manylinux_2_28 --no-build --generate-hashes \
+   -o requirements.txt
+```
+
+Commit `requirements.txt` to the pack's repository: it names each package
+at its version, with the sha256 of that version's files. Declare the wheel
+of each package for each platform you name, under the wheel's own file
+name, which is how pip finds it:
+
+```json
+"format": 5,
+"install": {
+  "lock": [
+    {"kind": "pip", "to": "dl/pip", "requirements": ["plover-tables[xlsx]"], "python": "3.12",
+     "for": {"linux/amd64": "x86_64-manylinux_2_28", "linux/arm64": "aarch64-manylinux_2_28"}}
+  ],
+  "fetch": [
+    {"url": "https://files.pythonhosted.org/packages/3a/7c/5d1f...3f2e/plover_tables-2.3.0-py3-none-any.whl",
+     "sha256": "0b918943df0962bc7a1824c0555a389347b4febdc7cf9d1254406d80ce44e3f9",
+     "to": "dl/pip/plover_tables-2.3.0-py3-none-any.whl"},
+    {"url": "https://files.pythonhosted.org/packages/c4/58/8f1e...4b6d/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_x86_64.whl",
+     "sha256": "3d914f9348c9cc0ff8a79716700b9fcd4d2f3e711608004eb8f138bcba7f14d9",
+     "to": "dl/pip/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_x86_64.whl",
+     "platform": "linux/amd64"},
+    {"url": "https://files.pythonhosted.org/packages/6e/2a/0c9b...2f1a/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_aarch64.whl",
+     "sha256": "73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049",
+     "to": "dl/pip/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_aarch64.whl",
+     "platform": "linux/arm64"}
+  ],
+  "steps": [["sh", "{dir}/install.sh"]]
+}
+```
+
+and `install.sh` installs from that directory alone, with the hashes
+required:
+
+```sh
+python3 -m venv "$here/venv"
+"$here/venv/bin/pip" install --no-index --find-links "$here/dl/pip" \
+    --require-hashes -r "$here/requirements.txt"
+```
+
+A pure wheel (`py3-none-any`) is one download for every platform; a built
+one is a download a platform, each under its own name. `lock` names the
+manager (`kind`), the directory its downloads are kept in (`to`), what the
+manager is asked for (`requirements`, each one line that starts with a
+name) and, for pip, the Python it installs for (`python`) and the platforms
+it is resolved for (`for`: each platform with the resolver's own name for
+it). An entry may have up to four locks, none inside another's directory.
+An install reads none of it: it fetches what `fetch` says. The lock is for
+whoever moves the pins, and for a reviewer to see what the files are the
+resolution of.
+
+For npm the shape is the same. `npm install --package-lock-only` writes
+`package-lock.json`, which names every package's tarball and its
+integrity; commit it with `package.json`, declare each tarball under the
+lock's directory (the registry states a sha512, so hash each file for its
+sha256), name a package for one system or processor (`os`, `cpu` in the
+lock) with its `platform`, and have the step install from them with
+npm's own word that it is offline:
+
+```json
+"lock": [{"kind": "npm", "to": "dl/npm", "requirements": ["gannet"]}]
+```
+
+```sh
+cache="$(mktemp -d)"
+npm cache add --cache "$cache" "$here"/dl/npm/*.tgz
+npm ci --offline --cache "$cache" --ignore-scripts --prefix "$here"
+```
+
+`npm ci` installs exactly the lock's tree and holds each tarball to the
+lock's integrity again; `--ignore-scripts` keeps a package's own install
+script from running. Anything a package's script would have downloaded (a
+browser, a prebuilt binary) is a declared download of its own, or the
+pack's `online` sentence.
+
+A toolchain AerieOS ships says the same in its row (`source.lock`), and
+`tools/pins.py` writes the lock's downloads for it: it asks `uv` or `npm`
+what the requirements resolve to for each platform the row names, writes
+each file as a declared download, and writes the requirements or the lock
+the step reads into the row itself (`source.files`: up to eight small text
+files, 96 KB together, which AerieOS writes into the row's directory before
+its steps; a row has no repository to keep them in, which is why a pack has
+no such key). An entry may declare up to 256 downloads, and a shipped row's
+recipe may be 192 KB: what a tool with a couple of hundred packages under
+it asks for.
+
+**What a node does with them.** AerieOS fetches each download itself, over
+`https` alone, before anything of the pack runs, and holds it to its sha256
+or its signature; one that answers another file stops the install, naming
+what it expected and what it got, and leaves nothing installed. The files
+are then where `to` says, inside the pack, and the install steps and the
+verify command run with no network: a step that tries to fetch anything
+else fails, and the job says it ran with no network. So a pinned commit
+pins everything the install brings, and a newer version of the tool is a
+new commit of the pack with a new address and a new sha256, which a
+Manifest update shows.
+
+**Look** lists what a pack declares before it is added, or says that it
+declares none.
+
+**The three words.** What an entry's downloads are held to comes down to
+one word, worked out from the entry alone, the same way for a shipped
+toolchain, an official pack, a vetted one and one you sideload:
+
+- **pinned**: every download it makes is a pin, a publisher's signature
+  under a key it carries, or a commit, and its steps run with no network.
+- **installer**: the same for everything it declares, and it says `online`:
+  its pinned installer downloads the rest from its vendor. The word comes
+  with the entry's sentence.
+- **open**: anything else, with the part that is held to nothing: a
+  download checked only against what its own origin says that day or not
+  checked at all, a repository at a branch with no commit, or steps that
+  run with the network and no declared reason (a pack with install steps
+  that leaves `install.fetch` out).
+
+`/api/toolchains` answers it for every row as `held` (`word` and `why`),
+the Library's rows pass it on, and **Look** answers it for a pack before it
+is added. An entry of the catalog's index says the word too (`held`, and
+with `installer` the manifest's sentence as `online`), so the card of a
+pack or an app not kept here yet says it before anything is fetched: its
+row carries `held` the same way, the `why` an installer's own sentence,
+and for `open` one sentence that says something is held to nothing, with
+the part named once the pack is looked at. Beside it each answers the entry's declared downloads as
+`downloads`, a row a download: the file it is kept as (`to`), its address
+(`url`), how it is held (`held`: `sha256` with the digest in `sha256`, or
+`signed` with the keys' name in `keys` and the signature's address in
+`sig`) and the `platform` it is for, empty for every one. An installed
+row's receipt lists the ones its node fetched, and what its steps ran with
+(`net`: `cut`, `open`, or `online` with the entry's sentence as `why`). A
+coding agent's row answers `held` and `downloads` the same way, from its
+recipe, and beside them `pinned`: the version the recipe installs where its
+program is one of its downloads, empty otherwise. Its `latest` is then that
+version, since it is what an install brings, and `vendor_latest` the newest
+its vendor names.
+
+**A toolchain AerieOS ships** says the same things in its row's `source`
+(`config/toolchains.json`), whatever its kind: `fetch`, `keyring` and
+`online` as above, and for its own download a checksum of kind `pin`:
+
+```json
+"source": {
+  "kind": "tarball",
+  "url": {"linux/amd64": "https://github.com/osprey-build/osprey/releases/download/{version}/osprey-{version}-linux-x64.tar.gz",
+          "linux/arm64": "https://github.com/osprey-build/osprey/releases/download/{version}/osprey-{version}-linux-arm64.tar.gz"},
+  "version": {"resolver": "github-release", "repo": "osprey-build/osprey"},
+  "checksum": {"from": "pin", "version": "v4.2.0",
+               "sha256": {"linux/amd64": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+                          "linux/arm64": "19581e27de7ced00ff1ce50b2047e7a567c76b1cbaebabe5ef03f7c3017bb5b7"}},
+  "strip": 1,
+  "verify": ["{dir}/bin/osprey", "--version"]
+}
+```
+
+A row whose own download is held to something it carries, a pin as here or
+its publisher's signature (the `signature` checksum kind, or `file` with
+`signed`), has said by that alone what arrives: everything it runs after
+its download, its installer's run, its follow-up steps, a warm-up and its
+verify, runs with no network, and `online` is the one way to keep it. It
+need not say `offline: true`; a row that does, or a command or a
+repository that downloads nothing more and says it, is cut the same way. A
+row whose download is checked only against what its own origin says that
+day, or not at all, is installed as it always was, and reads `open`.
+
+A pinned row installs the pinned version from the address made from it and
+asks nobody what is newest: `version` stays in the row as how a newer one
+is found, and is not read by an install. The digest is one per platform,
+keyed as `url` is, or a single string where one file serves every
+platform; a machine the pin names no digest for is told the row offers no
+pinned download for it. `aerie toolchains check` offers the pinned version
+for such a row, and an update is the pin moving in the row. A row's keys
+are read from its own `keyring` first and from `config/release-keys/`
+otherwise, for a declared download's `signed` and for the `signature` and
+`file` checksum kinds alike. What a row declares is fetched before anything
+of the row runs: after a tarball is checked and unpacked, after a script's
+installer is checked and before it runs, after a repository's checkout,
+and before a command; the installer, the follow-up steps, a warm-up and
+the verify then run with no network, or with it where the row says
+`online`.
+
+**A coding agent AerieOS ships** says the same things in its recipe, the
+`agent.install` block of its pack (`packs/agents/NAME/bbtool.json`): what
+it downloads under `fetch`, a publisher's keys under `keyring`, `online`
+where its installer keeps the network, and `steps` where a pack says its
+install steps:
+
+```json
+"format": 5,
+"agent": {
+  "install": {
+    "rev": 1,
+    "fetch": [
+      {"url": "https://github.com/merlin-code/merlin/releases/download/v{version}/install.sh",
+       "version": "3.4.0",
+       "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+       "to": "dl/install.sh",
+       "track": {"resolver": "github-release", "repo": "merlin-code/merlin", "trim_prefix": "v"},
+       "found": {"from": "github-asset"}}
+    ],
+    "online": "Its installer downloads the Merlin Code build for this machine from github.com/merlin-code/merlin's releases, and checks it against the sha256 that release states.",
+    "steps": [["sh", "{dir}/dl/install.sh", "--no-modify-path"]],
+    "pin": ["MERLIN_VERSION", "{v}"],
+    "env": {"MERLIN_INSTALL_DIR": "{home}/.local/bin"},
+    "bin": ".local/bin/merlin", "also": [".merlin/bin/merlin"], "fresh": ""
+  }
+}
+```
+
+A step is a list of plain words, run as it stands and never read by a
+shell: a file the recipe fetched (`{dir}/...`, named as its download is
+kept), `sh` or `bash` on one, or one of `mkdir`, `tar`, `unzip`, `install`,
+`ln` and `chmod`, which only put files in place. `{dir}` is where the
+downloads landed, `{home}` the account's home, and `{version}` the one
+version the downloads say they are. So nothing reaches a shell from the
+network but a file held to the recipe, and a recipe whose program is the
+download itself (a release's tarball for each platform, unpacked into
+place) needs no installer at all: it says no `online`, its steps run with
+no network, and it reads `pinned`. One that runs its vendor's installer
+says `online` with the sentence and reads `installer`. A vendor's
+installer handed to a shell as it arrives (`script`, in the place of
+`fetch` and `steps`, as a recipe before format 5 was written) is no
+recipe: a manifest that says one is refused. The rest of a recipe, and how a node
+runs one, is in
+[agents.md](agents.md#where-an-agent-s-install-recipe-comes-from). A coding
+agent a pack brings needs none of this under `agent`: its program is
+installed by the pack's own `install`, which is the same keys.
+
+**How a pin moves.** An install never asks a vendor what is newest: it
+takes the pin. A newer version arrives as a change to the entry, proposed
+by a tool (`tools/pins.py` for the rows AerieOS ships:
+[Moving a pin](toolchains.md#moving-a-pin)) and reviewed like any other
+change. How the tool finds the newer version is the entry's own data too,
+so nothing in the tool knows a vendor. It is read by the tool and by no
+install:
+
+- A pin may say `found`: how the new file's digest is learned from its
+  publisher's own statement without downloading it, written as a checksum
+  that asks the origin is (`{"from": "go-json"}`, `{"from": "file", "url":
+  "{url}.sha256"}`, `{"from": "github-asset"}`). Where the publisher states
+  no sha256 (a sha1, a sha512, or nothing), the tool downloads the file and
+  hashes it itself, holding it to what the publisher does state. The row's
+  `version` resolver says how the newest version is found.
+- A declared download may say the `version` it is, which fills `{version}`
+  in its `url` and in its signature's address, with nobody asked. The name
+  it is kept as (`to`) takes no version: the steps read one path whatever
+  the version is, so a pin that moves changes a version and a digest and
+  nothing else. Beside it, `track` says how a newer version is found, in the
+  shape of a row's `version`, and `found` how its digest is learned.
+  Downloads that say the same `track` (one tool's file for each platform)
+  move together to one version:
+
+  ```json
+  {"url": "https://github.com/heron-schema/heron/releases/download/v{version}/heron-{version}-linux-x64.tar.gz",
+   "version": "2.7.1",
+   "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+   "to": "dl/heron.tar.gz",
+   "platform": "linux/amd64",
+   "track": {"resolver": "github-release", "repo": "heron-schema/heron", "trim_prefix": "v"},
+   "found": {"from": "github-asset"}}
+  ```
+
+- A download with no version in its address, a vendor's one moving file,
+  has nothing to track. It is pinned by its digest and refused on the day
+  the vendor changes it; the tool says that the bytes moved, and re-pins
+  them.
+- A repository a row is cloned from is pinned by `source.commit`, and
+  `source.track` says how the commit to pin is found: `{"resolver":
+  "git-tag", "match": "^\\d+\\.\\d+\\.\\d+$"}` for the newest tag the
+  pattern matches, by version order, or `{"resolver": "git-branch",
+  "branch": "stable"}` for a branch's head. The checkout is fetched by the
+  commit's hash. A tool that reads its own version off its tag finds none in
+  such a checkout, so the row may name the tag (`source.tag`), fetched by
+  name and kept only where it is at the pinned commit; one that has moved
+  off it installs nothing. With `source.branch` the checkout is called that
+  branch and follows the address it came from.
+
+The resolvers that find a version: `text` (a file whose first line is the
+version), `match` (a document and a pattern whose first group is the
+version), `github-release` (the release GitHub calls latest, or, with
+`tag`, `settled` and `asset`, the newest whose tag matches, that has been
+out that many days, and the file in it whose name matches, one pattern per
+platform; with `asset` alone, the file in the latest release whose name
+matches), `node-index`, `zig-index`, `git-tag` and `git-branch`. A
+resolver that supplies the file's address itself (`zig-index`, a
+`github-release` with `asset`) has the tool write that address into the row
+beside the digest.
+
+The cut is a network namespace of the step's own, and a mount namespace
+with an empty folder over `/run`: a network namespace alone leaves every
+socket on the disk in reach, and the system bus's and systemd-resolved's
+there, which any account may write, look names up past it. The account a
+node's jobs run as makes both itself where the machine lets an account do
+that. Where it does not (a distribution that keeps user namespaces from
+unprivileged accounts), a managed node's agent makes them: it installs a
+small root helper, `bb-netcut`, with one sudo rule that lets the job account
+run it, and the helper makes the namespaces and runs the step as that
+account again, never as root, with none of its other groups. Where `/run`
+cannot be covered, the step still runs with no network of its own, and
+counts as run with the network: the job and the pack's page on Installed
+say so. A node that can do neither (its agent is not root, or it runs in a
+container that forbids namespaces) still installs the pack: its downloads
+are fetched and checked the same way, its steps run with the network, and
+the job and the pack's page on Installed say so. Sockets outside `/run`
+(an X server's under `/tmp`, an account database daemon's under
+`/var/lib`) stay in a step's reach.
+
+A coding agent's install is cut the same way and by the same helper, with
+one difference in who asks for it. Its steps run as the session account,
+which is not the job account and has no rule for `bb-netcut`. So on a
+managed node the agent, which is root, runs the steps through the helper
+itself, for the account the node's sessions run as: the downloads are
+fetched and held first, with the network, and the steps are then started
+inside the namespace as that account
+([agents.md](agents.md#where-an-agent-s-install-recipe-comes-from)). On a
+node whose agent is not root the session account makes the namespace where
+the machine lets it, and the job says so where it cannot.
+
+The cut stops an install step from fetching what the manifest does not
+name. It is not a sandbox: a step still runs as the job account (a coding
+agent's as the session account), with that account's files.
+
+### Images by digest
+
+A container image is held as a download is: by the digest of what is
+pulled. An image reference may carry it, `name:tag@sha256:` and the 64 hex
+digits of the manifest's digest. A node then pulls and runs that manifest,
+whatever the registry serves under the tag later; the tag beside it is what
+a person reads. For an image built for several platforms the digest is the
+manifest list's, which covers every platform the list names, so one
+reference serves an amd64 node and an arm64 one.
+
+From pack format 5 a Docker app names every image in its `compose.yml`
+this way, and one that does not is refused with the image named. An app
+written in an earlier format means what it meant: each image pinned to a
+tag that is not `latest`. A compose file of your own is held to the same
+two: a digest, or a tag that is not `latest`. An app whose every image has
+its digest reads **pinned**, as a tool whose every download is held does,
+and its entry in the index says so, so its card does before it is kept.
+
+AerieOS's own services are held the same way: the model router, nginx and
+the Scanners each name every image they run in their entry's `images`, a
+name of the service's own for each and the image as `name:tag@sha256:...`,
+written from the one file that holds them
+(`scripts/dashboard/service-images.json`). `images` is an official service
+pack's alone. `tools/pins.py` proposes a moved digest for a service's
+images and for a compose file's, asking the registry each image names
+([Moving a pin](toolchains.md#moving-a-pin)).
 
 ## Official packs and agent packs
 
@@ -61,11 +582,21 @@ fetched from, how it is verified, the system packages it needs), and under
 in, how it takes the briefing and AerieOS's guards, where its
 conversations are). Both carry `"tier": "official"`, which is what lets
 them stand in for install steps and verbs and take a shipped name; a pack
-you add is `url`, and a pack from the vetted catalog is `vetted`. An agent whose manifest cannot name how it takes the guards is
+you add is `url`, and a pack from the vetted catalog takes the tier its
+index entry says (the Library reads official and `aerie` as Packaged by Aerie).
+The word in the manifest is not what makes a pack official: AerieOS reads
+one as official only where it holds the manifest as its own (written from
+its tables, or at the pin the signed index names official for a row it
+ships). A pack you add by its address, paste or upload that says
+`"tier": "official"` is refused with that said; leave `tier` out.
+An agent whose manifest cannot name how it takes the guards is
 not a pack and is not listed. The files are written from the tables by
 `tools/packs-export.py --write` and `aerie lint` fails when they drift, so
 the format is one; the installer and the agents' adapters still read
-their own tables. The same folders live in the catalog repository
+their own tables, with one exception: how a shipped coding agent is
+installed is its pack's `agent.install`, and the catalog's copy is the one
+used when it is newer than the release's
+([agents.md](agents.md#where-an-agent-s-install-recipe-comes-from)). The same folders live in the catalog repository
 (`packs/official/NAME`, `packs/agents/NAME`, written there by
 `tools/packs-export.py --catalog DIR`), and its index pins every one of
 them at tier official to the catalog's own commit (`--catalog DIR
@@ -80,7 +611,11 @@ AerieOS ships. Its `agent` block is an adapter of data, never code: it
 says how AerieOS starts the agent, hands it the briefing and holds it to
 the same guards, in the shapes AerieOS already writes for the shipped
 agents. The pack installs the agent's program like any pack (its `install`
-steps, its `layout.bin` on `PATH`), and a catalog update updates it.
+steps, its `layout.bin` on `PATH`), and a catalog update updates it. What
+that install downloads is held as every pack's is
+([Declared downloads](#declared-downloads)): a pack that brings an agent
+and one of the five AerieOS ships are held by the same keys, read by the
+same code, and get the same word.
 
 ```json
 "agent": {
@@ -104,24 +639,334 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 |---|---|
 | `name`, `product`, `provider` | What the page calls it (Start, the dock, the Library card). |
 | `command` | The program a session runs, on `PATH` from the pack's own `layout.bin`. |
-| `briefing` | How it takes AerieOS's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file) or `none`. |
-| `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary) and `asking` (its permission prompt). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. |
-| `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, `PATH`, `HOME`, `LD_*` or a `BB_` name. |
+| `briefing` | How it takes AerieOS's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file), `hook` (handed to the model by its own hooks, at its `start` event and again on the first prompt after a restart changed it; its `hooks.answers` says how, below) or `none`. |
+| `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary), `asking` (its permission prompt) and `start` (a conversation's start, for a briefing handed over by `hook`). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. An agent whose hooks are neither shape says its own as data: [A protocol of its own](#a-protocol-of-its-own). |
+| `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, and each name held to [the one rule for a variable an entry sets](#a-variable-an-entry-sets). |
 | `respawn` | The arguments that resume its newest conversation, when a session comes back. |
 | `first_prompt` | How a new space's brief is handed over: after `--`, after a `flag`, or not at all. |
-| `signin` | Where its sign-in is kept (a file under home, or a variable such as an API key), and the login command a terminal tab runs for it. |
+| `signin` | Where its sign-in is kept (`file`, under the account's home, or `env`, a variable such as an API key): with either, a session does not start until one is there. `login` is the command that starts its sign-in, and `flow` says how that sign-in goes, so the page can run it: [A sign-in from the page](#a-sign-in-from-the-page). |
 | `transcripts` | Where its conversations are kept, so `aerie transcripts` and the Sessions view read them, and which payload field carries a session's id. |
 | `models`, `model_flag` | What Start's model step offers, and the option a pick is handed over with. |
+| `allow` | How it is told that a command needs no asking: `how` is `settings` (a rule in the settings file its session starts with, as Claude Code reads), `flag` (the option `flag` repeated with one rule each, as Grok Build's `--allow` and Copilot CLI's `--allow-tool`), `rules-file` (a `file` under the account's home with one rule a line, as Codex CLI's execpolicy), `hook` (its own hook's answer before a tool approves each such verb typed alone, with no `rule`, where an agent's rules are in a settings file that is the person's own; its `hooks.answers.pre` gives the `approve`) or `none`. `rule` is the agent's own rule for one command, with `{cmd}` (`aerie version`) or `{argv}` (`["aerie", "version"]`) where the command goes. AerieOS fills it once for each `aerie` verb its controller decides ([agents.md](agents.md#what-an-agent-need-not-ask-about)). Left out, the agent asks by its own judgment. |
 
 `pre`, `prompt` and `stop` are required: an agent that cannot take the
 guards is refused, as the shipped ones would be. The pack's name is its
 sessions' name (`kite-myproject`), so it is 2 to 16 lowercase letters and
-digits and never a shipped agent's. An agent is offered only from a pack the
+digits and never a shipped agent's. To try an agent of your own before
+submitting it, turn on **Offer coding agents from packs added here** in
+Controller settings, under Vetted catalog: a pack you added yourself then
+offers its agent as a catalog pack's is offered, on this install alone.
+With that off, as it starts, an agent is offered only from a pack the
 vetted catalog pinned (or an official one): a pack added by its address
 installs its program but never offers its agent, since the adapter decides
 what runs in every session of it.
 
+### A protocol of its own
+
+`grouped`, `flat`, `snake` and `camel` are names for descriptions AerieOS
+keeps. An agent whose hooks file, payload or answers are none of them
+writes the description out, and nothing in AerieOS has to know the agent:
+the next one with words of its own is a manifest in the catalog and no
+release.
+
+```json
+"hooks": {
+  "file": ".otter/settings.json",
+  "document": {"under": ["agent", "hooks"], "keep": true, "with": {"schema": 3},
+               "handler": {"run": "{command}", "limit": "{seconds}"},
+               "entry": ["{handler}"],
+               "entries": {"pre": [{"matcher": "*", "hooks": ["{handler}"]}]}},
+  "payload": {"session": "ctx.id", "cwd": "ctx.dir", "tool": "call.tool", "input": "call.params",
+              "prompt": "message", "stop_active": "again",
+              "args": {"command": "script", "file": "target"}},
+  "answers": {"pre":    {"refuse": {"ok": false, "why": "{reason}"}, "pass": {"ok": true}},
+              "prompt": {"refuse": {"block": true, "message": "{reason}"}, "say": {"context": "{text}"}},
+              "stop":   {"refuse": {"again": true, "because": "{reason}"}}},
+  "events": {"pre": "before_tool", "prompt": "on_message", "stop": "on_done"},
+  "tools": {"shell": ["terminal"], "edit": ["patch_file"]}
+}
+```
+
+| Key | What it says |
+|---|---|
+| `document` | How its hooks file is laid out, in place of `shape`. `under` is the keys down to the object that maps an event to its hooks. `handler` is one hook, with `{command}` where AerieOS's call goes and `{seconds}` for the time it is given. `entry` is an event's value, with `{handler}` where the hook goes, and `entries` gives one of AerieOS's events (`pre`, `prompt`, ...) an entry of its own. `with` is keys the file carries at its top. `keep` is true where the file is not AerieOS's alone (the agent's settings, a hooks file a person's own hooks are in): everything else in it is kept and only what `under` names is replaced. |
+| `payload` | Where its hooks' payload keeps each thing, in place of a named shape: `session`, `tool` and `input` (the tool's arguments) at least, and `cwd`, `prompt`, `stop_active` (a stop a hook already refused), `transcript` and `call` (the number of the call to its model, 0 opening a turn) where it has them. Each is a dotted path, or up to four tried in order. `args` adds its own names for a command, a file and a search pattern inside the tool's arguments. |
+| `answers` | What it reads back, as JSON on stdout, for each event: `refuse` when a guard said no (`{reason}` is why), `pass` when the call goes on (`{}` when left out), `say` for words meant for the model (`{text}`: a rule's text, a note, the briefing) and, before a tool, `approve` for an `aerie` verb the controller decides. `pre`, `prompt` and `stop` each need a `refuse`: an agent that cannot be refused cannot take the guards. Without `answers` it is answered as its shape's agents are. |
+| `prompt_fires` | `each-call` for an agent whose `prompt` event is raised before every call to its model rather than once for each thing a person sends: the hooks of a prompt then run on the first call of a turn alone. |
+
+A template is JSON the agent reads, so what it may hold is narrow: keys
+that are names, numbers, true and false, and strings that are one
+placeholder, whole, or one plain word (`command`, `allow`, `*`). No string
+in one can be a command line, a path or an address: the only command a
+hooks file runs is AerieOS's own, in `{command}`'s place.
+
+A manifest written with a named shape stays valid: the names are kept for
+good, and mean what they meant. Describing a protocol this way is pack
+format 2, so such a manifest says `"format": 2`.
+
+### A sign-in from the page
+
+An agent that signs in on a screen of its own (a menu, a link, a field for
+a code) can only be signed in at a keyboard, in its session's terminal,
+unless its pack says how the sign-in goes. With `signin.flow`, Sign in on
+the agent's page of the Installed page runs it on the node and shows a
+person the link and a field for the code, which is what a phone can use:
+
+```json
+"signin": {
+  "login": ["kite"],
+  "flow": {
+    "answers": [{"when": "Select login method", "send": ""}],
+    "url": "https://auth.example.com/oauth/",
+    "prompt": "paste the authorization code",
+    "refused": "Got an error",
+    "kept": ".kite/oauth-token"
+  }
+}
+```
+
+| Key | What it says |
+|---|---|
+| `answers` | Up to four things its screen asks before the link: `when` is the plain words it shows, `send` the key or short word typed there (letters and digits, eight at most; empty for Enter alone). Enter follows each. |
+| `url` | How the link it prints starts: `https`, its host, and as much of the path as never changes. The link is read whole however the program wraps it. A program that signs in at one of several hosts gives up to four, as a list (framework 2.2). |
+| `prompt` | The words it waits at for the code the provider's page hands back. The page draws a field, and what a person pastes there is typed into the program. |
+| `code_after` | In `prompt`'s place, for a flow where a person types a code on the provider's page: the words that code follows on its screen. The page shows the code, and nothing is typed back. |
+| `refused` | The words it shows when it does not take the code. The flow ends then and the page says why in the program's own words; without it, a code that was not taken is noticed after two minutes. |
+| `kept` | The file under the account's home its sign-in is kept in. Its arrival ends the flow, signed in; it is what says who is signed in on a node, it is sealed where a node seals sign-ins, and a sign-out removes it. |
+| `logout` | Its own sign-out command, where it has one (`["kite", "logout"]`); the kept file is removed after it. |
+| `forget` | In `logout`'s place, for a program with no sign-out command whose sign-in sits in a file of its settings: `{"keys": ["user"], "like": "token"}` takes those top-level keys, and any key that carries the word, out of the kept file (or the JSON file `file` names) and leaves the rest; the kept file is not removed (framework 2.2). |
+| `who` | Where who is signed in is read, for the row that names them: `email` and `plan` are each the keys to follow in the kept file (`["account", "email"]`), a token met on the way opened to what it says of its holder; `file` names another JSON file under the home that says it, beside the kept one; `key` the keys to an API key, and `key_named` what the account is called then; `named` what it is called when the file names nobody. Left out, the address a token in the kept file names, else the provider's account (framework 2.2). |
+| `ends` | `exit` for a program that ends itself once signed in (`kite login` that returns): the flow waits for it, and it is signed in when it exits clean. Left out, the flow ends when the kept file arrives and the program is ended then, which is for one that stays up on its own screens (framework 2.2). |
+
+The agents AerieOS ships sign in this way too: each one's row in its own
+table says its flow in these words, its official pack's manifest carries
+it, and one driver on the node runs every agent's sign-in, so what a
+shipped agent can do at its sign-in a pack's agent can.
+
+Nothing in a flow is a pattern or a command line: the words are plain ones,
+compared without their spaces or case, and the only program run is the
+agent's own. The program is started in an empty folder of the account's,
+on a terminal wide enough that a link stays on one row, and is ended once
+its sign-in is kept: whatever it asks after that (a color scheme, its
+terms, whether a folder is trusted) is the person's own to answer, in
+their first session. The code a person pastes is typed into the program
+and never written to the job's log.
+
+`flow` is framework 2.1's ([the framework's version](#the-frameworks-version)),
+so a manifest that describes one says `"framework": "2.1"`. An AerieOS from
+before it leaves the flow out, and the agent signs in in its terminal there
+as it did.
+
+## The format, and what it promises
+
+Everything a catalog entry can be is written in one format: a tool pack's
+`bbtool.json`, a Docker app's `bbapp.json` and `compose.yml`, a coding
+agent's adapter. The format has a number, and the number keeps a promise to
+whoever writes a pack:
+
+- **The format only grows.** A manifest that is valid at one number is
+  valid at every later one, and means what it meant. Nothing already in the
+  catalog is rewritten because something was added beside it, and you never
+  have to follow AerieOS's releases to keep a pack working.
+- **A manifest says the number it needs** (`format`), and its entry in the
+  catalog's signed index repeats it. An AerieOS that reads that number takes
+  the pack; one too old for it lists the card with what it needs (Needs
+  AerieOS 0.10.0 or newer) and fetches nothing. It never guesses at a
+  format it has not met.
+- **Adding something to the catalog needs no release of AerieOS** as long
+  as it is written in a format installs already read: a tool, a Docker app,
+  a coding agent with words of its own are each a signed commit to the
+  catalog.
+- **A pack that moves to a newer format keeps serving the installs that
+  read the one before.** Its entry keeps the pin of the manifest written in
+  the earlier format beside the new one, and each install is offered the
+  newest it reads ([An entry's older pins](#an-entrys-older-pins)).
+
+### The framework's version
+
+The framework has a version of its own, apart from AerieOS's, and it moves
+whenever the framework changes. It is two numbers, written `X.Y`:
+
+- **X is the format.** It moves when an AerieOS that does not read it could
+  not run the entry at all. Such an install lists the card with what it
+  needs and fetches nothing.
+- **Y moves when something is added** that an AerieOS from before it simply
+  leaves out, the rest meaning what it meant. An entry that uses it is still
+  taken by every install that took it before, minus the new part. Y never
+  goes back: after 2.1 comes 2.2, or 3.2 if X moves first.
+
+A manifest says both, in two keys:
+
+```json
+"format": 2,
+"framework": "2.1"
+```
+
+`format` is the least X an install must read to run the pack, a whole
+number (left out, it is 1). `framework` is the version the manifest is
+written for; left out, it is the format's first, `X.0`. What a manifest
+uses has to be in the version it says: a manifest that names a `maker`
+says `"framework": "2.1"` or later, and the check tells you so when it does
+not. So the number on a manifest is what an AerieOS has to know to do all
+of it, and a card written for a later version than an install reads says
+on its Details what that install leaves out.
+
+| Version | What it added | An AerieOS from before it | First read by |
+|---|---|---|---|
+| 1.0 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | | 0.9.0's first releases |
+| 2.0 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | Hides the entry: needs AerieOS 0.9.0 or newer. | 0.9.0 |
+| 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
+| 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
+| 3.2 | Declared downloads (`install.fetch`): every file an install takes from somewhere else, with its address and its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network. | Hides the entry: needs the first AerieOS that reads pack format 3. | the releases after 0.9.0-dev.5341 |
+| 4.2 | A Docker app that declares its own fields (`fields`: each the variable it fills, its label, its kind, a default, a line of help and whether it is required), drawn by New container as the app's panel; one on the machine's own network (`network`); one being replaced, with what to install in its place (`going`). | Hides the entry: needs the first AerieOS that reads pack format 4. | the releases after 0.9.0-dev.5341 |
+| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`); a pack's word that it downloads nothing (an empty `install.fetch`), which cuts its steps from the network; and how a newer pin is found, read by the tool that proposes one and by no install: a pin's `found`, a declared download's `version`, `track` and `found`, a repository's `track` and the `tag` its commit is fetched under, and the resolvers `match`, `git-tag` and `git-branch`; and what a package manager installs held the same way: what the entry asks pip or npm for (`lock`), each file of the set a declared download under the lock's directory, up to 256 downloads an entry, and the small files an install of them reads carried by a shipped row itself (`files`). | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
+
+### What stays AerieOS's own
+
+A manifest describes; it never brings code that AerieOS runs as itself. So
+a few things are words a manifest can only name, each with a meaning
+AerieOS carries. These are the format's primitives:
+
+| Primitive | The words |
+|---|---|
+| What a command's words may hold | `{dir}`, `{dist}`, `{project}`, `{args}` |
+| A node's package managers (`system`) | `apt`, `dnf`, `pacman`, `zypper`, `apk` |
+| A config field's kind | `secret`, `text`, `choice`, `list`, `switch`, `projects` |
+| A Docker app's blanks before format 4 | `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}` |
+| AerieOS's own fields of a Docker app, and the kinds of its own | `${PUID}`, `${PGID}`, `${TZ}`, `${PORT}`; `folder`, `port`, `text`, `secret`, `choice`, `switch`, `router` |
+| The network a Docker app runs on | `host` |
+| How an agent takes the briefing | `flag-text`, `flag-file`, `env-file`, `hook`, `none` |
+| A named hooks file shape and payload | `grouped`, `flat`; `snake`, `camel` |
+| AerieOS's events an agent's own are named for | `pre`, `prompt`, `stop`, `recall`, `asking`, `start` |
+| What an agent is answered | `refuse`, `pass`, `say`, `approve` |
+| A template's placeholders | `{command}`, `{seconds}`, `{handler}`, `{reason}`, `{text}` |
+| When its prompt event is raised | `once`, `each-call` |
+| How a first prompt is handed over | `after-dashdash`, `flag`, `none` |
+| How it is told what needs no asking | `settings`, `flag`, `rules-file`, `hook`, `none` |
+| An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`, `match`, `git-tag`, `git-branch`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `zig-index`, `android-repo`, `signature`, `pin` |
+| A package manager a lock is resolved by | `pip`, `npm` |
+| An official service's kind | `router` |
+
+A new primitive is a new format number, never a change to an old one: the
+words above mean what they mean for good. When something cannot be said
+with them, the answer is a new word in the next number, and every manifest
+already written stays as it is.
+
+A toolchain AerieOS ships is a row of its own table and an official pack
+in the catalog, written from that row. Most of a row is other people's
+facts: where a release is downloaded, how its version is found, which
+system packages it needs. So a row has a `rev`, and its entry in the signed
+index repeats it: when the catalog's is higher than an install's own, the
+install fetches that pack at its pin, checks its sha256, holds the row to
+the primitives above and uses it in the shipped row's place, on the
+controller and in what every node installs from. A recipe that moved
+upstream is then a catalog commit and no release. A higher `rev` never
+buys a weaker hold: the catalog's row is taken only where its downloads
+are held to as much as the shipped row's are (`pinned` above `installer`
+above `open`), so an installer that keeps the network does not replace a
+pinned row, and a row held to nothing replaces none. The same holds for a
+shipped coding agent's recipe. Each row or recipe taken is a line in the
+audit, by `catalog`, with the revs it moved between, and one refused as
+weaker is a line there too. The image's own row is
+what runs with no network and whenever the catalog's is no newer; a row
+that names a primitive an install does not carry is refused there and its
+shipped row stays. A toolchain nobody ships yet is not a row at all: it is
+a pack with its own install steps.
+
+How the promise is held: AerieOS keeps manifests of every format it has
+read (`scripts/dashboard/unit/packformat/`), each of which must pass its
+validators in every later build, and its lint refuses a change to one a
+release shipped. One thing a format 1 manifest could say is refused by
+name: a shipped coding agent's recipe that hands its vendor's installer to
+a shell (`agent.install.script`), which held nothing; an install that
+meets one keeps the recipe it shipped with. The catalog's own check holds every entry to each AerieOS
+release still supported, so an entry is signed only when the oldest install
+that reads its format takes it as the newest does.
+
+### A variable an entry sets
+
+An entry sets variables in a few places: a pack's or a shipped row's
+`layout.env`, which every job on a node that holds that toolchain runs
+with, and no other row's installer, steps or check; a shipped row's
+`source.env` and a coding agent's `agent.install.env` and `pin`, which an
+installer runs with; an agent's `env` and `signin.env`, and a config
+field's `env`. One rule holds every one of them, in one function
+(`packformat.env_name_ok`): a name of capitals, digits and underscores, and never one a loader, a shell, an interpreter, git, ssh, curl, tar, OpenSSL, gpg or AerieOS reads at its start to find code to run, the files it trusts or where it connects through, since a variable one entry sets reaches the tools another's install is checked with: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `IFS`, `ENV`, `BASH_ENV`, `PROMPT_COMMAND`, `SHELLOPTS`, `BASHOPTS`, `PS4`, `PYTHONSTARTUP`, `PYTHONPATH`, `PYTHONHOME`, `PYTHONUSERBASE`, `PYTHONPLATLIBDIR`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `RUBYOPT`, `RUBYLIB`, `NODE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`, `GCONV_PATH`, `LOCPATH`, `OPENSSL_CONF`, `OPENSSL_MODULES`, `OPENSSL_ENGINES`, `GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_ASKPASS`, `GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_EDITOR`, `GIT_PAGER`, `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `TAR_OPTIONS`, `CURL_HOME`, `WGETRC`, `GNUPGHOME`, `CURL_CA_BUNDLE`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `REQUESTS_CA_BUNDLE`, `NODE_EXTRA_CA_CERTS`, `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, or any name that begins `LD_`, `DYLD_`, `GIT_SSH`, `GIT_CONFIG`, `SSH_`, `XDG_`, `BB_`, `BUILDERBOT_` or `AERIEOS_`. A manifest
+or a catalog's row that sets one is refused.
+
+### An entry's older pins
+
+An entry of the index pins one manifest: the commit it is at, the sha256
+of its archive, and what the entry repeats of that manifest so a card can
+say it before anything is fetched. The entry's own keys are its newest
+pin. When a pack moves to a newer pack format, the installs on releases
+that read only the earlier one would be left with a card that says what it
+needs and nothing to add. So the entry keeps the pin it had, under
+`older`, newest first. The earlier manifest is still in the pack's
+repository at its earlier commit, so nothing is copied:
+
+```json
+{"name": "hexkit", "url": "https://github.com/you/hexkit-pack", "tier": "vetted", "maker": "Hexkit Project",
+ "about": "Looks inside binaries: dumps, strings, headers.", "withdrawn": false,
+ "format": 6, "framework": "6.0", "commit": "89ab...", "sha256": "5e1f...", "platforms": ["linux/amd64", "linux/arm64"], "held": "pinned",
+ "older": [
+   {"format": 5, "framework": "5.2", "commit": "0123...", "sha256": "9c4d...", "platforms": ["linux/amd64"], "held": "installer",
+    "online": "Its installer downloads the build for this machine from the project's releases."}
+ ]}
+```
+
+What moves with a pin is what is the pinned manifest's: `format`,
+`framework`, `commit`, `sha256`, `platforms`, `label`, `works_with`,
+`held` with `online`, and a shipped recipe's rev (`install_rev`,
+`shipped_rev`). A pin is whole: an older one says each of those its
+manifest gave the entry, and takes nothing from the pin beside it. What is
+the entry's own is said once: its name, where it is kept (`url`, `path`),
+its `kind`, its `tier`, its `maker`, what it is `about`, its `topics`, the
+day it was `added` and whether it is `withdrawn`. `older` lists up to
+eight pins, each with its `format`, `commit` and `sha256`, the formats
+going down from below the entry's own with none twice.
+
+An install takes the newest pin whose format it reads, and everything it
+does with the entry is done with that pin: the card and its Install, a
+Manifest update of a pack kept from it, a kept app's newer definition, a
+shipped toolchain's or a coding agent's newer recipe, a mirror's import.
+It says nothing of a newer pin it cannot use, and a pack kept from an older
+pin is offered the newer one by the first AerieOS that reads it. An entry
+with no pin an install reads is not listed there, as before. An `older`
+that is not written as above is left out whole by an install and the
+entry kept: its newest pin is as good as it was, an install too old for
+that pin is left with nothing to add, and what the entry says of itself,
+that it is withdrawn above all, is never lost with it.
+
+**When an older pin goes.** Every listed release takes the newest pin
+whose format it reads, so an older pin is still needed while some release
+the catalog lists (`aerieos-releases`) is answered that pin. It goes once
+every listed release reads the format of the pin after it, which is when
+the last release that read only the older format is taken off the list.
+The catalog serves the releases from the first that reads `older`
+forward: a release from before it reads an entry's own keys alone.
+
+Nobody writes any of this by hand. `tools/packs-export.py --catalog DIR
+--entry FOLDER` writes the entry of any folder under the catalog's
+`packs/` from that folder's own manifest at a commit, read as an install
+reads it, with the sha256 an install holds the folder to, and keeps what
+is the entry's own; `--index` does the same for every official pack. A pin
+is placed by its format: one past the entry's newest becomes the newest
+and the pin that was there is kept under `older`, one in the newest's
+format takes its place, and one in an earlier format (`--commit REF`, a
+commit where the folder holds the earlier manifest) takes that format's
+older pin. An older pin is dropped only by `--drop-older N`, which names
+the format. The pins inside the catalog's packs are moved by
+`tools/pins.py --catalog DIR`, the four verbs of
+[Moving a pin](toolchains.md#moving-a-pin) over every folder: a pack's
+declared downloads and what it asks a package manager for, a shipped
+toolchain's recipe, a coding agent's install recipe, a service's images
+and the images a Docker app's compose names.
+
 ## The vetted catalog
+
+To put a pack, a coding agent or an app of yours into it, see
+[Submitting to the catalog](submitting.md).
 
 The public catalog (the `aerieos-catalog` repository, R169) is an index
 of packs reviewed by AerieOS's maintainers, each entry pinning a pack's
@@ -130,7 +975,20 @@ commit, never a branch or latest. The index is signed with the
 maintainers' Ed25519 key; the public half ships with AerieOS
 (`config/catalog.pub`), and an install reads an entry only after the
 signature checks: an index changed on the way, or signed by another key,
-is refused and the one read before stands, with the reason said. Where it
+is refused and the one read before stands, with the reason said. So is an
+index made before the one the install holds, signed as it is: a signature
+says who made an index, never that it is the newest, and an old one served
+again would bring back what the catalog withdrew since. When an index was
+made is its `generated`, the stamp the catalog's tools write
+(`2026-11-12T21:34:58Z`): one of the same moment is taken, and one that
+says none, or says it another way, is refused once a dated one is held. An
+install that holds none yet has nothing to compare with, so each release
+says the oldest index it takes (`config/catalog-floor`, the moment of the
+index it was prepared against) and one made before that is refused too. A
+release carrying a floor older than the newest index the catalog has signed
+is refused before its tag, until the floor moves to it. `config/catalog.pub`
+may name a spare key on a second line, and an index signed by either is
+read ([security.md](security.md#the-signing-keys-and-replacing-one)). Where it
 is read from is the **Address** in Controller settings' Vetted catalog group. A pack the
 catalog withdraws (`withdrawn: true` in the next signed index) is a line on
 the bell for every install that holds it, saying to remove it. The Library
@@ -138,13 +996,43 @@ is what reads it. An entry may name a `path`, the folder of its repository
 the pack lives in (the catalog's own packs do; a repository of several
 packs may): its sha256 is then of that folder's archive at the commit,
 Look reads the manifest there, and an install keeps the folder's files as
-a pack made here, so a node fetches the folder and nothing else.
+a pack made here, so a node fetches the folder and nothing else. The files
+kept are fetched again after the look, and that fetch is held to the same
+commit and the same sha256 before anything is kept.
 
 ### Installing from the catalog
 
 The Library's **Tool packs** cards are the index's packs not yet added,
-each with its tier (official, vetted, sideloaded for one added by address
-or made here), what it is and the platforms it works on; **Install** opens
+each with who stands behind it, what it is and the platforms it works on:
+
+| On the card | What it means | The index's word |
+|---|---|---|
+| **Packaged by Aerie** | The pack is AerieOS's own work: how the tool is fetched, checked and installed, for a toolchain, agent or app it ships or a pack its maintainers wrote. The tool itself is usually somebody else's, named beside the pill. | `official` (a shipped row), `aerie` |
+| **Verified** | The vendor's own pack, from a vendor the maintainers have verified: a shorter list than Vetted. | `verified` |
+| **Vetted** | Anybody's pack, reviewed by the maintainers. | `vetted` |
+| **Sideloaded** | Added here by its address, or made here: no index pins it. | none |
+
+To the left of that pill a card names who the tool itself is by: the
+organization or the person that makes it, which an entry says in `maker`
+(`"maker": "Google"`), in its manifest and again in its index entry so the
+card can say it before the pack is fetched. A pack that puts several
+makers' tools together says `"maker": "AerieOS"` (or whoever put it
+together) and lists each under `credits`, which its Details page reads
+out:
+
+```json
+"maker": "AerieOS",
+"credits": [{"name": "shellcheck", "maker": "Vidar Holen"}, {"name": "ruff", "maker": "Astral"}]
+```
+
+Every entry in the vetted catalog names its maker; its check refuses one
+that does not. A sideloaded pack's card names none, whatever its manifest
+says: what nobody vetted does not get to say whose it is. Both keys are
+framework 2.1's ([the framework's version](#the-frameworks-version)).
+
+The words on the card are a person's; a manifest and the index keep their
+own, and an AerieOS from before `aerie` and `verified` reads both as
+vetted. **Install** opens
 the same dialog as Add your own on the commit the index pins, with the
 archive's sha256 checked on the way in: Look (on the card, or in the
 dialog) shows what it fetches and runs, and Add keeps exactly that. A pack
@@ -154,13 +1042,37 @@ when it cannot be read, is said over the cards.
 
 A pack kept from the catalog stays at the commit it was kept at. When a
 later index pins a newer commit of it (the same repository and folder), its
-card says so and offers **Catalog update**, which opens the dialog on the
+card says a manifest update is available and offers **Manifest update** (named
+apart from **Software update**, which puts a newer program on a node), which opens the dialog on the
 new pin with what it changes marked verb by verb, as Edit does for a pack
-added by address; **Update** keeps it at that pin with the index's sha256
-checked, its tier kept. Edit on a pack kept from the catalog looks at the
-index's pin too, never at the repository's head. A pack is kept as vetted or
-official only at a commit and sha256 the signed index pins; anything else
-is a pack by address.
+added by address; **Manifest update** keeps it at that pin with the index's sha256
+checked, its tier kept. A pack kept from the catalog has no Edit on its
+card: its kept copy is reached from its Details page, where the line that
+says where it came from carries **Look for a newer pin, or remove it**,
+which looks at the index's pin too, never at the repository's head. A pack
+that brings a coding agent sits with the coding agents, on the Library and
+on the Installed page. A pack is kept at the
+index's tier only at a commit and sha256 the signed index pins; anything
+else is a pack by address, Sideloaded.
+
+### What is not for this AerieOS
+
+The Library shows what this install can take, and nothing else. A catalog
+entry with no pin in a pack format this AerieOS reads
+([An entry's older pins](#an-entrys-older-pins)), or one
+whose `works_with` names other release lines than this one, is not listed;
+the page's head counts them (**Not for this AerieOS**), so a person knows a
+newer AerieOS would show more. A newer pin of a pack already kept is
+offered only when it fits.
+
+A pack kept here whose `works_with` stops naming the running line after an
+upgrade is **switched off**: it stays where it is installed, and until a
+version that fits is kept it is in no session's `PATH`, view or `aerie
+tool` verbs, in whichever space it was ticked, and a coding agent it brings
+is not offered. Its card and its Installed row say so, the bell says it
+once, and when the catalog pins a commit that names this line its card
+offers **Manifest update**, which switches it back on. Nothing is removed,
+and nothing has to be set again.
 
 ### Without the network
 
@@ -168,15 +1080,19 @@ A controller that cannot reach the catalog installs from a mirror of it.
 `tools/catalog-mirror.py catalog-mirror.tar.gz`, run on a machine with the
 network (from a checkout of AerieOS), reads the catalog's index, checks
 its signature, and fetches every repository the index pins at each commit it
-pins, into one archive: the index as signed and a git bundle per repository.
+pins, an entry's older pins among them, into one archive: the index as
+signed and a git bundle per repository. An import holds the mirror to the
+pin the importing AerieOS takes of each entry.
 `--from-dir` reads the index from a checkout of the catalog instead.
 
 Controller settings' **Vetted catalog** imports it with **Import a mirror**.
 The import is refused when the index is not the maintainers', when a pinned
 repository is missing, or when the mirror was made before the one held.
 Once imported, the Library reads the mirror's index whenever the catalog
-does not answer, and a pack or app the mirror holds is fetched from its
-bundle with nothing going to the network. A pack kept this way is kept as a
+does not answer, and whenever the catalog answers an index made before the
+mirror's: both are signed, a signature does not say which is the newest,
+and what the mirror's had withdrawn does not come back. A pack or app the
+mirror holds is fetched from its bundle with nothing going to the network. A pack kept this way is kept as a
 pack made here, so the nodes take it from the controller too. **Forget**
 drops the mirror; what was kept from it stays. The same group holds the
 catalog's address. A USB stick can carry one from the start: the stick
@@ -186,30 +1102,69 @@ it as it starts (docs/image.md).
 ### Docker apps in the catalog
 
 An entry of `"kind": "app"` is a Docker app: its folder holds `bbapp.json`
-(`name`, `label`, `about`, `port`, `media`, `platforms`, `license`, and an
+(`name`, `label`, `about`, `port`, `maker`, `platforms`, `license`, an
 optional `icon`, a PNG, WebP or SVG file in the folder held to a pack's
-rules) and
-`compose.yml` beside it, the compose held to what an app of your own is held
-to (every image pinned to a tag that is not latest, never built or
-privileged, only the blanks New container fills). The Library lists it as
-an **Apps** card with its tier. **Install** fetches the folder at the commit
-the signed index pins, checks its archive's sha256, keeps the app and opens
-New container with it picked, on the Library's node when that node runs
-Docker (the card says when it does not); from then on New container offers
-it to everyone, and each Create makes another container of it.
+rules, and from pack format 4 its own `fields`, `network` and `going`,
+[A Docker app](submitting.md#a-docker-app)) and `compose.yml` beside it,
+the compose held to what an app of your own is held to (every image held
+by its digest or pinned to a tag that is not latest, never built, only the
+keys that reach nothing of the machine past its ports and volumes, and
+every blank one it declares or one of AerieOS's own), and
+from pack format 5 every image named by its digest
+([Images by digest](#images-by-digest)). The Library lists it as an **Apps**
+card with its tier and what it asks for. **Install** fetches the folder at
+the commit the signed index pins, checks its archive's sha256, keeps the
+app and opens New container on its panel, on the Library's node when that
+node runs Docker (the card says when it does not); from then on New
+container offers it to everyone, and each Create makes another container
+of it, which keeps beside its compose file which app it was made from.
+
+Every Docker app comes this way: AerieOS ships none of its own. An install
+that has read no index of the catalog (it cannot reach it and holds no
+mirror) and has kept no app says so in one line where the Library's Apps
+would be, and offers none; an app kept earlier stays offered with no
+network. A container made from an app keeps what it needs of that app
+beside its own compose file, so it runs and opens its Configure whatever
+the Library holds later, an app AerieOS used to ship among them.
+
+An app is fixed or re-pinned by a commit to the catalog. When the signed
+index pins another commit of an app kept here, the Library takes that
+definition the next time it reads the index, fetched and checked as the
+first was. A container already made from the app keeps running what it
+has: its Configure offers the newer definition, and where that names
+another image its row offers Update, which moves the image and nothing
+else ([containers.md](containers.md#image-updates)).
 
 ### A session asking for one
 
 A session looks through the catalog with `aerie tool search WORDS`: each
 entry's name, kind, tier and what it is, and whether it is added here, never
 its address or commit. `aerie tool install NAME --why "what it is for"` asks for
-a tool pack from it, and the space's **Install a tool pack** setting,
-under Agents may, says what happens: **deny** refuses, **ask** (the default)
-puts it on the bell for a person who may curate the catalog, whose Allow
-adds it at the commit the signed index pins, its sha256 checked, and
-**auto** adds it at once the same way. A session never installs a pack on a
-node itself: once it is added, a person installs it from the Library. The
-briefing names the two verbs and the setting's value.
+a tool on the node that session runs on: a toolchain AerieOS ships, by its
+own name, or a tool pack of the catalog. The space's **Install a tool pack**
+setting, under Agents may, says what happens: **deny** refuses; **ask** (the
+default) puts it on the bell, naming the tool and the node, for a person who
+may curate the catalog, and their Allow installs it there as the Library's
+Install does, in their name with the session named beside it; **auto** does
+the same at once, as the session's own. A pack not yet added is added first,
+at the commit the signed index pins, its sha256 checked. The verb waits for
+the answer and names the job that installs it, and the person who allowed it
+gets that job's notice.
+
+A tool the node already holds is said at once and nobody is asked. A folder
+an install left with no tool in it is not a tool held: the ask goes ahead,
+and the install clears the folder. A toolchain whose install accepts an
+agreement (Google's Android SDK terms, NVIDIA's CUDA license) is never
+accepted for anybody: nothing is asked, and the verb says that a person
+installs it from the Library, where they accept it. A pack that needs root
+stays an administrator's: refused at auto, and kept or installed only on an
+administrator's Allow. A name AerieOS ships is always the toolchain and is
+never kept as a pack. A space that works on several nodes is asked for on the
+node the session runs on; where that cannot be told the verb says so and
+nobody is asked. A session never installs a pack on a node itself: the job
+is the controller's, queued in the name of whoever allowed it. A pack stays
+off for a space until a person switches it on under the space's Toolchains
+settings (below). The briefing names the two verbs and the setting's value.
 
 ## What a space's sessions can use
 
@@ -255,14 +1210,18 @@ the scripts it runs:
 |---|---|
 | `name` | The pack's name, 2 to 40 of `a-z`, `0-9` and `-`. It is the toolchain's name and the word after `aerie tool`, and it cannot be a shipped toolchain's. |
 | `label`, `about` | What the Library and the Installed page show. |
+| `format` | The pack format the manifest needs, a whole number; left out, it is 1. Say the number of the newest thing you use that an older AerieOS could not run ([The format, and what it promises](#the-format-and-what-it-promises)). |
+| `framework` | The framework's version the manifest is written for, as `"2.1"`: the newest thing it uses, whichever number brought it ([The framework's version](#the-frameworks-version)). |
 | `platforms` | Where it works, as `linux/amd64`, `linux/arm64`, `darwin/arm64` and so on; `linux/*` or `darwin/*` for any architecture of that system. A bare `*` is refused. |
 | `terms` | The licenses or agreements it is under, each a label and a link, shown on its row. |
-| `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. This is where a pack downloads its binaries. |
+| `install.fetch` | Pack format 3. The downloads the install takes from somewhere else, up to 256, each `{"url", "sha256", "to"}`: an `https` address, the sha256 of what it answers, and the file inside the pack it is kept as. AerieOS fetches each and holds it to its sha256 before any step runs, and a download that answers anything else installs nothing ([Declared downloads](#declared-downloads)). |
+| `install.lock` | Pack format 5. What the install asks a package manager for, up to four, each `{"kind", "to", "requirements"}`: `pip` or `npm`, the directory inside the pack the manager's files are kept in, and what it is asked for; pip adds `python` and `for`. The files themselves are rows of `install.fetch` under that directory, and no install reads the lock ([Declared downloads](#declared-downloads)). |
+| `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. A pack that declares no downloads fetches its binaries here; one that declares them (`install.fetch`) unpacks and builds here, with no network. |
 | `install.verify` | One command that must succeed for the install to count. |
-| `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`. `tool`: a file whose presence means it is installed. |
-| `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
+| `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`, each name held to [the one rule for a variable an entry sets](#a-variable-an-entry-sets). `tool`: a file whose presence means it is installed. |
+| `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A name is a package's name and nothing a package manager reads as more: letters, digits and `.` `+` `:` `_` `-`, starting with a letter or a digit and never ending in `-`, which to apt asks to remove it (`g++` and `gcc-c++` are names); alternatives are written `NAME|NAME`, and the node installs the first its release carries. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
 | `verbs` | The commands a session calls as `aerie tool NAME VERB`. |
-| `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and one held that stops fitting after an upgrade is a line on the bell saying to update or remove it (R169 step 6). |
+| `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and a catalog entry that repeats the list is not shown on such an install at all. One held that stops fitting after an upgrade is switched off until a version that names the new line is kept ([What is not for this AerieOS](#what-is-not-for-this-aerieos)). |
 | `touches` | What it touches: `hosts`, up to 16 host names its install fetches from, and `root`, true when it needs root on the node to install. Look shows both before it is added, and a pack that needs root is added by an administrator alone (R169 step 4). |
 | `config` | What it asks for on each node (R172): a list of fields, each `{name, label, kind, help, required, env, scope}`, the kind one of `secret`, `text`, `choice` (with `choices`), `list` (with `fields`, rows of them), `switch` or `projects`. The Installed page draws them as Configure on the pack's row for the node picked; the answers are kept on the controller, a secret sealed and never shown again, and handed to the node, where a field with `env` reaches the pack's verbs as that environment variable (a switch as `1` or empty, a list as JSON). `scope` is `node` (the default: one answer for everybody on that node, set by whoever may Configure there) or `person`: each person's own, set under **Yours** on the same row by anyone who works on that node's spaces, a secret sealed under their own key, written into their home on the node and read by their sessions' verbs over the node's answer. |
 | `guidance` | A Markdown file in the repository telling a session, whichever coding agent runs it, when and how to use the pack. It reads it with `aerie help tool-NAME`. |

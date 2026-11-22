@@ -1,9 +1,10 @@
 // The toolchain store's state and verbs, shared by the Library (what the
 // catalog offers), the Installed page (what the node holds) and the pack
-// dialogs: the read of a node's store (/api/toolchains), the one job at a
-// time it runs (tcAct: install, remove, check, the system packages, abort),
+// dialogs: the read of a node's store (/api/toolchains), the jobs it
+// runs one at a time, queued behind each other (tcAct: install, remove, check, the system packages, abort),
 // the lines a toolchain's row says (its terms, system packages, what it
-// needs, how its download was checked), the machine's own rows (the NVIDIA
+// needs, how its download was checked), where a row stands and the presses
+// the two pages share, the machine's own rows (the NVIDIA
 // driver and the container toolkit) and the tool pack dialog (R77). Not a
 // page: the Toolchains page it was went with R170, the Library in its place.
 //
@@ -17,7 +18,7 @@
 
 "use strict";
 
-let toolchains = null, tcRev = 0;
+let toolchains = null;
 
 // The sizes are measured by a worker on the server, so the first draw after
 // an install (or after a restart) carries the catalog's estimates and the
@@ -25,39 +26,30 @@ let toolchains = null, tcRev = 0;
 // not a poll: the flag clears when the measurement finishes, and nothing else
 // on this tab changes on its own.
 let tcSizeTimer = null;
-async function loadToolchains(){
-  const asked = ++tcLoadSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== tcLoadSeq) return;           // a later load asks instead
-  if (!tcPick()){
-    toolchains = {nonode: true};
-    clearTimeout(tcSizeTimer); tcSizeTimer = null;
-    tcRev++; drawPanes();
-    return;
-  }
-  // A reply is kept when it is still about the node on show and nothing
-  // asked after it has landed first. Dropping every reply a later ask had
-  // overtaken was a livelock on a loaded box: the revision watch, the
-  // sizing timer and the settling poll each ask again, and when they asked
-  // faster than one read came back, every reply was overtaken, the page sat
-  // on its template, and Forward to a node never said what it held (B154).
-  const node = tcNode;
-  const keep = () => tcNode === node && asked > tcLanded;
-  try{
-    const r = await fetch("/api/toolchains" + (node !== "local" ? `?node=${encodeURIComponent(node)}` : ""));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (!keep()) return;
+function loadToolchains(){
+  return reading("toolchains", async () => {
+    if (nodesList === null || nodesStale) await nodesKnown();
+    if (!tcPick()){
+      toolchains = {nonode: true};
+      clearTimeout(tcSizeTimer); tcSizeTimer = null;
+      return;
+    }
+    // A reply is kept while it is still about the node on show; reading()
+    // lands every other one in the order asked, since dropping each reply
+    // a later ask had overtaken was a livelock on a loaded box: the revision
+    // watch, the sizing timer and the settling poll each ask again, and when
+    // they asked faster than one read came back, the page sat on its
+    // template, and Forward to a node never said what it held (B154).
+    const node = tcNode;
+    const got = await getJSON("/api/toolchains" + (node !== "local" ? `?node=${encodeURIComponent(node)}` : ""));
+    if (tcNode !== node) return;
     toolchains = got;
-  }catch(e){ if (!keep()) return; toolchains = {error: String(e)}; }
-  tcLanded = asked;
-  clearTimeout(tcSizeTimer); tcSizeTimer = null;
-  // ...and while Claude Code's own job runs (R145), which is not a toolchain
-  // job and so moves nothing the tab waits on otherwise.
-  if (toolchains && toolchains.sizing) tcSizeTimer = setTimeout(loadToolchains, 1500);
-  else if ((toolchains?.machine || []).some(m => m.running)) tcSizeTimer = setTimeout(loadToolchains, 3000);
-  tcRev++;
-  drawPanes();
+    clearTimeout(tcSizeTimer); tcSizeTimer = null;
+    // ...and while Claude Code's own job runs (R145), which is not a toolchain
+    // job and so moves nothing the tab waits on otherwise.
+    if (toolchains && toolchains.sizing) tcSizeTimer = setTimeout(loadToolchains, 1500);
+    else if ((toolchains?.machine || []).some(m => m.running)) tcSizeTimer = setTimeout(loadToolchains, 3000);
+  });
 }
 
 // The animated ellipsis. One counter for the tab, ticked on its own timer and
@@ -75,15 +67,13 @@ let tcDots = 0, tcDotsTimer = null;
 // "local" is still what that installer is called (`aerie toolchains install`
 // from a shell and the suite address it) but no page sets it.
 let tcNode = "";
-let tcLoadSeq = 0;         // each load's number, in the order asked
-let tcLanded = 0;          // the newest load drawn: an older reply landing after it is dropped
 
 // The node the store is read for: the one a page showed last (remembered
 // in this browser), else the first live agent node, else nothing. Re-asked
 // on every load, so a node retired under a page is not read as if it were
 // still there.
 function tcPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const live = liveAgents();
   if (tcNode === "local") return tcNode;
   let want = tcNode;
   if (!live.some(n => n.id === want)){
@@ -98,7 +88,11 @@ function tcTickDots(){
   const spans = document.querySelectorAll(".dots");
   if (!spans.length){ clearInterval(tcDotsTimer); tcDotsTimer = null; return; }
   tcDots = (tcDots + 1) % 4;
-  spans.forEach(e => e.textContent = ".".repeat(tcDots));
+  // Only the ones on show are written (R228 step 10): a page left behind
+  // with a job still running there was written to every 400 ms. Kept going
+  // while any is on the page, so that page's dots move again when it is.
+  const dots = ".".repeat(tcDots);
+  spans.forEach(e => { if (e.checkVisibility?.({ visibilityProperty: true }) ?? true) e.textContent = dots; });
 }
 
 // What a row pulls onto the picked machine from its own package manager,
@@ -162,6 +156,137 @@ function tcVerifiedLine(p){
     : v.algo === "gpg" ? `<span class="sub tcverified">Checked when it was installed: ${esc(v.where)}</span>`
     : `<span class="sub tcverified">Checked when it was installed: its ${esc(v.algo)} matched ${esc(v.where)}</span>`;
 }
+// An installed pack's receipt (R234; the operator, 13 Nov: what a pack's
+// install downloads from somewhere else had no paper trail): the manifest
+// commit the copy here came from, when, how many files landed and how big,
+// and one hash over them all. Under it, each thing the receipt shows that a
+// person would act on: a copy from an earlier manifest than the one kept
+// now, the same manifest having left other files here the time before, and
+// another node's copy of the same manifest being another set of files,
+// which is what an install that fetches "the latest" looks like. Nothing for
+// one installed before receipts were kept.
+// What an entry's downloads are held to, as its Details says it in one
+// line (R267; the operator, 20 Nov: one mechanism for every entry, and no
+// paragraph where a phrase does): every download pinned, its installer
+// pinned with what it fetches by itself in the entry's own sentence, or not
+// pinned. Which part of an entry is not held is its author's to read (Look
+// and the catalog's check say it), and on this page it was a paragraph.
+// "" for an entry that says none (an app, a card from a catalog whose index
+// does not carry it).
+function tcHeldLine(p){
+  const h = p.held;
+  if (!h?.word) return "";
+  const why = esc(String(h.why || "").replace(/\.+$/, ""));
+  if (h.word === "pinned") return `<span class="sub tcheld">Every download is pinned, and its install runs with no network.</span>`;
+  if (h.word === "installer") return `<span class="sub tcheld">Its installer is pinned${why ? `; ${why}` : " and downloads the rest itself"}.</span>`;
+  return `<span class="sub tcheld">Its downloads are not pinned: what its install fetches is not checked against anything it carries.</span>`;
+}
+
+function tcReceiptLines(p){
+  const r = p.installed ? p.receipt : null;
+  if (!r) return "";
+  const short = h => esc(String(h || "").slice(0, 12));
+  // A pack's copy came from its manifest at a commit. A toolchain AerieOS
+  // ships has no manifest: its receipt is filed under the sha256 its own
+  // download was held to, or under nothing where a signature held it.
+  const from = p.pack ? ` from manifest <code>${short(r.commit)}</code>` : r.commit ? `, its download <code>${short(r.commit)}</code>` : "";
+  const lines = [`<span class="sub tcreceipt">Installed ${esc(flWhen(r.at))}${from}: ${
+    r.files === 1 ? "1 file" : `${esc(String(r.files))} files`}, ${esc(flSize(r.bytes))}, receipt <code>${short(r.tree)}</code>.</span>`];
+  // What it downloaded was held to what its entry carries (a sha256, or its
+  // publisher's signature), and what ran after that ran with no network, or
+  // with it on a node that cannot cut it, or with it because its installer
+  // downloads the rest by itself and its entry says so (pack format 5).
+  const how = (r.downloads || []).some(d => d.held === "signed") ? "its sha256 or its publisher's signature" : "its sha256";
+  const said = p.pack || (r.downloads || []).length ? `Its downloads are declared` : "";
+  if (r.net === "cut") lines.push(`<span class="sub tcreceipt">${said ? `${said}: each matched ${how}, and its install steps ran with no network.`
+    : "Its download was checked, and what it ran after that ran with no network."}</span>`);
+  if (r.net === "open") lines.push(`<span class="sub tcreceipt">${said ? `${said} and each matched ${how}, but this node cannot cut the network for a step, so its install steps ran with it.`
+    : "Its download was checked, but this node cannot cut the network for a step, so what it ran after that ran with it."}</span>`);
+  if (r.net === "online") lines.push(`<span class="sub tcreceipt">${said ? `${said} and each matched ${how}` : "Its download was checked"}; its installer kept the network${
+    r.why ? `: ${esc(String(r.why).replace(/\.+$/, ""))}` : ""}.</span>`);
+  if (r.stale) lines.push(`<span class="sub warn tcreceipt">This copy is from an earlier manifest: the one kept now is <code>${short(r.stale)}</code>. Install again takes what that one installs.</span>`);
+  if (r.before) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files here the time before (receipt <code>${short(r.before)}</code>): something its install fetches has changed.</span>`);
+  if (r.differs?.length) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files on ${esc(r.differs.map(d => d.node).join(", "))} (receipt ${
+    r.differs.map(d => `<code>${short(d.tree)}</code>`).join(", ")}): something its install fetches is not pinned.</span>`);
+  return lines.join("");
+}
+
+// ---- what a row says and does on both pages ---------------------------------
+// The Library's card and the Installed page's row are about the same thing
+// on the same node, each from its own read of /api/library: the facts and
+// the presses the two share are here, and each page keeps its own markup
+// around them (a card there, a row here).
+
+// Where a row stands, as the few words at its right: the one shape both
+// pages draw them in.
+function packState(words, cls = ""){ return `<span class="state${cls ? " " + cls : ""}">${words}</span>`; }
+// One of the machine's own two rows, the NVIDIA driver or the container
+// toolkit. `absent` is what the page says of one that is not installed:
+// nothing on a Library card, whose Install says it, and "not installed" on
+// the Installed page's row.
+function packMachineState(r, absent = ""){
+  const m = r.machine, st = m.state;
+  if (!m.managed) return packState("installed by hand on this machine");
+  if (r.name === TC_DRIVER) return st === "absent" ? packState(absent) : st === "loaded" ? packState("installed and in use", "ok")
+    : packState(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "software update available" : "installed, takes the card at a restart", "warn");
+  return st === "absent" ? packState(absent) : st === "ready" ? packState(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
+    : packState(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
+}
+// A toolchain, a pack or an agent with nothing else to say of it: installed,
+// behind what is out, a copy an earlier manifest made, or installed in a
+// version nobody could read.
+function packHeldState(r){
+  if (r.installed && !r.update && r.receipt?.stale) return packState("installed from an earlier manifest", "warn");
+  if (r.installed) return packState(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
+  if (r.unknown) return packState("installed, version unknown");
+  return packState("");
+}
+// The version installed, as a pill, or "" where there is none to name: a
+// row not installed, and one that is only known to be present.
+function packVersionPill(r){
+  return r.version && r.version !== "-" && r.version !== "present" ? `<span class="pill" title="installed">${esc(r.version)}</span>` : "";
+}
+// What the node's last job said went wrong with a toolchain or a pack, as
+// the line under its name, or "": nothing while its own job runs.
+function packJobErr(r, job){
+  return !r.running && (r.kind === "toolchain" || r.kind === "pack") && job?.errors?.[r.name] ? `<div class="sub bad">${esc(job.errors[r.name])}</div>` : "";
+}
+
+// What a page's read of a node tells the store's own state. The lines a
+// toolchain's and an agent's row say read the node's sandbox flag (Install
+// them now on a system line) and this person's plugins and MCP servers there
+// (an agent's Yours). tcAct refuses a second job by the record of the one
+// running, which the read keeps current: where the store's rows have not
+// been read, a stand-in holding the job alone, marked `stub` so nothing
+// takes it for the rows (toolchainsFor).
+function toolchainsSeen(read){
+  tcSandboxNow = !!read.sandbox; agYours = read.yours || {plugins: [], mcp: {}};
+  if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = read.job;
+  else toolchains = {name: read.name, job: read.job, items: [], stub: true};
+}
+// A node's store with its rows, read first where they are not held. The pack
+// dialogs find the pack they open on in the rows (tpOpen), and the stand-in
+// a page keeps for the running job has none: taken for them, a kept pack was
+// not found, and its Edit or its Manifest update opened as Add your own on
+// an empty address.
+async function toolchainsFor(node){
+  if (!toolchains || toolchains.stub || toolchains.nonode || toolchains.error || tcNode !== node) await loadToolchains();
+  return toolchains;
+}
+
+// Deploy a service on a node as a written container, or take it off: the
+// build is a job whose row the Containers page has, said when one starts.
+function packDeploy(b, node, r, act, after){
+  const off = act === "remove";
+  return sayPost(b, off ? "Removing" : "Deploying", "/api/library", {action: act, node, pack: r.name},
+    j => j.job ? `${off ? "removing" : "deploying"} ${r.label}: its row on the Containers page has the build` : "", after);
+}
+// Install a coding agent on a node, or update the one there. An update ends
+// the agent's sessions on the node first, so it is asked.
+async function agentUpdate(b, node, r, after){
+  if (r.installed && !await askYes(`Update ${r.label} on ${nodeNameOf(node)}? Its sessions there end first; they start again from the space rows.`)) return;
+  await sayPost(b, "Asking", "/api/agents", {action: "install", node, agent: r.agent || ""}, "", after);
+}
 // ---- tool packs (R77) -------------------------------------------------------
 // The one dialog the Library's Add tool pack and a pack's Edit open (tpDraw).
 // A pack is looked at before it is added: the dialog fetches its manifest at a
@@ -177,10 +302,11 @@ const TP_BLANK = () => ({url: "", seen: null, error: "", busy: "", from: "repo",
 // The vetted catalog (R169 step 4): its index as /api/catalog answers it,
 // read when the page opens and on Refresh, never polled.
 let tpCatalog = null;
-async function loadCatalog(fresh){
-  try{ tpCatalog = await (await fetch("/api/catalog" + (fresh ? "?fresh=1" : ""))).json(); }
-  catch(e){ tpCatalog = {error: "the catalog: " + failWords(e)}; }
-  tcRev++; drawPanes();
+function loadCatalog(fresh){
+  return reading("catalog", async () => {
+    tpCatalog = await getJSON("/api/catalog" + (fresh ? "?fresh=1" : ""));
+    if (tpCatalog.error) tpCatalog = {error: "the catalog: " + tpCatalog.error};
+  });
 }
 
 // What a pack would install and give a session, from the manifest a look
@@ -203,6 +329,12 @@ function tpSeen(seen, was, offer = true){
       .map(v => `<div class="sub">aerie tool ${esc(m.name)} ${esc(v)} <span class="pill warn">gone</span></div>`).join("");
   const steps = (m.steps || []).map(w).join(", ") + (was && !same(m.steps || [], was.steps || [])
     ? ` <span class="pill warn">changed</span>${(was.steps || []).length ? ` <span class="sub">was ${(was.steps || []).map(w).join(", ")}</span>` : ""}` : "");
+  // Its declared downloads as Look answers them (how each is held, and the
+  // platform it is for), and the entry's own sentence where its installer
+  // keeps the network (pack format 5); a Look from before those is read
+  // from the manifest's own list.
+  const dls = seen.downloads || (m.fetch || []).map(f => ({...f, held: f.sha256 ? "sha256" : "signed", keys: f.signed?.keys || "", platform: f.platform || ""}));
+  const keeps = seen.held?.word === "installer" ? String(seen.held.why || "").replace(/\.+$/, "") : "";
   return `<div class="tpseen">
     <div class="name">${esc(m.label)} <span class="pill">${esc(m.name)}</span> <span class="sub">${seen.here
       ? `as given here, ${seen.nfiles} file${seen.nfiles === 1 ? "" : "s"}` : `at ${esc(seen.commit.slice(0, 12))}`}</span></div>
@@ -211,8 +343,18 @@ function tpSeen(seen, was, offer = true){
       m.verify ? `, and checks it with ${w(m.verify)}` : ""}; on ${esc((m.platforms || []).join(", "))}.</div>
     ${verbs}
     ${Object.keys(m.system || {}).length ? `<div class="sub">System packages it installs first: ${Object.entries(m.system).map(([k, v]) => `${esc(k)} <code>${esc(v.join(" "))}</code>`).join("; ")}; a node of another package manager is not offered it.</div>` : ""}
+    ${(m.fetch || []).length ? `<div class="sub">It declares what it downloads, each held to ${dls.some(f => f.held === "signed") ? "its sha256 or its publisher's signature" : "its sha256"} before its ${
+      keeps ? `installer runs, which keeps the network (${esc(keeps)})` : "steps run with no network"}: ${
+      dls.map(f => `<code>${esc(f.to)}</code> from <code>${esc(f.url)}</code> (${f.held === "signed" ? `signed, key <code>${esc(f.keys)}</code>` : `<code>${esc(String(f.sha256 || "").slice(0, 12))}</code>`})${
+        f.platform ? ` on ${esc(f.platform)}` : ""}`).join("; ")}.${
+      was && !same(m.fetch, was.fetch || []) ? ` <span class="pill warn">changed</span>` : ""}</div>`
+      : seen.held?.word === "pinned" && (m.steps || []).length ? `<div class="sub">It declares that it downloads nothing: its install steps run with no network.</div>`
+      : keeps ? `<div class="sub">Its installer keeps the network: ${esc(keeps)}.</div>`
+      : (m.steps || []).length ? `<div class="sub">It declares no downloads: what its install steps fetch is not checked, and its receipt on a node says what landed.</div>` : ""}
     ${(m.touches?.hosts || []).length ? `<div class="sub">Its install fetches from ${m.touches.hosts.map(h => `<code>${esc(h)}</code>`).join(", ")}.</div>` : ""}
     ${(m.works_with || []).length ? `<div class="sub">It works with AerieOS ${esc(m.works_with.join(", "))}.</div>` : ""}
+    ${m.pack_agent ? `<div class="sub">It brings a coding agent, ${esc(m.pack_agent.name || m.name)} (<code>${esc(m.pack_agent.command || "")}</code>), handed the briefing and held by AerieOS's guards through its own hooks.${
+      tpForm?.catalog ? "" : " A pack added here offers its agent only where Controller settings, under Vetted catalog, says to offer coding agents from packs added here: nobody vetted this one."}</div>` : ""}
     ${m.touches?.root ? `<div class="hint warn">It needs root on the node to install: only an administrator adds it.</div>` : ""}
     ${(m.terms || []).length ? `<div class="sub">Under ${m.terms.map(t => t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.label)}</a>` : esc(t.label)).join(", ")}.</div>` : ""}
     ${seen.guidance ? `<div class="sub">Comes with guidance a session reads as <code>aerie help tool-${esc(m.name)}</code>.</div>` : ""}
@@ -222,7 +364,7 @@ function tpSeen(seen, was, offer = true){
 
 // An app of the person's own (R170 step 3, the Library's Add your own): a
 // compose file with the blanks New container fills, its id, name, what it
-// is and its port; Look checks it the way the shipped apps are held (every
+// is and its port; Look checks it the way the catalog's apps are held (every
 // image pinned, no blank but the known ones) and says what it would run;
 // Add keeps it at tier sideloaded, and it is offered as any app is.
 function tpAppHtml(f){
@@ -250,7 +392,7 @@ function tpAppSeen(seen){
 async function tpAppLook(){
   const f = tpForm;
   f.busy = "look"; f.error = ""; tpDraw();
-  const j = await (await postJSON("/api/nasapps", {action: "preview", compose: f.app.compose})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/nasapps", {action: "preview", compose: f.app.compose});
   if (tpEdit === null) return;
   f.busy = ""; f.seen = j.error ? null : j; f.error = j.error || ""; tpDraw();
 }
@@ -258,7 +400,7 @@ async function tpAppLook(){
 async function tpOpenApp(id){
   tpEdit = ""; tpForm = TP_BLANK(); tpForm.what = "app"; tpForm.app.editing = id; tpForm.app.id = id;
   tpDraw(true);
-  const j = await (await postJSON("/api/nasapps", {action: "source", app: id})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/nasapps", {action: "source", app: id});
   if (tpEdit === null || tpForm.app.editing !== id) return;
   if (j.error) tpForm.error = j.error;
   else Object.assign(tpForm.app, {name: j.name, what: j.what, port: j.port, compose: j.compose});
@@ -279,8 +421,9 @@ function tpWhatHtml(f){
   return `<div class="field"><label id="tpWhatLabel">What</label>
     <div class="pseg" role="group" aria-labelledby="tpWhatLabel">${[["pack", "A tool pack"], ["app", "An app"]]
       .map(([k, t]) => `<button type="button" data-tpwhat="${k}" class="${f.what === k ? "on" : ""}" aria-pressed="${f.what === k}">${t}</button>`).join("")}</div>
-    <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the shipped ones, kept as sideloaded."
-      : "A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's Tool packs says how to write one."}</div></div>`;
+    <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the catalog's, kept as sideloaded."
+      : `A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's <a href="#/help/tool-packs">Tool packs</a> says how to write one.`}
+      One meant for everybody goes to the vetted catalog: <a href="#/help/submitting">Submitting to the catalog</a> says how.</div></div>`;
 }
 function tpFromHtml(f, here){
   const seg = here ? "" : `<div class="field"><label id="tpFromLabel">From</label>
@@ -324,11 +467,13 @@ function tpModalHtml(){
   const look = fresh || f.error || here ? `<button type="button" data-tplook${f.busy ? " disabled" : ""}${offer ? "" : ` class="primary"`}>${
     f.busy === "look" ? "Looking…" : fresh || here ? "Look" : "Look again"}</button>` : "";
   const add = offer ? `<button type="button" class="primary" data-tpadd${f.busy ? " disabled" : ""}>${
-    f.busy === "add" ? (fresh ? "Adding…" : "Updating…") : fresh ? "Add" : "Update"}</button>` : "";
+    // A pack already kept takes a newer manifest here, never a program on
+    // a node: the press says so, as the card's does (the operator, 13 Nov).
+    f.busy === "add" ? (fresh ? "Adding…" : "Updating…") : fresh ? "Add" : "Manifest update"}</button>` : "";
   const rm = p ? `<button type="button" class="danger" data-tprm="${esc(p.name)}">Remove</button>` : "";
   return `<div class="box wide"><h3>${fresh ? (f.catalog ? `Install ${esc(f.catalog.name)} from the catalog` : "Add your own") : `${esc(p.label)}, a tool pack`}</h3>
     ${p ? `<div class="field"><div class="sub">${here ? "Made here" : `From <code>${esc(p.pack.url)}</code>`} at ${esc(p.pack.commit.slice(0, 12))}, added by ${
-          esc(p.pack.by || "an administrator")}${p.pack.at ? ` ${ago(p.pack.at)}` : ""}. Verbs: ${esc((p.pack.verbs || []).join(", "))}.</div></div>` : ""}
+          esc(p.pack.by || "an administrator")}${p.pack.at ? ` ${ago(p.pack.at)}` : ""}.${(p.pack.verbs || []).length ? ` Verbs: ${esc(p.pack.verbs.join(", "))}.` : ""}</div></div>` : ""}
     ${fresh && !f.catalog ? tpWhatHtml(f) : ""}
     ${fresh || here ? tpFromHtml(f, here) : ""}
     ${seen ? `<div class="field">${tpSeen(seen, p ? p.pack : null, offer)}</div>` : ""}
@@ -352,7 +497,7 @@ function tpOpenCatalog(entry){
 // Update then keeps it at that pin with the index's sha256, its tier kept.
 async function tpOpen(name, pin){
   const pack = name ? (toolchains?.items || []).find(i => i.name === name)?.pack : null;
-  const vetted = pack && (pack.tier === "vetted" || pack.tier === "official");
+  const vetted = pack && ["official", "aerie", "verified", "vetted"].includes(pack.tier);
   if (vetted && !pin && !tpCatalog?.index) await loadCatalog(false);
   pin = pin || (vetted ? tpPinOf(name, pack) : null);
   tpEdit = name || "";
@@ -372,7 +517,7 @@ function tpPinOf(name, pack){
 // A pack made here opens on its bbtool.json as kept, to change in place.
 async function tpSource(){
   const name = tpEdit;
-  const j = await (await postJSON("/api/toolpacks", {action: "source", name})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/toolpacks", {action: "source", name});
   if (tpEdit !== name) return;
   if (j.error) tpForm.error = j.error; else tpForm.text = j.text;
   tpDraw();
@@ -387,21 +532,20 @@ async function tpLook(){
   f.busy = "look"; f.error = ""; tpDraw();
   let body;
   if (pack && f.catalog) body = {action: "preview", url: f.catalog.url, commit: f.catalog.commit, sha256: f.catalog.sha256, path: f.catalog.path || ""};
-  else if (pack && !pack.here) body = {action: "preview", url: pack.url};
+  else if (pack && !pack.here) body = {action: "preview", url: pack.url, path: pack.path || ""};
   else if (!pack && f.catalog) body = {action: "preview", url: f.catalog.url, commit: f.catalog.commit, sha256: f.catalog.sha256, path: f.catalog.path || ""};
   else if (!pack && f.from === "repo") body = {action: "preview", url: f.url.trim()};
   else if (f.file){
     // The archive goes up on its own first, as New project's does, and the
     // look quotes the id the spool hands back.
-    const u = await fetch("/api/upload-archive?name=" + encodeURIComponent(f.file.name), {method: "POST", body: f.file});
-    const uj = await u.json().catch(() => ({}));
-    if (!u.ok || uj.error){
+    const uj = await postFile("/api/upload-archive?name=" + encodeURIComponent(f.file.name), f.file);
+    if (uj.error){
       if (tpEdit !== name) return;
-      f.busy = ""; f.error = uj.error || `the upload failed (HTTP ${u.status})`; tpDraw(); return;
+      f.busy = ""; f.error = `the upload failed: ${uj.error}`; tpDraw(); return;
     }
     body = {action: "preview", archive: uj.id};
   } else body = {action: "preview", text: f.text};
-  const j = await (await postJSON("/api/toolpacks", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/toolpacks", body);
   if (tpEdit !== name) return;                 // closed, or another opened, meanwhile
   f.busy = ""; f.seen = j.error ? null : j; f.error = j.error || ""; tpDraw();
 }
@@ -426,20 +570,22 @@ function tpDraw(first){
     document.body.appendChild(m);
     armModal(m);
   }
-  m.innerHTML = tpModalHtml();
+  drawHTML(m, tpModalHtml());
   m.hidden = false;
   if (first){
     tpHeld = 0;
-    if (m.querySelector("[data-tpfrom]")){
+    // On a phone the box is the whole screen whatever From is chosen, so
+    // nothing is held.
+    if (m.querySelector("[data-tpfrom]") && !isPhone()){
       const was = tpForm.from;
       let h = 0;
       for (const k of [...m.querySelectorAll("[data-tpfrom]")].map(x => x.dataset.tpfrom)){
         tpForm.from = k;
-        m.innerHTML = tpModalHtml();
+        drawHTML(m, tpModalHtml());
         h = Math.max(h, m.querySelector(".box").getBoundingClientRect().height);
       }
       tpForm.from = was;
-      m.innerHTML = tpModalHtml();
+      drawHTML(m, tpModalHtml());
       tpHeld = Math.ceil(h);
     }
   }
@@ -468,10 +614,10 @@ function tpDraw(first){
   if (rmApp) rmApp.onclick = async () => {
     const id = rmApp.dataset.tprmapp;
     if (!await askYes(`Remove the app ${tpForm.app.name || id}? It leaves the catalog; a container made from it keeps its own compose file.`)) return;
-    const j = await (await postJSON("/api/nasapps", {action: "remove", app: id})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/nasapps", {action: "remove", app: id});
     if (j.error){ tpForm.error = j.error; tpDraw(); return; }
     notify(`${tpForm.app.name || id} removed from the catalog`);
-    tpClose(); if (typeof loadLibrary === "function") loadLibrary();
+    tpClose(); loadLibrary();
   };
   m.querySelectorAll("[data-tpfrom]").forEach(b => b.onclick = () => {
     if (tpForm.from === b.dataset.tpfrom) return;
@@ -489,8 +635,9 @@ function tpDraw(first){
   m.querySelector("[data-tpfile]")?.addEventListener("click", () => file?.click());
   if (file) file.onchange = () => { tpForm.file = file.files[0] || null; tpForm.seen = null; tpForm.error = ""; tpDraw(); };
   m.querySelector("[data-tpcancel]").onclick = tpClose;
-  const post = async body => (await postJSON("/api/toolpacks", body)).json().catch(() => ({error: "no answer"}));
-  const packUrl = () => tpEdit ? (toolchains?.items || []).find(i => i.name === tpEdit)?.pack?.url || "" : tpForm.url.trim();
+  const post = body => postJSON("/api/toolpacks", body);
+  // The kept pack's address, or the catalog pin's the dialog was opened on.
+  const packUrl = () => tpEdit ? (toolchains?.items || []).find(i => i.name === tpEdit)?.pack?.url || tpForm.catalog?.url || "" : tpForm.url.trim();
   const look = m.querySelector("[data-tplook]");
   if (look) look.onclick = tpForm.what === "app" && !tpEdit ? tpAppLook : tpLook;
   const add = m.querySelector("[data-tpadd]");
@@ -498,20 +645,20 @@ function tpDraw(first){
     tpForm.busy = "add"; tpDraw();
     if (tpForm.what === "app" && !tpEdit){
       const a = tpForm.app;
-      const j = await (await postJSON("/api/nasapps", {action: "add", app: a.id, name: a.name, what: a.what, port: a.port, compose: a.compose, replace: !!a.editing})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/nasapps", {action: "add", app: a.id, name: a.name, what: a.what, port: a.port, compose: a.compose, replace: !!a.editing});
       if (j.error){ tpForm.busy = ""; tpForm.error = j.error; tpDraw(); return; }
       notify(a.editing ? `${a.name} saved` : `${a.name} added: Install on its card opens New container with it picked`);
-      tpClose(); if (typeof loadLibrary === "function") loadLibrary();
+      tpClose(); loadLibrary();
       return;
     }
     const j = await post(tpForm.seen?.staged ? {action: "add", staged: tpForm.seen.staged}
-                                             : {action: "add", url: packUrl(), commit: tpForm.seen?.commit || "",
+                                             : {action: "add", url: packUrl(), commit: tpForm.seen?.commit || tpForm.catalog?.commit || "",
                                                 ...(tpForm.catalog ? {sha256: tpForm.catalog.sha256, path: tpForm.catalog.path || ""} : {})});
     if (j.error){ tpForm.busy = ""; tpForm.error = j.error; tpDraw(); return; }
     notify(j.unchanged ? `${j.pack.name}: nothing changed, so it is kept as it was`
          : j.replaced ? `${j.pack.name} updated: where it is installed, uninstall it and install it again to take the new version`
          : `${j.pack.name} added: install it below like any toolchain`);
-    tpClose(); loadToolchains(); if (typeof loadLibrary === "function" && shown("library")) loadLibrary();
+    tpClose(); loadToolchains(); if (shown("library")) loadLibrary();
   };
   const rm = m.querySelector("[data-tprm]");
   if (rm) rm.onclick = async () => {
@@ -577,17 +724,8 @@ function tcToolkitLine(m){
   }
 }
 async function tcAct(action, only){
-  // One at a time, and the server enforces it with a 409, so the buttons go
-  // dead rather than letting a click earn an error message. Installs are
-  // minutes long and share one sdkmanager lock; a queue that outlived them
-  // would have to survive a page reload to mean anything, and this does not.
-  // Abort is the one thing that may be asked of a running job; everything
-  // else has to wait for it.
-  if (action !== "abort" && toolchains?.job?.running)
-    return notify("a toolchain operation is already running", true);
+  // A press while a job runs is queued behind it, here and on a node alike.
   if (action === "abort"){
-    if (!await askYes("Stop after the toolchain it is on? What has already installed stays."))
-      return;
     // On a node the install is a job, and stopping it is the queue's Cancel.
     if (tcNode !== "local" && toolchains?.job?.id)
       await postJSON("/api/v1/jobs", {action: "cancel", id: toolchains.job.id});
@@ -606,25 +744,23 @@ async function tcAct(action, only){
   // The driver is the one row whose install ends at a restart: said once,
   // before anything is queued.
   const drv = names.includes(TC_DRIVER) && action === "install";
-  if (drv && !await askYes(`Install NVIDIA's driver on ${toolchains?.name || "this node"}? It takes the card only when the machine restarts, which ends every session on it.`))
-    return;
   // ...and the toolkit is the one that adds a package source of somebody
-  // else's to the machine.
-  if (names.includes(TC_TOOLKIT) && action === "install"
-      && !await askYes(`Install the NVIDIA container toolkit on ${toolchains?.name || "this node"}? It adds NVIDIA's own package source to the machine. Running containers keep running.`))
+  // else's to the machine. Both in one press are one question (R265).
+  const kit = names.includes(TC_TOOLKIT) && action === "install";
+  if ((drv || kit) && !await askYes("", {title: `Install on ${toolchains?.name || "this node"}?`, verb: "Install", parts: [
+    {head: "NVIDIA's driver", lines: drv ? ["It takes the card only when the machine restarts, which ends every session on it."] : []},
+    {head: "The NVIDIA container toolkit", lines: kit ? ["It adds NVIDIA's own package source to the machine. Running containers keep running."] : []}]}))
     return;
   try{
     const body = {action, names, node: tcNode, ...(drv && tcDriverPick ? {driver: tcDriverPick} : {})};
-    let r = await postJSON("/api/toolchains", body);
-    let j = await r.json().catch(() => ({}));
+    let j = await postJSON("/api/toolchains", body);
     // An agreement a toolchain installs under (Google's Android SDK terms,
     // NVIDIA's CUDA license) is the person's to accept, named, before
     // anything is fetched: the server says which, and keeps who accepted.
-    if (r.status === 409 && Array.isArray(j.accept) && j.accept.length){
+    if (Array.isArray(j.accept) && j.accept.length){
       if (!await askYes(`Installing ${names.join(", ")} accepts ${j.accept.map(t => t.label).join(" and ")}.\n\n${
             j.accept.map(t => `${t.label}: ${t.url}`).join("\n")}\n\nAccept and install?`)) return;
-      r = await postJSON("/api/toolchains", {...body, accept: j.accept.map(t => t.label)});
-      j = await r.json().catch(() => ({}));
+      j = await postJSON("/api/toolchains", {...body, accept: j.accept.map(t => t.label)});
     }
     // A toolchain that needs another used to be installed without it and fail
     // inside it: android-tools with no jdk, from sdkmanager, naming
@@ -632,13 +768,13 @@ async function tcAct(action, only){
     // extra name appearing in the queue unexplained.
     if (j?.added?.length)
       notify(`also installing ${j.added.join(", ")}: needed by what you picked`);
-    if (!r.ok) return notify(j.error || `could not start (HTTP ${r.status})`, true);
+    if (j.error) return notify(j.error, true);
     // The job's own toast where there is one (R218 step 6): it follows the
     // job to its end, which is kept on the record.
     const on = tcNode !== "local" ? " on " + ((nodesList || []).find(n => n.id === tcNode)?.name || "the node") : "";
-    notifyJob(j.job, action === "check" ? "checking for updates" + on
+    notifyJob(j.job, (action === "check" ? "checking for updates" + on
       : action === "sysdeps" ? "installing the system packages" + on
-      : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`);
+      : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`) + (j.waits ? ", once the job running there ends" : ""));
     loadToolchains();
   }catch(e){ notify("could not start: " + failWords(e), true); }
 }

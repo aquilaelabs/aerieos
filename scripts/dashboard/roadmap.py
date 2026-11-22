@@ -35,7 +35,6 @@ _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from names import agent_sessions, running_session   # noqa: E402
 import agents
 import copy
-import json
 import os
 import sys
 
@@ -52,6 +51,7 @@ import statefile  # noqa: E402
 import ids  # noqa: E402
 from fields import field, field_list  # noqa: E402
 import pending  # noqa: E402
+import tracker  # noqa: E402
 import re
 import subprocess
 import time
@@ -116,6 +116,27 @@ def replay(project, verb, args):
 # instead of overwriting. Same sites, same shape. See statefile.py.
 _lock = statefile.on(lambda: FILE)
 
+# The file, its log, a batch and the numbers, which the bug tracker keeps the
+# same way: tracker.py. What is the roadmap's own about them is said here,
+# each of this module's names as a call that looks it up when it runs, so
+# what configure() sets later is what the tracker reads.
+_tracker = tracker.Tracker(
+    file=lambda: FILE, lock=_lock, save=lambda d: save(d),
+    number=lambda v: _int(v), actor=lambda: actor,
+    limit=lambda: MAX_HISTORY,
+    # A finished item's done event is the finished item, so the trim keeps it.
+    keep=lambda e: e.get("act") == "done" and e.get("step") is None,
+    coalesce=lambda events: _coalesce(events),
+    noun="this list",
+    already_open="a batch is already open here; commit or revert it",
+    # The words of the line, what it used to say, and the reason it was
+    # dropped: the three places anybody would look.
+    find_keys=("text", "was", "why", "of", "act"),
+    sections=("unsaved",),
+    # The rows going back is a change to the list like any other.
+    on_revert=lambda d, project: _touch(d, project),
+    view=lambda b: _batch_view(b))
+
 # What is kept and what a session is sent are two things (the operator, 29
 # Sep): the list keeps what there is to do, and a session's prompt carries
 # a count of it (brief) with the items a prompt names (preamble.mentioned).
@@ -157,16 +178,7 @@ def _clean(text, multiline=True, max_lines=None):
 
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-        if isinstance(d, dict) and isinstance(d.get("projects"), dict):
-            d.setdefault("unsaved", {})
-            return d
-    except (OSError, ValueError):
-        pass
-    return {"projects": {}, "unsaved": {}}
-
+    return _tracker.load()
 
 
 def save(d):
@@ -255,11 +267,7 @@ def _trim(h):
     an item's done event IS the finished item (its row rides in it), and one
     trimmed away left the Finished section and aerie roadmap show without it
     (B768). Kept whatever their age, as an archive is; the rest goes."""
-    if len(h) <= MAX_HISTORY:
-        return
-    cut = len(h) - MAX_HISTORY
-    keep = [e for e in h[:cut] if e.get("act") == "done" and e.get("step") is None]
-    h[:cut] = keep
+    _tracker.trim(h)
 
 
 # How long a run of moves of one item is one line in the log (R254 step 5):
@@ -289,30 +297,10 @@ def _log(d, project, by, ev):
 
     Called inside the lock, before the save that commits the change it
     describes, so the record and the change land together or neither does.
-
-    While a batch is open the event goes into it instead. A session working a
-    plan out rewords the same step three times before it is happy, and three
-    entries saying so is a log nobody can read to find the one change that
-    mattered. The batch is coalesced on commit into what actually happened.
+    While a batch is open its owner's events wait in it, and commit folds
+    them into what actually happened (tracker.Tracker.log).
     """
-    name = str((actor() if actor else "") or "")[:60]
-    ev = {"at": int(time.time()),
-          "by": "claude" if by == "claude" else "you", **agents.asker(by),
-          # The account behind it, where one is known, including behind a
-          # session, whose author is the person it was minted for.
-          **({"who": name} if name else {}),
-          # A replay of something the operator approved: said on the event,
-          # so the log reads "claude, approved" rather than "claude".
-          **({"approved": True} if pending.replaying() else {}), **ev}
-    b = d.get("batch", {}).get(project)
-    if b is not None and ev["by"] == b.get("by", "claude"):
-        b.setdefault("events", []).append(ev)
-        return
-    # Anyone else's change goes straight to the history, which is also what
-    # makes revert's guard work: it looks there for the operator's hand.
-    h = d.setdefault("history", {}).setdefault(project, [])
-    h.append(ev)
-    _trim(h)
+    _tracker.log(d, project, by, ev)
 
 
 # ---- batches -------------------------------------------------------------
@@ -328,22 +316,7 @@ def _log(d, project, by, ev):
 # doing, and hiding the work until commit would be worse than a noisy log.
 
 def begin(project, by="claude"):
-    with _lock:
-        d = load()
-        if d.get("batch", {}).get(project):
-            return {"error": "a batch is already open here; commit or revert it"}
-        # How many of the operator's changes the log already held. Counted,
-        # not timed: `at` has one-second resolution, so "later than the batch
-        # opened" caught anything that happened in the same second as it,
-        # which made revert refuse for a change that came *before* the work it
-        # was asked to undo.
-        h = d.get("history", {}).get(project) or []
-        d.setdefault("batch", {})[project] = {
-            "at": int(time.time()), "by": by, "events": [],
-            "yours": sum(1 for e in h if e.get("by") == "you"),
-            "rows": json.loads(json.dumps(d["projects"].get(project) or []))}
-        save(d)
-    return {"ok": True}
+    return _tracker.begin(project, by)
 
 
 # How long a batch may stay open before it stops holding the notebook. A
@@ -370,16 +343,12 @@ def batches():
     One read of the file for all of them: this runs on every poll, and asking
     per project would be a load and a lock each.
     """
-    with _lock:
-        d = load().get("batch", {})
-    return {p: _batch_view(b) for p, b in d.items() if b}
+    return _tracker.batches()
 
 
 def batch(project):
     """The open batch here, or None. What the panel shows a marker for."""
-    with _lock:
-        b = load().get("batch", {}).get(project)
-    return None if not b else _batch_view(b)
+    return _tracker.batch(project)
 
 
 # Two events about the same line are one event about that line. Ordered by
@@ -425,19 +394,7 @@ def _coalesce(events):
 
 
 def commit(project):
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return {"error": "nothing is open here"}
-        kept = _coalesce(b.get("events") or [])
-        h = d.setdefault("history", {}).setdefault(project, [])
-        h.extend(kept)
-        _trim(h)
-        del d["batch"][project]
-        save(d)
-    return {"ok": True, "written": len(kept),
-            "folded": len(b.get("events") or []) - len(kept)}
+    return _tracker.commit(project)
 
 
 def revert_blocked(project):
@@ -451,33 +408,11 @@ def revert_blocked(project):
     have to answer before either is put back, or a refusal from the second
     would leave the first already reverted.
     """
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return "nothing is open here"
-        h = d.get("history", {}).get(project) or []
-        if sum(1 for e in h if e.get("by") == "you") > b.get("yours", 0):
-            return ("the operator has changed this list since the batch "
-                    "opened; reverting would undo their work too. "
-                    "Commit it and correct what is wrong.")
-    return None
+    return _tracker.revert_blocked(project)
 
 
 def revert(project):
-    why = revert_blocked(project)
-    if why:
-        return {"error": why}
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return {"error": "nothing is open here"}
-        d["projects"][project] = b.get("rows") or []
-        del d["batch"][project]
-        _touch(d, project)
-        save(d)
-    return {"ok": True, "dropped": len(b.get("events") or [])}
+    return _tracker.revert(project)
 
 
 def history(project, limit=None, since=None, find=None):
@@ -489,24 +424,7 @@ def history(project, limit=None, since=None, find=None):
     line, what it used to say, and the reason it was dropped: the three
     places anybody would look.
     """
-    with _lock:
-        h = load().get("history", {}).get(project) or []
-    # Sorted, not merely reversed: a batch's events are written at commit, so
-    # the order they sit in the file is not the order they happened in.
-    out = sorted(h, key=lambda e: -e.get("at", 0))
-    if since is not None:
-        cut = _int(since)
-        if cut is not None:
-            out = [e for e in out if e.get("at", 0) >= cut]
-    if find:
-        needle = str(find).lower()
-        out = [e for e in out
-               if any(needle in str(e.get(k, "")).lower()
-                      for k in ("text", "was", "why", "of", "act"))]
-    n = _int(limit)
-    if n is not None and n > 0:
-        out = out[:n]
-    return out
+    return _tracker.history(project, limit=limit, since=since, find=find)
 
 
 def items(project):
@@ -566,16 +484,12 @@ def _next_id(rows, d=None, project=None):
     (bug B72). A number is the item's own, and "a gap means something was
     removed" only holds if nothing is ever numbered twice.
     """
-    top = max((int(r.get("id", 0)) for r in rows), default=0)
-    if d is not None and project is not None:
-        top = max(top, _int((d.get("reserved") or {}).get(project)) or 0)
-    return top + 1
+    return _tracker.next_id(rows, d, project)
 
 
 def _took(d, project, n):
     """Record that `n` has been handed out, so it never is again."""
-    r = d.setdefault("reserved", {})
-    r[project] = max(_int(r.get(project)) or 0, int(n))
+    _tracker.took(d, project, n)
 
 
 # The details under a line: the technical half the title should not carry.
@@ -817,12 +731,7 @@ def _moved_by(d, project, item_id):
     An open batch is searched first: its events are newer than anything in the
     history, and a session working a plan out is the likeliest other writer.
     """
-    b = (d.get("batch", {}).get(project) or {}).get("events") or []
-    h = d.get("history", {}).get(project) or []
-    for e in reversed(list(h) + list(b)):
-        if _int(e.get("id")) == item_id:
-            return {"by": e.get("by", ""), "at": e.get("at", 0)}
-    return {}
+    return _tracker.moved_by(d, project, item_id)
 
 
 def clash(what, stored, was):
@@ -1136,16 +1045,25 @@ _REF = re.compile(r"(?<![\w-])([RB])(\d{1,5})(?![\w-])")
 _SECTION = re.compile(r"^## (Unreleased|\d+\.\d+\.\d+[^:\s]*)")
 
 
-def changelog_refs(project, kind="R"):
+# A line's commits at its end, "(1a2b3c4, 5d6e7f8)", which its words are read without.
+_LINE_SHAS = re.compile(r"\s*\(\s*[0-9a-f]{7,40}(?:\s*,\s*[0-9a-f]{7,40})*\s*\)\s*$")
+
+
+def changelog_refs(project, kind="R", linked=None, commits=None):
     """The changelog entries that name a roadmap item (kind R) or a bug (B),
     by its id: {"R12": [{"in": "0.7.0" or "Unreleased", "text": ...}]},
     newest first, at most ten each (R254 step 4), so an item lists what was
-    written about it and the release it went out in."""
+    written about it and the release it went out in. `linked` is the lines
+    the notebook ties to each ({"B12": [words, ...]}, bugs.link_changelog),
+    found by their words: the public file names commits, never the id. Each
+    of those carries its words and tied, so the row can untie it. `commits`
+    ({"B12": [sha, ...]}, a bug's fix commits, R255) finds, for a key with no
+    tied line, the lines naming one of them, marked by: commit."""
     try:
         text = (Path(os.environ.get("WORKSPACE", "/workspace")) / project / "CHANGELOG.md").read_text(errors="replace")
     except OSError:
         return {}
-    out, where = {}, ""
+    out, where, found = {}, "", []
     for line in text.splitlines():
         m = _SECTION.match(line)
         if m:
@@ -1153,11 +1071,54 @@ def changelog_refs(project, kind="R"):
             continue
         if not where or not line.startswith("- "):
             continue
+        shown = line[2:].strip()[:240]
         for k, n in {(k, n) for k, n in _REF.findall(line) if k == kind}:
             got = out.setdefault(f"{k}{int(n)}", [])
             if len(got) < 10:
-                got.append({"in": where, "text": line[2:].strip()[:240]})
+                got.append({"in": where, "text": shown})
+        words = " ".join(_LINE_SHAS.sub("", line[2:]).split())
+        for key, texts in (linked or {}).items():
+            if words in texts:
+                got = out.setdefault(key, [])
+                if len(got) < 10 and not any(g["text"] == shown for g in got):
+                    got.append({"in": where, "text": shown, "words": words, "tied": True})
+        if commits:
+            m2 = _LINE_SHAS.search(line[2:])
+            named = re.findall(r"[0-9a-f]{7,40}", m2.group(0)) if m2 else []
+            if named:
+                found.append((where, shown, words, named))
+    for key, shas in (commits or {}).items():
+        if out.get(key):
+            continue
+        hits = [{"in": w, "text": t, "words": ws, "by": "commit"} for w, t, ws, named in found
+                if any(n.startswith(c[:7]) or c.startswith(n[:7]) for n in named for c in shas)]
+        if hits:
+            out[key] = hits[:10]
     return out
+
+
+def unreleased_lines(project):
+    """The Unreleased lines a bug can be tied to (R255): [{words, cat}], in the
+    file's order."""
+    try:
+        text = (Path(os.environ.get("WORKSPACE", "/workspace")) / project / "CHANGELOG.md").read_text(errors="replace")
+    except OSError:
+        return []
+    out, where, cat = [], "", ""
+    for line in text.splitlines():
+        m = _SECTION.match(line)
+        if m:
+            where, cat = m.group(1), ""
+            continue
+        if where != "Unreleased":
+            continue
+        if line.startswith("### "):
+            cat = line[4:].strip()
+        elif line.startswith("- "):
+            words = " ".join(_LINE_SHAS.sub("", line[2:]).split())
+            if words:
+                out.append({"words": words, "cat": cat})
+    return out[:400]
 
 
 def last_release(project):

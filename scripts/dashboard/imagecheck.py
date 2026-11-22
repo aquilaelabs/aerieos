@@ -9,27 +9,41 @@ RepoDigests) against the one the registry serves for that tag now. One that
 differs is behind: its row says so with Update (pull, then up), and the bell
 carries a note per node.
 
-What is not asked: a service whose image is pinned by digest (nginx's,
-which its own tab moves, nginxproxy.py), a service built from code, and an
-image the node has never pulled (Up pulls it; there is nothing to compare).
+What is not asked: a service whose image is named by its digest, a service
+built from code, and an image the node has never pulled (Up pulls it; there
+is nothing to compare). The tag beside a digest is not what runs, so a
+newer build of it is no update: such an image moves when its entry names
+another digest (containers.entry_moved: the app a container was made from,
+a service of AerieOS's), and the row's Update writes that one first.
 
-The registry is asked over its v2 API with an anonymous token, which is
-what a public image on Docker Hub, ghcr.io or quay.io answers; a private
-one says it could not be read, on the row, rather than guessing. The
-harness points BB_IMAGE_DIGESTS_FILE at {ref: digest} instead.
+AerieOS's own image is held to more than its registry (R199): a registry's
+tag is whatever was last pushed under it, and each AerieOS release names the
+image its tag pushed by digest, in the release's signed list of its files.
+So for a container that follows `:dev` or `:latest` of AerieOS's image, the
+digest the tag serves is compared with the one the newest signed release
+names (releasecheck.signed_image). Where they agree, the update is said by
+that digest and whose release it is; where the tag serves another image,
+that is said plainly on the row, and no update is offered from the tag.
+Where no release says (none signed, none naming its image yet), the row is
+as any other image's.
+
+The registry is asked over its v2 API with an anonymous token
+(imageregistry.py, the one client for that protocol), which is what a
+public image answers on any host that speaks it; a private one says it
+could not be read, on the row, rather than guessing. The harness points
+BB_IMAGE_DIGESTS_FILE at {ref: digest} instead, in the source tree alone
+(seams.py).
 """
-import contextlib
 import hashlib
-import http.client
 import json
 import os
-import re
 import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
+
+import imageregistry
+import seams
+import releasecheck
 
 STATE = None
 write_json = None
@@ -37,15 +51,9 @@ devapp = None
 _lock = threading.Lock()
 _checking = {"on": False}
 
-CHECK_EVERY = 7 * 86400
 CHECK_DELAY = float(os.environ.get("BB_IMAGE_CHECK_DELAY") or 300)
 AUTOCHECK = os.environ.get("BB_IMAGE_AUTOCHECK", "1") != "0"
-DIGESTS_FILE = os.environ.get("BB_IMAGE_DIGESTS_FILE") or ""
-ACCEPT = ", ".join(["application/vnd.oci.image.index.v1+json",
-                    "application/vnd.docker.distribution.manifest.list.v2+json",
-                    "application/vnd.docker.distribution.manifest.v2+json",
-                    "application/vnd.oci.image.manifest.v1+json"])
-_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+DIGESTS_FILE = seams.get("BB_IMAGE_DIGESTS_FILE")
 
 
 def configure(*, state, write_json, devapp_module):
@@ -67,18 +75,8 @@ def _load():
 def parse_ref(ref):
     """(registry, repository, tag) of an image reference, or None for one
     pinned by digest. `mariadb:11` is Docker Hub's library/mariadb."""
-    ref = str(ref or "").strip()
-    if not ref or "@" in ref:
-        return None
-    first, _, rest = ref.partition("/")
-    if rest and ("." in first or ":" in first or first == "localhost"):
-        registry, path = first, rest
-    else:
-        registry, path = "registry-1.docker.io", ref
-    name, _, tag = path.rpartition(":") if ":" in path.rsplit("/", 1)[-1] else (path, "", "latest")
-    if registry == "registry-1.docker.io" and "/" not in name:
-        name = "library/" + name
-    return registry, name, tag or "latest"
+    parts = imageregistry.parse(ref)
+    return None if not parts or parts[3] else parts[:3]
 
 
 def _stub(ref):
@@ -89,42 +87,15 @@ def _stub(ref):
 
 
 def remote_digest(ref):
-    """(digest, error): what the registry serves for this tag now."""
+    """(digest, error): what the registry serves for this tag now
+    (imageregistry.digest_of); ("", "") for a reference with no tag to ask
+    about."""
     if DIGESTS_FILE:
         got = _stub(ref)
         return (got, "") if got else ("", f"the registry has no {ref}")
-    parts = parse_ref(ref)
-    if not parts:
+    if not parse_ref(ref):
         return "", ""
-    registry, name, tag = parts
-    url = f"https://{registry}/v2/{name}/manifests/{tag}"
-
-    def head(token=""):
-        req = urllib.request.Request(url, method="HEAD", headers={"Accept": ACCEPT}
-                                     | ({"Authorization": f"Bearer {token}"} if token else {}))
-        with urllib.request.urlopen(req, timeout=20) as r:   # noqa: S310 (https to the registry the image names)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-            return r.headers.get("Docker-Content-Digest") or ""
-    try:
-        try:
-            got = head()
-        except urllib.error.HTTPError as e:
-            if e.code != 401:
-                raise
-            # The anonymous token the challenge names: realm, service, scope.
-            ch = dict(re.findall(r'(\w+)="([^"]*)"', e.headers.get("WWW-Authenticate") or ""))
-            if not ch.get("realm", "").startswith("https://"):
-                return "", f"{registry} asks for a sign-in this check does not have"
-            q = urllib.parse.urlencode({k: v for k, v in (("service", ch.get("service")),
-                                        ("scope", ch.get("scope") or f"repository:{name}:pull")) if v})
-            with urllib.request.urlopen(f"{ch['realm']}?{q}", timeout=20) as r:   # noqa: S310 (the realm the registry named, https)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-                tok = json.loads(r.read(200_000).decode("utf-8", "replace"))
-            got = head(tok.get("token") or tok.get("access_token") or "")
-    except urllib.error.HTTPError as e:
-        return "", (f"{registry} has no {name}:{tag}" if e.code == 404
-                    else f"{registry} would not say ({e.code}): a private image needs a sign-in this check does not have")
-    except (OSError, http.client.HTTPException, ValueError) as e:
-        return "", f"could not reach {registry}: {e}"[:200]
-    return (got, "") if _DIGEST.fullmatch(got or "") else ("", f"{registry} gave no digest for {name}:{tag}")
+    return imageregistry.digest_of(ref)
 
 
 def registry_images(project, instance):
@@ -152,31 +123,65 @@ def local_digests(image):
     return {d.partition("@")[2] for d in got or [] if "@" in d}
 
 
-def check_instance(project, instance):
-    """{"at", "behind": [{service, image, to}], "error"} for one instance,
-    asked on its node."""
-    behind, errors = [], []
+def release_image(image, memo=None):
+    """What the newest signed release names for `image`, when it is AerieOS's
+    own followed by a tag a publication moves (:dev, :latest):
+    releasecheck.signed_image's answer, asked once a check (`memo`). {} for
+    any other image, and where the release names another repository's."""
+    parts = parse_ref(image)
+    if not parts or f"{parts[0]}/{parts[1]}" != releasecheck.IMAGE or parts[2] not in releasecheck.FOLLOWED:
+        return {}
+    memo = memo if memo is not None else {}
+    if parts[2] not in memo:
+        try:
+            memo[parts[2]] = releasecheck.signed_image(parts[2])
+        except Exception as e:   # noqa: BLE001 (what the release says is an extra; the registry's answer stands)
+            memo[parts[2]] = {"why": f"{type(e).__name__}: {e}"}
+    own = memo[parts[2]]
+    return own if own.get("image") == releasecheck.IMAGE else {}
+
+
+def check_instance(project, instance, memo=None):
+    """{"at", "behind": [{service, image, to}], "said": [sentence], "error"}
+    for one instance, asked on its node. A behind row of AerieOS's own image
+    carries `signed`, the image by the digest its release names and whose
+    release it is; `said` is what a person must be told that is no update:
+    a tag that serves another image than the newest signed release names."""
+    behind, errors, said = [], [], []
     with devapp.on_node(devapp._instance_node(project, instance)):
         for service, image in registry_images(project, instance):
             have = local_digests(image)
             if not have:
                 continue
             want, err = remote_digest(image)
+            own = {} if err else release_image(image, memo)
             if err:
                 errors.append(f"{image}: {err}")
+            elif own and want != own["digest"]:
+                # One sentence on the row; the digests on lines of their own
+                # in the log, for whoever compares them.
+                said.append(f"{image} serves another image than {own['tag']}, the newest signed release, names, so no update is offered from it")
+                print(f"[dashboard] image check: {image} serves {want}\n"
+                      f"[dashboard] image check: {own['tag']} names {own['ref']}, {own['signed']}", flush=True)
             elif want and want not in have:
-                behind.append({"service": service, "image": image, "to": want})
-    return {"at": int(time.time()), "behind": behind, "error": "; ".join(errors)[:400]}
+                behind.append({"service": service, "image": image, "to": want}
+                              | ({"signed": f"{own['tag']}'s own image, {own['signed']}"} if own else {}))
+    return {"at": int(time.time()), "behind": behind, "said": said, "error": "; ".join(errors)[:400]}
 
 
 def check(node=None):
     """Every instance's registry images (on one node, or all), now. The
-    answers, keyed by container name."""
-    with _lock:
-        if _checking["on"]:
-            return {"error": "a check is already running"}
-        _checking["on"] = True
+    answers, keyed by container name. One asked for while another runs
+    waits for it and then runs, since it may be about another node."""
+    while True:
+        with _lock:
+            if not _checking["on"]:
+                _checking["on"] = True
+                break
+        time.sleep(0.5)
     out = {}
+    # What the newest signed release names, asked once a check.
+    memo = {}
     try:
         for project, insts in devapp._load().items():
             for inst in insts:
@@ -185,7 +190,7 @@ def check(node=None):
                 if node and (devapp._instance_node(project, inst) or "") != node:
                     continue
                 try:
-                    out[devapp._pname(project, inst)] = check_instance(project, inst) | {
+                    out[devapp._pname(project, inst)] = check_instance(project, inst, memo) | {
                         "node": devapp._instance_node(project, inst) or "",
                         "project": devapp.owner_of(project, inst) or project}
                 except Exception as e:   # noqa: BLE001 (one container's trouble is not the check's)
@@ -234,12 +239,15 @@ def _project_of(name, v):
     return ""
 
 
-def attention(node_name, allowed=None):
+def attention(node_name, allowed=None, entries=()):
     """The bell's rows: one per node with a container behind, kind image,
     keyed by bellseen on the digests it would move to. `allowed(project)`
     keeps the containers of the projects this account may act on: a row of
     another project's updates is news about containers it cannot touch, and
-    names what it may not see (the operator, 16 Oct)."""
+    names what it may not see (the operator, 16 Oct). `entries` are the
+    containers held by a digest whose entry names another now
+    (containers.entries_behind): no registry is asked about those, and
+    they are on the same row, since Update on the same page moves both."""
     by = {}
     for name, v in _load().items():
         if name.startswith("_") or not (v or {}).get("behind"):
@@ -247,6 +255,12 @@ def attention(node_name, allowed=None):
         if allowed is not None and not allowed(_project_of(name, v)):
             continue
         by.setdefault(v.get("node") or "", []).append((name, v["behind"]))
+    for name, nid, project, images in entries:
+        if allowed is not None and not allowed(project):
+            continue
+        rows = by.setdefault(nid or "", [])
+        if all(n != name for n, _ in rows):
+            rows.append((name, [{"image": i} for i in images]))
     out = []
     for nid, rows in sorted(by.items()):
         rows.sort()
@@ -263,9 +277,4 @@ import checks  # noqa: E402 (the cadence, R176)
 def check_loop():
     """The weekly check, from when the last one ran rather than from the
     start, beside the toolchains' and nginx's."""
-    time.sleep(CHECK_DELAY)
-    while True:
-        if checks.due("images", last_at()):
-            with contextlib.suppress(Exception):   # noqa: BLE001 (the loop outlives one bad pass)
-                check()
-        time.sleep(600)
+    checks.loop("images", last_at, check, CHECK_DELAY, 600)

@@ -168,13 +168,9 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.summary(o), {"nodes": "write", "jobs": "read"})
 
     def test_a_global_role_may_hold_its_node_areas_on_named_nodes(self):
-        # The operator, 7 Oct: making projects on one node, and node areas
-        # scoped as they were before R152.
-        # Toolchains, the area's name before 0.9, is read as Install (R174).
-        r = roles.set_role("creator", "global", {"newprojects": "write", "toolchains": "write", "controller": "read"},
-                           nodes=["n1"])
-        # The list from before R260 reads as each node area on those nodes at
-        # its own level.
+        # The operator, 7 Oct: making projects on one node.
+        r = roles.set_role("creator", "global", {"newprojects": "write", "install": "write", "controller": "read"},
+                           only={"newprojects": {"n1": "write"}, "install": {"n1": "write"}})
         self.assertEqual(r["only"], {"newprojects": {"n1": "write"}, "install": {"n1": "write"}})
         c = {"name": "c", "role": "user", "roles": ["creator"], "projects": []}
         self.assertTrue(roles.granted(c, "create", node="n1"))
@@ -185,7 +181,7 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.nodes_for(c, "newprojects"), ["n1"])
         self.assertIsNone(roles.nodes_for(ADMIN, "newprojects"), "admin: every node")
         self.assertEqual(roles.CAP_AREA["create"], ("newprojects", "write"), "its own area, not Controller's")
-        self.assertEqual(roles.set_role("p", "projects", {"projects": "read"}, nodes=["n1"])["only"], {},
+        self.assertEqual(roles.set_role("p", "projects", {"projects": "read"}, only={"nodes": {"n1": "read"}})["only"], {},
                          "only a Global role names nodes")
 
     def test_install_configure_and_curate_are_three_areas(self):
@@ -244,6 +240,12 @@ class Model(unittest.TestCase):
         self.assertEqual((d["scope"], d["perms"]), ("global", {"releases": "write", "jobs": "write"}))
         self.assertEqual(d["note"], "old")
 
+    def test_a_kept_role_with_one_list_of_nodes_holds_each_node_area_there(self):
+        with open(os.path.join(self.tmp, "roles.json"), "w") as f:
+            json.dump({"roles": {"creator": {"scope": "global", "nodes": ["n1"],
+                                               "perms": {"newprojects": "write", "jobs": "read", "controller": "read"}}}}, f)
+        self.assertEqual(roles.get("creator")["only"], {"newprojects": {"n1": "write"}, "jobs": {"n1": "read"}})
+
     def test_an_unknown_role_on_an_account_grants_nothing(self):
         ghost = {"name": "g", "role": "gone", "roles": ["gone"], "projects": ["alpha"]}
         self.assertFalse(self.g(ghost, "work", "alpha"))
@@ -251,45 +253,6 @@ class Model(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class Migration(unittest.TestCase):
-    """users.migrate_r152, once: user accounts to no role, each project's
-    owner to PROJECT_owner on it; the owner role moves with the project."""
-
-    def setUp(self):
-        import users
-        self.users = users
-        self.tmp = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.tmp, True)
-        wj = lambda p, d, mode=0o644: open(p, "w").write(json.dumps(d))  # noqa: E731
-        roles.configure(state=self.tmp, write_json=wj)
-        users.configure(state=self.tmp, write_json=wj)
-        with users._lock:
-            d = users.load()
-            d["users"] = {"boss": {"uid": "u_1", "role": "owner", "projects": ["*"]},
-                          "adm": {"uid": "u_2", "role": "admin", "projects": []},
-                          "ann": {"uid": "u_3", "role": "user", "projects": ["alpha"], "roles": ["user", "tester"]},
-                          "bob": {"uid": "u_4", "role": "user", "projects": ["beta"]}}
-            users._save(d)
-
-    def test_users_lose_user_and_owners_hold_their_projects(self):
-        u = self.users
-        self.assertTrue(u.migrate_r152({"alpha": "u_3", "beta": "u_1"}))
-        self.assertEqual(u.get("ann")["roles"], ["tester"], "user taken off, a role of its own kept")
-        self.assertEqual(u.get("bob")["roles"], [])
-        self.assertEqual(u.get("ann")["project_roles"], {"alpha": ["alpha_owner"]})
-        self.assertNotIn("beta", u.get("boss").get("project_roles") or {}, "AerieOS's owner needs none")
-        self.assertEqual(u.get("adm")["role"], "admin")
-        self.assertFalse(u.migrate_r152({"alpha": "u_4"}), "once")
-
-    def test_the_owner_gets_the_owner_role(self):
-        u = self.users
-        u.migrate_r152({"alpha": "u_3"})
-        u.give_owner_role("alpha", "u_4")
-        self.assertNotIn("alpha", u.get("ann").get("project_roles") or {})
-        self.assertEqual(u.get("bob")["project_roles"]["alpha"], ["alpha_owner"])
-        self.assertIn("alpha", u.get("bob")["projects"], "the owner works on what it owns")
 
 
 def write_json(p, d, mode=0o644):
@@ -317,14 +280,6 @@ class R155(unittest.TestCase):
                         "roles": ["dev", "ops"], "project_roles": {"gamma": ["dev"]}},
             }
             users._save(d)
-
-    def test_the_migration_gives_a_listed_project_role_on_each_project(self):
-        self.assertTrue(self.users.migrate_r155())
-        a = self.users.get("ann")
-        self.assertEqual(a["roles"], ["ops"], "an Everywhere role stays the account's")
-        self.assertEqual(a["project_roles"], {"alpha": ["dev"], "beta": ["dev"], "gamma": ["dev"]})
-        self.assertEqual(a["projects"], ["alpha", "beta", "gamma"])
-        self.assertFalse(self.users.migrate_r155(), "once")
 
     def test_assign_follows_the_roles_and_keeps_kinds_apart(self):
         boss = self.users.get("boss")
@@ -382,8 +337,8 @@ class SessionAndAccount(unittest.TestCase):
             users._save(d)
 
     def sess(self, uid, project, reads=()):
-        return {"name": f"session:{project}", "role": "user", "projects": [project, *reads],
-                "session": project, "uid": uid, "reads": list(reads)}
+        return {"name": f"session:{project}", "kind": "session", "role": "session", "projects": [project, *reads],
+                "session": project, "seat": uid, "reads": list(reads)}
 
     def test_a_session_is_held_to_its_accounts_roles(self):
         may = self.users.may

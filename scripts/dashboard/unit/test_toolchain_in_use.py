@@ -42,9 +42,11 @@ class InUse(unittest.TestCase):
         mine = [u for u in users if u["pid"] == p.pid]
         self.assertEqual(len(mine), 1, users)
         self.assertEqual(mine[0]["project"], "Shebang-DevBoard")
-        said = agent.tc_users_said("jdk", mine)
-        self.assertIn("jdk is in use by sleep", said)
-        self.assertIn("Shebang-DevBoard's session", said)
+        said = agent.tc_users_said("jdk", mine).splitlines()
+        # Who, with the pid and the session, on a line of its own...
+        self.assertEqual(said[0], f"  in use by sleep (pid {p.pid}, Shebang-DevBoard's session)")
+        # ...and the refusal a page shows: one sentence, no pid, no program.
+        self.assertEqual(said[-1], "refused: jdk is in use, so it was left as it is: try again once that has finished")
 
     def test_an_install_of_what_is_there_is_an_update_by_the_verb_that_works(self):
         """R193 (the operator, 11 Oct), and Swift on a node (12 Oct): an

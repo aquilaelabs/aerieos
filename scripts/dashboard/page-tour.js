@@ -32,7 +32,7 @@ const TOUR_STEPS = {
     // VMs do; the three steps after it turn the card over, the example or
     // the first card on the page, and back again after (the operator, 26 Oct).
     {at: `${TOUR_PANE} .pcard:not(.flipped) .pcfront`, sample: () => tourSampleProject(false), sampleKey: "project", part: true,
-     say: "A space's card: its repositories with their branches, who has a session there, and Start agent. A repository's name opens its notebook; the pin keeps it on Home and the box beside it archives it. Edit turns the card over."},
+     say: "A space's card: its repositories with their branches, who has a session there, and Start agent. A repository's name opens its notebook; the star makes it one of your favorites, on Home, and the box beside it archives it. Edit turns the card over."},
     {at: `${TOUR_PANE} .pcard.flipped .pcback .pcrepo`, sample: () => tourSampleProject(true), sampleKey: "project", part: true, flip: true,
      say: "The back of the card. Each repository has a shell in it, its git host, a rename, a move to another space, and delete, which puts it in the trash."},
     {at: `${TOUR_PANE} .pcard.flipped .pcback .pcfoot`, sample: () => tourSampleProject(true), sampleKey: "project", part: true, flip: true,
@@ -63,14 +63,15 @@ const TOUR_STEPS = {
     {say: "Its sections are its kind's: an agent's facts, your sign-in and what you added to it; a toolchain's path and system packages; a pack's or a service's Configure, saved with Save."},
   ],
   library: [
-    {say: "The Library is everything an AerieOS installs or runs on a node: the coding agents, the toolchains for builds and tests, the tool packs you add, the apps a NAS runs, and the apps for your own machines."},
+    {say: "The Library is everything an AerieOS installs or runs on a node: the coding agents, the toolchains for builds and tests, the tool packs, the services a node runs for the others, the apps a NAS runs, and the apps for your own machines."},
     {at: TOUR_MHEAD, say: "Pick the node here; it holds across the Library, the Emulator, the Phone and the CI runner. Check for updates reads what is newer; Add your own brings in a tool pack or an app of yours, looked at before it is kept."},
-    {at: `${TOUR_PANE} .lcard`, say: "Each card says its tier, what is installed and whether a newer one is out, with Install or Update on it; Details opens its own page with the whole description."},
+    {at: `${TOUR_PANE} .libsearchrow`, say: "It opens on shelves: what is on this node, then some of each kind, with All for the rest. The search, a kind or a topic makes it one list instead."},
+    {at: `${TOUR_PANE} .lcard`, say: "Each card says its tier, what is installed and whether a newer one is out, with Install or Software update on it; Details opens its own page with the whole description."},
   ],
   // A Library entry's own page (R183), reached from its card's Details.
   entry: [
     {say: "One entry of the Library: what it is in full, where it comes from, what it asks for and what installing it does. Back, at the top, returns to the page you opened it from."},
-    {say: "Its one verb is at the right of its head, as on its card: Install, Update, New container or Download. What is set for it on a node is on the Installed page."},
+    {say: "Its one verb is at the right of its head, as on its card: Install, Software update, Manifest update, New container or Download. What is set for it on a node is on the Installed page."},
   ],
   emulator: [
     {say: "The Android emulator on a node: the system images it holds and the virtual devices made from them."},
@@ -85,8 +86,8 @@ const TOUR_STEPS = {
   ],
   docker: [
     {say: "Containers: every space's containers on a node, grouped by space, with Up, Down, Rebuild and a Shell in the dock."},
-    {at: TOUR_SUB, say: "Containers, VMs and nginx are the three tools of this group."},
-    {at: TOUR_MHEAD, say: "Pick the node here; it holds for nginx too, and a sub-tab says when the node lacks what it needs."},
+    {at: TOUR_SUB, say: "Containers and VMs are the two tools of this group."},
+    {at: TOUR_MHEAD, say: "Pick the node here; a sub-tab says when the node lacks what it needs."},
     {at: TOUR_BAR, say: "Search, and switch between cards and a list. New container and Check for updates sit at the right."},
     // Its rows by name: TOUR_FIRST matched an empty page's own notice, so
     // the example never came (the operator, 21 Oct, on a phone).
@@ -102,7 +103,7 @@ const TOUR_STEPS = {
   ],
   nginx: [
     {say: "nginx: AerieOS's own reverse proxy on a node, putting your containers behind hostnames and certificates."},
-    {at: TOUR_MHEAD, say: "The node picked above is the one nginx runs on. Deploy puts nginx on a node that has none yet."},
+    {at: TOUR_MHEAD, say: "The node picked above is the one nginx runs on. Deploy puts nginx on a node that has none yet, as Install on its card in the Library does."},
     {at: TOUR_FIRST, say: "The image comes first, with an update when one is out; then hostnames, routes and certificates, each a section. A route sends a hostname to a port a container publishes."},
   ],
   settings: [
@@ -118,7 +119,7 @@ const TOUR_STEPS = {
     {at: `${TOUR_PANE} .snav, ${TOUR_FIRST}`, say: "Pick a section here: Connection sets http or https and its certificate; Reach from outside runs the home tunnel."},
   ],
   machine: [
-    {say: "This machine: the computer this AerieOS runs on, installed bare metal. What it is, the release it runs and its updates, and what it runs as a node."},
+    {say: "This controller: the release this AerieOS runs on its own computer, its updates and the older versions kept to boot. The computer as a node, its disks, its name and how it restarts, is on the Nodes page like every machine."},
     {at: `${TOUR_FIRST}, ${TOUR_PANE} .empty`, say: "Its sections are a node's: health, the spaces on it, its sessions, its features, storage and network, and the verbs at the end, reboot and power off among them."},
   ],
   audit: [
@@ -146,7 +147,7 @@ const TOUR_STEPS = {
   ],
   schedules: [
     {say: "Schedules: commands run on a node at the times you set, as cron runs them. Each run is a job, with its log on the Jobs page."},
-    {at: `${TOUR_PANE} #bSchedNew`, say: "New schedule is here. The static analysis scan is the Scanners page's, under Containers."},
+    {at: `${TOUR_PANE} #bSchedNew`, say: "New schedule is here. The static analysis scan is the Scanners page's, opened from the Scanners' row on Installed."},
     {at: `${TOUR_PANE} .schedrow, ${TOUR_PANE} .empty`, say: "Each schedule says when it runs, where and as whom, and how its last run went. Run now runs it once."},
   ],
   users: [
@@ -284,7 +285,7 @@ function tourSample(s){
   const box = document.createElement("div");
   box.id = "tourSample"; box.className = "toursample"; box.inert = true;
   if (s.sampleKey) box.dataset.key = s.sampleKey;
-  box.innerHTML = `<div class="field"><span class="pill note">example</span> <span class="sub">what one looks like once there is one</span></div>${s.sample()}`;
+  drawHTML(box, `<div class="field"><span class="pill note">example</span> <span class="sub">what one looks like once there is one</span></div>${s.sample()}`);
   const bar = doc.querySelector(":scope > .docbarrow, :scope > .vbar");
   if (bar) bar.after(box); else doc.prepend(box);
   return box;
@@ -296,7 +297,7 @@ function tourSampleProject(back){
   const fb = (icon, label) => `<button type="button" class="ic" aria-label="${label}">${icon}</button>`;
   return `<div class="field pgridband"><div class="pgrid"><div class="pcard pflip${back ? " flipped" : ""}">
     <div class="pcface pcfront"><div class="pcname"><span class="name">example</span><span class="sp"></span>
-        <button type="button" class="eye bare pcmark">${PIN}</button><button type="button" class="eye bare pcmark">${ARCHIVE}</button></div>
+        <button type="button" class="eye bare pcmark pcfav">${STAR}</button><button type="button" class="eye bare pcmark">${ARCHIVE}</button></div>
       <div class="pcmeta"><span class="pcfacts"><span class="pid">P1</span> · your-node</span></div>
       <div class="pcrepos"><div class="pcrepo"><button type="button" class="namelink">example-web</button><span class="pcfacts"><span class="pbr">main</span></span></div></div>
       <div class="pcacts actbar"><button type="button">Start agent</button><button type="button">Add repository</button><button type="button">Edit</button></div></div>
@@ -329,7 +330,7 @@ function tourSampleCard(){
   return `<section class="dmcard"><div class="field dmgroup" data-style="--gc:var(--accent)"><b>example</b></div>
     <div class="row stack2"><div class="grow"><div class="dmhead"><div class="dmid">
       <div class="name">web<span class="pill stat dmpill ok live">running</span></div>
-      <div class="sub dmorigin">nginx:1.31-alpine<span class="sep"></span>your-node</div>
+      <div class="sub data dmorigin">nginx:1.31-alpine<span class="sep"></span>your-node</div>
       <div class="sub dmstate ok">answers at http://your-node:8080/</div></div>
       <div class="actbar dmacts"><button type="button">Shell</button><button type="button">Rebuild</button>
         <span class="more"><button type="button" class="moreb" aria-label="More">${DOTS}</button></span></div></div></div></div></section>`;
@@ -366,12 +367,12 @@ function tourDraw(){
   if (box?.dataset.turning){ box.dataset.turning = ""; ring.hidden = true; return setTimeout(() => { if (tourKind) tourDraw(); }, 480); }
   const el = (box && s.part && box.querySelector(s.at.replace(TOUR_PANE, "").trim())) || box || tourTarget(s.at);
   tourKeepSample(!!s.sample);
-  card.innerHTML = `<div class="tourstep">${tourI + 1} of ${tourSteps.length}</div>
+  drawHTML(card, `<div class="tourstep">${tourI + 1} of ${tourSteps.length}</div>
     <div class="toursay">${esc(s.say)}</div>
     <label class="ndcap tourall"><input type="checkbox" id="tourAll"> Skip the tour on every page</label>
     <div class="actbar"><button type="button" id="tourSkip">Skip tour</button><span class="sp"></span>
       ${tourI ? `<button type="button" id="tourBack">Back</button>` : ""}
-      <button type="button" class="primary" id="tourNext">${last ? "Done" : "Next"}</button></div>`;
+      <button type="button" class="primary" id="tourNext">${last ? "Done" : "Next"}</button></div>`);
   card.hidden = ring.hidden = false;
   $("tourNext").onclick = () => tourGo(1);
   if ($("tourBack")) $("tourBack").onclick = () => tourGo(-1);
@@ -430,8 +431,7 @@ function tourEnd(all){
   // A poll already out answers with the list from before this: dropped, as
   // an action's own answer drops it (B217).
   adoptSeq++;
-  fetch("/api/users", {method: "POST", headers: {"Content-Type": "application/json"},
-                       body: JSON.stringify({action: "prefs", prefs: {tour_seen: seen, tour_off: state.tour.off}})}).catch(() => {});
+  postJSON("/api/users", {action: "prefs", prefs: {tour_seen: seen, tour_off: state.tour.off}}).catch(() => {});
 }
 
 // A tour put away because its page was left: nothing is saved.
@@ -451,9 +451,7 @@ async function tourReset(){
   // ...and a reset the same way: a poll in flight put the old list back,
   // and the tours waited for a reload (B217).
   adoptSeq++;
-  const r = await fetch("/api/users", {method: "POST", headers: {"Content-Type": "application/json"},
-                                       body: JSON.stringify({action: "prefs", prefs: {tour_seen: [], tour_off: false}})});
-  const j = await r.json().catch(() => ({}));
+  const j = await postJSON("/api/users", {action: "prefs", prefs: {tour_seen: [], tour_off: false}});
   // ...and a poll sent while this was on its way read the list from before it.
   adoptSeq++;
   if (j.error) notify(j.error, true);

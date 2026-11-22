@@ -6,15 +6,12 @@
 // to every tester whose session runs there. Whatever it returns carries no
 // credential. Nothing it makes is left behind, and what it touches is put back:
 // the account, the node's tick, the project's node and the switch.
-import { ok, done, URL, DIR } from './lib.mjs';
+import { ok, done, URL, DIR, asUser as basic, OWNER as ADMIN, asSession as bearer, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
-const basic = (u, p) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64'),
-                           'Content-Type': 'application/json' });
-const ADMIN = basic('test', 'test');
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -28,16 +25,18 @@ u.configure(state=${JSON.stringify(join(DIR, 'state'))}, write_json=lambda p, d:
 ${code}`], { encoding: 'utf8' }).trim();
 const ownerUid = usersPy('print(next(r["uid"] for r in u.load()["users"].values() if r.get("role") == "owner"))');
 const tok = uid => usersPy(`print(u.mint_session("alpha", uid=${JSON.stringify(uid)}))`);
-const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:=]\s*\S{6,}/;
 
 // ---- an administrator ------------------------------------------------------
-{
+await section("an administrator", async () => {
   const r = await call('/api/diag', {});
   const secs = Object.keys(r.body).filter(k => k !== 'at');
   ok(r.status === 200 && ['controller', 'images', 'settings', 'doctor', 'nodes', 'jobs', 'errors', 'audit']
        .every(s => secs.includes(s)),
      `an administrator reads the whole report (${r.status}: ${secs.join(',')})`);
+  ok(typeof r.body.tunnel?.running === 'boolean' && typeof r.body.tunnel?.registered === 'boolean'
+     && Array.isArray(r.body.tunnel?.tail) && !('ids' in r.body.tunnel),
+     `...the home tunnel's state among it, with nothing of its token (${JSON.stringify(r.body.tunnel)})`);
   ok(typeof r.body.controller?.agent_shipped === 'string' && 'debug_mode' in (r.body.settings || {})
      && Array.isArray(r.body.doctor?.checks) && typeof r.body.jobs?.last_24h === 'object',
      '...with the build it ships, the switches, the doctor and the jobs in it');
@@ -49,10 +48,10 @@ const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:
   ok(bad.status === 400 && /no section nosuch: the sections are/.test(bad.body.error || ''),
      `...and an unknown one is refused, naming the sections there are (${bad.status}: ${(bad.body.error || '').slice(0, 60)})`);
   ok(!CRED.test(JSON.stringify(r.body)), 'and nothing in it is shaped like a credential');
-}
+});
 
 // aerie diag, the way a person reads it: the verb against this server.
-{
+await section("aerie diag, the way a person reads it", async () => {
   const out = (() => { try {
     return execFileSync('bash', [join(HERE, '..', 'aerie'), 'diag', 'controller', 'nodes', 'jobs'],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
@@ -62,10 +61,10 @@ const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:
   ok(/== controller ==/.test(out) && /ships agent/.test(out) && /== jobs ==/.test(out)
      && /last 24h:/.test(out) && !/== audit ==/.test(out),
      `aerie diag prints the sections asked for, readably (${out.trim().split('\n').slice(0, 3).join(' | ').slice(0, 90)})`);
-}
+});
 
 // The redactor on its own, over the shapes it exists for.
-{
+await section("The redactor on its own, over the shapes it exists for", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util
 spec = importlib.util.spec_from_file_location("diag", ${JSON.stringify(join(HERE, 'diag.py'))})
@@ -74,7 +73,7 @@ print(m.redact("GET /x?t=bbs_abcdefgh1234 Authorization: Bearer abc.def.ghi pass
 `], { encoding: 'utf8' }).trim();
   ok(!CRED.test(out) && !/hunter22|abc\.def\.ghi/.test(out) && /kept words/.test(out),
      `the redactor takes tokens, headers and passwords out and leaves the words (${out})`);
-}
+});
 
 // ---- a session: the switch, the project's grant, the account's grant -------
 // Per project since 6 Oct: the grant is alpha's (its settings' Debug), not
@@ -82,7 +81,7 @@ print(m.redact("GET /x?t=bbs_abcdefgh1234 Authorization: Bearer abc.def.ghi pass
 // until a role names it; the built-in admin's "everything" leaves it out.
 // What is touched is read first and put back: alpha's node and grants and
 // the switch.
-{
+await section("a session: the switch, the project's grant, the account's grant", async () => {
   const prefsPy = code => execFileSync('python3', ['-c', `
 import importlib.util, json
 spec = importlib.util.spec_from_file_location("prefs", ${JSON.stringify(join(HERE, 'prefs.py'))})
@@ -165,6 +164,6 @@ print(json.dumps(m.job_add('system', {'node': '${node.id}'}, 'exec', {'argv': ['
   usersPy('d = u.load(); d["users"].pop("diag.plain", None); d["users"].pop("diag.admin", None); u._save(d)');
   ok(prefsPy('print(p.get("alpha").get("node") or "")') === wasNode,
      `...and what it touched is as it was: alpha's node (${wasNode || 'none'}) and its grants`);
-}
+});
 
 await done();

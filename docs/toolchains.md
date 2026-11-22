@@ -45,7 +45,7 @@ aerie toolchains env                 # the PATH lines; new shells get them autom
 
 The NDK, CMake, the SDK platform and build-tools are versioned rows: each
 is a family of packages side by side, so the check asks whether the newest
-the repository offers is on the store, and Update installs it beside the
+the repository offers is on the store, and Software update installs it beside the
 older ones rather than in their place. The platform row's newest is the
 newest level's base (`platforms;android-37.0`, what `compileSdk = 37`
 names), not a quarterly minor or an extension level. A session cannot
@@ -98,7 +98,9 @@ machine with no driver it is refused by name, and ticked with the driver
 the two are one job, the driver first; removed together, the toolkit comes
 off first. Neither Ubuntu nor Debian carries it, so installing it adds
 NVIDIA's own package source and its signing key to the machine
-(`bb-sandbox gpu-container install`), which the press asks about first,
+(`bb-sandbox gpu-container install`; the key is the copy the provisioner
+carries, never one fetched while installing, so apt holds what the source
+serves to it), which the press asks about first,
 and tells Docker about the runtime; Docker reloads its configuration for
 it, so running containers keep running (a restart, which leaves a container
 with no restart policy down, is the fallback only where a reload did not
@@ -147,6 +149,16 @@ aerie emu image add tv               # the newest of a flavor, or a full id:
 aerie emu image add "system-images;android-35;google_apis;x86_64"
 aerie emu image remove "system-images;android-35;google_apis;x86_64"
 ```
+
+**A recipe can come from the catalog.** Each row of that file has a `rev`
+(1 when it says none), and each is also an official pack in the vetted
+catalog. When the catalog's signed index says a row's recipe is newer than
+this install's own, the controller fetches that pack at its pin, checks it
+and uses the row in the shipped one's place, in its own table and in what
+every node installs from: a download address or a package list that moved
+upstream is put right by a catalog commit, with no release of AerieOS. The
+row in the image is what runs with no network, at first boot and whenever
+the catalog's is no newer ([tool-packs.md](tool-packs.md#what-stays-aerieoss-own)).
 
 **The recipes are a file, not code.**
 [`config/toolchains.json`](../config/toolchains.json) holds everything the container
@@ -254,6 +266,36 @@ Hover a size to see which one you are reading. Measuring walks the tree, so
 it happens on a worker rather than in the request: the first draw after an
 install carries the estimate and the real number arrives a moment later.
 
+**A download is held to something before it is unpacked or run.** Each row
+of the catalog says to what (`source.checksum`). A row carries the answer
+whole, as a **pin**: the version and the sha256 of the exact file, which
+the signed release or the signed catalog then holds, so the file is held to
+something its own origin cannot change. Two rest on their publisher's
+signature instead, under keys AerieOS ships (`config/release-keys`) or the
+row carries itself, each carrying the version it installs
+(`source.checksum.version`), since a signature says who published a file
+and not which release it is; and a repository is fetched at a commit. The rows not
+moved onto a pin yet ask the publisher at the moment of the install: the
+digest GitHub states for a release asset, a checksum file beside the
+download, the vendor's own index; such a row reads **open** on its card. A
+pinned row installs its version and asks nobody what is newest; a check
+offers the pinned version, and a newer one is the pin moving in the row
+([Moving a pin](#moving-a-pin)). Where a vendor publishes one moving file
+with no version in its address, the pin is that file's bytes on the day it
+was pinned, and an install is refused from the day the vendor changes it
+until the pin moves. What a row held by a pin or
+by a signature runs after its download (its installer, its follow-up
+steps, its verify) runs with no network, unless the row says in a sentence
+that its installer downloads the rest. A download that is not what
+its row says is removed and the install stops, naming both digests, with
+nothing left installed. The Installed page says under each toolchain how
+its download was checked. What a row downloads besides its own source it
+can declare the same way a pack does, each file held to a sha256 or a
+signature and fetched before anything of the row runs:
+[Declared downloads](tool-packs.md#declared-downloads) has the rule, the
+format and the three words (pinned, installer, open) an entry's downloads
+come down to.
+
 Android needs no PATH help on the machine that has it: a node's agent points
 `ANDROID_HOME` at its store's `android/` directory for every job and session,
 so Gradle and `sdkmanager` install and find things in one place. (The
@@ -279,7 +321,7 @@ anywhere else.
 
 **From the dashboard.** The **Library**, under Build on the rail, offers
 everything above as a card each for the node picked in the group's header:
-what it is, its terms, what it needs, and Install or Update. The
+what it is, its terms, what it needs, and Install or Software update. The
 **Installed** page, under Machines, lists what that node holds, the path each
 landed on and its system packages, with Remove. If an install fails, its
 card says why: the sentence, not the several hundred lines of progress
@@ -366,26 +408,184 @@ session.
 empty installs the Playwright browsers (~1.3GB) on first start. That happens
 once per share; from then on updates cost nothing.
 
+### Moving a pin
+
+A pinned row installs the version its pin names and asks nobody what is
+newest, so a newer version arrives as a change to the row, in a release of
+AerieOS or in the signed catalog. `tools/pins.py` proposes that change, and
+a person reviews it like any other. It names no vendor: how a row's newest
+version is found (`source.version`, `source.track` for a repository, a
+declared download's `track`) and how the new file's digest is learned
+(`found`) are the row's own data, read with the same resolvers an install
+of an unpinned row uses. A row held by its publisher's signature moves its
+version the same way, once every platform's file at the new one answers
+with its signature beside it or is named in its publisher's signed list;
+the signature stays the check an install makes.
+
+The five coding agents' install recipes are rows of the tool too, each
+under the name its row in the Library has (`tools/pins.py check codex-cli`).
+A recipe's downloads are declared in the same shape a row's are, in the one
+file that holds the recipes (`scripts/dashboard/agent-recipes.json`), and a
+move writes the new version and digest there, raises the recipe's `rev` and
+rewrites `packs/agents`. An installer with a version in its address moves
+with its track; a vendor's one moving installer has nothing to track, so
+`check` asks its address for the bytes it answers today and says when they
+are no longer the pinned ones, which is the day an install of it starts to
+be refused ([agents.md](agents.md#where-an-agent-s-install-recipe-comes-from)).
+
+```bash
+tools/pins.py check              # what each pinned row is pinned to, and what its resolver finds now
+tools/pins.py move go zig        # write the new version and digests for those rows, every platform
+tools/pins.py pin NAME           # a row not pinned yet becomes a pin at what its resolver finds now
+tools/pins.py verify --all       # download every pinned file and hold it to its pin
+tools/pins.py check --catalog DIR   # the same four verbs over a checkout of the catalog
+```
+
+- **check** reads the network and writes nothing. It exits 0 when nothing
+  would move, 3 when something would, 1 on an error. With nothing named it
+  asks everything this tree ships that carries a pin, the toolchains, the
+  coding agents' recipes, the CI runners, the services' images, the
+  controller image's own tools, what it takes from npm and the image it is
+  built from, so a release's pass is this one command. A file with no version
+  in its address has nothing to track: check downloads it and says when its
+  bytes are no longer the pinned ones, which is the day an install of it
+  starts being refused. A newer release that is not out for every platform
+  a row names holds the row where it is: check says so, and counts nothing
+  of that row as moving.
+- **move** writes `config/toolchains.json` and then the official packs
+  (`tools/packs-export.py --write`). A row that moved has its `rev` raised
+  by one, which is what lets the catalog carry it to installs with no
+  release. A row moves whole: when one platform's file cannot be learned
+  the row is left as it was, said by name, and the others still move. A row
+  that declares several tools' downloads asks each by its own `track`, so
+  the ones with a newer release move and the others stay where they are.
+  `--version V` with one row names the version in the resolver's place, for
+  a release whose files are not out for every platform yet.
+- **pin** turns a row whose download is checked against its own origin
+  into a pinned one, and keeps the old checksum as the pin's `found`. For a
+  repository it writes `source.commit`, and `source.tag` where its track is
+  by tag. A download the row declares with no digest yet, written with its
+  address and its `track`, is given the version its track finds now and its
+  digest: that is how a row gains a declared download.
+- **verify** is a release's check. It streams each pinned file, hashes it
+  and never keeps it; `--platform linux/arm64` asks for one platform and
+  `--all` for every one. For a repository it says whether the tag the row
+  names is still at the pinned commit.
+
+**What the controller's image is built from** is pinned where it lies,
+and each is a row of the tool. Its tools from their vendors' releases, and
+noVNC's source, are a table (`config/image-tools.json`, `--file` with that
+path). What it takes from npm is a folder a program (`config/image-npm`:
+Playwright and web-ext): `package.json` names the one version asked for
+and `package-lock.json` every package under it with its tarball's address
+and integrity, which `npm ci --ignore-scripts` installs by, holding each
+tarball to its integrity and running nobody's install script. `check
+--file config/image-npm` asks npm for each program's newest version and
+for the lock it would write, and says when either differs (a range
+somewhere under web-ext moved, a new Playwright is out); `move` writes
+both files. The image it is built on is named in the Dockerfile's `FROM`
+line by its tag and the digest of its list, a row of images like any
+other: `check --file Dockerfile` says when the tag serves another digest,
+and `move` rewrites that line and nothing else.
+
+**The CI runners a node installs** are pinned the same way, in a table of
+their own: `scripts/dashboard/runner-pins.json` lists a row for each kind
+of git host a runner registers with (`github`, GitHub's Actions runner;
+`gitea`, the runner Gitea and Forgejo share), its source written as a
+toolchain's is, with the version and the sha256 of the file for every
+platform it is offered on. `--file` with that path reads it, and the four
+verbs do there what they do for a toolchain; nothing else is written
+beside it, since a runner is not a pack. The controller hands a node its
+row with the job that installs a runner, and the node takes the file only
+where it is the pinned bytes
+([building.md](building.md#ci-runners)); a moved pin reaches a runner
+when it is installed again.
+
+```bash
+tools/pins.py --file scripts/dashboard/runner-pins.json check          # what each runner is pinned to, and what its resolver finds now
+tools/pins.py --file scripts/dashboard/runner-pins.json move gitea     # the new version and every platform's digest
+tools/pins.py --file scripts/dashboard/runner-pins.json verify --all   # each pinned file streamed, hashed and held to its pin
+```
+
+**The images AerieOS's own services run** are pinned the same way: the
+model router's (LiteLLM, its database, Ollama), nginx's and the scanners'
+are each named in `scripts/dashboard/service-images.json` by a tag and the
+digest of what is pulled, `name:tag@sha256:...`, and a node pulls each by
+that digest. For an image built for several platforms the digest is the
+manifest list's, which covers every platform the list names. The tool asks
+the registry each image names, by the registry protocol and its anonymous
+token, whatever host that is: `check` says where a tag serves another
+digest than the pinned one, `move` writes the digest the tag serves now,
+raises the row's `rev` and rewrites `packs/services`, `pin` gives an image
+written with its tag alone its first digest, and `verify` reads each
+pinned manifest by its digest and holds its bytes to it. A row names the
+platforms it needs (`platforms`), and a tag whose list lacks one holds the
+row where it is. A newer version of an image is a newer tag: write the tag
+into the row and `move` learns its digest.
+
+```bash
+tools/pins.py --file scripts/dashboard/service-images.json check     # each image's pin, and the digest its tag serves now
+tools/pins.py --file scripts/dashboard/service-images.json move nginx
+tools/pins.py --compose packs/apps/NAME/compose.yml check            # the same over a Docker app's compose file
+tools/pins.py --compose packs/apps/NAME/compose.yml pin              # each image named by its tag alone given its digest
+```
+
+`--compose FILE` reads a compose file in the table's place, which is how a
+Docker app's images are pinned and moved in the catalog: the file is one
+row, named for its folder, and a `pin` or a `move` rewrites its image lines
+and nothing else of it.
+
+**What a package manager installs** moves the same way. A row says what it
+asks pip or npm for (`source.lock`: the requirements, and for pip the
+Python and the platforms), and the tool asks the manager's own resolver
+which exact files that is: `uv pip compile` for each platform, wheels
+alone, with the sha256 the index states for each; `npm install
+--package-lock-only`, each tarball downloaded and hashed here and held to
+the lock's integrity. Both must be on the PATH of whoever runs the tool.
+Each file is written as a declared download under the lock's directory, and
+the requirements with their hashes, or `package.json` and its lock, into
+the row's `source.files`, which an install writes into the row's directory
+before its steps. `check` says when a lock would resolve otherwise and
+which packages moved; `move` replaces the lock's set whole and leaves the
+row's other downloads alone; `pin` resolves a lock that has no files yet. A
+package with no wheel for a platform is refused by name, since a source
+distribution runs its own code at install: such a package is a declared
+download of its own, placed by the row's step.
+
+Where a publisher states a sha256, the tool takes it and says from where.
+Where it states a sha1 or a sha512, or nothing, the tool downloads the file,
+hashes it, and holds it to what the publisher does state. `--file PATH`
+reads another table than the shipped one.
+
 ## The Library
 
 **Build** opens on the **Library**: everything an AerieOS installs or
 runs as one list for one node, picked in the Build group's header over
 the page (the pick holds across the Library, the Emulator, the Phone and
 the CI runner, and a sub-tab says *not here* when the node lacks what it
-needs). A section per kind, in
-this order: the coding agents a session runs (Claude Code, Codex CLI,
+needs). It browses as a store. With nothing typed it is shelves: **On
+this node** first (what is installed, anything with an update out ahead of
+the rest), then a shelf per kind with up to eight cards and **All N** for
+the rest: the coding agents a session runs (Claude Code, Codex CLI,
 Copilot CLI, Grok Build, OpenCode), the toolchains a space builds with,
-the tool packs a person added, the services a node runs for the others
-(the model router), the apps a NAS runs as containers, and under **For
-you** the companions a person downloads for their own machines. Every row
-is one shape: its name, its tier (official, shipped with AerieOS;
-vetted, from the catalog the maintainers sign; sideloaded, added by URL or
-made here), what is installed and what an update would move it to, one
-line saying what it is, and at its right the one verb it takes: Install,
-Update, Remove, Edit on a pack, Download on a companion, Install on a
-service once it is configured on the Installed page, and on an app New
-container, since an app is not installed on the node but made as a
-container, each press another one under its own name. Details opens the
+the tool packs, the services a node runs for the others (nginx, the
+Scanners, the model router), the apps a NAS runs as containers, and under
+**For you** the companions a person downloads for their own machines. A
+kind's chip, the **Topic** pulldown or the search (by name, maker or what
+it does) turns the page into one sorted list that loads more as you
+scroll, by name, best match or **Recently added**, as cards or as rows;
+the narrowing is in the page's address, so Back and a shared link land on
+it, and what runs only on other systems than the node's is counted in a
+line over the list and shown on a press. Every card is one shape: its
+name, who made it and its tier (Packaged by Aerie, what AerieOS ships or
+its maintainers packaged; Verified, a vendor's own pack; Vetted, anybody's
+pack the maintainers reviewed; Sideloaded, added by URL or made here),
+what is installed and what an update would move it to, what it is, and
+the one verb it takes: Install, Software update, Edit on a pack a person
+added,
+Download on a companion, and on an app New container, since an app is not
+installed on the node but made as a container, each press another one
+under its own name. Remove is the Installed page's. Details opens the
 entry's own page, with a small top header whose **Back** returns to the
 page you came from, and an address of its own
 (`#/build/library/NODE/KIND:NAME`), on the catalog's entry alone (the
@@ -394,8 +594,8 @@ what it is in full, its platforms, terms, size and source,
 what it adds to a session and what it asks for per node; a pack's
 **Look**, which fetches its manifest at the commit it is pinned to and says
 what it fetches and runs, as the Add tool pack dialog does; an app's
-compose file as the catalog holds it, with the blanks New container fills
-and the secrets made for it; a companion's other files. What is on the
+compose file as the catalog holds it, with what its panel asks for and the
+secrets made for it; a companion's other files. What is on the
 node (an agent's sign-in, a toolchain's path and system packages, a
 service's configuration, Remove) is the Installed page's under Machines
 ([machines.md](machines.md#installed)). A search box under the head matches a
@@ -409,19 +609,20 @@ Nothing installs a second way from here. A toolchain's Install is the
 toolchain job described below, with its agreements asked the same way; an
 agent's is the agents' own verb; a pack's Install opens the Add tool pack dialog
 on the catalog's commit, with Look first; an app's Install opens New
-container with the app picked and its blanks shown, and Create makes it a
-container on the Containers page. **Check for updates** asks
+container on the app's panel, and Create makes it a container on the
+Containers page. **Check for updates** asks
 about every row that installs on the node, and **Add your own** is the
 sideload, one dialog asking what is being added: a tool pack (from a
 repository, a pasted bbtool.json or an upload of its files, docs/tool-packs.md;
 a pack with an agent block is a coding agent) or an app, a compose file of
 your own with the blanks New container fills (`${PORT}`, `${DATA}`,
 `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}`), its name, its id, what it is
-and its port. Look checks it the way the shipped apps are held (every image
-pinned to a tag, never latest, nothing built or privileged, no blank but
-the known ones) and says what it would run; Add keeps it under the state as
-sideloaded, offered on an Apps card and in New container like the shipped
-ones, with Edit on its card to change or remove it. Both are an
+and its port. Look checks it the way the catalog's apps are held (every image
+held by its digest or pinned to a tag, never latest, nothing built,
+nothing that reaches the machine past its ports and volumes, no blank but
+the known ones) and says what it would run; Add
+keeps it under the state as sideloaded, offered on an Apps card and in New
+container like the catalog's, with Edit on its card to change or remove it. Both are an
 administrator's, since every person's New container then offers them. Over
 the Tool packs, **Submit it to the vetted catalog** links to the catalog's
 repository for a pull request, the way a pack becomes vetted. What it
@@ -433,7 +634,7 @@ puts on a node is the Installed page's, below.
 toolchain the [toolchain store](#the-toolchain-store-lives-outside-the-image)
 holds there, as the Library has a card per toolchain the catalog offers:
 each with its size, its installed version, its path, and an amber line
-when a check finds a newer one. Install and Update are on the Library's
+when a check finds a newer one. Install and Software update are on the Library's
 card; Remove is on the Installed page's row. A recipe that gives a session
 commands says under which name: they live under `aerie tool NAME` (`aerie tool
 graphics`, `aerie tool diagrams`), one name per recipe, so the card says what

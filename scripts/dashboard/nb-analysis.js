@@ -8,46 +8,53 @@
 function nbAnalysisView({$, nb, project}){
   const anaFx = {level: "", find: ""};
 
-  async function loadAnalysis(){
-    const hint = $("anaHint"), list = $("anaList");
-    if (!findings || findings.error) await loadFindings(!!findings?.error);
-    nb.anaStamp = state?.reports_mtime ?? null;
-    if (!findings || findings.loading){ glanceWaiting(hint); list.innerHTML = skel("rows"); return; }
-    if (findings.error){ viewGlance(hint, [], esc("analysis: " + findings.error), "", "bad"); return; }
-    if (!findings.available){
-      viewGlance(hint, [], "no scan results: the report folder is not mounted here", "", "warn");
-      // What the view is for, and the way to it (docs/scanners.md).
-      list.innerHTML = `<div class="field"><div class="hint nbempty">Findings from the static analysis stack land here once it runs:
-        <a href="#/help/scanners">setting it up</a> says how, with the script that runs it.</div></div>`;
-      return;
-    }
-    const rows = [];
-    for (const rep of findings.reports)
-      for (const f of rep.findings)
-        if (f.project === project) rows.push(f);
-    // The glance (R109): the findings by level, the worst first, an error
-    // in its color; a clean scan said on the line instead.
-    const lv = {};
-    rows.forEach(f => lv[f.level] = (lv[f.level] || 0) + 1);
-    viewGlance(hint, Object.keys(lv).sort((a, b) => (LEVEL_ORDER[a] ?? 9) - (LEVEL_ORDER[b] ?? 9)).slice(0, 6)
-      .map(l => ({label: `${l}${lv[l] === 1 ? "" : "s"}`, value: lv[l], tone: l === "error" ? "bad" : l === "warning" ? "warn" : ""})),
-      rows.length ? "" : "no findings for this space in the latest scan");
-    // The same two filters the Analysis tab has, project-fixed: one slice of
-    // narrowing shared by both surfaces, so learning one is learning the
-    // other. The bar only appears when there is something to narrow.
-    const shown = fxFilter(rows, anaFx);
-    list.innerHTML = (rows.length ? fxBarBand(rows, anaFx) : "")
-      + (rows.length && !shown.length
-          ? `<div class="empty">nothing matches the filters</div>` : "")
-      + findingsRulesHtml(shown);
-    fxWireBar(list, anaFx, loadAnalysis);
-    // By rule group, which is how the report is read: a rule split across a
-    // page boundary would separate its own occurrences.
-    // .rule, which is what findingsRulesHtml emits: .grp belongs to the other,
-    // per-file renderer, so this matched nothing and paginate returned early:
-    // a project with hundreds of findings drew every one of them at once while
-    // every list beside it paged.
-    paginate(list, ":scope > .rule", {key: "anaList", noun: "rules"});
+  function loadAnalysis(){
+    return reading(`${project}:analysis`, async () => {
+      const hint = $("anaHint"), list = $("anaList");
+      if (!findings || findings.error) await loadFindings(!!findings?.error);
+      nb.anaStamp = state?.reports_mtime ?? null;
+      if (!findings || findings.loading){ glanceWaiting(hint); drawHTML(list, skel("rows")); return; }
+      if (findings.error){ glanceBad(hint, "analysis", findings.error); return; }
+      if (!findings.available){
+        viewGlance(hint, [], "no scan results: the report folder is not mounted here", "", "warn");
+        // What the view is for, and the way to it (docs/scanners.md).
+        drawHTML(list, `<div class="field"><div class="hint nbempty">Findings from the static analysis stack land here once it runs:
+          <a href="#/help/scanners">setting it up</a> says how, with the script that runs it.</div></div>`);
+        return;
+      }
+      const rows = [];
+      for (const rep of findings.reports)
+        for (const f of rep.findings)
+          if (f.project === project) rows.push(f);
+      // The glance (R109): the findings by level, the worst first, an error
+      // in its color; a clean scan said on the line instead.
+      const lv = {};
+      rows.forEach(f => lv[f.level] = (lv[f.level] || 0) + 1);
+      viewGlance(hint, Object.keys(lv).sort((a, b) => (LEVEL_ORDER[a] ?? 9) - (LEVEL_ORDER[b] ?? 9)).slice(0, 6)
+        .map(l => ({label: `${l}${lv[l] === 1 ? "" : "s"}`, value: lv[l], tone: l === "error" ? "bad" : l === "warning" ? "warn" : ""})),
+        rows.length ? "" : "no findings for this space in the latest scan");
+      // The same two filters the Analysis tab has, project-fixed: one slice of
+      // narrowing shared by both surfaces, so learning one is learning the
+      // other. The bar only appears when there is something to narrow.
+      const shown = fxFilter(rows, anaFx);
+      // Built a rule at a time, a page of rules (pageLimit, R228 step 13).
+      const nRules = new Set(shown.map(f => f.rule ?? "none")).size;
+      const lim = pageLimit(list, "anaList", nRules);
+      // Patched (R244): the find box in the bar keeps its caret while the list
+      // under it narrows, and a scan landing leaves it as it is.
+      patch(list, (rows.length ? fxBarBand(rows, anaFx) : "")
+        + (rows.length && !shown.length
+            ? `<div class="empty">nothing matches the filters</div>` : "")
+        + findingsRulesHtml(shown, lim));
+      fxWireBar(list, anaFx, loadAnalysis);
+      // By rule group, which is how the report is read: a rule split across a
+      // page boundary would separate its own occurrences.
+      // .rule, which is what findingsRulesHtml emits: .grp belongs to the other,
+      // per-file renderer, so this matched nothing and paginate returned early:
+      // a project with hundreds of findings drew every one of them at once while
+      // every list beside it paged.
+      paginate(list, ":scope > .rule", {key: "anaList", noun: "rules", total: nRules, more: () => loadAnalysis()});
+    });
   }
 
   // The half of the briefing a session cannot write. Staged behind the
@@ -63,17 +70,11 @@ function nbAnalysisView({$, nb, project}){
   // cached by commit on the server, so this is cheap after the first time.
   let codeData = null;
   // Asked on every show of the briefing, and by the rules load beside it:
-  // one fetch answers everyone who asks while it is in flight (B218).
-  let codeInFlight = null;
+  // one read answers everyone who asks while it is out (B218).
   function loadCodebase(){
-    if (codeInFlight) return codeInFlight;
-    codeInFlight = (async () => {
-      try{
-        const r = await bootFetch("/api/codebase?project=" + encodeURIComponent(project));
-        codeData = await r.json();
-      }catch(e){ codeData = {error: String(e)}; }
-    })().finally(() => { codeInFlight = null; });
-    return codeInFlight;
+    return reading(`${project}:codebase`, async () => {
+      codeData = await getJSON("/api/codebase?project=" + encodeURIComponent(project));
+    }, {join: Infinity});
   }
   // GitHub's colors for the languages people recognize; a hue from the
   // name for the rest, so two rare ones do not come out the same.
@@ -126,13 +127,14 @@ function nbAnalysisView({$, nb, project}){
   // order, the joins and the cap are preamble.py's, and a second assembly on
   // this side would be a tab that quietly stops describing what sessions get.
   nb.preData = null;
-  async function loadPreamble(){
-    try{
-      const r = await bootFetch(`/api/preamble?project=${encodeURIComponent(project)}`);
-      const j = await r.json();
-      nb.preData = j.error ? {error: j.error} : j;
-    }catch(e){ nb.preData = {error: String(e)}; }
-    nb.drawRules();
+  function loadPreamble(){
+    return reading(`${project}:preamble`, async () => {
+      try{
+        const j = await getJSON(`/api/preamble?project=${encodeURIComponent(project)}`);
+        nb.preData = j.error ? {error: j.error} : j;
+      }catch(e){ nb.preData = {error: String(e)}; }
+      nb.drawRules();
+    });
   }
   const preSize = n => n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} bytes`;
   function preambleSection(){
@@ -164,7 +166,7 @@ function nbAnalysisView({$, nb, project}){
         + `the space's CLAUDE.md.</div>
         <textarea id="preText" readonly rows="16" spellcheck="false"
           aria-label="what a session started here is sent">${esc(d.text)}</textarea>
-        <div class="sub dim" id="preParts">${
+        <div class="sub data dim" id="preParts">${
           (d.parts || []).map(x => `${esc(x.name)} ${preSize(x.bytes)}${
             x.share ? ` of ${preSize(x.share)}` : ""}`).join(" · ")
         }</div>${(d.topics || []).length ? `<div class="sub dim" id="preTopics">pointed at, not sent: ${
@@ -183,12 +185,14 @@ function nbAnalysisView({$, nb, project}){
   // sent or set aside (brief.py). Read on every show of this view, since it
   // changes once, when the first session starts, and nothing after that.
   nb.briefData = null;
-  async function loadBrief(){
-    try{
-      const j = await (await bootFetch(`/api/brief?project=${encodeURIComponent(project)}`)).json();
-      nb.briefData = j.error ? null : j;
-    }catch(e){ nb.briefData = null; }
-    nb.drawRules();
+  function loadBrief(){
+    return reading(`${project}:brief`, async () => {
+      try{
+        const j = await getJSON(`/api/brief?project=${encodeURIComponent(project)}`);
+        nb.briefData = j.error ? null : j;
+      }catch(e){ nb.briefData = null; }
+      nb.drawRules();
+    });
   }
   function briefSection(){
     const d = nb.briefData, k = d?.kept;

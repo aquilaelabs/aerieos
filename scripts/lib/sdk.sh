@@ -33,10 +33,82 @@ SDK_TOOLCHAINS="android node jdk playwright flutter dotnet swift go rust zig"
 # rather than repeated here, so adding a toolchain is one edit and not two that
 # can drift. config/toolchains.json sits at the same place relative to this
 # script in the image and in a checkout.
+# Whether this file is AerieOS's own source tree's, and not an install's:
+# the tree's Dockerfile and its tools/ are beside it (the controller's
+# seams.py asks the same), which no image, no bare-metal install (it holds
+# the Dockerfile and scripts/, unit tests and all, and none of tools/), no
+# bundle a node fetches and no copy root keeps holds. It is where the file
+# is, which nothing in an environment says. A job's seam, every one below
+# that reads SDK_IN_TREE: what a test stands in for (a tool on its PATH,
+# the files named below with each) is read only there, since a job's
+# environment reaches this file.
+SDK_IN_TREE=""
+SDK_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || SDK_HERE=""
+if [ -n "$SDK_HERE" ] && [ -f "${SDK_HERE}/../../Dockerfile" ] && [ -d "${SDK_HERE}/../../tools" ]; then
+    SDK_IN_TREE=1
+fi
+
+# The tools a download is fetched, checked and unpacked with (curl,
+# sha256sum and its kin, gpgv, tar, python3 for sdkmeta.py) and the ones
+# the network is cut with (unshare, sudo), from the system's own folders
+# and never from the caller's PATH: a pack's bin folder is ahead of the
+# system's there for every job, and a sha256sum a pack shipped would check
+# every install after it. A recipe's own steps keep the PATH they are
+# handed. sdk_sys TOOL [ARG...] runs one; sdk_sys_path TOOL says where it is.
+SDK_SYS_PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+case "$(uname -s 2>/dev/null)" in Darwin) SDK_SYS_PATH="/opt/homebrew/bin:/usr/local/bin:${SDK_SYS_PATH}" ;; esac
+[ -z "$SDK_IN_TREE" ] || SDK_SYS_PATH="$PATH"
+sdk_sys_path() { PATH="$SDK_SYS_PATH" type -P "$1"; }
+# ...and started with none of the caller's environment but what a check and
+# a download need: that PATH, where home and temporary files are, the
+# language, and the machine's proxy. A pack's layout may set variables for
+# every job, and one a checking tool reads at its start (PYTHONHOME,
+# OPENSSL_CONF, GCONV_PATH, TAR_OPTIONS, GIT_DIR, CURL_HOME, SSL_CERT_FILE
+# and their like) loads code into the check or points it somewhere else.
+# A test's stand-ins read FAKE_* and BB_TOOLCHAINS_JSON, in the source tree
+# alone. Git, the whole of a pinned commit's check and of a newest-version
+# question, reads no configuration but the repository's own: a step of an
+# earlier pack may write the account's ~/.gitconfig (a hooks folder that
+# rewrites what a checkout left, while its commit still matches).
+SDK_SYS_KEEP="HOME TMPDIR LANG LC_ALL TZ USER LOGNAME BB_SDK_CACHE_TTL http_proxy https_proxy no_proxy all_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY ALL_PROXY"
+SDK_SYS_GIT=(GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1)
+# sdk_keep NAME...: KEEP becomes NAME=VALUE for each NAME this shell's
+# environment sets, and, in the source tree alone, a test's stand-ins.
+sdk_keep() {
+    local n
+    KEEP=()
+    for n in "$@"; do
+        [ -z "${!n+x}" ] || KEEP+=("$n=${!n}")
+    done
+    if [ -n "$SDK_IN_TREE" ]; then
+        for n in $(compgen -e); do
+            case "$n" in FAKE_*|BB_TOOLCHAINS_JSON) KEEP+=("$n=${!n}") ;; esac
+        done
+    fi
+}
+sdk_sys() {
+    local tool envbin
+    tool="$(sdk_sys_path "$1")" || { printf 'there is no %s among this system'\''s own tools\n' "$1" >&2; return 127; }
+    envbin="$(sdk_sys_path env)" || { printf 'there is no env among this system'\''s own tools\n' >&2; return 127; }
+    shift
+    local -a KEEP
+    # shellcheck disable=SC2086  # a list of names, split on purpose
+    sdk_keep $SDK_SYS_KEEP
+    "$envbin" -i "PATH=$SDK_SYS_PATH" "${KEEP[@]}" "${SDK_SYS_GIT[@]}" "$tool" "$@"
+}
+
 # The catalog, at the one place it sits relative to this file in both the
-# image and a checkout.
+# image and a checkout. On a node the bundle may carry a second file beside
+# it, the shipped rows with the vetted catalog's newer ones in their places
+# (toolchains.catalog.json, which the controller adds): that one is read
+# where it is there, and the shipped file stays as its release signed it.
 sdk_meta_file() {
-    printf '%s' "$(dirname "$(readlink -f "$0")")/../config/toolchains.json"
+    local d="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/../config"
+    if [ -f "$d/toolchains.catalog.json" ]; then
+        printf '%s' "$d/toolchains.catalog.json"
+    else
+        printf '%s' "$d/toolchains.json"
+    fi
 }
 
 sdk_checkable() {
@@ -79,6 +151,10 @@ sdk_dir() { printf '%s/%s' "$(sdk_root)" "$1"; }
 # finds no such tree and does nothing. One value, correct in both
 # places, and sdkmanager never runs without it.
 sdk_root_flag() { printf -- '--sdk_root=%s' "${ANDROID_HOME:-$(sdk_dir android)}"; }
+# sdk_android [CMD...] sdkmanager ARG...: the android rows' installer, started
+# as every row's step is (sdk_step), with JAVA_HOME, which it runs on, where
+# this shell has one.
+sdk_android() { sdk_step ${JAVA_HOME:+"JAVA_HOME=$JAVA_HOME"} "$@"; }
 sdkmgr() {
     # Every install goes past the licenses first; see below for why that is
     # here rather than at each call site.
@@ -96,7 +172,7 @@ sdkmgr() {
         rm -rf "${d:?}"
         return 0
     fi
-    sdkmanager "$(sdk_root_flag)" "$@"
+    sdk_android sdkmanager "$(sdk_root_flag)" "$@"
 }
 
 # The android SDK licenses, once per toolchain store root.
@@ -125,7 +201,7 @@ sdk_android_licenses() {
     mkdir -p "$root"
     # `yes` dies of SIGPIPE when sdkmanager stops reading. Expected, not a
     # failure; hence the || true inside the pipeline's first stage.
-    (yes || true) | sdkmanager "$(sdk_root_flag)" --licenses >/dev/null 2>&1 || true
+    (yes || true) | sdk_android sdkmanager "$(sdk_root_flag)" --licenses >/dev/null 2>&1 || true
 }
 
 # The PATH additions for whatever is installed, regenerated on demand rather
@@ -144,7 +220,7 @@ sdk_env_snippet() {
     local root d; root="$(sdk_root)"
     printf '# Generated by `aerie toolchains env`; do not edit, run the command instead.\n'
     SDK_ROOT="$root" python3 - "$(sdk_meta_file)" "$root" "$BB_LIB" <<'PY'
-import os, sys
+import os, shlex, sys
 sys.path.insert(0, sys.argv[3])
 import sdkmeta
 # The tool packs beside the catalog are rows like any other (R77).
@@ -160,19 +236,18 @@ def where(entry_dir, rel):
 
 for p in rows:
     lay = p.get("layout") or {}
-    d = "android" if p["name"].startswith("android:") else p["name"]
-    for var, rel in (lay.get("env") or {}).items():
-        # `=VALUE` is the value itself, as the agent's sdk_env reads it (B548).
-        if rel.startswith("="):
-            print(f'export {var}="{rel[1:]}"')
-            continue
-        path = where(d, rel)
-        if os.path.exists(path):
-            print(f'export {var}="{path}"')
+    d = sdkmeta.layout_dir(p)
+    # A path where it is there; `=VALUE`, the value itself (B548), where
+    # its row is installed and nowhere else: one a pack sets reaches no
+    # shell on a machine that does not hold that pack.
+    here = os.path.isdir(where(d, ""))
+    for var, value in sdkmeta.layout_env(p, root):
+        if here if str((lay.get("env") or {}).get(var)).startswith("=") else os.path.exists(value):
+            print(f"export {var}={shlex.quote(value)}")
     for rel in (lay.get("bin") or []):
         path = where(d, rel)
         if os.path.isdir(path):
-            print(f'export PATH="{path}:$PATH"')
+            print(f"export PATH={shlex.quote(path)}:\"$PATH\"")
 PY
     # Flutter needs to be told where the Android SDK is when ANDROID_HOME is
     # not already in the environment of whatever spawned it.
@@ -256,7 +331,7 @@ sdk_status() {
 # listing: a node that has never dialed in has told us nothing, and inventing
 # an inventory for it would be worse than showing this container's.
 sdk_status_node() {
-    local py; py="$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+    local py; py="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/dashboard/nodes.py"
     [ -f "$py" ] || return 1
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 - "$py" "$1" <<'NODESTAT'
 import importlib.util, os, sys
@@ -342,9 +417,18 @@ sdk_status_local() {
     # alone took this command from instant to seven seconds), and the size of
     # a toolchain is a question for `du` on the day you ask it, not something
     # to pay for on every status.
-    local t d
+    local t d unfinished tool
+    unfinished="$(sdk_unfinished "$root")"
     for t in $SDK_TOOLCHAINS; do
         d="$(sdk_dir "$t")"
+        # A folder with no tool in it is an install that did not finish, not
+        # a toolchain: said, with the verb that clears it and installs again.
+        tool="$(printf '%s\n' "$unfinished" | awk -F'\t' -v n="$t" '$1 == n { print $2; exit }')"
+        if [ -n "$tool" ]; then
+            printf '  %-11s not installed: %s holds no %s, an install that did not finish (aerie toolchains install %s clears it)\n' \
+                "$t" "$d" "$tool" "$t"
+            continue
+        fi
         if [ "$t" = android ]; then
             # Android is the one that also lives in the image: the bootstrap
             # tools ship there, the packages are what moved out.
@@ -510,7 +594,7 @@ sdk_builds_with() {
 # rather than holding the job until its step's hour is up, and a server
 # that never answers fails in thirty seconds; two retries for a blip.
 sdk_fetch() {
-    curl -fL --progress-bar --connect-timeout 30 --speed-limit 1024 --speed-time 120 \
+    sdk_sys curl -fL --progress-bar --connect-timeout 30 --speed-limit 1024 --speed-time 120 \
         --retry 2 --retry-delay 5 -o "$2" "$1"
 }
 
@@ -524,9 +608,29 @@ sdk_fetch() {
 # `aerie toolchains check <name>` once per toolchain, so a per-process memo would still
 # have asked six times. Two minutes is long enough for one sweep to ask once
 # and short enough that pressing "check for updates" again means what it says.
+#
+# /tmp is every account's, and the table read back is taken as sdkmanager's
+# own, so the file lives in a directory of this account's: made 0700, and
+# used only while it is a real directory this account owns that nobody else
+# may read or write (sdk_cache_dir, the directory sdkmeta.py keeps its
+# documents in). Where it is anything else nothing is kept, and sdkmanager
+# is asked every time.
 SDK_LIST_CACHE_TTL=120
+sdk_cache_dir() {
+    local d
+    d="${TMPDIR:-/tmp}/bb-sdk-cache-$(id -u)" || return 1
+    mkdir -m 700 "$d" 2>/dev/null || true
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
+    case "$(stat -c %a "$d" 2>/dev/null || stat -f %Lp "$d" 2>/dev/null)" in 700) ;; *) return 1 ;; esac
+    printf '%s\n' "$d"
+}
 sdk_android_list() {
-    local f="${TMPDIR:-/tmp}/bb-sdk-list.cache" age
+    local f age
+    if ! f="$(sdk_cache_dir)"; then
+        sdk_android timeout 120 sdkmanager "$(sdk_root_flag)" --list 2>/dev/null
+        return 0
+    fi
+    f="${f}/sdk-list.cache"
     if [ -s "$f" ]; then
         age=$(( $(date +%s) - $(stat -c %Y "$f" 2>/dev/null || echo 0) ))
         if [ "$age" -lt "$SDK_LIST_CACHE_TTL" ]; then cat "$f"; return 0; fi
@@ -536,7 +640,7 @@ sdk_android_list() {
     # snapshot would be a wrong answer to the one question this is asked for.
     # timeout cannot run a shell function, so this one names the binary
     # and takes the root from the same place sdkmgr does.
-    if timeout 120 sdkmanager "$(sdk_root_flag)" --list 2>/dev/null > "$f.$$"; then
+    if sdk_android timeout 120 sdkmanager "$(sdk_root_flag)" --list 2>/dev/null > "$f.$$"; then
         mv -f "$f.$$" "$f"; cat "$f"
     else
         rm -f "$f.$$"
@@ -544,7 +648,7 @@ sdk_android_list() {
 }
 # After anything that changes what is installed: the table is a statement
 # about both halves, and the installed half just moved.
-sdk_android_list_forget() { rm -f "${TMPDIR:-/tmp}/bb-sdk-list.cache"; }
+sdk_android_list_forget() { local d; d="$(sdk_cache_dir)" && rm -f "${d}/sdk-list.cache"; return 0; }
 
 # The newest package sdkmanager offers for a bare name, as `id<TAB>version`.
 # ndk and cmake ship as versioned ids (ndk;30.0.15729638) and a bare name
@@ -592,53 +696,38 @@ sdk_check_one() {
     # half is a directory read or a --version away, and it is what the
     # toolchain list wants on every draw; the other half is a round trip to a
     # different service per toolchain and belongs behind a button.
+    #
+    # A row its entry pins (a pinned download, a git source at a commit) has
+    # the pinned version on offer and no other: its vendor is not asked
+    # what is newest, so the probes below read what is installed and the
+    # offer is the entry's (sdkmeta.py offer).
+    local offer="" asked=""
+    if [ -z "$local_only" ]; then
+        offer="$(sdk_meta offer "$what" 2>/dev/null)" || offer=""
+        [ -z "$offer" ] || local_only=pinned
+    fi
+    # Each case reads what is installed: the tool asked its own version.
+    # What is newest is the row's own version resolver's word (below), as
+    # an install asks it, so no vendor is named here twice.
     case "$what" in
         flutter)
+            # A git clone: what is installed is the commit its HEAD is at.
             d="$(sdk_find flutter)" || d=""
-            # A git clone on the stable branch: the honest question is whether
-            # our HEAD is the branch head, and ls-remote answers it without
-            # fetching an object. Against the clone's origin when there is a
-            # clone and against the upstream URL when there is not: the same
-            # answer either way, and the second form is what lets a row that
-            # has never been installed say what it would get.
-            [ -z "$d" ] || inst="$(git -C "$d" rev-parse --short=8 HEAD 2>/dev/null || echo -)"
-            if [ -z "$local_only" ]; then
-                if [ -n "$d" ]; then
-                    latest="$(timeout 30 git -C "$d" ls-remote origin refs/heads/stable 2>/dev/null | cut -c1-8)"
-                else
-                    latest="$(timeout 30 git ls-remote https://github.com/flutter/flutter.git refs/heads/stable 2>/dev/null | cut -c1-8)"
-                fi
-            fi
-            [ -n "$latest" ] || latest="-"
+            [ -z "$d" ] || inst="$(sdk_sys git -C "$d" rev-parse --short=8 HEAD 2>/dev/null || echo -)"
             ;;
         swift)
             d="$(sdk_find swift)" || d=""
             [ -z "$d" ] || inst="$("$d/usr/bin/swift" --version 2>/dev/null | sed -n 's/.*Swift version \([0-9.]*\).*/\1/p' | head -1)"
-            if [ -z "$local_only" ]; then
-                latest="$(timeout 30 curl -fsSLI -o /dev/null -w '%{url_effective}' \
-                          https://github.com/swiftlang/swift/releases/latest 2>/dev/null)"
-                latest="${latest##*/swift-}"; latest="${latest%-RELEASE}"
-            fi
-            case "$latest" in ''|*[!0-9.]*) latest="-" ;; esac
             ;;
         dotnet)
             d="$(sdk_find dotnet)" || d=""
             [ -z "$d" ] || inst="$("$d/dotnet" --list-sdks 2>/dev/null | tail -1 | awk '{print $1}')"
-            # The installer itself knows what the channel currently holds, so
-            # ask it rather than parsing a release feed that changes shape.
-            # The dry-run echoes the exact invocation it would make, version
-            # and all (a more stable thing to read than the payload URL), and
-            # it needs nothing installed to say so.
-            [ -n "$local_only" ] || latest="$(timeout 60 bash -c 'curl -fsSL https://dot.net/v1/dotnet-install.sh \
-                      | bash -s -- --channel LTS --dry-run' 2>/dev/null \
-                      | sed -n 's/.*--version "\([^"]*\)".*/\1/p' | head -1)"
-            [ -n "$latest" ] || latest="-"
+            # What is on offer is the version its entry pins (the offer,
+            # below): nothing is asked of the vendor here.
             ;;
         go)
             d="$(sdk_find go)" || d=""
             [ -z "$d" ] || inst="$("$d/bin/go" version 2>/dev/null | awk '{print $3}')"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS 'https://go.dev/VERSION?m=text' 2>/dev/null | head -1)"
-            [ -n "$latest" ] || latest="-"
             ;;
         jdk)
             # java -version prints to STDERR, which is why the redirect is a
@@ -646,11 +735,6 @@ sdk_check_one() {
             # every installed JDK as absent.
             d="$(sdk_find jdk)" || d=""
             [ -z "$d" ] || inst="$("$d/bin/java" -version 2>&1 | sed -n 's/.*version "\([^"]*\)".*/\1/p' | head -1)"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS \
-                'https://api.adoptium.net/v3/info/release_names?release_type=ga&version=%5B21%2C22%29&page_size=1&sort_order=DESC' \
-                2>/dev/null | python3 -c 'import json,sys
-print((json.load(sys.stdin).get("releases") or [""])[0].removeprefix("jdk-"))' 2>/dev/null)"
-            [ -n "$latest" ] || latest="-"
             ;;
         android-tools)
             # sdkmanager --version needs a JDK, so this reads the package file
@@ -673,49 +757,19 @@ print((json.load(sys.stdin).get("releases") or [""])[0].removeprefix("jdk-"))' 2
         node)
             d="$(sdk_find node)" || d=""
             [ -z "$d" ] || inst="$("$d/bin/node" --version 2>/dev/null | head -1)"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS https://nodejs.org/dist/index.json 2>/dev/null \
-                      | python3 -c 'import json,sys
-print(next((r["version"] for r in json.load(sys.stdin) if r.get("lts")), ""))' 2>/dev/null)"
-            [ -n "$latest" ] || latest="-"
             ;;
         zig)
             d="$(sdk_find zig)" || d=""
             [ -z "$d" ] || inst="$("$d/zig" version 2>/dev/null | head -1)"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS https://ziglang.org/download/index.json 2>/dev/null \
-                      | python3 -c 'import json,sys
-d = json.load(sys.stdin)
-print(next(k for k in d if k != "master"))' 2>/dev/null)"
-            [ -n "$latest" ] || latest="-"
             ;;
         rust)
             d="$(sdk_find rust)" || d=""
             [ -z "$d" ] || inst="$(RUSTUP_HOME="$d/rustup" CARGO_HOME="$d/cargo" "$d/cargo/bin/rustc" --version 2>/dev/null | awk '{print $2}')"
-            if [ -z "$local_only" ] && [ -n "$d" ]; then
-                # rustup already knows how to ask; its answer names the
-                # version it would move to, which is the only interesting half.
-                local line=""
-                line="$(RUSTUP_HOME="$d/rustup" CARGO_HOME="$d/cargo" timeout 60 \
-                        "$d/cargo/bin/rustup" check 2>/dev/null | grep -i 'stable' | head -1 || true)"
-                # Lower case, and a colon rather than an arrow:
-                #   stable-x86_64-unknown-linux-gnu - up to date: 1.97.1 (...)
-                #   stable-x86_64-unknown-linux-gnu - update available: 1.97.1 -> 1.98.0
-                case "$line" in
-                    *"up to date"*)      latest="$inst" ;;
-                    *"update available"*)
-                        latest="$(printf '%s' "$line" | sed -n 's/.*-> *\([0-9][0-9.]*\).*/\1/p')"
-                        [ -n "$latest" ] || latest="newer" ;;
-                    *) latest="-" ;;
-                esac
-            elif [ -z "$local_only" ]; then
-                # No rustup here to ask, so ask GitHub: the release tags are
-                # the same numbers rustc reports.
-                latest="$(timeout 30 curl -fsSLI -o /dev/null -w '%{url_effective}' \
-                          https://github.com/rust-lang/rust/releases/latest 2>/dev/null)"
-                latest="${latest##*/}"
-                case "$latest" in ''|*[!0-9.]*) latest="-" ;; esac
-            fi
             ;;
         playwright)
+            # The module itself answers both halves (its dry run), so no
+            # resolver is asked for it.
+            asked=1
             d="$(sdk_find playwright)" || d=""
             # The module decides which browser revisions it wants; --dry-run
             # names the directories it would use, and names them whether or
@@ -740,6 +794,8 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
             fi
             ;;
         android:*)
+            # sdkmanager's repository answers both halves.
+            asked=1
             local pkg="${what#android:}"
             # A versioned row (the NDK, CMake, build-tools, the SDK platform)
             # is a family of packages side by side, and a newer one is a new
@@ -773,7 +829,7 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
                 # Trimmed, not stripped of spaces: the version column
                 # is where a release candidate says so ("30.0.15729638
                 # rc2"), and squeezing it out hid that.
-                inst="$(timeout 120 sdkmanager "$(sdk_root_flag)" --list_installed 2>/dev/null \
+                inst="$(sdk_android timeout 120 sdkmanager "$(sdk_root_flag)" --list_installed 2>/dev/null \
                         | awk -F'|' -v p="$pkg" '$1 ~ "^ *"p"(;|  *$)" {v=$2; gsub(/^ +| +$/,"",v); print v; exit}')"
                 [ -n "$inst" ] || inst="installed"
             fi
@@ -794,9 +850,53 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
             fi
             fi
             ;;
-        *) printf '%s\t-\t-\tunknown\n' "$what"; return 0 ;;
+        *)
+            # Any other row, a pack's among them, read from what its install
+            # left: where it is, and a repository's commit; the digest its
+            # download was held to is compared with its pin below. One whose
+            # version nothing says is "installed", and only a pin decides
+            # whether it is current. A name no row of the catalog has is
+            # unknown.
+            [ -n "$(sdk_meta field "$what" source.kind 2>/dev/null)" ] || { printf '%s\t-\t-\tunknown\n' "$what"; return 0; }
+            d="$(sdk_find "$what")" || d=""
+            if [ -n "$d" ]; then
+                if [ "$(sdk_meta field "$what" source.kind 2>/dev/null)" = git ]; then
+                    inst="$(sdk_sys git -c "safe.directory=$d" -C "$d" rev-parse --short=8 HEAD 2>/dev/null)" || inst=""
+                fi
+                case "$inst" in ""|-) inst=installed ;; esac
+            fi
+            ;;
     esac
     [ -n "$inst" ] || inst="-"
+    if [ -z "$local_only" ] && [ -z "$asked" ]; then
+        latest="$(sdk_meta resolve "$what" 2>/dev/null)" || latest=""
+        latest="${latest%%$'\t'*}"
+        [ -n "$latest" ] || latest="-"
+    fi
+    if [ -n "$offer" ]; then
+        # Pinned: what is on offer is the pin. An installed copy that was
+        # held to the same digest is that file, whatever each calls its
+        # version; one with no such record is compared by version below.
+        local_only=""
+        local want="${offer#*$'\t'}" have=""
+        latest="${offer%%$'\t'*}"
+        [ -n "$latest" ] || latest="-"
+        d="$(sdk_find "$what" 2>/dev/null)" || d=""
+        [ -z "$d" ] || have="$(sdk_verified_digest "$d")"
+        if [ "$inst" != "-" ] && [ -n "$want" ] && [ -n "$have" ]; then
+            if [ "$have" = "$want" ]; then
+                status=current
+                # The pin's file: its version, where nothing else said one.
+                [ "$inst" != installed ] || inst="$latest"
+            # Another file than the pin's, and a later release than the pin
+            # names: a copy installed when installs took the vendor's newest,
+            # or under a pin that has since been moved back. Installing the
+            # pin over it would be a step down, so it is not offered as an
+            # update; it reads as current until the pin passes it.
+            elif [ "$inst" != installed ] && sdk_vnewer "$inst" "$latest"; then status=current
+            else status=update; fi
+        fi
+    fi
     # A local probe knows what is installed and nothing about what exists
     # elsewhere, so it must not answer the other question. "current" from a
     # directory listing would be a claim nobody checked.
@@ -810,7 +910,7 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
     fi
     if [ "$status" = unknown ]; then
         if [ "$inst" = "-" ]; then status=absent
-        elif [ "$latest" = "-" ]; then status=unknown
+        elif [ "$latest" = "-" ] || [ "$inst" = installed ]; then status=unknown
         # The same release written with and without its build (Temurin's
         # 21.0.12.1+1 against java's own 21.0.12.1) is the same release, and
         # so is one written with and without its trailing zero (Swift 6.4
@@ -841,6 +941,20 @@ sdk_versions() {
 
 # A version with its trailing zero components off (6.4.0 and 6.4 are one
 # release), for the one comparison the check makes.
+# sdk_vnewer A B: whether A names a later release than B, each read as the
+# first run of dotted numbers in it (21.0.13.1 in java's own word, 21.0.13
+# in jdk-21.0.13+9), compared number by number. False where either has
+# none, or they are the same.
+sdk_vnewer() {
+    local a b
+    a="$(printf '%s' "$1" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    b="$(printf '%s' "$2" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    [ -n "$a" ] && [ -n "$b" ] || return 1
+    a="$(sdk_vnorm "$a")"; b="$(sdk_vnorm "$b")"
+    [ "$a" != "$b" ] || return 1
+    [ "$(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -1)" = "$a" ]
+}
+
 sdk_vnorm() {
     local v="$1"
     while [ "${v%.0}" != "$v" ]; do v="${v%.0}"; done
@@ -864,38 +978,26 @@ sdk_check() {
 sdk_update() {
     sdk_operator_only update "$@"
     local what="${1:-}" d
+    # A row its entry pins updates to what the entry names now and by its
+    # own recipe, held as an install is: never by a fetch of the vendor's
+    # latest written here. One that cannot install over itself is taken off
+    # first, as an install of it is.
+    if [ -n "$what" ] && [ -n "$(sdk_meta offer "$what" 2>/dev/null)" ]; then
+        d="$(sdk_find "$what")" || die "${what} is not installed"
+        log "updating ${what} to what its entry pins"
+        [ -z "$(sdk_meta field "$what" source.fresh_only)" ] || sdk_remove "$what"
+        sdk_install "$what"
+        return 0
+    fi
+    # What is left is a row with nothing on offer, whose version is what its
+    # own tooling gives at the moment: playwright (the module's own
+    # browsers) and the android packages (sdkmanager's, held by its
+    # repository). flutter, dotnet and swift (the version its publisher's
+    # signature holds) are rows with an offer and went above.
     case "$what" in
-        flutter)
-            d="$(sdk_find flutter)" || die "flutter is not installed"
-            # Half of a clone an install cut short (no .git, or no
-            # bin/flutter) has nothing to fetch into: git stopped at the
-            # share's edge with "not a git repository". Installed again
-            # instead, as an install clears the same half.
-            if [ ! -e "$d/.git" ] || [ ! -x "$d/bin/flutter" ]; then
-                warn "flutter at ${d} is not a whole checkout: an earlier install did not finish; installing it again"
-                rm -rf "${d:?}"
-                sdk_install flutter
-                return
-            fi
-            log "updating flutter to the head of stable"
-            # The clone is shallow, so fetch the branch tip and move onto it;
-            # `flutter upgrade` refuses to work in a shallow checkout.
-            git -C "$d" fetch --depth 1 origin stable
-            git -C "$d" reset --hard FETCH_HEAD
-            "$d/bin/flutter" --version
-            ;;
-        dotnet)
-            d="$(sdk_find dotnet)" || die "dotnet is not installed"
-            log "installing the current LTS .NET SDK alongside what is there"
-            sdk_fetch https://dot.net/v1/dotnet-install.sh /tmp/dotnet-install.sh
-            bash /tmp/dotnet-install.sh --channel LTS --install-dir "$d" --no-path
-            rm -f /tmp/dotnet-install.sh
-            ;;
-        swift|playwright)
-            # Both are "unpack the current thing": swift is a tarball with the
-            # version in its path, and playwright fetches whatever revisions
-            # the module now wants, leaving the old ones alone.
-            [ "$what" = swift ] && sdk_remove swift
+        playwright)
+            # "Unpack the current thing": playwright fetches whatever
+            # revisions the module now wants, leaving the old ones alone.
             sdk_install "$what"
             ;;
         android:*)
@@ -914,7 +1016,7 @@ sdk_update() {
             log "updating ${what#android:}"
             sdkmgr --update
             ;;
-        *) die "usage: aerie toolchains update playwright|flutter|dotnet|swift|android:<package>" ;;
+        *) die "usage: aerie toolchains update NAME: a toolchain its entry pins, or playwright|android:<package>" ;;
     esac
 }
 
@@ -1050,6 +1152,34 @@ sdk_clear_interrupted() {
 # bin/flutter, listed as installed until the census asked for the tool, and
 # then refused by a fresh-only install as "already installed" (diagnostics
 # #124). Nothing in it can run, so nothing in it is kept.
+# sdk_unfinished [ROOT]: every toolchain whose folder is in the store and
+# holds no tool its layout runs, a line each of NAME, a tab and the tool: the
+# same test as sdk_clear_toolless, asked of the whole catalog at once, for
+# the status to say an install did not finish where it listed such a folder
+# as installed (a JDK left as lib/ alone by an update that stopped).
+sdk_unfinished() {
+    local meta root="${1:-}"
+    meta="$(sdk_meta_file)"
+    [ -n "$root" ] || root="$(sdk_root)"
+    [ -f "$meta" ] || return 0
+    python3 - "$meta" "$BB_LIB" "$root" <<'PY' 2>/dev/null || true
+import os, sys
+sys.path.insert(0, sys.argv[2])
+import sdkmeta
+for t in sdkmeta.catalog_at(sys.argv[1]):
+    name, lay = t.get("name", ""), t.get("layout") if isinstance(t.get("layout"), dict) else {}
+    tool = lay.get("tool") or ""
+    if not name or ":" in name or not tool or tool.startswith("root:") or lay.get("needs"):
+        continue
+    d = os.path.join(sys.argv[3], name)
+    try:
+        held = os.path.isdir(d) and bool(os.listdir(d))
+    except OSError:
+        held = False
+    if held and not os.path.exists(os.path.join(d, tool)):
+        print(f"{name}\t{tool}")
+PY
+}
 sdk_clear_toolless() {
     local what="$1" d="$2" tool
     [ -d "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ] || return 0
@@ -1102,8 +1232,56 @@ sdk_install_cleanup() {
 # directory, a vendor installer that wants its own arguments, a tool already in
 # the image pointed at a new directory, and sdkmanager, which resolves its own
 # package ids. A table that could express all five would be a language.
-SDK_META="$(dirname "$(readlink -f "$0")")/lib/sdkmeta.py"
-sdk_meta() { python3 "$SDK_META" "$@"; }
+SDK_META="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/lib/sdkmeta.py"
+# SDK_CATALOG: the one catalog this run reads in place of the installed
+# one, where whoever sourced this file names it afterwards (held-run.sh,
+# for the row it was handed): a variable of this shell's, which no
+# environment sets, handed to sdkmeta.py as its first words.
+SDK_CATALOG=""
+# sdk_step [NAME=VALUE...] CMD [ARG...]: a recipe's step, started by the
+# system's own env with none of the caller's environment but what a check
+# keeps (SDK_SYS_KEEP), the PATH it is handed (the store's toolchains on
+# it) and BB_LIB (where a row's step finds a helper beside bb), and then
+# the step's own variables: its row's layout and its own env (sdk_row_env).
+# A pack's layout may set variables for every job, and one an installer
+# reads (a download host, a package registry, a check switched off) would
+# steer every other row's install that runs after it. What stands in front
+# of the step (the cut) is no name a pack's bin folder answers to.
+# SDK_STEP_KEEP are those names; sdk_step_env makes STEP_ENV the words.
+SDK_STEP_KEEP="PATH BB_LIB $SDK_SYS_KEEP"
+sdk_step_env() {
+    local en
+    en="$(sdk_sys_path env)" || { printf 'there is no env among this system'\''s own tools\n' >&2; return 127; }
+    local -a KEEP
+    # shellcheck disable=SC2086  # a list of names, split on purpose
+    sdk_keep $SDK_STEP_KEEP
+    STEP_ENV=("$en" -i "${KEEP[@]}")
+}
+sdk_step() {
+    local -a STEP_ENV
+    sdk_step_env || return 127
+    "${STEP_ENV[@]}" "$@"
+}
+# sdk_row_env WHAT DIR SOURCE: ROW_ENV becomes what a step of the row WHAT
+# installed in DIR is started with of its own: its layout's variables (what
+# every job has where it is installed, sdkmeta.py layout_env), then SOURCE's
+# (source.env, a step's then.N.env), which win where both name one.
+sdk_row_env() {
+    local -a lay own
+    sdk_meta_into lay layout_env "$1" "root=$(sdk_root)"
+    sdk_meta_into own env "$1" "$3" "dir=$2"
+    ROW_ENV=("${lay[@]}" "${own[@]}")
+}
+# sdk_said_by TOOL TEXT: what a checking tool said, a line of the log each,
+# before the one sentence a refusal is: a key's fingerprint and the tool's
+# own words are the log's, never the job's failure line.
+sdk_said_by() {
+    local ln
+    while IFS= read -r ln; do
+        [ -z "$ln" ] || log "${1}: ${ln#"${1}": }"
+    done <<< "$2"
+}
+sdk_meta() { sdk_sys python3 "$SDK_META" ${SDK_CATALOG:+--catalog "$SDK_CATALOG"} "$@"; }
 
 # Read a NUL-separated list from the catalog into an array named by $1.
 sdk_meta_into() {
@@ -1208,6 +1386,12 @@ sdk_install_android() {
     pkg="$(sdk_android_id "$what")"
     [ -n "$pkg" ] || die "could not find a ${what#android:} package to install"
     log "installing ${pkg} into $(sdk_dir android)"
+    # sdkmanager is the installer here, and downloads the package by
+    # itself: said in the row's own sentence where it has one (an id with no
+    # row of its own has none to say).
+    local online
+    online="$(sdk_meta field "$what" source.online 2>/dev/null)" || online=""
+    [ -z "$online" ] || log "${what} keeps the network, as its entry says: ${online}"
     sdk_android_clear_stale_installer "$pkg"
     sdk_mark_partial "$(sdk_android_pkg_dir "$pkg")"
     sdkmgr --install "$pkg"
@@ -1230,10 +1414,20 @@ sdk_verified_said() {
     esac
 }
 
+# sdk_verified_digest DIR: the sha256 the toolchain in DIR was held to when
+# it was installed, or nothing where it was held to none (.bb-verified).
+sdk_verified_digest() {
+    local f="$1/.bb-verified" algo want rest
+    [ -r "$f" ] || return 0
+    IFS=$'\t' read -r algo want rest < "$f" || return 0
+    [ "$algo" != sha256 ] || printf '%s' "$want"
+}
+
 # sdk_verify_download WHAT FILE URL VERSION DIR: the download held to what
 # its publisher says it is (R137), before anything unpacks or runs it: the
 # catalog row's source.checksum, answered by sdkmeta.py. A mismatch removes
-# the file and stops the install, naming both digests. A row whose publisher
+# the file and stops the install in one line, each digest on a line of its
+# own before it. A row whose publisher
 # states nothing says so on the install, and DIR keeps how it was checked
 # (.bb-verified), which the Installed page reads.
 sdk_verify_download() {
@@ -1243,16 +1437,21 @@ sdk_verify_download() {
     algo="${said%%$'\t'*}"; said="${said#*$'\t'}"; want="${said%%$'\t'*}"; where="${said#*$'\t'}"
     if [ "$algo" = gpg ]; then
         # The publisher signs the download itself (Swift): its signature
-        # checked with the publisher's keys shipped beside the catalog.
-        local sig keyring signer
-        sig="$(mktemp "${TMPDIR:-/tmp}/bb-sig.XXXXXX")"
-        sdk_fetch "$want" "$sig" >/dev/null 2>&1 || { rm -f "$file" "$sig"; die "could not fetch ${what}'s signature (${want})"; }
-        keyring="$(sdk_meta keyring "$where")" || { rm -f "$file" "$sig"; die "${what}: no keys to check its signature with"; }
-        if ! signer="$(gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
-            rm -f "$file" "$sig"
-            die "${what}'s download does not carry its publisher's signature: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing was installed"
+        # checked with the publisher's keys the row carries, or the ones
+        # shipped beside the catalog under that name.
+        # The keys made into a keyring for this one check, in a directory
+        # of its own that goes with it: never one found from a run before.
+        local sig keyring signer kd
+        kd="$(mktemp -d "${TMPDIR:-/tmp}/bb-sig.XXXXXX")" || { rm -f "$file"; die "${what}: no place to check its signature in"; }
+        sig="${kd}/sig"
+        sdk_fetch "$want" "$sig" >/dev/null 2>&1 || { rm -rf "$file" "$kd"; die "could not fetch ${what}'s signature (${want})"; }
+        keyring="$(sdk_meta keyring "$where" "$what" "$kd")" || { rm -rf "$file" "$kd"; die "${what}: no keys to check its signature with"; }
+        if ! signer="$(sdk_sys gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
+            rm -rf "$file" "$kd"
+            sdk_said_by gpgv "$signer"
+            die "${what}'s download does not carry its publisher's signature: nothing was installed"
         fi
-        rm -f "$sig"
+        rm -rf "$kd"
         signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
         [ -n "$signer" ] || signer="a key of its publisher"
         log "verified: signed by ${signer}"
@@ -1265,10 +1464,17 @@ sdk_verify_download() {
         return 0
     fi
     case "$algo" in sha1|sha256|sha512) ;; *) rm -f "$file"; die "${what}: unknown checksum kind ${algo}" ;; esac
-    got="$("${algo}sum" "$file" | cut -d' ' -f1)"
+    # The digest, the first word of what the system's tool said: cut by
+    # the shell itself, so no tool a pack put on PATH stands between them.
+    got="$(sdk_sys "${algo}sum" "$file")" || got=""
+    got="${got%% *}"
     if [ "$got" != "$want" ]; then
         rm -f "$file"
-        die "${what}'s download is not what ${where} says it is (${algo} ${got}, expected ${want}): nothing was installed"
+        # What was wrong in one line, last; each digest on a line of its
+        # own before it, for whoever compares them.
+        log "${algo} of what arrived: ${got}"
+        log "${algo} expected: ${want}"
+        die "${what}'s download is not what ${where} says it is: nothing was installed"
     fi
     log "verified: ${algo} matches ${where}"
     printf '%s\t%s\t%s\n' "$algo" "$want" "$where" > "$d/.bb-verified" 2>/dev/null || true
@@ -1294,22 +1500,35 @@ sdk_install_tarball() {
     sdk_verify_download "$what" "$tmp" "$url" "$version" "$d"
     # -a: tar picks the decompressor from the file, so the catalog does not
     # have to say whether a release ships .gz or .xz this year.
-    tar -xaf "$tmp" -C "$d" --strip-components="$strip" || { rm -f "$tmp"; die "could not unpack ${url}"; }
+    sdk_sys tar -xaf "$tmp" -C "$d" --strip-components="$strip" || { rm -f "$tmp"; die "could not unpack ${url}"; }
     rm -f "$tmp"
+    # Unpacking is AerieOS's own; nothing of the entry has run yet. What it
+    # declares it downloads besides is fetched and checked here, and its
+    # follow-up steps and its verify then run as it declares (sdk_declared).
+    sdk_declared "$what" "$d"
+    sdk_install_steps "$what" "$d"
     sdk_install_verify "$what" "$d" "$version"
+    sdk_declared_done "$what" "$d" "$(sdk_verified_digest "$d")"
 }
 
 # Fetch an installer and run it. The URL here is a script, not the payload;
 # it goes and gets that itself, with the arguments the catalog gives.
 sdk_install_script() {
-    local what="$1" d url tmp tmpdir
+    local what="$1" d url tmp tmpdir rest version=""
     d="$(sdk_dir "$what")"
     sdk_mark_partial "$d"
     [ -z "$(sdk_meta field "$what" source.fresh_only)" ] || [ ! -d "$d" ] \
         || die "${what} is already installed at ${d} (aerie toolchains remove ${what} first)"
     url="$(sdk_meta field "$what" source.url)"
     [ -n "$url" ] || die "no installer URL in the catalog for ${what}"
-    log "installing ${what} into ${d}"
+    # A pinned installer is the version its pin names, which its address
+    # may carry: resolved as a tarball's is, with nobody asked.
+    if [ "$(sdk_meta field "$what" source.checksum.from)" = pin ]; then
+        rest="$(sdk_meta resolve "$what")"
+        version="${rest%%	*}"; url="${rest#*	}"
+        [ -n "$url" ] || die "could not resolve a download URL for ${what}"
+    fi
+    log "installing ${what}${version:+ }${version} into ${d}"
     mkdir -p "$d"
     # Kept under the name upstream gave it, in a directory of its own.
     # rustup-init decides what it is by the name it was invoked as: downloaded
@@ -1319,16 +1538,51 @@ sdk_install_script() {
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/bb-${what}.XXXXXX")"
     tmp="$tmpdir/$(basename "${url%%\?*}")"
     sdk_fetch "$url" "$tmp" || { rm -rf "$tmpdir"; die "could not download ${url}"; }
-    sdk_verify_download "$what" "$tmp" "$url" "" "$d"
+    sdk_verify_download "$what" "$tmp" "$url" "$version" "$d"
     [ -z "$(sdk_meta field "$what" source.chmod)" ] || chmod +x "$tmp"
-    local -a cmd env
-    sdk_meta_into cmd argv "$what" source.run "dir=$d" "script=$tmp"
+    local -a cmd ROW_ENV
+    sdk_meta_into cmd argv "$what" source.run "dir=$d" "script=$tmp" "version=$version"
     [ "${#cmd[@]}" != 0 ] || { rm -f "$tmp"; die "no run command in the catalog for ${what}"; }
-    sdk_meta_into env env "$what" source.env "dir=$d"
-    env "${env[@]}" "${cmd[@]}" || { rm -rf "$tmpdir"; die "${what} installer failed"; }
+    sdk_row_env "$what" "$d" source.env
+    # The installer is here and checked, and has not run. What the entry
+    # declares it downloads besides is fetched and checked first; the
+    # installer, the follow-up steps and the verify then run as it declares
+    # (sdk_declared).
+    sdk_declared "$what" "$d"
+    sdk_step "${ROW_ENV[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
+        || { rm -rf "$tmpdir"; die "${what} installer failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry)}"; }
     rm -rf "$tmpdir"
     sdk_install_steps "$what" "$d"
-    sdk_install_verify "$what" "$d" ""
+    sdk_install_verify "$what" "$d" "$version"
+    sdk_declared_done "$what" "$d" "$(sdk_verified_digest "$d")"
+}
+
+# sdk_bounded SECONDS CMD...: CMD run in a session of its own with nothing to
+# read, and ended with everything it started once SECONDS have passed: 124
+# then, else CMD's own exit. The whole group is signaled here, by its id,
+# and killed five seconds later if it is still there. `timeout` was not
+# enough: a tool whose script traps the signal and goes on (flutter's waits
+# for its own lock in a loop) outlived it on a node whose timeout signals
+# the one process it started, and what was left kept the directory busy, so
+# the partial install could not be removed and the next install was refused
+# as in use.
+sdk_bounded() {
+    local secs="$1" pid t=0
+    shift
+    setsid "$@" < /dev/null &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ "$t" -ge "$secs" ]; then
+            kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+            sleep 5
+            kill -KILL -- "-$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            return 124
+        fi
+        sleep 1
+        t=$((t + 1))
+    done
+    wait "$pid"
 }
 
 # A shallow clone. The tool updates itself in place from here, which a tarball
@@ -1351,43 +1605,490 @@ sdk_install_git() {
         # maps every owner to one account (a node's NFS mount) is another
         # user's to git, which then refuses the directory it just made.
         log "fetching ${what} at ${commit:0:12} into ${d}"
-        local -a g=(git -c "safe.directory=$d" -C "$d")
-        git init -q "$d"
+        # The system's git, as every check is made: it is the whole check
+        # here, and a git a pack put on PATH would say any commit it liked.
+        local -a g=(sdk_sys git -c "safe.directory=$d" -C "$d")
+        sdk_sys git init -q "$d"
         "${g[@]}" fetch --progress --depth 1 "$url" "$commit"
         "${g[@]}" checkout -q --detach FETCH_HEAD
         [ "$("${g[@]}" rev-parse HEAD)" = "$commit" ] \
             || die "${what}: ${url} answered $("${g[@]}" rev-parse --short HEAD) where ${commit:0:12} was approved"
+        # A tool that reads its own version off its repository's tag, and
+        # its channel off its branch and origin, finds neither in a checkout
+        # fetched by a commit's hash alone. So an entry may name them
+        # beside the commit: the tag (source.tag) is fetched by name and
+        # kept only where it is at the pinned commit, and the branch
+        # (source.branch) is what the checkout is called, following the
+        # address it came from. Neither is what holds the checkout: the
+        # commit is, and a tag that has moved off it installs nothing.
+        local tag
+        tag="$(sdk_meta field "$what" source.tag)"
+        if [ -n "$tag" ]; then
+            "${g[@]}" fetch -q --depth 1 "$url" "refs/tags/${tag}:refs/tags/${tag}" \
+                || die "${what}: ${url} has no tag ${tag}, which its entry names for ${commit:0:12}"
+            [ "$("${g[@]}" rev-parse "refs/tags/${tag}^{commit}")" = "$commit" ] \
+                || die "${what}: the tag ${tag} is at $("${g[@]}" rev-parse --short "refs/tags/${tag}^{commit}") and its entry pins ${commit:0:12}: nothing was installed"
+        fi
+        if [ -n "$branch" ]; then
+            "${g[@]}" checkout -q -B "$branch"
+            "${g[@]}" remote add origin "$url"
+            "${g[@]}" update-ref "refs/remotes/origin/${branch}" "$commit"
+            "${g[@]}" config "branch.${branch}.remote" origin
+            "${g[@]}" config "branch.${branch}.merge" "refs/heads/${branch}"
+        fi
         # The commit's hash is the check on what was fetched (R137): what the
-        # Installed page says of a pack's row.
-        printf 'sha1\t%s\tthe git commit an administrator approved\n' "$commit" > "$d/.bb-verified" 2>/dev/null || true
+        # Installed page says of a pack's row, and of a shipped row's whose
+        # entry pins the commit.
+        local held="the git commit an administrator approved"
+        [ -n "$(sdk_meta field "$what" pack)" ] || held="the commit its entry pins"
+        printf 'sha1\t%s\t%s\n' "$commit" "$held" > "$d/.bb-verified" 2>/dev/null || true
         sdk_mark_exec "$what" "$d"
     else
         log "cloning ${what} (${branch:-default}) into ${d}"
         # --progress: git prints none unless stderr is a terminal, and this runs
         # from the dashboard's job runner, where it is a pipe.
-        git clone --progress ${depth:+--depth "$depth"} ${branch:+-b "$branch"} "$url" "$d"
+        sdk_sys git clone --progress ${depth:+--depth "$depth"} ${branch:+-b "$branch"} "$url" "$d"
     fi
     [ -z "$(sdk_meta field "$what" source.safe_directory)" ] \
         || git config --global --add safe.directory "$d"
+    # The repository is here, and nothing of it has run. What it declares
+    # it downloads (pack format 3) is fetched and checked now; its warm-up,
+    # its steps and its verify then run as it declares (sdk_declared), so
+    # what it did not declare cannot arrive.
+    sdk_declared "$what" "$d"
     local -a warm
     sdk_meta_into warm argv "$what" source.warm "dir=$d"
     if [ "${#warm[@]}" != 0 ]; then
         log "$(sdk_meta field "$what" source.warm_note)"
-        # Bounded, and asked of nobody: flutter's first --version sat for half
-        # an hour on bb-sandbox with nothing written (12 Oct) and held every
-        # toolchain queued behind it. CI=true is how its tool knows no person
-        # is there to answer; a warm-up that does not finish in the limit
+        # Bounded, and asked of nobody: a first --version sat for half an
+        # hour on a node with nothing written (12 Oct) and held every
+        # toolchain queued behind it. CI=true is how a tool knows no person
+        # is there to answer, and what else its own tool wants set for
+        # that is the row's to say (source.env, the environment its run and
+        # its verify have too); a warm-up that does not finish in the limit
         # fails this toolchain alone, saying so, and the job goes on.
-        if ! CI=true FLUTTER_SUPPRESS_ANALYTICS=true DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-                timeout --kill-after=30 "${BB_WARM_TIMEOUT:-900}" "${warm[@]}" < /dev/null; then
-            die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
-        fi
+        local rc=0
+        local -a ROW_ENV STEP_ENV
+        sdk_row_env "$what" "$d" source.env
+        sdk_step_env || die "${what}: there is no env among this system's own tools"
+        sdk_bounded "${BB_WARM_TIMEOUT:-900}" "${STEP_ENV[@]}" CI=true "${ROW_ENV[@]}" "${SDK_CUT[@]}" "${warm[@]}" || rc=$?
+        [ "$rc" != 124 ] || die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
+        [ "$rc" = 0 ] || die "${what}: warming failed (${warm[*]}, exit ${rc}); this install is taken off again, and Install retries it"
     fi
     # A repository that installs more than itself (a tool pack's install
     # steps fetching its binaries) runs them as the script kind does.
     sdk_install_steps "$what" "$d"
     [ -z "$commit" ] || sdk_mark_exec "$what" "$d"
     sdk_install_verify "$what" "$d" ""
+    # A pinned repository leaves a receipt whether or not it declares.
+    [ -z "$commit" ] || SDK_DECLARED=1
+    sdk_declared_done "$what" "$d" "$commit"
+}
+
+# sdk_declared WHAT DIR: what an entry declares of its own install, done
+# before anything of the entry runs. One code path for every kind of source
+# and every entry, a row AerieOS ships or anybody's pack, read from the
+# entry alone:
+#
+#   source.fetch    the downloads it declares (a pack's install.fetch), each
+#                   fetched into DIR and held to its sha256 or its
+#                   publisher's signature (sdk_fetch_declared);
+#   source.offline  its steps run with no network, which a pack that
+#                   declares downloads always says;
+#   source.online   a sentence: its installer downloads the rest by itself,
+#                   and from where. Its declared downloads are fetched and
+#                   checked all the same, and its steps keep the network.
+#   source.files    small text files a shipped row carries, written into
+#                   DIR before anything else here: what a package manager
+#                   installs by (sdkmeta.py write_files). A row that says
+#                   only this has declared nothing of its downloads.
+#
+# A row whose own download is held to something it carries (a pin, or its
+# publisher's signature under keys it names) has declared by that alone:
+# its steps run with no network without saying offline, and online is the
+# one way to keep it (sdkmeta.py held_by_entry).
+#
+# An entry that says none of these is installed as it always was. For
+# one that does, SDK_CUT is afterwards the words that run a command with no
+# network (sdk_net_cut), or nothing where it says online or this node
+# cannot cut, and everything of the entry that runs from here on runs
+# behind them: a script's installer and a command's run, the follow-up
+# steps, a repository's warm-up, the verify. DIR/.bb-net keeps which it
+# was (cut, open, or online with the entry's sentence on the next line),
+# for the receipt. Where each kind calls this:
+#
+#   tarball   after its own download is checked and unpacked
+#   script    after its installer is fetched and checked, before it runs
+#   git       after the checkout, before its warm-up
+#   command   before its command
+#
+# The entry is asked once (sdkmeta.py declared): nothing for one that
+# declares nothing, else a line for what its steps run with and a line a
+# download, this machine's and the ones left out for another's.
+#
+# One install may be two runs of this (held-run.sh, for a caller that is
+# root and makes the cut itself): SDK_PHASE fetch fetches and holds what
+# the entry declares and decides nothing about the network, since nothing
+# runs in that run; SDK_PHASE run finds the downloads where the first run
+# held them, fetches nothing, and decides the network as ever. Empty, which
+# is every install but that one, it is both. A variable of this shell's,
+# set here: nothing in an install's environment names a phase.
+SDK_DECLARED=""
+SDK_PHASE=""
+sdk_declared() {
+    local what="$1" d="$2" plan tag net online wrote
+    SDK_CUT=()
+    SDK_DECLARED=""
+    # The small files the row carries (source.files) first: what a package
+    # manager installs by, its requirements with their hashes or its lock,
+    # which the steps read beside the downloads fetched below.
+    wrote="$(sdk_meta files "$what" "$d")" || die "${what}: the files its entry carries could not be written: nothing is installed"
+    [ -z "$wrote" ] || log "wrote from its entry: ${wrote//$'\n'/, }"
+    plan="$(sdk_meta declared "$what")"
+    [ -n "$plan" ] || return 0
+    SDK_DECLARED=1
+    [ "$SDK_PHASE" = run ] || sdk_fetch_declared "$what" "$d" "$plan"
+    [ "$SDK_PHASE" != fetch ] || return 0
+    IFS=$'\037' read -r tag net online <<< "${plan%%$'\n'*}"
+    if [ "$tag" = net ] && [ "$net" = online ]; then
+        log "${what} keeps the network for its steps, as its entry says: ${online}"
+        printf 'online\n%s\n' "$online" > "$d/.bb-net" 2>/dev/null || true
+    elif [ "$plan" = "${plan%%$'\n'*}" ]; then
+        # Nothing declared beside it: a row cut because its own download is
+        # held (a pin, its publisher's signature), said as that.
+        sdk_net_cut "$what" "$d" "${what}'s download is held to what its entry carries"
+    else
+        sdk_net_cut "$what" "$d"
+    fi
+}
+
+# sdk_declared_done WHAT DIR ID: the end of an install that declared
+# (sdk_declared), or of a pinned repository's: the cut is over, and what
+# landed is written down as its receipt, under the commit it was fetched at
+# or the sha256 its own download was held to (ID).
+sdk_declared_done() {
+    SDK_CUT=()
+    [ -z "$SDK_DECLARED" ] || sdk_receipt "$1" "$2" "$3"
+    SDK_DECLARED=""
+}
+
+# sdk_https_only WHAT URL: an address a declared download names is fetched
+# over https and nothing else; SDK_PROTO becomes curl's word for it. A
+# suite's download is a file on disk (BB_TOOLPACKS_FILE_URLS=1, as its packs
+# are): a job's seam, read only in the source tree.
+SDK_PROTO="=https"
+sdk_https_only() {
+    SDK_PROTO="=https"
+    case "$2" in
+        https://*) ;;
+        file:///*) { [ -n "$SDK_IN_TREE" ] && [ "${BB_TOOLPACKS_FILE_URLS:-}" = 1 ]; } \
+                       || die "${1}: a declared download is fetched over https, and ${2} is not"
+                   SDK_PROTO="=file" ;;
+        *) die "${1}: a declared download is fetched over https, and ${2} is not" ;;
+    esac
+}
+
+# sdk_fetch_declared WHAT DIR [PLAN]: each download an entry declares
+# (source.fetch, a pack's install.fetch: an address, the file inside the
+# entry's directory it is kept as, and what holds it), fetched into DIR and
+# held before anything uses it: to the sha256 the entry names, or, where
+# it names `signed` in the sha256's place, to its publisher's detached
+# signature (signed.sig) under the keys the entry carries (signed.keys:
+# sdkmeta.py keyring). One that names a platform is fetched on that
+# platform alone, which sdkmeta.py decides as it does for a row's address.
+# One that answers anything else installs nothing: the directory is the
+# partial install the caller takes off again. PLAN is what the entry
+# declares as sdk_declared read it; left out, the entry is asked here.
+# SDK_NOT_HELD is the file that answered other bytes than its entry holds,
+# for a caller that says so in its own words on the way out (held-run.sh,
+# which sources this file: nothing here reads it).
+SDK_NOT_HELD=""
+sdk_fetch_declared() {
+    local what="$1" d="$2" plan tag url want to tmp got sig keys sigf keyring signer kd
+    if [ "$#" -ge 3 ]; then plan="$3"; else plan="$(sdk_meta declared "$what")"; fi
+    # On a descriptor of its own: nothing a line runs can read the rest.
+    while IFS=$'\037' read -r tag url want to sig keys <&3; do
+        case "$tag" in
+            fetch) ;;
+            # One for another machine: url and want are its file and its platform.
+            skip) log "leaving out ${url}: it is for ${want}"; continue ;;
+            *) continue ;;
+        esac
+        sdk_https_only "$what" "$url"
+        case "/${to}/" in *"/../"*|"//"*) die "${what}: a declared download is kept inside the pack, and ${to} is not" ;; esac
+        sdk_inside "$d" "${d}/${to}" || die "${what}: a declared download is kept inside the pack, and ${to} is not"
+        [ -n "$want" ] || [ -n "$sig" ] \
+            || die "${what}: ${to} is held to nothing: a declared download names its sha256, or its publisher's signature"
+        log "fetching ${to} from ${url}"
+        tmp="$(mktemp "${d}/.bb-fetch.XXXXXX")"
+        if ! sdk_sys curl -fL --proto "$SDK_PROTO" --proto-redir '=https' --progress-bar --connect-timeout 30 \
+                --speed-limit 1024 --speed-time 120 --retry 2 --retry-delay 5 -o "$tmp" "$url"; then
+            rm -f "$tmp"
+            die "${what}: ${url} could not be fetched: nothing is installed"
+        fi
+        if [ -n "$want" ]; then
+            got="$(sdk_sys sha256sum "$tmp")" || got=""
+            got="${got%% *}"
+            if [ "$got" != "$want" ]; then
+                rm -f "$tmp"
+                # shellcheck disable=SC2034  # held-run.sh reads it on the way out
+                SDK_NOT_HELD="$to"
+                log "sha256 of what ${url} answered: ${got}"
+                log "sha256 expected: ${want}"
+                die "${what}: ${to} is not the file its entry pins: nothing is installed"
+            fi
+            log "verified: sha256 matches what ${what} declares for ${to}"
+        else
+            # Held by its publisher's signature, under keys the entry
+            # carries or names: never a keyring of this machine's.
+            [ -n "$keys" ] || { rm -f "$tmp"; die "${what}: ${to} is signed, and its entry names no keys to check it with"; }
+            sdk_sys_path gpgv >/dev/null 2>&1 \
+                || { rm -f "$tmp"; die "${what}: there is no gpgv here to check the signature of ${to} with: nothing is installed"; }
+            sdk_https_only "$what" "$sig"
+            # The signature and the keyring made of the keys, in a
+            # directory of this one check's own that goes with it.
+            kd="$(mktemp -d "${TMPDIR:-/tmp}/bb-sig.XXXXXX")" || { rm -f "$tmp"; die "${what}: no place to check the signature of ${to} in"; }
+            sigf="${kd}/sig"
+            if ! sdk_sys curl -fsL --proto "$SDK_PROTO" --proto-redir '=https' --connect-timeout 30 --max-time 120 \
+                    --retry 2 --retry-delay 5 -o "$sigf" "$sig"; then
+                rm -rf "$tmp" "$kd"
+                die "${what}: the signature of ${to} (${sig}) could not be fetched: nothing is installed"
+            fi
+            keyring="$(sdk_meta keyring "$keys" "$what" "$kd")" \
+                || { rm -rf "$tmp" "$kd"; die "${what}: no keys named ${keys} to check ${to} with: nothing is installed"; }
+            if ! signer="$(sdk_sys gpgv --keyring "$keyring" "$sigf" "$tmp" 2>&1)"; then
+                rm -rf "$tmp" "$kd"
+                # shellcheck disable=SC2034  # held-run.sh reads it on the way out
+                SDK_NOT_HELD="$to"
+                sdk_said_by gpgv "$signer"
+                die "${what}: ${to} does not carry its publisher's signature under ${keys}: nothing is installed"
+            fi
+            rm -rf "$kd"
+            signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
+            log "verified: ${to} is signed by ${signer:-a key of its publisher} (${keys})"
+        fi
+        # Where it really lands, asked again now that it is to be put there.
+        sdk_inside "$d" "${d}/${to}" || { rm -f "$tmp"; die "${what}: a declared download is kept inside the pack, and ${to} is not"; }
+        mkdir -p "$(dirname "${d}/${to}")"
+        rm -f "${d}/${to}"
+        mv -f "$tmp" "${d}/${to}"
+    done 3<<< "$plan"
+}
+
+# sdk_inside DIR PATH: whether PATH's folder really is inside DIR, by where
+# both are and not by how PATH is spelled: the nearest folder of PATH that
+# exists, with every link in its name followed, is DIR or under it, and
+# PATH itself is no folder and no link to one. A pack's repository may
+# carry a link at a folder's name, and a file put "inside the pack" through
+# it lands wherever the link points.
+sdk_inside() {
+    local top at
+    top="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+    at="$(dirname "$2")"
+    while [ ! -e "$at" ] && [ ! -L "$at" ]; do at="$(dirname "$at")"; done
+    at="$(cd "$at" 2>/dev/null && pwd -P)" || return 1
+    case "${at}/" in "${top}/"*) ;; *) return 1 ;; esac
+    [ ! -d "$2" ] || return 1
+    return 0
+}
+
+# sdk_net_cut WHAT DIR [SAID]: SDK_CUT becomes the words that run a command with no
+# network, for an entry whose downloads are declared: a network namespace of
+# its own, as the same account where this unshare can say so, else as that
+# namespace's root with tar told not to hand files to owners that do not
+# exist there. Where the machine keeps user namespaces from an account (a
+# distribution's own restriction), the helper a managed node's agent
+# installs makes the namespace as root and runs the step as this account
+# again (nodes/bb-netcut, through the one sudo rule the agent writes for
+# it). A node that can do none of these (a container that forbids
+# namespaces, a node whose agent is not root) installs the pack all the
+# same, its steps with the network, and says so here and on its receipt
+# (the operator, 13 Nov). DIR/.bb-net keeps which, for the receipt.
+#
+# A cut of the network alone leaves the step every socket on the disk: the
+# system bus's and systemd-resolved's under /run, which any account may
+# write and which look names up past the cut, and a daemon's a group of the
+# account's may write (in the docker group, which a node not beside its
+# controller puts the jobs account in, a step could ask the docker daemon
+# for a container with the network and the host's root). So the cut is a
+# mount namespace as well, with an empty tmpfs over /run (and over /var/run
+# where that is not a link to it): the namespace of the account's own
+# where this unshare can make one (SDK_RUN_HIDE), else the helper's, which
+# also drops every group. Where /run cannot be covered, the step still runs
+# in a network namespace of its own and the receipt says it had the
+# network; where a group of the account's reaches a daemon's socket
+# (sdk_groups_reach), the helper goes before such a namespace.
+#
+# A caller that is root may have made the cut already and started this
+# inside it, as the account, with no way back to root (a node's agent
+# installing a coding agent for the session account, which has no rule for
+# the helper and is given none: held-run.sh --run). It says so with
+# SDK_CUT_MADE, a variable of this shell's that no environment sets, and is
+# believed only where this process can see it for itself: its network
+# namespace holds a loopback and nothing else (sdk_net_none). Then nothing
+# is put in front of a step, since every step already runs there. Said and
+# not so, nothing runs. So the word can take the network away from a run or
+# stop it, and gives it nothing.
+SDK_CUT=()
+SDK_CUT_MADE=""
+# The file the kernel lists this process's network in: a job's seam, a
+# test's stand-in read only in the source tree.
+SDK_NET_DEV=/proc/self/net/dev
+[ -z "$SDK_IN_TREE" ] || SDK_NET_DEV="${BUILDERBOT_NET_DEV:-$SDK_NET_DEV}"
+# sdk_net_none: whether this process has no network: the interfaces of its
+# own network namespace, as the kernel lists them, are a loopback alone.
+sdk_net_none() {
+    local ifaces
+    ifaces="$(sdk_sys awk -F: 'NR > 2 { gsub(/[ \t]/, "", $1); print $1 }' "$SDK_NET_DEV" 2>/dev/null | sdk_sys sort -u | sdk_sys tr '\n' ' ')" || return 1
+    [ "$ifaces" = "lo " ]
+}
+# The node's helper that cuts for this account: a job's seam, a test's
+# stand-in read only in the source tree.
+SDK_NETCUT_BIN=/usr/local/sbin/bb-netcut
+[ -z "$SDK_IN_TREE" ] || SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-$SDK_NETCUT_BIN}"
+# Where the system's daemons keep their sockets, which a cut of the network
+# alone leaves in reach: a job's seam, a test's stand-in read only in the
+# source tree.
+SDK_RUN_DIR=/run
+[ -z "$SDK_IN_TREE" ] || SDK_RUN_DIR="${BUILDERBOT_RUN_DIR:-$SDK_RUN_DIR}"
+# sdk_groups_reach: whether a group this account holds besides its own may
+# write a socket of the system's (a daemon's under /run, which has the
+# network and may be root: the docker daemon's, where the account is in its
+# group). A user namespace keeps every group the account has and cannot drop
+# one, so a step it cuts still reaches that daemon; bb-netcut drops them.
+sdk_groups_reach() {
+    local own g
+    own="$(sdk_sys id -g)" || return 0
+    for g in $(sdk_sys id -G); do
+        [ "$g" != "$own" ] || continue
+        [ -z "$(sdk_sys find "$SDK_RUN_DIR" -xdev -maxdepth 3 -type s -group "$g" -perm -g=w -print -quit 2>/dev/null)" ] \
+            || return 0
+    done
+    return 1
+}
+# A step relayed through the helper: sudo starts it with a plain environment,
+# so the step's own is written to a file only this account reads and read
+# back by the step's shell, after the helper has dropped to this account.
+# shellcheck disable=SC2016  # the words are for the bash -c that runs them
+SDK_NETCUT_RELAY='f="$(mktemp)" || exit 1
+su="$1"; shift
+export -p > "$f"
+"$su" -n "$0" bash -c '\''. "$0"; rm -f "$0"; exec "$@"'\'' "$f" "$@"
+rc=$?
+rm -f "$f"
+exit "$rc"'
+# sdk_net_helper SUDO [hides]: whether the node's helper cuts for this
+# account, asked for nothing through the one sudo rule for it; with
+# `hides`, whether it also covered /run, which it says to what it runs
+# (BB_NETCUT_RUN): a helper from before it does not.
+sdk_net_helper() {
+    [ -n "$1" ] && [ -x "$SDK_NETCUT_BIN" ] || return 1
+    if [ "${2:-}" = hides ]; then
+        # shellcheck disable=SC2016  # for the sh the helper starts
+        "$1" -n "$SDK_NETCUT_BIN" sh -c '[ "${BB_NETCUT_RUN:-}" = covered ]' 2>/dev/null
+    else
+        "$1" -n "$SDK_NETCUT_BIN" true 2>/dev/null
+    fi
+}
+# What a namespace of the account's own runs first, as that namespace's
+# root, to cover /run: $0 the system's mount, then the words to exec. An
+# empty tmpfs only root may write, private to the namespace (unshare's
+# own default); /var/run too where it is a folder and not a link. Where a
+# mount is refused, nothing runs, and the cut is asked of another way.
+# shellcheck disable=SC2016  # the words are for the bash -c that runs them
+SDK_RUN_HIDE='o=mode=0755,nosuid,nodev,noexec,size=1m
+"$0" -t tmpfs -o "$o" tmpfs /run || exit 125
+if [ -d /var/run ] && [ ! -L /var/run ]; then "$0" -t tmpfs -o "$o" tmpfs /var/run || exit 125; fi
+exec "$@"'
+# sdk_net_try WORDS...: whether a step behind WORDS starts.
+sdk_net_try() { "$@" true 2>/dev/null; }
+# sdk_net_said SAID DIR REACH: the cut said in the log and kept in DIR/.bb-net
+# for the receipt. Where this account's groups reach past it (REACH), its
+# steps still run with no network of their own, and are counted as having
+# had the network.
+sdk_net_said() {
+    if [ -n "$3" ]; then
+        log "${1}: its steps run with no network, but this account's groups reach a daemon past the cut, so they count as run with it"
+        printf 'open\n' > "$2/.bb-net" 2>/dev/null || true
+    else
+        log "${1}: its steps run with no network"
+        printf 'cut\n' > "$2/.bb-net" 2>/dev/null || true
+    fi
+}
+sdk_net_cut() {
+    local what="$1" d="$2" said="${3:-${1} declares its downloads}"
+    SDK_CUT=()
+    local reach=""
+    if sdk_groups_reach; then reach=1; fi
+    if [ -n "$SDK_CUT_MADE" ]; then
+        sdk_net_none \
+            || die "${what}: it was started as if the network had been cut for it, and this process still has one: nothing is run"
+        sdk_net_said "$said" "$d" "$reach"
+        return 0
+    fi
+    # The system's own unshare, sudo, id, bash, env and mount, by where they
+    # are (sdk_sys_path): what stands in front of a step is never a name a
+    # pack's bin folder on PATH could answer to.
+    local un su me my sh en mt
+    un="$(sdk_sys_path unshare)" || un=""
+    su="$(sdk_sys_path sudo)" || su=""
+    sh="$(sdk_sys_path bash)" || { un=""; su=""; }
+    en="$(sdk_sys_path env)" || un=""
+    mt="$(sdk_sys_path mount)" || mt=""
+    me="$(sdk_sys id -u)" && my="$(sdk_sys id -g)" || un=""
+    local -a helper=("$sh" -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
+    # The account's own namespace with /run covered: made as that
+    # namespace's root, which may mount there, then the account again in
+    # one inside it (its files its own), or that root with tar told not to
+    # hand files to owners that do not exist there.
+    local -a own=() root=()
+    if [ -n "$un" ] && [ -n "$mt" ]; then
+        own=("$un" --user --map-root-user --net --mount "$sh" -c "$SDK_RUN_HIDE" "$mt" "$un" --user --map-user="$me" --map-group="$my")
+        root=("$en" TAR_OPTIONS=--no-same-owner "$un" --user --map-root-user --net --mount "$sh" -c "$SDK_RUN_HIDE" "$mt")
+    fi
+    local open=""
+    if [ -n "$reach" ] && sdk_net_helper "$su" hides; then
+        SDK_CUT=("${helper[@]}")
+    elif [ "${#own[@]}" != 0 ] && sdk_net_try "${own[@]}"; then
+        SDK_CUT=("${own[@]}")
+    elif [ "${#root[@]}" != 0 ] && sdk_net_try "${root[@]}"; then
+        SDK_CUT=("${root[@]}")
+    elif sdk_net_helper "$su" hides; then
+        SDK_CUT=("${helper[@]}")
+    # /run left as it is from here on: cut, and counted as with the network.
+    elif [ -n "$reach" ] && sdk_net_helper "$su"; then
+        SDK_CUT=("${helper[@]}") open=1
+    elif [ -n "$un" ] && "$un" --user --map-user="$me" --map-group="$my" --net true 2>/dev/null; then
+        SDK_CUT=("$un" --user --map-user="$me" --map-group="$my" --net) open=1
+    elif [ -n "$un" ] && "$un" --user --map-root-user --net true 2>/dev/null; then
+        SDK_CUT=("$en" TAR_OPTIONS=--no-same-owner "$un" --user --map-root-user --net) open=1
+    elif sdk_net_helper "$su"; then
+        SDK_CUT=("${helper[@]}") open=1
+    fi
+    if [ "${#SDK_CUT[@]}" = 0 ]; then
+        log "${said}, but this node cannot cut the network for a step (this account may make no network namespace, and no bb-netcut makes one for it): its steps run with it"
+        printf 'open\n' > "$d/.bb-net" 2>/dev/null || true
+    elif [ -n "$open" ]; then
+        log "${said}: its steps run with no network, but the system's sockets under /run stay in their reach here, so they count as run with it"
+        printf 'open\n' > "$d/.bb-net" 2>/dev/null || true
+    else
+        sdk_net_said "$said" "$d" ""
+    fi
+}
+
+# sdk_receipt WHAT DIR COMMIT: what a pinned install left behind, written
+# down (R234; the operator, 13 Nov): the commit pins the pack's own files,
+# and what its install steps fetched from somewhere else had no trail. Every
+# file's sha256 and one hash over them all go into DIR/.bb-receipt and the
+# store's log (sdkmeta.py receipt), which the Installed page reads. A
+# receipt that could not be written fails nothing: the install is whole.
+sdk_receipt() {
+    local said
+    if said="$(sdk_meta receipt "$2" "$3" "$1" 2>&1)"; then
+        log "$said"
+    else
+        log "no receipt was kept for ${1}: ${said}"
+    fi
 }
 
 # The programs a tool pack runs by path, marked executable (B83): what its
@@ -1418,11 +2119,16 @@ sdk_install_command() {
     [ -z "$need" ] || command -v "$need" >/dev/null 2>&1 \
         || die "${need} is not in this image"
     mkdir -p "$d"
-    local -a cmd env
+    local -a cmd ROW_ENV
     sdk_meta_into cmd argv "$what" source.run "dir=$d"
-    sdk_meta_into env env "$what" source.env "dir=$d"
+    sdk_row_env "$what" "$d" source.env
     log "installing ${what} into ${d}"
-    env "${env[@]}" "${cmd[@]}"
+    # Nothing of the entry has run. What it declares it downloads is
+    # fetched and checked first, and its command then runs as it declares
+    # (sdk_declared).
+    sdk_declared "$what" "$d"
+    sdk_step "${ROW_ENV[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
+        || die "${what}: its install command failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry)}"
     # A stable path to whatever the run produced under a revisioned name, so
     # that everything pointing at it survives the next release.
     local find_at link_at exe
@@ -1442,6 +2148,7 @@ sdk_install_command() {
             ln -sfn "${rel:-$exe}" "$at"
         fi
     fi
+    sdk_declared_done "$what" "$d" ""
     log "${what} ready at ${d}"
 }
 
@@ -1452,15 +2159,15 @@ sdk_install_command() {
 sdk_install_steps() {
     local what="$1" d="$2" i=0 note soft
     while :; do
-        local -a cmd env
+        local -a cmd ROW_ENV
         sdk_meta_into cmd argv "$what" "source.then.${i}.run" "dir=$d"
         [ "${#cmd[@]}" != 0 ] || break
         note="$(sdk_meta field "$what" "source.then.${i}.note")"
         soft="$(sdk_meta field "$what" "source.then.${i}.optional")"
         [ -z "$note" ] || log "$note"
-        sdk_meta_into env env "$what" "source.then.${i}.env" "dir=$d"
-        if ! env "${env[@]}" "${cmd[@]}"; then
-            [ -n "$soft" ] || die "${what}: a required step failed"
+        sdk_row_env "$what" "$d" "source.then.${i}.env"
+        if ! sdk_step "${ROW_ENV[@]}" "${SDK_CUT[@]}" "${cmd[@]}"; then
+            [ -n "$soft" ] || die "${what}: a required step failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry, install.fetch in a manifest)}"
             warn "$soft"
         fi
         i=$((i + 1))
@@ -1471,16 +2178,16 @@ sdk_install_steps() {
 # time somebody tries to use the thing.
 sdk_install_verify() {
     local what="$1" d="$2" version="$3"
-    local -a cmd env
+    local -a cmd ROW_ENV
     sdk_meta_into cmd argv "$what" source.verify "dir=$d" "version=$version"
     [ "${#cmd[@]}" != 0 ] || return 0
-    sdk_meta_into env env "$what" source.env "dir=$d"
+    sdk_row_env "$what" "$d" source.env
     # Captured rather than piped into head: a pipeline reports head's exit
     # status, so a verify that failed would have read as passing, and closing
     # the pipe early can kill the producer with SIGPIPE, which pipefail then
     # reports as a failure that never happened.
     local out
-    out="$(env "${env[@]}" "${cmd[@]}" 2>&1)" \
+    out="$(sdk_step "${ROW_ENV[@]}" "${SDK_CUT[@]}" "${cmd[@]}" 2>&1)" \
         || die "${what} installed but ${cmd[0]} does not run: ${out}"
     printf '%s\n' "${out%%$'\n'*}"
 }
@@ -1566,6 +2273,33 @@ bundle), so putting it on the toolchain store is a manual job:
 EOF
 }
 
+# A toolchain's folder taken off the store. On a share, a file some running
+# program still has open cannot go with it: the server keeps it under a
+# hidden name (.nfsXXXX, or .fuse_hidden on an export over FUSE) until the
+# program lets go, so rm ends on a directory that is not empty. An update
+# that begins with this remove then stopped with the toolchain gone and
+# nothing installed in its place (the JDK, its lib/modules held by a running
+# JVM, 19 Nov). Where such files are all that is left, the folder is set
+# aside under .gone in the store, which frees its name for the install; the
+# program goes on with the file it holds, and the next remove clears .gone
+# of what has been let go since. Anything else left is a failure, as before.
+sdk_rm_tree() {
+    local d="$1" gone left why
+    gone="$(dirname "$d")/.gone"
+    if [ -d "$gone" ]; then
+        rm -rf "${gone:?}"/* 2>/dev/null || true
+        rmdir "$gone" 2>/dev/null || true
+    fi
+    why="$(rm -rf "$d" 2>&1)" || true
+    [ -e "$d" ] || return 0
+    left="$(find "$d" ! -type d ! -name '.nfs*' ! -name '.fuse_hidden*' -print -quit 2>/dev/null || true)"
+    [ -z "$left" ] || die "could not remove ${d}: ${why:-something in it would not go}"
+    if ! { mkdir -p "$gone" && mv "$d" "$gone/$(basename "$d").$(date +%s)"; }; then
+        die "could not remove ${d}: a program still has a file of it open, and what is left would not move aside (${why})"
+    fi
+    log "a program still running has a file of it open: what is left is set aside in ${gone} until it lets go"
+}
+
 sdk_remove() {
     sdk_operator_only remove "$@"
     local what="${1:-}" d marker
@@ -1606,7 +2340,7 @@ sdk_remove() {
     if [ "$kind" != sdkmanager ]; then
         d="$(sdk_find "$what")" || die "${what} is not installed"
         log "removing ${d}"
-        rm -rf "$d"
+        sdk_rm_tree "$d"
         return 0
     fi
     case "$kind" in

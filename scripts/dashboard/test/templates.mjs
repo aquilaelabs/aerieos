@@ -9,19 +9,19 @@
 import { launch, newPage, ok, done, ready, sleep, URL } from './lib.mjs';
 
 const PAGES = [
-  ['home', '#/home', 'homeData = null; homeFetching = true; renderHomeInto(0)'],
+  ['home', '#/home', 'homeData = null; renderHomeInto(0)'],
   ['jobs', '#/jobs', 'jobsList = null; renderJobsInto(0)'],
   ['schedules', '#/jobs/schedules', 'schedData = null; renderSchedulesInto(0)'],
   ['nodes', '#/machines/nodes', 'nodesList = null; renderNodesInto(0)'],
   ['storage', '#/machines/storage', 'storageList = null; renderStorageInto(0)'],
   // Installed (R172): its sections are the kinds with anything there, which
   // the fixture's node has one or two of; the template draws the four.
-  ['installed', '#/machines/installed', 'inst = null; instSeq = 1; renderInstalledInto(0)', ['title:Coding agents', 'title:Toolchains', 'title:Tool packs', 'title:Services']],
+  ['installed', '#/machines/installed', 'inst = null; renderInstalledInto(0)', ['title:Coding agents', 'title:Toolchains', 'title:Tool packs', 'title:Services']],
   // Deploy is an undeployed node's alone, which is not known while it waits.
   // ...and its four sections are a deployed node's: the fixture's is not, so
   // the page draws one line and Deploy where the template, waiting for the
   // node a person mostly has, draws them.
-  ['nginx', '#/containers/nginx', 'nginxList = null; renderNginxInto(0)',
+  ['nginx', '#/machines/nginx', 'nginxList = null; renderNginxInto(0)',
    ['barSig', 'card', 'jump', 'title:Image', 'title:Hostnames', 'title:Routes', 'title:Certificates']],
   // This machine is a node's with a GPU or Claude Code row to show, which
   // is not known while it waits; on a phone, where it is drawn it is the one
@@ -29,7 +29,7 @@ const PAGES = [
   // The Library (R170): its five sections are always drawn, so the template
   // is the page. Its address is where #/build/toolchains and #/build/apps
   // land now, so those pages are not measured by address.
-  ['library', '#/build/library', 'lib = null; libSeq = 1; renderLibraryInto(0)'],
+  ['library', '#/build/library', 'lib = null; renderLibraryInto(0)'],
   // The fixture's node never reported its images (known false), so the page
   // lands with no tiles; a node that has carries them, as the template does.
   ['emulator', '#/build/emulator', 'emu = null; renderEmulatorInto(0)', ['tiles']],
@@ -38,18 +38,35 @@ const PAGES = [
   ['users', '#/people/users', 'usersList = null; renderUsersInto(0)'],
   ['roles', '#/people/roles', 'rolesData = null; renderRolesInto(0)'],
   ['profile', '#/settings', 'profile = null; renderProfileInto(0)'],
-  ['notices', '#/notifications', 'noticesData = null; noticesFetching = true; renderNoticesInto(0)'],
-  ['containers', '#/containers', 'dockerList = null; for (const k in dockerSeen) delete dockerSeen[k]; renderDockerInto(0)'],
+  ['notices', '#/notifications', 'noticesData = null; renderNoticesInto(0)'],
+  // Landed means the daemon answered: one that did not (a slow one, under
+  // load) leaves the page honestly drawing its rows grayed with no tiles,
+  // which is another page than the one its template stands in for.
+  ['containers', '#/containers', 'dockerList = null; for (const k in dockerSeen) delete dockerSeen[k]; renderDockerInto(0)', [],
+   '!!dockerList && !dmBlind()'],
   ['analysis', '#/projects/findings', 'findings = {loading: true}; renderFindingsInto(0)'],
 ];
 // A notebook view's template is what a project not yet read shows: the view
 // is drawn loaded on one project and waiting on another.
-const VIEWS = ['briefing', 'roadmap', 'bugs', 'git', 'tests', 'analysis', 'design', 'artifacts', 'settings'];
+// Every view of the notebook (the operator, 18 Nov: the Docker view waited
+// as four tiles and a lone Containers, and lands as two and a bar).
+const VIEWS = ['briefing', 'roadmap', 'bugs', 'git', 'tests', 'analysis', 'design', 'artifacts', 'docker', 'vms', 'signing',
+               'wiki', 'sessions', 'permissions', 'settings'];
 // Sections a view draws only from what the project holds: a red CI, a
 // README, a Brief to keep.
 // A phone opens one section of a view at a time, so the Git view's
 // Branches table is folded under Changes on the page and not in its wait.
-const VIEW_SKIP = { git: ['title:CI', 'title:README.md', 'phone:table'], briefing: ['title:Brief'] };
+// A view the fixture fills past what a space mostly has, so its markup
+// declares fewer: the waiting shape is the common one, not the fullest.
+const MORE_TILES = { analysis: "the fixture's scan has a finding at every level, where a scan mostly has two or three" };
+// The fixture's tracker holds under two bugs, so the Bugs view lands
+// without its search; a tracker mostly holds more and waits with it.
+// The fixture's node has no signing tool, so the Signing view heads itself
+// with why above its sections; a node that signs has no such head, and the
+// view waits without it. The fixture's repository has no remote, so the
+// Git view lands without Fetch, Pull and Push; a repository mostly has one,
+// and its row waits with them.
+const VIEW_SKIP = { git: ['title:CI', 'title:README.md', 'phone:table', 'barSig'], briefing: ['title:Brief'], bugs: ['barSig'], signing: ['top'] };
 const HELD = /\/api\/(?!status|layout|revs|presence)/;
 // Reads held while a template is measured, then let go: a request held and
 // never answered keeps one of the browser's six connections to the server,
@@ -109,9 +126,13 @@ const outline = sel => {
     // operator 18 Oct: Containers and Nodes waited as pages they had
     // stopped being): the bar's parts in order (its picker with its word or
     // without, a search, Cards and List, its buttons), the jump bar, and
-    // the titles of the sections on show.
+    // the titles of the sections on show. A notebook view's status line on
+    // its control row counts as the row's words: a row waiting without them
+    // and landing with them moved its buttons from beside the tiles to under
+    // them (the operator, 18 Nov).
     barSig: bar ? [...bar.children].filter(shown).map(e => e.matches('label.pick') ? (e.querySelector('.pickw') ? 'picker' : 'picker without its word')
-      : e.matches('input') ? 'search' : e.matches('.pseg') ? 'a switch' : e.matches('.actbar') ? 'buttons' : null).filter(Boolean).join(', ') : '',
+      : e.matches('input') ? 'search' : e.matches('.pseg') ? 'a switch' : e.matches('.actbar') ? 'buttons'
+      : e.matches('.nbsaidslot') ? 'words' : null).filter(Boolean).join(', ') : '',
     jump: !!first('.sectjump'),
     titles: [...root.querySelectorAll('details.sect > summary .t')].filter(shown).map(e => e.textContent.trim()).filter(Boolean),
   };
@@ -141,7 +162,7 @@ const differ = (got, tpl, skip = []) => {
   if (!skip.includes('card') && !!got.card !== !!tpl.card) out.push(`card: page ${got.card ? 'floats one' : 'floats none'}, template ${tpl.card ? 'floats one' : 'floats none'}`);
   else if (got.card && (Math.abs(got.card.l - tpl.card.l) > 2 || Math.abs(got.card.r - tpl.card.r) > 2))
     out.push(`card edges ${got.card.l} to ${got.card.r} on the page, ${tpl.card.l} to ${tpl.card.r} in the template`);
-  else if (got.card && !skip.includes('tiles') && Math.abs(got.top - tpl.top) > 24)
+  else if (got.card && !skip.includes('tiles') && !skip.includes('top') && Math.abs(got.top - tpl.top) > 24)
     out.push(`the first card starts ${got.top}px down on the page, ${tpl.top}px in the template`);
   return out.join('; ');
 };
@@ -196,10 +217,20 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
   await page.goto(URL);
   await ready(page);
   const where = W < 900 ? 'on a phone' : 'at a desk';
-  for (const [name, hash, reset, skip] of PAGES){
+  for (const [name, hash, reset, skip, landed] of PAGES){
     await page.evaluate(h => { location.hash = h; }, hash);
     await page.waitForFunction(w => { const l = [...document.querySelectorAll('.pane .doc.on')].find(e => e.checkVisibility({ visibilityProperty: true, opacityProperty: true }));
       return l && l.children.length && !l.querySelector(w); }, WAITING, { timeout: 15000 }).catch(() => {});
+    // ...and, where a page says what landed is, that: read again by its
+    // own polls until it is so.
+    if (landed){
+      const came = await page.waitForFunction(js => { try { return !!(0, eval)(js); } catch (e) { return false; } }, landed, { timeout: 30000 }).then(() => true, () => false);
+      // Said when it never did, with what the page knew: the comparison
+      // below then fails on a page that is not the one its template is for,
+      // and this is the line that says which page it was.
+      if (!came) console.log(`NOTE  ${name} had not landed ${where}: ${await page.evaluate(() => { try {
+        return JSON.stringify({ list: !!dockerList, blind: dockerList?.blind, error: String(dockerList?.error || '').slice(0, 160), poll: dmPollSays() }); } catch (e) { return String(e); } })}`);
+    }
     const got = await settled(page, '.pane .doc.on');
     const release = await hold(page);
     // ...and what renderGuarded does after every draw, which the reset's
@@ -228,7 +259,7 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
       const g = [...document.querySelectorAll('.nb .nbview:not([hidden]) .nbglance')].find(e => e.checkVisibility());
       return g ? { declared: +g.dataset.tiles || 0, drawn: g.querySelectorAll('.tile').length } : null;
     });
-    ok(!decl || decl.drawn <= decl.declared,
+    ok(!decl || decl.drawn <= decl.declared || MORE_TILES[v],
        `the notebook's ${v} view draws no more tiles than its markup declares for its waiting shape ${where} (${JSON.stringify(decl)})`);
     const release = await hold(page);
     await page.evaluate(([p, v]) => openNotebook(p, v), [waiting, v]);

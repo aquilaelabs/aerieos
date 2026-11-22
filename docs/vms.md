@@ -27,7 +27,7 @@ set to host passthrough, Proxmox's CPU type host) and nested KVM on in the host'
 `kvm_intel` or `kvm_amd`. Without it the Features row says so, and offers no
 Install: a VM in software emulation would be tens of times slower.
 
-The VMs' images and disks are in `/var/lib/builderbot/vms` on the node,
+The VMs' images and disks are in `/var/lib/aerieos/vms` on the node,
 owned by the jobs account, which is in the libvirt group; no session can
 reach libvirt. Removing VM host is refused while any VM is there, and takes
 off exactly the packages its install added.

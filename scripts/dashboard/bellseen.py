@@ -9,10 +9,11 @@ again; a row whose every key is dismissed is not sent. What stops work (an
 agent out of window, a failing CI run, an ask) has no key and cannot be put
 away: it leaves when it stops being true.
 """
-import json
 import threading
 import time
 from pathlib import Path
+
+import statefile
 
 FILE = None                  # <state>/bell-dismissed.json, set by configure()
 write_json = None
@@ -28,11 +29,8 @@ def configure(*, state, write_json):
 
 
 def _load():
-    try:
-        d = json.loads(FILE.read_text())
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError, AttributeError):
-        return {}
+    d = statefile.read_json(FILE) if FILE else None   # read once while the same file (R228 step 1)
+    return d if isinstance(d, dict) else {}
 
 
 def dismissed(uid):
@@ -118,6 +116,12 @@ def filter_rows(uid, rows):
                 continue
         elif r.get("kind") == "ci":
             # To the failed run: put away until another run fails.
+            if r.get("key") in gone:
+                hidden += 1
+                continue
+        elif r.get("kind") == "bundle-refused":
+            # To the bundle it refused (R267 step 6): put away until the
+            # controller serves another and the node refuses that one.
             if r.get("key") in gone:
                 hidden += 1
                 continue

@@ -21,7 +21,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/move-backup` | exact | `_get_move_backup` | GET /api/move-backup?name=: the controller's backup packed under a token of its own, as a download; the owner's. |  |
 | GET | `/api/backup` | exact | `_get_backup` | GET /api/backup (R161 step 4): the password set or not, the last copy, where the copies go and the copies found; an administrator's. |  |
 | GET | `/api/backup-file` | exact | `_get_backup_file` | GET /api/backup-file?name=NAME: a copy under the state as a download, the owner's; sealed, so a download is only ever a sealed file. |  |
-| GET | `/api/findings` | prefix | `_get_findings` | GET /api/findings: findings.view, scoped to the projects this account sees, and for a session to its own. |  |
+| GET | `/api/findings` | prefix | `_get_findings` | GET /api/findings: findings.view, scoped to the projects this account sees. |  |
 | GET | `/api/profile` | prefix | `_profile` | The signed-in account's own settings (the Profile page): read on GET, saved on POST, by profiletab.py. |  |
 | GET | `/api/transcripts` | prefix | `_get_transcripts` | GET /api/transcripts?project=NAME: the signed-in account's own conversations with Claude on that project, newest first (transcripts.mine); with audit=DAYS, what they did against the house rules that can be counted instea |  |
 | GET | `/api/snapshots` | prefix | `_get_snapshots` | GET /api/snapshots?project=NAME: the days kept of the project's tree (snapshots.py), newest first, and how many it keeps. | refused: settings |
@@ -60,13 +60,14 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/library` | prefix | `_get_library` | GET /api/library?node=ID (R170): everything an AerieOS installs or runs as one list for one node (library.rows): the toolchains and packs with what the node's store holds, the coding agents, the apps a NAS runs, the vett |  |
 | GET | `/api/pack-icon` | prefix | `_get_pack_icon` | GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an app's own icon, as the image its file is and nothing else: its type set here and never sniffed, and a policy that runs no script and sandboxes it, so an SVG  |  |
 | GET | `/api/storebackups` | exact | `_get_storebackups` | GET /api/storebackups (R162 step 5): the backups the controller's own machine copies, as recorded. |  |
+| GET | `/api/old-compose` | exact | `_get_old_compose` | GET /api/old-compose: the old system's containers as compose files in a zip, one each, to import from New container (adoptapps.export_zip). |  |
 | GET | `/api/v1/nodes` | prefix | `_get_nodes` | GET /api/v1/nodes: the Nodes page's read (nodes.tab_view), scoped to this account. |  |
 | GET | `/api/v1/jobs` | prefix | `_get_jobs` | GET /api/v1/jobs: nodes.jobs_view, narrowed to the projects this account may see unless it administers. |  |
 | GET | `/api/home` | prefix | `_get_home` | GET /api/home: home.read, the overview's numbers (R218 step 5). |  |
 | GET | `/api/apps` | prefix | `_get_apps` | GET /api/apps: the apps this controller offers and holds (apps.view), for the Library's companion cards and the Settings section. |  |
 | GET | `/api/notices` | prefix | `_get_notices` | GET /api/notices: notices.listing, this account's own (R218 step 6). |  |
 | GET | `/api/help` | prefix | `_get_help` | GET /api/help: the docs on the Help page (helpdocs.py, R258): the listing, ?doc=NAME one of them, ?q=WORDS a search across them. |  |
-| GET | `/api/docker` | prefix | `_get_docker` | GET /api/docker: the manager's whole page, containers.manager_view, for the node this account may read. |  |
+| GET | `/api/docker` | prefix | `_get_docker` | GET /api/docker: the manager's whole page, containers.manager_view, for the node this account may read; with a space and one of the nodes its containers may be on, that node as the space's, naming every such node. |  |
 | GET | `/api/containers` | prefix | `_get_containers` | GET /api/containers. | refused: containers-read |
 | GET | `/api/vms` | exact | `_get_vms` | GET /api/vms (R91): the VMs of the projects this account may read them on (a session: its own), the OS catalog and the VM hosts. |  |
 | GET | `/api/node-files` | exact | `_get_node_files` | GET /api/node-files?node=&root=&path= (R224): the node's roots, and with a root the folder's listing; an administrator's. |  |
@@ -97,15 +98,15 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/v1/hook` | exact | `_hook` | What a session's hooks have to say, from a NODE (roadmap #24): hooks.py says what each kind means. |  |
 | POST | `/api/v1/tty-grant` | exact | `_tty_grant` | Whose terminal a node's bb-tty is about to start, answered here (B166). |  |
 | POST | `/api/lock` | prefix | `_lock` | Lock or unlock a project (R119), never a session's. |  |
-| POST | `/api/archive` | prefix | `_archive` | Archive or unarchive a project (R119): out of sight, and nothing else; the project's owner or an administrator, never a session. |  |
+| POST | `/api/archive` | prefix | `_archive` | Archive or unarchive a space for the account asking: folded away under Archived on their own Spaces page and nothing else, as their favorites are theirs; anybody signed in, never a session. |  |
 | POST | `/api/repos` | prefix | `_repos` | Projects and their repositories (R138): create (a project with a name and nothing in it), rename, move (a repository into another project) with move-check (what it changes, asked first: the nodes, containers and VMs it t | refused: create |
-| POST | `/api/project-pin` | prefix | `_project_pin` | Pin or unpin a project: whether the sidebar card shows it (projects.pin). |  |
+| POST | `/api/project-pin` | prefix | `_project_pin` | A space made one of this account's favorites or not, kept as its pin: whether Home shows it and the Spaces page's Favorites chip finds it (projects.pin). |  |
 | POST | `/api/project-group` | prefix | `_project_group` | Put a project in one of this account's groups, take it out, or rename a group (projects.set_group, rename_group), or delete one (delete_group): a label for the Projects page, nothing more. |  |
 | POST | `/api/apps` | prefix | `_apps` | POST /api/apps: look at the release again now (apps.check_now). | refused: controller |
 | POST | `/api/pc` | prefix | `_pc` | POST /api/pc: a session's word with a PC lent to its project (pcwork.py, aerie pc): lent (which PCs lend which verbs), run (ask one, under the project's Agents may: Use a lent PC) and result (an ask's answer, held a whil |  |
 | POST | `/api/project-color` | prefix | `_project_color` | Give a project one of the colors for this account alone, or none (projects.set_mark): worn by its card, its tabs and its bar. |  |
 | POST | `/api/project-auth` | prefix | `_project_auth` | What credential this project's remote uses, and what else it could: projects.auth_answer. | refused: rename |
-| POST | `/api/project-ftp` | exact | `_project_ftp` | A project's file access over FTP (ftp.py, R151): what it is, for whoever sees the project, and a change, for an account with the ftp grant (named only: the owner, until a role names it). | refused: ftp |
+| POST | `/api/project-ftp` | exact | `_project_ftp` | A project's file access over FTP (ftp.py, R151): what it is, for whoever sees the project, and a change, for an account with File access Write on it (users.may's ftp). | refused: ftp |
 | POST | `/api/container` | prefix | `_container` | A container from a compose file written here, with no project: containers.tab_verb. | refused: docker-write |
 | POST | `/api/vms` | exact | `_vms` | POST /api/vms (R91): new, start, stop, restart, remove, snapshot, revert, snapshot-rm. | refused: vms-write, refused: node |
 | POST | `/api/dockerctl` | prefix | `_docker_ctl` | Start, stop, restart or read the log of ONE container on a node. | refused: docker-write |
@@ -113,7 +114,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/trash-restore` | prefix | `_trash_restore` | A repository out of the bin, back into the project it was in, or into the one named (`project`) where that one is gone or another is wanted (R138); one from before projects into a project of its own. | refused: trash |
 | POST | `/api/trash-purge` | prefix | `_trash_purge` | Delete a trashed project for good. | refused: trash |
 | POST | `/api/trash` | prefix | `_trash` | Move a project out of the workspace: projects.trash, once project_busy says nothing holds it (the same guards as renaming). | refused: trash |
-| POST | `/api/session` | prefix | `_session` | Kill a session. |  |
+| POST | `/api/session` | prefix | `_session` | Kill a session, or say whether one asked to end has. |  |
 | POST | `/api/send` | prefix | `_send` | Type a macro's command lines into a shell session of the caller's and press Enter: macros.send. |  |
 | POST | `/api/say` | prefix | `_say` | Type a message into a CLAUDE session and press Enter. |  |
 | POST | `/api/chat` | prefix | `_chat` | Read a conversation, send into one, or mark one seen: chat.converse. |  |
@@ -123,7 +124,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/nginx` | exact | `_nginx` | Deploy, save, certificate, remove, check and update on one node's nginx (nginxproxy.py): writing a compose file and building it on a node, so docker-write like a written container, and never a session's. | refused: docker-write |
 | POST | `/api/scanners` | exact | `_scanners` | Deploy, update, remove, run now, the schedule and a version check (scanners.py): compose and scan jobs on a node, so docker-write like a written container, and never a session's. | refused: docker-write |
 | POST | `/api/router` | exact | `_router` | POST /api/router: a node's model router (router.py): its keys and endpoints saved, Deploy, Save and Remove as a written container's compose jobs, Ollama's models pulled and removed, a project allowed or not, the models a | refused: docker-write |
-| POST | `/api/library` | exact | `_library` | POST /api/library (R172): a card's Configure, Install and Remove for a service (the model router, router.py's own verbs, docker-write as the nginx page), the router's models, spend and Ollama's pulls, and Configure for a |  |
+| POST | `/api/library` | exact | `_library` | POST /api/library (R172): a card's Configure, Install and Remove for a service (the model router, router.py's own verbs, docker-write as the nginx page), the router's models, spend and Ollama's pulls, and Configure for a | refused: docker-write |
 | POST | `/api/images` | exact | `_images` | Check for updates on the Containers page (imagecheck.py, R195): every container's registry images on one node, or all, asked now. | refused: docker-write |
 | POST | `/api/storage` | exact | `_storage` | Measure now on the Storage page: a node's disks walked at once (nodes.node_storage_measure). |  |
 | POST | `/api/schedules` | exact | `_schedules` | POST /api/schedules (R117): save (add or change, turning one on or off among them), remove, or run now. |  |
@@ -155,7 +156,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/idle` | prefix | `_idle` | The idle rule for every agent's sessions (idle.py): minutes, 0 for never. | refused: controller |
 | POST | `/api/paths` | prefix | `_paths` | Where the controller keeps one kind of what grows (paths.py), and what is there moved across. | refused: controller |
 | POST | `/api/snapshots` | prefix | `_snapshots` | POST /api/snapshots: take one now, or restore the whole tree as of a day or one file of it (snapshots.restore, which snapshots the tree first so it can be undone). | refused: settings |
-| POST | `/api/transcripts` | exact | `_transcripts` | POST /api/transcripts {project, id, action}: one of the signed-in person's own conversations deleted, or made visible to every session on the project (share) or private again (unshare). |  |
+| POST | `/api/transcripts` | exact | `_transcripts` | POST /api/transcripts {project, id, action}: one of the signed-in person's own conversations deleted, or made visible to every session on the project (share) or private again (unshare): a person's, from the notebook's Se |  |
 | POST | `/api/settings` | prefix | `_settings_post` | POST /api/settings. | refused: controller, refused: debug |
 | POST | `/api/checks` | exact | `_checks_post` | POST /api/checks {kind}: Check for updates, for one of the update checks under Controller settings (R176, checks.py). | refused: controller |
 | POST | `/api/catalog-mirror` | exact | `_catalog_mirror_post` | POST /api/catalog-mirror {action: import, archive} or {action: forget}: the vetted catalog's mirror under Controller settings (R169 step 6), its archive taken through /api/upload-archive. | refused: controller |

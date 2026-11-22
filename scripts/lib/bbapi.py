@@ -13,9 +13,11 @@ So this is where those changes live:
   * the URL is BB_CONTROLLER when set (the agent exports it into every
     session it starts), the loopback otherwise;
   * https is verified by PIN, not by CA, exactly as the node agent verifies
-    it: BB_CONTROLLER_PIN is the certificate digest the node learned at
-    enrollment, and a different one is refused. No pin and https is allowed
-    and unverified, which is the node's own choice at enrollment, repeated here;
+    it: BB_CONTROLLER_PIN is the pin the node holds, the controller's key
+    (KEY_PIN's form, which any certificate over that key passes) or the
+    certificate digest the node learned at enrollment, and a different one
+    is refused. No pin and https is allowed and unverified, which is the
+    node's own choice at enrollment, repeated here;
   * the auth header is whatever bb_auth_or_die produced: a session token
     (Bearer) or a name:password for the command (Basic).
 
@@ -36,6 +38,8 @@ import sys
 import time
 import urllib.parse
 
+import scopedir
+
 
 def keep_token(tok):
     """A renewed session token, written where bb_token_now reads: the same
@@ -51,13 +55,8 @@ def keep_token(tok):
         project = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode().split("|")[0]
         if not project or "/" in project:
             return "the token names no space"
-        home = os.environ.get("HOME", "")
-        d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-            or f"/tmp/bb-scope-{os.getuid()}"
-        # Per account (B159): on a node the cache folder is shared, so without
-        # the uid this writes over another account's token.
-        d = os.path.join(d, "builderbot", "u",
-                         os.environ.get("BB_ACCOUNT_UID") or "_none", "project", project)
+        # The account's own folder for the space (B159).
+        d = scopedir.scope_dir(project)
         os.makedirs(d, mode=0o700, exist_ok=True)
         # A unique temporary name, not a fixed one: the agent refreshes this
         # file for a session that is idle (R27) while the session's own bb may
@@ -72,9 +71,70 @@ def keep_token(tok):
     return ""
 
 
+# A pin of the controller's key, as the node agent reads it (its
+# controller.py, which says why): this, then the base64 of the sha256 of
+# the certificate's SubjectPublicKeyInfo. The agent hands a session this
+# form only where this file reads it (it looks for this line).
+KEY_PIN = "sha256//"
+
+
+def _tlv(buf, at):
+    """(tag, where its value starts, where it ends) of the DER element at `at`."""
+    tag, n = buf[at], buf[at + 1]
+    at += 2
+    if n & 0x80:
+        k = n & 0x7F
+        if not 1 <= k <= 4:
+            raise ValueError("not a DER length")
+        n = int.from_bytes(buf[at:at + k], "big")
+        at += k
+    if at + n > len(buf):
+        raise ValueError("a DER element runs past its buffer")
+    return tag, at, at + n
+
+
+def key_pin_of(der):
+    """The pin of the key a DER certificate carries, or "": its
+    SubjectPublicKeyInfo found by stepping over the fields before it, as
+    the agent finds it (controller.spki_of; a test holds the two, and
+    bb-session's, to each other and to the cryptography library)."""
+    try:
+        tag, at, end = _tlv(der, 0)
+        if tag != 0x30:
+            return ""
+        tag, at, end = _tlv(der, at)
+        if tag != 0x30:
+            return ""
+        tag, _, after = _tlv(der, at)
+        if tag == 0xA0:
+            at = after
+        for _ in range(5):
+            _, _, at = _tlv(der, at)
+        tag, _, after = _tlv(der, at)
+        if tag != 0x30 or after > end:
+            return ""
+    except (IndexError, ValueError, TypeError):
+        return ""
+    return KEY_PIN + base64.b64encode(hashlib.sha256(bytes(der[at:after])).digest()).decode()
+
+
 def url():
     return (os.environ.get("BB_CONTROLLER")
             or f"http://127.0.0.1:{os.environ.get('DASHBOARD_PORT', '7680')}").rstrip("/")
+
+
+class Unnamed(http.client.HTTPSConnection):
+    """A TLS connection that sends no server name: what a connection held
+    to a key's pin is. The controller answers a handshake that asks for its
+    hostname with that name's certificate, which is another key's, and
+    every other handshake with the install's own, the one a node pinned: a
+    node that dials by the hostname and said so was answered with a key it
+    refuses. The pin is the whole check, so nothing is lost by not naming
+    who is dialed."""
+
+    def connect(self):
+        http.client.HTTPConnection.connect(self)
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=None)
 
 
 def _conn(timeout):
@@ -93,13 +153,30 @@ def _conn(timeout):
     if u.scheme != "https":
         return http.client.HTTPConnection(u.hostname, port, timeout=timeout), u.path.rstrip("/")
     ctx = ssl.create_default_context()
+    pin = os.environ.get("BB_CONTROLLER_PIN", "")
+    if pin == "ca":
+        # A node enrolled by a public hostname (--reach public): the name's
+        # own certificate by the system's CAs, as the agent's client checks
+        # it (controller.py's CA). Nothing is pinned: what the node sees is
+        # the edge's certificate, which changes. Compared to a digest, as
+        # every other pin is, this was refused, and no aerie verb in a
+        # session on such a node reached its controller (R243).
+        return http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx), u.path.rstrip("/")  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE                 # the pin below is the check
-    # Pinned on first use, see the agent.
-    c = http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx)  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
+    # Pinned on first use, see the agent. A key's pin sends no server name
+    # (Unnamed), as the agent's connection does not.
+    c = (Unnamed if pin.startswith(KEY_PIN) else http.client.HTTPSConnection)(  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
+        u.hostname, port, timeout=timeout, context=ctx)
     c.connect()
-    pin = os.environ.get("BB_CONTROLLER_PIN", "")
-    seen = "sha256:" + hashlib.sha256(c.sock.getpeercert(True)).hexdigest()
+    der = c.sock.getpeercert(True)
+    if pin.startswith(KEY_PIN):
+        # The controller's key: any certificate over it, and no other.
+        if key_pin_of(der) != pin:
+            c.close()
+            raise OSError(f"controller key changed: pinned {pin[:19]}…, presented another")
+        return c, u.path.rstrip("/")
+    seen = "sha256:" + hashlib.sha256(der).hexdigest()
     if pin and seen != pin:
         c.close()
         raise OSError(f"controller certificate changed: pinned {pin[:19]}…, "
@@ -133,10 +210,7 @@ def _gate_down():
     project = os.environ.get("BB_PROJECT", "")
     if not project or "/" in project:
         return
-    home = os.environ.get("HOME", "")
-    d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-        or f"/tmp/bb-scope-{os.getuid()}"
-    sf = os.path.join(d, "builderbot", "u", os.environ.get("BB_ACCOUNT_UID") or "_none", "project", project, "gate")
+    sf = scopedir.scope_dir(project, "gate")
     try:
         os.makedirs(os.path.dirname(sf), mode=0o700, exist_ok=True)
         with open(sf, "w") as f:

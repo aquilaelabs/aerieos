@@ -7,7 +7,7 @@
 // The hooks are the shipped scripts, run as processes, because "does the rule
 // reach the session" is the only question this file is about and a stub of
 // the hook would be a stub of the answer.
-import { launch, newPage, ok, done, ready, URL, DIR, nbShown, nbTab, sleep, openFold } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, nbShown, nbTab, sleep, openFold, OWNER, asSession, mint, section } from './lib.mjs';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +63,7 @@ await page.waitForFunction(() => /2 files/.test(document.querySelector('#rulesBo
 const sects = await page.$$eval('#rulesBox .sect', ss => ss.map(s => s.querySelector('.stitle, .shead, summary')?.textContent || s.textContent.slice(0, 40)));
 ok(/Code base/.test(sects[0] || '') && /Your rules/.test(sects[1] || ''),
    `the code base section comes first, the rules after it (${sects.map(x => x.trim().slice(0, 20)).join(' | ')})`);
-const cb = await (await fetch(URL + 'api/codebase?project=alpha', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
+const cb = await (await fetch(URL + 'api/codebase?project=alpha', { headers: OWNER })).json();
 ok(cb.files === 2 && cb.lines === 3 && cb.code_lines === 2
    && cb.languages.some(l => l.name === 'Python' && l.lines === 2 && l.pct === 100)
    && cb.languages.some(l => l.name === 'Markdown' && l.kind === 'prose'),
@@ -76,7 +76,7 @@ ok(new RegExp(`${cb.files} file`).test(await page.$eval('#rulesBox .sect', e => 
 const cbText = await page.$eval('#rulesBox .sect', e => e.textContent.replace(/\s+/g, ' '));
 ok(/2 files and 3 lines tracked by git/.test(cbText) && /2 lines of code in 1 file\b/.test(cbText),
    `...and its body is the head's totals, then the code among them (${cbText.slice(0, 160)})`);
-const nogit = await (await fetch(URL + 'api/codebase?project=gamma', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
+const nogit = await (await fetch(URL + 'api/codebase?project=gamma', { headers: OWNER })).json();
 ok(/not a git repository/.test(nogit.error || ''), 'a space that is not a repository says so rather than counting nothing');
 ok(await page.$('#memList') !== null,
    '...on the same tab as the memories, which is the point of the rename');
@@ -158,7 +158,14 @@ ok(rowLook.radius === '0px' && rowLook.top === '1px',
    `...drawn as a line-divided row like a bug report, not a box (${JSON.stringify(rowLook)})`);
 await page.click('#rulesBox .rulerow[data-i="1"] summary');
 await page.waitForFunction(() => document.querySelector('#rulesBox .rulerow[data-i="1"]').open, null, { timeout: 10000 });
+// Pressed again when the field has not come: a redraw landing between the
+// press's down and up takes it (B822, '0 shut, 1 open' under a whole run).
 await page.click('#rulesBox .rulerow[data-i="1"] .rlEdit');
+for (let t = 0; t < 3; t++){
+  if (await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 4000 }).then(() => true, () => false)) break;
+  await page.evaluate(() => { const r = document.querySelector('#rulesBox .rulerow[data-i="1"]');
+    if (r && !r.querySelector('.rlText')) r.querySelector('.rlEdit')?.click(); });
+}
 await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 10000 }).catch(async e => {
   // What the panel drew instead, said before the timeout is thrown (B297):
   // each row, open or shut, editing or not, and whether its field exists.
@@ -171,7 +178,9 @@ await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 
 ok(await page.$('#rulesBox .rulerow[data-i="0"] .rlText') === null,
    'Edit opens that rule\'s fields and no other\'s');
 await page.fill('#rulesBox .rulerow[data-i="1"] .rlText', 'typed, then thought better of');
-ok(!await page.$eval('[data-ssave="briefing:rules"]', b => b.disabled),
+// Read once the input's handler has run, not in the same instant (B836).
+ok(await page.waitForFunction(() => !document.querySelector('[data-ssave="briefing:rules"]')?.disabled, null, { timeout: 5000 })
+     .then(() => true, () => false),
    'typing into a rule arms the panel\'s Save');
 await page.click('#rulesBox .rulerow[data-i="1"] .rlCancel');
 await page.waitForFunction(() => !document.querySelector('#rulesBox .rulerow .rlText'), null, { timeout: 10000 });
@@ -240,7 +249,7 @@ ok(/PASS  design/.test(bb('check', 'design')),
    'aerie rules check NAME runs the check in the space tree and reports it');
 ok(/nothing changed here that a rule/.test(bb('check')),
    '...and with nothing changed under a rule\'s files, bare check has nothing to run');
-{
+await section("while a new file under its files makes bare check run it", async () => {
   const { writeFileSync: wf, mkdirSync: mk } = await import('node:fs');
   mk(`${DIR}/ws/alpha/src`, { recursive: true });
   wf(`${DIR}/ws/alpha/src/new.txt`, 'changed under the rule\n');
@@ -300,12 +309,12 @@ ok(/nothing changed here that a rule/.test(bb('check')),
   bb('edit', 'design', '--check', 'false');
   ok(stop({ stop_hook_active: false }) === '',
      '...and the same tree is not checked again, even though the check would now fail');
-}
+});
 
 // ---- reading them from a session -------------------------------------------
 ok(/^aerie rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }).toString()),
    'aerie rules -h is its help, as every verb\'s is (B411)');
-{
+await section("B536: every verb's -h is its entries in the reference, exit 0, never", async () => {
   // B536: every verb's -h is its entries in the reference, exit 0, never
   // its usage error: devapp's and container's said "ERROR:" and exited 1.
   const help = v => { try { return [0, execFileSync(BB, [v, '-h'], { env: ENV, stdio: 'pipe' }).toString()]; }
@@ -313,7 +322,7 @@ ok(/^aerie rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }
   const said = ['devapp', 'container', 'capture', 'jobs'].map(v => [v, ...help(v)]);
   ok(said.every(([v, st, out]) => st === 0 && new RegExp(`^aerie ${v}\\b`).test(out) && !/ERROR/.test(out)),
      `bb VERB -h prints that verb's entries from the reference and exits 0 (${said.map(([v, st]) => v + ':' + st).join(' ')})`);
-}
+});
 ok(/No em dashes/.test(bb('list')) && /agent-compat/.test(bb('list')),
    'aerie rules lists what is in effect');
 ok(/add, do not change/.test(bb('show', 'agent-compat')),
@@ -341,7 +350,7 @@ ok(read().find(r => r.name === 'dont-edit-during-a-suite')?.by === 'claude',
    '...marked as its own, which is what decides who may change it later');
 ok(/reworded/.test(bb('edit', 'dont-edit-during-a-suite', 'Stage edits; apply after.')),
    '...and change it');
-{
+await section("and cannot touch one of the operator\\", async () => {
   let no = '';
   try { bb('edit', 'voice', 'no em dashes, and no semicolons either'); }
   catch (e) { no = String(e.stdout || '') + String(e.stderr || ''); }
@@ -349,13 +358,13 @@ ok(/reworded/.test(bb('edit', 'dont-edit-during-a-suite', 'Stage edits; apply af
      '...and cannot touch one of the operator\'s, being told which it is');
   ok(read().find(r => r.name === 'voice').text === 'No em dashes.',
      '...and nothing moved when it tried');
-}
+});
 ok(/\*dont-edit-during-a-suite/.test(bb('list')),
    'the listing marks which are a session\'s, since that is what decides what it may do');
 ok(/^\* No em dashes/m.test(bb('--prompt')) || /\*dont-edit-during-a-suite/.test(bb('--prompt')),
    'and the block says so too: a session\'s own note must not reach the next one '
    + 'wearing the operator\'s authority');
-{
+await section("The mark AND the account", async () => {
   const h = bb('history');
   // The mark AND the account: "you" and "claude" say a person or a session,
   // and the name says which person, the same thing the Nodes tab's audit
@@ -363,7 +372,7 @@ ok(/^\* No em dashes/m.test(bb('--prompt')) || /\*dont-edit-during-a-suite/.test
   ok(/claude test\s+add\s+dont-edit-during-a-suite/.test(h) && /you test\s+add\s+voice/.test(h),
      'every change is in a history that says who made it, and which account, '
      + 'which is what makes this safe to share, rather than a lock');
-}
+});
 ok(/dropped dont-edit-during-a-suite/.test(
      bb('rm', 'dont-edit-during-a-suite', 'it belongs in CLAUDE.md now')),
    'a session can drop its own, with the reason kept');
@@ -374,29 +383,17 @@ ok(/dropped dont-edit-during-a-suite/.test(
 // project. Without a refusal here the HTTP route would have been the way
 // around the whole arrangement, which is the kind of hole a design like this
 // is worth nothing without.
-{
+await section("The endpoint, not just the verb", async () => {
   // A real one, minted the way bb-tty mints the token it hands a session:
   // the point is a genuine session principal, not a shape.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, os, sys
-spec = importlib.util.spec_from_file_location('users', ${
-  JSON.stringify(join(HERE, '..', 'users.py'))})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-import json
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha'))
-`], { encoding: 'utf8' }).trim();
+  const tok = mint('alpha');
   ok(/^bbs_/.test(tok), 'a session token can be minted for the check below');
   // From outside the browser, which is where a session actually is: a shell
   // with a token and no cookie. Through the page it would have carried the
   // operator's own login as well, and proved nothing.
   const res = await fetch(URL.replace(/\/$/, '') + '/api/rules', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+    headers: asSession(tok),
     body: JSON.stringify({ project: 'alpha', action: 'save',
                            rules: [{ name: 'mine', text: 'a session wrote this' }] }) });
   const r = { status: res.status, body: await res.text() };
@@ -406,14 +403,13 @@ print(m.mint_session('alpha'))
      '...and is told why rather than getting a bare no');
   ok(!read().some(x => x.name === 'mine'),
      '...and nothing was written');
-}
+});
 
 // ---- global rules (R63): set once on the controller, in every project -----
 // The drift the block has, these do not: there is no copy anywhere, so a rule
 // the operator sets is the rule every session on the box is handed.
-{
-  const auth = { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+await section("global rules", async () => {
+  const auth = OWNER;
   const api = async body => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/global-rules',
       { method: 'POST', headers: auth, body: JSON.stringify(body) });
@@ -441,23 +437,19 @@ print(m.mint_session('alpha'))
 
   // A session's token is a principal with user rights over one project; a
   // global rule reaches every project, so this endpoint wants an admin.
-  const tok = execFileSync('python3', ['-c', `
-import sys; sys.path.insert(0, ${JSON.stringify(join(HERE, '..'))})
-import users, statefile
-users.configure(write_json=statefile.write_json, state=${JSON.stringify(`${DIR}/state`)})
-print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
+  const tok = mint('alpha');
   const asSession = await fetch(URL.replace(/\/$/, '') + '/api/global-rules',
     { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
       body: JSON.stringify({ action: 'save', rules: [{ name: 'x', text: 'y' }] }) });
   ok(asSession.status === 403, `...and a session's token is refused by the endpoint too (${asSession.status})`);
-}
+});
 
 // B195: the tab writes the WHOLE list, so a list that moved since it was loaded
 // is somebody else's rule about to be overwritten: one a session added, one an
 // administrator approved from the queue, another person's reword. It used to
 // go through, and the log then blamed the person saving for removing a rule
 // they had never seen.
-{
+await section("B195: the tab writes the WHOLE list, so a list that moved since it was loaded", async () => {
   const call = (path, body) => page.evaluate(async ([p, b]) => {
     const r = await fetch(p, b === null ? {} : { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
@@ -493,7 +485,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
   const standing = Array.from({ length: 41 }, (_, i) => ({ name: `standing-${i}`, text: `a standing rule, number ${i}` }));
   // From here rather than the page, so the refusal is not a console error.
   const over = await (await fetch(URL.replace(/\/$/, '') + '/api/rules', { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    headers: OWNER,
     body: JSON.stringify({ project: 'alpha', action: 'save', rules: standing, force: true }) })).json();
   ok(/40 standing rules is the limit: each is read whole into every session/.test(over.error || '')
      && /Give one a file or a word that calls for it/.test(over.error || ''),
@@ -512,7 +504,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
      && /`aerie rules` lists them with it/.test(short.text),
      `a list of named rules over its share gives their names without what calls for each, and still says which are checked (${sp.bytes} of ${sp.share})`);
   await call('/api/rules', { project: 'alpha', action: 'save', rules: first.rules || [], force: true });
-}
+});
 
 // A project's rules beside the global ones. Flat by construction: both lists
 // reach a session, and a global rule and a project rule with the same trigger
@@ -521,9 +513,8 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
 // and a shared NAME resolved to the global rule, which is backwards. Names
 // carry no meaning here on purpose: an override you can only make by knowing
 // the other rule's name helps exactly the person who did not need it.
-{
-  const auth = { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+await section("A project's rules beside the global ones", async () => {
+  const auth = OWNER;
   const post = async (path, body) => (await fetch(URL.replace(/\/$/, '') + path,
     { method: 'POST', headers: auth, body: JSON.stringify(body) })).json();
   const get = async path => (await fetch(URL.replace(/\/$/, '') + path, { headers: auth })).json();
@@ -562,7 +553,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
   let seen = null;
   for (let i = 0; i < 30 && !seen?.global; i++){
     await page.evaluate(() => pollRevs());
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 400));     // the loop's own period: the page is asked to read again each time round
     seen = await page.evaluate(() => ({
       global: [...document.querySelectorAll('.nb #rlGlobal .grule .btitle')].map(e => e.textContent).includes('house-changelog'),
       edit: document.querySelectorAll('.nb #rlGlobal .rlEdit, .nb #rlGlobal .rlRm').length,
@@ -574,7 +565,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
 
   await post('/api/rules', { project: 'alpha', action: 'save', force: true, rules: first.rules || [] });
   await post('/api/global-rules', { action: 'save', rules: gWas.filter(r => !r.builtin) });
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${
   page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);

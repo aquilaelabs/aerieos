@@ -18,7 +18,7 @@ class Queue:
     def job_running(self, nid):
         return self.busy
 
-    def run_wait(self, who, nid, argv, timeout=30, forget=False):
+    def run_wait(self, who, nid, argv, timeout=30, forget=False, docker=False):
         self.asked.append(argv)
         return dict(self.answer)
 

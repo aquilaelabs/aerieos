@@ -1,5 +1,7 @@
 {
  "about": "Installs and switches Xcode versions on a Mac: run xcodes install --latest on the node, with an Apple ID the first time.",
+ "format": 5,
+ "framework": "5.1",
  "label": "xcodes (Xcode installer)",
  "layout": {
   "bin": [
@@ -8,6 +10,7 @@
   "env": {},
   "tool": "bin/xcodes"
  },
+ "maker": "XcodesOrg",
  "name": "xcodes",
  "platforms": [
   "darwin/*"
@@ -15,9 +18,15 @@
  "shipped": {
   "probe": "xcodes",
   "reports": "xcodes",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "github-asset"
+    },
+    "from": "pin",
+    "sha256": "3c3ce6c550f079300c578b741e20ea0405fbe1eea808b8002ef591d568cea564",
+    "version": "2.2.0"
    },
    "download": {
     "bytes": 12000000,
@@ -33,11 +42,15 @@
     "{script}",
     "{dir}"
    ],
-   "url": "https://github.com/XcodesOrg/xcodes/releases/latest/download/xcodes.zip",
+   "url": "https://github.com/XcodesOrg/xcodes/releases/download/{version}/xcodes.zip",
    "verify": [
     "{dir}/bin/xcodes",
     "version"
-   ]
+   ],
+   "version": {
+    "repo": "XcodesOrg/xcodes",
+    "resolver": "github-release"
+   }
   },
   "updatable": true
  },

@@ -117,6 +117,8 @@ class Look(unittest.TestCase):
         # successor stopped, and the passing lint workflow is no finding.
         self.assertEqual(rec["run"]["id"], 11)
         self.assertEqual([f["where"] for f in rec["findings"] if f["kind"] == "run"], ["run 11"])
+        said = next(f["text"] for f in rec["findings"] if f["kind"] == "run")
+        self.assertRegex(said, r"^The [^.]+ check failed on main \([^)]*\)$", "one sentence, with no run's number and no command")
         self.assertTrue(any("Ubuntu 26" in f["text"] for f in rec["findings"]))
         self.assertEqual(ciwatch.read("app")["run"]["id"], 11)
         self.assertEqual([r["project"] for r in ciwatch.red(["app"])], ["app"])

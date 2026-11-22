@@ -60,6 +60,26 @@ class Reason(unittest.TestCase):
         got = self.why("refused: this agent does not administer the machine, so its owner installs these: playwright: libXtst\n")
         self.assertIn("does not administer the machine", got)
 
+    def test_a_signature_refusal_is_its_error_alone(self):
+        # As a vendor's changed key reads in the log: curl's bar, gpgv's own
+        # lines, bb's ERROR, the partial copy removed. The row is the ERROR.
+        tail = toolchains._job_tail("######################################################################## 100.0%\n"
+                                    "gpgv: using EDDSA key 0016B9E1A994\n"
+                                    "gpgv: Can't check signature: No public key\n"
+                                    "[builderbot] ERROR: kit: dl/data.bin does not carry its publisher's signature under kit.asc: nothing is installed\n"
+                                    "[builderbot] WARN: install failed (exit 1); removing the partial /srv/tc/kit\n")
+        got = toolchains._reason(tail, "install failed (exit 1)")
+        self.assertEqual(got, "ERROR: kit: dl/data.bin does not carry its publisher's signature under kit.asc: nothing is installed · install failed (exit 1)")
+
+    def test_a_refusal_after_its_detail_is_the_reason_alone(self):
+        # The agent says what holds a toolchain, pid and all, on lines of
+        # their own, then the refusal in one sentence: the row takes that.
+        got = toolchains._reason(["  in use by node (pid 4242, ann's session)", "  in use by java (pid 4250, ann's session)",
+                                  "refused: jdk is in use, so it was left as it is: try again once that has finished"],
+                                 "install failed on the node")
+        self.assertEqual(got, "refused: jdk is in use, so it was left as it is: try again once that has finished · install failed on the node")
+        self.assertNotIn("pid", got)
+
     def test_a_long_reason_starts_at_a_line_not_mid_word(self):
         # B83: a tool pack's install, as bb-dev-sandbox logged it; the row
         # was cut by characters from the end and began '3pack · * branch'.
@@ -79,6 +99,16 @@ class Reason(unittest.TestCase):
         got = toolchains._reason(["ERROR: the tool said " + "word " * 120], "install failed on the node")
         self.assertTrue(got.startswith("ERROR: the tool said word") and got.endswith("… · install failed on the node"), got)
         self.assertLessEqual(len(got), 400)
+
+    def test_the_digests_a_download_is_held_to_stay_in_the_log(self):
+        # sdk.sh says each digest on a line of its own before its refusal,
+        # for whoever compares them in the job's log; the row says why alone.
+        got = toolchains._reason(["[builderbot] sha256 of what https://example.invalid/k.zip answered: " + "ab" * 32,
+                                  "[builderbot] sha256 expected: " + "cd" * 32,
+                                  "[builderbot] gpgv: using key " + "EF" * 20,
+                                  "[builderbot] ERROR: kotlin-lsp: k.zip is not the file its entry pins: nothing is installed"],
+                                 "install failed (exit 1)")
+        self.assertEqual(got, "ERROR: kotlin-lsp: k.zip is not the file its entry pins: nothing is installed · install failed (exit 1)")
 
 
 if __name__ == "__main__":

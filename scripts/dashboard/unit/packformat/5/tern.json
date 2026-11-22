@@ -1,0 +1,26 @@
+{
+  "name": "tern",
+  "label": "Tern",
+  "about": "Reads and converts map data: shapefiles, GeoJSON, tiles.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Tern Mapping",
+  "platforms": ["linux/*"],
+  "terms": [{"label": "MIT", "url": "https://opensource.org/license/mit"}],
+  "install": {
+    "fetch": [
+      {"url": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz",
+       "to": "dl/tern.tar.xz",
+       "signed": {"sig": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz.sig", "keys": "tern.asc"}}
+    ],
+    "keyring": {
+      "tern.asc": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEawBw5xYJKwYBBAHaRw8BAQdAm2GTTeGggKj4KNv0JcfH+W0aHHmEmp77mDK+\n9oY6ehq0VlRlcm4gUmVsZWFzZXMgKGFuIGludmVudGVkIHB1Ymxpc2hlciwgZm9y\nIGEga2VwdCBtYW5pZmVzdCkgPHJlbGVhc2VzQHRlcm4uZXhhbXBsZS5vcmc+iJAE\nExYKADgWIQQTM4Ph9nbDuJouMemdV0ukFuzijQUCawBw5wIbAwULCQgHAgYVCgkI\nCwIEFgIDAQIeAQIXgAAKCRCdV0ukFuzijd9nAQCJhsybZyrYRnuLGj7ZpSq0AF+4\nJ57EYznl+kpoAnfB3QD9Hu6BQf/w68AwOQpyxXlkWvW4Baewe0+XuxFQoeOoPQ0=\n=RHfr\n-----END PGP PUBLIC KEY BLOCK-----\n"
+    },
+    "steps": [["sh", "{dir}/install.sh"]],
+    "verify": ["{dir}/bin/tern", "--version"]
+  },
+  "layout": {"bin": ["bin"], "tool": "bin/tern"},
+  "verbs": {
+    "convert": {"about": "One map format into another.", "usage": "FROM TO", "run": ["{dir}/bin/tern", "convert", "{args}"]}
+  }
+}

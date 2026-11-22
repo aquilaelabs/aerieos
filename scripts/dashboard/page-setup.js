@@ -85,12 +85,12 @@ function drawSetup(){
                               s.git, s.claude, s.project, s.own?.reported?.console || null, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
-  const typed = setupKeepTyped(el);
+  // Patched into what is there (R244): what was typed, a file picked and
+  // the field being typed in stay where they were through the redraw.
   if (setupWalking()){
-    el.innerHTML = setupWalkHtml(s);
+    patch(el, setupWalkHtml(s));
     wireSetup(el, s);
     setupInOrder(el, s);
-    typed();
     return;
   }
   const card = setupCard;
@@ -98,15 +98,15 @@ function drawSetup(){
   const stick = setupStickOf(s);
   const placed = !stick || !!stick.ready || !!stick.projects_bound;
   let next = 2;
-  el.innerHTML = `<div class="setuppage">
+  patch(el, `<div class="setuppage">
     <div class="setuphead">
-      <h2>Set up AerieOS</h2>
+      <div class="setuptitle"><h2>Set up AerieOS</h2>${setupTopActs(s)}</div>
       <p>AerieOS works on nodes: machines you enroll, where spaces are kept, built and worked on. One is all it needs to start.</p>
       <div class="setwalkask"><span class="grow">Moving a controller or an old system here?</span><button type="button" data-setwalk="move">Walk me through it</button></div>
     </div>
     ${s.own ? card(1, "This machine", !!s.node, !s.node, s.node
       ? `<p><b>${nodeName}</b>, the machine this controller runs on, is enrolled and answering: it is your first node${
-          s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}${s.node.reported?.timezone ? `, its clock on ${esc(s.node.reported.timezone)}` : ""}. Its name and time zone are set on This machine, after Finish.</p>`
+          s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}${s.node.reported?.timezone ? `, its clock on ${esc(s.node.reported.timezone)}` : ""}. Its name and time zone are set on the Nodes page, after Finish.</p>`
       : `<p>The machine this controller runs on is its first node, set up by the installer: ${
           s.own.state === "pending" ? "its agent is being installed and enrolled"
           : s.own.live === false ? "enrolled, and waiting for it to answer"
@@ -138,59 +138,74 @@ function drawSetup(){
       ? `<p>The Spaces page holds it, and every one after it.</p>`
       : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the spaces have a place, in step 3.</div>`}`,
       s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New space</button>`)}
-    ${setupConsoleWanted(s) ? setupConsoleCard(next++, s) : ""}
     <div class="setfinish">
       <p class="dim">${s.node ? `Steps 2 to ${next - 1} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
         Storage and the idle timeout have working defaults, under Controller settings.</p>
       <div class="actbar"><button type="button" class="primary" id="setupFinish"${s.node ? "" : " disabled"}>Finish</button></div>
       <div class="hint bad" id="setupWhy" hidden></div>
     </div>
-  </div>`;
+  </div>`);
   wireSetup(el, s);
   setupInOrder(el, s);
-  typed();
 }
 
 // What a disk's row shows, for the redraw test: a disk's temperature and the
 // like move on every read and are not the page's business.
-// A password for the machine's screen (R194): the machine takes admin with
-// none until setup ends, so this is for keeping a way in past that. Never in
-// the needed order: a person may leave it, and This machine sets one later.
-function setupConsoleWanted(s){
-  return !!s.own?.reported?.console?.os;
+// The two presses at the top of the page on a machine that is its own
+// controller (the operator, 9 Nov): off, and a login for its screen. Neither
+// is a step, so neither waits for one; one job runs on a machine at a time,
+// and the page's band says which while they are dead for it.
+function setupTopActs(s){
+  if (!s.own) return "";
+  const c = s.own.reported?.console;
+  const dead = !s.node || (s.own.jobs || []).some(j => j.apply) ? " disabled" : "";
+  return `<div class="actbar">${c?.os ? `<button type="button" data-setconsole${dead}>${c.set ? "New console login" : "Generate console login"}</button>${
+      helpIcon(`For this machine's screen or a KVM: the name admin, sudo gives root. ${c.open ? "Until setup ends that screen takes admin with no password; generating one ends that, and keeps a way in afterwards." : "Not your dashboard password."}`)}` : ""}<button type="button" class="danger" data-setoff${dead}>Shut down</button></div>${
+      s.node ? "" : `<div class="sub dim setupwait">These wait for this machine's agent to answer.</div>`}`;
 }
-function setupConsoleCard(num, s){
-  const c = s.own.reported.console;
-  return setupCard(num, "A password for this screen", !!c.set, false, c.set
-    ? `<p>Log in at this machine's screen or a KVM as <code>admin</code> with it; <code>sudo</code> gives root. This machine changes it, after Finish.</p>`
-    : `<p>${c.open ? "Until setup ends, this machine's screen or a KVM logs in as <code>admin</code> with no password, in case something here stops answering. Set one to keep that way in afterwards" : "Set one to log in at this machine's screen or a KVM as <code>admin</code>"}. It is not your dashboard password, and This machine can set one later.</p>${consolePwFields("setfields")}`,
-    c.set ? "" : `<button type="button" class="primary" data-console="set">Set it</button>`, c.set ? "" : "optional");
+// Sixteen characters a person can read off a page and type at a KVM: no
+// look-alikes, in fours.
+function consoleLogin(){
+  const abc = "abcdefghjkmnpqrstuvwxyz23456789", out = [];
+  while (out.length < 16){
+    for (const b of crypto.getRandomValues(new Uint8Array(32))) if (b < 248 && out.length < 16) out.push(abc[b % abc.length]);
+  }
+  return out.join("").replace(/(.{4})(?=.)/g, "$1-");
+}
+async function setupGenerateConsole(b){
+  const n = ownMachine();
+  if (n?.reported?.console?.set && !await askYes("Make a new console login?\n\nThe password this machine has now stops working.", {title: "New console login?", verb: "Make a new one"})) return;
+  const was = b.textContent;
+  busy(b, "Generating");
+  const password = consoleLogin();
+  const j = await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", password});
+  if (j.error){ notify(j.error, true); unbusy(b, was); return; }
+  await ask({title: "Console login", text: "At this machine's screen or a KVM, log in as admin with this password; sudo gives root. It takes a few seconds to reach the machine.\n\nIt is shown this once and never kept here, so note it now.",
+             choices: [{label: "Done", value: true}], cancel: null, field: {value: password, label: "Password"}});
+  await loadNodes();
+}
+async function setupShutDown(b){
+  const n = ownMachine();
+  if (!await askYes(`Shut ${n?.name || "this machine"} down?\n\nIt stays off until somebody switches it on. Setup picks up where it was when it starts again.`, {title: "Shut down?", verb: "Shut down"})) return;
+  busy(b, "Shutting down");
+  const j = await postJSON("/api/v1/nodes", {action: "poweroff", id: n?.id || ""});
+  if (j.error){ notify(j.error, true); unbusy(b, "Shut down"); return; }
+  notify("shutting down");
+  await loadNodes();
 }
 
 function setupDisksSig(dk){
-  return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.ok]));
+  return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.health]));
 }
 
-// Text a person has typed, put back when the page has had to be drawn again:
-// a disk plugged in mid-sentence moves the page, and is no reason to lose it.
-function setupKeepTyped(el){
-  const had = [...el.querySelectorAll("input[id]:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea[id]")]
-    .filter(i => i.value).map(i => ({id: i.id, value: i.value, focus: i === document.activeElement, at: i.selectionStart}));
-  return () => had.forEach(h => {
-    const now = el.querySelector("#" + CSS.escape(h.id));
-    if (!now || now.value) return;
-    now.value = h.value;
-    now.dispatchEvent(new Event("input", {bubbles: true}));
-    if (h.focus){ now.focus(); try{ now.setSelectionRange(h.at, h.at); }catch(e){ /* a type with no caret */ } }
-  });
-}
 
 function wireSetup(el, s){
   el.querySelectorAll("[data-setwalk]").forEach(b => b.onclick = () => setupWalkPick(b.dataset.setwalk));
   // The walk's steps are This machine's and Controller settings' own, so
   // their own wiring serves them; nothing here sends anything else.
   if (setupWalking()){ wireHeld(el); wireMove(el); }
-  wireMachineConsole(el);
+  el.querySelectorAll("[data-setconsole]").forEach(b => b.onclick = () => pressing(b, () => setupGenerateConsole(b)));
+  el.querySelectorAll("[data-setoff]").forEach(b => b.onclick = () => pressing(b, () => setupShutDown(b)));
   const vm = el.querySelector("[data-setvm]"), en = el.querySelector("[data-setenroll]");
   if (vm) vm.onclick = () => ndDialogs().openVm();
   if (en) en.onclick = () => ndDialogs().openEnroll();
@@ -200,17 +215,15 @@ function wireSetup(el, s){
   if (name && email){ name.oninput = ready; email.oninput = ready; }
   if (git) git.onclick = async () => {
     busy(git, "Saving");
-    const j = await (await postJSON("/api/profile", {action: "save", profile: {full_name: name.value.trim(), email: email.value.trim()}}))
-      .json().catch(() => ({error: "no answer from the dashboard"}));
+    const j = await postJSON("/api/profile", {action: "save", profile: {full_name: name.value.trim(), email: email.value.trim()}});
     if (j.error){ unbusy(git, "Save"); return notify(j.error, true); }
     refresh();
   };
   const cl = el.querySelector("[data-setclaude]");
   if (cl) cl.onclick = async () => {
     busy(cl, "Starting");
-    const r = await postJSON("/api/agents", {action: "install", agent: "claude", node: s.node.id});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok){ unbusy(cl, "Install"); return notify(j.error || `could not start (HTTP ${r.status})`, true); }
+    const j = await postJSON("/api/agents", {action: "install", agent: "claude", node: s.node.id});
+    if (j.error){ unbusy(cl, "Install"); return notify(j.error, true); }
     notifyJob(j.job, `installing Claude Code on ${s.node.name}`);
     // It turns to done when the node's census reports the version.
     busy(cl, "Installing");
@@ -226,7 +239,7 @@ async function setupFinish(){
   busy(btn, "Finishing");
   let j;
   try{
-    j = await (await postJSON("/api/settings", {set: {setup_done: true}})).json();
+    j = await postJSON("/api/settings", {set: {setup_done: true}});
   }catch{ j = {error: "no answer from the dashboard"}; }
   if (j.error){
     unbusy(btn, "Finish");
@@ -277,16 +290,19 @@ function setupPlaceCard(num, s, moving){
     : moved ? `<p>Moving them to the pool. Docker and the VMs are stopped until it ends.</p>`
     : `<p>They write all day, so they live on a pool and never on the stick. This is done by itself when your first pool is made.</p>${
        (n?.reported?.pools || []).length ? pick : ""}`);
+  const pool = stickPoolPick(n, stick, old && adopted ? "None of these disks can hold them: a data disk carries the old parity. Name a folder below, or add a disk."
+    : "Nothing to pick yet: the step before gives this one its disks.", true);
+  const folder = projectsFolderField(n, stick, !!state?.can?.admin, true);
   return setupCard(num, "Where the spaces and containers go", placed, false,
-    `<p>They write all day, so they live on the disks and never on the stick. There are two choices here.</p>
-     ${factGrid([["System pool", `where Docker, the VMs and the toolchains write: ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}`],
-                 ["Spaces folder", `only if your spaces already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back`]], "stickfacts")}
-     <p>${moving ? "The Spaces page stays empty until the controller lands: its list comes with the move. " : ""}Where they are now:</p>
+    `<p>They write all day, so they live on the disks and never on the stick.</p>
+     <p><b>System pool</b>: where Docker, the VMs and the toolchains write; ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}.</p>
+     <p><b>Spaces folder</b>: only if your spaces already sit on these disks, the folder they are in. Nothing is copied: its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back.</p>
+     ${moving ? "<p>The Spaces page stays empty until the controller lands: its list comes with the move.</p>" : ""}
      ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
                  ["The spaces", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
                   {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
      ${roOnly ? `<div class="sub warn">These disks were adopted read only, with no writable pool, so nothing can go on them. Release them in the step before and adopt Writable, or add a disk.</div>` : ""}
-     ${pick}${projectsFolderField(n, stick, !!state?.can?.admin)}`);
+     ${pool || folder ? `<div class="fgrid setpicks">${pool}${folder}</div>` : ""}`);
 }
 // The first pool of a new start named, once a press, so nobody has to know what
 // a system pool is. Not on a move or with another system's disks: there it is
@@ -301,24 +317,19 @@ function setupPlaceAuto(s){
   const arr = n.reported?.array?.mount, mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || (arr && !(stick.others || []).includes(arr) ? arr : "");
   if (!mount || setupPlaceTried === mount) return;
   setupPlaceTried = mount;
-  postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount}).then(r => r.json()).catch(() => ({error: "no answer"}))
+  postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount})
     .then(j => { if (j.error) notify(j.error, true); loadNodes().then(() => drawSetup()); });
 }
-// One machine's system jobs run one at a time, and a second asked for while the
-// first runs is refused (B670): each is sent when the last has ended, the button
-// saying how far along. The error to say, or "".
+// One machine's system jobs run one at a time, a second queued behind the
+// first: each is sent when the last has ended, so one that fails stops the ones
+// after it, the button saying how far along. The error to say, or "".
 async function setupInTurn(calls, btn, word){
   for (const [i, c] of calls.entries()){
     if (calls.length > 1) busy(btn, `${word} ${i + 1} of ${calls.length}`);
-    let j;
-    for (let tries = 0; tries < 200; tries++){
-      j = await (await postJSON("/api/v1/nodes", c)).json().catch(() => ({error: "no answer"}));
-      if (!/already in flight/.test(j.error || "")) break;
-      await new Promise(r => setTimeout(r, 3000));
-    }
+    const j = await postJSON("/api/v1/nodes", c);
     if (j.error) return j.error;
     for (let tries = 0; j.job && tries < 900; tries++){
-      const d = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`)).json().catch(() => ({}));
+      const d = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`);
       if (d.state === "failed" || d.state === "canceled") return `${d.error || "that job failed"}: its log is on the Jobs page, after Finish`;
       if (!d.state || d.state === "succeeded") break;
       await new Promise(r => setTimeout(r, 2000));
@@ -355,10 +366,12 @@ function setupWalkPick(to){
   if (to === "move") setupLandLoad();
   setupSig = ""; drawSetup();
 }
-async function setupLandLoad(){
-  try{ setupLand = (await (await fetch("/api/move")).json()).land || null; }
-  catch(e){ /* the step says it is waiting */ }
-  drawSetup();
+function setupLandLoad(){
+  return reading("setup.land", async () => {
+    try{ setupLand = (await getJSON("/api/move")).land || null; }
+    catch(e){ /* the step says it is waiting */ }
+    drawSetup();
+  });
 }
 // What the walk's steps show, for the page's own redraw test: a poll that moved
 // none of it leaves what was typed alone.
@@ -405,30 +418,31 @@ function setupWalkHtml(s){
     `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your spaces are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the spaces folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
   if (n && stick) cards.push(setupPlaceCard(++i, s, true));
-  if (setupConsoleWanted(s)) cards.push(setupConsoleCard(++i, s));
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
-    : `<p>The moved controller's accounts, nodes, spaces and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed)}`;
+    : `<p>The moved controller's accounts, nodes, spaces and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed, old)}`;
   cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
+  // Said as sentences, a word in bold to find each by (the operator, 10 Nov:
+  // long values in a grid of two columns read as wonky).
   cards.push(setupCard(++i, "After it lands", false, false,
-    `${factGrid([["Sign in", "with an account the old controller had"],
-                 ["Your nodes", "follow by themselves. Any that does not is listed on the Nodes page, with the one line to run on it"],
-                 ...(state?.firstboot?.apps_from ? [["Containers and VMs", "This machine reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
-                 ...(state?.held?.held ? [["Start", "nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be"]] : [])], "stickfacts")}`,
+    `<p><b>Sign in</b> with an account the old controller had.</p>
+     <p><b>Your nodes</b> follow by themselves once they can reach this address. Any that does not is listed on the Nodes page, with the one line to run on it${old ? "; a node that was a VM on the old system is off until its VM runs here" : ""}.</p>
+     ${old ? `<p><b>Containers and VMs</b>: this machine's Containers page reads what the old system ran. Its containers come as a zip of compose files, each imported with New container; its VMs are defined there, a VM that was one of your nodes with them. Home keeps this until it is read.</p>` : ""}
+     ${state?.held?.held ? `<p><b>Start</b>: no session starts until it is pressed, and nothing of the old system's disks is mounted until you adopt them. Press it once the disks are as they should be.</p>` : ""}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
   cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the spaces folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>
        <pre class="setcmd">bash ${esc(stick.projects)}/.aerieos-give-back.sh</pre>` : ""}
      <p>${old ? esc(setupBootBack(had)) : "Nothing here has touched the old controller."}</p><p>If you pressed Prepare to move on the old controller, press Forget it there, so its nodes stop expecting a new home. Once a move has landed the old controller stays read-only for good, and going back is another move.</p>`, "", "any time"));
   return `<div class="setuppage">
     <div class="setuphead">
-      <h2>Moving here</h2>
+      <div class="setuptitle"><h2>Moving here</h2>${setupTopActs(s)}</div>
       <p>The steps in the order they have to happen, each done on this page. ${old ? "Nothing on the old system's disks changes until a step says so." : "The old controller runs on, untouched, until the move lands."}</p>
       <div class="setwalkask"><span class="grow">Starting new, with nothing to bring?</span><button type="button" data-setwalk="fresh">Set up a new one instead</button></div>
     </div>
     ${cards.join("")}
     <div class="setfinish">
-      <p class="dim">${s.node ? `Not landing a controller: Finish keeps this setup account as the owner and opens Home.${s.own ? " This machine holds all of the above." : ""}` : s.own ? "Finish opens once this machine answers." : "Not moving after all? Set up a new one instead, above."}</p>
+      <p class="dim">${s.node ? `Not landing a controller: Finish keeps this setup account as the owner and opens Home.${state?.me === "setup" ? " Its name is setup and its password the move token until you change them, under Users and in your Profile." : ""}${s.own ? " The Nodes page holds all of the above." : ""}` : s.own ? "Finish opens once this machine answers." : "Not moving after all? Set up a new one instead, above."}</p>
       <div class="actbar"><button type="button" id="setupFinish"${s.node ? "" : " disabled"}>Finish</button></div>
       <div class="hint bad" id="setupWhy" hidden></div>
     </div>
@@ -452,10 +466,15 @@ const setupDiskFree = d => !d.system && !d.removable;
 // off their NAS saw every disk of it listed under Make it). A plan's id is
 // the old system's name for the disk (MODEL_SERIAL), met by the serial or
 // the by-id name.
+// A pool is met by its disk where the plan names one (B945: pools carry no
+// id, and their disks were offered to erase), and a disk the plan sets
+// apart (encrypted, degraded) is the old system's all the same.
 function setupPlanned(){
-  const w = state?.firstboot?.adopt?.want || {};
+  const a = state?.firstboot?.adopt || {}, w = a.want || {};
   return [...(w.data || []).map(x => ({...x, what: "data"})), ...(w.parity || []).map(x => ({...x, what: "parity"})),
-          ...(w.pools || []).map(x => ({...x, what: "pool"}))].filter(x => x.id);
+          ...(w.pools || []).map(x => ({...x, id: x.id || x.disk_id || "", what: "pool"})),
+          ...(a.skipped || []).map(x => ({...x, what: "apart"})),
+          ...(a.degraded || []).map(x => ({...x, what: "apart", why: x.status}))].filter(x => x.id);
 }
 const setupDiskPlanned = (d, rows) => rows.find(x => x.id === d.serial || (d.serial && x.id.endsWith("_" + d.serial)) || (d.by_id && d.by_id.includes(x.id))) || null;
 // The machine's free disks split: theirs (the plan's, each with its row of
@@ -469,7 +488,10 @@ function setupDiskSplit(n){
 // What a disk or partition holds, in the agent's words: "nothing" is its word
 // for nothing, as the Storage page and the pool and array jobs read it.
 const setupHolds = x => !!x && x !== "nothing";
-const setupDiskHeld = d => setupHolds(d.holds) || (d.parts || []).some(p => setupHolds(p.holds));
+// ...and a disk with any partition at all counts, whatever the partition
+// holds: an old array's parity is a partition with no filesystem, and was
+// ticked to erase with no way to untick it (B945).
+const setupDiskHeld = d => setupHolds(d.holds) || (d.parts || []).length > 0;
 
 // The plan for these disks: {main, fast, notes}. `main` is where the shares
 // live, {kind: "zfs"|"array", layout, disks, parity, usable_mb, may_fail,
@@ -524,13 +546,15 @@ function setupDiskPlan(disks, {lose = 1, layout = ""} = {}){
 // fail, an Advanced layout, the disks holding something a person said to
 // use, and the storage read it draws from (the own machine's row).
 const setupDisks = {lose: 1, layout: "", use: new Set(), adv: false, own: null, at: 0, made: false};
-async function setupDisksLoad(){
-  setupDisks.at = Date.now();
-  try{
-    const j = await (await fetch("/api/storage")).json();
-    setupDisks.own = (j.nodes || []).find(n => n.own) || null;
-  }catch(e){ /* the card says it is waiting */ }
-  drawSetup();
+function setupDisksLoad(){
+  return reading("setup.disks", async () => {
+    setupDisks.at = Date.now();
+    try{
+      const j = await getJSON("/api/storage");
+      setupDisks.own = (j.nodes || []).find(n => n.own) || null;
+    }catch(e){ /* the card says it is waiting */ }
+    drawSetup();
+  });
 }
 // Done once the machine holds a pool or an array, whoever made it.
 const setupDisksDone = n => !!(n && ((n.pools || []).length || (n.array?.data || []).length || n.array?.mount));
@@ -549,7 +573,8 @@ function setupDisksCard(num){
   const facts = d => `<b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>`;
   // The old system's disks: said whose they are, no box, nothing to press.
   const theirRow = ([d, p]) => `<div class="row setdisk theirs"><span class="grow">${facts(d)}
-      <span class="sub note">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is, in the walk; nothing here touches it</span></span></div>`;
+      <span class="sub note">${p.what === "apart" ? `the old system's ${esc(p.slot || "disk")}: not adopted (${esc(p.why || "set apart")}); nothing here touches it`
+        : `the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is, in the walk; nothing here touches it`}</span></span></div>`;
   if (theirs.length && !free.length){
     const nd = theirs.filter(([, p]) => p.what === "data").length, np = theirs.filter(([, p]) => p.what === "parity").length, npool = theirs.length - nd - np;
     const what = [nd ? `${nd} data disk${nd === 1 ? "" : "s"}` : "", np ? `${np === 1 ? "the parity disk" : `${np} parity disks`}` : "", npool ? `${npool} pool disk${npool === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
@@ -564,8 +589,8 @@ function setupDisksCard(num){
   const plan = setupDiskPlan(free.filter(use), setupDisks);
   const row = d => `<div class="row setdisk"><label class="grow"><input type="checkbox" data-setdiskuse="${esc(d.name)}"${use(d) ? " checked" : ""}${setupDiskHeld(d) ? "" : " disabled"}>
       ${facts(d)}
-      ${d.smart && d.smart.ok === false ? `<span class="pill bad">failing</span>` : ""}
-      ${setupDiskHeld(d) ? `<span class="sub warn">holds ${esc(d.holds || "data")}: kept unless you tick it, which erases it</span>` : ""}</label></div>`;
+      ${d.smart?.health === "failing" ? `<span class="pill bad">failing</span>` : ""}
+      ${setupDiskHeld(d) ? `<span class="sub warn">holds ${esc(setupHolds(d.holds) ? d.holds : (d.parts || []).map(p => p.holds).find(setupHolds) || "a partition")}: kept unless you tick it, which erases it</span>` : ""}</label></div>`;
   const says = p => !p ? "" : `<div class="setplan"><p><b>${p.kind === "array" ? "An array" : p.layout === "single" ? "One pool" : `A ZFS ${esc(p.layout)}`}</b> of ${p.disks.length} disk${p.disks.length === 1 ? "" : "s"}${
       p.parity?.length ? `, ${p.parity.length} for parity` : ""}: <b>${esc(setupGB(p.usable_mb))}</b> to use, ${p.may_fail ? `any ${p.may_fail === 1 ? "one disk" : `${p.may_fail} disks`} may fail` : "no disk may fail"}.</p>
       <p class="dim">${esc(p.why)}${p.grows ? ` ${esc(p.grows)}` : ""}</p></div>`;
@@ -708,9 +733,9 @@ function setupInOrder(el, s){
   // nothing but its time (the progress rule).
   const since = job.started ? Math.max(0, Math.floor(Date.now() / 1000 - job.started)) : 0;
   const took = since >= 3600 ? `${Math.floor(since / 3600)} h ${Math.floor(since % 3600 / 60)} min` : since >= 60 ? `${Math.floor(since / 60)} min` : since ? `${since} s` : "";
-  band.innerHTML = `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span>${
+  drawHTML(band, `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span>${
       job.step || took ? ` <span class="dim">${[job.step && esc(job.step), took && `${esc(took)} so far`].filter(Boolean).join(", ")}</span>` : ""
-    } One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`;
+    } One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`);
   if (head) head.after(band); else el.prepend(band);
   if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
 }

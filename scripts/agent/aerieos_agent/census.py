@@ -20,6 +20,8 @@ from .base import (
     CLAUDE_DIR,
     OS_RELEASE,
     SANDBOX_BIN,
+    REFUSED,
+    RELAY,
     SCREEN_PORT,
     SESSION,
     SHARE,
@@ -28,10 +30,14 @@ from .base import (
     _probe,
     _probe_died,
     _run,
+    fs_said,
+    read_json,
 )
-from .stores import _stores, noexec, store_dirs, tc_root
+from .stores import _stores, console_said, noexec, store_dirs, tc_root
+from .controller import KEY_PIN
+from .base import CHANNEL
 from .backends import _have, net_backend, pkg_backend
-from .toolchains import _toolchains, sdk_images, sdk_verified, sdk_versions, sysdeps_now
+from .toolchains import _toolchains, sdk_images, sdk_receipts, sdk_verified, sdk_versions, sysdeps_now
 from .gpu import (
     _gpu_amd,
     _gpu_card,
@@ -44,6 +50,7 @@ from .gpu import (
 )
 from .sessnet import SESSNET_STATUS, isolation_now
 from .runners import _runner_state, runner_dirs
+from . import release
 from . import storage
 from . import vmhw
 from .disks import disks_now
@@ -57,6 +64,7 @@ from .power import host_updates_now, ups_now
 from .extmounts import extmounts_now
 from .backups import backups_now
 from .vms import isos_now, vm_memory, vm_pool, vms_now, vms_other
+from .names import ETC
 
 
 def _sshd_listening():
@@ -162,9 +170,14 @@ def _store_ro(state):
 
 
 # The internet, asked at most every ten minutes: a machine with none spent
-# a timeout on it at every check-in otherwise.
-_NET = {"at": 0.0, "ok": None}
+# a timeout on it at every check-in otherwise. A "no" is asked again after a
+# minute while the agent is young: its first look is at boot, before the
+# network (and a LAN bridge) is up, and that answer stood for ten minutes on
+# a machine that had it (B770).
+_NET = {"at": 0.0, "ok": None, "first": 0.0}
 NET_EVERY = 600
+NET_NO_EVERY = 60
+NET_YOUNG_S = 900
 NET_HOSTS = ("github.com", "dl.google.com")
 
 
@@ -172,7 +185,10 @@ def _internet():
     """True when this machine reaches the internet, False when it does not."""
     import socket
     import time
-    if _NET["ok"] is not None and time.time() - _NET["at"] < NET_EVERY:
+    now = time.time()
+    _NET["first"] = _NET["first"] or now
+    keep = NET_EVERY if _NET["ok"] or now - _NET["first"] > NET_YOUNG_S else NET_NO_EVERY
+    if _NET["ok"] is not None and now - _NET["at"] < keep:
         return _NET["ok"]
     ok = False
     for host in NET_HOSTS:
@@ -199,12 +215,8 @@ def _docker_ip():
     """127.0.0.1 where published ports stay on the node: both docker's `ip`
     (the default bridge) and the networks' default bind (every network
     compose makes), else "" (R190)."""
-    try:
-        with open("/etc/docker/daemon.json", encoding="utf-8") as f:
-            d = json.load(f)
-    except (OSError, ValueError):
-        return ""
-    if not isinstance(d, dict):
+    d = read_json("/etc/docker/daemon.json", None)
+    if d is None:
         return ""
     br = ((d.get("default-network-opts") or {}).get("bridge") or {}) if isinstance(d.get("default-network-opts"), dict) else {}
     ip = str(d.get("ip") or "")
@@ -218,7 +230,7 @@ def _docker_ip():
 # so IOMMU, Storage, Shares and UPS could not be installed from the page
 # (B641).
 FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
-FEATURES_DIR = "/etc/builderbot/features"
+FEATURES_DIR = ETC + "/features"
 
 
 def _gpuvm_now():
@@ -267,7 +279,7 @@ def features_now():
                    "kvm": kvm, **({"nokvm": nokvm} if nokvm else {}),
                    "virtiofs": bool(vmhw.virtiofsd()),
                    "libvirt": _run([virsh, "--version"], timeout=10) if virsh else ""},
-        "firewall": {"installed": os.path.exists("/etc/builderbot/hosting-fw.nft")},
+        "firewall": {"installed": os.path.exists(ETC + "/hosting-fw.nft")},
         # The IOMMU on the kernel's command line (R116 step 4): put there by
         # AerieOS (its marker), and on in the running kernel (its groups),
         # which a restart and the firmware's VT-d or AMD-Vi decide.
@@ -303,6 +315,19 @@ def timezone_now():
         return tz if re.fullmatch(r"[A-Za-z0-9_+./-]{1,64}", tz) else ""
     except OSError:
         return ""
+
+
+def channel_now(state):
+    """{"scheme", "pin", "why"?}: how node.json says this node reaches its
+    controller, the pin by its kind and never its characters."""
+    pin = str((state or {}).get("pin") or "")
+    out = {"scheme": "https" if str((state or {}).get("controller") or "").startswith("https://") else "http",
+           "pin": "key" if pin.startswith(KEY_PIN) else "ca" if pin == "ca" else "cert" if pin else "none"}
+    if out["scheme"] == "http":
+        out["pin"] = "none"
+        if CHANNEL.get("why"):
+            out["why"] = str(CHANNEL["why"])[:120]
+    return out
 
 
 def census(state):
@@ -396,6 +421,32 @@ def census(state):
         # is mounted and from where, and the address this machine is on.
         # The row draws the operator's desired config against these.
         "sandbox": os.access(SANDBOX_BIN, os.X_OK),
+        # Whose agent updates this node takes (release.py): the release key
+        # it pinned, shortened, the keys added at its console the same way,
+        # whether its console allows unsigned ones, and whether it chose
+        # to pin no release key.
+        "release_key": str(console_said().get("release_key") or "")[:16],
+        "release_spare": str(console_said().get("release_spare") or "")[:16],
+        "release_also": [k[:16] for k in release.also(console_said())],
+        "unsigned_ok": console_said().get("unsigned_ok") is True,
+        # ...and whether it said an older agent may be put back (older on).
+        "older_ok": console_said().get("older_ok") is True,
+        "release_unpinned": console_said().get("release_unpinned") is True,
+        # ...and whether its console switched root commands off (R227 step 2).
+        "root_off": console_said().get("root_off") is True,
+        # ...and whether file work in an account's folder is done as that
+        # account here, or refused until a try holds (base.fs_holds).
+        "file_work": fs_said(),
+        # How this node reaches its controller: plain http or https, and
+        # what an https channel is held to (the controller's key, its
+        # certificate, the system's authorities for a public hostname, or
+        # nothing), with why it is still plain http where the controller
+        # names a key and the move was not made (the agent's channel_move).
+        "channel": channel_now(state),
+        # ...and the controller's bundle this node refused and keeps
+        # refusing, with why (bundle(), R267 step 6): named only while one
+        # is, so the controller can say it where a person looks.
+        **({"bundle_refused": dict(REFUSED)} if REFUSED.get("digest") else {}),
         # ...and whether this agent may install the machine's own packages
         # here: the stamp AND root, which is what administers() asks. The
         # stamp alone said yes for an agent that could not, and the
@@ -444,11 +495,17 @@ def census(state):
         "toolchain_versions": sdk_versions(state),
         # ...and how each was checked when it was installed (R137).
         "toolchain_verified": sdk_verified(state),
+        # ...and what each pinned install left behind: its receipt (R234).
+        "toolchain_receipts": sdk_receipts(state),
         "services": services_now(),
         # The session half (roadmap #24), as this process is holding it.
         "session": session_now(state),
         # The file explorer's requests, on the screen relay's port (R224).
         "files": {"port": SCREEN_PORT},
+        # ...and how that port is spoken to (R243): its certificate's sha256
+        # where it has one, which the controller pins, and that it takes a
+        # signed request once.
+        "relay": dict(RELAY),
         # What the disks hold (the Storage tab): the last hourly walk, never
         # one taken here, since a walk of a big store is minutes.
         "storage": storage.last(),

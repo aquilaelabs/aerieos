@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# `aerie`: small convenience CLI inside the container.
+# `aerie`: AerieOS's command line. The operator runs it on the controller, and
+# a session runs it on its node, where each verb either answers there or is
+# relayed to the controller with the session's token.
 #
 set -euo pipefail
 
@@ -8,18 +10,23 @@ set -euo pipefail
 # image (both live in /opt/aerieos/scripts), and it means a dry-run from a
 # checkout uses that checkout's library instead of silently mixing new
 # commands with the installed image's older helpers.
+# Where this script is, found once: each of the thirty places that asked ran
+# readlink and dirname for itself, five of them before any verb was read,
+# which was half of what every aerie call cost before it began.
+BB_SCRIPTS="$(readlink -f "$0")"
+BB_SCRIPTS="${BB_SCRIPTS%/*}"
 # shellcheck source=lib/common.sh
-. "$(dirname "$(readlink -f "$0")")/lib/common.sh"
+. "$BB_SCRIPTS/lib/common.sh"
 # The toolchain manager (`aerie toolchains` and everything the Library and the Installed page drive) is a
 # third of this script's length and none of its subject, so it lives next door.
 # shellcheck source=lib/sdk.sh
-. "$(dirname "$(readlink -f "$0")")/lib/sdk.sh"
+. "$BB_SCRIPTS/lib/sdk.sh"
 # shellcheck source=lib/preflight.sh
-. "$(dirname "$(readlink -f "$0")")/lib/preflight.sh"
+. "$BB_SCRIPTS/lib/preflight.sh"
 # The API client the network verbs share (lib/bbapi.py) and the programs
 # behind them (lib/*-verbs.py, lib/report.py and the rest), run by path so
 # a checkout's bb runs with the checkout's library.
-BB_LIB="$(dirname "$(readlink -f "$0")")/lib"
+BB_LIB="$BB_SCRIPTS/lib"
 export BB_LIB
 
 # The reference's entries for one verb: each line that starts `bb VERB `,
@@ -135,7 +142,8 @@ aerie changelog add "..." --cat NAME   log what a change means for the person us
                    Added (somebody can do something they could not), Changed
                    (already here, now different), Deprecated (going away),
                    Removed (gone), Fixed (was wrong in a released version,
-                   now right; --bug N says which bug), Security (act on it
+                   now right; --bug N says which bug, several by repeating
+                   it), Security (act on it
                    because of what it exposed). When two fit, the one a reader would look under;
                    something nobody using the product would notice gets no
                    entry, and neither does a fix to something no release has
@@ -169,6 +177,11 @@ aerie changelog missing [TAG]  the bugs fixed since the last release (or TAG)
 aerie changelog skip N "why"   a fixed bug that needs no Fixed line, and why
                    (the release never had it, nobody using it meets it); kept
                    in the bug's notes, as add's --bug N is for the line itself
+aerie changelog link N BUG...  the unreleased line N answers these bugs: kept in
+                   the notebook, where each bug's row lists the line and the
+                   release that carried it; the public line names its commits
+                   alone, and an edit, a merge or the editor's Save keeps the
+                   bugs tied; `unlink N BUG...` unties them
 aerie projects        the space dirs here and their branches
 aerie shell           login shell as the builder user
 aerie login           Claude Code subscription auth flow, on the machine it is
@@ -240,10 +253,13 @@ aerie nodes           the machines enrolled as nodes, each with the agent it run
                    read-only in a terminal; the Nodes page is where they are edited
 aerie nodes show NAME one of them in full, by name or id: its agent against the one
                    this controller ships, and what Update agent would fix
-aerie nodes enroll-token NAME [--user U] [--own]
+aerie nodes enroll-token NAME [--user U] [--own] [--pins]
                    a new node's enrollment token, printed once, from a shell on
                    the controller: Enroll node's Just a token, for a scripted setup;
-                   --own is the controller's own machine, on a bare-metal install
+                   --own is the controller's own machine, on a bare-metal install;
+                   --pins adds, a line each, what the provisioner is handed with
+                   it: the release key the node pins, and the digest and the
+                   signature the agent it fetches is held to
 aerie projects adopt FOLDER [--name NAME]
                    a folder already under the spaces share made a space, as
                    if AerieOS had made it, from a shell on the controller: a
@@ -306,7 +322,7 @@ aerie devapp new [NAME] [--branch REF] [--compose FILE] [--override FILE] [--nod
                    files (site/compose.yml), the root's own by default; --override
                    lays another compose file from the tree over it, for this one
                    container (its own ports, env or an extra service). --node
-                   puts it on a hosting node ticked under the space's Also
+                   puts it on a hosting node listed under the space's Also
                    works on (marked Hosting only): built on the space's own
                    node and shipped there. On ask, one request carries all of it and
                    Approve makes and builds it
@@ -356,12 +372,17 @@ aerie sign status [TAG]
                    node with its tools) and how the newest went: handed over,
                    signed and attached with the key's fingerprint, or what
                    stopped it, in the bell's words
-aerie sign release --why "..."
+aerie sign release [--again TAG] --why "..."
                    look for unsigned release APKs now and sign a failed one
                    again, as the Signing view's Look for unsigned APKs now,
                    under Sign a build: auto starts it, ask waits for the owner;
                    then waits for the look and says what it found, run by run,
-                   or why it found nothing
+                   or why it found nothing. Only a release's own run is signed
+                   from (the one its tag started, on the tag's commit, in the
+                   repository itself; any other is refused, saying why), and
+                   a release is signed once: --again TAG replaces the signed
+                   APK on TAG's release with its own run's, signed again,
+                   which waits for the owner whatever the setting
 aerie emu create API  build the AVD for an API level, installing its image if missing
 aerie emu install APK install an APK on the running emulator
 aerie emu shot [FILE] screenshot the emulator into dist/emu/
@@ -421,6 +442,12 @@ aerie bug add "..."   report one (--sev, --area, --repro, ...); `note N`, `fix N
                    --repro, --reproduces always|sometimes|once|untried says how
                    often those steps showed it; --report N files diagnostics
                    report N with its words, area, repro and that answer
+aerie bug fix N [N...] "what fixed it" [--commit SHA]
+                   close the bugs one commit fixed, after committing it: each
+                   records the commit the space is on (or the ones --commit
+                   names) as its Fixed in, which ties it to the changelog
+aerie bug fixed-in N [SHA...] [--drop SHA...]
+                   the commits that fixed a bug: listed, added or taken off
 aerie tests run [ARGS]  run the space's test command, time it, and record the run: says first when it should
                    finish, and ends by NAMING what went wrong: the failed assertions per file, and for a file
                    that CRASHED the line it died on, the assertions that had already failed before it did,
@@ -444,9 +471,23 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests bisect SUITE GOOD BAD [--check WORDS] [--times N]   the first commit between GOOD and
+                   BAD where SUITE fails (or prints a FAIL line holding WORDS), found by halving and
+                   running it --at each commit; a suite that has flaked runs three times a commit
+aerie tests flakes [DAYS]  the suites that failed in a whole run and passed when run again, counted over
+                   the last 30 days (or DAYS), the most often first, each with the check that failed
+                   last; the harness records one as it names it, and aerie tests preflight fails on one
+                   in a suite it ran
+aerie tests root      the root tier (scripts/dashboard/roottier): what the root agent and the root
+                   helpers do in a folder an account controls, with a link planted where root
+                   works, as root in a throwaway container of the controller's image where docker
+                   answers; `aerie devapp test root-tier` runs it in the space's dev instance, and CI
+                   on every pull request and release
 aerie tests lab       the lab suites (test/lab-*.mjs) against real services rather than stand-ins.
                    Each names what it needs and skips in one line without it, so a missing service
-                   is never a failure, and nothing records them: a lab run is a proof, not a timing.
+                   is never a failure. Each subject a suite walks whole (a system, a git host) is
+                   written, dated, into scripts/dashboard/lab-record.json, which the vetted lines
+                   are read from: commit it with the work.
                    Two services are known. A Gitea: the `gitea` service of AerieOS's own dev
                    stack, under its compose file's `lab` profile, brought up from the Containers page
                    like any space's stack (`BB_LAB_GITEA`, the local one by default), and
@@ -492,8 +533,12 @@ aerie design file [--from FILE]   docs/design-language.md as the notebook writes
                    of the saved design, so a branch writes the file from its own
 aerie design json     the record: the language, the pages, and the presets by key
 aerie design schema   the record's shape with every limit, for a save that lands first time
-aerie design save FILE   write a record of that shape back, whole: how a session
-                   puts a design language it was given into the notebook
+aerie design save FILE [--file]   write a record of that shape back, whole: how a
+                   session puts a design language it was given into the notebook
+aerie design edit NAME --text FILE|--append FILE [--file]   one rule's text (as
+                   show names it: a-dialog/layout) or one page's notes, changed
+                   in place and saved, printing what changed; - reads stdin.
+                   --file, here and on save, writes docs/design-language.md
 aerie wiki            the space's wiki, from the notebook's Wiki view: its pages,
                    who changed each last, and where it is pushed
 aerie wiki show NAME [--rev]   one page's Markdown (--rev: the revision a save checks)
@@ -513,6 +558,13 @@ aerie transcripts show ID [--tz ZONE] [--all]   one of them as text: what was sa
 aerie transcripts fetch ID [--into DIR]   the file itself into this machine's folder
                    for it: how a node holding its spaces as a synced copy
                    resumes a conversation it does not have (bb-tty runs it)
+aerie transcripts label ID WORDS   the name one of yours is listed and picked by,
+                   in place of its first words; no words takes it off.
+                   aerie transcripts note ID WORDS says more of it, shown
+                   where it is picked
+aerie transcripts keep ID   keep a copy of one of yours on the controller, where
+                   its agent's own cleanup does not reach, so it can still
+                   be read and resumed; unkeep ID lets the copy go
 aerie memory          your memories on this repository, kept for every coding agent:
                    the index, newest first (aerie -p REPO for another repository
                    of the space, which keeps them when it moves)
@@ -656,21 +708,24 @@ aerie logs --node NAME [--agent|--runner|--nginx|--system|--kernel|--crash] [N]
                    mode** is on in Controller settings, the session's space
                    has been granted that node's logs under **Debug** in its
                    settings, its own node included, and the session's account
-                   has the **debug** grant, which is the owner's unless a role
-                   names it. The space is the session's own, proved by its
+                   has **Controller** Write on its roles (the owner's and an
+                   administrator's, and a role's that gives it). The space is the session's own, proved by its
                    token. What can be read is a table of three streams;
                    anything else is refused, not run
 aerie diag [--json] [SECTION...]
                    the controller's diagnostics, read-only: its build and the
-                   images it ran, its switches, the doctor's every check, each
+                   images it ran, its switches, the home tunnel (running,
+                   registered, whether its name reaches here, its last lines),
+                   the doctor's every check, each
                    node's agent and session half, the Claude plugins each
                    account installed on each node, the last day's jobs and the
                    failures, error lines from its own logs and the audit
                    trail, with anything shaped like a credential redacted. The
-                   **debug** grant's: the owner's, or a role's that names it.
+                   **Controller** Write's: the owner's, an administrator's, or
+                   a role's that gives it.
                    A session reads it only while **debug mode** is on, its
                    space is granted **the controller's diagnostics** on
-                   the Debug page, and its account has the grant.
+                   the Debug page, and its account has Controller Write.
                    Its `reports` section is what sessions on any space
                    reported about AerieOS, kept until a person clears them
 aerie report "..." [--area A] [--repro "..." --reproduces always|sometimes|once|untried]
@@ -698,13 +753,18 @@ aerie pc [VERB] [--why "..."]
 aerie doctor          check everything that usually goes wrong
 
 # developing AerieOS itself, from inside it
-aerie dashboard test  browser-test the dashboard from this checkout, isolated
+aerie dashboard test [SUITE...] [--at REF] [--loaded]  browser-test the dashboard from
+                   this checkout, isolated; --at runs a commit as it was (git archive, not the
+                   working tree); --loaded runs one suite beside a whole run's load, the gate's
+                   workers taking the longest of the rest, so a suite that fails only in a gate
+                   fails on demand
 aerie dashboard dev   serve the live dashboard from ./scripts/dashboard (--off reverts)
 aerie dashboard status  which copy of the dashboard is serving
 aerie dashboard trace [SECONDS]  what the dashboard was asked over the last SECONDS, by endpoint and who asked, with how long each took
 aerie drift           what this checkout changed that the container is not serving
 aerie map VERB ...    the code map, which a session asks before grepping: find NAME,
-                   who-calls NAME, calls NAME, defs FILE, draws ID|.class,
+                   show NAME|FILE:LINE (the definition whole), who-calls NAME,
+                   calls NAME, defs FILE, draws ID|.class,
                    suites FILE..., state [FILE], sections FILE, unused [FILE],
                    addresses [FILE...], coverage, covered NAME, uncovered [FILE],
                    affected --base REF FILES..., languages (which files it
@@ -731,6 +791,14 @@ aerie capture reel --video FILE|--url URL|--emu [PKG]|--display :N [--seconds N]
                    Only the sheet and frames.json land in dist/: the recording
                    and the full-size frames are on this machine's disk, where
                    frames.json says
+aerie capture browsers | devices [WORDS]
+                   what a page's shot or reel can be opened in and as: the
+                   browsers installed here, and the devices Playwright knows
+                   (each with its size, density and touch). --browser NAME|all
+                   picks one, or a picture in each; --device NAME or --size WxH
+                   the screen; --scheme dark|light and --set NAME=VALUE the
+                   rest of what a browser's context takes (locale, timezoneId,
+                   reducedMotion)
 aerie capture ls      the captures in this space's dist/ (reels and emulator
                    shots), each with who asked and when: the Artifacts view's
                    Captures fold, in the terminal
@@ -743,10 +811,13 @@ aerie capture prune [--days N] [NAME...]
 aerie tool            the tools toolchains add to a session, each under its own name
 aerie tool search [WORDS...]  the vetted catalog's tool packs and apps, each with
                    its tier and what it is, and whether it is added here
-aerie tool install NAME --why "..."  ask for a pack from the vetted catalog, as the
+aerie tool install NAME --why "..."  ask for a toolchain AerieOS ships, or a pack
+                   from the vetted catalog, on this session's node, as the
                    space's Install a tool pack setting says: refused, asked
-                   of a person on the bell, or added now; a person installs
-                   it on a node from the Library
+                   of a person on the bell whose Allow installs it there, or
+                   installed now. One the node has is said at once; one whose
+                   install accepts an agreement is a person's to install
+                   from the Library
 aerie tool graphics CMD  pictures a session can make and then read back, with the
                    graphics toolchain on its node: info, resize, crop, compose,
                    annotate, diff, svg2png and optimize, into dist/img/, and
@@ -780,6 +851,24 @@ version() {
     local out
     out="$("$@" 2>/dev/null | head -1)" || out=""
     printf '  %-8s %s\n' "$label" "${out:--}"
+}
+
+# Each "LABEL COMMAND [ARG...]" asked at once and said in the order given
+# (R228 step 17): asked in turn, the versions were most of aerie status,
+# playwright's alone 0.6 s. Words split on spaces, as none of these has one.
+versions() {
+    local dir i=0 j spec words pids=()
+    dir="$(mktemp -d)" || { for spec in "$@"; do read -ra words <<< "$spec"; version "${words[@]}"; done; return; }
+    for spec in "$@"; do
+        read -ra words <<< "$spec"
+        version "${words[@]}" > "$dir/$i" &
+        pids+=("$!"); i=$((i + 1))
+    done
+    wait "${pids[@]}" 2>/dev/null || true
+    for ((j = 0; j < i; j++)); do
+        [ -s "$dir/$j" ] && printf '%s\n' "$(< "$dir/$j")"
+    done
+    rm -rf "$dir"
 }
 
 cmd_status() {
@@ -825,9 +914,12 @@ cmd_status() {
         # are the controller's and unset here. What answers "which build is the
         # box on" from a session is the CONTROLLER's build, asked for over the
         # API rather than read off an env that was never set here (R62).
-        printf '  %-8s %s\n' controller "$(bb_controller_stamp)"
-        # ...and this node's agent, with when it was built (R131).
-        local agl; agl="$(bb_agent_stamp)"
+        # ...and this node's agent, with when it was built (R131): both
+        # from one ask (bb_stamps).
+        local stamps agl
+        stamps="$(bb_stamps; printf x)"; stamps="${stamps%x}"
+        printf '  %-8s %s\n' controller "${stamps%%$'\n'*}"
+        agl="${stamps#*$'\n'}"; agl="${agl%$'\n'}"
         [ -z "$agl" ] || printf '  %-8s %s\n' agent "$agl"
     else
         printf '  %-8s %s\n' version "${BB_VERSION:-unstamped}"
@@ -842,37 +934,35 @@ cmd_status() {
     # Only where a session runs: the controller carries no coding agent (R47),
     # and a dash against one there reads as something missing rather than as
     # something that was never meant to be here. Every agent a session may be.
-    if on_node; then
-        version claude  claude --version
-        version codex   codex --version
-        version copilot copilot --version
-        version grok    grok --version
-    fi
-    version node   node --version
-    version npm    npm --version
-    version python python3 --version
-    version uv     uv --version
-    version git    git --version
-    version gh     gh --version
-    version docker docker --version
-    version mise   mise --version
-    version java   java --version
-    version adb    adb --version
-    version pw     playwright --version
+    local agentv=()
+    on_node && agentv=("claude claude --version" "codex codex --version"
+                       "copilot copilot --version" "grok grok --version")
+    versions "${agentv[@]}" "node node --version" "npm npm --version" "python python3 --version" \
+             "uv uv --version" "git git --version" "gh gh --version" "docker docker --version" \
+             "mise mise --version" "java java --version" "adb adb --version" "pw playwright --version"
     echo
     # What is installed beyond the image, and where. Here rather than only in
     # `aerie toolchains` because this is the command a session runs first, and "is
     # flutter on this box" should not need a second guess.
     echo "== toolchains =="
-    local root have=""
+    local root have="" unfinished broken=""
     root="$(sdk_root)"
+    # A folder with no tool in it is not installed (an update that stopped
+    # left a JDK as lib/ alone, listed here while java was missing above).
+    unfinished="$(sdk_unfinished "$root" | cut -f1)"
     for t in $SDK_TOOLCHAINS; do
         [ "$t" = android ] && continue
-        sdk_have "$root" "$t" && have="${have:+$have }$t"
+        sdk_have "$root" "$t" || continue
+        case "
+$unfinished
+" in *"
+$t
+"*) broken="${broken:+$broken }$t" ;; *) have="${have:+$have }$t" ;; esac
     done
     printf '  %-8s %s%s\n' root "$root" \
         "$(is_mountpoint "$root" && printf ' (share)' || printf ' (home volume)')"
     printf '  %-8s %s\n' installed "${have:-none (see: aerie toolchains)}"
+    [ -z "$broken" ] || printf '  %-8s %s (an install that did not finish: aerie toolchains status)\n' unfinished "$broken"
     echo
     # CI runs on nodes (docs/nodes.md phase 7); `aerie ci-labels` lists their
     # runners' labels and the Nodes tab shows each one's state.
@@ -891,7 +981,7 @@ cmd_projects() {
         local name="" folder="$2"
         [ "${3:-}" = --name ] && name="${4:-}"
         BB_ADOPT_DIR="$folder" BB_ADOPT_NAME="$name" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-            WORKSPACE="$WORKSPACE" python3 "$BB_LIB/projects-adopt.py" "$(dirname "$(readlink -f "$0")")/dashboard"
+            WORKSPACE="$WORKSPACE" python3 "$BB_LIB/projects-adopt.py" "$BB_SCRIPTS/dashboard"
         return
     fi
     echo "== projects (${WORKSPACE}) =="
@@ -931,7 +1021,7 @@ cmd_projects() {
 claude_login_check() {
     on_node || return 0
     [ -n "${BB_TOKEN:-}" ] || return 0
-    BB_LOGIN_AUTH="$(bb_auth_header)" python3 "$BB_LIB/login-check.py" "${1:-}" "${2:-claude}" || true
+    api_py --auth "$(bb_auth_header)" login-check.py "${1:-}" "${2:-claude}" || true
 }
 
 cmd_login() {
@@ -955,86 +1045,52 @@ cmd_login() {
         BB_USERS_DIR="$BUILDER_USERS" python3 "$BB_LIB/login-list.py"
         return 0
     fi
-    # `--flow --agent ID` and `--out --agent ID` are the same two for another
-    # coding agent (R95 step 3): its own device login in the account's home
-    # on this machine, the binary found where a session finds it (the
-    # agent's pinned copy, then the session account's own). Each prints its
-    # link and its one-time code and waits for the person to enter the code
-    # on the provider's page; nothing is typed back here. Checked against
-    # Codex CLI 0.163.0 and Copilot CLI 1.0.102 (22 Oct), Grok Build's
-    # device code from its user guide (25 Oct).
-    if { [ "${1:-}" = --flow ] || [ "${1:-}" = --out ]; } && [ "${2:-}" = --agent ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}" ag="${3:-}"
-        local pinned="${BB_AGENTS_PINNED:-/usr/local/lib/builderbot/agents}"
-        case "$ag" in
-            codex|copilot|grok) ;;
-            *) die "no coding agent called '${ag}' signs in here" ;;
-        esac
-        [ -n "$uid" ] || die "a sign-in names the account it is for"
-        HOME="$(user_home "$uid")" && export HOME
-        PATH="$pinned/$ag:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
-        command -v "$ag" >/dev/null 2>&1 \
-            || die "$ag is not installed on this machine: Install on its card in the Library, with this node picked, puts one down"
-        case "$1:$ag" in
-            --flow:codex)   codex login --device-auth || die "the sign-in did not complete" ;;
-            --flow:copilot) COPILOT_AUTO_UPDATE=false copilot login --device-code || die "the sign-in did not complete" ;;
-            --out:codex)    codex logout || die "codex logout did not complete" ;;
-            # Copilot CLI 1.0.102 has no logout of its own outside a session
-            # (its /logout): the account it signed in as is forgotten from
-            # its config, and the token with it where it was kept there.
-            --out:copilot)  python3 "$BB_LIB/login-list.py" --forget-copilot "$HOME" || die "the sign-out did not complete" ;;
-            --flow:grok)    GROK_DISABLE_AUTOUPDATER=1 grok login --device-auth || die "the sign-in did not complete" ;;
-            --out:grok)     GROK_DISABLE_AUTOUPDATER=1 grok logout || die "grok logout did not complete" ;;
-        esac
-        log "signed ${1#--} ${ag} on ${BB_NODE:-this machine}"
-        # ...and said to the controller at once, as Claude's flow says its own.
-        claude_login_check --loud "$ag" || true
-        return 0
-    fi
-    # `--out` is the sign-out run BY THE AGENT, in a claude-logout job, for
-    # the account the dashboard asked about: `claude auth logout` in that
-    # account's home on this machine, found the way --flow finds it.
-    if [ "${1:-}" = --out ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}"
-        local pinned="${BB_CLAUDE_PINNED:-/usr/local/lib/builderbot/claude}"
-        [ -n "$uid" ] || die "a sign-out names the account it is for"
-        HOME="$(user_home "$uid")" && export HOME
-        PATH="$pinned:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
-        command -v claude >/dev/null 2>&1 \
-            || die "Claude Code is not installed on this machine, so there is no login here to sign out of"
-        claude auth logout || die "claude auth logout did not complete"
-        log "signed out of Claude on ${BB_NODE:-this machine}"
-        claude_login_check --loud || true
-        return 0
-    fi
-    # `--flow` is the sign-in run BY THE AGENT, in a claude-login job, with
-    # that job's pty as its terminal (roadmap R47). The account is the one the
-    # dashboard asked for and the home is resolved here, by the same user_home
-    # a session on this machine gets: one implementation of "where does this
-    # account live", rather than a second copy in the agent.
+    # `--flow` and `--out` are the sign-in and the sign-out run BY THE AGENT,
+    # in a job, for the account the dashboard asked about, with that job's pty
+    # as its terminal (roadmap R47): Claude's, or with `--agent ID` any other
+    # coding agent's (R95 step 3, R233 step 6). One path for every agent
+    # (R234 step 6): each says how it signs in as data, its row in the
+    # agents' table or its pack's manifest, and login-flow.py runs its
+    # program and works its screens from that. The account's home is
+    # resolved here, by the same user_home a session on this machine gets:
+    # one implementation of "where does this account live".
     #
-    # The grant STAYS HERE. What goes up is which Anthropic account this
-    # machine is now signed in as, so its row can name it.
-    if [ "${1:-}" = --flow ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}"
-        # The pinned dir is the agent's CLAUDE_DIR; BB_CLAUDE_PINNED is for
-        # the suite, which runs on a machine that may carry a real one.
+    # The grant STAYS HERE. What goes up is which account this machine is
+    # now signed in as, so its row can name it.
+    if [ "${1:-}" = --flow ] || [ "${1:-}" = --out ]; then
+        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}" ag=claude
+        # The pinned copies are the agent's own folders; BB_CLAUDE_PINNED and
+        # BB_AGENTS_PINNED are for the suite, which runs on a machine that
+        # may carry a real one.
         local pinned="${BB_CLAUDE_PINNED:-/usr/local/lib/builderbot/claude}"
-        [ -n "$uid" ] && HOME="$(user_home "$uid")" && export HOME
-        mkdir -p "$HOME/.claude" 2>/dev/null || true
-        # Claude Code from where a SESSION finds it (the agent's session
+        local pinned_agents="${BB_AGENTS_PINNED:-/usr/local/lib/builderbot/agents}"
+        [ "${2:-}" = --agent ] && ag="${3:-}"
+        python3 "$BB_LIB/login-flow.py" has "$ag" 2>/dev/null \
+            || die "no coding agent called '${ag}' signs in here"
+        if [ -n "$uid" ]; then
+            HOME="$(user_home "$uid")" && export HOME
+        elif [ "$1" = --out ]; then
+            die "a sign-out names the account it is for"
+        elif [ "$ag" != claude ]; then
+            die "a sign-in names the account it is for"
+        fi
+        # The program from where a SESSION finds it (the agent's session
         # PATH): the pinned copy first, then the session account's own
         # ~/.local/bin, which is where the provisioner installs it, and only
         # then this account's. The agent runs this with its own PATH, and
         # the flow used to look in this account's home alone: the owner's
         # home IS the session account's, so it worked for them and for
-        # nobody else, and a second account was told Claude Code was not
-        # installed on a machine whose sessions ran it fine (24 Sep).
-        PATH="$pinned:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
-        command -v claude >/dev/null 2>&1 \
-            || die "Claude Code is not installed on this machine (looked on PATH, at $pinned and in $base/.local/bin): Install on Claude Code's card in the Library, with this node picked, puts down one copy every account runs"
-        claude auth login || die "the sign-in did not complete"
-        claude_login_check --loud || true
+        # nobody else (24 Sep).
+        PATH="$pinned:$pinned_agents/$ag:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
+        if [ "$1" = --flow ]; then
+            # Its last line says why where it fails, in the program's own
+            # words: nothing is said after it.
+            python3 "$BB_LIB/login-flow.py" in "$ag" || exit 1
+        else
+            python3 "$BB_LIB/login-flow.py" out "$ag" || die "the sign-out did not complete"
+        fi
+        # ...and said to the controller at once.
+        if [ "$ag" = claude ]; then claude_login_check --loud || true; else claude_login_check --loud "$ag" || true; fi
         return 0
     fi
     # ON A NODE the flow below runs in this terminal: this machine signs
@@ -1270,7 +1326,7 @@ project_node() {
     # every caller then does the thing locally, which is what being on the
     # project's node means (roadmap #24).
     on_node && return 0
-    local proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    local proj; proj="$(need_project --or-dir)"
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" prefs "$proj" 2>/dev/null
 }
 
@@ -1291,7 +1347,7 @@ emu_via_node() {
     fi
     local auth
     auth="$(bb_auth_or_die)"
-    local proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    local proj; proj="$(need_project --or-dir)"
     # The credential rides the environment, never argv: ps shows argv to
     # every account on the box, and this is the person's own header.
     BB_EMU_FILES="$(printf '%s\n' "${files[@]}")" \
@@ -1814,8 +1870,8 @@ cmd_ci_log() {
     fi
     # The project this is run from, the same way `aerie roadmap` decides.
     if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one, or pass --project NAME"
+        proj="$(need_project --here --soft)"
+        [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one, or pass --project NAME"
     fi
     local d="$dir/$proj"
     # The workflows file a run under the REPOSITORY's name (GITHUB_REPOSITORY),
@@ -1834,9 +1890,8 @@ cmd_ci_log() {
         if ci_hosted_only "$proj"; then
             # GitHub keeps these, and hands a log only to a token: the
             # controller asks with its own, for this project (R115).
-            local auth; auth="$(bb_auth_or_die)"
             local a=(); [ "$list" = 1 ] && a+=(--list); [ -n "$want" ] && a+=("$want")
-            BB_CI_AUTH="$auth" BB_CI_PROJECT="$proj" python3 "$BB_LIB/cilog-hosted.py" "${a[@]}"
+            api_py --project "$proj" cilog-hosted.py "${a[@]}"
             return
         fi
         if [ -n "$(project_node 2>/dev/null)" ]; then
@@ -2017,7 +2072,11 @@ ci_log_rows() {
         # rather than finished, which on this box usually means the container
         # updated underneath it. Say so: a blank column reads like a bug in
         # this listing, and it is the opposite, a job whose end never happened.
-        result="$(sed -n 's/^result: //p' "$f" | head -1)"
+        # The worst of its jobs': a tag's run keeps one log for several
+        # (the lint, the unit tier, the suites, then the run's own line),
+        # and the first to finish said only how it went itself.
+        result="$(sed -n 's/^result: //p' "$f" | awk '{ n[$1]++; if (first == "") first = $1 }
+            END { if (n["failure"]) print "failure"; else if (n["cancelled"]) print "cancelled"; else print first }')"
         printf '  %-20s %s  %-12s %s\n' "$(basename "$f" .log)" \
             "$(date -r "$f" '+%d %b %H:%M')" \
             "$(ci_log_name "$f")" \
@@ -2301,15 +2360,13 @@ cmd_diag() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --json) json=1 ;;
-            -h|--help) printf 'usage: aerie diag [--json] [controller|images|settings|doctor|nodes|plugins|jobs|errors|audit|reports]...\n'; return 0 ;;
+            -h|--help) printf 'usage: aerie diag [--json] [controller|images|settings|tunnel|doctor|nodes|plugins|jobs|errors|audit|reports]...\n'; return 0 ;;
             -*) die "aerie diag: no such option \`$1'" ;;
             *) sections+=("$1") ;;
         esac
         shift
     done
-    local auth
-    auth="$(bb_auth_or_die)"
-    BB_DIAG_AUTH="$auth" BB_DIAG_JSON="$json" python3 "$BB_LIB/diag.py" "${sections[@]}"
+    BB_DIAG_JSON="$json" api_py diag.py "${sections[@]}"
 }
 
 # aerie report: a problem with AerieOS itself, from a session on any project
@@ -2321,31 +2378,20 @@ cmd_diag() {
 # A person's Windows PC lent to this project by the Windows companion
 # (R270 step 6): lib/pc.py says the verbs.
 cmd_pc() {
-    case "${1:-}" in
-        -h|--help)
-            printf '%s\n' 'usage: aerie pc                        the PCs lending this space and their verbs' \
-                '       aerie pc VERB [--why "..."]     run one (editor-start, editor-stop, game-start, game-stop, build, shot, log)' \
-                '       aerie pc editor-call METHOD PATH [--body JSON] [--why "..."]'
-            return 0 ;;
-    esac
-    BB_PC_AUTH="$(bb_auth_or_die)" python3 "$BB_LIB/pc.py" "$@"
+    BB_AUTH_HEADER="$(bb_auth_or_die)" python3 "$BB_LIB/pc.py" "$@"
 }
 
 cmd_report() {
     local auth proj sub="${1:-}"
     auth="$(bb_auth_or_die)"
-    proj="${BB_PROJECT:-$(project_here 2>/dev/null || true)}"
+    proj="$(need_project --soft 2>/dev/null)"
     case "$sub" in
-        -h|--help)
-            printf '%s\n' 'usage: aerie report "what happened" [--area A] [--repro "..."]' \
-                '       aerie report conversation N    the reporter'"'"'s conversation a report carries (the diagnostics'"'"' gate)'
-            return 0 ;;
         conversation) ;;
         "") die 'aerie report "what happened": say what went wrong; aerie diag reports lists what was reported' ;;
         *) sub=add ;;
     esac
     [ "$sub" = add ] || shift || true
-    BB_R_AUTH="$auth" BB_R_PROJECT="$proj" BB_R_SUB="$sub" python3 "$BB_LIB/report.py" "$@"
+    BB_R_SUB="$sub" api_py --auth "$auth" --project "$proj" report.py "$@"
 }
 
 cmd_logs() {
@@ -2398,10 +2444,7 @@ cmd_logs() {
         # A node's log is read once through a job, so there is nothing to
         # follow: said, rather than -f quietly printing once.
         [ "$follow" = 0 ] || die "aerie logs --node reads the last lines once; -f follows only the controller's own log"
-        local auth
-        auth="$(bb_auth_or_die)"
-        BB_LOG_AUTH="$auth" BB_LOG_NODE="$want_node" \
-        BB_LOG_STREAM="${stream:-agent}" BB_LOG_LINES="$lines" python3 "$BB_LIB/node-log.py"
+        BB_LOG_NODE="$want_node" BB_LOG_STREAM="${stream:-agent}" BB_LOG_LINES="$lines" api_py node-log.py
         return
     fi
     if [ -n "$gen" ]; then
@@ -2514,13 +2557,9 @@ cmd_roadmap() {
     # roadmap.py, still: the file is where the roadmap has always been implemented
     # and renaming it would move code the running image serves by absolute
     # path. The command is what the operator reads, and that is `aerie roadmap`.
-    py="$(dirname "$(readlink -f "$0")")/dashboard/roadmap.py"
+    py="$BB_SCRIPTS/dashboard/roadmap.py"
     [ -f "$py" ] || die "roadmap.py is missing from this image"
-    local proj="${BB_ROADMAP_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_ROADMAP_PROJECT)" || exit
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/roadmap-verbs.py" "$py" "$proj" "$@"
 }
 
@@ -2531,12 +2570,8 @@ cmd_history() {
     # "when did anything here mention the picker?", which is a question about
     # the notebook and not about a tab of it.
     local dir
-    dir="$(dirname "$(readlink -f "$0")")/dashboard"
-    local proj="${BB_ROADMAP_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    dir="$BB_SCRIPTS/dashboard"
+    local proj; proj="$(need_project BB_ROADMAP_PROJECT)" || exit
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nb-history.py" "$dir" "$proj" "$@"
 }
 
@@ -2549,13 +2584,11 @@ cmd_history() {
 # and the words it is handed are the controller's (design.py), so what it
 # prints is what the tab shows.
 cmd_design() {
-    local verb="${1:-list}" auth proj
-    case "$verb" in list|show|file|json|schema|save) ;; -h|--help)
-        echo "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]: what this space looks like, from the notebook's Design view; aerie design save -h prints the record's shape"; return 0 ;;
-        *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]" ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
-    auth="$(bb_auth_or_die)"
-    BB_DESIGN_AUTH="$auth" BB_DESIGN_PROJECT="$proj" python3 "$BB_LIB/design-verbs.py" "$@"
+    local verb="${1:-list}" proj
+    case "$verb" in list|show|file|json|schema|save|edit) ;;
+        *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]" ;; esac
+    proj="$(need_project)" || exit
+    api_py --project "$proj" design-verbs.py "$@"
 }
 
 # `aerie transcripts`: this account's own conversations with Claude on the
@@ -2563,47 +2596,41 @@ cmd_design() {
 # project this one reads (the operator, 29 Sep). Only the account's own:
 # the controller looks under its transcripts and nowhere else.
 cmd_wiki() {
-    local auth proj
-    case "${1:-}" in -h|--help) usage | sed -n '/^aerie wiki /,/^bb [^w]/p' | sed '$d'; return 0 ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
-    auth="$(bb_auth_or_die)"
-    BB_WIKI_AUTH="$auth" BB_WIKI_PROJECT="$proj" python3 "$BB_LIB/wiki-verbs.py" "$@"
+    local proj
+    proj="$(need_project)" || exit
+    api_py --project "$proj" wiki-verbs.py "$@"
 }
 
 cmd_transcripts() {
-    local verb="${1:-list}" auth proj
-    case "$verb" in list|show|fetch) ;; -h|--help)
-        echo "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR]]: your own conversations on this space, every agent's, from the controller"; return 0 ;;
-        *) die "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR]]" ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
-    auth="$(bb_auth_or_die)"
-    BB_TRANSCRIPTS_AUTH="$auth" BB_TRANSCRIPTS_PROJECT="$proj" python3 "$BB_LIB/transcripts-verbs.py" "$@"
+    local verb="${1:-list}" proj
+    case "$verb" in list|show|fetch|label|note|keep|unkeep) ;;
+        *) die "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]" ;; esac
+    proj="$(need_project)" || exit
+    api_py --project "$proj" transcripts-verbs.py "$@"
 }
 
 cmd_memory() {
-    local verb="${1:-list}" auth proj
+    local verb="${1:-list}" proj
     local use='aerie memory [list | show NAME | add NAME --type user|feedback|space|reference --about "one line" "what to remember" | forget NAME]'
-    case "$verb" in list|show|add|forget) ;; -h|--help)
-        echo "$use: your memories on this repository, kept for every coding agent; aerie -p REPO memory for another repository of the space"; return 0 ;;
+    case "$verb" in list|show|add|forget) ;;
         *) die "$use" ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
-    auth="$(bb_auth_or_die)"
-    BB_MEMORY_AUTH="$auth" BB_MEMORY_PROJECT="$proj" python3 "$BB_LIB/memory-verbs.py" "$@"
+    proj="$(need_project)" || exit
+    api_py --project "$proj" memory-verbs.py "$@"
 }
 
 cmd_brief() {
     local verb="${1:-show}" auth proj
-    case "$verb" in show|take) ;; -h|--help) echo "aerie brief: the brief this space was started from"; return 0 ;;
+    case "$verb" in show|take) ;;
         *) die "aerie brief: the brief this space was started from (take is bb-tty's)" ;; esac
-    proj="$(bb_project 2>/dev/null)" \
-        || { [ "$verb" = take ] && return 0; die "not inside a space under ${WORKSPACE}; cd into one first"; }
+    proj="$(need_project --soft 2>/dev/null)"
+    [ -n "$proj" ] || { [ "$verb" = take ] && return 0; not_in_a_space; }
     if [ "$verb" = take ]; then
         auth="$(bb_auth_header 2>/dev/null)" || return 0
         [ -n "$auth" ] || return 0
     else
         auth="$(bb_auth_or_die)"
     fi
-    BB_BRIEF_AUTH="$auth" BB_BRIEF_PROJECT="$proj" python3 "$BB_LIB/brief-verbs.py" "$verb" \
+    api_py --auth "$auth" --project "$proj" brief-verbs.py "$verb" \
         || [ "$verb" = take ]
 }
 
@@ -2614,14 +2641,10 @@ cmd_preamble() {
     # draws the same string: one assembly, so the tab cannot drift from what
     # a session actually gets.
     local dir py
-    dir="$(dirname "$(readlink -f "$0")")/dashboard"
+    dir="$BB_SCRIPTS/dashboard"
     py="$dir/preamble.py"
     [ -f "$py" ] || die "preamble.py is missing from this image"
-    local proj="${BB_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project)" || exit
     python3 "$BB_LIB/preamble-verbs.py" "$dir" "$proj" "${1:-}" "${2:-}"
 }
 
@@ -2640,15 +2663,7 @@ cmd_rules() {
     # The house rules: the operator's on the Briefing tab, a session's own
     # through add/edit/rm here. Each carries who wrote it, and a session may
     # change only its own; see rules.py for the ownership and the log.
-    # Its help, as every verb's -h is (B411): the lines aerie help carries for it.
-    case "${1:-}" in
-        -h|--help) usage | sed -n '/^aerie rules /,/^aerie [^r]/p' | sed '$d'; return 0 ;;
-    esac
-    local proj="${BB_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project)" || exit
     # `aerie rules check` runs a rule's check command HERE, in this tree, on
     # whichever machine the session is on (roadmap R31): the rules themselves
     # come through `aerie rules --json`, which is relayed on a node, so this
@@ -2688,7 +2703,7 @@ cmd_rules() {
     # controller's API like aerie transcripts, which is where they are kept.
     if [ "${1:-}" = audit ]; then
         shift
-        BB_TRANSCRIPTS_AUTH="$(bb_auth_or_die)" BB_TRANSCRIPTS_PROJECT="$proj" \
+        BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$proj" \
             python3 "$BB_LIB/transcripts-verbs.py" audit "$@"
         return $?
     fi
@@ -2701,7 +2716,7 @@ cmd_rules() {
     # module by design, so the hand-back hook blocked on the one machine
     # sessions actually run on.
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/rules.py"
+    py="$BB_SCRIPTS/dashboard/rules.py"
     [ -f "$py" ] || die "rules.py is missing from this image"
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
         python3 "$BB_LIB/rules-verbs.py" "$py" "$proj" "$@"
@@ -2788,7 +2803,7 @@ cmd_tests() {
     # run` the one verb that cannot work on a node, which is the one machine
     # a suite actually runs on.
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/testreg.py"
+    py="$BB_SCRIPTS/dashboard/testreg.py"
     # The checkout is the working tree's top, not the working directory:
     # from scripts/dashboard every verb looked for scripts/dashboard/scripts/
     # and said there was no harness (B778).
@@ -2885,6 +2900,49 @@ cmd_tests() {
         python3 -m unittest discover -s "$u" -t "$u" "$@"
         return
     fi
+    # Which commit broke a suite (R55): halving the commits between GOOD and
+    # BAD, the suite run --at each, until the first that fails is found.
+    if [ "${1:-}" = bisect ]; then
+        shift
+        [ $# -ge 3 ] || die "usage: aerie tests bisect SUITE GOOD BAD [--check WORDS] [--times N]"
+        local here="${BB_REPO:-$PWD}/scripts/dashboard/test/run.sh"
+        [ -x "$here" ] || die "no dashboard test harness at $here: run this from the AerieOS checkout"
+        python3 "$BB_LIB/bisect-suite.py" --harness "$here" --flakes "${BB_REPO:-$PWD}/.bb-map/flakes.tsv" "$@"
+        return
+    fi
+    # The flakes on record (R7 step 3): each suite that failed in a whole
+    # run and passed when run again, counted over the last thirty days (or
+    # DAYS), with the first check that failed the last time.
+    if [ "${1:-}" = flakes ]; then
+        shift
+        case "${1:-30}" in ''|*[!0-9]*) die "usage: aerie tests flakes [DAYS]" ;; esac
+        # ...each with the open bug that names it, when one does.
+        local bl; bl="$(mktemp)"
+        "$0" bug list > "$bl" 2>/dev/null || : > "$bl"
+        python3 "$BB_LIB/flakes.py" list --file "${BB_REPO:-$PWD}/.bb-map/flakes.tsv" --days "${1:-30}" --bugs "$bl"
+        rm -f "$bl"
+        return
+    fi
+    # The root tier (R240 step 5): what the root agent and the root helpers
+    # do in a folder an account controls, seen as root, which the browser
+    # harness refuses to be. As root it runs here (roottier.py refuses a
+    # machine that is not a container without --here); where docker
+    # answers, in a throwaway container of the controller's image;
+    # otherwise where it does run is said.
+    if [ "${1:-}" = root ]; then
+        shift
+        local rt="${BB_REPO:-$PWD}"
+        [ -f "$rt/scripts/lib/roottier.py" ] || die "no root tier at $rt: run this from the AerieOS checkout"
+        if [ "$(id -u)" = 0 ]; then
+            python3 "$rt/scripts/lib/roottier.py" "$@"
+            return
+        fi
+        if docker info >/dev/null 2>&1; then
+            bash "$rt/tools/root-tier.sh" --tree "$rt" "" "$@"
+            return
+        fi
+        die "the root tier runs as root in a container, and this account is neither root nor has docker: aerie devapp test root-tier runs it in this space's dev instance, as the tree it was last rebuilt from, and CI runs it on every pull request and release"
+    fi
     # A covered run (roadmap R76): the suite, or the named suites, with the
     # counters in, and the map's account of what they reached after.
     if [ "${1:-}" = coverage ]; then
@@ -2948,24 +3006,32 @@ cmd_tests() {
         # the tree here): beside the installed bb there are none, so a
         # session's aerie tests lab died saying the checkout had no lab suites.
         local tdir="${BB_REPO:-$PWD}/scripts/dashboard/test"
-        [ -d "$tdir" ] || tdir="$(dirname "$(readlink -f "$0")")/dashboard/test"
+        [ -d "$tdir" ] || tdir="$BB_SCRIPTS/dashboard/test"
         local -a labs=()
         local f
         for f in "$tdir"/lab-*.mjs; do [ -e "$f" ] && labs+=("$(basename "$f" .mjs)"); done
         [ "${#labs[@]}" -gt 0 ] || die "no lab suites (test/lab-*.mjs) in this checkout"
-        local rc=0
-        bash "$tdir/run.sh" "${labs[@]}" || rc=$?
+        # What the run says, kept beside it: a suite prints one RECORD line
+        # for each subject it walked with nothing failed (lib.mjs record()),
+        # and the lab's own record is written from them (R3 step 8), in the
+        # tree, where the vetted lines are read from and a commit carries it.
+        local rc=0 said
+        said="$(mktemp)"
+        bash "$tdir/run.sh" "${labs[@]}" 2>&1 | tee "$said"
+        rc="${PIPESTATUS[0]}"
         if [ -n "$ok_forgejo" ]; then
             echo "lab: the forge suite again, against Forgejo at $ok_forgejo"
-            BB_LAB_GITEA="$ok_forgejo" BB_LAB_FORGE=forgejo bash "$tdir/run.sh" lab-forge || rc=$?
+            BB_LAB_GITEA="$ok_forgejo" BB_LAB_FORGE=forgejo bash "$tdir/run.sh" lab-forge 2>&1 | tee -a "$said"
+            [ "${PIPESTATUS[0]}" -eq 0 ] || rc=1
         fi
+        if [ -f "$tdir/../labrecord.py" ]; then
+            python3 "$tdir/../labrecord.py" add --from "$said" --build "$(cmd_version --semver 2>/dev/null || true)" \
+                --file "$tdir/../lab-record.json" || true
+        fi
+        rm -f "$said"
         return "$rc"
     fi
-    local proj="${BB_TESTS_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_TESTS_PROJECT)" || exit
     # `ingest` with no file reads stdin, so the whole thing is one pipe. The
     # log reaches python as a PATH, never as a value: a run log is a couple
     # of hundred kilobytes; passed in the environment it is "Argument list
@@ -3125,13 +3191,9 @@ cmd_bug() {
     # callers that are not in one, like bb-tty), the module loaded from the
     # file beside this script so the checkout's copy is the one under test.
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/bugs.py"
+    py="$BB_SCRIPTS/dashboard/bugs.py"
     [ -f "$py" ] || die "bugs.py is missing from this image"
-    local proj="${BB_BUG_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_BUG_PROJECT)" || exit
     # --report N files a diagnostics report: read through aerie diag, whose
     # gate is the diagnostics' own (R124).
     local reports="" a
@@ -3168,7 +3230,10 @@ cmd_phone() {
             # is a minefield and this shipped broken once, with a SyntaxError
             # where the phone's model should have been. What the program needs
             # arrives by environment, never by pipe.
-            BB_PHONE_AUTH="$auth" python3 "$BB_LIB/phone-verbs.py" status
+            # Told which space this is, so it can say whether the phone is
+            # lent to it: it never was, and those lines never printed.
+            BB_PHONE_PROJECT="$(need_project --soft 2>/dev/null)" \
+                api_py --auth "$auth" phone-verbs.py status
             ;;
         run)
             # `--why` is required, not polite. The operator is being asked
@@ -3183,9 +3248,8 @@ cmd_phone() {
             done
             [ -n "$why" ] || die "aerie phone run needs --why \"what this is for\""
             [ $# -gt 0 ] || die "nothing to run; put the adb arguments after --"
-            BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
-                python3 "$BB_LIB/phone-verbs.py" run "$@"
+            BB_PHONE_WHY="$why" BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" phone-verbs.py run "$@"
             ;;
         lease|shot|record|install|start|stop|ime|log|ui|touch)
             # The phone lent to this project (R113). Each command but lease
@@ -3199,9 +3263,8 @@ cmd_phone() {
                 esac
             done
             set -- "${a[@]}"
-            BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
-                python3 "$BB_LIB/phone-verbs.py" "$sub" "$@"
+            BB_PHONE_WHY="$why" BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" phone-verbs.py "$sub" "$@"
             ;;
         *) die "usage: aerie phone [status | run --why \"...\" -- adb args... | lease | shot | record [S] | install FILE | start|stop|ime|log PKG | ui | touch ...]" ;;
     esac
@@ -3217,7 +3280,7 @@ cmd_root() {
     shift || true
     case "$sub" in
         status)
-            BB_PHONE_AUTH="$auth" python3 "$BB_LIB/root-verbs.py" status
+            api_py --auth "$auth" root-verbs.py status
             ;;
         run)
             # --node NAME: one of the nodes the project hosts its containers
@@ -3233,9 +3296,8 @@ cmd_root() {
             done
             [ -n "$why" ] || die "aerie root run needs --why \"what this is for\""
             [ $# -gt 0 ] || die "nothing to run; put the command after --"
-            BB_PHONE_WHY="$why" BB_PHONE_NODE="$node" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
-                python3 "$BB_LIB/root-verbs.py" run "$@"
+            BB_PHONE_WHY="$why" BB_PHONE_NODE="$node" BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" root-verbs.py run "$@"
             ;;
         *) die "usage: aerie root [status|run --why \"...\" -- command...]" ;;
     esac
@@ -3246,8 +3308,7 @@ cmd_root() {
 cmd_vm() {
     local auth
     auth="$(bb_auth_or_die)"
-    BB_VM_AUTH="$auth" \
-    BB_VM_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
+    BB_AUTH_HEADER="$auth" BB_PROJECT="$(need_project --or-dir)" \
         exec python3 "$BB_LIB/vm-verbs.py" "$@"
 }
 
@@ -3261,7 +3322,7 @@ cmd_container() {
     auth="$(bb_auth_or_die)"
     case "$sub" in
         status)
-            BB_PHONE_AUTH="$auth" python3 "$BB_LIB/container-verbs.py" status
+            api_py --auth "$auth" container-verbs.py status
             ;;
         new)
             # One verb, and the project's setting decides (the operator, 24
@@ -3285,10 +3346,10 @@ cmd_container() {
             [ -n "$compose" ] || die "aerie container new needs --compose FILE"
             [ -f "$compose" ] || die "no such file: $compose"
             [ -z "$envf" ] || [ -f "$envf" ] || die "no such file: $envf"
-            BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" BB_C_NAME="$name" BB_C_COMPOSE="$compose" \
+            BB_PHONE_WHY="$why" BB_C_NAME="$name" BB_C_COMPOSE="$compose" \
             BB_C_ENV="$envf" BB_C_NODE="$node" BB_C_FOR="$forp" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
-                python3 "$BB_LIB/container-verbs.py" new
+            BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" container-verbs.py new
             ;;
         *) die "usage: aerie container [status|new --why \"...\" --name NAME --compose FILE [--env FILE] [--node NODE] [--for PROJECT]]" ;;
     esac
@@ -3299,8 +3360,8 @@ cmd_container() {
 # ask to its answer and the job to its verdict.
 cmd_sign() {
     local file="" route="" why="" key="" a
-    local auth proj
-    proj="${BB_PROJECT:-$(project_here 2>/dev/null || true)}"
+    local proj
+    proj="$(need_project --soft 2>/dev/null)"
     case "${1:-}" in
         keys|key|map|rotate|status|release)
             local sub="$1"; shift
@@ -3312,9 +3373,7 @@ cmd_sign() {
                     *) rest+=("$1"); shift ;;
                 esac
             done
-            auth="$(bb_auth_or_die)"
-            BB_SIGN_AUTH="$auth" BB_SIGN_PROJECT="$proj" \
-                python3 "$BB_LIB/sign-verbs.py" --"$sub" "$route" "$why" "${rest[@]}"
+            api_py --project "$proj" sign-verbs.py --"$sub" "$route" "$why" "${rest[@]}"
             return $? ;;
     esac
     while [ $# -gt 0 ]; do
@@ -3334,9 +3393,7 @@ cmd_sign() {
         case "$file" in *.aab) route=play ;; *) route=sideload ;; esac
     fi
     case "$route" in play|sideload) ;; *) die "--for is play or sideload, not $route" ;; esac
-    auth="$(bb_auth_or_die)"
-    BB_SIGN_AUTH="$auth" BB_SIGN_PROJECT="$proj" BB_SIGN_KEY="$key" \
-        python3 "$BB_LIB/sign-verbs.py" "${file#dist/}" "$route" "$why"
+    BB_SIGN_KEY="$key" api_py --project "$proj" sign-verbs.py "${file#dist/}" "$route" "$why"
 }
 
 # aerie devapp: this project's dev instance, and what a session may be given
@@ -3375,20 +3432,16 @@ cmd_devapp() {
     export BB_DEV_INSTANCE="$inst" BB_DEV_CONTAINER="$ctr"
     local sub="${1:-status}" auth proj
     auth="$(bb_auth_or_die)"
-    proj="${BB_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project)" || exit
     case "$sub" in
         status|state)
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" status
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py status
             ;;
         probe)
             # Whether it answers on its node's loopback (R248): a read, with
             # no root ask, from its own published ports only.
             shift || true
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" probe "$@"
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py probe "$@"
             ;;
         rebuild)
             shift || true
@@ -3412,14 +3465,14 @@ EOT
                     *) die "usage: aerie devapp rebuild [--why \"what it is for\"]" ;;
                 esac
             done
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_WHY="$why" python3 "$BB_LIB/devapp-verbs.py" rebuild
+            BB_DEV_WHY="$why" api_py --auth "$auth" --project "$proj" devapp-verbs.py rebuild
             ;;
         test)
             # The project's test command inside its running dev instance
             # (roadmap R48): the whole log to stdout, so `aerie tests run` can
             # read it, and the job's exit code as this one's.
             shift || true
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" test "$@"
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py test "$@"
             ;;
         new)
             # This project sent to Docker, as the Artifacts tab's Send does: a
@@ -3449,8 +3502,8 @@ EOT
             done
             if [ "$file" = - ]; then tmp="$(mktemp)"; cat > "$tmp"; file="$tmp"; fi
             [ -z "$file" ] || [ -f "$file" ] || die "no such file: $file"
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_WHY="$why" BB_DEV_REF="$ref" \
-            BB_DEV_COMPOSE="$compose" BB_DEV_OVERRIDE="$override" BB_DEV_HOST="$host" BB_DEV_FILE="$file" python3 "$BB_LIB/devapp-verbs.py" new || rc=$?
+            BB_DEV_WHY="$why" BB_DEV_REF="$ref" BB_DEV_COMPOSE="$compose" BB_DEV_OVERRIDE="$override" \
+            BB_DEV_HOST="$host" BB_DEV_FILE="$file" api_py --auth "$auth" --project "$proj" devapp-verbs.py new || rc=$?
             [ -z "$tmp" ] || rm -f "$tmp"
             return "$rc"
             ;;
@@ -3475,8 +3528,8 @@ EOT
             if [ "$file" = - ]; then tmp="$(mktemp)"; cat > "$tmp"; file="$tmp"; fi
             [ -z "$file" ] || [ -f "$file" ] || die "no such file: $file"
             local rc=0
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_WHY="$why" BB_DEV_VERB="$verb" \
-            BB_DEV_SET="$setting" BB_DEV_FILE="$file" python3 "$BB_LIB/devapp-verbs.py" edit || rc=$?
+            BB_DEV_WHY="$why" BB_DEV_VERB="$verb" BB_DEV_SET="$setting" BB_DEV_FILE="$file" \
+                api_py --auth "$auth" --project "$proj" devapp-verbs.py edit || rc=$?
             [ -z "$tmp" ] || rm -f "$tmp"
             return "$rc"
             ;;
@@ -3487,13 +3540,13 @@ EOT
             # person in the container's settings.
             shift || true
             [ $# -eq 1 ] || die "usage: aerie devapp override FILE|none [--instance NAME]"
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_OVERRIDE="$([ "$1" = none ] || printf %s "$1")" \
-                python3 "$BB_LIB/devapp-verbs.py" override
+            BB_DEV_OVERRIDE="$([ "$1" = none ] || printf %s "$1")" \
+                api_py --auth "$auth" --project "$proj" devapp-verbs.py override
             ;;
         ls|list)
             # What belongs to this project on its node, as its group on the
             # Docker tab lists it (the operator, 24 Sep).
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" ls
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py ls
             ;;
         log|logs|start|stop|restart)
             # One container that belongs to this project, by the name bb
@@ -3513,8 +3566,8 @@ EOT
             # The project too (B675): a read project's container is
             # answered only when its project is named, so `aerie -p X devapp
             # log NAME` fell to this session's own and was refused.
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_VERB="$verb" BB_DEV_NAME="$name" BB_DEV_WHY="$why" \
-                python3 "$BB_LIB/devapp-verbs.py" ctl
+            BB_DEV_VERB="$verb" BB_DEV_NAME="$name" BB_DEV_WHY="$why" \
+                api_py --auth "$auth" --project "$proj" devapp-verbs.py ctl
             ;;
         *) die "usage: aerie devapp [--instance NAME|--container NAME] [status|rebuild [--why \"...\"]|new [NAME] [--branch REF] [--compose FILE] [--env FILE] [--why \"...\"]|env [set FILE|-]|test [ARGS]|ls|log NAME|start|stop|restart NAME]" ;;
     esac
@@ -3522,13 +3575,9 @@ EOT
 
 cmd_findings_history() {
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/findings.py"
+    py="$BB_SCRIPTS/dashboard/findings.py"
     [ -f "$py" ] || die "findings.py is missing from this image"
-    proj="${BB_FINDINGS_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project BB_FINDINGS_PROJECT)" || exit
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/findings-verbs.py" history "$py" "$proj" "$@"
 }
 
@@ -3567,14 +3616,34 @@ ago() {
 # for a single command rather than being unable to reach the API at all. It
 # reaches the operator's own shell that way and nowhere else: a session has
 # no DASHBOARD_AUTH in its environment at all.
-# When a session token stops being good, as a unix time, or nothing for
-# anything that is not one. The body is base64url of `project|exp|uid|sig`.
-bb_token_exp() {
-    case "${1:-}" in bbs_*) ;; *) return 0 ;; esac
-    local b="${1#bbs_}"
-    b="$(printf '%s' "$b" | tr '_-' '/+')"
+# A session token's fields, decoded once a process (R228 step 17): each of
+# the helpers below was a pipeline of five processes, and an authenticated
+# verb ran them some ten times. bb_token_fields TOKEN sets _bbt_e (when it
+# stops being good, a unix time) and _bbt_p (the project it was minted
+# for), each empty for anything that is not a session token, and keeps them
+# by token; bb_token_prime fills them in the main shell before a verb runs,
+# so every command substitution after it inherits them. The body is
+# base64url of `project|exp|uid|sig`.
+bb_token_fields() {
+    local t="${1:-}" b d p e r
+    _bbt_e=""; _bbt_p=""
+    case "$t" in bbs_*) ;; *) return 0 ;; esac
+    declare -p _bbt_ex >/dev/null 2>&1 || declare -gA _bbt_ex=() _bbt_pr=()
+    if [ -n "${_bbt_ex[$t]+x}" ]; then _bbt_e="${_bbt_ex[$t]}"; _bbt_p="${_bbt_pr[$t]}"; return 0; fi
+    b="${t#bbs_}"; b="${b//_//}"; b="${b//-/+}"
     while [ $(( ${#b} % 4 )) -ne 0 ]; do b="${b}="; done
-    printf '%s' "$b" | base64 -d 2>/dev/null | cut -d'|' -f2 | tr -dc '0-9'
+    d="$(printf '%s' "$b" | base64 -d 2>/dev/null)"
+    # As cut read them: a body with no `|` is its own first and second field.
+    if [[ "$d" == *"|"* ]]; then p="${d%%|*}"; r="${d#*|}"; e="${r%%|*}"; else p="$d"; e="$d"; fi
+    _bbt_p="${p//[^A-Za-z0-9._-]/}"; _bbt_e="${e//[^0-9]/}"
+    _bbt_ex[$t]="$_bbt_e"; _bbt_pr[$t]="$_bbt_p"
+}
+
+# When a session token stops being good, as a unix time, or nothing for
+# anything that is not one.
+bb_token_exp() {
+    bb_token_fields "${1:-}"
+    printf '%s' "$_bbt_e"
 }
 
 # The project a session token was minted for: its first field. The kept
@@ -3583,17 +3652,38 @@ bb_token_exp() {
 # copy and sent the environment's, long dead (B497). bbapi.keep_token
 # reads the token the same way, for the same reason.
 bb_token_project() {
-    case "${1:-}" in bbs_*) ;; *) return 0 ;; esac
-    local b="${1#bbs_}"
-    b="$(printf '%s' "$b" | tr '_-' '/+')"
-    while [ $(( ${#b} % 4 )) -ne 0 ]; do b="${b}="; done
-    printf '%s' "$b" | base64 -d 2>/dev/null | cut -d'|' -f1 | tr -dc 'A-Za-z0-9._-'
+    bb_token_fields "${1:-}"
+    printf '%s' "$_bbt_p"
 }
 
 bb_token_dead() {
-    local e; e="$(bb_token_exp "${1:-}")"
+    bb_token_fields "${1:-}"
+    local e="$_bbt_e" now
     [ -n "$e" ] || return 1                  # not a session token: not ours to judge
-    [ "$e" -le "$(date +%s)" ]
+    printf -v now '%(%s)T' -1
+    [ "$e" -le "$now" ]
+}
+
+# The copy of the token bb-tty keeps beside the launcher, for this account
+# and the project the environment's token names, or "" when there is none.
+bb_token_kept() {
+    local t="${BB_TOKEN:-}" ft=""
+    bb_token_fields "$t"
+    # The account's own folder for the space (B159): the cache folder is
+    # shared between accounts on a node.
+    bb_scope_dir "${_bbt_p:-${BB_PROJECT:-}}"
+    # shellcheck disable=SC2154 # _bb_scope is bb_scope_dir's answer (common.sh)
+    local f="$_bb_scope/token"
+    [ -r "$f" ] && { IFS= read -r ft < "$f" || true; }
+    printf '%s' "$ft"
+}
+
+# Both tokens' fields decoded in the main shell, once (see bb_token_fields).
+bb_token_prime() {
+    [ -n "${BB_TOKEN:-}" ] || return 0
+    bb_token_fields "$BB_TOKEN"
+    local ft; ft="$(bb_token_kept)"
+    bb_token_fields "$ft"
 }
 
 # One line for aerie status: which copy of the session token is in use, where
@@ -3649,19 +3739,14 @@ cmd_token() {
     local home py
     home="$(user_home "${BB_ACCOUNT_UID:-}")"
     [ -n "$home" ] || die "no home for account ${BB_ACCOUNT_UID:-(none)} on this machine"
-    py="$(dirname "$(readlink -f "$0")")/lib/bbapi.py"
+    py="$BB_SCRIPTS/lib/bbapi.py"
     [ -f "$py" ] || die "bbapi.py is missing beside aerie"
     HOME="$home" python3 "$BB_LIB/token-verbs.py" keep
 }
 
 bb_token_now() {
-    local t="${BB_TOKEN:-}"
-    local dir="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}"
-    # Per account (B159): the cache folder is shared between accounts on a node.
-    local own; own="$(bb_token_project "$t")"
-    local f="${dir:-/tmp/bb-scope-$(id -u)}/builderbot/u/${BB_ACCOUNT_UID:-_none}/project/${own:-${BB_PROJECT:-}}/token"
-    local ft=""
-    [ -r "$f" ] && ft="$(cat "$f" 2>/dev/null)"
+    local t="${BB_TOKEN:-}" ft fe te
+    ft="$(bb_token_kept)"
     # The later-expiring of the two. The file used to be read only once the
     # environment's token had died; now every answer from the controller
     # can renew it (users.renewal, kept by bbapi.keep_token), so the file is
@@ -3669,8 +3754,9 @@ bb_token_now() {
     # session that keeps sending the older token would be renewed on every
     # call for nothing.
     if [ -n "$ft" ] && ! bb_token_dead "$ft"; then
-        if [ -z "$t" ] || bb_token_dead "$t" \
-           || [ "$(bb_token_exp "$ft")" -gt "$(bb_token_exp "$t")" ] 2>/dev/null; then
+        bb_token_fields "$ft"; fe="$_bbt_e"
+        bb_token_fields "$t"; te="$_bbt_e"
+        if [ -z "$t" ] || bb_token_dead "$t" || [ "$fe" -gt "$te" ] 2>/dev/null; then
             printf '%s' "$ft"; return 0
         fi
     fi
@@ -3712,6 +3798,39 @@ terminal, or pass one for the command with DASHBOARD_AUTH=name:password."
     printf '%s' "$h"
 }
 
+# api_py [--auth HEADER] [--project NAME] SCRIPT [ARGS...]: one of the
+# library's programs, run as the caller. bbapi sends BB_AUTH_HEADER with
+# every request, and a program that is about one project reads which from
+# BB_PROJECT; whatever else a verb hands its program rides in front of the
+# call (BB_DEV_WHY="$why" api_py ...).
+# The header is bb_auth_or_die's, asked for here. --auth hands over one the
+# verb already holds: it refused a missing credential before it read its
+# arguments, or it asks softly (bb_auth_header) and goes on without one.
+# With no --project the program is about no project and runs with the
+# environment's own BB_PROJECT.
+# Both are set on the program's command line and never exported: run_here
+# and cmd_run execute the person's own build command from this shell, and
+# an exported header would be in that command's environment. A verb whose
+# program replaces this shell (exec) sets the same two names on its own
+# command line.
+api_py() {
+    local auth="" held=0 proj="" named=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --auth) auth="$2"; held=1; shift 2 ;;
+            --project) proj="$2"; named=1; shift 2 ;;
+            *) break ;;
+        esac
+    done
+    if [ "$held" = 0 ]; then auth="$(bb_auth_or_die)"; fi
+    local script="$1"; shift
+    if [ "$named" = 1 ]; then
+        BB_AUTH_HEADER="$auth" BB_PROJECT="$proj" python3 "$BB_LIB/$script" "$@"
+    else
+        BB_AUTH_HEADER="$auth" python3 "$BB_LIB/$script" "$@"
+    fi
+}
+
 # The controller's own build, for `aerie status` on a node (R62). A node runs no
 # controller image, so BB_IMAGE_REV and BB_VERSION are empty here and the old
 # status lines read "unstamped". The which-build rule sends a session to bb
@@ -3721,17 +3840,13 @@ terminal, or pass one for the command with DASHBOARD_AUTH=name:password."
 # and build time. Softly, with a short timeout, because a controller that is
 # down, or a session with no token, is a state the line reports rather than
 # dies on.
-bb_agent_stamp() {
+# Two lines from one ask: the controller's build, then this node's agent
+# (empty when it cannot be had).
+bb_stamps() {
     local auth; auth="$(bb_auth_header)"
-    [ -n "$auth" ] || return 0
-    BB_META_AUTH="$auth" python3 "$BB_LIB/controller-stamp.py" agent 2>/dev/null || true
-}
-
-bb_controller_stamp() {
-    local auth; auth="$(bb_auth_header)"
-    [ -n "$auth" ] || { printf 'unknown: no session token to ask the controller with'; return; }
-    BB_META_AUTH="$auth" python3 "$BB_LIB/controller-stamp.py" 2>/dev/null \
-        || printf 'unreachable: the controller did not answer'
+    [ -n "$auth" ] || { printf 'unknown: no session token to ask the controller with\n'; return; }
+    api_py --auth "$auth" controller-stamp.py 2>/dev/null \
+        || printf 'unreachable: the controller did not answer\n'
 }
 
 # ---- a session on a node (roadmap #24) --------------------------------------
@@ -3750,7 +3865,7 @@ bb_controller_stamp() {
 # emulator, `aerie build` is a build (cmd_run). That is the point of being here.
 # One list, lib/relay-verbs, read here and by the server: a verb added to
 # one side only was either refused on arrival or never sent.
-BB_RELAY_VERBS=" $(tr -s '[:space:]' ' ' < "$(dirname "$(readlink -f "$0")")/lib/relay-verbs") "
+BB_RELAY_VERBS=" $(tr -s '[:space:]' ' ' < "$BB_SCRIPTS/lib/relay-verbs") "
 
 # bb_project: the project a verb acts on: BB_PROJECT, which is the session's
 # own or what `aerie -p NAME` named, else the working directory's when it is
@@ -3762,11 +3877,63 @@ bb_project() {
     project_here
 }
 
+# The variables a verb's own override of its project rides in. A verb that
+# reads one ignores BB_PROJECT on purpose: a caller that is in no project
+# (bb-tty, the test suites) names the project for that verb alone. `aerie
+# -p NAME` sets every one beside BB_PROJECT, the logs' two among them
+# (B675: `aerie -p X tests log` and `aerie -p X ci-log` answered for the
+# session's own project), and bb_relay falls back on them. The controller's
+# side of the relay sets the same names (dashboard/bbrelay.py
+# PROJECT_VARS): a name added here is added there.
+BB_PROJECT_VARS=(BB_ROADMAP_PROJECT BB_BUG_PROJECT BB_VERSION_PROJECT
+                 BB_TESTS_PROJECT BB_CILOG_PROJECT BB_FINDINGS_PROJECT)
+
+# not_in_a_space [TAIL]: the sentence a verb dies with when it was handed no
+# project and is run outside every one, with what the verb adds to it.
+not_in_a_space() {
+    die "not inside a space under ${WORKSPACE}; cd into one first${1:-}"
+}
+
+# need_project [VAR|--here] [--soft|--or-dir]: the project a verb acts on,
+# printed. The value of VAR when it has one: BB_PROJECT, as bb_project
+# reads it, unless the verb names its own override (one of
+# BB_PROJECT_VARS), and no variable at all with --here. Else the project
+# the working directory is in (project_here, which takes a worktree for its
+# project). Outside every project it dies with the one sentence; called as
+# $(need_project) that ends its subshell, and the caller ends itself with
+# || exit.
+# --soft prints nothing there instead, for a verb that goes on without a
+# project or says a sentence of its own. --or-dir prints the name of the
+# tree's top directory, or of the directory itself, for a verb that also
+# runs in a checkout outside the workspace.
+need_project() {
+    local var=BB_PROJECT lack=die p=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --here) var="" ;;
+            --soft) lack=soft ;;
+            --or-dir) lack=dir ;;
+            *) var="$1" ;;
+        esac
+        shift
+    done
+    [ -z "$var" ] || p="${!var:-}"
+    if [ -z "$p" ]; then
+        case "$lack" in
+            die) p="$(project_here)" || not_in_a_space ;;
+            soft) p="$(project_here || true)" ;;
+            dir) p="$(project_here 2>/dev/null)" \
+                     || p="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")" ;;
+        esac
+    fi
+    printf '%s' "$p"
+}
+
 bb_relay() {
-    local auth proj rc
+    local auth proj rc v
     auth="$(bb_auth_or_die)"
     proj="$(bb_project 2>/dev/null || true)"
-    [ -n "$proj" ] || proj="${BB_ROADMAP_PROJECT:-${BB_BUG_PROJECT:-${BB_VERSION_PROJECT:-}}}"
+    for v in "${BB_PROJECT_VARS[@]}"; do [ -n "$proj" ] || proj="${!v:-}"; done
     BB_RELAY_PROJECT="$proj" BB_AUTH_HEADER="$auth" python3 "$BB_LIB/relay.py" "" "$@"
     rc=$?
     return $rc
@@ -3831,7 +3998,7 @@ run_here() {
         # every APK by hand to get that name, and never used aerie build (R104).
         local pre="" proj ver
         if [ "$role" = build ]; then
-            proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+            proj="$(need_project --or-dir)"
             ver="$(BB_PROJECT="$proj" "$0" version --file 2>/dev/null | tail -1 | tr -cd 'A-Za-z0-9._+-')" || ver=""
             [ -z "$ver" ] || pre="${proj}-${ver}-"
         fi
@@ -3932,7 +4099,7 @@ cmd_settings() {
         # --json from a shell with no project still answers: the commit
         # identity in it is the account's, and bb-tty asks for a shell too.
         proj="$(project_here 2>/dev/null)" || {
-            [ "$json" = 1 ] || die "not inside a space under ${WORKSPACE}; cd into one first"
+            [ "$json" = 1 ] || not_in_a_space
             proj=""
         }
     fi
@@ -3941,19 +4108,19 @@ cmd_settings() {
         # scripted setup: an administrator's, as on the Settings page.
         [ -z "${BB_TOKEN:-}${BB_ACCOUNT_UID:-}" ] && ! on_node \
             || die "aerie settings node is run in a shell on the controller, not from a session: a space's node is its Settings page's"
-        [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one first, or aerie -p NAME settings node NODE"
+        [ -n "$proj" ] || not_in_a_space ", or aerie -p NAME settings node NODE"
         [ -n "${2:-}" ] || die "aerie settings node NODE: which node? aerie nodes lists them"
         BB_SET_VALUE="$2" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-            python3 "$BB_LIB/settings-verbs.py" node "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
+            python3 "$BB_LIB/settings-verbs.py" node "$BB_SCRIPTS/dashboard" "$proj"
         return
     fi
     if [ "${1:-}" = set ]; then
-        [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one first"
+        [ -n "$proj" ] || not_in_a_space
         local field="${2:-}"; shift 2 2>/dev/null || true
         case "$field" in build|test|outputs) ;; *) die "aerie settings set build|test|outputs VALUE" ;; esac
         [ $# -ge 1 ] || die "aerie settings set $field VALUE: the command to run, or for outputs the globs, comma-separated"
         BB_SET_FIELD="$field" BB_SET_VALUE="$*" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-            python3 "$BB_LIB/settings-verbs.py" set "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
+            python3 "$BB_LIB/settings-verbs.py" set "$BB_SCRIPTS/dashboard" "$proj"
         return
     fi
     # The tree this is being asked from, when the caller is standing in the
@@ -3964,7 +4131,7 @@ cmd_settings() {
     [ -n "$here_root" ] && [ "$(basename "$here_root")" = "$proj" ] || here_root=""
     BB_SETTINGS_JSON="$json" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
         BB_WORKSPACE="${WORKSPACE:-/workspace}" BB_PROJECT_ROOT="$here_root" \
-        python3 "$BB_LIB/settings-verbs.py" show "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
+        python3 "$BB_LIB/settings-verbs.py" show "$BB_SCRIPTS/dashboard" "$proj"
 }
 
 # aerie work: who else is changing this project, and where you overlap.
@@ -3979,15 +4146,15 @@ cmd_settings() {
 # to walk into, not a place to declare anything.
 cmd_work() {
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/overlap.py"
+    py="$BB_SCRIPTS/dashboard/overlap.py"
     [ -f "$py" ] || die "overlap.py is missing from this image"
-    proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    proj="$(need_project --or-dir)"
     python3 "$BB_LIB/work-verbs.py" "$py" "$proj" "${DASHBOARD_STATE:-/config}" "${WORKSPACE:-/workspace}"
 }
 
 cmd_users() {
     local py sub="${1:-list}"
-    py="$(dirname "$(readlink -f "$0")")/dashboard/users.py"
+    py="$BB_SCRIPTS/dashboard/users.py"
     [ -f "$py" ] || die "users.py is missing from this image"
     shift || true
     case "$sub" in
@@ -4040,7 +4207,7 @@ cmd_users() {
 
 cmd_nodes() {
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+    py="$BB_SCRIPTS/dashboard/nodes.py"
     [ -f "$py" ] || die "nodes.py is missing from this image"
     case "${1:-}" in
         "") DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nodes-verbs.py" list "$py" ;;
@@ -4054,9 +4221,6 @@ cmd_nodes() {
                 || die "aerie nodes enroll-token is run in a shell on the controller (docker exec Aerie-Workshop aerie nodes enroll-token NAME), not from a session"
             shift
             DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nodes-verbs.py" enroll-token "$py" "$@" ;;
-        -h|--help) echo "aerie nodes            the enrolled machines, each with the agent it runs"
-                   echo "aerie nodes show NAME  one of them in full, by name or id"
-                   echo "aerie nodes enroll-token NAME [--user U] [--own]  a new node's enrollment token, from a shell on the controller" ;;
         *) die "aerie nodes [show NAME|enroll-token NAME]: '$1' is not one of its forms" ;;
     esac
 }
@@ -4095,9 +4259,7 @@ cmd_jobs() {
     # diagnostics grant the nodes' own (system, toolchain) jobs as well. Run
     # here rather than relayed, so the call carries the session's account,
     # which that grant is checked against (the relayed token has none).
-    local auth; auth="$(bb_auth_or_die)"
-    BB_JOBS_AUTH="$auth" BB_JOBS_NODE="$node" BB_JOBS_TYPE="$type" BB_JOBS_ALL="$whole" \
-        python3 "$BB_LIB/jobs-verbs.py" "$n" "$jid"
+    BB_JOBS_NODE="$node" BB_JOBS_TYPE="$type" BB_JOBS_ALL="$whole" api_py jobs-verbs.py "$n" "$jid"
 }
 
 # aerie run / build / test: a job on the project's node, watched from here.
@@ -4128,7 +4290,7 @@ cmd_run() {
         esac
     done
     [ $# -gt 0 ] || die "aerie run needs a command after -- (aerie run -h)"
-    proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    proj="$(need_project --or-dir)"
     # ON A NODE THE SESSION IS WHERE THE TOOLCHAIN IS (roadmap #24), so there
     # is nothing to snapshot and nowhere to send it: the command runs here,
     # in this tree, and what --out names is copied into dist/ the way a job's
@@ -4155,7 +4317,7 @@ cmd_run() {
 cmd_build_or_test() {
     local role="$1" proj
     shift
-    proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    proj="$(need_project --or-dir)"
     # One value per line: the command first, then each output glob. Read as
     # lines rather than words, because a build command has spaces in it.
     local -a rec
@@ -4217,7 +4379,7 @@ cmd_build_or_test() {
 cmd_ci_labels() {
     local write=0
     [ "${1:-}" = "--write" ] && write=1
-    local py; py="$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+    local py; py="$BB_SCRIPTS/dashboard/nodes.py"
     local -a labels=()
     local l
     while IFS= read -r l; do [ -n "$l" ] && labels+=("$l"); done < <(
@@ -4395,6 +4557,13 @@ cmd_findings() {
 #
 # Each check is skipped, visibly, when its tool is missing: an image from
 # before these tools shipped should say so rather than pass by omission.
+# Whether the tree lint is run in is AerieOS's own, by what only it holds:
+# this command and the reference written from its help. One place, for the
+# checks that are about this repository and no space's project.
+_lint_own_tree() {
+    [ -f scripts/aerie ] && [ -f docs/reference.md ] && grep -q '^aerie status ' docs/reference.md
+}
+
 cmd_lint() {
     local root="${1:-$PWD}" rc=0 skipped=0
     [ -d "$root" ] || die "no such directory: ${root}"
@@ -4403,6 +4572,13 @@ cmd_lint() {
     section() { printf '== %s ==\n' "$1"; }
     need() { # need TOOL: false (and say so) when it is not installed
         command -v "$1" >/dev/null 2>&1 && return 0
+        # CI's lint skips nothing (BB_LINT_STRICT=1): a check not run because
+        # its tool is missing is a pass by omission, and a failure there.
+        if [ -n "${BB_LINT_STRICT:-}" ]; then
+            printf '  [FAIL] %s is not installed, and this lint skips nothing (BB_LINT_STRICT)\n' "$1"
+            rc=1
+            return 1
+        fi
         if on_node; then
             printf '  [skip] %s is not in this node'"'"'s store; the Library installs lint-tools, with this node picked\n' "$1"
             return 1
@@ -4425,14 +4601,21 @@ cmd_lint() {
         fi
     }
 
+    # Each tracked file's first line, read once and in one process for the
+    # two lists below that go by shebang (R228 step 22): read for each, three
+    # processes a read, it was about 14 s of a lint.
+    local -A bang=()
+    local bk
+    while IFS= read -r -d '' bk && IFS= read -r -d '' f; do bang["$f"]+="$bk"; done \
+        < <(files '*' | python3 "${BB_LIB_DIR:-$BB_SCRIPTS/lib}/embedded.py" shebangs 2>/dev/null)
+
     # Shell scripts, by shebang: the same selection CI's lint workflow makes,
     # so passing here means passing there.
     section "shell scripts (shellcheck)"
     if need shellcheck; then
         local -a shells=()
         while IFS= read -r -d '' f; do
-            head -c 64 "$f" 2>/dev/null | head -1 | grep -qE '^#!.*\b(ba)?sh\b' \
-                && shells+=("$f")
+            case "${bang["$f"]:-}" in *sh*) shells+=("$f") ;; esac
         done < <(files '*')
         # A script embedded in a QUOTED heredoc is a string to the shell and a
         # string to shellcheck, so it was never checked at all, and one of
@@ -4447,7 +4630,7 @@ cmd_lint() {
             tmpd="$(mktemp -d)"
             while IFS= read -r f; do
                 [ -n "$f" ] && shells+=("$f")
-            done < <(python3 "${BB_LIB_DIR:-$(dirname "$(readlink -f "$0")")/lib}/embedded.py" \
+            done < <(python3 "${BB_LIB_DIR:-$BB_SCRIPTS/lib}/embedded.py" \
                              shell "$tmpd" "${shells[@]}" 2>/dev/null)
         fi
         if [ "${#shells[@]}" -eq 0 ]; then
@@ -4491,18 +4674,14 @@ cmd_lint() {
         local -a pys=() others=() embedded=()
         while IFS= read -r -d '' f; do
             case "$f" in *.py) pys+=("$f"); continue ;; esac
-            if head -c 64 "$f" 2>/dev/null | head -1 | grep -qE '^#!.*\bpython3?\b'; then
-                pys+=("$f")
-            else
-                others+=("$f")
-            fi
+            case "${bang["$f"]:-}" in *py*) pys+=("$f") ;; *) others+=("$f") ;; esac
         done < <(files '*')
         local pyd=""
         if [ "${#others[@]}" -gt 0 ]; then
             pyd="$(mktemp -d)"
             while IFS= read -r f; do
                 [ -n "$f" ] && embedded+=("$f")
-            done < <(python3 "${BB_LIB_DIR:-$(dirname "$(readlink -f "$0")")/lib}/embedded.py" \
+            done < <(python3 "${BB_LIB_DIR:-$BB_SCRIPTS/lib}/embedded.py" \
                              python "$pyd" "${others[@]}" 2>/dev/null)
         fi
         local -a conf=()
@@ -4529,9 +4708,12 @@ cmd_lint() {
         while IFS= read -r -d '' f; do
             case "$f" in *.js|*.mjs) jss+=("$f") ;; esac
         done < <(files '*.js' '*.mjs')
-        for f in "${jss[@]}"; do
-            node --check "$f" >/dev/null 2>&1 || jsbad+=("$f")
-        done
+        # As many at once as the machine has cores (R228 step 22): one after
+        # another they were about 9 s of a lint.
+        while IFS= read -r f; do [ -n "$f" ] && jsbad+=("$f"); done < <(
+            [ "${#jss[@]}" -eq 0 ] || printf '%s\0' "${jss[@]}" \
+                | xargs -0 -r -P "$(nproc 2>/dev/null || echo 4)" -n 1 \
+                    sh -c 'node --check "$1" >/dev/null 2>&1 || printf "%s\n" "$1"' _)
         while IFS= read -r -d '' f; do
             node -e '
 const fs = require("fs"); const s = fs.readFileSync(process.argv[1], "utf8");
@@ -4624,14 +4806,17 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
             local nid; nid="$(project_node)"
             if [ -n "$nid" ]; then
                 DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/lint-checks.py" runner \
-                    "$(dirname "$(readlink -f "$0")")/dashboard/nodes.py" "$nid" 2>/dev/null
+                    "$BB_SCRIPTS/dashboard/nodes.py" "$nid" 2>/dev/null
             fi
             # A hosted job on a moving label (ubuntu-latest) builds on whatever
             # GitHub points it at that day (R116): a note in any project, a
             # failure in this one, whose image build must not move under it.
             local strict=""
-            [ -f scripts/aerie ] && [ -f docs/reference.md ] && grep -q '^aerie status ' docs/reference.md && strict="--strict"
+            _lint_own_tree && strict="--strict"
             python3 "$BB_LIB/lint-checks.py" hosted $strict || rc=1
+            # An action named by a tag runs whatever its publisher moves the
+            # tag to (R206): a note in any project, a failure in this one.
+            python3 "$BB_LIB/lint-checks.py" pinned $strict || rc=1
         fi
     else
         echo "  none found"
@@ -4695,7 +4880,7 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
     # reference's command list are two copies of one thing, and the copy nobody
     # runs is the one that goes stale: `aerie toolchains migrate` outlived its code in
     # the README because nothing compared them.
-    if [ -f scripts/aerie ] && [ -f docs/reference.md ] && grep -q '^aerie status ' docs/reference.md; then
+    if _lint_own_tree; then
         # The agent's version is the one number in this tree a person moves
         # by hand, and a node compares the file while the row names the
         # number (B221): tools/agent-version.sh holds the two together, here
@@ -4758,19 +4943,38 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
     # The official packs under packs/ against the tables they are written
     # from (R169 step 1): tools/packs-export.py --write rewrites them.
     # The word Unraid only where its XML files are the subject (the operator, 28 Oct).
-    if grep -qF '"unraid": unraid' "$BB_LIB/lint-checks.py"; then
+    # AerieOS's own house rules, for AerieOS's own tree: these three ran on
+    # every space's project, so one that names Unraid in a tracked file, or
+    # whose changelog cites an issue as B12, failed a lint that was never
+    # about it (the audit of 13 Nov).
+    if _lint_own_tree && grep -qF '"unraid": unraid' "$BB_LIB/lint-checks.py"; then
         echo "== unraid: the word only where its XML files are the subject"
         python3 "$BB_LIB/lint-checks.py" unraid || rc=1
     fi
     # The changelog names commits, never a notebook number (the operator, 3 Nov).
-    if [ -f CHANGELOG.md ] && grep -qF '"changelog": changelog' "$BB_LIB/lint-checks.py"; then
+    if _lint_own_tree && [ -f CHANGELOG.md ] && grep -qF '"changelog": changelog' "$BB_LIB/lint-checks.py"; then
         echo "== changelog: commits named, never a bug's or an item's number"
         python3 "$BB_LIB/lint-checks.py" changelog || rc=1
     fi
     # A name defined twice, where the later silently wins (B733, B734).
-    if grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
+    if _lint_own_tree && grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
         section "names defined twice (python functions and methods, the page's scripts)"
         python3 "$BB_LIB/lint-checks.py" dupes || rc=1
+    fi
+    # AerieOS's release key file, read by its one reader (releasepub.py): a
+    # file that does not parse names no key, and every node enrolled from
+    # that build would pin none. Asked of the tree that signs with it, so a
+    # file gone missing fails too.
+    if _lint_own_tree && [ -f tools/sign-agent.py ] && grep -qF '"releasekey": releasekey' "$BB_LIB/lint-checks.py"; then
+        section "release key (config/aerieos-release.pub names the key, or the key and its spare)"
+        python3 "$BB_LIB/lint-checks.py" releasekey || rc=1
+    fi
+    # Who may sign a release (config/release-signers) against what it is
+    # written from, and the stick maker's copy against it: a drifted file is
+    # an install that refuses every dev build.
+    if _lint_own_tree && [ -f tools/release-signers.py ] && grep -qF '"releasesigners": releasesigners' "$BB_LIB/lint-checks.py"; then
+        section "release signers (config/release-signers vs config/aerieos-release.pub, and the stick maker's copy)"
+        python3 "$BB_LIB/lint-checks.py" releasesigners || rc=1
     fi
     if [ -f tools/packs-export.py ] && grep -qF '"packs": packs' "$BB_LIB/lint-checks.py"; then
         section "packs (packs/ vs config/toolchains.json and agents.py)"
@@ -4787,6 +4991,13 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
             echo "  [skip] this aerie's lint-checks.py predates the check: bash scripts/aerie lint runs the tree's"
             skipped=1
         fi
+    fi
+
+    # A manifest a release read is read for good (R234): the kept manifests
+    # of each pack format at the newest v* tag, byte-for-byte.
+    if [ -d scripts/dashboard/unit/packformat ] && grep -qF '"formats": formats' "$BB_LIB/lint-checks.py"; then
+        section "pack formats (the kept manifests unchanged since the newest release tag)"
+        python3 "$BB_LIB/lint-checks.py" formats || rc=1
     fi
 
     # The instruction channels, each saying its own (R202): CLAUDE.md the
@@ -4889,7 +5100,7 @@ is not running; see aerie logs."
             # to use the dashboard.
             nohup env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u BB_AGENT "${envs[@]}" \
                 python3 -u "$dir/server.py" 2>&1 \
-                | "$(dirname "$(readlink -f "$0")")/lib/log-split.sh" \
+                | "$BB_SCRIPTS/lib/log-split.sh" \
                     "$(bb_log_dir)/dashboard.log" dashboard &
             sleep 1
             [ -n "$(dashboard_pid)" ] || die "the new dashboard did not stay up; see $(bb_log_dir)/dashboard.log"
@@ -4909,8 +5120,7 @@ is not running; see aerie logs."
             # and by who asked, with how long each took (B245): the one
             # command that shows a poll that should not be there, a tab that
             # asks twice, or the request a slow tab is waiting on.
-            local auth; auth="$(bb_auth_or_die)"
-            BB_TRACE_AUTH="$auth" python3 "$BB_LIB/trace-verbs.py" "${1:-60}"
+            api_py trace-verbs.py "${1:-60}"
             ;;
         *) die "usage: aerie dashboard test|dev|status|trace [SECONDS]" ;;
     esac
@@ -4966,6 +5176,28 @@ cmd_drift() {
     fi
 }
 
+# project_dist: the dist folder of the space this was run from, whatever
+# directory inside it that was (B6), or the working directory's own where it
+# was run from no space: where a capture lands and where the captures are
+# listed from.
+project_dist() {
+    local proj; proj="$(project_here 2>/dev/null || true)"
+    if [ -n "$proj" ]; then printf '%s' "$WORKSPACE/$proj/dist"; else printf '%s' "$PWD/dist"; fi
+}
+
+# pw_browser_dirs: the folders Playwright's browsers may be in that exist
+# here, one a line, in the order their answers can be trusted:
+# PLAYWRIGHT_BROWSERS_PATH (what the image sets and any project honors), then
+# the toolchain store directly, then the historical /opt path. The one list,
+# for Chromium, for Firefox and for the folder a capture hands Playwright.
+pw_browser_dirs() {
+    local base
+    for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$(sdk_root)/playwright" /opt/pw-browsers; do
+        [ -n "$base" ] && [ -d "$base" ] && printf '%s\n' "$base"
+    done
+    return 0
+}
+
 # Where Chromium actually is, in the order the answers can be trusted:
 # PLAYWRIGHT_BROWSERS_PATH (what the image sets and any project honors), then
 # the toolchain store directly, then the historical /opt path. Resolved rather than
@@ -4975,8 +5207,8 @@ cmd_drift() {
 # sitting right there on the share.
 find_chromium() {
     local base exe
-    for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$(sdk_root)/playwright" /opt/pw-browsers; do
-        [ -n "$base" ] && [ -d "$base" ] || continue
+    local -a bases=(); mapfile -t bases < <(pw_browser_dirs)
+    for base in "${bases[@]}"; do
         exe="$base/chromium"
         [ -x "$exe" ] || exe="$(find -L "$base" -path '*/chromium-*/chrome-linux*/chrome' -type f 2>/dev/null | head -1)"
         [ -n "$exe" ] && [ -x "$exe" ] || continue
@@ -5025,30 +5257,40 @@ cmd_capture() {
     case "${1:-}" in
         shot) shift; capture_shot "$@" ;;
         reel) shift; capture_reel "$@" ;;
+        # What a page can be opened in and as (pagecap.mjs): the browsers
+        # installed here and the devices Playwright knows, asked of it.
+        browsers) capture_env node "$BB_LIB/pagecap.mjs" browsers ;;
+        devices)  shift; capture_env node "$BB_LIB/pagecap.mjs" devices "$*" ;;
         # The captures in dist/ and their removal (R96): capture.py reads
         # and applies the one rule the Artifacts tab's sweep also does.
         ls|prune)
             local verb="$1"; shift
             case "${1:-}" in -h|--help) cmd_capture --help; return 0 ;; esac
-            local proj; proj="$(project_here 2>/dev/null || true)"
-            local dist="${proj:+${WORKSPACE}/${proj}/dist}"
-            [ -n "$dist" ] || dist="$PWD/dist"
+            local dist; dist="$(project_dist)"
             python3 "$BB_LIB/capture.py" "$verb" "$dist" "$@"
             ;;
         *) cat <<'EOT'
 aerie capture shot URL... [FILE|DIR] | --emu [PKG] [FILE] | --display :N [FILE]   [--drive F] [--settle|--now]
 aerie capture reel --video FILE | --url URL | --emu [PKG] | --display :N   [--seconds N] [--drive F] [--name N]
+aerie capture browsers
+aerie capture devices [WORDS]
 aerie capture ls
 aerie capture prune [--days N] [NAME...]
   shot:  one picture at rest (shots a quarter second apart until a second of
          them match; --now takes it at once)
+  a page, for shot and reel alike: --browser NAME|all (any installed here:
+         browsers lists them; all is a picture in each), --device NAME (any
+         Playwright knows: devices lists them, with its size, density and
+         touch), --size WxH, --scheme dark|light, and --set NAME=VALUE for
+         anything else a browser's context takes (locale, timezoneId,
+         reducedMotion)
   reel:  the frames that changed, stamped with their times, on one sheet in
          dist/reel/NAME/ with frames.json beside it (aerie capture reel -h)
   ls:    the captures in this project's dist/, with who asked and when
   prune: remove the captures named, or every one older than --days N; the
          controller sweeps them after the project's "captures kept" days
 EOT
-           [ -z "${1:-}" ] || [ "$1" = -h ] || [ "$1" = --help ] || die "aerie capture shot|reel|ls|prune"
+           [ -z "${1:-}" ] || [ "$1" = -h ] || [ "$1" = --help ] || die "aerie capture shot|reel|browsers|devices|ls|prune"
            ;;
     esac
 }
@@ -5056,9 +5298,14 @@ EOT
 # A browser with an extension loaded (R247): Playwright's Chrome for Testing
 # and Firefox from the store, driven by browser.mjs on the store's node.
 cmd_browser() {
-    local root ff node
+    local root ff="" node base
+    local -a bases=(); mapfile -t bases < <(pw_browser_dirs 2>/dev/null)
     root="$(sdk_root 2>/dev/null || true)"
-    ff="$(find -L "${PLAYWRIGHT_BROWSERS_PATH:-$root/playwright}" -path '*/firefox-*/firefox/firefox' -type f 2>/dev/null | head -1)"
+    # The first of the folders that has one, as Chromium is found.
+    for base in "${bases[@]}"; do
+        ff="$(find -L "$base" -path '*/firefox-*/firefox/firefox' -type f 2>/dev/null | head -1)"
+        [ -z "$ff" ] || break
+    done
     node="$(command -v node || true)"; [ -n "$node" ] || { [ -x "$root/node/bin/node" ] && node="$root/node/bin/node"; }
     [ -n "$node" ] || die "aerie browser runs on Node, and there is no node toolchain here; installing it is the operator's"
     BB_BROWSER_CHROME="$(find_chromium 2>/dev/null || true)" BB_BROWSER_FIREFOX="$ff" exec "$node" "$BB_LIB/browser.mjs" "$@"
@@ -5070,19 +5317,45 @@ cmd_browser() {
 # token and refused it, and anybody's page there would have had it too.
 capture_trust() {
     if [ -n "${BB_CONTROLLER:-}" ]; then
-        printf '%s' "$BB_CONTROLLER" | sed -E 's#^(https?://[^/]+).*#\1#'
+        # Under both schemes: the controller's one port answers http and
+        # https, and a node's channel may be either (its agent moves it to
+        # https by itself), so the page is the controller's own at both.
+        printf '%s' "$BB_CONTROLLER" | sed -E 's#^https?://([^/]+).*#http://\1,https://\1#'
     else
         printf 'http://127.0.0.1:%s,http://localhost:%s' "${DASHBOARD_PORT:-7680}" "${DASHBOARD_PORT:-7680}"
     fi
 }
 
+# Whether URL is on one of the origins this shell's own credential would go
+# to (capture_trust's list).
+capture_is_own() {
+    local origin; origin="$(printf '%s' "$1" | sed -E 's#^(https?://[^/]+).*#\1#')"
+    case ",$2," in *",$origin,"*) return 0 ;; esac
+    return 1
+}
+
+# What a session is told when it points a capture at the controller's own
+# dashboard: the page is a person's, and what a session photographs instead.
+capture_person_only() {
+    printf '%s is the controller'"'"'s own dashboard, which is a person'"'"'s page: a session'"'"'s token opens none of it. A session photographs a dev instance (aerie devapp says where it is; --auth USER:PASSWORD signs in to it), any other page, the emulator (--emu) or an X display (--display :N)' "$1"
+}
+
 # The store's tools for capture.py, which shot and reel share.
+# Where Playwright's browsers are: the folder named, the store's, the image's.
+pw_browsers_path() {
+    local first=""
+    IFS= read -r first < <(pw_browser_dirs 2>/dev/null) || true
+    printf '%s' "$first"
+}
+
 capture_env() {
     local root; root="$(sdk_root 2>/dev/null || true)"
     local ff; ff="$(command -v ffmpeg || true)"; [ -n "$ff" ] || { [ -x "$root/ffmpeg/bin/ffmpeg" ] && ff="$root/ffmpeg/bin/ffmpeg"; }
     local adb; adb="$(command -v adb || true)"; [ -n "$adb" ] || { [ -x "$root/platform-tools/adb" ] && adb="$root/platform-tools/adb"; }
     BB_CAPTURE_FFMPEG="$ff" BB_CAPTURE_NODE_PATH="$(pw_node_path)" BB_CAPTURE_CHROME="$(find_chromium 2>/dev/null || true)" \
-    BB_CAPTURE_ADB="$adb" BB_CAPTURE_AUTH="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" BB_CAPTURE_TRUST="$(capture_trust)" "$@"
+    NODE_PATH="$(pw_node_path)" PLAYWRIGHT_BROWSERS_PATH="$(pw_browsers_path)" \
+    BB_CAPTURE_ADB="$adb" BB_CAPTURE_AUTH="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" BB_CAPTURE_TRUST="$(capture_trust)" \
+    BB_CAPTURE_PERSON_ONLY="$(capture_person_only "the page")" "$@"
 }
 
 capture_reel() {
@@ -5091,6 +5364,7 @@ capture_reel() {
             cat <<'EOT'
 aerie capture reel --video FILE | --url URL | --emu [PKG] | --display :N  [--seconds N] [--drive FILE] [--name NAME]
         [--patch N] [--max N] [--from S] [--to S] [--dry] [--threshold T] [--fps N]
+        [--browser NAME] [--device NAME] [--size WxH] [--scheme dark|light] [--set NAME=VALUE]...   (a page's, as shot takes them)
   the frames that changed, each stamped with its time, tiled into
   dist/reel/NAME/sheet.png (and sheet-2.png on, twelve frames a page)
   beside frames.json (when, and how much moved): what a screenshot cannot
@@ -5129,9 +5403,7 @@ aerie capture reel --video FILE | --url URL | --emu [PKG] | --display :N  [--sec
 EOT
             return 0 ;;
     esac
-    local proj; proj="$(project_here 2>/dev/null || true)"
-    local out="${proj:+${WORKSPACE}/${proj}/dist/reel}"
-    [ -n "$out" ] || out="$PWD/dist/reel"
+    local out; out="$(project_dist)/reel"
     BB_CAPTURE_OUT="$out" capture_env python3 "$BB_LIB/reel.py" "$@"
 }
 
@@ -5139,6 +5411,10 @@ capture_shot_usage() {
     cat <<'EOT'
 usage: aerie capture shot URL... [FILE|DIR] | --emu [PKG] [FILE] | --display :N [FILE]   [--drive F] [--settle|--now]
         [--auth user:pass] [--size WxH] [--full] [--scale N] [--wait MS] [--resize W]
+        [--browser NAME|all] [--device NAME] [--scheme dark|light] [--set NAME=VALUE]...
+a page is opened in the first browser installed here unless one is named
+(aerie capture browsers; all takes one picture in each, NAME-BROWSER.png), at
+1280x800 unless a size or a device is (aerie capture devices)
 URLs need their scheme (http:// or https://); with no FILE a page's shot goes
 to dist/shot/ and the emulator's to dist/emu/
 EOT
@@ -5147,14 +5423,16 @@ EOT
 capture_shot() {
     # The operator's password, or a session's token, whichever this shell
     # has. --auth overrides both.
-    local auth="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" width=1280 height=800 scale=1 wait=0 settle="" src="" pkg="" disp="" drive=""
-    local full=0 resize="" out="" mode=file urls=() mark=0 trust; trust="$(capture_trust)"
+    # No size, scale, browser or device of its own here: what is not asked for
+    # is pagecap.mjs's to decide (1280x800 in the first browser installed),
+    # and a device brings its own size and density.
+    local auth="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" width="" height="" scale="" wait=0 settle="" src="" pkg="" disp="" drive=""
+    local full=0 resize="" out="" mode=file urls=() mark=0 trust browser="" device="" scheme="" sets=(); trust="$(capture_trust)"
     # A shot nobody named goes to the project's dist/ whatever directory the
     # command is run in (B6), under emu/ or shot/ with a record beside it
     # (--mark): the Artifacts tab lists those as captures and the project's
     # sweep removes them by age (R96).
-    local proj dist; proj="$(project_here 2>/dev/null || true)"
-    dist="${proj:+${WORKSPACE}/${proj}/dist}"; [ -n "$dist" ] || dist="$PWD/dist"
+    local dist; dist="$(project_dist)"
     # Used by the test harness, which needs the same answer this does and
     # should not re-implement the search to get it.
     if [ "${1:-}" = --print-chromium ]; then find_chromium; printf '\n'; return 0; fi
@@ -5167,6 +5445,14 @@ capture_shot() {
             --wait)   wait="$2"; shift 2 ;;
             --resize) resize="${2%x}"; shift 2 ;;
             --full)   full=1; shift ;;
+            # Which browser (any installed: aerie capture browsers; all for
+            # one picture in each), which screen (any device Playwright
+            # knows: aerie capture devices), and anything else its context
+            # takes by name (--set locale=de-DE --set reducedMotion=reduce).
+            --browser) [ -n "${2:-}" ] || die "--browser needs a name after it: aerie capture browsers lists those here, all is every one"; browser="$2"; shift 2 ;;
+            --device)  [ -n "${2:-}" ] || die "--device needs a name after it: aerie capture devices lists them"; device="$2"; shift 2 ;;
+            --scheme)  [ -n "${2:-}" ] || die "--scheme needs dark or light after it"; scheme="$2"; shift 2 ;;
+            --set)     [ -n "${2:-}" ] || die "--set needs NAME=VALUE after it"; sets+=("$2"); shift 2 ;;
             # Shot at rest: screenshots a quarter second apart until two
             # match, so a modal still arriving or a list still loading is
             # not what the picture shows. The dashboard's own pages settle
@@ -5207,6 +5493,19 @@ capture_shot() {
         return
     fi
     [ "${#urls[@]}" -gt 0 ] || die "$(capture_shot_usage)"
+    # A session's token opens none of the controller's page (R227 step 4): a
+    # shot of the controller's own address with nothing else to sign in with
+    # says so, and the token goes to no page at all. A credential named with
+    # --auth is the person's word and is sent as before.
+    if [ "$trust" != named ]; then
+        case "$auth" in bbs_*)
+            local u
+            for u in "${urls[@]}"; do
+                capture_is_own "$u" "$trust" && die "$(capture_person_only "$u")"
+            done
+            auth="" ;;
+        esac
+    fi
     case "${width}${height}${scale}${wait}${resize}" in
         *[!0-9]*) die "--size WxH, --scale N, --wait MS and --resize W take whole numbers" ;;
     esac
@@ -5222,174 +5521,13 @@ capture_shot() {
         mode=dir; mkdir -p "$out"
     fi
 
-    local chrome; chrome="$(find_chromium)"
-    local files st=0
-    files="$(NODE_PATH="$(pw_node_path)" node - \
-        "$chrome" "$auth" "$width" "$height" "$scale" "$wait" "$full" \
-        "$mode" "$out" "$trust" "$resize" "$settle" "${drive:+$(readlink -f "$drive")}" "${urls[@]}" <<'EOF'
-const { chromium } = require("playwright");
-const fs = require("fs");
-const path = require("path");
-const [exe, auth, w, h, scale, wait, full, mode, dest, trust, resize, settle, drive, ...urls]
-  = process.argv.slice(2);
-(async () => {
-  const b = await chromium.launch({ executablePath: exe });
-  // Either shape of credential. A session holds a bearer token rather than a
-  // password now (bug #16), and splitting on ":" produced no credential at
-  // all for one, so a session photographing a dashboard page would have got
-  // the LOGIN page and no error, which is the worst way for this to fail.
-  const bearer = /^bbs_/.test(auth);
-  const [username, password] = !bearer && auth.includes(":")
-    ? auth.split(/:(.*)/) : [null, null];
-  const header = bearer ? "Bearer " + auth
-    : username ? "Basic " + Buffer.from(auth).toString("base64") : "";
-  // Matched on the whole origin, the controller's own (B143): a port alone
-  // let a dev instance, or anybody's page, on :7680 have this session's
-  // token. A credential named with --auth goes to the URLs named with it.
-  const trusted = new Set(trust === "named" ? [] : trust.split(",").filter(Boolean));
-  const mine = new Set(urls.filter(u => {
-    try { return trust === "named" || trusted.has(new URL(u).origin); } catch { return false; }
-  }).map(u => new URL(u).origin));
-  // Credentials go both ways: httpCredentials answers a server that
-  // challenges, the preemptive Authorization header satisfies one that
-  // deliberately never does (the dashboard, whose challenge-free 401s are
-  // what keep browsers from popping their own dialog). The challenge is
-  // answered for one trusted origin alone, Playwright's limit.
-  const ctx = await b.newContext({
-    viewport: { width: +w, height: +h },
-    deviceScaleFactor: +scale,
-    ...(username && mine.size === 1 ? { httpCredentials: { username, password, origin: [...mine][0] } } : {}) });
-  // The header goes to the DASHBOARD and nowhere else. On the context it went
-  // to every URL in the run, so `aerie capture shot <dashboard> https://example.com`
-  // handed the credential to example.com as well (bug #49). Per-route, matched
-  // on origin, so shooting somebody else's page cannot carry it there.
-  if (header && mine.size) {
-    await ctx.route("**/*", async (route) => {
-      let same = false;
-      try { same = mine.has(new URL(route.request().url()).origin); } catch {}
-      await route.continue(same
-        ? { headers: { ...route.request().headers(), authorization: header } }
-        : {});
-    });
-  }
-  // ...and a real sign-in, for the cookie. A header added by routing does not
-  // reach a WEBSOCKET handshake (Playwright does not intercept those) and
-  // the terminal is a websocket on the dashboard's own origin now, so a
-  // shot of a page with a terminal in it came out with the terminal
-  // refused. A cookie goes on the handshake like any other request.
-  // Best-effort: a page that is not an AerieOS dashboard has no /login,
-  // and the header above is still what answers for it.
-  if (username) {
-    for (const origin of mine) {
-      try {
-        await ctx.request.post(origin + "/login", {
-          form: { username, password }, maxRedirects: 0, timeout: 10000 });
-      } catch {}
-    }
-  }
-  // The downscale, in the browser that took the shot. It used to be
-  // imagemagick's `convert`, which is in the controller's image and on no
-  // node (B103), so the one flag a README script needs died on the machine
-  // sessions actually run on. Chromium resamples as well as convert does and
-  // is already here, by definition: nothing that can take a screenshot lacks
-  // it. On a blank page of its own, because a data: image is exactly what a
-  // photographed page's own CSP may refuse.
-  let scaler = null;
-  const shrink = async (file, width) => {
-    scaler = scaler || await b.newPage();
-    const b64 = fs.readFileSync(file).toString("base64");
-    const done = await scaler.evaluate(async ([data, wide]) => {
-      const img = new Image();
-      img.src = "data:image/png;base64," + data;
-      await img.decode();
-      if (img.width <= wide) return null;      // never upscale: that adds nothing
-      const c = document.createElement("canvas");
-      c.width = wide;
-      c.height = Math.max(1, Math.round(img.height * wide / img.width));
-      const g = c.getContext("2d");
-      g.imageSmoothingEnabled = true;
-      g.imageSmoothingQuality = "high";
-      g.drawImage(img, 0, 0, c.width, c.height);
-      return c.toDataURL("image/png").split(",")[1];
-    }, [b64, width]);
-    // In place, and metadata-free by construction: a fresh encode carries
-    // none. The full-size original is scaffolding, the downscale is the
-    // deliverable, and keeping both would double the repo cost the flag
-    // exists to avoid.
-    if (done) fs.writeFileSync(file, Buffer.from(done, "base64"));
-  };
-  const p = await ctx.newPage();
-  const taken = new Set();
-  let unanswered = 0;
-  for (const url of urls) {
-    // A page that never goes quiet is still a page, and is shot as it is;
-    // one that never answered is not (B535): Chromium draws its own error
-    // page, and a picture of that with exit 0 read as the site being up.
-    let failed = "";
-    const res = await p.goto(url, { waitUntil: "networkidle" }).catch(e => {
-      if (!/timeout/i.test(`${e.name} ${e.message}`)) failed = String(e.message).split("\n")[0];
-      return null;
-    });
-    if (failed) {
-      console.error(`${url}: did not answer (${failed}); no picture taken`);
-      unanswered++;
-      continue;
-    }
-    if (res && res.status() >= 400) console.error(`${url}: answered ${res.status()}; shot as it is`);
-    if (+wait) await p.waitForTimeout(+wait);
-    // --drive works the page first, as it does the emulator and a display
-    // (B847: it was taken and never run for a URL, so the shot was of the
-    // page as it loaded): its default export gets the page and the context.
-    if (drive) {
-      const mod = await import(drive);
-      await (mod.default || mod.drive)(p, { ctx, browser: b, url });
-    }
-    let out = dest;
-    if (mode === "dir") {
-      // Named from the path so reruns overwrite their own shots, with a
-      // counter only for two URLs that share a path (e.g. differing query).
-      const u = new URL(url);
-      // No leading dash or dot: "/?view=x" would otherwise slug to
-      // "-view-x.png", which convert then parses as an option. Capped at 80
-      // because a long query string made a filename longer than the 255 a
-      // filesystem takes, and the whole run died on ENAMETOOLONG.
-      const s = ((u.pathname + u.search).replace(/^\/+|\/+$/g, "")
-        .replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+/, "") || "index")
-        .slice(0, 80);
-      let name = s, n = 2;
-      while (taken.has(name)) name = `${s}-${n++}`;
-      taken.add(name);
-      out = path.join(dest, name + ".png");
-    }
-    // At rest, when asked or when it is the dashboard's own page: a shot
-    // every quarter second until a whole second of them are the same
-    // bytes, and that one is the picture. Two matching frames were not
-    // enough: they came in the first half second, before a list that
-    // lands a second later. A page that never stops moving (a spinner) is
-    // taken as it is after six seconds, and said.
-    let atRest = settle === "1" || (settle === "" && (() => {
-      try { return mine.has(new URL(url).origin); } catch { return false; } })());
-    if (atRest) {
-      let last = await p.screenshot({ fullPage: full === "1" }), still = 0;
-      const until = Date.now() + 6000;
-      while (Date.now() < until && still < 4) {
-        await p.waitForTimeout(250);
-        const next = await p.screenshot({ fullPage: full === "1" });
-        still = next.equals(last) ? still + 1 : 0;
-        last = next;
-      }
-      if (still < 4) console.error(`${url}: still moving after six seconds; shot as it is`);
-      fs.writeFileSync(out, last);
-    } else {
-      await p.screenshot({ path: out, fullPage: full === "1" });
-    }
-    if (+resize) await shrink(out, +resize);
-    console.log(out);
-  }
-  await b.close();
-  if (unanswered) process.exitCode = 3;
-})().catch(e => { console.error(String(e)); process.exit(1); });
-EOF
+    # The page is opened by pagecap.mjs, which reel shares: the browsers
+    # installed here, a device's screen or a size, and the credential to the
+    # trusted origins alone, all there. Its arguments as one JSON object.
+    local files st=0 spec
+    spec="$(python3 "$BB_LIB/capture.py" spec "$auth" "$width" "$height" "$scale" "$wait" "$full" "$mode" "$out" "$trust" "$resize" "$settle" \
+                    "${drive:+$(readlink -f "$drive")}" "$browser" "$device" "$scheme" "${#sets[@]}" "${sets[@]}" "${urls[@]}")"
+    files="$(capture_env node "$BB_LIB/pagecap.mjs" shot "$spec"
 )" || st=$?
     if [ "$mark" = 1 ] && [ -n "$files" ]; then
         local f
@@ -5431,11 +5569,12 @@ cmd_tool() {
         # install; the ffmpeg toolchain turns its WAV into OGG and draws the
         # pictures a session checks it by.
         sound)     tool_sound "$@" ;;
-        # The vetted catalog's packs (R169 step 5): looked through, and one
-        # asked for, as the project's Install a tool pack setting says.
+        # The vetted catalog (R169 step 5): looked through, and a tool asked
+        # for on this session's node, a shipped toolchain or a pack of the
+        # catalog, as the project's Install a tool pack setting says.
         search|install)
             local auth; auth="$(bb_auth_or_die)"
-            BB_PACK_AUTH="$auth" exec python3 "$BB_LIB/pack-verbs.py" "$tool" "$@" ;;
+            BB_AUTH_HEADER="$auth" exec python3 "$BB_LIB/pack-verbs.py" "$tool" "$@" ;;
         "")
             local t d
             for t in graphics diagrams documents office; do
@@ -5843,12 +5982,18 @@ PY
             self) printf '  [ok]   the dashboard is served over https with the install'"'"'s own certificate (pinned by its fingerprint on the Connection section)\n' ;;
             acme) printf '  [ok]   the dashboard is served over https with a Let'"'"'s Encrypt certificate\n' ;;
         esac
+        # The key every node pins (tls.key_state): a file that is there and
+        # cannot be opened is kept, and said here, never made anew.
+        local tls_key
+        tls_key=$(DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" tlskey \
+            "$BB_SCRIPTS/dashboard/tls.py" 2>/dev/null) || true
+        [ -z "$tls_key" ] || { printf '%s\n' "$tls_key"; ok=1; }
         # What the dashboard's process does about the keys it holds (R158
         # step 6), as it said at its start.
         if [ -r /run/builderbot-hardening.json ]; then
             case "$(python3 -c 'import json; d = json.load(open("/run/builderbot-hardening.json")); print("ok" if d.get("core") and d.get("dumpable") and d.get("mlock") else "mlock" if d.get("core") and d.get("dumpable") else "no")' 2>/dev/null)" in
                 ok) printf '  [ok]   the dashboard writes no core dump, cannot be read by another process of its user, and keeps its memory from swap\n' ;;
-                mlock) printf '  [warn] the dashboard writes no core dump and cannot be read by another process of its user, but its memory may be swapped: the memlock limit is too low (docker-compose.yml raises it with ulimits memlock -1; on Unraid --ulimit memlock=-1:-1 in Extra Parameters)\n' ;;
+                mlock) printf '  [warn] the dashboard'"'"'s memory may be swapped, since its memlock limit is too low (docs/security.md)\n' ;;
                 no) printf '  [warn] the dashboard could not turn core dumps off or make itself undumpable: a key it holds could land in a core file (docs/security.md)\n' ;;
             esac
         fi
@@ -5944,7 +6089,7 @@ PY
     # here rather than leaving somebody to find it when a button refuses.
     if ! on_node; then
         DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" node \
-            "$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+            "$BB_SCRIPTS/dashboard/nodes.py"
     fi
     # The daemon the dashboard's dev instances are built and run on: the
     # sandbox VM a node record names. This used to report only a mounted socket,
@@ -5955,7 +6100,7 @@ PY
     # its own poll, so doctor cannot drift into disagreeing with the tab about
     # whether the thing is up.
     local docker_line dst dmsg lib note
-    lib="$(dirname "$(readlink -f "$0")")/lib/docker-probe.py"
+    lib="$BB_SCRIPTS/lib/docker-probe.py"
     # `|| true`: a probe that dies is a skip line, not the end of the
     # doctor. Under set -e a failing substitution here ended the function
     # after the session line, and every check below it went unprinted.
@@ -5969,7 +6114,7 @@ PY
         docker_line="skip docker daemon: the controller checks it; its Doctor (the dot in the dashboard's header) says"
     else
         docker_line="$(python3 "$lib" \
-            "$(dirname "$(readlink -f "$0")")/dashboard/devapp.py" 2>/dev/null || true)"
+            "$BB_SCRIPTS/dashboard/devapp.py" 2>/dev/null || true)"
     fi
     [ -n "$docker_line" ] || docker_line="none"
     while read -r dst dmsg; do
@@ -6012,7 +6157,7 @@ PY
             printf '  [warn] nvidia EGL is installed but has no display to render on\n'
             note="$(gpu_display_note)"
             [ -n "${note:-}" ] && printf '         the startup hook says: %s\n' "$note"
-            printf '         %s; the emulator will use software (aerie emu gpu)\n' \
+            printf '         %s; the emulator will use software\n' \
                 "$(command -v Xorg >/dev/null 2>&1 \
                    && { [ -S /tmp/.X11-unix/X0 ] \
                         && echo "the X server started and has gone: a stale socket is all that is left, see /var/log/xorg-builderbot.log" \
@@ -6020,7 +6165,7 @@ PY
                    || echo "this image has no X server")"
         fi
     elif command -v nvidia-smi >/dev/null 2>&1; then
-        printf '  [FAIL] nvidia-smi present but no GPU visible: check --runtime=nvidia --gpus all\n'
+        printf '  [FAIL] nvidia-smi is here but no GPU is visible: the container is not given the GPU (docs/toolchains.md)\n'
         ok=1
     else
         printf '  [skip] no nvidia gpu passed through\n'
@@ -6091,7 +6236,7 @@ PY
     # holds no key: an empty agent (the entrypoint starts one whether or not
     # a key is ever added) is not a fault (B685).
     if [ -z "$ssh_src" ] && [ "$ssh_rc" = 2 ] && [ -S "${SSH_AUTH_SOCK:-/run/ssh-agent.sock}" ]; then
-        printf '  [FAIL] an agent socket exists but this user cannot use it; see: aerie logs | grep ssh\n'
+        printf '  [FAIL] an ssh agent socket exists but this user cannot use it (the controller'"'"'s log says why)\n'
         ok=1
     fi
     if on_node; then
@@ -6120,7 +6265,6 @@ PY
                 | head -1)"
             printf '  [FAIL] %s but github auth failed: %s\n' \
                 "$ssh_src" "${ssh_why:-$(printf '%s' "$ssh_out" | head -1)}"
-            printf '         diagnose with: ssh -vT git@github.com\n'
             ok=1
         fi
     else
@@ -6142,8 +6286,7 @@ PY
         printf '  [ok]   signed in to Claude on this machine%s\n' \
             "$(python3 "$BB_LIB/doctor-probes.py" login 2>/dev/null)"
     else
-        printf '  [warn] not signed in to Claude on this machine: Sign in on the Installed page\n'
-        printf '         runs the flow here, or `aerie login` in this shell\n'
+        printf '  [warn] not signed in to Claude on this machine: Sign in on the Installed page runs the flow here\n'
     fi
     # ...and each other agent installed here, said as Claude's is but never a
     # warning: which agents a person signs in to is theirs.
@@ -6176,23 +6319,16 @@ PY
 # the edit asked of the controller over its API (lib/release-edit.py).
 cmd_version_edit() {
     local proj
-    proj="${BB_VERSION_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
-    export BB_VERSION_AUTH; BB_VERSION_AUTH="$(bb_auth_or_die)"
-    BB_WORKSPACE="$WORKSPACE" python3 "$BB_LIB/release-edit.py" "$proj" "$@"
+    proj="$(need_project BB_VERSION_PROJECT)" || exit
+    BB_WORKSPACE="$WORKSPACE" api_py release-edit.py "$proj" "$@"
 }
 
 # aerie forge (R188): the project's git host worked through the controller,
 # which holds the token (lib/forge-verbs.py, dashboard/forgeaccess.py).
 cmd_forge() {
     local proj
-    proj="$(project_here)" \
-        || die "not inside a space under ${WORKSPACE}; cd into one first"
-    export BB_FORGE_AUTH; BB_FORGE_AUTH="$(bb_auth_or_die)"
-    python3 "$BB_LIB/forge-verbs.py" "$proj" "$@"
+    proj="$(need_project --here)" || exit
+    api_py forge-verbs.py "$proj" "$@"
 }
 
 cmd_version() {
@@ -6200,12 +6336,18 @@ cmd_version() {
         case " $* " in *" -h "*|*" --help "*) ;; *) cmd_version_edit "$@"; return $? ;; esac ;;
     esac
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/version.py"
+    py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
-    proj="${BB_VERSION_PROJECT:-}"
+    proj="$(need_project BB_VERSION_PROJECT --soft)"
     if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
+        # A checkout that is not under the workspace (a CI runner's, for a
+        # rehearsal's file names) still has a version to read: its own,
+        # from where it stands. Reading only; anything that moves a
+        # version is a space's.
+        local out; out="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        case "${1:-}" in ""|--file|--semver|--code|--json) ;; *) out="" ;; esac
+        [ -n "$out" ] && [ -f "$out/VERSION" ] || not_in_a_space
+        WORKSPACE="$(dirname "$out")"; proj="$(basename "$out")"
     fi
     # Asked from one of the project's worktrees, the answer is that tree's:
     # its HEAD, its VERSION file, its ordinal (version.py root()). The relay
@@ -6219,10 +6361,12 @@ cmd_version() {
     fi
     case "$top" in "$BB_WORKTREES/$proj"/*) export BB_VERSION_TREE="$top" ;; esac
     # A release is the controller's to make (R138): the verb asks it, with
-    # this session's credential.
-    case " $* " in *" release "*|*" rehearse "*) export BB_VERSION_AUTH; BB_VERSION_AUTH="$(bb_auth_or_die)" ;; esac
+    # this session's credential. Every other form reads and writes here and
+    # is handed none.
+    local -a run=(python3 "$BB_LIB/version-verbs.py")
+    case " $* " in *" release "*|*" rehearse "*) run=(api_py version-verbs.py) ;; esac
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-    BB_WORKSPACE="$WORKSPACE" python3 "$BB_LIB/version-verbs.py" "$py" "$proj" "$@"
+    BB_WORKSPACE="$WORKSPACE" "${run[@]}" "$py" "$proj" "$@"
 }
 
 # aerie changelog: the user-facing record beside VERSION, per project or
@@ -6231,13 +6375,9 @@ cmd_version() {
 # the shape stays uniform; reading is just the file.
 cmd_changelog() {
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/version.py"
+    py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
-    proj="${BB_VERSION_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project BB_VERSION_PROJECT)" || exit
     # Asked from one of the project's worktrees, the answer is that tree's:
     # its HEAD, its VERSION file, its ordinal (version.py root()). The relay
     # runs this in the caller's cwd, so a node's session gets the same.
@@ -6278,10 +6418,10 @@ if [ "${1:-}" = -p ] || [ "${1:-}" = --project ]; then
         p_res="$(BB_PROJECT="$p_dir" "$0" settings 2>/dev/null | sed -n '1s/:$//p')" || p_res=""
         [ -n "$p_res" ] && [ -d "$WORKSPACE/$p_res" ] && p_dir="$p_res"
     fi
-    export BB_PROJECT="$p_dir" BB_ROADMAP_PROJECT="$p_dir" BB_BUG_PROJECT="$p_dir" BB_VERSION_PROJECT="$p_dir"
-    # ...and the verbs that read logs (B675): `aerie -p X tests log` and
-    # `aerie -p X ci-log` answered for this session's own project.
-    export BB_TESTS_PROJECT="$p_dir" BB_CILOG_PROJECT="$p_dir"
+    export BB_PROJECT="$p_dir"
+    # ...and each verb's own override (BB_PROJECT_VARS), so none answers for
+    # this session's own project.
+    for p_var in "${BB_PROJECT_VARS[@]}"; do export "$p_var=$p_dir"; done
     export BB_TREE="$WORKSPACE/$p_dir"
     shift 2
     # Said rather than answered for this project or for nothing
@@ -6326,6 +6466,8 @@ case "${1:-}:${3:-}" in
         verb_help "$1" && exit 0 ;;
 esac
 
+# A session token's fields, decoded here once for every helper after this.
+bb_token_prime
 if on_node && [ -z "${BB_RELAYED:-}" ]; then
     # One verb is relayed except for one of its subcommands. `aerie tests` reads
     # and writes the registry, which is the controller's; `aerie tests run` RUNS
@@ -6350,8 +6492,11 @@ if on_node && [ -z "${BB_RELAYED:-}" ]; then
         # to the real controller it would be a session planting findings in
         # somebody else's report directory.
         # `probe` and `keep` drive the dashboard fixture, which runs here.
-        # `rules -h` is help, the bb beside it answers (B411).
-        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"rules check"|"rules audit"|"rules -h"|"rules --help"|"findings sample") : ;;
+        # `flakes` reads the record the harness keeps beside the tree it ran
+        # from, and `root` runs the root tier of the tree here (in a
+        # container where docker answers): neither is the controller's.
+        # `bisect` runs the harness here at each commit, as `run` does.
+        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests bisect"|"tests root"|"rules check"|"rules audit"|"findings sample") : ;;
         *)  # ...and that is the whole run: without the exit the dispatch
             # below ran the verb a second time HERE, against files the bundle
             # does not carry: `aerie bug` printed the controller's answer and
@@ -6386,7 +6531,7 @@ fi
 case "${1:-help}" in
     status)   cmd_status ;;
     settings) shift; cmd_settings "$@" ;;
-    router-key) shift; BB_RK_AUTH="$(bb_auth_or_die)" BB_RK_PROJECT="${BB_PROJECT:-$(project_here 2>/dev/null || true)}" python3 "$BB_LIB/router-key.py" "$@" ;;
+    router-key) shift; BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$(need_project --soft 2>/dev/null)" python3 "$BB_LIB/router-key.py" "$@" ;;
     version)  shift; cmd_version "$@" ;;
     forge)    shift; cmd_forge "$@" ;;
     changelog) shift; cmd_changelog "$@" ;;
@@ -6400,13 +6545,12 @@ case "${1:-help}" in
     browser)  shift; cmd_browser "$@" ;;
     node)     shift
               case "${1:-busy}" in
-                  -h|--help) sed -n '/^aerie node busy/,/if it never was/p' "$0"; exit 0 ;;
                   # A node's own log is `aerie logs --node`; asked as `aerie node
                   # log NAME [--runner] [N]`, it is the same read.
                   log) shift; nd="${1:-${BB_NODE:-}}"; [ $# -gt 0 ] && shift
                        cmd_logs --node "$nd" "$@"; exit $? ;;
               esac
-              BB_BUSY_AUTH="$(bb_auth_or_die)" BB_BUSY_PROJECT="$(bb_project 2>/dev/null || true)" \
+              BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$(bb_project 2>/dev/null || true)" \
                   BB_BUSY_NODE="${BB_NODE:-}" exec python3 "$BB_LIB/busy-verbs.py" "$@" ;;
     lint)     shift; cmd_lint "$@" ;;
     findings) shift; cmd_findings "$@" ;;

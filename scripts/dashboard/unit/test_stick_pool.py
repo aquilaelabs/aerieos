@@ -145,6 +145,23 @@ class TheImage(unittest.TestCase):
                     self.assertIn("move token", r.stderr)
                     self.assertEqual(json.loads(self.tool(d, "status").stdout)["pool"], "", "the pool is not named")
                 self.assertEqual(read(d, "pool", "aerieos-system", ".aerieos-install"), "someone-else", "nothing on it touched")
+                # B939: the pool a restored configuration names as its own (its
+                # stick died; this one has another id) is taken back as it is,
+                # and its id becomes this stick's; another id never is.
+                os.makedirs(f"{d}/pool5/aerieos-system/home/bb")
+                old = "a" * 32
+                with open(f"{d}/pool5/aerieos-system/.aerieos-install", "w") as f:
+                    f.write(old)
+                with mock.patch.dict(os.environ, {"BB_SP_ADOPT_ID": "b" * 32}):
+                    self.assertEqual(self.tool(d, "set", f"{d}/pool5").returncode, 3, "an id it does not carry: refused")
+                with mock.patch.dict(os.environ, {"BB_SP_ADOPT_ID": old}):
+                    r = self.tool(d, "set", f"{d}/pool5")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn("taken back as it is", r.stdout)
+                self.assertTrue(os.path.isdir(f"{d}/pool5/aerieos-system/home/bb"), "nothing of it set aside")
+                self.assertEqual(read(d, "work", "install-id"), old)
+                self.assertEqual(json.loads(self.tool(d, "status").stdout).get("install_id"), old, "said for the controller to keep")
+                os.unlink(f"{d}/work/install-id")
                 # A pool with nothing of another's is taken, and marked as this install's.
                 os.makedirs(f"{d}/pool2")
                 r = self.tool(d, "set", f"{d}/pool2")
@@ -229,7 +246,26 @@ class TheImage(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
             self.assertEqual(os.listdir(f"{d}/secrets"), [], "off the stick")
-            self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o077, 0, "nobody else's")
+            self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o067, 0, "nobody else's to read, list or write")
+
+    def test_the_controller_keeps_its_way_to_its_key_when_the_pool_is_placed(self):
+        # B777: a controller's start opens the secrets folder to its account
+        # for the key folder alone (0710). Placing the pool shut the pool's
+        # copy outright, so the running controller lost its key until its
+        # next start, and a move landing right after was refused at the key
+        # it carried.
+        for mode, want in ((0o710, 0o710), (0o700, 0o700)):
+            with tempfile.TemporaryDirectory() as d:
+                os.makedirs(f"{d}/secrets/install-key")
+                with open(f"{d}/secrets/install-key/key", "w") as f:
+                    f.write("k" * 64)
+                os.chmod(f"{d}/secrets", mode)
+                os.makedirs(f"{d}/pool")
+                with mock.patch.dict(os.environ, self.fakes(d)):
+                    r = self.tool(d, "set", f"{d}/pool")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o777, want, oct(mode))
+                self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
 
     def test_secrets_kept_on_the_stick_by_an_earlier_release_go_to_its_pool_once(self):
         # A pool named before the secrets went there: its folder for them is
@@ -321,7 +357,7 @@ class TheAgent(unittest.TestCase):
             # The stick's own partition's room rides along, measured here.
             self.assertTrue(isinstance(got.pop("var_total_mb"), int) and isinstance(got.pop("var_free_mb"), int))
             self.assertEqual(got, {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12,
-                                   "projects": "", "projects_bound": False, "projects_home": "", "others": []})
+                                   "projects": "", "projects_bound": False, "projects_home": "", "others": [], "install_id": "", "other_marks": {}})
             with mock.patch.dict(os.environ, {"BB_OS_POOL": os.path.join(d, "none")}):
                 self.assertEqual(self.av.stick_status(), {})
 
@@ -345,6 +381,14 @@ class TheAgent(unittest.TestCase):
                 a = A()
                 self.assertEqual(a._apply_system_pool(Job(), {"path": "/mnt/fast"}), ("succeeded", 0))
                 self.assertEqual(a.ran[-2:], ["set", "/mnt/fast"])
+                # Only a place on the machine's disks: never a folder of the
+                # system's, by its name or through a link.
+                os.symlink("/etc", os.path.join(d, "link"))
+                for bad in ("/etc", "/", "/mnt", "/root", "/mnt/../etc", "/mnt/a b", "/mnt/$(id)", os.path.join(d, "link")):
+                    b = A()
+                    self.assertEqual(b._apply_system_pool(Job(), {"path": bad}), ("failed", 64), bad)
+                    self.assertEqual(b._apply_projects_folder(Job(), {"path": bad}), ("failed", 64), bad)
+                    self.assertFalse(hasattr(b, "ran"), bad)
 
 
 class TheAgentsProjectsFolder(unittest.TestCase):
@@ -406,7 +450,7 @@ class TheController(unittest.TestCase):
         got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "secrets", "evil"],
                                           "written_kb": 2048, "boot_written_kb": -1}})
         self.assertEqual(got["os_stick"], {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "secrets"],
-                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": "", "others": []})
+                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": "", "others": [], "install_id": "", "other_marks": {}})
         self.assertNotIn("os_stick", nodes._census({"os_stick": {"stick": False}}))
 
     def test_the_verb_is_a_sticks(self):
@@ -422,6 +466,22 @@ class TheController(unittest.TestCase):
         self.assertEqual(nodes.node_system_pool("user:t", "n_nothere", "/mnt/fast").get("error"), "no such node")
         self.assertIn("does not run AerieOS from a stick", nodes.node_projects_folder("user:t", n["id"], "/mnt/user/projects").get("error", ""))
         self.assertEqual(nodes.node_projects_folder("user:t", "n_nothere", "/mnt/user/projects").get("error"), "no such node")
+
+    def test_the_install_id_is_kept_and_sent_with_the_system_pool(self):
+        # B939: a ready stick's id kept in the state, and named to the
+        # system-pool step, which takes back a pool marked with it.
+        import nodes
+        got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "install_id": "c" * 32}})
+        self.assertEqual(got["os_stick"]["install_id"], "c" * 32)
+        self.assertEqual(nodes._census({"os_stick": {"stick": True, "install_id": "not-hex"}})["os_stick"]["install_id"], "")
+        n = {"id": "n1", "name": "nas", "kind": "agent", "live": True, "config": {"own": True},
+             "reported": {"administers": True, "os_stick": {"stick": True}, "pools": [{"mount": "/mnt/fast"}]}}
+        with mock.patch.object(nodes, "node", return_value=n), mock.patch.object(nodes, "own_machine", return_value=True), \
+             mock.patch.object(nodes, "node_locked", return_value=""), mock.patch.object(nodes, "audit"), \
+             mock.patch.object(nodes, "install_id_kept", return_value="d" * 32), \
+             mock.patch.object(nodes, "job_add", side_effect=lambda *a: {"ok": True, "job": "j1"}) as add:
+            self.assertTrue(nodes.node_system_pool("user:t", "n1", "/mnt/fast").get("ok"))
+        self.assertEqual(add.call_args[0][3]["config"]["adopt_id"], "d" * 32)
 
     def test_an_adopted_pool_is_a_system_pool_whatever_its_filesystem(self):
         import nodes

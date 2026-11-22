@@ -86,6 +86,19 @@ others() {
     done < <(findmnt -rn -o TARGET 2>/dev/null | sort -u)
     return 0
 }
+# ...and the id each of them is marked with, "PATH": "ID", so a controller
+# restored here knows its own pool from before among them (B939).
+other_marks() {
+    local t m
+    while IFS= read -r t; do
+        case "$t" in /|/proc*|/sys*|/dev*|/run*|/boot*|/usr*|/etc*|/var*|/home*|/srv*|/tmp*) continue ;; esac
+        if [ -d "$t/$SUB" ] && [ "$(pool_owner "$t")" = other ]; then
+            m="$(head -c 64 "$t/$SUB/$OWNER_MARK" 2>/dev/null | tr -cd '0-9a-f')"
+            [ -n "$m" ] && printf '"%s": "%s"\n' "${t//\"/}" "$m"
+        fi
+    done < <(findmnt -rn -o TARGET 2>/dev/null | sort -u)
+    return 0
+}
 CONTROLLER="aerieos-controller"
 
 envget() { sed -n "s/^$1=//p" "$ENVF" 2>/dev/null | tr -d '"' | tail -1; }
@@ -136,6 +149,20 @@ as_place() {
     [ -n "${BB_SP_NO_MOUNT:-}" ] && return 0
     chown --reference="$2" "$1" 2>/dev/null || true
     chmod --reference="$2" "$1" 2>/dev/null || true
+}
+# The pool's secrets folder shut as the folder it stands in for is: root's,
+# nothing for anybody else, and for the controller's account the one way
+# through to its own key folder where the folder it replaces had it (0710,
+# boot.sh secrets_enterable, which only a controller's start sets). Shut
+# outright here, a running controller was locked out of its key until its
+# next start, and a move landed in that time, right after Moving here placed
+# the pool, was refused at the install key it carried (B777).
+secrets_shut() {
+    local through=""
+    [ -d "$2" ] && [ "$(( 0$(stat -c %a "$2" 2>/dev/null || echo 0) & 010 ))" -ne 0 ] && through=1
+    [ -z "$through" ] || chgrp --reference="$2" "$1" 2>/dev/null || true
+    chmod go-rwx "$1"
+    [ -z "$through" ] || chmod g+x "$1"
 }
 # The hold let go before the projects get a real place.
 unhold() { held "$1" && umount "$1"; return 0; }
@@ -218,7 +245,7 @@ apply() {
             continue
         fi
         if ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
-            [ "$name" = secrets ] && chmod go-rwx "$src"
+            [ "$name" = secrets ] && secrets_shut "$src" "$place"
             [ -n "$(ls -A "$src" 2>/dev/null)" ] || as_place "$src" "$place"
             # Secrets a stick kept before they went to the pool (a pool named
             # by an earlier release) go there once, never hidden under an
@@ -393,6 +420,17 @@ set_pool() {
     if [ -n "$var_src" ] && [ "$var_src" = "$p_src" ]; then
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
+    # The pool this controller had before its stick died (B939): a
+    # configuration restored here carries the install id its system pool is
+    # marked with, and names it; the pool is this install's again, and the
+    # stick takes that id for its own.
+    local adopt="${BB_SP_ADOPT_ID:-}"
+    if [ -n "$adopt" ] && [ "$(pool_owner "$p")" = other ] && [ "$(head -c 64 "$p/$SUB/$OWNER_MARK" 2>/dev/null || true)" = "$adopt" ] \
+            && [[ "$adopt" =~ ^[0-9a-f]{32,64}$ ]]; then
+        mkdir -p "$WORK"
+        printf '%s' "$adopt" > "$IDFILE.new" && mv -f "$IDFILE.new" "$IDFILE"
+        echo "system-pool: $p/$SUB is this controller's own from before (its configuration was restored here): taken back as it is"
+    fi
     if [ "$(pool_owner "$p")" = other ]; then
         if [ "${2:-}" != --aside ]; then
             echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, set it aside, or pick a pool without it; nothing on $p was touched" >&2
@@ -449,7 +487,7 @@ set_pool() {
             cp -an "$place/." "$src/"
         fi
         unhold "$place"
-        [ "$name" = secrets ] && chmod go-rwx "$src"
+        [ "$name" = secrets ] && secrets_shut "$src" "$place"
         local tries=0
         while findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; do
             if [ "$tries" -ge 8 ] || ! umount "$place"; then
@@ -495,9 +533,12 @@ status() {
     # held (nowhere yet: never the stick).
     if [ -n "$pf" ]; then home="folder"; elif [ -n "$p" ] && [ "$ready" = true ]; then home="pool"; else home="held"; fi
     local oth; oth="$(others | paste -sd, -)"
-    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s]}\n' \
+    # The id its system pool is marked with (B939), for a backup to carry.
+    local iid=""; [ -s "$IDFILE" ] && iid="$(head -c 64 "$IDFILE" | tr -cd '0-9a-f')"
+    local marks; marks="$(other_marks | paste -sd, -)"
+    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s], "install_id": "%s", "other_marks": {%s}}\n' \
         "${p//\"/}" "$ready" "${on_stick[*]}" "${kb:-null}" "${since:-null}" "${pf//\"/}" \
-        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home" "$oth"
+        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home" "$oth" "$iid" "$marks"
 }
 
 case "${1:-}" in

@@ -24,7 +24,14 @@ to `python3 -` on stdin: thousands of lines ruff had never seen.
         source, so a finding's line number is the line in the file it came from.
 
 Each file written is printed, one path a line.
+
+    embedded.py shebangs < PATHS
+        the paths, NUL-separated, whose first line (within its first 64
+        bytes) names a shell or python: "sh" or "py" and the path, each
+        NUL-ended. aerie lint's lists by shebang, one process for every
+        tracked file where each was read twice, three processes a read.
 """
+import os
 import pathlib
 import re
 import sys
@@ -45,7 +52,28 @@ def is_shell(path, text):
     return path.suffix == ".sh" or bool(SHEBANG.match(text.split("\n", 1)[0]))
 
 
+PY_BANG = re.compile(rb"#!.*\bpython3?\b")
+SH_BANG = re.compile(rb"#!.*\b(ba)?sh\b")
+
+
+def shebangs(names, out):
+    """Each path whose first line names a shell or python, as `head -c 64 |
+    head -1 | grep -E` read it: "sh" or "py", the path, each NUL-ended."""
+    for name in names:
+        try:
+            with open(name, "rb") as f:
+                first = f.read(64).split(b"\n", 1)[0]
+        except OSError:
+            continue
+        for kind, bang in ((b"sh", SH_BANG), (b"py", PY_BANG)):
+            if bang.match(first):
+                out.write(kind + b"\0" + os.fsencode(name) + b"\0")
+
+
 def main(argv):
+    if argv[:1] == ["shebangs"]:
+        shebangs([n for n in os.fsdecode(sys.stdin.buffer.read()).split("\0") if n], sys.stdout.buffer)
+        return 0
     if len(argv) < 3 or argv[0] not in ("shell", "python"):
         return 0
     kind, out = argv[0], pathlib.Path(argv[1])

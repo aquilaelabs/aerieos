@@ -1,0 +1,41 @@
+{
+ "install": {
+  "steps": [
+   [
+    "sh",
+    "{dir}/install.sh"
+   ]
+  ],
+  "verify": [
+   "{dir}/ghidra/support/analyzeHeadless",
+   "-help"
+  ]
+ },
+ "label": "Ghidra",
+ "layout": {
+  "tool": "ghidra/support/analyzeHeadless"
+ },
+ "name": "ghidra",
+ "platforms": [
+  "linux/amd64"
+ ],
+ "terms": [
+  {
+   "label": "Apache-2.0",
+   "url": "https://github.com/NationalSecurityAgency/ghidra/blob/master/LICENSE"
+  }
+ ],
+ "verbs": {
+  "analyze": {
+   "about": "Decompile a binary headless, the results into dist/.",
+   "run": [
+    "{dir}/ghidra/support/analyzeHeadless",
+    "{dist}",
+    "proj",
+    "-import",
+    "{args}"
+   ],
+   "usage": "FILE"
+  }
+ }
+}

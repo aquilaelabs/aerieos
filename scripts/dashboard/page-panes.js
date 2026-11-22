@@ -4,8 +4,8 @@
 // kept warm per pane, and a terminal nudged when the page comes back.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -16,36 +16,31 @@
 // whenever the same tab is still in it, because rebuilding it would reload the
 // iframe and drop a live terminal for no reason.
 function paintBar(pane, t, i){
-  const bar = pane.querySelector(".bar");
+  const bar = pane.querySelector(":scope > .bar");
   // The dock's pane wears the dock's line (R218 step 4), with or without a
   // terminal in it.
   if (i === 1){
     setClass(bar, "bar dockbar");
     bar.style.removeProperty("--pc");
-    // Painted only when it changed: a poll that moves nothing leaves the
-    // line's buttons where they are, and a pointer over one keeps its hover.
-    // A line drawn again keeps where it was scrolled to (B322), and one
-    // with a tab held in it is not drawn at all: a poll bringing a session
-    // dot replaced the tab under the finger and dropped it; the drag's end
-    // draws it.
+    // Patched only where it changed: a poll that moves nothing leaves the
+    // line's buttons where they are, a pointer over one keeps its hover,
+    // and one that moves something keeps the line and each tab by its id
+    // (R244). A line written whole keeps where it was scrolled to (B322),
+    // and one with a tab held in it is not drawn at all: a poll bringing a
+    // session dot replaced the tab under the finger and dropped it; the
+    // drag's end draws it.
     const old = bar.querySelector(".dockline"), kept = old?.scrollLeft || 0;
     const ends = ["chl", "chr"].filter(c => old?.classList.contains(c));
-    if (!ddrag && paint(bar, dockBar())){
+    if (!ddrag && patch(bar, dockBar())){
       const line = bar.querySelector(".dockline");
       // ...with the ends' arrows it had before the scroll is put back: an
       // arrow moves the tabs by the line's gap (B318), so one added after
       // moved a line scrolled along by that much at every redraw.
-      if (line){ line.classList.add(...ends); line.scrollLeft = kept; }
+      if (line && line !== old){ line.classList.add(...ends); line.scrollLeft = kept; }
       wireDockBar(bar); dockReveal(bar);
     }
     return;
   }
-  // Only the kinds that still declare it. Toolchains moved its own into the tab
-  // beside the node picker, where a control belongs: this bar is the tab's
-  // name and its close button everywhere else, and a third thing in it was a
-  // shape one tab had and no other.
-  const reload = TABKINDS[t.kind]?.reload
-    ? `<button class="ic" data-reload="${esc(t.kind)}" data-style="margin-left:8px">reload</button>` : "";
   // A page (R218 step 2) wears its group's sub-nav, or its name, and no
   // close: the rail is how you leave it. A project (step 3) wears its
   // header: the name, the facts, the session's state and its actions.
@@ -53,12 +48,13 @@ function paintBar(pane, t, i){
   // Which project the front pane is on, so a band put away there comes back
   // once it is left (pnoteOnShow).
   if (i === 0) pnoteOnShow(proj ? t.arg : "");
-  // Painted, and wired, only when it changed (R218 step 10): assigned on
+  // Patched, and wired, only when it changed (R218 step 10): assigned on
   // every draw, the page's sub-nav and a project's header were rebuilt by
-  // each poll under the pointer that was about to press them.
-  const fresh = paint(bar, isToolKind(t.kind) ? shellBar(t, i) + reload
+  // each poll under the pointer that was about to press them; patched, the
+  // header's repository pulldown and its menus are kept as they are (R244).
+  const fresh = patch(bar, isToolKind(t.kind) ? shellBar(t, i)
     : proj ? projectHeader(t)
-    : `<span title="${esc(tabTitle(t))}">${esc(tabLabel(t))}</span>${reload}`, true);
+    : `<span title="${esc(tabTitle(t))}">${esc(tabLabel(t))}</span>`, true);
   bar.classList.toggle("page", isToolKind(t.kind));
   bar.classList.toggle("proj", proj);
   bar.classList.toggle("machines", isToolKind(t.kind) && groupOf(t.kind)?.key === "machines");
@@ -66,9 +62,6 @@ function paintBar(pane, t, i){
   if (fresh){
     wireShellBar(bar);
     if (proj) wireProjectHeader(bar);
-    bar.querySelectorAll("[data-reload]").forEach(b =>
-      b.onclick = e => { e.stopPropagation();
-        loadFindings(true); });
   }
   if (proj) syncResumeMenu();
   // The project's color on the strip too, so a split pane says whose it is.
@@ -139,9 +132,11 @@ function unveil(frame){
 function consoleBar(t){
   if (mayShell() || !isClaude(t)) return "";
   const s = sessionOf(t.arg);
+  // By the name of the agent the session is: a Gemini tab's said Claude.
+  const who = agentOfSession(tmuxBase(s))?.agent.name || "Claude";
   return `<div class="consbar" data-sess="${esc(s)}">
-    <input class="consin" placeholder="message Claude, then Enter"
-      aria-label="message Claude" autocomplete="off" spellcheck="false">
+    <input class="consin" placeholder="message ${esc(who)}, then Enter"
+      aria-label="message ${esc(who)}" autocomplete="off" spellcheck="false">
     <button type="button" class="conssend primary">Send</button>
     <button type="button" class="consend" title="end this conversation: the
       transcript is kept and can be resumed">Terminate</button>
@@ -164,9 +159,7 @@ function wireConsole(root){
       inp.value = ""; consDraft[sess] = "";
       let r = {};
       try{
-        r = await (await fetch("/api/say", { method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session: sess, text }) })).json();
+        r = await postJSON("/api/say", { session: sess, text });
       }catch(e){ r = { error: "could not reach the container" }; }
       // Put it back on failure rather than losing it: a message somebody
       // typed is worth more than a tidy field.
@@ -190,7 +183,7 @@ function drawPanes(){
   // is nobody's, and a nobody's frame is still an attached tmux client.
   const liveTabs = new Set(tabs.map(t => t.id));
   for (let j = 0; j < 2; j++)
-    [...($("pane" + j).querySelector(".stack")?.children || [])]
+    [...($("pane" + j).querySelector(":scope > .stack")?.children || [])]
       .filter(c => c.dataset.key && !liveTabs.has(c.dataset.key.split("|")[0]))
       .forEach(c => c.remove());
   for (let i = 0; i < 2; i++){
@@ -203,7 +196,7 @@ function drawPanes(){
       // a hidden frame is still a live tmux client, and one that
       // reattachTerminals would reload, recreating a session since ended.
       if (pane.dataset.tab || !pane.querySelector(".bar")){
-        pane.innerHTML = `<div class="bar dockbar"></div>`;
+        drawHTML(pane, `<div class="bar dockbar"></div>`);
         pane.dataset.tab = pane.dataset.kind = pane.dataset.arg = pane.dataset.popped = pane.dataset.own = "";
       }
       paintBar(pane, null, 1);
@@ -266,13 +259,21 @@ function drawPanes(){
       : termOwn(t) ? termSlot(t)
       : t.kind === "term"
       // A VM's screen: noVNC's page in a frame.
-      ? `<div class="slot"><iframe title="${esc(tabLabel(t))}" src="${esc(tabUrl(t.arg))}" onload="unveil(this)"></iframe><i class="veil"></i></div>`
+      ? `<div class="slot"><iframe title="${esc(tabLabel(t))}" src="${esc(tabUrl(t.arg))}"></iframe><i class="veil"></i></div>`
       // Documents are not kept: they redraw from state in a millisecond, and
       // one per pane means one #docN, which is what renders into them.
       : `<div class="doc fx" id="doc${i}"></div>`);
     // The boot a new frame's URL carries, for openTab to tell one from before
     // its machine restarted.
     if (fresh && t.kind === "term") t.frameBoot = bootFor(t.arg);
+    // The veil over a screen's frame comes off when the frame has loaded.
+    // Wired here and not as an attribute on the frame: the page's
+    // Content-Security-Policy runs no inline handler, so the attribute was
+    // refused and nothing else lifted the veil (the audit of 13 Nov).
+    if (fresh && t.kind === "term" && !termOwn(t) && !t.popped){
+      const f = el.querySelector("iframe");
+      f?.addEventListener("load", () => unveil(f));
+    }
     if (termOwn(t)) termMount(el, t, key);
     // The id names "the document being shown in pane i", so it must name one
     // node. A hidden document left in the stack (the notebook parks there)
@@ -287,7 +288,8 @@ function drawPanes(){
     // replaced whenever the slot is, and a handler bound once would be bound
     // to a node nothing is looking at any more.
     wireConsole(el);
-    el.querySelector("[data-reattach]")?.addEventListener("click", e => reattachTab(t.id, e));
+    const ra = el.querySelector("[data-reattach]");
+    if (ra) ra.onclick = e => reattachTab(t.id, e);
     // A VM's screen shown again after being hidden: one marked stale slept
     // through a disconnect, and needs the reload it was spared while nobody
     // was looking at it; any other is nudged to its box's size.
@@ -366,9 +368,9 @@ let stackClock = 0;
 // client, and tmux sizes a window to its smallest one. Overlapping them keeps
 // every client on the same geometry, so there is nothing to fight about.
 function paneStack(pane){
-  let st = pane.querySelector(".stack");
+  let st = pane.querySelector(":scope > .stack");
   if (!st){
-    pane.innerHTML = `<div class="bar"></div><div class="stack"></div>`;
+    drawHTML(pane, `<div class="bar"></div><div class="stack"></div>`);
     st = pane.querySelector(".stack");
   }
   return st;
@@ -379,7 +381,7 @@ function showInStack(st, key, html){
   const fresh = !el;
   if (fresh){
     st.insertAdjacentHTML("beforeend", html());
-    el = st.lastElementChild;
+    el = drawn(st.lastElementChild);
     el.dataset.key = key;
   }
   el.dataset.seen = String(++stackClock);
@@ -416,7 +418,7 @@ function holdLeaving(st){
 function dropElsewhere(keep, key){
   for (let j = 0; j < 2; j++){
     if (j === keep) continue;
-    [...($("pane" + j).querySelector(".stack")?.children || [])]
+    [...($("pane" + j).querySelector(":scope > .stack")?.children || [])]
       .filter(c => c.dataset.key === key)
       .forEach(c => c.remove());
   }

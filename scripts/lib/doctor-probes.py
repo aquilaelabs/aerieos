@@ -1,14 +1,15 @@
-"""Behind five probes bb makes of the machine it is on, for `aerie doctor` and
+"""Behind the probes bb makes of the machine it is on, for `aerie doctor` and
 the verbs that share its questions (gpu_gles_ok, project_node and
 cmd_doctor in bb): does hardware GLES work here, which node a project is
 assigned, whether the accounts carry a commit identity, whether any node
-can run a session, and which account each coding agent on this machine is
-signed in as.
+can run a session, which account each coding agent on this machine is
+signed in as, and whether the key the nodes pin can be opened.
 
 The first argument is the probe: `egl` (prints the vendor, exits 1 for
 none or for Mesa), `prefs PROJECT` (prints the project's node, or nothing),
-`id`, `node NODES_PY`, `login` (Claude's) and `signed AGENT` (Codex's or
-Copilot's: prints the account, exits 1 for none). DASHBOARD_STATE says where the
+`id`, `node NODES_PY`, `login` (Claude's), `signed AGENT` (Codex's or
+Copilot's: prints the account, exits 1 for none) and `tlskey TLS_PY` (prints
+a line and exits 1 for a key that cannot be opened). DASHBOARD_STATE says where the
 dashboard's files are.
 """
 import ctypes
@@ -141,17 +142,39 @@ def login():
 
 
 def signed():
-    """Codex's, Copilot's or Grok's account here, read as `aerie login --list` reads
+    """A coding agent's account here, read as `aerie login --list` reads
     it (login-list.py), so doctor and the Installed page cannot disagree."""
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
-    ll = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ll)
-    got = {"codex": ll.codex_of, "copilot": ll.copilot_of, "grok": ll.grok_of}[args[0]](os.path.expanduser("~"))
+    ll = dash.load_path("login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
+    a = ll.signins().get(args[0])
+    got = ll.who_of(os.path.expanduser("~"), args[0], a) if a else None
     if not got or not got.get("email"):
         sys.exit(1)
     sys.stdout.write(f" ({got['email']})")
 
 
-{"egl": gles, "prefs": prefs, "id": identity, "node": node, "login": login, "signed": signed}[verb]()
+def tlskey():
+    """The install's own TLS key, which every node pins (tls.key_state):
+    said only where its file is there and cannot be opened, since the
+    dashboard then leaves it as it is, answers no handshake under it, and
+    the nodes wait. Exits 1 with the line. Nothing is said by an account
+    that cannot read the install key itself, which cannot know."""
+    here = dash.beside(args[0])
+    state = os.environ["DASHBOARD_STATE"]
+    if not os.path.isfile(os.path.join(state, "tls", "key.pem")):
+        return
+    sys.path.insert(0, here)
+    signing, tls = dash.load("signing", here), dash.load("tls", here)
+    secret = os.environ.get("BB_SIGNING_SECRET_FILE") or signing.SECRET_FILE
+    if os.path.exists(secret) and not os.access(secret, os.R_OK):
+        return
+    signing.load_master()
+    tls.configure(state=state, unseal_fn=signing.unseal)
+    said = {tls.LOCKED: "cannot be opened under this install key, so the nodes that pinned it wait until the "
+                        "controller starts with the key it was sealed under",
+            tls.DAMAGED: "file is damaged, so the nodes that pinned it wait until it is put back from a backup"}.get(tls.key_state())
+    if said:
+        print(f"  [FAIL] the controller's own TLS key {said}")
+        sys.exit(1)
+
+
+{"egl": gles, "prefs": prefs, "id": identity, "node": node, "login": login, "signed": signed, "tlskey": tlskey}[verb]()

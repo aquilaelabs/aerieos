@@ -3,7 +3,7 @@
 // report is a form submitted once, not a list curated in place), and nothing
 // is ever deleted: a bug closes as fixed or wontfix, each with a note, because
 // a closed bug is the record that stops the same report being chased twice.
-import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -76,7 +76,7 @@ ok(/repro: put a compose file/.test(bbBug('show', '2')),
 ok(/happens: always/.test(bbBug('show', '2')) && /happens: sometimes/.test(bbBug('show', '1')),
    '...and beside its repro, whether it happens every time (R124)');
 // The opened row says it as a fact, and a chip narrows the list by it.
-{
+await section("The opened row says it as a fact, and a chip narrows the list by it", async () => {
   await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 2, null, { timeout: 10000 });
   const chips = await page.$$eval('#bugRepro [data-bgrepr]', bs => bs.map(b => b.dataset.bgrepr));
   await page.click('#bugRepro [data-bgrepr="always"]');
@@ -89,7 +89,7 @@ ok(/happens: always/.test(bbBug('show', '2')) && /happens: sometimes/.test(bbBug
   await page.click('#bugList .bug[data-id="1"] summary');
   ok(chips.join(',') === ',always,sometimes' && left === '2' && /Happens\s*sometimes/.test(fact),
      `the list narrows by whether a bug reproduces, and the opened row says it (${chips.join(',')}; ${left})`);
-}
+});
 // ---- the letter (roadmap #28) ------------------------------------------------
 // A bug is B2, everywhere it is printed; the bare number and the lower-case
 // letter are accepted on the way in; the ROADMAP's letter is refused with a
@@ -138,16 +138,21 @@ ok(!/picker loses/.test(bbBug()), '...and it leaves the open list');
 // it and when, how it was closed and when, with the note; the verbs are an
 // action bar with the one that cannot be undone last. It was six buttons in
 // a plain div with Delete third, where the thumb goes.
-{
+await section("What a report knows is facts above its verbs", async () => {
   const bar = await page.$eval('#bugList .bug[data-id="1"]', el => ({
     bar: el.querySelector('.macts')?.classList.contains('actbar'),
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])),
-    last: el.querySelector('.macts button:last-of-type')?.className || '' }));
+    // Last on the bar, or last under its ⋯ where a fixed bug keeps it with
+    // the changelog's three (R255).
+    last: (() => {
+      const l = [...el.querySelectorAll('.macts > button, .macts > .more')].at(-1);
+      return (l?.matches('.more') ? l.querySelector('.actmenu > button:last-of-type') : l)?.className || '';
+    })() }));
   ok(bar.bar && /, by /.test(bar.facts.Reported || '') && /^fixed, .+, by you: the select re-measures on rotate now$/.test(bar.facts.Closed || ''),
      `a report's facts say who reported it, and when and how it was closed with its note (${JSON.stringify(bar.facts)})`);
   ok(/bRm/.test(bar.last),
      '...and Delete is last, being the one that cannot be undone');
-}
+});
 ok(/\[fixed\]/.test(bbBug('all')), '...but never the tracker: aerie bug all still has it');
 ok(/bug tracker with 1 open \(1 low\)/.test(bbBug('--prompt')),
    '...and the next session is not told of a bug that is already fixed');
@@ -167,20 +172,20 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
    '...and closing again writes the new answer');
 // ...but not closing a closed one (bug #70): that overwrote the note that is
 // the whole point of closing, and left no line in the log saying so.
-{
+await section("but not closing a closed one", async () => {
   let said = '';
   try { bbBug('wontfix', '1', 'never mind'); } catch (e) { said = String(e.stderr || ''); }
   ok(/already fixed/.test(said) && /reopen it first/.test(said)
      && read().find(b => b.id === 1).status_note === 'this time with the resize listener',
      'closing a bug that is already closed is refused, and its note survives');
-}
+});
 
 // ---- the version it was seen in, and closed in (roadmap #6) ---------------
 // A tree with no commits has nothing honest to say about its version, and
 // nothing is said: a blank, never a made-up number. Its own project rather
 // than alpha, which another file commits in (B144). A project with a commit
 // gets the same identity `aerie version` prints, on filing and again on closing.
-{
+await section("the version it was seen in, and closed in", async () => {
   const N = `${DIR}/ws/eta`;
   execFileSync('git', ['init', '-q', N]);
   execFileSync(BB, ['bug', 'add', 'filed before any commit', '--sev', 'low'],
@@ -190,8 +195,8 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
   ok(e && !('seen_in' in e),
      'a report on a tree with no commits carries no version: a blank rather than a guess');
   execFileSync('rm', ['-rf', N]);
-}
-{
+});
+await section("a report is stamped with the space", async () => {
   const Z = `${DIR}/ws/zeta`;
   const genv = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@x',
                  GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@x' };
@@ -216,7 +221,7 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
   ok(!('fixed_in' in zread()[0]),
      'reopening takes the closed-in stamp with the note, since it turned out not to be true');
   execFileSync('rm', ['-rf', Z]);
-}
+});
 
 // ---- editing ---------------------------------------------------------------
 bbBug('edit', '2', 'sev', 'medium');
@@ -313,20 +318,23 @@ await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').leng
 
 // An open report's bar on a phone (B43): four on it share the width, and
 // none is cut short ('Send to Clau' at 360 and 393).
-{
+await section("An open report's bar on a phone", async () => {
   const was = page.viewportSize();
   await openFold(page, '#bugList .bug[data-id="3"]');
   const cut = [];
   for (const width of [360, 393]){
     await page.setViewportSize({ width, height: 800 });
-    await page.waitForTimeout(150);
+    // The page at the new width and drawn for it: the breakpoint's listeners
+    // run before a frame's callbacks.
+    await page.waitForFunction(w => innerWidth === w, width, { timeout: 10000 });
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     cut.push(...await page.$$eval('#bugList .bug[data-id="3"] .macts > :is(button,.more) ', bs =>
       bs.map(b => b.matches('.more') ? b.querySelector('button') : b)
         .filter(b => b && b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim())).then(t => t.map(x => `${width}: ${x}`)));
   }
   await page.setViewportSize(was);
   ok(cut.length === 0, `an open report's buttons each fit their text at 360 and 393 (${cut.join(', ') || 'none cut'})`);
-}
+});
 
 // ---- deleting a report that should not exist -------------------------------
 // Not the same act as closing one: fixed and wontfix keep the bug, because a
@@ -491,18 +499,14 @@ const merged = execFileSync(BB, ['history', '--find', 'compose files'],
 ok(/bugs\s+claude\s+filed/.test(merged),
    'aerie history finds a bug by its words, tagged with which log it came from');
 
-const post = body => page.evaluate(async b => {
-  const r = await fetch('/api/bugs', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, body);
+const post = body => pageCall(page, '/api/bugs', body);
 
 // ---- opening one is a slide, not a snap -------------------------------------
 // The same height tween the sidebar cards fold with. A <details> opens
 // instantly by construction, so the summary's click is taken over; what
 // proves it is an animation running on the element and a height between the
 // two resting sizes rather than at one of them.
-{
+await section("opening one is a slide, not a snap", async () => {
   // Back on the list: the History above swapped it out, and a fold cannot be
   // measured through a view that is not on screen.
   await page.evaluate(n => openNotebook(n), 'alpha');
@@ -557,7 +561,45 @@ const post = body => page.evaluate(async b => {
   });
   ok(!back.open && back.inline === "" && Math.abs(back.box - back.want) < 0.05,
      `...and closes back to exactly its shut height, nothing of the tween left (${back.box} vs ${back.want}px)`);
-}
+});
+// A press that lands while a slide still runs is the one that counts: the
+// slide before it is replaced, not left to finish and write its own open or
+// shut over the press. A fold opened while its closing slide ran, which a
+// redraw had shut under that slide, shut again a moment later.
+await section("a fold pressed while it still slides keeps that press", async () => {
+  await page.waitForSelector('#bugList .bug', { timeout: 15000 });
+  const s = `#bugList .bug[data-id="${await page.$eval('#bugList .bug', d => d.dataset.id)}"]`;
+  const got = await page.evaluate(async s => {
+    const el = document.querySelector(s);
+    el.open = true;
+    await new Promise(r => setTimeout(r, 50));
+    el.querySelector('summary').click();          // sliding shut
+    const sliding = el.getAnimations().length > 0;
+    el.open = false;                              // ...shut under it, as a redraw does
+    el.querySelector('summary').click();          // and opened again mid-slide
+    await new Promise(r => setTimeout(r, 500));   // past the first slide's end
+    const open = el.open;
+    el.open = false;
+    return { sliding, open };
+  }, s);
+  ok(got.sliding && got.open, `a fold opened while its closing slide still runs stays open after that slide would have ended (${JSON.stringify(got)})`);
+  // ...and a second press with nothing under it means the other way: held
+  // open for its closing slide, the fold read as open and took the second
+  // press as shut too (B838).
+  const twice = await page.evaluate(async s => {
+    const el = document.querySelector(s);
+    el.open = true;
+    await new Promise(r => setTimeout(r, 50));
+    el.querySelector('summary').click();          // sliding shut
+    const sliding = el.getAnimations().length > 0;
+    el.querySelector('summary').click();          // pressed again to reopen it
+    await new Promise(r => setTimeout(r, 500));
+    const open = el.open;
+    el.open = false;
+    return { sliding, open };
+  }, s);
+  ok(twice.sliding && twice.open, `a fold pressed again while it slides shut opens again (${JSON.stringify(twice)})`);
+});
 
 // ---- handing one to a session ----------------------------------------------
 // A bug goes over as a NUMBER and an instruction to look it up, never as a
@@ -645,7 +687,14 @@ page.errors = [];
 // once. One rule reaching one child too far.
 const sheetBox = await page.evaluate(async () => {
   document.getElementById('bugLog').click();
-  await new Promise(r => setTimeout(r, 400));
+  // The sheet open and at rest, ten seconds at most: its box is what is
+  // measured, and one still coming in has not its full size.
+  for (const end = Date.now() + 10000; Date.now() < end;){
+    const s = document.querySelector('.nbsheet:not([hidden])');
+    if (s && s.getBoundingClientRect().height && !s.getAnimations({ subtree: true })
+        .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
   const sh = document.querySelector('.nbsheet:not([hidden])');
   const r = sh.getBoundingClientRect();
   return {w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x),
@@ -715,18 +764,18 @@ if (page.errors.length) console.log(page.errors);
 // A deleted report's number is not handed out again either (bug B72). Last,
 // because its two log lines would push the oldest verb off the History
 // pane's first page for the check above.
-{
+await section("A deleted report's number is not handed out again either", async () => {
   const filed = bbBug('add', 'numbered after the deletions above', '--sev', 'low');
   const n = Number((filed.match(/filed B(\d+)/) || [])[1]);
   ok(n > 5, `a report filed after the newest were deleted gets a new number, not a reused one (B${n})`);
   bbBug('rm', String(n), 'numbering fixture');
-}
+});
 
 // B197: the token an open Bugs tab watches was the history's LENGTH, and the
 // history is capped, so past 300 events it sat at 300 for good and the tab
 // never re-read again. A tracker at the cap, one more write, and the token has
 // to have moved.
-{
+await section("B197: the token an open Bugs tab watches was the history's LENGTH, and the", async () => {
   const call = (path, body) => page.evaluate(async ([p, b]) => {
     const r = await fetch(p, b === null ? {} : { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
@@ -737,8 +786,10 @@ if (page.errors.length) console.log(page.errors);
   const h = (d.history = d.history || {}).alpha = d.history.alpha || [];
   while (h.length < 300) h.unshift({ at: 1, by: 'you', act: 'pad' });
   fs.writeFileSync(FILE, JSON.stringify(d));
+  // A poll already out when this one is asked for is followed by another
+  // (revsAgain), so the token is read once none is out.
   const token = async () => { await page.evaluate(() => pollRevs());
-                              await new Promise(r => setTimeout(r, 500));
+                              await page.waitForFunction(() => !revsBusy, null, { timeout: 10000 }).catch(() => {});
                               return page.evaluate(() => revs['bug:alpha']); };
   const before = await token();
   const added = await call('/api/bugs', { project: 'alpha', action: 'add', title: 'one more, past the cap',
@@ -747,12 +798,12 @@ if (page.errors.length) console.log(page.errors);
   const len = JSON.parse(fs.readFileSync(FILE, 'utf8')).history.alpha.length;
   ok(!added.error && len === 300 && after !== before,
      `a tracker whose history is at its cap still moves its token on a write (${before} to ${after}, history ${len})`);
-}
+});
 
 // The cap is on OPEN bugs. It used to count every row, so a project that had
 // fixed 195 and had 5 open could file nothing more, under a message telling
 // it to close some, which changed nothing.
-{
+await section("The cap is on OPEN bugs", async () => {
   const fs = await import('node:fs');
   const d = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   const rows = d.projects.gamma = d.projects.gamma || [];
@@ -765,6 +816,6 @@ if (page.errors.length) console.log(page.errors);
     body: JSON.stringify({ project: 'gamma', action: 'add', title: 'one more, with 200 fixed behind it',
                            severity: 'low', area: '', repro: '', expected: '', actual: '', notes: '' }) })).json());
   ok(!r.error, `200 fixed bugs do not stop the next one being filed (${r.error || 'filed'})`);
-}
+});
 
 await done(browser);

@@ -4,18 +4,10 @@
 // reaches the controller's copy and the other node over the agent API alone;
 // a change on the controller's copy reaches both; the same file changed on
 // both keeps both versions and says so in the bell's poll.
-import { URL, ok, done, sleep, DIR } from './lib.mjs';
+import { URL, ok, done, sleep, DIR, api, REPO } from './lib.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, openSync, readlinkSync, symlinkSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const api = async (path, body) => {
-  const r = await fetch(URL.replace(/\/$/, '') + path, body === undefined
-    ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
   while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }

@@ -197,9 +197,7 @@ def name_free(name):
     and a second name is a second container on the same data."""
     slug = devapp._slug(name) or ""
     if slug in devapp._load():
-        return (f"{slug} already exists here. To change it, the operator removes it from "
-                "the Containers page first, or a session changes a variable with aerie devapp "
-                f"--container {slug} env set FILE and then aerie devapp --container {slug} rebuild")
+        return f"{slug} already exists here, so change that container rather than asking for it again"
     return devapp.name_clash(slug, devapp.MAIN)
 
 
@@ -278,16 +276,15 @@ def build_refusal(name, compose_text, env_text=""):
     svcs = relative_builds(compose_text, env_text)
     if not svcs:
         return ""
-    return (f"{name or 'this container'} builds {', '.join(svcs)} from a relative path, and a "
-            "container written here has no space tree behind it: compose resolves that path "
-            "against the container's own data directory, which is empty, so there is nothing to "
-            "build. A space's own code goes into Docker from a compose file at the space's "
-            "root (docker-compose.yml or compose.yml), with Send to Docker on its Artifacts view "
-            "or aerie devapp new from a session, and builds from the tree. A container written "
-            "here builds from an absolute path or a git URL.")
+    # Compose resolves a relative path against the container's own data
+    # directory, which is empty: a space's own code goes into Docker from the
+    # compose file at the space's root, sent from its Artifacts view.
+    return (f"{name or 'this container'} builds {', '.join(svcs)} from a relative path, which a container "
+            "written here has no tree for: build from an absolute path or a git URL, or send the space's "
+            "own compose file to Docker from its Artifacts view")
 
 
-def create_container(name, compose_text, env_text="", node="", for_project=""):
+def create_container(name, compose_text, env_text="", node="", for_project="", app=None):
     """A container from a compose file written here, with no project behind it.
 
     The shape every other Docker front end uses: a stack is a name, a compose
@@ -328,9 +325,7 @@ def create_container(name, compose_text, env_text="", node="", for_project=""):
     # Registered before the check, because the check goes through _compose()
     # and that reads the record to know where the file is. Removed again if
     # the file turns out not to parse, so a refusal leaves nothing behind.
-    with devapp._lock:
-        d2 = devapp._load()
-        rec = devapp._rec(d2, slug, devapp.MAIN)
+    with devapp.edit_rec(slug, devapp.MAIN, create=True) as rec:
         rec["source"] = "file"
         # Not listed while compose reads it: a manager listing that landed
         # in this window drew a row for a container that was then refused
@@ -344,7 +339,6 @@ def create_container(name, compose_text, env_text="", node="", for_project=""):
         # by its sessions. None when not given, which is the default here.
         if for_project:
             rec["for"] = str(for_project)[:100]
-        devapp.write_json(devapp.FILE, d2)
     if (env_text or "").strip():
         devapp.write_env(slug, env_text, devapp.MAIN)
     with devapp.on_node(devapp._instance_node(slug, devapp.MAIN)):
@@ -358,6 +352,10 @@ def create_container(name, compose_text, env_text="", node="", for_project=""):
     if why:
         devapp.forget_container(slug)
         return {"error": why}
+    # Made from an app (R238 step 3): which one, at which pin and with which
+    # fields, kept beside its compose file, so Configure opens on its panel.
+    if app:
+        keep_app(slug, app)
     with devapp._lock:
         d3 = devapp._load()
         ((d3.get(slug) or {}).get(devapp.MAIN) or {}).pop("pending", None)
@@ -365,6 +363,223 @@ def create_container(name, compose_text, env_text="", node="", for_project=""):
     devapp._bump()
     return {"ok": True, "project": slug, "instance": devapp.MAIN,
             "name": devapp._pname(slug, devapp.MAIN)}
+
+
+# ---- a container made from an app ------------------------------------------
+# What a container made from an app keeps of it (R238 step 3): app.json
+# beside its compose file, nasapps.snapshot's record. Edited by hand, it
+# is taken away and the container is a written one like any other.
+APP_FILE = "app.json"
+
+
+def keep_app(name, snap):
+    """Keep the app a container was made from, or take it away with none."""
+    f = devapp.containers_dir(name) / APP_FILE
+    try:
+        if snap:
+            f.write_text(json.dumps(snap), encoding="utf-8")
+        else:
+            f.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def app_of(name):
+    """The app container `name` was made from, as kept, or None."""
+    try:
+        d = json.loads((devapp.containers_dir(name) / APP_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return d if isinstance(d, dict) and d.get("id") and isinstance(d.get("fields"), list) else None
+
+
+def apps_held(nid, but=""):
+    """What the containers already made hold, so another made from the same
+    app is offered its own: every name the store has, and the ports the ones
+    made from an app on node `nid` publish there, read from their
+    environment, and the apps they were made from. One still pulling its
+    image, or stopped, answers on nothing, so asking the node alone let a
+    second take its port. `but` is a container whose own are not counted
+    (the one being saved)."""
+    import nasapps
+    store = devapp._load()
+    ports, apps = set(), set()
+    for name in store:
+        snap = app_of(name) if nid and name != but else None
+        if not snap or devapp.instance_node(name, devapp.MAIN) != nid:
+            continue
+        apps.add(snap["id"])
+        vals = nasapps.env_values(devapp.read_env(name, devapp.MAIN))
+        for v in [f["var"] for f in snap["fields"] if f.get("kind") == "port"] + (["PORT"] if "PORT" in (snap.get("own") or []) else []):
+            if str(vals.get(v) or "").isdigit():
+                ports.add(int(vals[v]))
+    return {"names": sorted(store), "ports": sorted(ports), "apps": sorted(apps)}
+
+
+def app_made(req, a, node="", keep=None, name=""):
+    """An app's compose file and environment from what its panel sent:
+    {compose, env, app, routers} or {error}. `a` is the app as the Library
+    holds it or as a container kept it; `keep` the container's values on an
+    edit, so a secret is made once and a port it holds is its own; `name`
+    the container's, whose own key a router field takes at the router
+    picked (R238 step 7), `routers` the nodes whose routers it uses."""
+    import nasapps
+    import router
+    extra, why = nasapps.extra_env(a, req.get("env"))
+    if why:
+        return {"error": why}
+    used = set()
+
+    def at(v):
+        nid = router.which(v) if str(v).startswith("http") else str(v)
+        used.add(nid)
+        return router.container_key(nid, devapp._slug(name), "")
+    r = nasapps.render_with(a, req.get("values"), field(req, "ids") or "1000:1000", field(req, "tz") or "UTC", req.get("port"), keep, router=at)
+    if r.get("error"):
+        return r
+    held = apps_held(node, but=devapp._slug(name) or "")
+    # One on the machine's own network answers on its own port, which is not
+    # picked: a second of it on the same node has nothing to answer on.
+    if a.get("network") == "host" and a.get("id") in held["apps"]:
+        return {"error": f"{a.get('name') or a['id']} answers on the machine's own network, on port {a.get('port')}, and another on that node already does: make this one on another node"}
+    busy = nasapps.ports_taken(a, r["values"], node, keep, held=held["ports"])
+    if busy:
+        return {"error": f"port {busy[0]} is taken on that node already: pick another for {a.get('name') or 'the app'}"}
+    return {"compose": a.get("compose") or "", "env": r["env"] + extra, "app": nasapps.snapshot(a), "routers": sorted(used)}
+
+
+def app_view(name, env_text):
+    """What Configure draws for a container made from an app: its kept app
+    with each value read back from the environment, the other variables
+    apart, and whether the Library holds a newer definition of it. None for
+    a container made any other way."""
+    import nasapps
+    snap = app_of(name)
+    if not snap:
+        return None
+    import router
+    vals = nasapps.env_values(env_text)
+    mine = {v for f in snap["fields"] for v in (f["var"], f.get("key")) if v} | set(snap.get("own") or [])
+    # A router field reads back as the node whose router its address is.
+    for f in snap["fields"]:
+        if f.get("kind") == "router" and vals.get(f["var"]):
+            vals[f["var"]] = router.which(vals[f["var"]]) or ""
+    extra = [ln for ln in str(env_text or "").splitlines() if ln.strip() and ln.partition("=")[0].strip() not in mine]
+    now = next((a for a in nasapps.catalog() if a["id"] == snap["id"]), None)
+    # Newer: kept from another pin since, and its file or its fields differ.
+    newer = bool(now) and (now.get("commit") or now.get("at")) != (snap.get("commit") or snap.get("at")) \
+        and (now.get("compose") != _compose_of(name) or now.get("fields") != snap.get("fields"))
+    return {**snap, "values": {k: v for k, v in vals.items() if k in mine}, "extra": "\n".join(extra) + ("\n" if extra else ""),
+            "newer": {"commit": now.get("commit") or "", "fields": now["fields"], "own": now["own"], "compose": now["compose"]} if newer and now else None}
+
+
+# ---- an image its entry names by another digest ------------------------------
+# Update, for a container that runs an image by digest, means that its
+# entry names another: the app it was made from, as the Library holds it
+# now, or the service of AerieOS's it is. The registry is not asked: the tag
+# beside a digest is not what is run. An image the container still runs by
+# its tag alone moves the same way once its entry names a digest for it.
+def images_moved(mine, entry):
+    """{reference: the entry's} for each image reference of `mine` (a
+    compose file's) that the entry names otherwise: the same image, by its
+    name, under a digest that is not the one it runs. An image the entry
+    names twice, or not at all, or with no digest, is left alone."""
+    import packformat
+    by_name = {}
+    for ref in entry:
+        parts = packformat.image_parts(ref)
+        if parts and parts["digest"]:
+            by_name.setdefault(parts["name"], []).append(ref)
+    out = {}
+    for ref in mine:
+        parts = packformat.image_parts(ref)
+        to = by_name.get(parts["name"]) if parts else None
+        if to and len(to) == 1 and to[0] != ref:
+            out[ref] = to[0]
+    return out
+
+
+def entry_images(name, kept=None):
+    """The images the entry a written container came from names now: the
+    Library's kept app it was made from, or, for one of AerieOS's own, its
+    service's. `kept` is nasapps._all(), read here when not handed in.
+    [] for a container that came from neither (a space's own,
+    one written by hand), and for a service whose own page moves its image."""
+    import packformat
+    import services
+    if not name or not devapp.is_file_source(name):
+        return []
+    if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
+        nid = devapp._instance_node(name, devapp.MAIN) or ""
+        kind = services.container_names(nid).get(name, "") if nid else ""
+        if not kind or not services.updates(kind):
+            return []
+        return list(services.images(services.module(kind).pack().get("name", "")).values())
+    snap = app_of(name)
+    if not snap:
+        return []
+    import nasapps
+    now = (nasapps._all() if kept is None else kept).get(snap["id"])
+    return packformat.compose_images(now.get("compose")) if now else []
+
+
+def entry_moved(name, kept=None):
+    """images_moved for the container `name`: what its Update would write.
+    `kept` is the Library's apps where the caller has read them already
+    (a page of rows reads them once)."""
+    import packformat
+    entry = entry_images(name, kept)
+    return images_moved(packformat.compose_images(_compose_of(name)), entry) if entry else {}
+
+
+def entries_behind():
+    """The written containers whose entry names another image than their
+    file runs, for the bell's row beside the registry's
+    (imagecheck.attention): [(its name, its node's id, the space it is
+    under, [each image as its row names it])]. An image is said by its
+    name and tag: the digest is the row's to show, not a notice's."""
+    import nasapps
+    import packformat
+    kept, out = nasapps._all(), []
+    for project, insts in sorted(devapp._load().items()):
+        if devapp.MAIN not in insts:
+            continue
+        moved = entry_moved(project, kept)
+        if not moved:
+            continue
+        said = []
+        for to in moved.values():
+            parts = packformat.image_parts(to) or {}
+            said.append((parts.get("name") or str(to)[:120]) + (f":{parts['tag']}" if parts.get("tag") else ""))
+        out.append((devapp._pname(project, devapp.MAIN), devapp._instance_node(project, devapp.MAIN) or "",
+                    devapp.owner_of(project, devapp.MAIN) or project, said))
+    return out
+
+
+def repin(name):
+    """The first half of Update on a row whose entry names another image:
+    its compose file's image lines moved to the entry's, the rest of the
+    file as it was. {} where nothing moved or it is written and the pull
+    is still to run, {"done": ...} where its service wrote and rebuilt it
+    itself, {"error"} where the file was refused."""
+    import packformat
+    import services
+    moved = entry_moved(name)
+    if not moved:
+        return {}
+    if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
+        nid = devapp._instance_node(name, devapp.MAIN) or ""
+        r = services.update(services.container_names(nid).get(name, ""), nid)
+        return r if r.get("error") else {"done": r}
+    r = update_container(name, packformat.compose_repinned(_compose_of(name), moved), devapp.read_env(name, devapp.MAIN))
+    return {"error": r["error"]} if r.get("error") else {}
+
+
+def _compose_of(name):
+    try:
+        return (devapp.containers_dir(name) / "docker-compose.yml").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 def overview_names():
@@ -469,13 +684,19 @@ def rename_container(name, new, instance=None):
 
 
 def read_container(name):
-    """What was written, for the editor to open on."""
+    """What was written, for the editor to open on, and whether it is
+    AerieOS's own: the editor opened while the page's list was put away has
+    no row to read that from (B810)."""
     try:
         compose = (devapp.containers_dir(name) / "docker-compose.yml").read_text(
             encoding="utf-8", errors="replace")
     except OSError:
         compose = ""
-    return {"compose": redact_keys(compose), "env": devapp.read_env(name, devapp.MAIN)}
+    env = devapp.read_env(name, devapp.MAIN)
+    return {"compose": redact_keys(compose), "env": env,
+            "managed": devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM,
+            # ...and the app it was made from, read back for its panel (R238).
+            "app": app_view(name, env)}
 
 
 def listed_owner(c):
@@ -688,7 +909,29 @@ def tab_verb(act, name, req, seen):
         # through update_container directly.
         if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
             return {"error": f"{name} is AerieOS's own, written from the nginx page: change it there"}, 403
-        r = update_container(name, req.get("compose") or "", req.get("env") or "")
+        compose, env = req.get("compose") or "", req.get("env") or ""
+        # Made from an app (R238 step 3): its panel's values make the
+        # environment, the file stays the one it was made with, or the
+        # Library's newer one when Configure takes it; edited by hand, it
+        # leaves the app and is saved as written.
+        snap, made = app_of(name), {}
+        if snap and not req.get("by_hand"):
+            import nasapps
+            kept = nasapps.env_values(devapp.read_env(name, devapp.MAIN))
+            a = next((x for x in nasapps.catalog() if x["id"] == snap["id"]), None) if req.get("newer") else snap
+            if not a:
+                return {"error": f"{snap.get('name') or snap['id']} is not in the Library any more: its newer definition cannot be taken"}, 400
+            made = app_made(req, {**a, "compose": a.get("compose") or _compose_of(name)}, devapp._instance_node(name, devapp.MAIN), kept, name)
+            if made.get("error"):
+                return made, 400
+            compose, env = made["compose"], made["env"]
+        r = update_container(name, compose, env)
+        if snap and not r.get("error") and (req.get("by_hand") or req.get("newer")):
+            keep_app(name, None if req.get("by_hand") else made.get("app"))
+        # A router it no longer uses lets go of its key (R238 step 7).
+        if snap and not r.get("error") and not req.get("by_hand"):
+            import router
+            router.drop_container(name, keep=made.get("routers") or ())
         # ...and a new name with it, while it is down (rename_container):
         # the file is saved first, so what was typed is kept either way.
         new = field(req, "rename")
@@ -714,8 +957,31 @@ def tab_verb(act, name, req, seen):
     under = field(req, "owner")
     if under and under not in mine:
         return {"error": f"not a space: {under}"}, 400
-    r = create_container(name, req.get("compose") or "",
-                         req.get("env") or "", field(req, "node"), under)
+    # From an app the Library holds (R238 step 3): its panel's values make
+    # the environment and its compose file is the catalog's, never the page's.
+    compose, env, app = req.get("compose") or "", req.get("env") or "", None
+    if field(req, "app"):
+        import nasapps
+        a = next((x for x in nasapps.catalog() if x["id"] == field(req, "app")), None)
+        if not a:
+            return {"error": f"no app called {field(req, 'app')} in the Library"}, 400
+        # A name already taken is refused before a router makes it a key:
+        # its key is the container that has the name. Said to the person on
+        # the panel, which offers a free one: another of the same app is a
+        # container of its own under a name of its own.
+        with devapp._lock:
+            taken = name_free(devapp._slug(name)) if devapp._slug(name) else ""
+        if taken:
+            return {"error": f"{devapp._slug(name)} is another container's name: give this {a.get('name') or 'one'} a name of its own"}, 400
+        made = app_made(req, a, field(req, "node"), name=name)
+        if made.get("error"):
+            return made, 400
+        compose, env, app = made["compose"], made["env"], made["app"]
+    r = create_container(name, compose, env, field(req, "node"), under, app=app)
+    # Refused after a router made it a key: the key goes again.
+    if r.get("error") and app:
+        import router
+        router.drop_container(devapp._slug(name))
     # Made for a project: its sessions may reach it (R79).
     if not r.get("error") and under:
         net_nudge()
@@ -759,6 +1025,7 @@ def manager_view(nid, seen):
     # (relocate.py): the row's line while the jobs pass it between nodes.
     import imagecheck
     import nginxproxy
+    import packformat
     import relocate
     got["images_at"] = imagecheck.last_at()
     # A node whose ports stay on it: a row still publishing on every address
@@ -786,10 +1053,11 @@ def manager_view(nid, seen):
     # opens that one's page. The scanners are a compose job of their own on
     # the node, never an instance, so their containers are put under
     # System here by their compose project's name.
-    import router
-    import scanners
-    ours = {nginxproxy.container_name(got["node"]): "nginx", router.container_name(got["node"]): "router",
-            scanners.container_name(got["node"]): "scanners"} if got.get("node") else {}
+    import nasapps
+    import services
+    ours = services.container_names(got["node"]) if got.get("node") else {}
+    # The Library's apps, read once for the rows made from one.
+    kept = nasapps._all()
     for c in got.get("containers") or []:
         if c.get("project") and ours.get(c["project"]) == "scanners":
             c["owner"], c["system"] = devapp.SYSTEM, "scanners"
@@ -807,10 +1075,22 @@ def manager_view(nid, seen):
         # Update (R192); "" for every other row.
         if i.get("owner") == devapp.SYSTEM:
             i["nginx_to"] = nginxproxy.behind_named(i.get("project", ""))
+            # ...and another of AerieOS's own whose entry names another
+            # image than its file runs, with Update as on every row.
+            i["images_behind"] = [packformat.image_said(to) for to in entry_moved(i.get("project", ""), kept).values()]
         # ...and any other's registry images behind what the registry serves
         # (imagecheck, R195): the row says which, with Update.
+        # AerieOS's own image is said by the digest its release's signed
+        # list names, and a tag that serves another image than the newest
+        # signed release names is said in a line of its own (R199).
+        # A container made from an app whose entry names another digest
+        # says that one, short, and the registry is not asked about it.
         else:
-            i["images_behind"] = [b["image"] for b in imagecheck.of(i.get("name", "")).get("behind") or []]
+            checked = imagecheck.of(i.get("name", ""))
+            moved = entry_moved(i.get("project", ""), kept) if (i.get("instance") or devapp.MAIN) == devapp.MAIN else {}
+            i["images_behind"] = [b["image"] + (f" ({b['signed']})" if b.get("signed") else "") for b in checked.get("behind") or []
+                                  if b["image"] not in moved] + [packformat.image_said(to) for to in moved.values()]
+            i["images_said"] = [str(s) for s in checked.get("said") or []]
     if seen is not None:
         was = len(got.get("instances") or []) + len(got.get("containers") or [])
         got["instances"] = [i for i in got.get("instances") or []

@@ -29,7 +29,8 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import NoReturn
+
+from say import die
 
 SYS_ROOT = os.environ.get("BB_SYS_ROOT", "/sys")
 # The lease: a lock every session on the node can reach. /run/lock is the
@@ -37,11 +38,6 @@ SYS_ROOT = os.environ.get("BB_SYS_ROOT", "/sys")
 LOCK_DIR = os.environ.get("BB_GPU_LOCK_DIR") or ("/run/lock" if os.access("/run/lock", os.W_OK) else "/tmp")
 LOCK = os.path.join(LOCK_DIR, "builderbot-gpu.lock")
 NOTE = os.path.join(LOCK_DIR, "builderbot-gpu.holder")
-
-
-def die(msg) -> NoReturn:
-    sys.stderr.write(f"[builderbot] ERROR: {msg}\n")
-    sys.exit(1)
 
 
 def card():

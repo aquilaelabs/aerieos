@@ -446,6 +446,36 @@ class Agent(unittest.TestCase):
         self.agent = agentpkg.load("aerieos_agent_vms")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".vms"]
 
+    def test_a_vm_s_state_is_virsh_s_word_within_its_time_or_nothing(self):
+        # Nothing where virsh knows no such VM, and nothing where libvirt
+        # holds the question past fifteen seconds: a check that the VM is
+        # off then reads it as not off, and a clone as no VM to copy.
+        from unittest import mock
+        asked = []
+
+        def sub(argv, **kw):
+            asked.append((argv[-2:], kw.get("timeout")))
+            if argv[-1] == "slow":
+                raise subprocess.TimeoutExpired(argv, kw["timeout"])
+            there = argv[-1] == "bbvm-web-db"
+            return mock.Mock(returncode=0 if there else 1, stdout="shut off\n\n" if there else "")
+
+        class Job:
+            def __init__(self):
+                self.t = []
+
+            def say(self, x):
+                self.t.append(x)
+        with mock.patch.object(self.av.subprocess, "run", side_effect=sub):
+            state = self.av.VmsMixin._vm_state
+            self.assertEqual(state("bbvm-web-db", {}), "shut off")
+            self.assertIsNone(state("gone", {}))
+            self.assertIsNone(state("slow", {}))
+            self.assertEqual(asked, [(["domstate", n], 15) for n in ("bbvm-web-db", "gone", "slow")])
+            job = Job()
+            got = self.av.VmsMixin._vm_disk_grow(self.av.VmsMixin(), job, {"disk": "vda", "gb": 20}, "slow", {})
+            self.assertEqual((got, job.t), (("failed", 75), ["refused: stop the VM first; a disk grows while it is off\n"]))
+
     def test_a_clone_copies_each_disk_and_keeps_the_rest(self):
         # R163 step 12: each file disk copied as qcow2 (the original
         # untouched), a cdrom left empty, a passed-through disk kept and
@@ -561,6 +591,27 @@ class Agent(unittest.TestCase):
             self.assertFalse(os.path.lexists(os.path.join(d, "iso")))
             self.assertEqual(open(target).read(), "root:x:0:0\n", "the file it named untouched")
 
+    def test_an_iso_already_here_is_taken_only_when_it_is_the_file_given(self):
+        # R247 step 5: ISOs are the node's, and the same name from another
+        # person's own address answered an ask for the official one.
+        import hashlib
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "iso"))
+            with open(os.path.join(d, "iso", "ubuntu.iso"), "wb") as f:
+                f.write(b"someone else's image")
+            theirs = hashlib.sha256(b"someone else's image").hexdigest()
+            a = self.agent.Agent.__new__(self.agent.Agent)
+            a.own_dir = lambda *a_, **k: None
+            job = mock.Mock()
+            with mock.patch.object(self.av, "VM_DIR", d):
+                got = a._vm_iso_add(job, {"iso": {"name": "ubuntu.iso", "url": "https://x/ubuntu.iso", "sha256": "b" * 64}}, "", {})
+                said = "".join(c.args[0] for c in job.say.call_args_list)
+                self.assertEqual(got, ("failed", 65), said)
+                self.assertIn("as another file", said)
+                got = a._vm_iso_add(job, {"iso": {"name": "ubuntu.iso", "url": "https://x/ubuntu.iso", "sha256": theirs}}, "", {})
+                self.assertEqual(got, ("succeeded", 0))
+
     def test_on_the_controllers_own_machine_a_vm_job_runs_as_the_agent(self):
         # R165 step 1: the wall's file says the machine is the controller's
         # own, and there the job keeps root rather than dropping to the jobs
@@ -582,15 +633,18 @@ class Agent(unittest.TestCase):
         self.assertEqual(self.av.sums_lookup("d" * 128 + "\n", "alpine.qcow2"), "d" * 128)
         self.assertEqual(self.av.sums_lookup(f"{h} *other.img\n", "missing.img"), "")
 
-    def test_a_running_vm_s_root_filesystem_from_its_guest_agent(self):
+    def test_a_running_vm_s_filesystems_from_its_guest_agent(self):
+        # Every one the guest agent names, the root among them, in guest_facts
+        # alone: no second reader of the root's for a caller that is not there.
         from unittest import mock
         said = ("fs.count             : 2\nfs.0.name            : vda15\nfs.0.mountpoint      : /boot/efi\n"
                 "fs.0.used-bytes      : 6\nfs.0.total-bytes     : 10\nfs.1.name            : vda1\n"
                 "fs.1.mountpoint      : /\nfs.1.used-bytes      : 3221225472\nfs.1.total-bytes     : 10737418240\n")
         with mock.patch.object(self.av, "_run", return_value=said):
-            self.assertEqual(self.av.guest_root("bbvm-web-db"), [3072, 10240])
+            self.assertEqual(self.av.guest_facts("bbvm-web-db")["fs"], [["/boot/efi", 0, 0], ["/", 3072, 10240]])
         with mock.patch.object(self.av, "_run", return_value="error: Guest agent is not responding"):
-            self.assertIsNone(self.av.guest_root("bbvm-web-db"))
+            self.assertEqual(self.av.guest_facts("bbvm-web-db")["fs"], [])
+        self.assertFalse(hasattr(self.av, "guest_root"))
 
     def test_a_vm_s_guest_agent_facts_and_its_balloon_memory(self):
         from unittest import mock

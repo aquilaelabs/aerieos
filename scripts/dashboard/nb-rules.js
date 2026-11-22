@@ -33,26 +33,24 @@ function nbRulesView({$, nb, project}){
     nb.rulesInFlight = loadRulesNow(again).finally(() => { nb.rulesInFlight = null; });
     return nb.rulesInFlight;
   }
-  async function loadRulesNow(again){
-    nb.loadCodebase().then(() => drawRules());
-    try{
-      const r = await bootFetch("/api/rules?project=" + encodeURIComponent(project));
-      nb.ruleData = await r.json();
-    }catch(e){ nb.ruleData = {error: String(e), rules: []}; }
-    // The answer's own revision, not the page's token as of now (B201); an
-    // answer that failed carries none, and the token stands in.
-    nb.rulesRev = nb.ruleData.rev ?? revs[`rules:${project}`] ?? nb.rulesRev;
-    // A reload that lands on staged work keeps the work: the poll never
-    // asks while the panel is dirty (HALVES), but a load already on its
-    // way when Add or Edit was pressed used to land afterwards and drop the
-    // row under the finger that made it (B255). What is on disk is read
-    // fresh either way; Save's own conflict check is what judges the base.
-    if (!ruleDirty()) nb.ruleClash = null;
-    drawRules();
-    // Already behind (see nb-tests.js): read once more now, unless somebody
-    // is typing, which is the case the poll's own guard keeps.
-    if (!again && nb.ruleData.rev !== undefined && revs[`rules:${project}`] !== undefined
-        && revs[`rules:${project}`] !== nb.ruleData.rev && !ruleDirty()) return loadRulesNow(true);
+  // The rules' read (nbRevRead), with the code base's numbers asked beside
+  // it. An answer is kept whole, its error with it, which drawRules says.
+  function loadRulesNow(again){
+    return nbRevRead(nb, {
+      key: "rules", url: "/api/rules",
+      start: () => nb.loadCodebase().then(() => drawRules()),
+      rev: [() => nb.rulesRev, v => nb.rulesRev = v],
+      put: (j, threw) => nb.ruleData = threw ? {error: j.error, rules: []} : j,
+      // A reload that lands on staged work keeps the work: the poll never
+      // asks while the panel is dirty (HALVES), but a load already on its
+      // way when Add or Edit was pressed used to land afterwards and drop the
+      // row under the finger that made it (B255). What is on disk is read
+      // fresh either way; Save's own conflict check is what judges the base.
+      draw: () => { if (!ruleDirty()) nb.ruleClash = null; drawRules(); },
+      // No second read while somebody is typing, which is the case the
+      // poll's own guard keeps.
+      hold: ruleDirty,
+    }, again);
   }
 
   // The global rules, under the project's own: every project's sessions
@@ -121,13 +119,11 @@ function nbRulesView({$, nb, project}){
     const own = gs.filter(g => !g.builtin);
     const shippedOff = new Set(gs.filter(g => g.builtin && g.disabled).map(g => g.name));
     mutate(own, shippedOff);
-    const r = await postJSON("/api/global-rules", {action: "save",
+    const j = await postJSON("/api/global-rules", {action: "save",
       rules: own.map(g => ({name: g.name, text: g.text, paths: g.paths || [], words: g.words || [],
                             doc: g.doc || "", check: g.check || "", refuse: g.refuse || [], why: g.why || ""})),
       disabled: [...shippedOff]});
-    let j = {};
-    try{ j = await r.json(); }catch{ j = {error: `the controller answered ${r.status}`}; }
-    if (!r.ok || j.error){ notify(j.error || `the controller answered ${r.status}`, true); return false; }
+    if (j.error){ notify(j.error, true); return false; }
     nb.globalEditing = null;
     await loadRules(true);
     return true;
@@ -156,7 +152,7 @@ function nbRulesView({$, nb, project}){
     if (!box) return;
     const d = nb.ruleData || {};
     if (d.error){
-      box.innerHTML = `<div class="field"><div class="hint bad">rules: ${esc(d.error)}</div></div>`;
+      drawHTML(box, `<div class="field"><div class="hint bad">rules: ${esc(d.error)}</div></div>`);
       return;
     }
     const rows = ruleRows();
@@ -266,8 +262,9 @@ function nbRulesView({$, nb, project}){
       count: () => (ruleDirty() ? 1 : 0),
       what: () => "the edited rules",
       save: async () => { await saveRules(); return ""; },
-      revert: () => nb.ruleClearStaged()});
-    box.innerHTML = nb.codebaseSection()
+      revert: () => { nb.rulePending = null; nb.globalOffPending = null; nb.globalEditing = null;
+                      nb.ruleEditing.clear(); nb.ruleOpen.clear(); nb.ruleWas.clear(); drawRules(); }});
+    drawHTML(box, nb.codebaseSection()
       + nb.briefSection()
       + docSection("briefing", "rules", briefTitle("rules"),
       rows.length ? `${rows.length}` : "none", clash + body + nb.sectBar("briefing:rules"),
@@ -278,15 +275,15 @@ function nbRulesView({$, nb, project}){
       // Last, because it CONTAINS the two above: the rules in full, then the
       // open roadmap and bugs. Reading it before them is reading the summary
       // before the thing.
-      + nb.preambleSection();
+      + nb.preambleSection());
     const keep = box.querySelector("#rlKeepTheirs"), mine = box.querySelector("#rlUseMine");
     if (keep) keep.onclick = () => loadRules();          // their list, my edits dropped
     if (mine) mine.onclick = () => saveRules(true);
     wireSections(box);
-    nb.ruleStagedCount = () => (ruleDirty() ? 1 : 0);
-    nb.ruleClearStaged = () => { nb.rulePending = null; nb.globalOffPending = null; nb.globalEditing = null;
-                                 nb.ruleEditing.clear(); nb.ruleOpen.clear(); nb.ruleWas.clear(); drawRules(); };
-    nb.ruleCommitStaged = saveRules;
+    // A page of rules at a time, the one being edited always among them.
+    const rl = box.querySelector("#rlList");
+    pageReach(rl, "rlList", Math.max(0, ...[...nb.ruleEditing].map(i => i + 1)));
+    paginate(rl, ":scope > .rulerow", {key: "rlList", noun: "rules"});
     box.querySelectorAll(".rulerow").forEach(row => {
       const i = Number(row.dataset.i);
       const put = (k, sel) => {
@@ -340,7 +337,7 @@ function nbRulesView({$, nb, project}){
       if (sum) sum.onclick = e => {
         e.preventDefault();
         if (row.open) nb.ruleOpen.delete(i); else nb.ruleOpen.add(i);
-        slideDetails(row, !row.open);
+        slideDetails(row, !foldOpen(row));
       };
     });
     const add = $("rlAdd");
@@ -417,7 +414,7 @@ function nbRulesView({$, nb, project}){
       const kind = box.querySelector(".rlkind");
       kind.textContent = on ? "on its triggers" : "every session";
       kind.classList.toggle("cond", !!on);
-      box.querySelector(".actbar .state").innerHTML = ruleWhen(r);
+      drawHTML(box.querySelector(".actbar .state"), ruleWhen(r));
     }
     nb.syncSave();
   }
@@ -427,10 +424,9 @@ function nbRulesView({$, nb, project}){
     if (!ruleDirty()) return;
     const body = nb.rulePending || (nb.ruleData?.rules || []);
     try{
-      const r = await postJSON("/api/rules", {project, action: "save", rules: body,
+      const j = await postJSON("/api/rules", {project, action: "save", rules: body,
                                               ...(nb.globalOffPending ? {globals_off: [...nb.globalOffPending]} : {}),
                                               rev: nb.ruleData?.rev, ...(force === true ? {force: true} : {})});
-      const j = await r.json();
       // Somebody else wrote these rules while they were open here (B195).
       // Nothing is written and nothing typed is dropped: the staged copy
       // stays, and the band puts the choice where the rules are.

@@ -19,6 +19,7 @@ lab/.env.example                 the lab's one setting: the address other machin
 lab/stick-walk/.gitignore        what a walk leaves in its own folder
 lab/stick-walk/README.md         a first run walked on a real stick image in QEMU, blank disks and a reboot included
 lab/stick-walk/go.sh             the whole walk from a blank machine
+lab/stick-walk/iso.py            the installer ISO in a VM as a person installs it: boot, the console's keys and screen, the installed disk after
 lab/stick-walk/person.mjs        one browser step of it, its sign-in kept
 lab/stick-walk/rehearse.py       the move off another NAS rehearsed on the walked stick: the branch's agent handed in and run, its checks read back
 lab/stick-walk/rehearse-inside.py  that rehearsal, run as root on the stick: the old system's disks laid out, adopted, its VM defined and cloned, the array taken over and checked, every checksum compared
@@ -36,7 +37,7 @@ image/                           AerieOS, the appliance image the installed edit
   mkosi.extra/                   what is laid into the tree: the initramfs script that mounts /var and /etc's overlay, fstab, the slot tool, the apt stub, the first-boot unit, the boot's own settings and the stick's network file, the data partition grown to its disk, the screen's login during a first setup, the installer and its unit, nouveau kept off an NVIDIA card (etc/modprobe.d)
   partitions.sh                  the disk's fixed partition UUIDs, sizes and labels, one place for build.sh, the initramfs, fstab and GRUB
   grub.cfg                       GRUB's menu on the ESP: the two slots, bb_slot from grubenv naming the one to boot
-  iso-grub.cfg                   the ISO's menu (R160 step 2): the same root booted live, with the installer or without
+  iso-grub.cfg                   the ISO's menu: the same root run live from the medium, and where a new machine starts; it offers no installer
   lay-disk                       one disk laid out as AerieOS: the partitions, GRUB for both firmwares, slot A and the data partition; build.sh runs it on a loop device, the installer on a person's disk
   ovf.xml                        the OVA's descriptor (the VM disk for VMware and VirtualBox, R160 step 3), its marks filled by build.sh
   build.sh                       the build: mkosi, the squashfs, the disk on a loop device with GRUB for UEFI and BIOS, the stamps
@@ -45,7 +46,8 @@ scripts/
   host-boot.sh                   a bare-metal install's boot under systemd: lib/boot.sh's steps, then setpriv to its account (R90)
   supervisor.sh                  keeps the box alive; the graceful shutdown
   mint-runner-token              root-only token helper (one of the two sudo commands)
-  deploy-key                     root-only deploy key helper: make, keep, forget, load (the other)
+  deploy-key                     root-only deploy key helper: make, keep, forget, load; each key sealed under the install key and opened only into the ssh agent (the other)
+  secrets-carry                  root-only carrier of the secrets folder across a move on a machine of its own: pack, land (a third sudo command there, B728)
   healthcheck.sh                 docker healthcheck
   aerie                          in-container helper CLI
   bb                             what an older agent calls in the bundle until it updates; no PATH carries it
@@ -56,23 +58,29 @@ scripts/
   lib/controller-packages.sh     the controller's package list read one way, for the Dockerfile and a bare-metal install (R90)
   lib/relay-verbs                the aerie verbs a node relays to the controller (aerie and bbrelay.py both read it)
   lib/sdk.sh                     the toolchain manager: `aerie toolchains`, sourced by aerie
+  lib/held-run.sh                one entry's steps run from what the entry declares and nothing else: the row read from standard input, its downloads fetched and held by sdk.sh's own mechanism, then the steps, cut from the network unless it says online, in one run or, where a root agent makes the cut for the session account, in two (--fetch, then --run inside the cut); how a node installs a coding agent from the recipe it is handed
   lib/preflight.sh               `aerie tests preflight`, sourced by aerie
   lib/bbapi.py                   the controller's API from aerie: one client, the loopback or BB_CONTROLLER, pinned https
+  lib/say.py                     the `[builderbot] ERROR:` line a helper ends on with exit code 1, and the check of an answer for one
   lib/cmdmatch.py                which commands a shell line runs, read as a shell splits it, for a rule that refuses (R200)
-  lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200)
+  lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200); and what the hooks share, the node test, the word to the controller's hook endpoint and the stores' writer
+  lib/scopedir.py                where an account keeps what it has for one space on this machine: the one builder of that path in Python, for bbapi and the hooks (bb_scope_dir in common.sh is the shell's)
+  lib/sealfile.py                what a root helper in shell keeps, sealed and opened under the install key by the controller's own seal (the deploy keys)
   lib/syncwait.py                a session's aerie on a synced node waits for its copy to be in step with the controller's (R163)
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
-  lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
-  lib/sdkmeta.py                 reads config/toolchains.json for aerie, with the tool packs beside it: fields, argv, versions
+  lib/pin-fetch                  one file a table pins (config/image-tools.json), kept only when it is the pinned bytes: the image and the bare-metal installer fetch their own tools with it
+  lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions, what a download is held to (its publisher's word, a pin, a signature), the files a row carries into its directory and an install's receipt
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log
+  lib/supervise.sh               what the supervisor asks of the dashboard: its pid by the file it leaves, and a JSON string for the saved sessions
   lib/embedded.py                pulls scripts and python out of quoted heredocs so `aerie lint` sees them
   lib/waits.py                   the wait for a person's Allow and the job-log stream, shared by the verbs below
   lib/devapp-verbs.py            `aerie devapp`: status, rebuild, test, new, env, remove, ls, log, start, stop, restart
   lib/capture.py                 `aerie capture`: the sources anything that draws gives (a page, the emulator, an X display) and a shot at rest
   lib/reel.py                    `aerie capture reel`: the frames of a recording that changed, stamped and tiled
+  lib/pagecap.mjs                a page opened for a shot or a reel: the browsers installed, a device or a size, and the credential to the trusted origins alone
   lib/touch.py                   `aerie emu touch` and a drive script's $BB_TOUCH: a tap, hold or glide with its timing kept, through sendevent
   lib/hand.py                    a finger's path through points for a glide (curved, eased, overshooting, wobbling, by seed), played by `aerie emu touch` and `aerie phone touch`
   lib/sound.py                   `aerie tool sound`: sound effects from sfxr's presets and plain tones, into dist/sound/ as OGG with a waveform and a spectrogram (ffmpeg)
@@ -85,12 +93,15 @@ scripts/
   lib/tmux-keys.conf             the keys the dashboard's terminal sends down its socket (a line of history up or down, leaving copy mode before what is typed), which bb-tty gives every tmux server before each attach
   lib/gpu.py                     `aerie gpu`: the node's NVIDIA card from where a session stands, and a turn on it for a heavy job
   lib/tidy.py                    `aerie tidy`: what a task left holding (its emulator, the card, build daemons, browsers, /tmp) given back
-  lib/unitpar.py                 `aerie tests unit` across the cores: the modules dealt by their last measured seconds, one unittest process per core (R130)
+  lib/unitpar.py                 `aerie tests unit` across the cores: the modules dealt by their last measured seconds, one unittest process per core (R130), a module that failed run once more alone and said as flaky when it passes then
+  lib/flakes.py                  the harness's flakes on record: a line for each suite that failed in a whole run and passed run again, with the first check that failed; `aerie tests flakes` counts them and preflight fails on one it ran
+  lib/bisect-suite.py            `aerie tests bisect`: the first commit between two where a suite fails, by halving and running it --at each (R55); a suite that has flaked is run three times a commit
+  lib/roottier.py                `aerie tests root`: the root tier's runner, as root in a container alone, a skip failing it (tools/root-tier.sh, `aerie devapp test root-tier`)
   lib/bottleneck.py              what bounded a run of the dashboard suites, from its own numbers: the floor, the machine, the reruns (R130)
   lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
   lib/proc-verbs.py              `aerie proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
   lib/container-verbs.py         `aerie container`: status and new
-  lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a pack asked for as the project's Install a tool pack setting says (R169 step 5)
+  lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a shipped toolchain or a pack asked for on the session's node as the space's Install a tool pack setting says (R169 step 5)
   lib/vm-verbs.py                `aerie vm`: a project's VMs listed, made, started, stopped, snapshotted and removed (R91)
   lib/phone-verbs.py             `aerie phone`: status and run
   lib/root-verbs.py              `aerie root`: status and run
@@ -99,6 +110,7 @@ scripts/
   lib/diag.py                    `aerie diag`
   lib/node-log.py                `aerie logs --node`
   lib/login-check.py             `aerie login --check`: who this account is signed in to each agent as on this machine, told to the controller
+  lib/login-flow.py              `aerie login --flow` and `--out` for every coding agent, shipped or a pack's: its sign-in's own screens worked from what its row or its pack says of them, the link sent up and the code typed in
   lib/emu-job.py                 `aerie emu` as a job on the project's node
   lib/run-job.py                 `aerie run`: the snapshot, the job, the log back
   lib/build-or-test.py           the command, place and outputs `aerie build` and `aerie test` read from the settings
@@ -136,21 +148,26 @@ scripts/
   lib/version-verbs.py           `aerie version`
   lib/changelog-verbs.py         `aerie changelog`
   lib/token-verbs.py             `aerie token keep`
-  lib/login-list.py              `aerie login --list`: every account this machine is signed in as
+  lib/agentids.py                the ids of the coding agents that ship with AerieOS, and the rows of the tool packs a bundle carries: the one list login-list.py, bb-agent-hook and bb-tty tell a pack's agent from a shipped one by
+  lib/login-list.py              `aerie login --list`: every account this machine is signed in as, each agent's read from what its sign-in data says (who_of), and the sign-out that forgets keys
   lib/doctor-probes.py           egl, project node, commit identity, session-capable node, signed-in account
   lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement
+  lib/releasepub.py              config/aerieos-release.pub read one way, for the Enroll script, the build's signer and aerie lint: the key and its spare, or none and why
+  lib/bundleparts.py             what a release ships in the bundle a node fetches, and the list of those files a release signs (R267 step 6): the parts, their files without Python's bytecode, and one line a file with its sha256; read by the controller's bundle and tools/sign-agent.py
   startup.d/*.sh                 startup hooks
   dashboard/                     web dashboard: server.py (the routes, the transport and the gates, each handler one call
-                                 into a module beside it); index.html (markup, stylesheet, the wiring that runs at load);
+                                 into a module beside it); index.html (the markup); page-*.css (the stylesheet, a cascade layer a file);
                                  one tab-*.js per document tab, one nb-*.js per notebook view (nb-core.js is the
                                  notebook itself), one page-*.js per part of the page that is neither, all strict,
                                  all pure declarations, served by name from the page's own script tags (R77)
     server.py                    the routes, the transport and the gates; each handler one call into a module beside it
-    index.html                   the markup, the stylesheet and the wiring that runs at load
+    index.html                   the markup, and the head's script that reads the theme before the first paint
+    page-*.css                   the stylesheet, a cascade layer a file (R9): page-skin.css (the tokens, the schemes, bare elements), page-components.css, page-surfaces.css, page-overrides.css
     terminal.html                one terminal on a page of its own: a tab popped out of the dock, and the Android app's session screen (R133)
     tab-*.js                     one per document tab (Docker, Nodes, Jobs, Schedules, nginx, Scanners, Storage, Library, a Library entry's own page, Installed, an installed thing's own page, Files, Toolchains, Agents, Emulator, Phone, Apps, Settings, Keys, Audit, Users, Profile, Findings, Projects)
     nb-*.js                      one per notebook view; nb-core.js is the notebook itself
     page-*.js                    one per part of the page that is neither: the state, the tabs, the panes and the dock, a project's rows, the polls, the bell, the doctor and the rest
+    page-boot.js                 what runs as the page loads, a function a part, called in order by boot(), which index.html runs once every script is in (R9)
     static/                      the favicon set and the SVG marks the page draws
     vendor/                      xterm.js 5.5.0 and its fit addon 0.10.0 as npm publishes them, with xterm's MIT license (R133), served by name under /vendor/
     bb-tty                       what a terminal runs: which tmux session it is, and whose
@@ -170,20 +187,23 @@ scripts/
     extmounts.py                 the other disks and shares the controller's own machine mounts (R162 step 4): the record, a share's password sealed, what the hello hands the agent
     storebackups.py              the backups the controller's own machine copies (R162 step 5): the record, what the hello hands the agent, the summary Home and the bell read
     poolkeys.py                  the passphrases of the own machine's encrypted pools (R162 step 3): kept sealed, or asked after every boot and offered once; what the hello hands the agent, nothing in Safe mode
-    nasapps.py                   the catalog of ready apps New container offers (R164 step 2): each a compose file pinned to a tag with its blanks in the environment, filled by render
-    schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words, its timer and the built-in scan
+    nasapps.py                   the Docker apps New container offers (R164 step 2, R238): none shipped, each kept from the vetted catalog at the commit its signed index pins or added by a person; a compose file with every image held by its digest (pack format 5) or pinned to a tag, the fields its panel asks for filled into its environment by render_with, and a kept app's newer definition taken when the index pins another commit
+    schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words and its timer
     tunnel.py                    the home tunnel the controller runs itself (R176): cloudflared as its child from the settings, and the hostname's record and rules through Cloudflare's API
     statefile.py                 writing a state file, and holding it while you read-modify-write one
-    stateversion.py              /config's state version: the start's refusal of a newer or too old one, the copy before a migration, the JSON stores' migrations run
+    stateversion.py              /config's state version: the start's refusal of a newer or too old one, the copy before a migration, the JSON stores' migrations run, and /config put back with the start stopped when one fails
     statemigrations/             numbered migrations for the JSON stores (NNNN_name.py, run(ctx)), each run once as the state moves, never edited once shipped
     toolchains.py                everything behind the toolchains in the Library and the Installed page: catalog, sizes, the job worker
     toolpacks.py                 the tool packs a person adds (docs/tool-packs.md): a repository's bbtool.json, pinned to a commit, as catalog rows
     packconfig.py                what each added pack is configured with per node (R172): the answers to its config block, secrets sealed, handed in the hello
     library.py                   the Library's one list (R170): the toolchains and packs with what a node's store holds, the coding agents, the apps, the catalog's offers and the companions as rows of one shape
-    catalogindex.py              the vetted catalog's index (R169 step 2): fetched from the catalog's address, its signature checked against config/catalog.pub before an entry is read, a withdrawn pack on the bell
+    catalogindex.py              the vetted catalog's index (R169 step 2): fetched from the catalog's address, its signature checked against config/catalog.pub before an entry is read, a withdrawn pack on the bell; each entry's older pins kept, and one entry read out of it at the pin this build takes
+    catalogentry.py              an index entry written from the folder it pins: what a folder's own manifest says at a commit, read as an install reads it; the entry with that pin placed by its pack format, the pin it had kept as an older one; what an entry says that its folder does not, for the catalog's check; used by tools/packs-export.py
+    catalogrows.py               a shipped toolchain's recipe from the catalog when the catalog's is newer (R234 step 4): its row from its official pack's manifest, held to the primitives this build carries, kept under the state and carried by the table in the shipped row's place and by the nodes' bundle as config/toolchains.catalog.json beside the shipped file
+    packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; what an entry's downloads are held to (a pin, a declared download, the keys it carries, an installer that keeps the network, what it asks a package manager for and the files a row carries) and the word for it, pinned, installer or open; an image reference with the digest it is pulled by, and a compose file's image lines read and written as text; the pins an index entry carries, its newest and the older ones it keeps for earlier formats, the entry as a build takes it, and the word an entry says of its downloads; unit/packformat/N keeps manifests of each
     catalogmirror.py             the vetted catalog's mirror (R169 step 6): an archive tools/catalog-mirror.py made, imported under Controller settings once its index is the maintainers', answering when the catalog does not and holding each pinned repository as a git bundle
     emulator.py                  everything behind the Emulator page: a node's Android system images
-    enrollscript.py              Enroll node as one script: the answers, the token and a WireGuard tunnel inside the provisioner
+    enrollscript.py              Enroll node as one script: the answers, the token, what the controller's https is held to and a WireGuard tunnel inside the provisioner
     memory.py                    everything behind the memory book: what Claude remembers per project
     rules.py                     house rules: what has been decided about working on a project
     preamble.py                  what every session on a project starts with, assembled once
@@ -196,6 +216,7 @@ scripts/
     wiki.py                      the notebook's Wiki view: a project's wiki kept as a forge-shaped git repository of its own, exported as a zip and pushed to or pulled from the repository's wiki
     names.py                     what things are called: a project, a tmux session, a project's agent sessions
     agents.py                    the coding agents a session may run, one adapter each (R95): how each installs, signs in, is launched, briefed, guarded and read; page-agents.js is the page's copy
+    agent-recipes.json           each shipped coding agent's install recipe, by its id: what it fetches with the sha256 that holds each download, its steps, and where the program lands; the one copy, read by agents.py, written by tools/pins.py when a pin moves, and what packs/agents is written from
     projects.py                  new project / link and unlink a remote, the worker that clones and pushes, the locks and the pins Home shows
     forges.py                    which git host a remote is on, and the two things a host can be asked that git cannot
     forgeaccess.py               what an agent may do on a project's git host: the abilities, the token measured without changing anything, the project's Allow or Deny, and aerie forge's verbs on GitHub, GitLab and Gitea
@@ -217,17 +238,19 @@ scripts/
     records.py                   the notebook's records whole as JSON, YAML or Markdown, and read back in (R167)
     bugs.py                      the bug tracker; `aerie bug` drives the same file
     notebook.py                  one batch over both of those, so half of one cannot exist
+    tracker.py                   what the roadmap and the bug tracker keep the same way: the file read, the log and its trim, a batch begun, committed or reverted, and the numbers handed out
     pending.py                   what a session wants to add to the notebook, held for the operator
     ids.py                       one letter per notebook tab, so a number says which list it came from
     presence.py                  who else has a notebook open, in memory only
     overlap.py                   what each session is changing, and where two of them collide
     chat.py                      messages between accounts, and what each project's people are doing
     version.py                   one version identity per project, rendered for whatever is asking
+    vers.py                      a dotted version as a tuple that sorts, for any module to import
     changelog.py                 the user-facing record beside it: categories, and the editor's writes
     artifacts.py                 what a project built: dist/, and what a row may offer
     signing.py                   a project's Android signing keys, kept by the controller, never a session's, and the sign-key jobs that work on them on the project's node (R106)
-    releasesign.py               a release's unsigned APK from CI, signed on the project's node with its sideload key and attached (R106)
-    releasefiles.py              a release checked against the files its project lists in .release-files, a short one said on the bell (R190)
+    releasesign.py               a release's unsigned APK from CI, signed on the project's node with its sideload key and attached, from a run that passed or one still going once its release exists (R106)
+    releasefiles.py              a release checked against the files its project lists in .release-files as its CI ends, a short one said on the bell and a complete one said once (R190)
     membership.py                a project's owner, whether it is invite only, and the invitations to it
     registry.py                  projects by id (R154): each directory's permanent number and the name it is shown under, in projects.json; a directory is never handed out twice
     repos.py                     projects and their repositories (R138): which project each repository is in, in project-repos.json; create, add, move, detach for the trash, delete an empty one, and place one in no project
@@ -236,7 +259,8 @@ scripts/
     devactions.py                the layer that runs and reports an instance: up, down, rebuild, test, remove, state and act, the compose plan and job runners, on the base devapp.py keeps
     relocate.py                  copying or moving a dev instance to another node, its volumes and data directory with it: three jobs, packed on the old node, unpacked on the new, then its rebuild
     containers.py                containers AerieOS did not build: the daemon's list and controls, ones written from a compose file, and whose each is; the Docker manager's view and verbs
-    imagecheck.py                every container's registry images against what their registries serve (R195): a weekly check, Check for updates on the Containers page, Update on a row
+    imagecheck.py                every container's registry images against what their registries serve (R195): a weekly check, Check for updates on the Containers page, Update on a row; an image named by its digest is not asked about, and moves when its entry names another
+    imageregistry.py             a container registry asked what it serves, one client for the protocol whatever the host: the digest a tag serves now, a manifest held to its digest and the platforms a list names, with the anonymous token a host's challenge names; read by imagecheck.py and tools/pins.py
     vms.py                       the VM manager (R91): each project's VMs on the nodes with VM host, the OS catalog matched by name, the limits, and the vm jobs
     gitcreds.py                  who gave a project a token, a line per person in /config/gitcreds naming their key store's entry, and the credential git work is handed: theirs while they are signed in (R135, R159)
     logins.py                    who is signed in now: a row per browser sign-in the cookie names, and a device signed in as the account, in /config/logins.json (R159)
@@ -251,24 +275,29 @@ scripts/
     releasegaps.py               what a release owes the changelog (R217): the bugs fixed since the last release that it carried, with no Fixed line or answer
     checks.py                    update checks on one clock (R176): each check's cadence a setting under Controller settings, when it last ran, Check for updates
     firstboot.py                 a stick's prepared configuration at its first boot (R161 step 8): the owner and the people made, the setup page skipped where asked, the rest kept waiting, said on This machine
-    adoptapps.py                 the containers another system ran, made again here (R163 step 10): each template's compose with the exact image it ran, its network of fixed addresses, started with the machine where it was, its paths said where the adopted disks do not hold or may not write them; made and started through the Containers page's own calls
-    held.py                      a held start on a bare-metal install (R56 step 9): held after an unclean stop or when armed for the next restart, lifted by Start on This machine
+    adoptapps.py                 the containers another system ran, as compose files to import (R163 step 10): each written from the settings the read handed over (oldapps-put), its image, environment, ports, paths and network of fixed addresses, restarting with the machine where it did, what it will not do as written said at its top; a zip of them for an administrator, kept settings readable by the controller alone
+    held.py                      a held start on a bare-metal install (R56 step 9): held after an unclean stop or when armed for the next restart, lifted by Start on This controller
     move.py                      moving this controller to another home (R90 step 12): the sealed bundle and its token, the nodes' challenges, the restore under the version gate, the old home marked moved
     backup.py                    the configuration backed up (R161 step 4): the move's bundle under a password's key, written onto the pools after every change, found and restored at a first run
-    scanners.py                  AerieOS's own scanners on each node (R145): the compose project of Semgrep, Trivy and mobsfscan deployed and updated per node, one schedule for every node's runs, the SARIF each sends up, and the bell's rows
-    nginxproxy.py                one nginx per node, AerieOS's own (R171): the routes and certificate kept here, the compose file generated from them, deployed and rebuilt through containers.py
+    scanners.py                  AerieOS's own scanners on each node (R145): the compose project of Semgrep, Trivy and mobsfscan, each the image its entry names by digest, deployed and updated per node, one schedule for every node's runs, the SARIF each sends up, and the bell's rows
+    nginxproxy.py                one nginx per node, AerieOS's own (R171): the routes and certificate kept here, the compose file generated from them with the image its entry names by digest, deployed and rebuilt through containers.py
+    seams.py                     the seams into the controller a test or a tool of the tree's own needs (a pack from a repository on disk, the release signers, the services' images or the registry's digests from a file, a stub in docker's or cloudflared's place), each named with what it stands in for and read in one place, only where the file is the source tree's (the Dockerfile and tools/ beside it)
+    services.py                  AerieOS's own services as one table (R172, R264): the model router, nginx and the Scanners by kind, each one's module and grant, and the images each runs as its entry names them by digest, read by every list of them and by the Library's rows, Install and Remove
+    syscontainer.py              a System container on a node, what nginx and the model router share (R171, R180): its name, whether it is deployed, and deploy, apply and remove of one generated compose file through containers.py, each handed what differs
     acme.py                      an ACME client on the cryptography library: Let's Encrypt certificates for the nginx page by HTTP-01 or DNS-01, renewed (R150)
     unlocks.py                   a person's tokens opened per use for the window they pick and logged, git's handout of an opened one, and a store under a key of the person's own opened only while unlocked (R158 step 5, R157)
     hardening.py                 the dashboard's process kept from core files and swap, not dumpable, and wipe() for a key let go (R158 step 6)
     csp.py                       the page's Content-Security-Policy, its inline blocks allowed by hash and its scripts by integrity, and what a browser refused under it, kept for the Doctor (R158 step 4)
-    tls.py                       the dashboard's own TLS: one port serving https and http by the first byte, the install's own certificate or Let's Encrypt's, its key sealed under the install key (R158 step 2)
+    leanpage.py                  the page as it is served, without its comments: a tokenizer for its scripts, stylesheets and page, which keep theirs in the tree (R228 step 15)
+    tls.py                       the dashboard's own TLS: one port serving https and http by the first byte, the install's own certificate in every mode (its key kept through each remake, which is what a node pins) and Let's Encrypt's for a name, each key sealed under the install key (R158 step 2, R267 step 15)
     phone.py                     a paired handset on a node: install, push, and the asking
     phonelease.py                a phone lent to a project (R113): the lease, and what its sessions may do on the phone without asking
     db.py                        the controller's store: the SQLite connection, the migrations, ids and the audit trail
     nodes.py                     the node registry, the job queue and the agent's channel (docs/nodes.md); the Nodes page's verbs; a build job from the controller
+    nodeset.py                   which rows of the node list are agent nodes work can go to, enrolled and not retired, for the modules handed the list
     channel.py                   the node agent's verbs behind /api/v1/agent/: enroll, hello, work, a job's files, log and result
-    claudecode.py                Claude Code on each node: which version, checking for and installing an update
-    agentcode.py                 the other coding agents on each node (Codex CLI, Copilot CLI): which version, the registry's latest, installing, updating and removing each (R95)
+    claudecode.py                what is Claude Code's alone on a node: the hold on a node without it or updating it, and the status payload's versions
+    agentcode.py                 the coding agents on each node (Claude Code, Codex CLI, Copilot CLI and the others): which version, the latest out, installing, updating and removing each (R95, R145)
     claudegrant.py               which nodes each account is signed in to each agent on, as each node reported it
     mapping.py                   a new project's code map built in the background as it is created
     plugins.py                   the Claude Code plugins a project carries, listed and installed
@@ -285,7 +314,9 @@ scripts/
     diag.py                      the Diagnostics section of Controller settings: reports, images, errors, the audit trail, and the download
     featuresoff.py               the features an install switches off from its environment (FEATURES_OFF): the list, the sentence, and what the page and the routes read of it (R81)
     doctor.py                    `aerie doctor` run on a timer and cached, for the Doctor card
-    runners.py                   a node's CI runners: the root-only token helper, and the Runner card's list
+    runners.py                   a node's CI runners: the root-only token helper, the Runner card's list, and the pin each runner's download is held to, as a node is handed it
+    service-images.json          the images AerieOS's own services run (the model router's, nginx's, the scanners'), a row for each service: every image by its tag and the digest of what is pulled; the one copy, read by services.py, carried by each service's entry and so by packs/services, moved by tools/pins.py --file
+    runner-pins.json             the CI runners a node installs, a row for each kind of git host: the version and the sha256 of the file for every platform, written as a toolchain's pinned source is; the one copy, read by runners.py, handed to a node with a runner's install, moved by tools/pins.py --file
     findings.py                  the scanner's reports read and attributed, and what they used to say
     gitrelay.py                  a node session's push, fetch and pull, done in a repository of the controller's own
     pushscan.py                  what a push would send, read for secrets and private things before it goes, and the lines a person okayed (R219)
@@ -302,16 +333,19 @@ scripts/
     layout.py                    what the page keeps here: each account's tabs and panes, the dock's terminals among them
     bellseen.py                  what each account has dismissed from its bell: an update to one version, until a newer one is out
     migrations/                  numbered schema files for /config/builderbot.db, applied at boot
+    labrecord.py                 the lab's own record: what each lab suite walked, on what and when, written by `aerie tests lab` into lab-record.json beside it, which a system's vetted line is read from
+    lab-record.json              that record: the newest walks of each suite and subject, dated, with the build each ran against
     testreg.py                   the test registry: what each test protects, and
                                  what a run measured it costing
     notify.py                    getting a line into a running session, and knowing it landed
     signin.py                    each agent's sign-in and sign-out on one node, as jobs there
-    test/                        its Playwright suite: `aerie dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
-    unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it)
+    test/                        its Playwright suite: `aerie dashboard test`, isolated; catalog-apps.json in it is the two Docker apps its world offers, kept as from a made-up catalog since none is shipped; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
+    unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it; sdkstore.py is a store and a catalog of made-up rows for the installer's)
+    roottier/                    the root tier: what the root agent and the root helpers do in a folder an account controls, with a link planted where root works, seen as root (world.py is what its modules stand on)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs
   agent/aerieos_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
     __init__.py                  what the agent is and how it runs, and AGENT_VERSION
-    base.py                      the constants naming the node's paths and tools, the log, own_path and own_digest
+    base.py                      the constants naming the node's paths and tools, the log, own_path and own_digest, a small file written or read whole (write_atomic, write_json, read_json), and env_or and run_out
     bundle.py                    the zip a node runs, built the same on the controller and the node, so the digests agree
     controller.py                the connection to the controller, verified by pin
     stores.py                    the node's stores, a store's path rules, and node.json
@@ -321,6 +355,7 @@ scripts/
     vmhw.py                      a VM's hardware beyond size (R100): the host's CPUs and devices, pinning, the balloon, the network, a virtiofs folder, passthrough, the vBIOS dump
     lanbridge.py                 the wired LAN card in a bridge, br0, on AerieOS (R219), so a VM on it reaches its own host; once at a boot, put back without an address
     screen.py                    the node's one port for the controller's sockets, 7684, signed by the controller: the terminals (term.py) and a VM's screen for the dock (R99), relayed to its VNC on the loopback
+    relaytls.py                  the relay port's TLS, loaded by both ends: the node's own certificate, the controller's pin on it, the pump between a TLS socket and the plain one each side's code keeps, and a signed request taken once
     term.py                      AerieOS's own terminal (R133): a pty per tab on the screen relay's port, running what its kind runs (rw, ro, ctr), signed by the controller
     toolchains.py                the toolchain store (R19): what is installed, who uses it, a session's environment
     gpu.py                       the NVIDIA card: its sample, its memory's holders, the driver and container toolkit
@@ -330,7 +365,9 @@ scripts/
     tokenwatch.py                who opens an account's coding-agent token on the node (R125): the files held at 600, a reader that is neither the account nor the agent said on the next hello
     tokens.py                    the coding agents' sign-ins sealed on the node (R126): sealed where a login wrote them, opened into a tmpfs for a person's terminal, wiped after the last session
     tokenseal.py                 the sealing both ends load: an account's key pair per node, the seal, and the wrap a seal's key travels in to the agent
-    runners.py                   the CI runners: their slots and state, and Agent's runner verbs
+    names.py                     where a node keeps what is AerieOS's under its own name (R204): /etc/aerieos, /var/lib/aerieos and aerieos-agent where they are there, the names before where only those are, and the links and the command a starting agent adds so the new names answer before the Enroll script moves anything
+    release.py                   whether an agent update is AerieOS's own release (R227): the Ed25519 release key a node pins at enrollment or at its console, the signature over the update's digest it then requires, and the console's word that unsigned builds are taken
+    runners.py                   the CI runners: their slots and state, Agent's runner verbs, and the download held to the pin the controller hands
     census.py                    the census and the sample every hello carries
     jobs.py                      Job: one piece of the controller's work, on its own thread
     ftp.py                       the file-access servers a project's settings open
@@ -358,14 +395,14 @@ scripts/
     cli.py                       enroll, run, status, sample
     coverage.py                  function coverage under aerie tests coverage only
   agent/ruff.toml                the linter's settings for the agent, pinned to the python a Rocky node carries
-packs/                           the official packs (R169 step 1): every shipped toolchain and every coding agent as a pack in bbtool.json's format, tagged official and bundled for an install with no network, written by tools/packs-export.py from the tables and held to them by aerie lint
+packs/                           the official packs (R169 step 1): every shipped toolchain and every coding agent as a pack in bbtool.json's format, tagged official, written by tools/packs-export.py from the tables and held to them by aerie lint; the vetted catalog carries them (packs-export.py --catalog), and its mirror is how an install with no network takes them
 tools/catalog-mirror.py          makes the vetted catalog's mirror on a machine with the network: the signed index and a git bundle per repository at every commit it pins, for a controller that cannot reach the catalog (R169 step 6)
     official/                    one folder per shipped toolchain (a colon in its name a hyphen), its bbtool.json carrying the recipe config/toolchains.json has under shipped
     agents/                      one folder per coding agent, its bbtool.json carrying the adapter agents.py's table has under agent
     services/                    one folder per deployed thing of AerieOS's that is a pack (R172): the model router, its service block and its config block, what its Installed row asks for per node
 apps/                            the companions a person installs (R98 step 1): the phone app, the editor extension and the
                                  Windows companion, each released by its own workflow and offered as a card in the Library
-  android/                         the companion app: api-surface.json is its contract with the dashboard, each field's type pinned, app/ the Kotlin
+  android/                         the companion app: api-surface.json is its contract with the dashboard, each field's type pinned, app/ the Kotlin, gradle/verification-metadata.xml the sha256 of every file its release build resolves
   vscode/                          AerieOS for VS Code (R159): plain JavaScript, no build step and no dependencies
     package.json                   the extension's manifest: its commands, its settings, and aerieosApi, the Files API it speaks
     extension.js                   the builderbot: file system, the sign-in, open project, search and the session's terminal
@@ -385,35 +422,51 @@ apps/                            the companions a person installs (R98 step 1): 
     bbcompanion/update.py          kept current by its controller: what it holds asked at start and daily, a newer copy checked and swapped in at the next start
     bbcompanion/app.py             the window: sign in, the projects and each one's state, Add, Remove, Open folder, Conflicts
 nodes/bb-session                    the root helper that runs a session in a view of its own project; the agent installs it
+nodes/bb-netcut                     the root helper that runs a declared pack's install step as the job account with no network, where that account cannot make the namespace itself; the agent installs it
 nodes/provision-macos.sh            a provisioner for macOS, not offered by default takes it away
 nodes/provision-linux.sh                  turns a Linux machine into a node (the Docker sandbox, the stores, the session half) and enrolls it; Debian, RHEL, Arch and SUSE families, Alpine, Void, Gentoo
 nodes/families/                           the provisioner's family files, one per package family (deb, rhel, arch, suse, alpine, void, gentoo): package names and verbs, where docker comes from; the enroll script carries the picked system's beside the core
 nodes/install-controller.sh               installs the controller bare metal on the provisioner's core, lays the release out by the Dockerfile's COPY lines, and makes the machine a node of itself; --check, --update, --remove (R90)
 nodes/unraid-vm.xml             the node as an Unraid VM: one file for every distribution; only the installer ISO line changes
 nodes/vm/                        the same machine for the other six hypervisors: Proxmox, libvirt, QEMU, VMware, Hyper-V, VirtualBox
-nodes/cloud-init/                the seed a cloud image boots from: meta-data and the user-data that runs the provisioner
 config/skel/                     home directory skeleton
 config/icon.png                  the icon the Unraid template shows
 config/toolchains.json           the toolchains the Library offers, and how to install each
-config/release-signers           the keys a release's SHA256SUMS.sig must verify against (R199), as ssh-keygen's allowed signers: what AerieOS's updater, the stick maker and the installer check a release by
-config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against
+config/release-signers           who may sign a release's SHA256SUMS (R199), as ssh-keygen's allowed signers, the namespace naming the channel: aerieos-dev for the release build's key and its spare (written from config/aerieos-release.pub), aerieos-release for the stable key's holder; in the image, and what AerieOS's updater, the installer, the stick maker and the Library's downloads check a release by
+config/apk-signers               the certificates a release's Android app may be signed by, one SHA-256 fingerprint a line (R199): the app is the one file no build attests, so the release's list of files is signed only over an APK apksigner verifies against one of these; read by tools/release-sign.py alone
+config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against, with its spare on a second line (R232)
+config/catalog-floor             the oldest catalog index this release takes, one moment as an index says its own: an install that holds none yet refuses an index made before it; moved forward at a release, never back
+config/aerieos-release.pub       AerieOS's release key, public half (R227): what the Enroll script hands a node to pin, and what tools/sign-agent.py holds a build's key to; a second line names its spare (R232); read by scripts/lib/releasepub.py alone, and aerie lint fails when it does not parse to one key or two
 config/release-keys/README.md    where each publisher release key came from, and how one is refreshed (R137)
 config/release-keys/node.asc     the Node.js release team keys that sign each release SHASUMS256.txt
 config/release-keys/swift.asc    the Swift signing keys that sign each download
 config/controller.env            a bare-metal install's env file as the installer first writes it: the paths compose mounts, the settings compose passes (R90)
 config/controller-packages.tsv   what the controller needs installed, per provisioner family: the image and a bare-metal install read this one list (R90)
 config/vm-images.json            the operating systems a VM is made from: each publisher's cloud image and its checksum file (R91)
+config/apt-keys/                the public keys of the three package sources the image adds (NodeSource, GitHub CLI, Docker), carried so none is fetched as the image is built; docker.asc is the key the provisioner carries for a node
+config/image-tools.json         the programs the controller's image takes from their vendors' releases as it is built (cloudflared, hadolint, yq, actionlint, ruff, uv, mise), noVNC's source at its release's tag, and mkosi's, which the OS image's build runs, each pinned to a version and the sha256 of the file for each architecture: the Dockerfile and the bare-metal installer read it (scripts/lib/pin-fetch), tools/pins.py moves it (R267 step 17)
+config/image-npm/               what the controller's image takes from npm, a folder a program (playwright, web-ext): package.json names the one version asked for and package-lock.json every package under it with its tarball's address and integrity; the Dockerfile and the bare-metal installer install each with npm ci --ignore-scripts, tools/pins.py moves it (check, move --file config/image-npm)
 config/templates/                briefing.md, assembled per session by preamble.py; nothing is copied into a project
 tools/readme-shots.mjs           the README's pictures (dashboard, notebook, nodes, toolchains, the phone's dashboard and terminal) from a running dashboard, normally the dev instance: default scheme, addresses scrubbed, nothing saved
+tools/sign-agent.py              the release's signatures over what a build sends its nodes (R227, R267 step 6): --keygen makes the key pair once, a release build signs the agent's digest, root's tools and the list of the bundle's files into scripts/agent/agent.sig with the key from its secret, --check holds all three to the committed public key, --digests prints what a tree would be signed as
 tools/bb-ref.sh                  writes the aerie block of docs/reference.md from aerie help; aerie lint holds the two equal
 tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
-tools/release-sign.py            makes the release key and signs a release's SHA256SUMS on the key holder's own machine (R199): never run in CI, the repository or a controller
-tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what every job that attaches a file to a release calls
+tools/release-sign.py            makes a release's SHA256SUMS from its files' own bytes and signs it (R199): sign on the stable key holder's own machine (aerieos-release), seal in CI for a dev build with the release build's key (aerieos-dev, a stable tag refused), each file held to the build attestation of the workflow named for it and the Android app to config/apk-signers; seal --from seals a folder dry for the rehearsal; key makes the stable key
+tools/release-requirements.txt   the cryptography library a release's build uses its key with, and the two it needs, each pinned and held to its files' sha256
+tools/release-lib.sh             installs that list into a folder of its own with --require-hashes, in a step that holds no secret; the step that holds the key reads it by PYTHONPATH
+tools/release-signers.py         writes config/release-signers' dev lines from config/aerieos-release.pub and the stick maker's copy from config/release-signers; --check is aerie lint's, so neither is typed and neither drifts
+tools/release-place.sh           where a release may be cut from: a dev build on a commit that is on a branch tools/release-branches lists, a stable release or a candidate only on main (the tag's first check, and asked again by the default branch's copy in each job that holds the release key)
+tools/release-branches           the branches a release may be cut from, a name or a pattern a line: main, and a release's working branch
+tools/companion-requirements.txt PyInstaller and what it needs for the companion's Windows build, each pinned and every file held to its sha256
+tools/root-tier.sh               the root tier as root in a throwaway container of the controller's image: the image's own copy, or a checkout's with --tree (the lint workflow's root job, the image workflow's upgrade job)
+tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what a tag's last job makes the release with, what the seal attaches the signed list with and publishes a dev build by once it is whole, and what a job run again by hand attaches with
+tools/release-missing.sh         the files .release-files names that a set of names lacks: one reading of the list for the seal's publication and the rehearsal
 tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step aerieos-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
-tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; aerie lint's --check holds them to it (R169 step 1)
+tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; aerie lint's --check holds them to it (R169 step 1); with --catalog DIR, the same folders in the catalog's checkout and its index entries, each written from the folder it pins, an older pin kept where a pack moved to a newer format
+tools/pins.py                    moves the pins of the shipped toolchains: check says what each pinned row is pinned to and what its own resolver finds now, move writes the new version and digests for every platform and raises the row's rev, pin turns an origin-checked row into a pinned one and fills in what it declares, verify holds each pinned file to its pin; with --file, the same over the CI runners' table (scripts/dashboard/runner-pins.json) and over the images AerieOS's own services run (scripts/dashboard/service-images.json), each image asked of the registry it names; with --compose, over the images a compose file names; with --catalog, over a checkout of the catalog, every folder under its packs/ a row read from and written to the file that holds its pins; with --file naming config/image-npm or the Dockerfile, over what the controller's image takes from npm (a folder a program, its package.json and its lock) and over the image it is built FROM; check with nothing named asks every table this tree ships and those two; what a row asks pip or npm for is resolved to exact files, each a declared download; a row's own data says how, and no vendor is named in it
 tools/check-sysdeps.py           checks every recipe's system packages, and with --controller the controller's own list, against each distribution's package index
 tools/agent-version.sh           the lint check that the agent's version moved with its file
 tools/no-em-dash.sh              the house rule voice's check: no em dash on a line this branch adds
@@ -422,12 +475,11 @@ test/nettest/Dockerfile          its image: alpine with curl, dig and nc, runnin
 test/nettest/probe.sh            the probe itself: DNS, the internet, the controller, the node's 80 and 443, and not its 22, the private ranges or IPv6; PASS/FAIL per line in the log
 test/nettest/.env.example        the two addresses it needs: the controller's and the node's
 tools/american-spelling.sh       the house rule spelling's check: no British spelling on a line this branch adds
-tools/no-net-growth.sh           the everything-files against their ceilings in tools/ratchet.txt (R77)
-tools/upgrade-snapshot.py        a lived-in /config made by this tree's controller through its API, written to scripts/dashboard/test/upgrade/VERSION/ for the upgrade suite; a release runs it
+tools/upgrade-snapshot.py        a lived-in /config made by this tree's controller through its API, written to scripts/dashboard/test/upgrade/VERSION/ for the upgrade suite, one taken at an older state kept beside it as VERSION-stateN; a release runs it
+tools/upgrade-image.sh           the built image started on each release snapshot of /config through its own entrypoint: it answers, the stamp is the image's state, a copy was taken, the owner signs in (the image workflow's upgrade job)
 tools/vscode-vsix.py             packages apps/vscode/ as a .vsix with python's zipfile, AerieOS's version inside (R159)
 tools/companion-build.py         builds the Windows companion as one .pyz with the four agent modules its sync is (R270)
 tools/app-schemes.py             writes the Android app's twelve color schemes, both halves, from the design record (aerie design json | tools/app-schemes.py)
-tools/ratchet.txt                those ceilings, one per file
 pyrightconfig.json               how pyright (the pyright-lsp plugin, or the CLI) reads this repo: each directory's imports and Python
                                  version, with the None checks off, since a module's configure() fills what it declares as None
 tools/version-stamp              this repo's own stamp hook: a bump moves the compatibility
@@ -450,6 +502,7 @@ docs/building.md                 builds, tests, CI runners and logs, the scanner
 docs/toolchains.md               the toolchain store, the Library, the Installed page's toolchains, the Emulator page, the NVIDIA card, Android, the Phone page
 docs/agents.md                   the coding agents: the agent table, the Library and the Installed page, installing and signing in to each on a node (R95)
 docs/tool-packs.md               tool packs: adding one, a project's Toolchains setting, and writing a bbtool.json
+docs/submitting.md               submitting to the vetted catalog: a tool pack, a coding agent or a Docker app from writing it to a merged entry
 docs/containers.md               the Containers page and nginx: dev instances, how one is reached, networks, image updates
 docs/scanners.md                 the Scanners page: AerieOS's own scanners on each node, their schedule, and the reports
 docs/versions.md                 versions and release lines: aerie version line, forward, backport, a patch line's rules
@@ -476,13 +529,14 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
-  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs; a tag's build and its release, made a draft
+  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); on a tag, the one run that builds everything the release carries (the image, the bundle, the apps, the OS image) behind the tag's checks, the agent signed once by the one job that reads the release key, every file attested, its last job making the release once with every file and the image's digest, a draft
+  seal-release.yml               a release's signed list of its files (R199), started for a tag by the controller once the signed Android app is attached, or by hand: tools/release-sign.py seal --attested, the two files attached, and a dev build published once it is whole
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
-  lint.yml                       the linters, on a pull request, on this runner
-  dashboard.yml                  the dashboard's browser suite, on a pull request that changes it, on this runner
-  android-app.yml                the companion app's build
-  companion-app.yml              the Windows companion's .exe: PyInstaller on a hosted Windows runner, on a published release or by hand, attached to the release
-  release-rehearsal.yml          every build a release's tag runs, on a branch by hand or aerie version rehearse, publishing nothing
+  lint.yml                       aerie lint itself with nothing skipped, and the unit tier, on a pull request and before a release's tag publishes, on this runner; the root tier beside them, in a container on a hosted one
+  dashboard.yml                  the dashboard's browser suites, on a pull request that changes what they test and before a release's tag publishes, on this runner
+  android-app.yml                the companion app's build: on a push to main that touches it, as a job of a tag's run (the unsigned APK handed to the controller to sign), or by hand
+  companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files attested and handed to that run's last job, or by hand for a release that exists, attached to it
+  release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing; and the seal's steps dry, with a key made in the job, the Android app among the files, signed with a key of the job's and held to it by the runner's apksigner
   runner-smoke-test.yml          proves this runner picks up jobs, carries its toolchain and cannot see the shielded PAT (manual)
 ```

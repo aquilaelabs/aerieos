@@ -14,7 +14,7 @@ import threading
 import unittest
 
 HERE = os.path.dirname(__file__)
-BB = os.path.join(HERE, "..", "..", "bb")
+BB = os.path.join(HERE, "..", "..", "aerie")
 MJS = os.path.join(HERE, "..", "..", "lib", "browser.mjs")
 
 

@@ -45,13 +45,13 @@ const port = await freePort();
 const out = openSync(`${w}/server.log`, 'a');
 const proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', out, out], env: {
   ...env, DASHBOARD_PORT: String(port), BUILDER_HOME: `${w}/home`, TC_AUTOCHECK: '0', BB_NODE_POLL: '3',
-  BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600', BB_NGINX_TAGS_URL: 'file:///nonexistent',
+  BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',
   BB_NGINX_CHECK_DELAY: '3600', BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
   BB_IMAGE_CHECK_DELAY: '3600', BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '' } });
 const base = `http://127.0.0.1:${port}`;
 for (let i = 0; i < patience(120); i++){
   try { if ((await fetch(`${base}/login`)).status === 200) break; } catch { /* not up yet */ }
-  await sleep(250);
+  await sleep(250);     // the loop's own period
 }
 const keys = async body => (await fetch(base + '/api/keys', { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
 await fetch(base + '/api/settings', { method: 'POST', headers: H, body: JSON.stringify({ set: { setup_done: true } }) });
@@ -190,7 +190,7 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   for (let i = 0; i < patience(40); i++){
     purged = await keys({ action: 'mine' });
     if (!(purged.forges || []).length) break;
-    await sleep(250);
+    await sleep(250);     // the loop's own period
   }
   ok(!purged.forges.length && !purged.has, `Purge empties it after a plain confirmation, no password or code asked (${JSON.stringify(purged)})`);
   ok(page.dialogs.some(t => /Purge your key store/.test(t)), '...the confirmation it asked');

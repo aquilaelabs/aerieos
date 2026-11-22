@@ -1,0 +1,84 @@
+{
+ "about": "A ledger with a web page and a database beside it: every kind of field an app can declare.",
+ "compose": "compose.yml",
+ "fields": [
+  {
+   "var": "BOOKS",
+   "kind": "folder",
+   "label": "Its books",
+   "default": "ledger/books",
+   "example": "/mnt/tank/ledger",
+   "help": "where the ledgers are kept: a share's folder"
+  },
+  {
+   "var": "DB",
+   "kind": "folder",
+   "label": "Its database",
+   "default": "apps/ledger"
+  },
+  {
+   "var": "SYNC_PORT",
+   "kind": "port",
+   "label": "Sync port",
+   "default": 7070,
+   "help": "what its phone app syncs on"
+  },
+  {
+   "var": "SITE_NAME",
+   "kind": "text",
+   "label": "Its title",
+   "default": "Ledger",
+   "required": true
+  },
+  {
+   "var": "DB_PASSWORD",
+   "kind": "secret",
+   "label": "Database password",
+   "help": "made for it once"
+  },
+  {
+   "var": "CURRENCY",
+   "kind": "choice",
+   "label": "Currency",
+   "default": "EUR",
+   "choices": [
+    {
+     "value": "EUR",
+     "label": "Euro"
+    },
+    {
+     "value": "USD",
+     "label": "US dollar"
+    }
+   ]
+  },
+  {
+   "var": "SIGNUPS",
+   "kind": "switch",
+   "label": "Others may sign up",
+   "default": false
+  },
+  {
+   "var": "LLM_URL",
+   "kind": "router",
+   "label": "Model router",
+   "key": "LLM_KEY",
+   "path": "/v1",
+   "help": "the model router it writes summaries with, a key of its own made there"
+  }
+ ],
+ "format": 4,
+ "framework": "4.2",
+ "label": "Ledger",
+ "license": {
+  "label": "MIT",
+  "url": "https://example.com/ledger/LICENSE"
+ },
+ "maker": "Example Labs",
+ "name": "ledger",
+ "platforms": [
+  "linux/amd64",
+  "linux/arm64"
+ ],
+ "port": 8020
+}

@@ -38,6 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import statefile   # noqa: E402
+from vers import vkey   # noqa: E402
 
 # The directory a project's component keeps its changelog in, from version.py
 # (its _sub), set by server.py for editor_verb(); bb never calls that.
@@ -267,7 +268,8 @@ def put(d, gs):
     # an entry the file holds word for word is kept as it is. Held to the
     # limit too, one long entry refused every add, edit and rm after it,
     # with a sentence that blamed the new line (B352).
-    have = {" ".join(e["text"].split()) for g in groups(d) for e in g["entries"]}
+    before = [(" ".join(e["text"].split()), tuple(e.get("shas") or ())) for g in groups(d) for e in g["entries"]]
+    have = {t for t, _ in before}
     try:
         rows = []
         for g in (gs or []):
@@ -324,6 +326,16 @@ def put(d, gs):
         _write(d, "\n".join(_tidy(out)) + "\n")
     except OSError as e:
         return {"error": f"could not write {FILE}: {e}"}
+    # A line reworded here keeps the bugs tied to it (R255): an old line
+    # whose words are gone is the one new line naming the same commits.
+    after = [(t, tuple(sh)) for _, ents in rows for t, sh in ents]
+    now = {t for t, _ in after}
+    for t, sh in before:
+        if t in now or not sh:
+            continue
+        took = [n for n, nsh in after if nsh == sh and n not in have]
+        if len(took) == 1:
+            _tell_relinked(d, [t], took[0])
     return {"ok": True, "entries": sum(len(e) for _, e in rows),
             "categories": len([n for n, _ in rows if n])}
 
@@ -471,6 +483,20 @@ def _pick(rows, ns):
     return want
 
 
+# Told when a line's words change (an edit, a merge), as (d, old words list,
+# new words): the bugs a line answers are tied to it by its words in the
+# notebook (bugs.relink_changelog), never by a number in the public file.
+relinked = None
+
+
+def _tell_relinked(d, olds, new):
+    if relinked and new and any(o and o != new for o in olds):
+        try:
+            relinked(d, [o for o in olds if o], new)
+        except Exception as e:                                   # noqa: BLE001 (the line is written; a link left behind is said)
+            print(f"changelog: the bugs tied to a reworded line were not moved to its new words: {e}", file=sys.stderr)
+
+
 @_held
 def edit(d, n, text=None, sha="", cat=None):
     """Reword Unreleased entry n, move it between categories, or both.
@@ -496,12 +522,15 @@ def edit(d, n, text=None, sha="", cat=None):
     Only Unreleased is editable: a dated section is a release somebody may
     have read.
     """
+    seen = {}
+
     def go(rows):
         [i] = _pick(rows, [n])
         was_cat, was_text, shas = rows[i]
         if sha and sha not in shas:
             shas = shas + [sha]
         words = was_text if text is None else _clean_text(text)
+        seen.update(was=was_text, now=words)
         if cat is None:
             return rows[:i] + [(was_cat, words, shas)] + rows[i + 1:]
         to = _clean_name(cat)
@@ -512,6 +541,7 @@ def edit(d, n, text=None, sha="", cat=None):
     r = _apply(d, go)
     if not r.get("error"):
         r["n"] = int(n)
+        _tell_relinked(d, [seen.get("was", "")], seen.get("now", ""))
     return r
 
 
@@ -541,10 +571,13 @@ def merge(d, ns, text, cat=None):
     was and in that one's category unless told otherwise, and it carries every
     commit in the order they were already in.
     """
+    told = {}
+
     def go(rows):
         want = _pick(rows, ns)
         if len(want) < 2:
             raise _Refused("merge takes two entries or more")
+        told["olds"] = [rows[i][1] for i in want]
         shas, seen = [], set()
         for i in want:
             for sh in rows[i][2]:
@@ -554,9 +587,13 @@ def merge(d, ns, text, cat=None):
         at = min(want)
         line = (rows[at][0] if cat is None else _clean_name(cat),
                 _clean_text(text), shas)
+        told["now"] = line[1]
         return [line if j == at else r
                 for j, r in enumerate(rows) if j == at or j not in want]
-    return _apply(d, go)
+    r = _apply(d, go)
+    if not r.get("error"):
+        _tell_relinked(d, told.get("olds") or [], told.get("now", ""))
+    return r
 
 
 @_held
@@ -901,7 +938,7 @@ def stitch(ours, theirs):
 
     def key(t):
         m = _TITLE_VER.match(t)
-        return tuple(int(x) for x in m[1].split(".")) if m else None
+        return vkey(m[1]) if m else None
 
     for t, b in sorted(new, key=lambda tb: key(tb[0]), reverse=True):
         k = key(t)
@@ -958,6 +995,21 @@ def editor_verb(name, req):
         if r.get("error"):
             return r, 400
         return r | {"text": read(d), "groups": groups(d)}, 200
+    if req.get("action") == "line":
+        # One new line, from a fixed bug's Write a line (R255): its words,
+        # its category and the commits that fixed it; the server ties the
+        # bug to the words this answers with.
+        shas = [str(x) for x in req.get("shas") or [] if re.fullmatch(r"[0-9a-f]{7,40}", str(x))][:20]
+        try:
+            words = " ".join(_clean_text(str(req.get("text") or "")).split())
+        except _Refused as e:
+            return {"error": str(e)}, 400
+        if not words:
+            return {"error": "the line needs its words"}, 400
+        r = add(d, words + (f" ({', '.join(shas)})" if shas else ""), cat=str(req.get("cat") or "Fixed"))
+        if r.get("error"):
+            return r, 400
+        return r | {"words": words, "text": read(d), "groups": groups(d)}, 200
     gs = req.get("groups")
     if not isinstance(gs, list):
         return {"error": "groups is a list of {name, entries}"}, 400

@@ -9,11 +9,10 @@
 // the sign-in's job the way an agent would, posts the flow's output as that
 // job's log and reads the code coming back down. No job here ever runs on a
 // real agent, which would find the machine's real Claude Code.
-import { launch, newPage, ok, done, ready, sleep, refreshUntil, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, refreshUntil, URL, DIR, OWNER as H, section } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const BASE = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const call = async (path, body, hdrs) => {
   const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { ...H, ...(hdrs || {}) },
     ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -47,7 +46,7 @@ await ready(page);
 // Since R170 a node's sign-in lives on the Library, on the agent's card, opened by the door that names it.
 // Since R181 step 2 it is on Claude Code's own page on that node.
 const block = () => page.$eval(`.thingtab [data-instnode="${box.id}"][data-thing="agent:claude-code"] [data-signin="${box.id}"][data-siagent="claude"]`, e => e.textContent.replace(/\s+/g, ' ').trim());
-const redraw = () => page.evaluate(async () => { await refresh(); nodesRev++; drawPanes(); });
+const redraw = () => page.evaluate(async () => { await refresh(); readMoved('nodes'); drawPanes(); });
 
 // ---- a Claude press on a node with no sign-in offers that node's sign-in ----
 await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'beta')?.session_node);
@@ -125,7 +124,8 @@ ok(/Starting the sign-in on signbox/.test(await block())
    && await page.$eval('#authCode', f => f.disabled),
    'until the flow has printed its link the row says it is starting, and the code field waits');
 const log = (seq, chunk) => call('/api/v1/agent/log', { job: job.id, chunks: chunk ? [{ seq, chunk }] : [] }, asNode);
-await log(1, 'Opening browser to sign in...\nIf the browser did not open, visit: https://claude.com/cai/oauth/authorize?code=true&state=abc\nPaste code here if prompted > ');
+await log(1, '[aerieos] open this link to sign in: https://claude.com/cai/oauth/authorize?code=true&state=abc\n'
+  + '[aerieos] Paste code: the one that page gives you once you have signed in there\n');
 await page.waitForFunction(() => !!document.querySelector('[data-signin] a[href^="https://claude.com/"]')
                                  && !document.getElementById('authCode')?.disabled, null, { timeout: 20000 });
 ok(await page.$eval('[data-signin] a', a => a.target === '_blank' && /authorize\?code=true/.test(a.href))
@@ -134,14 +134,14 @@ ok(await page.$eval('[data-signin] a', a => a.target === '_blank' && /authorize\
 // What is half typed survives the repaint a heartbeat brings, focus included.
 await page.click('#authCode');
 await page.keyboard.type('abc#de');
-await page.evaluate(() => { nodesRev++; drawPanes(); });
+await page.evaluate(() => { readMoved('nodes'); drawPanes(); });
 const kept = await page.evaluate(() => ({ value: document.getElementById('authCode').value, active: document.activeElement?.id || document.activeElement?.tagName,
   n: document.querySelectorAll('#authCode').length, held: signinCode }));
 ok(kept.value === 'abc#de' && kept.active === 'authCode',
    `a repaint under a half-typed code keeps the text and the focus (${JSON.stringify(kept)})`);
 await page.keyboard.type('f');
 await page.keyboard.press('Enter');
-const down = await (async () => { for (let i = 0; i < 40; i++){ const r = await log(0, ''); if (r.input) return r.input; await sleep(250); } return ''; })();
+const down = await until(async () => (await log(0, '')).input, 15000, 250) || '';
 ok(down === 'abc#def', `Enter sends the code, which goes down to the node on the job's own channel (${down})`);
 // The flow ends and the node says who signed in: its heartbeat, the way an
 // agent says it after the job.
@@ -209,7 +209,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
 // ChatGPT's, for Codex CLI: a device flow, so the section shows the link and
 // the one-time code the flow printed, for the person to enter on OpenAI's
 // page; nothing is pasted back. The node's report names the account.
-{
+await section("another coding agent's sign-in, on this node", async () => {
   const CX = `.thingtab [data-instnode="${box.id}"][data-thing="agent:codex-cli"] [data-signin="${box.id}"][data-siagent="codex"]`;
   await page.evaluate(id => openInstalledOn(id, 'codex'), box.id);
   await page.waitForSelector(`${CX} [data-si="in"]`, { timeout: 20000 });
@@ -221,9 +221,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   ok(cj.type === 'codex-login' && cj.spec?.uid === me && cj.spec?.agent === 'codex',
      `Sign in queues a codex-login job on that node, for this account (${cj.type || cj.error})`);
   await call('/api/v1/agent/log', { job: cj.id, chunks: [{ seq: 1, chunk:
-    'Welcome to Codex [v0.163.0]\nFollow these steps to sign in with ChatGPT using device code authorization:\n'
-    + '1. Open this link in your browser and sign in to your account\n   https://auth.openai.com/codex/device\n'
-    + '2. Enter this one-time code (expires in 15 minutes)\n   ABCD-1234\n' }] }, asNode);
+    '[aerieos] open this link to sign in: https://auth.openai.com/codex/device\n[aerieos] then enter this code there: ABCD-1234\n' }] }, asNode);
   await page.waitForFunction(sel => document.querySelector(sel + ' .sicode')?.textContent === 'ABCD-1234', CX, { timeout: 20000 });
   ok(await page.$eval(`${CX} a`, a => a.href === 'https://auth.openai.com/codex/device' && a.target === '_blank')
      && !await page.$(`${CX} #authCode`),
@@ -239,15 +237,15 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   await page.click(`${CX} [data-si="out"]`);
   // The press asks first and then queues the job: taken once it is there.
   let xo = {};
-  for (let i = 0; i < 40 && !xo?.type; i++){ xo = await beat(); if (!xo?.type) await sleep(250); }
+  await until(async () => { xo = await beat(); return xo?.type; }, 15000, 250);
   ok(page.dialogs.length === n0 + 1 && /Sign out of ChatGPT on signbox\?/.test(page.dialogs[n0])
      && xo.type === 'codex-logout' && xo.spec?.uid === me,
      `Sign out asks first and is a codex-logout job there for this account (${xo.type || xo.error})`);
   await call('/api/v1/agent/result', { job: xo.id, state: 'succeeded', exit: 0 }, asNode);
-}
+});
 
 // ---- the agent a project's Start opens (R95 step 4) --------------------------
-{
+await section("the agent a project's Start opens", async () => {
   const set = await call('/api/prefs', { project: 'beta', agent_default: 'codex' });
   await page.evaluate(() => openProjectsTab());
   // One word on every card (the operator, 22 Oct): Start agent, the agent it
@@ -278,20 +276,20 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   ok(term.status >= 400 && /do not allow ChatGPT sessions/.test(term.error) && !offeredCodex,
      `an agent the space switches off is refused at its terminal and missing from its chooser (${term.status} ${term.error.slice(0, 60)})`);
   await call('/api/prefs', { project: 'beta', agents_off: '' });
-}
+});
 
 // ---- an account that does not administer ------------------------------------
 // It is shown the nodes its own projects work on, no install or update, and
 // its own sign-in live: the one thing on the page that is its to change.
 await call('/api/users', { action: 'add', name: 's.user', password: 's.user-pass-1', role: 'user' });
-await call('/api/users', { action: 'projects', name: 's.user', projects: ['beta'] });
+await call('/api/users', { action: 'edit', name: 's.user', projects: ['beta'] });
 // A Claude session is work on the project, so it holds Projects Write there,
 // and a terminal to watch it in (B86: Start Claude is dead without them).
 await call('/api/roles', { action: 'set', name: 'si-worker', scope: 'projects', perms: { projects: 'write', terminal: 'write' } });
 await call('/api/roles', { action: 'assign', name: 's.user', project_roles: { beta: ['si-worker'] } });
 // ...with the name and email its commits carry, which a session waits for.
 await call('/api/users', { action: 'edit', name: 's.user', profile: { full_name: 'S User', email: 's.user@example.invalid' } });
-{
+await section("the Claude Code versions it is sent are those nodes", async () => {
   const auth = 'Basic ' + Buffer.from('s.user:s.user-pass-1').toString('base64');
   const up = await newPage(browser, { viewport: { width: 1280, height: 1000 },
     httpCredentials: { username: 's.user', password: 's.user-pass-1' }, extraHTTPHeaders: { Authorization: auth } });
@@ -356,7 +354,7 @@ await call('/api/users', { action: 'edit', name: 's.user', profile: { full_name:
   ok(denied === 403, `the verbs behind the ghosted controls are an administrator's on the server as well (${denied})`);
   up.errors = [];
   await up.context().close();
-}
+});
 
 await call('/api/prefs', { project: 'beta', node: '' });
 await call('/api/v1/nodes', { action: 'retire', id: box.id });

@@ -33,10 +33,59 @@ COMP = {"apps": [{"name": "android", "title": "AerieOS for Android", "does": "th
                  {"name": "companion", "title": "Windows companion", "does": "not offered here", "offered": False, "version": "", "files": []}]}
 
 
+class RunningJob(unittest.TestCase):
+    """A job running before its agent says which name it is on: the first
+    is the one it works on and the rest wait, so a card pressed reads as
+    pressed (the operator, 17 Nov: Node.js kept its Software update while
+    the Jobs page said it ran)."""
+    def test_its_names_are_running_and_queued_before_the_agent_says(self):
+        tc = dict(TC, job={"running": True, "action": "install", "current": "", "queue": ["node", "jdk"]})
+        by = {r["name"]: r for r in library.rows(tc, [], [], {}, {"apps": []})}
+        self.assertEqual((by["node"]["running"], by["node"]["queued"]), (True, False))
+        self.assertEqual((by["jdk"]["running"], by["jdk"]["queued"]), (False, True))
+        self.assertEqual(by["node"]["doing"], "install")
+
+    def test_once_it_says_its_word_holds(self):
+        tc = dict(TC, job={"running": True, "action": "install", "current": "jdk", "queue": ["node"]})
+        by = {r["name"]: r for r in library.rows(tc, [], [], {}, {"apps": []})}
+        self.assertEqual((by["jdk"]["running"], by["node"]["running"], by["node"]["queued"]), (True, False, True))
+
+    def test_a_check_marks_nothing(self):
+        tc = dict(TC, job={"running": True, "action": "check", "current": "", "queue": ["node"]})
+        by = {r["name"]: r for r in library.rows(tc, [], [], {}, {"apps": []})}
+        self.assertEqual((by["node"]["running"], by["node"]["queued"]), (False, False))
+
+
 class Rows(unittest.TestCase):
     def setUp(self):
         self.rows = library.rows(TC, AGENTS, APPS, INDEX, COMP)
         self.by = {(r["kind"], r["name"]): r for r in self.rows}
+
+    def test_a_card_names_who_the_tool_is_by_and_never_on_a_sideloaded_packs_own_word(self):
+        """The operator, 12 Nov: the tier says who stands behind the pack,
+        the maker who the tool itself is by."""
+        tc = {"nonode": False, "items": [
+            {"name": "jdk", "label": "JDK 21", "about": "Java", "maker": "Eclipse Adoptium"},
+            {"name": "lint-tools", "label": "Lint tools", "about": "linters", "maker": "AerieOS", "credits": [{"name": "ruff", "maker": "Astral"}]},
+            {"name": "ghidra", "label": "Ghidra", "about": "a decompiler", "pack": {"url": "https://example.com/g", "commit": "a" * 40, "tier": "vetted"}},
+            {"name": "mine", "label": "Mine", "about": "my own", "maker": "Google", "credits": [{"name": "x", "maker": "y"}],
+             "pack": {"url": "https://example.com/m", "commit": "b" * 40, "tier": "url"}}]}
+        index = {"packs": [{"name": "ghidra", "url": "https://example.com/g", "commit": "a" * 40, "sha256": "c" * 64, "tier": "vetted", "maker": "NSA"},
+                           {"name": "radare", "url": "https://example.com/r", "commit": "d" * 40, "sha256": "e" * 64, "tier": "vetted", "maker": "the radare project"},
+                           {"name": "whoami", "kind": "app", "url": "https://example.com/w", "commit": "d" * 40, "sha256": "e" * 64, "tier": "aerie", "maker": "Traefik Labs"}]}
+        apps = [dict(APPS[0], maker="Jellyfin", tier="official"), {"id": "ownapp", "name": "Own", "what": "mine", "tier": "sideloaded", "maker": "Somebody", "compose": ""}]
+        by = {r["name"]: r for r in library.rows(tc, AGENTS + [{"name": "opencode", "agent": "open", "label": "OpenCode", "for": "Any model"}], apps, index, COMP,
+                                                 services=[{"manifest": {"name": "model-router", "label": "Model router", "maker": "AerieOS",
+                                                                         "credits": [{"name": "LiteLLM", "maker": "BerriAI"}]}, "status": {}}])}
+        self.assertEqual((by["jdk"]["maker"], by["jdk"]["credits"]), ("Eclipse Adoptium", []))
+        self.assertEqual((by["lint-tools"]["maker"], by["lint-tools"]["credits"]), ("AerieOS", [{"name": "ruff", "maker": "Astral"}]))
+        self.assertEqual(by["ghidra"]["maker"], "NSA", "a pack kept from the catalog, by its entry's word")
+        self.assertEqual((by["mine"]["maker"], by["mine"]["credits"]), ("", []), "what nobody vetted does not say whose it is")
+        self.assertEqual(by["radare"]["maker"], "the radare project", "an entry not yet added names its maker before it is fetched")
+        self.assertEqual((by["whoami"]["maker"], by["jellyfin"]["maker"], by["ownapp"]["maker"]), ("Traefik Labs", "Jellyfin", ""))
+        self.assertEqual((by["claude-code"]["maker"], by["codex-cli"]["maker"], by["opencode"]["maker"]), ("Anthropic", "OpenAI", "Anomaly"))
+        self.assertEqual((by["model-router"]["maker"], by["model-router"]["credits"]), ("AerieOS", [{"name": "LiteLLM", "maker": "BerriAI"}]))
+        self.assertEqual(by["android"]["maker"], "AerieOS")
 
     def test_one_shape_in_the_pages_order(self):
         kinds = [r["kind"] for r in self.rows]
@@ -121,12 +170,42 @@ class Rows(unittest.TestCase):
                            {"name": "anylinux", "url": "https://example.com/b", "commit": "c" * 40, "sha256": "d" * 64, "tier": "vetted", "about": "any",
                             "platforms": ["linux/*"]}]}
         by = {r["name"]: r for r in library.rows(tc, [], [], index, None)}
-        self.assertEqual(by["xcode"]["wrong_platform"], "needs darwin/arm64", "the toolchain's own verdict stands")
+        # The toolchain's own verdict stands, said as every other card's is
+        # now a card for another system can be shown (R256).
+        self.assertEqual(by["xcode"]["wrong_platform"], "not for this node (linux/amd64): needs darwin/arm64", "the toolchain's own verdict stands")
         self.assertIn("not for this node (linux/amd64)", by["armonly"]["wrong_platform"])
         self.assertEqual((by["anylinux"]["wrong_platform"], by["jdk"]["wrong_platform"]), ("", ""))
         by = {r["name"]: r for r in library.rows({**tc, "platform": ""}, [], [], index, None)}
-        self.assertEqual((by["armonly"]["wrong_platform"], by["xcode"]["wrong_platform"]), ("", "needs darwin/arm64"),
+        self.assertEqual((by["armonly"]["wrong_platform"], by["xcode"]["wrong_platform"]), ("", "not for this node: needs darwin/arm64"),
                          "a node that has not said its platform is not judged")
+
+class NoShippedApps(unittest.TestCase):
+    """No app is shipped (R238): the Apps are what the catalog's index
+    lists and what is kept here, and nothing where there is neither."""
+    INDEX = {"packs": [{"name": "whoami", "kind": "app", "url": "https://example.com/catalog", "commit": "c" * 40, "sha256": "d" * 64,
+                        "path": "packs/apps/whoami", "tier": "aerie", "about": "A tiny web server.", "maker": "Traefik Labs"}]}
+    KEPT = {"id": "site", "name": "Site", "what": "a site", "port": 8080, "tier": "aerie", "maker": "Example Labs", "compose": "",
+            "held": {"word": "pinned", "why": "every image it runs is named by the digest its entry carries"}}
+
+    def apps(self, apps, index):
+        return [r for r in library.rows({"items": []}, [], apps, index, {}) if r["kind"] == "app"]
+
+    def test_the_apps_are_the_index_s_and_the_kept_ones(self):
+        got = self.apps([], self.INDEX)
+        self.assertEqual([(r["name"], r["verb"], r["catalog"]["commit"]) for r in got], [("whoami", "install", "c" * 40)], "offered from the signed index")
+        got = self.apps([self.KEPT], self.INDEX)
+        self.assertEqual(sorted(r["name"] for r in got), ["site", "whoami"])
+        self.assertEqual(next(r for r in got if r["name"] == "site")["held"]["word"], "pinned", "a kept one says what its images are held to")
+        self.assertEqual(library.apps_note([self.KEPT], None), "", "one kept here is offered with no catalog")
+        self.assertEqual(library.apps_note([], self.INDEX), "")
+
+    def test_with_no_catalog_read_and_none_kept_they_say_so_in_a_line_and_offer_nothing(self):
+        self.assertEqual(self.apps([], None), [])
+        note = library.apps_note([], None)
+        self.assertEqual(note, library.NO_APPS)
+        self.assertLessEqual(len(note), 80, "one short sentence")
+        self.assertNotIn("\n", note)
+
 
 if __name__ == "__main__":
     unittest.main()

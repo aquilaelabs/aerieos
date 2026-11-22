@@ -170,15 +170,12 @@ def _drop(project, instance):
 
 def _set(project, instance, **fields):
     """Fields of an instance's record, None removing one."""
-    with devapp._lock:
-        d = devapp._load()
-        rec = devapp._rec(d, project, instance)
+    with devapp.edit_rec(project, instance, create=True) as rec:
         for k, v in fields.items():
             if v is None:
                 rec.pop(k, None)
             else:
                 rec[k] = v
-        devapp.write_json(devapp.FILE, d)
     devapp._bump()
 
 # Run on the node when a written container is renamed while down (the
@@ -309,9 +306,7 @@ def _name_instance(project, instance, new):
     its key, so its worktree, its jobs and aerie devapp --instance are where
     they were. A name that is the project's own default again is no name."""
     src = devapp.env_path(project, instance)
-    with devapp._lock:
-        d = devapp._load()
-        rec = (d.get(project) or {}).get(instance)
+    with devapp.edit_rec(project, instance) as rec:
         if rec is None:
             return
         rec.pop("renaming", None)
@@ -320,7 +315,6 @@ def _name_instance(project, instance, new):
             rec.pop("name", None)
         else:
             rec["name"] = new
-        devapp.write_json(devapp.FILE, d)
     dst = devapp.env_path(project, instance)
     try:
         if src != dst and src.exists() and not dst.exists():

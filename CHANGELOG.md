@@ -1,6 +1,503 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.6054: 2026-11-21
+
+### Added
+
+- `aerie capture shot` and `reel` open a page in any browser installed (`--browser NAME`, or `all` for a shot in each) and as any device Playwright knows (`--device NAME`), with `--scheme` and `--set NAME=VALUE` for the rest; `aerie capture browsers` and `devices` list them (d8814eb)
+- A controller you build yourself can sign its node agent with a key of your own: `tools/sign-agent.py --builder-keygen FILE` makes it, `--builder FILE` signs a build, and a node takes such builds once the key is added at its console with `aerieos-agent release-key add HEX` (up to four, `release-key drop HEX` takes one away) (2cb12d8, b898ba9)
+- Pack format 5: an entry says what each of its downloads is held to, a sha256 or its publisher's signature under a key the entry carries, for one platform or all; a pack may declare that it downloads nothing; what an entry runs after its downloads runs with no network unless its installer must fetch the rest itself, which the entry says in one sentence. A toolchain's row may pin its download to a version and a sha256 for each platform, and an install then asks no vendor what is newest. An entry's Details page says in one line whether its downloads are pinned, and Look and an install's receipt say how each was held. What a package manager installs is held the same way: an entry says what it asks pip or npm for, each file of that set is a declared download, and its steps install from them with no index and no network. Every toolchain AerieOS ships holds what it fetches: the lint tools, the graphics tools, the document readers, speech, PyTorch, the file access server, the diagram renderers and the language servers install with no network from files pinned in their rows, and Playwright from pinned packages, with its browsers downloaded by Playwright itself (5ec3484, e32d1a2, 0f32645, 20e3daf, 34523c6, bc8373e, ca0df31, 73aca31)
+- Test on a node's row also says whether the node takes what this controller ships: signed by the release key, its spare or a key added at its console, unchecked where its console allows unsigned builds, or not at all and why (6c78f2b)
+- A catalog entry that moves to a newer pack format keeps the pin of each earlier one, and an install takes the newest pin whose format it reads: an entry no longer disappears for an AerieOS that reads only the older format. An offer in the Library says what its downloads are held to before it is added (45ea48c, 1d79f17)
+- Controller settings says when the catalog's index in use was made (9875c09)
+
+### Changed
+
+- What pops up over the page stands out from it in every theme: a tour's card, the bell, the doctor and the gear menu, a row's menu, a help note, the phone's More sheet and a toast are a step brighter than the page, white in a light theme, with a firmer edge (c17c3ae)
+- On a phone a toast shows just above an open dialog's buttons, where it floated over the dialog's words (1ee6913)
+- The Library stays easy to get around however big the catalog grows: it opens on shelves (what is on this node, then up to eight of each kind with All N to see the rest), and a kind, a topic or a search is one sorted list that loads more as you scroll, kept in the page's address so Back and a shared link land on it. A Topic pulldown, Recently added and a Rows view are new beside the search, and what runs only on other systems is counted and shown on a press (fcf70a4, 208b302)
+- Restart on a session asks once: the step where the model and effort are picked is the question, with no confirm after it (31f6b8b)
+- A session's rebuild of a container whose compose file gained a service beside the app is a request on the bell that names the service, where it stopped as a failed job nobody was told about; Allow builds it and the same service is not asked about again (f2e1640)
+- A space's notebook lists its containers on every node they are on, where its Docker view showed its own node's alone, and its Docker and VMs views narrow to one node with a band of chips when they are on more than one (c56e7a8)
+- The page asks far less, and never twice for one press: Rebuild, Up, Down, Stop and an image update on a container just run, and when a rebuild's compose file reaches past its own folder or runs something new beside the app, both are listed in one question. Saving or applying a node's storage, installing a toolchain with its driver, and uploading over existing files each ask once. On a phone a question is a short sheet at the bottom of the screen, where it filled the screen (0dd3c86)
+- nginx and the Scanners are services in the Library, as the model router is: Install on their cards under Services, and a row under Services on the Installed page, where Open leads to each one's page and Remove takes it off the node. Their pages moved from the Containers group to Machines (#/machines/nginx, #/machines/scanners); the old addresses still open them (4a1d05c, 2fc5855)
+- Restart, End, Reboot, Shut down, a job's Cancel, Sign out and Disconnect are amber buttons; red is kept for what deletes or cannot be undone (7f00b50)
+- On the stable channel a release is offered by its tag, whatever the pre-release flag beside it says (403d120)
+- Toolchains install at a version AerieOS pins, each file held to its sha256, where an install asked the vendor for its newest and checked it against the vendor's own word at that moment: Go, Zig, the JDK, FFmpeg, the Kotlin language server, xcodes, LibreOffice and Android's command line tools are pinned whole; Rust, Python, .NET, Flutter and Android's packages install from a pinned program (rustup, uv, the .NET SDK, Flutter at a release's commit, sdkmanager) that downloads the rest itself, and say so. A newer version arrives as a newer pin, from the catalog or a release, and shows as an update. .NET installs from Microsoft's SDK archive, no longer from its install script, which nothing checked (fa9a1ee, 6d6f458, 8254ecd, 82ed514)
+- A failed job's toast says why in one sentence; the whole reason is on the job's row and in its log (8a3c9c0)
+- Docker apps come from the catalog alone: AerieOS ships no table of apps, so an app is added, fixed or re-pinned by a catalog commit with no release. A container already made from an app keeps running and keeps its Configure. With no catalog reachable and none kept, the Library's Apps say so (271fb5f)
+- The bell's container-update row names a container made from an app or a service once its entry names a newer image (79a8209)
+- A refused agent update, and a download that is not the file its entry pins, are each said in one line (aab77e7, b192d01)
+- A release is refused while config/catalog-floor is older than the catalog's newest signed index, a release rehearsal builds the Android app on the hosted runner a tag's run uses, and the OS image's build fetches nothing from PyPI (9dcbc9f, 6dddc02, 81c8e92)
+- A signature refusal, a stale agent's row and a pinned download each say one sentence (72925b6)
+- A move or backup bundle from a build before its outer details were held, or one naming no state version, is refused before it lands, and a bundle is an .aeriemove alone (4df62ba)
+- The static analysis scan's old schedule row leaves schedules.json. (bfe2989)
+- A start no longer rewrites checkouts' credential helpers or a line of the home's .bashrc, and its banner names AerieOS; with no stable release, the bare-metal installer takes the newest published release (14aa76b, 1429a5b, f6a5ff3)
+- Container, nginx and scanner rows name an image by name and tag, a toolchain row's failure leaves its digests to the log, and release, container and move refusals, the CI, cut-landing and switched-off pack rows, two toasts and the Doctor's lines are each one sentence with no commit, key or command (a471b89, 6c70b3c, 308bf8f)
+- A node's root-off line, Un-enroll dialog, Updates fact, reused-token bell row, in-use toolchain refusal and agent-is-behind notice each say one sentence, with no key characters or commands; a switched-off pack is titled as switched off (aaa2257, 06cbd0a, 68c76fe)
+- A toolchain row's failure is bb's error alone, and three more switches are honored only in AerieOS's source tree (e592c6c)
+
+### Removed
+
+- Upgrading: nothing updates from 0.9.0-dev.5641 or earlier. Install fresh, with a new /config, and add your spaces again from their repositories; a controller started on an older /config stops and says so, and a backup or a move from one is refused before it lands (41e85a7)
+- Certificates are asked of Let's Encrypt alone. Upgrading: an install that set BB_ACME_DIRECTORY to another certificate authority asks Let's Encrypt (d6ab365)
+
+### Fixed
+
+- A node's CI runner that has updated itself shows as listening, where its row said not listening and asked for Reinstall runner while it took jobs (d02e808)
+- The CI runner row on a phone reads Registered as NAME, where it said registered twice (b5c9e61)
+- `aerie changelog add --bug N` names the commits that fixed the bug, where it named whichever commit was newest when the line was written (b11f332)
+- Terminals: an Any model session starts where OpenCode is installed, where Linux refused it as not installed; a terminal with no space opens on a node that builds on its own disk; resuming a Claude conversation that is no longer kept says so; two terminals of one space opened at once both start; and a space's shell asks for your commit name and email as the other terminals do (80828f9)
+- `aerie bug fix` on a node just after a commit waits for the commit to reach the controller, where it said there was no such commit (1fb767b)
+- A node's Grok and Copilot sign-ins sealed there open with a terminal, as Claude's and ChatGPT's do: the controller kept only those two of what the node reported (3d9c03d)
+- A stale mount's reason on a node's Storage section reads whole, where it ended mid-word (2a57da9)
+- The catalog's check refuses an app description longer than the 200 characters its card shows, where the card cut it mid-word (6679086)
+- The Git view's history shows a commit's subject however many branches point at it: two branch names and a count of the rest (e38c6ba)
+- A page whose scripts never arrive says it did not finish loading, with Reload, where it said loading forever (5a53495)
+- `aerie bug add --from FILE`, `aerie roadmap add --from FILE` and `aerie design edit` work in a session on a node (4eae63f, 460ba1c)
+- A node whose report has one field in a shape the controller cannot read still checks in, that field left out, where its whole check-in was refused (93de515)
+- Cutting a release keeps the commit each changelog line names, where it could rename a line to the change committed after it (c41fc43)
+- The vetted catalog is read up to 20,000 entries and says when it lists more, where entries past 2,000 were dropped without a word (fcf70a4)
+- A Library entry's page keeps its Install on the line with its name, where it stood alone under the node's name (39289c5)
+- A node's agent keeps running when one of its checks fails, where one error stopped it, left its running jobs to read lost and could restart it every few seconds (304f18a)
+- A node's settings file is saved one save at a time, where two at once could leave it unreadable and the node had to be enrolled again at its console (326f01b)
+- A network share that stops answering no longer stalls a node: its jobs, cancels and keys go on arriving, its mount tries once a minute, and its store reads as not answering, where the node read as gone for minutes at a time (2d42812)
+- A job on a node ends when its own work has, where a process it left behind holding its output kept it running for ever and held the node's agent updates (07cf898)
+- A session left open across several controller updates keeps its guards and notices, where after the third update every hook failed and the session ran on unguarded, showing only that its stop hooks failed (64e3189)
+- Updating a toolchain while a running program still has one of its files open goes through, where the update stopped with the toolchain removed and nothing installed (1a39710)
+- A Claude session whose guards cannot be run refuses every tool and says to start it again, and a session that works a turn with nothing heard from its hooks is a row on the bell for its account and for administrators, where such a session ran on unguarded and nothing said so (2b8534a, 07fe564)
+- Restart on a session waits for its node to end it, saying so with the seconds so far, and then starts it again by itself, where it gave up after half a minute and said to press Restart again (31f6b8b)
+- The page no longer shows bare for a moment while its stylesheets load, its mark across the whole screen, in a browser that paints before they arrive (5c47982)
+- A restarted session shows on its space's card at once, where the card said Start agent for a minute with the session running; and every repository of a space shows the space's session in its header (7f00b50)
+- The node's name in a group header shows whole on a phone in Firefox and Safari, where it was cut short with room beside it (7f00b50)
+- Install a tool pack under Agents may in a space's settings saves, where changing it did nothing (f033e43)
+- `aerie phone status` says whether the phone is lent to the space it is run in, and by whom; those lines never printed (4dcc590)
+- Changing your password while the controller cannot be reached says the controller did not answer, where the form said nothing (b09deca)
+- A bug's Reported by and a roadmap item's Added by name the coding agent that did it, where they always said Claude (89cd7a2)
+- A second session on a space (another slot, or another coding agent) is no longer mistaken for the first when its rule checks report in, which could clear the first one's working-with-no-word mark (944df11)
+- aerie browser finds the store's Firefox where PLAYWRIGHT_BROWSERS_PATH names a folder that is not there or holds none, as it finds Chromium (3e5727d)
+- Edit on a tool pack you added yourself opens that pack's dialog from the Installed page, where it opened Add your own with an empty address whenever Installed was opened by itself (741954c)
+- A git host permission picked under Permissions and not applied yet is unsaved work: leaving the view or closing the notebook asks first, where the pick was dropped with no word (a3e8cba)
+- A node's Enable or Disable that the controller refuses says so once, where it said it twice (bdce886)
+- `aerie map` reads a method of an object written inside a call's own parentheses as the definition it is, where it read it as a call and gave what it calls to the function around it (6ec31d6)
+- A space's card shows one face in a browser that draws without 3D acceleration, where its back showed mirrored through its front (2e5a823)
+- A node that takes only signed agent updates is left alone by a controller whose build is unsigned, and its row on the bell says it waits for a signed build, where the update was sent and refused every two minutes (81e1355)
+- `aerie toolchains status` and `aerie status` say a toolchain's folder with no program in it is an install that did not finish, where they listed it as installed (552b028)
+- `aerie tool install NAME` installs the tool on the node the session runs on once a person allows it (or at once where the space's setting is auto), as the person who allowed it, and the request on the bell names the node; it only added the pack to the catalog, so Allow installed nothing and nobody was told. A toolchain AerieOS ships is asked for as the toolchain, and answers at once when the node has it. (7906bf6, 4fd4fea, 6e112a3)
+- Your coding agent's sign-in on a node is no longer lost when a terminal is opened for you while a session of yours is running: the open put the sealed copy back over a sign-in the session had just refreshed, and the next session started signed out, most likely right after a controller update (b7b4aed)
+- Controller settings' Vetted catalog said no mirror was imported even with one held (e5c3da6)
+- A stick whose aerieos.env names BB_RELEASE_LINE is offered that line's releases and dev builds alone, where 0.10 was offered to a 0.9 stick (e7dabfb)
+- The node agent saves its record under one lock every change takes, so a save never meets it half changed (f1857cf)
+- Update agent no longer warns that a node's sessions end: they outlive the agent's restart (6414ccd)
+- aerie toolchains check answers for a pack and every other catalog row, and offers its pin as an update (2bda815)
+- Wiping a one-byte key or sign-in file no longer turns that byte to zero everywhere else in a node's agent or the controller until it restarts (ce35e43)
+- The controller's own certificate loads in its container, where a certificate set under Connection had its port answer plain http to a TLS handshake (2d63f2d)
+- Revert on a space's Build and test puts Tests run back, where Revert on Where it runs did and Build and test's own left it changed (96ca639)
+- A toolchain whose first run of its vendor's tool outlives its time limit, as Flutter's can, is ended whole, where it went on holding its folder and every later install on that node was refused as in use (dd2ae86)
+
+### Security
+
+- A release's Android app is signed only from the release tag's own run, checked against the tag's commit, its workflow and its repository, and a release already signed is not signed again unless a person asks (`aerie sign release --again TAG --why "..."`); the controller signed an unsigned APK from any recent run that carried the right artifact name (af75b04)
+- The vetted catalog refuses an index older than the one it holds, so an old signed index cannot be served again to bring back a withdrawn pack; a pack can no longer call itself official; and a pack kept from the catalog is checked against the signed digest on the second fetch too (7e45f30, baaacb0, 01fc389)
+- A node's first agent is checked at enrollment: the Enroll script and the token-only commands carry the agent's digest and, from a release's build, its signature, and the provisioner checks both before the agent ever runs; a provisioner run again asks the installed agent before it replaces it; and enrolling a Mac, enrolling with a token alone and a bare-metal install's own node pin the release key as the Enroll script does. Upgrading: an Enroll script or command made before a controller update is refused after it, and says to make a new one (b647f3c, 7e20fa6, 1c78941)
+- A node that pinned no release key pins it on the first agent update a release signed, and until then says in the update's job that nothing was checked; `aerieos-agent release-key none` at its console is kept as a choice and such a node pins nothing by itself (2f92f38, bdaa07f)
+- A release carries a signed list of its files (`SHA256SUMS` and `SHA256SUMS.sig`), and every way an install takes a release checks it: AerieOS's own updater, the installer, the stick maker and the Library's downloads refuse a release whose list is unsigned, signed by a key the install does not name, or does not name the file. A dev build's list is signed by the release's build once its Android app is attached; a stable release's by its key's holder alone, with a key no build holds. Upgrading: a build from here on takes no release made before this one, which carries no signed list (7082b31, 262610e, 59e6132, 5695024, 81dae95)
+- The key that signs a release's node agent is read only where a release tag is built, and a tag whose agent comes out unsigned fails; every file a release's build makes carries a build attestation, the Android app is held to its signing certificate, and the image a release publishes is named by its digest in the signed list, so the Containers page says when the registry's tag serves an image the newest signed release does not name (5695024, a75984f)
+- A node that pinned the release key takes the whole bundle its controller sends (aerie, its library, the toolchain recipes, the publishers' keys, the session hooks) only when every file in it is the one the release signed: a changed, missing or added file is refused by name, the node goes on with the bundle it had, and the bell and the node's page say so. A person's tool packs and the catalog's newer recipes ride beside it as their own files. A node whose console allows unsigned builds, or that pinned no key, takes it as before (096fc53, c89ce33)
+- An imported catalog mirror also answers when the catalog itself answers an index made before the mirror's, so what the mirror's index had withdrawn does not come back (b9b41c9)
+- A coding agent's install is held like any entry's: its recipe declares what it downloads, each file held to a sha256 the recipe carries, and nothing is piped from the network to a shell. Copilot CLI and Grok Build install at a pinned version; Codex CLI, OpenCode and Claude Code run their vendor's installer from a pinned copy, which then downloads the agent itself, so an install is refused on the day a vendor changes its installer until the pin moves (f7082f0, 6b62454, 76d0a35)
+- A node's door for SSH (cloudflared, Tailscale) installs from a source its package manager verifies, the vendor's signed repository with its key carried by the provisioner or the distribution's own package, where it was a download checked against nothing and a script piped to a shell; a system with no verified source for one says so. The NVIDIA container toolkit's source is held to a key the provisioner carries. A CI runner's download is held to a pinned version and sha256 before it is unpacked (abdff8d, 31eb602, 7d7d1ef, e8d9851)
+- A container image is named by its digest. The model router, nginx and the scanners each run the images AerieOS names by digest, no service asks a registry what is newest any more, and Update on such a container means its entry names another image, shown by its short digest. A catalog app written in pack format 5 names every image by digest. The scanners run an image that already holds each tool, where one ran pip at every scan (25dc82f, fb4f20d, 3237ffe, 5767b92)
+- A coding agent's pinned install runs with no network on a node whose agent is root: the agent makes the cut itself (bc55040)
+- A node talks to its controller over TLS under the controller's own key, which it pins when it is enrolled: the Enroll script and the token commands name the controller as https with the pin, and a node enrolled over plain http moves by itself once it has updated. The controller keeps its key when its certificate is remade, so a renewal cuts no node off. A node that cannot reach its controller over TLS stays on http and its row says so (a1c04e5, 1deaead, 41bb6ad)
+- A node that pinned the release key pins the spare key by itself, from a statement the release key signed: no Enroll script is run again for it (3f2101e)
+- Nothing a node or the image sets up takes a key or a tool from the network unchecked: Docker's package source on a node is held to a key the provisioner carries, and the image's package sources, its build tools and linters are held to keys and pins in the tree (b2f1869, 61dcf7b, 3999b5a)
+- An app's compose file is refused when it uses an anchor, an alias, a merge key, a tag or a mapping in braces, or names an image anywhere but on an image line of its own: what Look shows is then what Docker runs (babb869)
+- A release says the oldest catalog index it takes, so a new install is not handed an old signed index with its withdrawn packs back (ba3ce80)
+- A controller that starts without the install key its TLS key was sealed under keeps that key and waits, where it made a new one that every node then refused (88f30c1)
+- A catalog's newer recipe for a shipped toolchain or coding agent is taken only where its downloads are held to as much as the shipped one's, each one taken is in the audit, and a recipe that hands its vendor's installer to a shell is refused (02a0457)
+- A pack's layout can no longer set a loader's, a shell's, an interpreter's or AerieOS's own variables, and a system package's name can no longer be an option or carry apt's remove suffix (be671fa)
+- An update on a machine of its own takes nothing while the install names no release signer (67508b9)
+- The controller's image installs Playwright and web-ext from a committed lock with no install script run, is built from a base image named by its digest, and takes noVNC as a pinned row; an update on a machine of its own replaces the copies an earlier install took by name (8b68194, fc0dea5)
+- A dev build's tag is refused unless its commit is on main or a release's branch, a release's Android app is built on a hosted runner, and the image tags people follow move only onto a published, sealed release's own digest (2a1ed22)
+- A node's root agent runs and follows nothing its jobs account owns in the toolchain store, and an installed coding agent is read out of the session account's home by that account (ddf268c, 252af80)
+- On a node, a recipe's system packages, a runner's slot, a system job's network, pool, folder and backup values, the store's path and the controller's address are each held to their shape before root uses them (8f7ba08, 6ca6866, 7d869ac, 367c095)
+- The installer checks a download with the system's own tools and a keyring made for that one check, and puts a declared download only inside its pack (4b7ebd8, 7cc7ad2, f4fa9c8)
+- A node that trusts the release key takes no signed agent older than the one it runs unless its console says aerieos-agent older on, pins only the key an update's signature is under, follows a controller's move only under a key, and asks a pinned controller for no hostname, so a certificate for that name does not cut it off (f5ac401, a607d96, 092f1a8, 8be13f5)
+- The provisioner run again on an enrolled node fetches its agent under the node's pin, and the file explorer reaches a node's own folders by name and none where the node's console turned root asks off (e307631, e9f9147)
+- A signed toolchain that names its version installs that version and no other (71c92ac)
+- No app, stick image or OS update is taken while the install names no release signer (b75c9e3, 6c79d59)
+- An account that pointed a folder of its home at another account's no longer has that account's sign-in sealed as its own (690699a)
+- An install step with no network keeps none of the jobs account's other groups, docker's among them, and a toolchain's version is asked of the file the census looked at, never as root of a file an account controls (7747599, bda6dfc)
+- An app's compose, from the catalog or of your own, may use only keys that reach nothing of the machine past its ports and volumes: added capabilities, devices, the host's or another container's namespaces, a loosened profile, extends, include, env_file, and an external or host-bound volume are refused (1756f4a)
+- Node.js and Swift install the version their row names, held by their publisher's signature, and tools/pins.py checks and moves it; Node.js offers no musl build, since its publisher signs none (3172324)
+- A pack can no longer set a variable that loads code into, or redirects, the tools installs are checked with, and the installer's checks run on the system's own tools with none of a pack's variables (2f611dd, 5bd6b91)
+- A pinned node refuses an older release's signed bundle and an older spare statement, a pinned coding agent holds no link that leads out of its folder, and a backup is refused where its folder in the destination is a link (1fc73b6, aac7787, 052c587)
+- Test seams are read only in AerieOS's source tree: no variable in an install's environment changes who may sign a release or which programs run, and a bare-metal controller's own node reads none of the installer's (ca6c47a, c09384a)
+- The release's signing jobs read where a release may be cut from on the default branch alone and match branch names whole, the Windows code-signing certificate is read by a tag's run alone, and the Android app's dependencies are held to their sha256 (8960dd0, dbb6dcb, 049144e)
+- The .NET MAUI workload installs with its packages' signatures checked (9bab719)
+- An agent update that cannot check itself on the node is refused, not installed without a way back (3a9a3b5)
+- A node's terminals, files and VM screens open over TLS alone: the controller opens nothing on a node with no certificate, a node with one refuses a plain request, and the node's row says why (f9ef449, 097f5d8)
+- A node with no cryptography library seals no sign-in rather than sealing the old way, and says so on its row (c8e6dd0)
+- A storage backup copies only into a folder root alone may write, and a link left at a run's name in the destination stops the run instead of taking root's copy elsewhere (6dfdf25)
+- A toolchain's installer, steps and verify start with none of the variables another pack set for every job, a layout's own value is set only where its toolchain is installed, and a pinned repository's check reads no account's git configuration (a89e37e)
+- A pack's install steps cut from the network no longer reach the system bus's or the resolver's sockets under /run, and a cut that cannot cover /run is counted as run with the network (7d16922)
+- One account can no longer freeze every account's sign-in pass, or the node's hello, by leaving a FIFO where root writes in its folder (e82e424)
+- File work in an account's folder on a node is refused where the node cannot do it as that account, where it fell back to root and could follow a link the account left there (ccefa6f)
+
+## 0.9.0-dev.5641: 2026-11-18
+
+### Added
+
+- Pack receipts: each pack install on a node records the manifest commit, the time and the sha256 of every file it placed, and the Installed page says when a node's copy differs from the manifest kept now or from another node's. A pack installed before gets one at its next install (3777ced)
+- Pack format 3, declared downloads: a pack lists each file its install fetches with its sha256; AerieOS fetches and checks them first, then runs the install steps with no network, through a small root helper (`bb-netcut`) where the system needs one. A node that cannot cut the network installs anyway and says so (95bebe6, d987f70)
+- A node tries a new agent before installing it, and goes back to the one it had by itself when the new one fails to load, crashes three times or cannot reach the controller for ten minutes; the bell says so, and that build is not sent again until you press Update agent (6e5a538)
+- `sudo aerieos-agent root-asks off` at a machine's console switches off every root command the controller can send there, and the node's row says so (ff55bda)
+- The Spaces page has a Compact view beside Full, which folds each card to its name (2883407)
+- `aerie map show NAME` prints a definition whole, and `aerie design edit NAME` changes one design rule or page note in place (1cf46c9)
+- Pack format 4: a Docker app declares its own fields (folders, ports, text, secrets, choices and switches), whether it runs on the machine's own network, and what replaces it when it is being retired (d41d0ea)
+- An app that calls AI models picks a model router on its panel and gets a key of its own there; its spend shows under the container's name, and the key goes when the container does (a08dcee)
+- Import anyway, on the Storage page and on a new stick's Restoring a saved configuration page, brings back a pool last used by another system, such as the machine's own pools after its stick died, once its name is typed (2d591be)
+- Bugs and changelog lines are tied in the notebook, never in the file: a fixed bug records the commits that fixed it (`aerie bug fix B7 B8 --commit SHA`, `aerie bug fixed-in`), and its row and the changelog editor tie it to the line that says so, write one, or say why it needs none (`aerie changelog link`, `unlink`) (bd4bf07)
+- A repository's Settings has a Releases section: whether a fixed bug with no changelog line holds a release or is only said, and what each of a release's files is for, shown as a table at the top of every release AerieOS makes or publishes (bd4bf07)
+
+### Changed
+
+- Upgrading: this release moves /config from state 21 to state 26, so once it has started on a /config, an earlier build no longer starts on that one (8a8f0b4, b49f127, ff55bda, 2883407, d41d0ea)
+- New container from the Library draws the app's own panel: the fields it asks for (Immich its photos and its database folder, Nextcloud its files and admin account), who it runs as, the time zone and its port. The panel owns those values: the compose file is read-only, and Edit the definition by hand, asked first, leaves the app's panel for good (d41d0ea)
+- A container made from an app remembers which app: its row's Configure reopens the app's panel with its values, and offers a newer version of the app when the Library has one. (d41d0ea)
+- Home Assistant runs on the machine's own network and is no longer privileged (a USB radio still needs its device passed by hand). Sonarr, Radarr and Prowlarr are an app each; the combined arr stack is being retired, and one already made keeps running (d41d0ea)
+- The Library names its two updates apart: Software update installs a newer program on a node, and Manifest update takes the catalog's newer pack definition, showing what it changes first; the Updates chip counts both (593a44d)
+- A node's agent works in an account's folders as that account, no longer as root, and files a container left root-owned in a space go back to the space's owner (f2a45ad)
+- Sessions on a node use AerieOS's own tmux settings rather than the account's `~/.tmux.conf`, a new worktree is filled by the session that enters it, and an account enters only the spaces it has a terminal on. Upgrading: a session started before the update may need its terminal opened once before Restart works (0f4f618)
+- An update that cannot move /config forward puts it back as it was and starts the release you came from, leaving a note in /config/update-did-not-land.txt; it is not tried again until the note is removed. Snapshots kept for 0 days now means none, and keeps the snapshots a repository already has (8a8f0b4)
+- Terminals, files and VM screens on a node cross your network encrypted, each node with its own certificate that the controller pins. Upgrading: each node takes it with its next agent update (0cfbf38)
+- Deploy keys are sealed under the install key and opened only into the ssh agent. Upgrading: the keys you have are sealed at the first start (75b436e)
+- The password hash Samba needs is kept only for people a share names. Upgrading: somebody newly named on a share signs in to AerieOS once before the share opens to them (b49f127)
+- Passkey signatures are checked by the cryptography library; a controller without it seals nothing and says so (75b436e)
+- Controller settings, Network, Connection has Reverse proxy in front, so failed sign-ins are counted per visitor and not against your proxy (b49f127)
+- Release and `aerie version release` tag the commit pushed to the remote, not what is in the folder, and a stable release or a candidate is cut only from the branch builds come from (8736503)
+- A release draft's row says what keeps it from being published, the bell says as soon as a release's CI run ends whether every file is there, the Android app is signed in the run that builds it, and `aerie version` on a pre-release tag says what the tag says (8736503, cadab82, 59da71e)
+- Every release of AerieOS is built by one run that passes lint, the unit tests and every browser suite before anything is published (0d187b2, cadab82)
+- The configuration's backup carries the install key, sealed under the backup password, so the password alone restores everything; copies made before are marked as without it (ff55bda)
+- A node that pinned the release key runs root's tools from the bundle only when the release signed them (ff55bda)
+- Pages no longer lose what you are doing when they refresh: text being typed (its cursor and an input method's composition too), a pick in a pulldown, an open section and an open dialog stay as they were, on every page and view (c60f33c, b73b098, 9a94691, a1204ba, 1782e35, 21fd9f6)
+- The dashboard is faster and lighter: its status read costs about a quarter of what it did, the page is a third smaller to download, a page, view or terminal not on show stops refreshing, a long list builds only the rows it shows, and `aerie` commands start sooner (c32326f, 44323cb, 7e05263, 218ba7c)
+- While the controller restarts, the page stays and says so, its buttons resting until it is back; after an update it says which version it runs now, with What changed (72394e2)
+- Controller settings opens on a Controller section: the doctor's checks with their fixes, the free space, the database's size, the nodes online and the sessions open; the doctor's panel is a short list of what is wrong that opens it (6ed2274, a2bcdf0)
+- More settings are tables edited a row at a time: a node's mounts, path mapping, CI runners, repositories and USB controllers, a space's Also reaches, Also works on and snapshots, and nginx's certificates; an Emulator system image installs from its own row, or several with Select several (f2e1cc1, dfa2dcb, 44f6a7f, 1d4f588, d3d5c70, 447e9fc)
+- A node's Sessions section shows what keeps its sessions apart as four lines with a state each, and counts the sessions open in each space (e4c521c)
+- File access over FTP to a space can be set up by anybody whose role gives File access Write there (0efa969)
+- One look across the dashboard: one height for every button and field, a faint gradient on buttons, one hairline, the same type for every row's name and the line under it, one height for every row of tabs, a true yellow for warnings with the same green, yellow and red in every theme, see-through warning bands in the dark themes, pulldowns as wide as their longest answer, and the same chevron on every fold (201649c, 19856ba, 6710524, 58ea9c9, 48073c8, bea7ad0, 698ed89, 1912504, 1c5977a, fc16521, 4318716, 4fda6c4, 1b82535)
+- The Nostromo theme dresses the rail, the search, the tiles, the cards and the dock (586f9f7)
+- The Git view lists commits by day with the branch graph behind a switch, loads more as you scroll, and opens the diffs by itself only when three files or fewer changed (a549e40)
+- An Artifacts file is one line with Download and its main action, the rest behind its ⋯; a press opens where it is and what built and signed it (484e390)
+- The Design view's pages are rows, each at an address of its own, and its long lists load a page at a time (c85ba2e)
+- A space's id, branch and notes read the same on its card, its notebook's header and Home; the header also says when a phone is lent to the space or its code is being mapped (042caa2)
+- A node shows one state: online, not answering, draining or disabled (391cf7c)
+- The header over Machines, Build and Containers is one row: the machine picker beside its state, which opens that machine's page (e9b80fb, 2e9ce87)
+- Start agent and Manage agent open a dialog rather than a menu beside the button (89c7709)
+- Favorites replace pins: a star marks a space, Home lists your favorites, and the Spaces page's Favorites chip narrows the list to them. Favorites and archiving are each person's own; a space archived before stays archived for everyone who had it. The Spaces page fades between Full and Compact (63adcc9, 2883407, 797308b)
+- Dialogs behave one way: the main button first, the way out after it, anything that cannot be undone last; a press on the page around a dialog, Escape and Back each close it, and the focus goes back to what opened it; on a phone every dialog fills the screen, its buttons at the bottom (a6403f5, a9ab7bc, 8acd882, 1277b83)
+- A space card's back has Settings at its top right and Back in its foot (797308b)
+- A test named as a sentence counts as described on the Tests view (4b5c08b)
+- A notebook view loads in the shape it lands in (a2e4bf4)
+- Taking an old array over waits until every data disk the plan names is adopted, since the old parity it reformats is their only protection; a disk missing from the machine no longer stops the rest being adopted read-only (2d591be)
+- Landing a move names the old controller's version when the bundle is too new for this install, checks the stick has room first, and says what it could not bring (the install key when it was not ticked, a space whose folder is not here); its confirmation says when the bundle was packed (2d591be)
+- The held start's banner says what it holds: no session starts until you press Start, and what the machine already had comes up as before (2d591be)
+
+### Fixed
+
+- A wiki that cannot be read says why (9f8d3ef)
+- Pressing the rail, a sub-page or a notebook view no longer shows a spinning ring that pushes the row aside (2cad430)
+- Certificates from Let's Encrypt renew with the image-update checks turned off too, and a failed renewal is logged (71a209b)
+- A controller restart no longer throws away unsaved work: with something unsaved, the page offers Reload rather than reloading (71a209b)
+- A VM's screen in the dock is no longer left behind its dark cover (71a209b)
+- Taking a retired node's folder off a shared toolchain store works (71a209b)
+- A job on the controller that prints nothing still ends at its time limit, and what it started ends with it (71a209b)
+- `aerie lint` in your own space no longer applies AerieOS's own house rules (71a209b)
+- Wrong passwords through the home tunnel are counted per visitor, so one person no longer locks everyone out for fifteen minutes (b49f127)
+- A session on a node enrolled by a public hostname reaches its controller, and its terminal opens (b49f127)
+- A repository whose daily snapshots were switched off keeps them off (0 days kept) and keeps its snapshots (8a8f0b4)
+- An audit entry or a job whose id was taken is kept under another, not lost (8a8f0b4)
+- A hostname being typed on the nginx page is no longer wiped by a refresh (e688169)
+- Ending a session just before a restart still ends it, and a coding agent's sign-in in progress survives the restart (ff55bda)
+- Two calls at once can no longer both retire a node's token, and one handed out before a node was enrolled again can no longer come alive (ff55bda)
+- A container's Agent pill shows a changed Run its container setting at once (eb4e0a5)
+- A press that never reaches the controller says so, and an error the page meets is shown (2df776a)
+- A button's spinning ring follows its own press alone (2df776a)
+- A busy page (Jobs, Storage, VMs, Users, Schedules, Scanners) never draws an older answer over a newer one (2df776a)
+- Less motion also stills a dialog opening and a page a press leaves (7f0448c)
+- A section pressed open while it is closing stays open (7d1e7e7, 488e06f)
+- A page opened from a space's page (nginx, Scanners, a Library entry) opens again, its Back naming the space (56e74af)
+- A managed container's Edit dialog stays read-only through a reload (8afcb16)
+- New container from the Library suggests a data folder named for the app picked (b1b7816)
+- A pack installed from an earlier manifest says so, with Install again (4214389)
+- `aerie devapp rebuild` no longer says an instance is up when its container stops at once (4d77c2c)
+- One file a node cannot sync no longer holds back every other change; it shows as the space's sync error (501a681)
+- `aerie git push` on a node fails when a commit made there has not reached the controller, where it pushed the older tree (5d08d15)
+- The changelog editor shows what Save kept (6cab345)
+- A node with a synced copy catches up in moments after git packs its objects, where aerie waited on it for minutes (5412515)
+- Six dialogs that had their buttons at the left have them at the right, clear of notices (4dd850e)
+- A VM keeps its console password through a hardware change, a start and a move to the LAN bridge (3df960a)
+- A space's settings name each other branch of its repository, where they said "1 repositories" (b5a5d69)
+- A session held while AerieOS is down can read and save its memory (59bcfa3)
+- `aerie map` names an arrow function in a conditional rightly (1cf46c9)
+- A tool pack's Manifest update keeps the catalog's newer pin (c3da2f9)
+- Minimize on the Sessions page takes away a tab that was opened again (562e2fb)
+- A notebook's Roadmap and Bugs history shows its title again, and on a phone its time window sits beside the search (070a1f9)
+- A conversation with nothing in it opens as a small dialog (070a1f9)
+- A toolchain shows it is updating as soon as Software update is pressed (bbe559b)
+- A second container from the same Library app gets a name, folders and ports of its own; it was given the first one's (6f8491c)
+- Moving a controller: a node that checked in after the bundle was packed follows the move (it held a key the new home had never seen), a node on your network keeps the address it knocked at rather than being sent to the tunnel's name, hosting-only and locked-down nodes follow too, and the line a node runs by hand names an address (2d591be)
+- A move lands on a home that keeps deploy keys, a stick among them, where it stopped and put everything back; a landing no longer starts a second dashboard on the half-moved state; and a moved controller still offers Download the bundle (2d591be)
+- A move or a configuration backup no longer carries the controller's earlier backups and pre-update copies: a state of tens of megabytes made a bundle of gigabytes (2d591be)
+- After a stick dies: the configuration's copies now reach the machine's pools, where a new stick finds them, and a restored configuration takes back its system pool with its containers, VMs and spaces rather than setting them aside (2d591be)
+- Moving off another NAS: a disabled or missing disk on the old array is shown, and nothing writes to the array until it is rebuilt there; a two-disk pool is adopted as one pool; the stick's fixed address survives the network bridge; the first run never offers the old system's disks to erase; the people and their share passwords are kept when the stick names no owner; and a reset before the first start no longer loses the prepared configuration (2d591be)
+- Both stick makers refuse a stick too small for the image before erasing it (2d591be)
+- AerieOS USB Maker writes the newest dev build while no stable release exists, and says where to pick the dev channel for its updates; its default stopped with no way back (2d591be)
+
+### Security
+
+- A coding agent's session reaches only what its own verbs need: it could read the list of accounts, its person's chat and layout and the controller's settings, and type into or end its person's other sessions; and its token opens none of the dashboard. Upgrading: a session that photographed the controller's dashboard photographs a dev instance of it instead (`aerie devapp`) (2241625)
+- A node's recorded address is where its calls come from; a forwarded header counts only from a proxy this install trusts (f578e79)
+- An OS update takes only an image built by AerieOS's release workflow on a version tag (14a575e)
+- A CI runner on a node can no longer be used to take root there (d9f36a9)
+- Removing a phone or clearing its snapshot can no longer delete files outside its owner's folder (2ff2d4e)
+- A VM's shared folder is checked at every start, and the guest can no longer make setuid programs or device files on the host through it (398fe52, 460dd69)
+- A VM can no longer join a container network's bridge, and an ISO added under a name already there is checked against its SHA-256 (3df960a)
+- Shares from other machines, the array's disks and adopted disks no longer honor setuid programs or device files (3e758c5)
+- A share can no longer be named global, homes or printers, and FTP never runs as root (1013735)
+- A coding session can no longer reach another account's sign-in through links in its own cache folder, nor the host's per-user runtime folder (9c8f0c4)
+- An old system's VMs are adopted with only what they need to run: extra QEMU settings, dnsmasq options and folders or ISOs outside the adopted disks are left out and listed, and a VM whose disk or firmware lies elsewhere is not defined, with the reason (afd45dd)
+- A coding session's changes to the shared Flutter install stay in that session, where they changed Flutter for other spaces and CI jobs (5601c65)
+
+## 0.9.0-dev.5341: 2026-11-12
+
+### Added
+
+- Gemini, Google's Antigravity CLI, can be added as a coding agent from the Library: a pack in the vetted catalog brings it, handed the briefing and held by the same guards as the agents AerieOS ships. It signs in with a Google account in its own session's terminal (347605e)
+- Gemini is signed in from its page: open its row on the Installed page with the node picked and press Sign in, and the page shows Google's link and a field for the code, which works on a phone. Any coding agent a pack brings is signed in this way where its pack says how its sign-in goes; its sign-in is sealed on a node that seals sign-ins, and Sign out removes it (732cb3c)
+- A conversation can be given a label and a note, and be kept: Edit on its row of a space's Sessions view names it, notes it, and keeps a copy on the controller that outlives its agent's own cleanup; aerie transcripts label, note, keep and unkeep say the same from a session (b64cf66)
+- A terminal has a hot bar: Esc, Shift+Tab or Tab, the arrows, Enter, Ctrl+C and page up and down a press each, and Links, which lists the links the terminal shows to open or copy, so a sign-in link a program prints can be opened on a phone. At a desk it floats over the terminal's bottom right corner and folds to a handle; on a phone it is the band at the terminal's foot, a line of keys that scrolls as the dock's tabs do, in place of the Keys panel, whose keys are on the line (467cb8e)
+- A coding agent a pack brings can say where who is signed in is read (signin.flow.who: the keys to follow in the file its sign-in is kept in, or another file beside it) and sign out by taking keys out of its settings file where the program has no sign-out of its own (signin.flow.forget); both are catalog framework 2.2. The agents AerieOS ships are described this way too, in their official packs, so a pack's agent can do at its sign-in whatever a shipped one does (300436f)
+- Help has Submitting to the catalog: one guide from writing a tool pack, a coding agent or a Docker app to a merged entry in the vetted catalog, with a worked example of each, how to try it on your own install, how to run the catalog's check, and what the maintainers vet. The Library's Add your own links to it (6c97ba7)
+- A pack you added yourself can offer the coding agent it brings, on your own install: turn on Offer coding agents from packs added here in Controller settings, under Vetted catalog. For trying an agent of your own before submitting it to the catalog; off as it starts (8000f77)
+
+### Changed
+
+- A pack kept from the catalog has no Edit on its row of the Installed page either, as on its Library card (f46b202)
+- Start agent's menu offers your conversations on a space as one pulldown with one Resume, each named by its label or its first words, where it listed a row and a button for each; a link under it opens all of them in the Sessions view, which has a find field past five (b64cf66)
+- A Library card names who its tool is by (Google, Eclipse Adoptium, Anthropic) to the left of its pill, and the pill reads Packaged by Aerie where it read Built by Aerie: the pill says who packaged a tool, never who made it. A toolchain that puts several makers' tools together is by AerieOS, with each credited on its Details page (53fddea)
+- A sign-in job's log holds the link and the one-time code for every agent, each on a line of its own, and never the program's own screen, as a pack agent's did already; Claude's link is read from a terminal wide enough to hold it on one row. Upgrading: a node signs in this way from its next bundle, within ten minutes of the controller's update; a sign-in started before then is read as before (300436f)
+- The Files page is laid out as a file explorer: a node's places down the left with Trash last, one bar with where you are, a filter, New folder and Upload, and a plain listing with icons, sizes and short dates; on a phone a row is one line. Trash lists what was deleted by its own name and when, and Put back returns it to where it was (66c8e3d)
+- The Library no longer lists a catalog entry this AerieOS cannot take, one written in a newer pack format or for other release lines; its head counts them under Not for this AerieOS. A pack you already hold that stops fitting after an upgrade is switched off, not removed: no session gets it and its agent is not offered until a version that names this AerieOS is kept, which its card offers. Upgrading: nothing to do; a pack that names no release lines is unaffected (8000f77)
+
+### Deprecated
+
+- The page's routes for pinned and custom commands (/api/pin for a command, the custom command edit) and their two files in /config are no longer used by the page and go in a later release; /api/send stays (5bcf1d8)
+
+### Removed
+
+- The Commands panel under a terminal is gone: the press at the end of a phone's hot bar, the band under a desk's shell, the lists of pinned, own, Linux and git commands, and the dialog for a command of your own. A shell is typed into, and the hot bar keeps its keys and Links. Upgrading: commands you saved are no longer reached from the page; they stay in /config/custom-commands.json until the release after this one, so copy out any you want to keep (5bcf1d8)
+
+### Fixed
+
+- Sign in on Claude Code's row opened a link cut off at its first line, so Claude's page said only that the sign-in did not complete: a newer Claude Code prints the link wrapped and as a terminal hyperlink. The whole link is read now, for every agent's sign-in (54f906a)
+- A kept pack that brings no aerie verbs says nothing of verbs in its dialog; it said 'Verbs: .' (92ae1e4)
+- Check for updates on the Library reads the vetted catalog again, so a newer pin of a kept pack is offered at once; it showed up to an hour late (70aa16c)
+- The message bar under a session's terminal, for an account with no shell, names the agent the session is; under a Gemini or a ChatGPT session it said Claude (d416735)
+- A thing's page that came back after a reload without what it was for opens the Installed page; it read 'Installed is not installed on NODE now'. A Library entry's page does the same with the Library (f68f872)
+- A release deleted on the git host leaves the bell; its row stayed as a release missing its files and was asked after again and again (b0a8553)
+- A card's line about where a space's sessions run names the space as it is shown everywhere else; after a move it used the folder's name (a218047)
+- A session or a shell that ends before it starts shows why: the reason was pushed off the top of a terminal shorter than 24 rows, which left only the line saying it had ended. Upgrading: a node shows it once it has this build's bundle and session helper, which it takes by itself (f69d77b)
+
+### Security
+
+- A sign-in job's entry on the Jobs page and in /api/v1/jobs no longer carries the session token minted for its flow, which every reader of the list was handed for the half hour it was good. Upgrading: nothing to do; a token handed out before the update ran out within thirty minutes of its sign-in (ac4b721)
+- An account with two-factor sign-in is no longer let in over FTP on its password alone: it gives its password with its authenticator app's six-digit code right after it, as one word, and its password alone is refused with that sentence. Upgrading: an FTP client that kept such an account's password has to be given the code each time; an account whose only second factor is a passkey adds an authenticator app under Profile to use FTP (37a765d)
+
+## 0.9.0-dev.5284: 2026-11-12
+
+### Changed
+
+- A pack kept from the catalog has no Edit on its Library card. Edit is for a pack or an app you added yourself; a catalog pack's kept copy is reached from its Details page, on the line that says where it came from (82a452a)
+- A pack that brings a coding agent is listed with the coding agents on the Installed page, where it was listed among the tool packs, and its page says where it signs in (82a452a)
+
+### Fixed
+
+- A session that cannot start on a node because part of its view could not be mounted says which part; it said only 'No such file or directory' (6ee24d7)
+- A session or a shell starts again on a node set up before AerieOS had its name, once that node's agent has restarted: none did where the node carries a CI runner's folder, ending at 'this node could not build its view' (55a9cd1)
+- A session's view leaves out the agent's own folder on a node set up since AerieOS had its name, or whose Enroll script was run again: it was left in view there, readable as far as its files' permissions allowed (other spaces' build caches and containers' data among them) (55a9cd1)
+- A pack installed from the catalog says where it came from on its page and its Library entry; it said 'Made here' (15b6a4f)
+- A command a house rule refuses is refused in a Codex, Copilot, Grok or OpenCode session too, and a check that fails at the end of a turn sends that agent back to work once: both held Claude Code's sessions only, and in the others the command ran and the turn ended. Upgrading: a session of one of those agents started before the update keeps its old hooks; restart it to have it held (0b24dab)
+- A session on a node is not asked about the aerie commands AerieOS itself decides: the rules that say so reached only sessions on the controller's own machine (5a603f4)
+
+## 0.9.0-dev.5269: 2026-11-12
+
+### Added
+
+- A pack can bring a coding agent with a hook protocol of its own, described in its manifest: how its hooks file is laid out, where its payload keeps each thing and how each answer is written. The next such agent needs no update of AerieOS, and where its hooks file is also yours, its guards sit beside your own hooks (14b6057)
+- A built-in toolchain's recipe can be put right from the catalog: when the signed catalog holds a newer one (a download address or a package list that moved upstream), the controller and its nodes use it without waiting for a release of AerieOS (2f16bb0)
+
+### Changed
+
+- Moving a controller from or onto a machine of its own (an AerieOS stick or disk, or a bare-metal install) carries its secrets files and ssh keys, where you were told to copy them by hand as root. Anything in them that is not a plain secret is left out and named (202a994)
+- A file in the secrets folder is read as plain NAME=value lines and never run. Upgrading: a line there that is not a plain value (one with $( ), backticks, a $VARIABLE in double quotes, or a command of its own) is no longer honored and the controller's log names it: write the value out in full, in single quotes. A line that sets PATH or the like is left out too; it used to stop the controller starting (4789074)
+- A catalog entry written in a newer pack format than this AerieOS reads says so on its Library card (Needs AerieOS X or newer) and is not fetched; it used to be refused only when you pressed Install. The format now has a number that only grows, so a pack that works today keeps working (f44c779)
+- The Library says who stands behind each card as Built by Aerie, Verified or Vetted, where it said official or vetted: Built by Aerie is what AerieOS ships or its maintainers wrote, Verified a verified vendor's own pack, Vetted anybody's pack the maintainers reviewed (dee246b)
+
+### Fixed
+
+- A display adapter that is not an AMD card is no longer listed as an AMD GPU a container can be given: every adapter was, a VM's and an NVIDIA or Intel card among them (e51c4c0)
+- First run marks a disk SMART calls failing; no disk could be marked before (e51c4c0)
+- A machine just started no longer says it has no internet for up to ten minutes after its network comes up (e51c4c0)
+- The UPS feature installs on AerieOS's own image, which now carries what it needs (e51c4c0)
+- A move or a backup that carries the install key lands on an AerieOS stick: it was refused with 'Permission denied' at the key once the system pool had been placed, which Moving here does just before (3e4f7df)
+- On Moving here, a bundle you picked is still picked when you press Land it here; the page could drop it and ask for it again (7980d72)
+- A catalog pack kept in a folder of a larger repository installs on a node; the install ended at 'bad object' before any of the pack's own steps ran (2ea3823)
+- A catalog pack that brings a coding agent sits with the coding agents on the Library before it is installed, where it sat among the tool packs (433e4d2)
+- The Scanners page no longer names a section [object Object] while it loads (3d3efc2)
+
+## 0.9.0-dev.5236: 2026-11-11
+
+### Changed
+
+- This release names a spare for the catalog's key and for the release key. Upgrading: a node pins the spare when its Enroll script is run on it again; until then its row says no spare key is pinned, and it goes on taking updates signed by the first key (ff87870)
+
+### Fixed
+
+- On a phone a space's header keeps its buttons on the name's row: with a longer name, several repositories and Manage agent, the menu's button dropped to a line of its own (125d3e7)
+
+## 0.9.0-dev.5230: 2026-11-11
+
+### Added
+
+- Each signing key can have a spare, so a key that is lost or has to be replaced no longer cuts installs off: a release may name a second key for the catalog and for agent updates, an install reads a catalog signed by either, and a node takes an agent update signed by either. Upgrading: a node enrolled before a spare is named pins it when its Enroll script is run again, and its row says so under Updates until then (23c0207)
+
+### Changed
+
+- The catalog is signed by a new key, which this release carries. Upgrading: an install on 0.9.0-dev.5221 or earlier keeps the catalog it last read and refuses newer ones (its Library says the index's signature does not match) until it is updated to this release; nothing installed is affected (2713dd2)
+
+## 0.9.0-dev.5221: 2026-11-11
+
+### Changed
+
+- How each coding agent is installed is now a recipe in its catalog pack, so when a vendor changes its installer (as OpenCode's did) the fix reaches every install through the catalog with no new release of AerieOS; an update's first line says when the catalog's recipe is the one used. Takes effect on a node once its agent has updated (24f3a37)
+
+### Fixed
+
+- Updating OpenCode works again: it failed with 'installed, but no opencode to run' since OpenCode's installer moved where it puts the program. Takes effect once a node's agent has updated (fb6049b)
+- An agent's update, sign-in and sign-out jobs say what they are on the Jobs page and in aerie jobs, where OpenCode's (and in aerie jobs every agent's) read 'exec' (fb6049b)
+
+## 0.9.0-dev.5214: 2026-11-11
+
+### Changed
+
+- A coding agent no longer second-guesses the aerie commands AerieOS itself decides: a release, a push or a roadmap change that the space's Agents may allows is not refused or asked about again by the agent's own permission check, which could differ from one day to the next. Claude Code, Codex, Copilot and Grok are each told in their own way, and a pack's agent can say how in its manifest (agent.allow). A session picks this up when it starts, so restart running sessions after the update (d0297ee)
+
+## 0.9.0-dev.5211: 2026-11-11
+
+### Added
+
+- aerie diag has a tunnel section: whether the home tunnel is running and registered, whether its name reaches this controller, and its last lines; a secret that is set says so in the settings section, where it printed as empty (03d106d)
+
+### Changed
+
+- Only one controller can run on a configuration folder at a time: a second one started on the same /config stops with the reason, rather than writing over the first (e303494)
+- A backup and a move's bundle copy the configuration at one moment, rather than file by file while it is being written; the copies kept before an upgrade no longer carry the install key (e303494)
+- With Run its container on auto, a session's build still runs at once, unless its compose file asks for more than its own folder (the host's files, privileges, the Docker socket): then you are asked once, with the list, and your Allow covers that file from then on (0c4735d)
+- A node locked out because a token it had replaced came back now says it may be a machine restored from a snapshot or a backup, and that Enroll script on its row brings it back (ac7e5dc)
+- A node keeps its files in /etc/aerieos and /var/lib/aerieos and runs the service aerieos-agent, under AerieOS's own name. A node from before changes over when its Enroll script is run on it: the folders are renamed with the old names left as links, and builderbot-agent still works as a command. Until then it runs as it did, and both names answer (c850175)
+- A page already loaded once in a browser opens without asking the controller about each of its scripts again: a repeat load was 82 requests and is one (8add20a)
+- An open page no longer reads the whole status every two seconds while a coding session is working: the turning mark in a working session's title is no longer taken for a change (b53ac75)
+- A coding session's tool calls no longer wait about two seconds in every twenty while their gate asked the controller for its whole status, and every aerie command starts about 50 ms sooner (873e79e)
+- A command that acts on a space's tree right after an edit there (aerie git push after a commit, aerie version) no longer waits up to half a minute for the node's own change to come back to it. Takes effect on a node once its agent has updated (fe36377)
+- The Jobs page and Home read a short form of each job rather than the script or configuration it carried: a hundred jobs were over a megabyte, read again whenever any job moved (89a91dd)
+
+### Removed
+
+- The ISO is no longer an installer: its boot menu offers no Install, and a new machine is set up from the USB edition (the stick's image also serves as a VM's disk). The ISO stays on each release as the file a running AerieOS machine updates from. An installer on the machine's own screen is being built. The ISOs up to 0.9.0-dev.5173 could not install on a blank machine in any case (f725a42)
+
+### Fixed
+
+- Installs and space clones that were queued behind another job when the controller restarted are picked up again, or named on the Spaces page as not started, rather than dropped without a word (e303494)
+- aerie changelog missing, and a release's own check for bugs owed a Fixed line, no longer run past three minutes and end with nothing said on a space with hundreds of fixed bugs (879e7c2)
+- The Enroll script's last lines say the machine's address again, where they printed 'my_ip: command not found' (874b4d1)
+- Home's updates due counts updates only: a failing disk, a hot one or a restart owed is no longer one (874b4d1)
+
+### Security
+
+- A node is handed a session's credential only for a space that works on that node and a person who may work on that space. Before, a node that merely named another space's session was handed its credential, so one node taken over reached every space (e9502c6)
+- An accounts file that cannot be read no longer opens the make-the-first-account page to whoever reaches the dashboard: nobody signs in until it is mended or put back from a backup, and nothing is written over it. State files are now synced to disk as they are written, so a power cut does not leave one cut short (e303494)
+- A coding agent's session can no longer change its person's Profile: where their notifications go, their browser sign-ins, their second factor (e9502c6)
+- A CI runner registered to a public repository says on its row that a pull request from anybody can run on that node, and which setting on the git host to change (61a3651)
+- A container's compose file is checked for more ways of reaching the host before it is built: the host's other namespaces, another container's volumes, a volume bound to a host folder under another name, a build that uses the host's network or ssh agent, and a folder that is a link to the system (35f094d)
+- A node can pin AerieOS's release key and then takes only agent updates the release signed, whatever its controller sends. Nothing changes until a release names the key; a node's row says which it is under Updates (ac7e5dc)
+
+## 0.9.0-dev.5173: 2026-11-10
+
+### Changed
+
+- A job pressed while another is running is queued behind it rather than refused, on the Library, the Installed page, a container's row, a node's system changes, Reboot and Shut down, and a new space's clone; the card or row says it is queued, and pressing the same thing again does not queue it twice. What still cannot happen during a job, such as renaming a container or disabling a node with sessions on it, is ghosted with the reason on its row (3d75e07)
+- Two people can sign in to a coding agent at the same time, and a sign-in left open no longer holds up a build on that node, nor waits behind one (b757ee1)
+- Restart on a session, the tests panel's output, and a container's shell right after an update now wait until they can go through, rather than asking you to press again in a moment (b757ee1)
+
+### Fixed
+
+- A node that reached a move's new home and then came back to the old controller is taken back by itself, rather than refused every five minutes until it is enrolled again (5640b84)
+- The bell and the doctor's buttons no longer show a loading ring under their icon when pressed, and any other icon-only button that is still waiting shows its ring in place of the icon (ae30aba)
+- A certificate through Cloudflare's DNS waits until the record can be seen before asking Let's Encrypt, and says so when it never appears, rather than waiting a fixed time and failing with Let's Encrypt's words (b757ee1)
+- A node enrolled at the public hostname of Reach from outside follows a move to a controller on the local network: it is told that hostname rather than the new home's local address, and Prepare to move no longer warns about it (6dd5554)
+- A machine's first boot no longer fails to make the machine its own node when its dashboard answers the agent's download with an error in its first moments: the download is tried again (101fb59)
+- The bell no longer loses its whole list while a node is being turned away or has shown a retired token (7e481f5)
+- A node no longer restarts its CI runner in the middle of a job when the runner has updated itself, which canceled the run (d047877)
+- The Analysis page shows its findings once they arrive, rather than loading until something else on the page moved, and its filters redraw it (273b47b)
+- On a phone the Files page's filter shares a line with New folder and Upload rather than spanning the page above them (ea6e923)
+- After a controller update its nodes are back within seconds, rather than showing quiet for a minute or two while their agents waited to ask again (ed35650)
+
+## 0.9.0-dev.5146: 2026-11-10
+
+### Added
+
+- Prepare to move names any node that dials in from outside the local network when the new home's address is a local one it cannot reach (133a1ba)
+- New container's Compose pane has Import a compose file, which fills it from a file on your computer and names the container after the file (16a8572)
+
+### Changed
+
+- The move token given on the first page is not asked for again when the move lands, and where the old controller ran on the same machine the landing asks for the bundle alone (133a1ba)
+- The old system's containers and VMs are brought back from the machine's Containers page, and are found where they usually are when the stick was made without the old system's backup (133a1ba)
+- New container offers a ready app only when the Library's New container opened it on that app; apps are picked on the Library (133a1ba)
+- The old system's containers come back as compose files: Download compose files saves a zip of them, each with the image, settings, ports and paths it ran with and what it will not do as written said at its top, to import with New container; Make the network makes a network the old Docker kept for its own containers as a bridge of its own (16a8572)
+
+### Removed
+
+- Make and start for the old system's containers. Upgrading: once this machine's agent is updated, press Read again on its Containers page, under Containers and VMs from the old system, then download their compose files and import each one (16a8572)
+
+### Fixed
+
+- Moving here's pool and folder picks and its After it lands step no longer squeeze long sentences into a grid, and each pick's button sits beside its field (133a1ba)
+- A move from a container install onto a machine no longer risks retiring one of its nodes and moving that node's spaces onto the new machine (133a1ba)
+- The old system's VMs on this machine's page say each defined VM's name once with its buttons beside it, Define the VMs sits under the VMs it defines rather than under another's buttons, and whether one starts with the machine is a tick (f4e0613)
+
+## 0.9.0-dev.5138: 2026-11-09
+
+### Added
+
+- A controller's own machine now runs containers: the Containers page, the Library's apps and Make and start under Containers and VMs from the old system all work there. A session's build on that machine waits for a person, and a container there has no Shell (0da04aa)
+
+### Changed
+
+- Moving a controller here asks only for its move token on the first page, not for an account the move then replaces (4cc9d2c)
+- A controller's own machine is now a node like any other: it is on the Nodes page and in the picker of the Library, Installed, the Emulator, the Phone and the CI runner, so toolchains and coding agents install on it; its name, disks, console password, restart and shut down moved to its row on the Nodes page, and the Controller group's page, now This controller, keeps its release, updates and older versions (4cc9d2c)
+- The first-run page has Generate console login and Shut down at its top, in place of a step asking for a console password (4cc9d2c)
+
+### Fixed
+
+- On a stick the data partition now grows to fill the stick at boot, as it was meant to; it had stayed at 2 GB on a stick of any size, which filled up and left no room for an update (c783e0f)
+- An OS update no longer loses the machine's ZFS pools at its first boot, which took the spaces, the sign-ins and the secrets with them (e914d08)
+
+## 0.9.0-dev.5128: 2026-11-08
 
 ### Added
 

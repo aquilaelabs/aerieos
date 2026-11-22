@@ -15,6 +15,7 @@ import sys
 import time
 
 import dash
+from say import need
 
 reg = dash.load("rules", dash.beside(sys.argv[1]))
 statefile = dash.statefile(dash.beside(sys.argv[1]))
@@ -107,8 +108,7 @@ elif op == "add":
             said.append(rest[i]); i += 1
     r = reg.add(proj, name, " ".join(said), paths=paths_, words=wds_, by="claude",
                 doc=doc_, check=chk_, refuse=ref_, replaces=repl_, why=why_)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if r.get("held"):
         print(f"held for approval as the rule {r['held']['number']}: it takes "
               "effect when the operator approves it on the notebook. `aerie rules "
@@ -128,8 +128,7 @@ elif op == "edit":
                          {"name": held["number"], "text": " ".join(rest[1:])},
                          f"reword {held['number']}: {' '.join(rest[1:])}",
                          number=held["number"], after=held["id"])
-        if r.get("error"):
-            sys.exit(f"[builderbot] ERROR: {r['error']}")
+        need(r)
         print(f"held behind the rule {held['number']}: it lands with it when the "
               "operator approves it, and goes if they deny it")
         sys.exit(0)
@@ -146,8 +145,7 @@ elif op == "edit":
         sys.exit('usage: aerie rules edit <name> "what it should say now" [--doc PATH] [--check CMD] '
                  '[--refuse "CMD, CMD"] [--replaces GLOBAL-RULE] [--why "..."]')
     r = reg.edit(proj, rest[0], text=" ".join(said) if said else None, by="claude", **flags)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     print(f"reworded {rest[0]}" if said else f"updated {rest[0]}: {', '.join(flags)}")
 elif op == "rm":
     if not rest:
@@ -156,8 +154,7 @@ elif op == "rm":
         sys.exit(f"[builderbot] ERROR: the rule {rest[0]} is still waiting for the "
                  "operator's approval; there is nothing to drop yet. `aerie rules pending`")
     r = reg.remove(proj, rest[0], why=" ".join(rest[1:]), by="claude")
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     print(f"dropped {r['removed']}")
 elif op == "pending":
     # The rules' half of what is waiting for the operator (roadmap #27).

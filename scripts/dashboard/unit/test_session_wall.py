@@ -75,6 +75,22 @@ class TheFile(unittest.TestCase):
 class Faults(unittest.TestCase):
     # The session account is this test's own; the job account one that is
     # in no docker group; the controller's, one more.
+    def setUp(self):
+        # ...read as being in its own group and no other, and with no account
+        # users beside it: the account a CI runner runs as is in docker's and
+        # libvirt's groups, and every test here said so before its own fault
+        # (the rehearsal of 14 Nov). A test that puts it in a group, or adds
+        # an account user, does so itself.
+        real = session._ids
+        me = pwd.getpwnam(ME)
+
+        def ids(name):
+            return (me.pw_uid, {me.pw_gid}) if name == ME else real(name)
+        for p in (mock.patch.object(session, "_ids", side_effect=ids),
+                  mock.patch.object(session.pwd, "getpwall", return_value=[])):
+            p.start()
+            self.addCleanup(p.stop)
+
     def wall(self, cover, jobs="daemon"):
         return {"ACCOUNT": "nobody", "JOBS_USER": jobs, "COVER": cover, "PORTS": [7681, 7682]}
 
@@ -139,15 +155,24 @@ class Faults(unittest.TestCase):
         self.assertEqual(got, [f"/ctl/state lets the session account ({ME}) in through its group"])
 
     def test_an_account_in_the_docker_group(self):
-        try:
-            import grp
-            members = grp.getgrnam("docker").gr_mem
-        except KeyError:
-            self.skipTest("no docker group on this machine")
-        if not members:
-            self.skipTest("nobody is in the docker group here")
-        got = session.wall_faults(self.c(), self.wall(["/root"], jobs=members[0]), guard=True)
-        self.assertIn(f"the job account ({members[0]}) is in the docker group", got)
+        # A docker group of the test's own, and the job account put in it:
+        # it read the machine's docker group and its first member before,
+        # which on a CI runner is the running account, the one setUp reads
+        # as in its own group alone (the rehearsal of 14 Nov), and on a
+        # machine with no docker group it proved nothing.
+        import collections
+        import grp
+        G = collections.namedtuple("G", "gr_gid")
+        real_gr, real_ids = grp.getgrnam, session._ids
+        docker = 64999
+        job = pwd.getpwnam("daemon")
+
+        def ids(name):
+            return (job.pw_uid, {job.pw_gid, docker}) if name == "daemon" else real_ids(name)
+        with mock.patch.object(grp, "getgrnam", side_effect=lambda n: G(docker) if n == "docker" else real_gr(n)), \
+             mock.patch.object(session, "_ids", side_effect=ids):
+            got = session.wall_faults(self.c(), self.wall(["/root"]), guard=True)
+        self.assertEqual(got, ["the job account (daemon) is in the docker group"])
 
     def test_sessions_on_the_nodes_own_network(self):
         got = session.wall_faults({"SESSION_USER": ME}, self.wall(["/root"]), guard=True)

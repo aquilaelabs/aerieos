@@ -8,7 +8,7 @@
 // hook line that tells the session what was decided, and the endpoint's
 // refusal of a session's own token. What is faked: nothing. The hook is the
 // shipped script run as a process, and bb is the checkout's.
-import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold, asSession, mint, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -40,11 +40,7 @@ await ready(page);
 // selector wait never returns: ask the DOM instead.
 const gone = sel => page.waitForFunction(q => !!document.querySelector(q)?.hidden, sel,
                                          { timeout: 30000 });
-const post = (path, body) => page.evaluate(async ([p, b]) => {
-  const r = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, [path, body]);
+const post = (path, body) => pageCall(page, path, body);
 
 // ---- auto is today ----------------------------------------------------------
 const first = bb('roadmap', 'add', 'a thing added under auto');
@@ -235,27 +231,16 @@ ok(!/The operator has answered/.test(hook('bb-prompt-relay', ['alpha', 'u_test']
    '...once');
 
 // ---- a session cannot answer for itself -------------------------------------
-{
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, os, sys
-spec = importlib.util.spec_from_file_location('users', ${JSON.stringify(join(HERE, '..', 'users.py'))})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-import json
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha'))
-`], { encoding: 'utf8' }).trim();
+await section("a session cannot answer for itself", async () => {
+  const tok = mint('alpha');
   const res = await fetch(URL.replace(/\/$/, '') + '/api/pending', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+    headers: asSession(tok),
     body: JSON.stringify({ project: 'alpha', action: 'approve', ids: [1, 2, 3] }) });
   const body = await res.text();
   ok(res.status === 403 && /cannot answer for itself/.test(body),
      `a session's own token cannot approve what it added (${res.status} ${body.slice(0, 80)})`);
-}
+});
 
 // ---- rules, through the same door ------------------------------------------
 const set = await post('/api/prefs', { project: 'alpha', gate: { rules: 'ask' } });
@@ -277,7 +262,7 @@ ok(/no rule is waiting/.test(bb('rules', 'pending')),
 await done(browser);// A session asking for an item back off the shelf (R78) is held whatever the
 // gate says, with its reason, and a person's Approve replays it: a decision
 // with a notification behind it, not a gate on creation.
-{
+await section("gate says, with its reason, and a person's Approve replays it", async () => {
   const added = await post('/api/roadmap', { project: 'alpha', action: 'add', text: 'a parked plan' });
   const id = added.body.item.id;
   bb('roadmap', 'shelve', String(id));
@@ -293,6 +278,6 @@ await done(browser);// A session asking for an item back off the shelf (R78) is 
   bb('roadmap', 'done', String(id));
   ok(!roadmapItems().some(r => r.id === id),
      '...and the request never locked the item: a session ticks it off as usual afterwards');
-}
+});
 
 

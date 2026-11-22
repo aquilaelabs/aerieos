@@ -1,0 +1,37 @@
+{
+ "about": "The scanners on this node, run over the spaces it holds on a schedule or when asked: what each found is on the space's notebook. Their schedule and their runs are on their own page, opened from Installed.",
+ "config": [],
+ "credits": [
+  {
+   "maker": "Semgrep",
+   "name": "Semgrep"
+  },
+  {
+   "maker": "Aqua Security",
+   "name": "Trivy"
+  },
+  {
+   "maker": "MobSF",
+   "name": "mobsfscan"
+  }
+ ],
+ "format": 5,
+ "framework": "5.1",
+ "images": {
+  "mobsfscan": "opensecurity/mobsfscan:0.4.5@sha256:7d1d06ee36ec550d11071c6aa6f4a9d5c8ce60197067d59da0c86d8ba529834f",
+  "semgrep": "semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b",
+  "trivy": "aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa"
+ },
+ "label": "Scanners",
+ "maker": "AerieOS",
+ "name": "scanners",
+ "platforms": [
+  "linux/amd64",
+  "linux/arm64"
+ ],
+ "service": {
+  "kind": "scanners"
+ },
+ "terms": [],
+ "tier": "official"
+}

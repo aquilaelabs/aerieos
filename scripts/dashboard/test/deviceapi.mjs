@@ -7,24 +7,22 @@
 // way to update, and the controller says the version it speaks for an app
 // newer than it to say so. The Android app's surface is
 // apps/android/api-surface.json, held by test/appapi.mjs. No browser.
-import { ok, done, DIR, URL, pinBreaks as breaks } from './lib.mjs';
+import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const require = createRequire(import.meta.url);
 const client = require(`${REPO}/apps/vscode/lib/client.js`);
 const base = URL.replace(/\/$/, '');
 const pins = JSON.parse(readFileSync(new globalThis.URL('./device-api.json', import.meta.url), 'utf8'));
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const admin = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
-  { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
+const addUser = (name, pw) => aerie(['users', 'add', name, '--role', 'user'],
+  { input: `${pw}\n${pw}\n`, env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
 
@@ -35,7 +33,7 @@ const rowsSeen = (body, reads) => Object.keys(reads || {}).filter(k => k.include
 
 // ---- accounts: a person with read and write on alpha through the editor's door ---------
 addUser('pin.rw', 'pinrwpass1');
-await admin('/api/users', { action: 'projects', name: 'pin.rw', projects: ['alpha'] });
+await admin('/api/users', { action: 'edit', name: 'pin.rw', projects: ['alpha'] });
 await admin('/api/roles', { action: 'set', name: 'pin-files-w', scope: 'projects', perms: { projects: 'write', files: 'write' } });
 await admin('/api/roles', { action: 'assign', name: 'pin.rw', project_roles: { alpha: ['pin-files-w'] } });
 const set = await admin('/api/project-ftp', { action: 'set', project: 'alpha', editor: true, access: { [uidOf('pin.rw')]: 'rw' } });
@@ -63,7 +61,7 @@ const signedIn = await dev('signin', { username: 'pin.rw', password: 'pinrwpass1
 token = signedIn.json?.token || '';
 const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'pin.rw'], { encoding: 'utf8', env }).trim();
 const pcApi = async body => (await fetch(`${base}/api/pc`, { method: 'POST',
-  headers: { Authorization: `Bearer ${stok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+  headers: asSession(stok), body: JSON.stringify(body) })).json();
 
 // One driver per pinned call: the answer the app would get. A pin with no
 // driver fails, so a new pinned call cannot go undriven.
@@ -167,17 +165,17 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
 // ---- the checker refuses what it should ------------------------------------------------------
 // A removed field, a changed type and a row's changed type each fail, so a
 // pass above means the fields were looked at.
-{
+await section("the checker refuses what it should", async () => {
   const reads = { a: 'number', 'b?': 'string', 'rows[].x': 'string', 'tup[]': ['string', 'number'] };
   const good = { a: 1, rows: [{ x: 'y' }], tup: [['p', 2]] };
   ok(breaks(good, reads, 't').length === 0 && breaks({ ...good, a: undefined }, reads, 't').length === 1
      && breaks({ ...good, a: '1' }, reads, 't').length === 1 && breaks({ ...good, b: 3 }, reads, 't').length === 1
      && breaks({ ...good, rows: [{ x: 1 }] }, reads, 't').length === 1 && breaks({ ...good, tup: [['p', 'q']] }, reads, 't').length === 1,
      'the pin check fails on a field gone, a type changed, and a row\'s field or column changed');
-}
+});
 
 // ---- the handshake: each side says its version -------------------------------------------------
-{
+await section("the handshake", async () => {
   // An app from before the door's window is refused with the way to update,
   // by its name; what it would update from still answers.
   const old = await dev('projects', {}, { headers: { 'X-BB-Door': '0', 'X-BB-App': 'companion/0.0.1' } });
@@ -202,6 +200,6 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
   ok(mine.tooOld === '' && /needs 1: update AerieOS on the controller/.test(client.controllerTooOld({ api: 0 }))
      && client.controllerTooOld({ api: client.API }) === '',
      'the extension says plainly when its controller is too old for it, and nothing when it is not');
-}
+});
 
 await done();

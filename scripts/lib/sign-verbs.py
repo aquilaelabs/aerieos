@@ -5,16 +5,17 @@ session sends a file name and a route and gets a file back in dist/; the
 key and its password never come near it.
 
 Arguments: FILE (relative to dist/), ROUTE (play or sideload), WHY.
-BB_SIGN_AUTH and BB_SIGN_PROJECT come from bb."""
+BB_PROJECT is the project. The auth header is bbapi's own (BB_AUTH_HEADER,
+from api_py in aerie)."""
 import os
 import sys
 import time
 
 import bbapi
 import waits
+from say import need
 
-auth = os.environ["BB_SIGN_AUTH"]
-project = os.environ.get("BB_SIGN_PROJECT", "")
+project = os.environ.get("BB_PROJECT", "")
 if not project:
     sys.exit("[builderbot] ERROR: run aerie sign inside a space's tree")
 
@@ -30,9 +31,8 @@ def status_verb(rest):
     signed, and how the newest went, in the Signing view's and the bell's
     words."""
     tag = rest[0] if rest else ""
-    d = bbapi.call("/api/signing", {"action": "release", "project": project}, auth=auth)
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    d = bbapi.call("/api/signing", {"action": "release", "project": project})
+    need(d)
     r = d.get("release") or {}
     if not r.get("wanted"):
         print(f"  {project}'s workflows hand over no unsigned APK (an artifact named bb-release-apk-TAG), "
@@ -59,20 +59,24 @@ def status_verb(rest):
         print("  aerie sign release --why \"...\" asks for the look again once what stopped it is fixed")
 
 
-def release_verb(why):
+def release_verb(why, rest):
     """aerie sign release --why (R134 step 5): the Signing view's Look for
-    unsigned APKs now, under the Sign a build dial."""
+    unsigned APKs now, under the Sign a build dial. --again TAG names a
+    release whose signed APK is replaced by its own run's, signed again:
+    the owner's answer whatever the dial."""
+    if rest and (len(rest) != 2 or rest[0] != "--again"):
+        sys.exit("[builderbot] ERROR: aerie sign release [--again TAG] --why \"...\"")
+    again = {"tag": rest[1]} if rest else {}
     # The look before this one, so its end is told by the controller's own
     # clock, never this machine's.
-    before = int(((bbapi.call("/api/signing", {"action": "release", "project": project}, auth=auth)
+    before = int(((bbapi.call("/api/signing", {"action": "release", "project": project})
                    .get("release") or {}).get("last") or {}).get("at") or 0)
-    r = bbapi.call("/api/signing", {"action": "release-sign", "project": project, "why": why}, auth=auth)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    r = bbapi.call("/api/signing", {"action": "release-sign", "project": project, "why": why} | again)
+    need(r)
     if r.get("id") and not r.get("ok"):
         print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
               "15 minutes for Approve in their bell", file=sys.stderr)
-        o = waits.outcome(auth, r["id"], "the look was not allowed")
+        o = waits.outcome("", r["id"], "the look was not allowed")
         if o.get("code"):
             sys.exit(f"[builderbot] ERROR: {o.get('out') or 'it was not started'}")
     # The look is waited for and what it found said run by run (R190
@@ -82,7 +86,7 @@ def release_verb(why):
     t0 = time.time()
     while time.time() - t0 < 900:
         time.sleep(5)
-        d = bbapi.call("/api/signing", {"action": "release", "project": project}, auth=auth)
+        d = bbapi.call("/api/signing", {"action": "release", "project": project})
         rel = d.get("release") or {}
         last = rel.get("last") or {}
         if not rel.get("looking") and int(last.get("at") or 0) > before:
@@ -99,7 +103,9 @@ def said_look(last, expect):
     for x in last.get("runs") or []:
         print(f"  run {x.get('run')} for {x.get('tag')}: {x.get('state')}"
               + (f": {x['why']}" if x.get("why") else "") + (f"  {x['url']}" if x.get("url") else ""))
-    if not last.get("runs") and not last.get("error"):
+    for line in last.get("said") or []:
+        print(f"  {line}")
+    if not last.get("runs") and not last.get("error") and not last.get("said"):
         print(f"  no unsigned APK waiting: {last.get('asked', 0)} recent run(s) that passed were asked and "
               f"none handed one over, {last.get('known_bare', 0)} more are known to hand over none")
         print("  the Android workflow's run for the release may still be going, or it failed: "
@@ -111,9 +117,8 @@ def said_look(last, expect):
 def keys_verb(sub, route, why, rest):
     """aerie sign keys | key new NAME | map PACKAGE KEY (R106 step 6)."""
     if sub == "--keys":
-        d = bbapi.call("/api/signing", {"action": "keys", "project": project}, auth=auth)
-        if d.get("error"):
-            sys.exit(f"[builderbot] ERROR: {d['error']}")
+        d = bbapi.call("/api/signing", {"action": "keys", "project": project})
+        need(d)
         for name, slots in (d.get("keys") or {}).items():
             for rt, rec in slots.items():
                 print(f"  {name:<14} {rt:<9} " + (f"{rec.get('alias')}  {rec.get('sha256')}" if rec else "-"))
@@ -134,13 +139,12 @@ def keys_verb(sub, route, why, rest):
         if len(rest) != 2:
             sys.exit("[builderbot] ERROR: aerie sign map PACKAGE KEY --why \"...\" (KEY \"\" unmaps it)")
         body = {"action": "map", "package": rest[0], "key": rest[1]}
-    r = bbapi.call("/api/signing", body | {"project": project, "why": why}, auth=auth, timeout=180)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    r = bbapi.call("/api/signing", body | {"project": project, "why": why}, timeout=180)
+    need(r)
     if r.get("id") and not r.get("keys") and not r.get("key"):
         print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
               "15 minutes for Approve in their bell", file=sys.stderr)
-        o = waits.outcome(auth, r["id"], "the change was not allowed")
+        o = waits.outcome("", r["id"], "the change was not allowed")
         if o.get("code"):
             sys.exit(f"[builderbot] ERROR: {o.get('out') or 'it was not made'}")
     print("[builderbot] done: aerie sign keys says what the space has now", file=sys.stderr)
@@ -150,7 +154,7 @@ if sys.argv[1] == "--status":
     status_verb(sys.argv[4:])
     sys.exit(0)
 if sys.argv[1] == "--release":
-    release_verb(sys.argv[3])
+    release_verb(sys.argv[3], sys.argv[4:])
     sys.exit(0)
 if sys.argv[1].startswith("--"):
     keys_verb(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:])
@@ -162,14 +166,13 @@ import syncwait  # noqa: E402
 if not syncwait.up(project, "the controller signs the build in its copy of dist/"):
     sys.exit("[builderbot] ERROR: not asked: the build here has not reached the controller yet; try again in a moment")
 r = bbapi.call("/api/signing", {"action": "sign", "project": project, "file": file, "route": route,
-                                "key": os.environ.get("BB_SIGN_KEY", ""), "why": why}, auth=auth, timeout=60)
-if r.get("error"):
-    sys.exit(f"[builderbot] ERROR: {r['error']}")
+                                "key": os.environ.get("BB_SIGN_KEY", ""), "why": why}, timeout=60)
+need(r)
 job = r.get("job") or ""
 if not job and r.get("id"):
     print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
           "15 minutes for Approve in their bell", file=sys.stderr)
-    o = waits.outcome(auth, r["id"], "the signing was not allowed")
+    o = waits.outcome("", r["id"], "the signing was not allowed")
     if o.get("code"):
         sys.exit(f"[builderbot] ERROR: {o.get('out') or 'the signing would not start'}")
     job = o.get("out") or ""
@@ -178,7 +181,7 @@ if not job:
 print(f"[builderbot] signing {file} for {route} on the space's node ({job})", file=sys.stderr)
 for _ in range(600):
     time.sleep(2)
-    j = bbapi.call(f"/api/v1/jobs?id={job}", auth=auth)
+    j = bbapi.call(f"/api/v1/jobs?id={job}")
     if j.get("error") and "state" not in j:
         sys.exit(f"[builderbot] ERROR: {j['error']}")
     if j.get("state") not in ("succeeded", "failed", "canceled"):

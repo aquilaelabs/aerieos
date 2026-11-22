@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The AerieOS USB stick maker (R161 step 5): one tool for Windows, a Mac
-and Linux, nothing but Python's own library, that writes a release's stick
-image onto a USB stick and checks it.
+and Linux, Python's own library and the system's ssh-keygen, that writes a
+release's stick image onto a USB stick and checks it.
 
     aerieos-stick.py list                      the removable disks here
     aerieos-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest [--channel dev]] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]
@@ -9,7 +9,8 @@ image onto a USB stick and checks it.
 
 DISK is /dev/sdX on Linux, /dev/diskN on a Mac, \\\\.\\PhysicalDriveN or its
 number on Windows. The image is aerieos-os-VERSION.stick.raw.xz from a
-release (its sha256 beside it is fetched and checked, and its build
+release (held to the release's signed list of its files, which needs
+ssh-keygen; its sha256 beside it is fetched and checked, and its build
 attestation where gh is on the machine), the newest one when nothing else
 is named, or a file you have (checked the same way, with its .sha256 where
 it sits beside it). --set KEY=VALUE, as often as
@@ -215,6 +216,9 @@ def release_image(tag, channel="normal"):
         die("a release is named by its tag, vX.Y.Z")
     name = f"aerieos-os-{tag[1:]}.stick.raw.xz"
     base = f"{RELEASES}/download/{tag}/{name}"
+    # The release's signed list first: one this tool may not take is said
+    # before the image is fetched.
+    got = signed_list(tag, name)
     say(f"fetching {name} from the {tag} release")
     try:
         fetch(base, name)
@@ -226,11 +230,17 @@ def release_image(tag, channel="normal"):
     fetch(base + ".sha256", name + ".sha256", say_progress=False)
     check_sha(name, name + ".sha256")
     attested(name)
-    signed(tag, name)
+    signed(tag, name, got)
     return name
 
 
 ATTEST = "https://api.github.com/repos/aquilaelabs/aerieos/attestations/sha256:{digest}"
+# Who may have built an image this tool writes: the release workflow,
+# build-image.yml, run on a version's tag, as the OS updater pins it
+# (osimage.signer_identity; test_release_signing.py holds the two and the
+# installer's equal). The repository alone passed any workflow on any branch
+# that attested one.
+SIGNER_IDENTITY = r"^https://github\.com/aquilaelabs/aerieos/\.github/workflows/build-image\.yml@refs/tags/v"
 
 
 def attested(path):
@@ -261,8 +271,8 @@ def attested(path):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
         f.write("\n".join(lines) + "\n")
     try:
-        r = subprocess.run([gh, "attestation", "verify", path, "--bundle", f.name, "--repo", "aquilaelabs/aerieos"],
-                           capture_output=True, text=True, check=False)
+        r = subprocess.run([gh, "attestation", "verify", path, "--bundle", f.name, "--repo", "aquilaelabs/aerieos",
+                            "--cert-identity-regex", SIGNER_IDENTITY], capture_output=True, text=True, check=False)
     finally:
         os.unlink(f.name)
     if r.returncode != 0:
@@ -282,14 +292,24 @@ def check_sha(path, sha_file):
 
 
 # ---- the release's signature (R199) ------------------------------------------------
-# The keys that may sign a release, as config/release-signers holds them (a
-# lint keeps the two the same). A release's SHA256SUMS signed by one of them
-# is what says the image is AerieOS's own: the sha256 beside it is the
-# release's word for itself, and the attestation proves only which workflow
-# built it, which whoever changes the repository could run.
+# Who may sign a release, as config/release-signers holds them: written here
+# by tools/release-signers.py --write, never typed, and aerie lint keeps the
+# two the same. A release's SHA256SUMS signed by one of them is what says
+# the image is AerieOS's own: the sha256 beside it is the release's word for
+# itself, and the attestation proves only which workflow built it, which
+# whoever changes the repository could run.
 RELEASE_SIGNERS = """
+aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC65rdjAZZY0ad55f/HT6WeaGdkEyTlWSH9eJVDZgugY
+aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFmZ+JSPAxCTUn43jmUEv0NugpMoNa6rzhLWAxY0WGzo
 """
-SIG_NS = "aerieos-release"
+# The namespace a signer is named for says the channel, and the release's
+# tag says which it may be signed in: a pre-release (vX.Y.Z-dev.N, -rc.N,
+# any name) in either, a stable release (vX.Y.Z) in aerieos-release alone, so
+# the key the release build holds, which signs dev builds as they publish
+# themselves, can never sign a stable release. The rule an install's own
+# updates follow (osimage.py, install-controller.sh, apps.py).
+SIG_RELEASE, SIG_DEV = "aerieos-release", "aerieos-dev"
+SIGNED_BY = {SIG_RELEASE: "AerieOS's release key", SIG_DEV: "the key AerieOS's dev builds are signed with"}
 
 
 def signers():
@@ -302,47 +322,87 @@ def tag_of(path):
     return f"v{m.group(1)}" if m else ""
 
 
-def signed(tag, path):
-    """The image is in its release's SHA256SUMS, signed by a release key;
-    stops when it is not. Said and passed over only while this tool holds no
-    key at all."""
+def tag_namespaces(tag):
+    """The namespaces the list of release `tag` may be signed in, by the
+    tag's shape; none for what is no release's tag."""
+    if re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+        return (SIG_RELEASE,)
+    if re.fullmatch(TAG, tag):
+        return (SIG_RELEASE, SIG_DEV)
+    return ()
+
+
+def signed_list(tag, name):
+    """({file: sha256}, who signed it) for release `tag`'s SHA256SUMS, fetched
+    and verified against this tool's signers, with the file `name` in it;
+    stops when the list is unsigned, signed by nobody this tool names or by
+    somebody the tag may not have, or does not name the file, and when this
+    tool names no signer at all: every release's copy of it carries them."""
     keys = signers()
     if not keys:
-        say("no release key is set in this tool yet, so the release's signature is not checked")
-        return
+        die("this tool names no release signer, so the release's signature cannot be checked: not written")
     if not tag:
-        die(f"{os.path.basename(path)} does not name its release, so its signature cannot be checked: use the release's own file name")
+        die(f"{name} does not name its release, so its signature cannot be checked: use the release's own file name")
+    may = tag_namespaces(tag)
+    if not may:
+        die(f"{tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told: not written")
+    if SIG_DEV not in may and not any(k.split(None, 1)[0] == SIG_RELEASE for k in keys):
+        die(f"{tag} is a stable release and no stable signer is named yet: this tool names only the key dev builds are "
+            "signed with, and a stable release is signed by its own key's holder; not written")
     tool = shutil.which("ssh-keygen")
     if not tool:
         die("ssh-keygen is not here to check the release's signature: install OpenSSH (on Windows: Settings, Optional features, OpenSSH Client)")
     import tempfile
     with tempfile.TemporaryDirectory() as d:
         base = f"{RELEASES}/download/{tag}"
+        sums, sig = os.path.join(d, "SHA256SUMS"), os.path.join(d, "SHA256SUMS.sig")
         try:
-            fetch(f"{base}/SHA256SUMS", os.path.join(d, "SHA256SUMS"), say_progress=False)
-            fetch(f"{base}/SHA256SUMS.sig", os.path.join(d, "SHA256SUMS.sig"), say_progress=False)
+            fetch(f"{base}/SHA256SUMS", sums, say_progress=False)
+            fetch(f"{base}/SHA256SUMS.sig", sig, say_progress=False)
         except OSError as e:
-            die(f"the {tag} release carries no signature ({e}): it has not been signed yet, so it is not written")
+            die(f"the {tag} release carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig: {e}): it was made "
+                "before releases were signed, or its key's holder has not signed it yet; not written")
         with open(os.path.join(d, "signers"), "w", encoding="utf-8") as f:
             f.write("\n".join(keys) + "\n")
-        with open(os.path.join(d, "SHA256SUMS"), "rb") as sums:
-            r = subprocess.run([tool, "-Y", "verify", "-f", os.path.join(d, "signers"), "-I", SIG_NS, "-n", SIG_NS,
-                                "-s", os.path.join(d, "SHA256SUMS.sig")], stdin=sums, capture_output=True, text=True, check=False)
-        if r.returncode != 0:
-            die(f"the {tag} release's signature does not verify against AerieOS's release key: not written")
-        h = hashlib.sha256()
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(CHUNK), b""):
-                h.update(chunk)
+        # Each signer is asked for in the one namespace it is named for.
+        ns = ""
+        for want in (SIG_RELEASE, SIG_DEV):
+            with open(sums, "rb") as fh:
+                r = subprocess.run([tool, "-Y", "verify", "-f", os.path.join(d, "signers"), "-I", want, "-n", want, "-s", sig],
+                                   stdin=fh, capture_output=True, text=True, check=False)
+            if r.returncode == 0:
+                ns = want
+                break
+        if not ns:
+            die(f"{tag}'s list of files is signed by no key this tool names: not written")
+        if ns not in may:
+            die(f"{tag} is a stable release and its list is signed by the key dev builds are signed with: "
+                "a stable release takes its own key's signature alone; not written")
         listed = {}
-        with open(os.path.join(d, "SHA256SUMS"), encoding="utf-8") as f:
+        with open(sums, encoding="utf-8", errors="replace") as f:
             for line in f:
                 parts = line.split()
-                if len(parts) == 2:
+                if len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0].lower()):
                     listed[parts[1].lstrip("*")] = parts[0].lower()
-        if listed.get(os.path.basename(path)) != h.hexdigest():
-            die(f"{os.path.basename(path)} is not the file the {tag} release signed: not written")
-    say(f"{os.path.basename(path)}: signed by AerieOS's release key")
+    if name not in listed:
+        die(f"{name} is not in the list of files {tag} signed: not written")
+    return listed, SIGNED_BY[ns]
+
+
+def signed(tag, path, got=None):
+    """The image's own bytes are the ones its release's signed list names,
+    whatever the sha256 beside it says; stops when they are not. `got` is
+    signed_list's answer where the list was read before the image was
+    fetched."""
+    name = os.path.basename(path)
+    listed, who = got if got is not None else signed_list(tag, name)
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(CHUNK), b""):
+            h.update(chunk)
+    if listed.get(name) != h.hexdigest():
+        die(f"{name} is not the file {tag} signed: its bytes are not the ones the signed list names; not written")
+    say(f"{name}: the image {tag}'s list names, signed by {who}")
 
 
 # ---- the stick's aerieos.env --------------------------------------------------
@@ -707,6 +767,32 @@ def open_disk(dev):
     return os.fdopen(fd, "r+b", buffering=0)
 
 
+def image_needs(image):
+    """The bytes a stick needs for `image`, from its partition table's last
+    sector (the GPT header's backup copy, read off its first megabyte); 0
+    when the image says none."""
+    try:
+        with lzma.open(image, "rb") as f:
+            head = f.read(1 << 20)
+    except (OSError, lzma.LZMAError, EOFError):
+        return 0
+    hdr = head[512:512 + 92]
+    if hdr[:8] != b"EFI PART":
+        return 0
+    return (int.from_bytes(hdr[32:40], "little") + 1) * 512
+
+
+def fits_why(image, size):
+    """Why a stick of `size` bytes cannot take `image`, or "" (B958): said
+    before anything is erased, where a write onto a stick too small failed
+    part way and read as a failing stick."""
+    need = image_needs(image)
+    if need and size and size < need:
+        return (f"this stick holds {size / GB:.1f} GB and the image needs {need / GB:.1f} GB: "
+                f"use a stick of {-(-need // (1 << 30)) + 1} GB or more (16 GB is the usual size)")
+    return ""
+
+
 def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None):
     size_xz = os.path.getsize(image)
     say(f"writing {os.path.basename(image)} ({size_xz / GB:.1f} GB compressed) to {dev}")
@@ -841,6 +927,9 @@ def cmd_write(a):
     again = pick(a.disk)
     if (again["size"], again["model"]) != (d["size"], d["model"]):
         die(f"{a.disk} is not the disk it was before the download ({again['model'] or 'unnamed'}, {again['size'] / GB:.1f} GB now): nothing written")
+    why = fits_why(image, again["size"])
+    if why:
+        die(f"{why}: nothing written")
     say(f"{d['id']}: {named(d)}. Everything on it is lost.")
     if not a.yes:
         if input("Type yes to write it: ").strip().lower() != "yes":

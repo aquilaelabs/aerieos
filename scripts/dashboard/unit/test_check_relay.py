@@ -38,7 +38,7 @@ class CheckRelay(unittest.TestCase):
         os.makedirs(os.path.join(self.root, "dashboard"))
         shutil.copy(HOOK, os.path.join(self.root, "dashboard", "bb-check-relay"))
         os.makedirs(os.path.join(self.root, "lib"))
-        for m in ("rulehook.py", "cmdmatch.py"):
+        for m in ("rulehook.py", "cmdmatch.py", "scopedir.py"):
             shutil.copy(os.path.join(HERE, "..", "..", "lib", m), os.path.join(self.root, "lib", m))
         bb = os.path.join(self.root, "aerie")
         with open(bb, "w") as f:

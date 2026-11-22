@@ -26,6 +26,9 @@ import agents
 from names import tmux_name
 
 SESSIONS = None       # () -> every session row, here and on the nodes
+# ...and the same for the revisions poll's token, which may be a moment old:
+# this container's tmux listed every few seconds at most (server.tmux_sessions).
+LIVE_SESSIONS = None
 BASE = None           # name -> the name without its account prefix
 OWNER = None          # name -> the uid in its prefix, "" for the owner's bare name
 ACCOUNTS = None       # () -> {uid: account name}
@@ -38,9 +41,10 @@ END = None            # (name, node_id) -> the kill path's answer
 BEHIND = lambda s: []   # noqa: E731
 
 
-def configure(*, sessions, base, owner, accounts, owner_name, end):
+def configure(*, sessions, base, owner, accounts, owner_name, end, live_sessions=None):
     globals().update(SESSIONS=sessions, BASE=base, OWNER=owner,
-                     ACCOUNTS=accounts, OWNER_NAME=owner_name, END=end)
+                     ACCOUNTS=accounts, OWNER_NAME=owner_name, END=end,
+                     LIVE_SESSIONS=live_sessions or sessions)
 
 
 def _kind(base, project):
@@ -207,7 +211,7 @@ def live_token():
     without the status poll, which runs git for every project, going any
     faster (the operator, 25 Sep)."""
     rows = sorted((s["name"], (s.get("claude") or {}).get("state") or "")
-                  for s in SESSIONS())
+                  for s in LIVE_SESSIONS())
     # A change token for the poll, not a secret: said so to hashlib.
     return hashlib.sha256(json.dumps(rows).encode()).hexdigest()[:12]
 

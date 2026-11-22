@@ -13,17 +13,24 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import move  # noqa: E402
 
-SCHEMA = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "migrations", "0001_init.sql")).read()
+MIGRATIONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "migrations")
+SCHEMA = open(os.path.join(MIGRATIONS, "0001_init.sql")).read()
+TOKEN_STATE = open(os.path.join(MIGRATIONS, "0008_token_state.sql")).read()
 
 
-def db(path, nodes, tokens):
+def db(path, nodes, tokens, now=False):
+    """A store as 0001 laid it out, or `now` with a token's state in a column
+    of its own (0008)."""
     c = sqlite3.connect(path)
     c.executescript(SCHEMA)
     for nid, name, own, state in nodes:
         c.execute("INSERT INTO nodes (id, name, kind, pool, created, state, concurrency, ssh_addr, capabilities, services, labels, agent, reported, routing, config) "
                   "VALUES (?, ?, 'agent', '', 1, ?, 1, '', '{}', '{}', '{}', '{}', '{}', '{}', ?)", (nid, name, state, json.dumps({"own": True} if own else {})))
-    for tid, nid in tokens:
-        c.execute("INSERT INTO tokens (id, kind, node_id, secret_hash, created, expires, revoked, uses) VALUES (?, 'node', ?, 'h', 1, NULL, 0, 0)", (tid, nid))
+    for tid, nid, *revoked in tokens:
+        c.execute("INSERT INTO tokens (id, kind, node_id, secret_hash, created, expires, revoked, uses) VALUES (?, 'node', ?, 'h', 1, NULL, ?, 0)",
+                  (tid, nid, revoked[0] if revoked else 0))
+    if now:
+        c.executescript(TOKEN_STATE)
     c.commit()
     c.close()
 
@@ -47,6 +54,25 @@ class Carry(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(state, "firstboot.json")))
         self.assertEqual(len(said), 2, said)
 
+    def test_a_token_keeps_its_state_whichever_store_is_the_older(self):
+        # R227 step 14: a token's state has a column of its own since the
+        # database's migration 0008, which either store may not have run.
+        for old_aside, old_state in ((True, True), (True, False), (False, True), (False, False)):
+            d = tempfile.mkdtemp()
+            aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
+            os.makedirs(aside)
+            os.makedirs(state)
+            db(os.path.join(aside, "builderbot.db"), [("n_here", "tower", True, "online")],
+               [("t_live", "n_here", 0), ("t_pending", "n_here", 2), ("t_retired", "n_here", 3), ("t_gone", "n_here", 1)], now=not old_aside)
+            db(os.path.join(state, "builderbot.db"), [("n_far", "draconis", False, "online")], [], now=not old_state)
+            move.carry_here(aside, state)
+            c = sqlite3.connect(os.path.join(state, "builderbot.db"))
+            col = "revoked" if old_state else "state"
+            got = dict(c.execute(f"SELECT id, {col} FROM tokens"))
+            want = ({"t_live": 0, "t_pending": 2, "t_retired": 3, "t_gone": 1} if old_state
+                    else {"t_live": "live", "t_pending": "pending", "t_retired": "retired", "t_gone": "revoked"})
+            self.assertEqual(got, want, f"aside {'old' if old_aside else 'new'}, moved in {'old' if old_state else 'new'}")
+
     def test_the_projects_on_the_old_machine_run_on_this_one(self):
         d = tempfile.mkdtemp()
         aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
@@ -64,6 +90,23 @@ class Carry(unittest.TestCase):
         self.assertEqual(p["api"], {"node": "n_far", "nodes": ["n_far"]})
         self.assertEqual(json.load(open(os.path.join(state, "move.json")))["nodes"], ["n_far"], "the old machine is not waited for")
         self.assertTrue(any("1 space that ran" in x for x in said), said)
+
+    def test_a_container_install_has_no_machine_to_hand_on(self):
+        # The old home ran in a container: a node it marked as its own is a
+        # node like any other, never retired here, its spaces kept on it.
+        d = tempfile.mkdtemp()
+        aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
+        os.makedirs(aside)
+        os.makedirs(state)
+        db(os.path.join(aside, "builderbot.db"), [("n_here", "tower", True, "online")], [("t_here", "n_here")])
+        db(os.path.join(state, "builderbot.db"), [("n_vm", "sandbox", True, "online")], [])
+        with open(os.path.join(state, "claude-prefs.json"), "w") as f:
+            json.dump({"projects": {"demo": {"node": "n_vm", "nodes": ["n_vm"]}}, "users": {}}, f)
+        said = move.carry_here(aside, state, source_bare_metal=False)
+        c = sqlite3.connect(os.path.join(state, "builderbot.db"))
+        self.assertEqual(dict(c.execute("SELECT id, state FROM nodes").fetchall()), {"n_here": "online", "n_vm": "online"})
+        self.assertEqual(json.load(open(os.path.join(state, "claude-prefs.json")))["projects"]["demo"]["node"], "n_vm")
+        self.assertFalse(any("space" in x for x in said), said)
 
     def test_nothing_the_moved_state_has_is_replaced(self):
         d = tempfile.mkdtemp()

@@ -71,6 +71,18 @@ class Order(unittest.TestCase):
 
 
 class Steps(unittest.TestCase):
+    def test_the_banner_is_aerieos_and_a_start_leaves_a_homes_bashrc_as_it_is(self):
+        r = sh("banner")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.startswith("AerieOS: the controller"), r.stdout)
+        self.assertEqual(len(r.stdout.strip().splitlines()), 1, "one line")
+        with open(os.path.join(SCRIPTS, "lib", "boot.sh"), encoding="utf-8") as f:
+            text = f.read()
+        body = text[text.index("seed_home() {"):]
+        body = body[:body.index("\n}\n")]
+        self.assertNotIn("bashrc\" \"$old\"", body, "no line of a person's .bashrc is rewritten at a start")
+        self.assertNotIn("BuilderBot", text)
+
     def test_secrets_stashed_from_the_folder_named_and_shielded(self):
         with tempfile.TemporaryDirectory() as d:
             sec, run = os.path.join(d, "secrets"), os.path.join(d, "run")
@@ -84,6 +96,39 @@ class Steps(unittest.TestCase):
             self.assertIn("secrets: loaded 1 value(s) [NPM_TOKEN]", r.stdout)
             self.assertIn("NPM_TOKEN=npm_abcdefghijklmnopqrstu", r.stdout)
             self.assertIn("\n700\n600", r.stdout)
+
+    def test_a_secrets_file_is_read_as_words_and_never_run(self):
+        # B779: the start is root and sourced these files whole, so a line
+        # that set PATH left the controller in a restart loop ('chmod:
+        # command not found') and a command in one ran as root.
+        with tempfile.TemporaryDirectory() as d:
+            sec, run, mark = os.path.join(d, "secrets"), os.path.join(d, "run"), os.path.join(d, "ran")
+            os.mkdir(sec)
+            with open(os.path.join(sec, "site.env"), "w") as f:
+                f.write("# a note\n"
+                        "NPM_TOKEN=npm_abcdefghijklmnopqrstu\n"
+                        "export UV_PUBLISH_TOKEN='pypi-AgEI with spaces'   # a note after it\n"
+                        'SIGNING_SECRET="words, in double quotes"\n'
+                        "OTHER_SETTING=plain!value#mid*ok   # bare, as a shell would take it\n"
+                        "PATH=/tmp/evil\n"
+                        "LD_PRELOAD=/tmp/x.so\n"
+                        f"INSTALL_KEY=$(touch {mark}1)\n"
+                        'INSTALL_KEY_PREVIOUS="has $HOME in it"\n'
+                        f"touch {mark}2\n"
+                        f"BARE=a;touch {mark}3\n")
+            r = sh('stash_secrets; echo "got:$NPM_TOKEN|$UV_PUBLISH_TOKEN|$SIGNING_SECRET|$OTHER_SETTING|'
+                   '${INSTALL_KEY:-unset}|${INSTALL_KEY_PREVIOUS:-unset}|${BARE:-unset}|$(command -v chmod)"',
+                   {"BB_SECRETS_DIR": sec, "BB_RUN_DIR": run})
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("got:npm_abcdefghijklmnopqrstu|pypi-AgEI with spaces|words, in double quotes|plain!value#mid*ok|unset|unset|unset|/",
+                          r.stdout)
+            self.assertIn("secrets: loaded 3 value(s) [NPM_TOKEN,UV_PUBLISH_TOKEN,SIGNING_SECRET]", r.stdout)
+            said = r.stdout + r.stderr
+            for word in ("line 6 sets PATH, which a secrets file does not set", "line 7 sets LD_PRELOAD",
+                         "line 8 (INSTALL_KEY) is not a plain value", "line 9 (INSTALL_KEY_PREVIOUS) is not a plain value",
+                         "line 10 is not a NAME=value line", "line 11 (BARE) is not a plain value"):
+                self.assertIn(word, said)
+            self.assertEqual([x for x in os.listdir(d) if x.startswith("ran")], [], "nothing in the file was run")
 
     def test_no_folder_is_said(self):
         with tempfile.TemporaryDirectory() as d:

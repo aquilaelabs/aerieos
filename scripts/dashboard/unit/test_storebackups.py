@@ -60,8 +60,14 @@ class TheAgent(unittest.TestCase):
             def __init__(self):
                 self.state = {"store_backups": [{"id": "b_1", "name": "media", "source": "/mnt/tank/media", "dest": "/mnt/other/usb", "keep": 2}]}
 
-            def _sh(self, job, argv, timeout=0, **kw):
-                ran.append(argv)
+            def _sh(self, job, argv, timeout=0, pass_fds=(), **kw):
+                # rsync is handed held folders: kept here as the paths each
+                # reaches now, by the descriptors it was handed.
+                for x in argv:
+                    if x.startswith("/proc/self/fd/"):
+                        assert int(x.split("/")[4]) in pass_fds, (x, pass_fds)
+                ran.append([os.path.realpath(x) if x.startswith("/proc/self/fd/") else x for x in argv])
+                (getattr(self, "during", None) or (lambda: None))()
                 # rsync's work: the partial folder filled.
                 part = argv[-1].rstrip("/")
                 os.makedirs(part, exist_ok=True); open(os.path.join(part, "a.txt"), "w").write("hello")
@@ -72,9 +78,11 @@ class TheAgent(unittest.TestCase):
         self.A = A
         self.job = type("J", (), {"log": [], "say": lambda s, t: s.log.append(t), "text": lambda s: "".join(s.log)})()
 
-    def run_job(self, a, cfg, stamp, mounted=True, swap_dest=True):
+    def run_job(self, a, cfg, stamp, mounted=True, swap_dest=True, owner=None):
         real = {"/mnt/tank/media": self.src, **({"/mnt/other/usb": self.dest} if swap_dest else {})}
+        # Root here is this test's own account, unless a test says who.
         with mock.patch.dict(os.environ, self.env), mock.patch.object(self.bm.os, "geteuid", return_value=0), \
+             mock.patch.object(self.bm, "OWNER", os.getuid() if owner is None else owner), \
              mock.patch.object(self.bm.shutil, "which", return_value="/usr/bin/rsync"), mock.patch.object(self.bm.time, "strftime", return_value=stamp), \
              mock.patch.object(self.bm.os.path, "ismount", side_effect=lambda p: mounted and p.startswith("/mnt/other/usb")), \
              mock.patch.object(self.bm, "_du_mb", return_value=1), mock.patch.object(self.bm, "log"):
@@ -92,11 +100,11 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("succeeded", 0), self.job.text())
         self.assertEqual(self.ran[-1][0], "/usr/bin/rsync")
         self.assertNotIn("--link-dest", self.ran[-1], "nothing before the first run")
-        self.assertEqual(self.ran[-1][-2:], [self.src + "/", os.path.join(self.dest, "media", "20261028-040000.partial") + "/"])
+        self.assertEqual(self.ran[-1][-2:], [os.path.realpath(self.src), os.path.realpath(os.path.join(self.dest, "media", "20261028-040000.partial"))])
         self.assertEqual(os.readlink(os.path.join(self.dest, "media", "latest")), "20261028-040000")
         self.run_job(a, {"name": "media"}, "20261029-040000")
         self.assertIn("--link-dest", self.ran[-1])
-        self.assertEqual(self.ran[-1][self.ran[-1].index("--link-dest") + 1], os.path.join(self.dest, "media", "20261028-040000"))
+        self.assertEqual(self.ran[-1][self.ran[-1].index("--link-dest") + 1], os.path.realpath(os.path.join(self.dest, "media", "20261028-040000")))
         self.run_job(a, {"name": "media"}, "20261030-040000")
         kept = sorted(d for d in os.listdir(os.path.join(self.dest, "media")) if d[0].isdigit())
         self.assertEqual(kept, ["20261029-040000", "20261030-040000"], "two kept, the oldest pruned")
@@ -105,6 +113,121 @@ class TheAgent(unittest.TestCase):
         with mock.patch.dict(os.environ, self.env):
             rows = self.bm.backups_now(a.state)
         self.assertEqual((rows[0]["name"], rows[0]["ok"], rows[0]["runs"]), ("media", True, 2))
+
+    def test_a_link_at_the_backups_name_is_refused(self):
+        # A share user may write the destination: a link left at the
+        # backup's name would take root's copy, and its deletions, anywhere.
+        elsewhere = os.path.join(self.d, "etc")
+        os.makedirs(elsewhere)
+        open(os.path.join(elsewhere, "keep"), "w").write("root's own")
+        os.symlink(elsewhere, os.path.join(self.dest, "media"))
+        a = self.A()
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), self.job.text())
+        self.assertIn("leads somewhere else", self.job.text())
+        self.assertEqual(self.ran, [], "rsync is not run")
+        self.assertEqual(os.listdir(elsewhere), ["keep"])
+
+    def test_a_runs_folder_not_roots_alone_is_refused(self):
+        # A share user who made the backup's folder before its first run, or
+        # a folder others may write: either could leave a name inside it for
+        # root's copy to follow.
+        runs = os.path.join(self.dest, "media")
+        os.makedirs(runs)
+        os.chmod(runs, 0o755)
+        a = self.A()
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000", owner=os.getuid() + 1), ("failed", 64), self.job.text())
+        self.assertIn("is not root's alone", self.job.text())
+        for mode in (0o777, 0o757):
+            os.chmod(runs, mode)
+            self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), oct(mode))
+        # The test stands this account's uid in for root's; where its group
+        # has the same number (a runner's user and group often do), the
+        # folder's group is root's in this model and may write it.
+        if os.stat(runs).st_gid != os.getuid():
+            os.chmod(runs, 0o775)
+            self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), "writable by a group not root's")
+        self.assertEqual(self.ran, [], "rsync is not run")
+        os.chmod(runs, 0o755)
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("succeeded", 0), self.job.text())
+
+    def test_an_smb_mounts_folder_is_roots_alone_without_an_acl(self):
+        # What an SMB mount shows (uid=0, gid=0, dir_mode=0775) is root's
+        # alone; group bits that are an ACL's mask are not.
+        smb = os.stat_result((0o40775, 0, 0, 0, 0, 0) + (0,) * 4)
+        with mock.patch.object(self.bm.os, "fstat", return_value=smb), mock.patch.object(self.bm, "_acl", return_value=False):
+            self.assertTrue(self.bm._roots_alone(0))
+        with mock.patch.object(self.bm.os, "fstat", return_value=smb), mock.patch.object(self.bm, "_acl", return_value=True):
+            self.assertFalse(self.bm._roots_alone(0))
+        with mock.patch.object(self.bm.os, "fstat", return_value=os.stat_result((0o40755, 0, 0, 0, 0, 1000) + (0,) * 4)):
+            self.assertTrue(self.bm._roots_alone(0), "a group that may only read")
+        with mock.patch.object(self.bm.os, "fstat", return_value=os.stat_result((0o40775, 0, 0, 0, 0, 1000) + (0,) * 4)):
+            self.assertFalse(self.bm._roots_alone(0), "a group not root's that may write")
+
+    def test_a_link_at_the_runs_partial_name_stops_the_run(self):
+        # The audit's scenario: links left at the next seconds' run names,
+        # to a folder of root's that rsync --delete would empty.
+        victim = os.path.join(self.d, "victim")
+        os.makedirs(victim)
+        open(os.path.join(victim, "precious"), "w").write("root's own")
+        runs = os.path.join(self.dest, "media")
+        os.makedirs(runs)
+        os.chmod(runs, 0o755)
+        os.symlink(victim, os.path.join(runs, "20261028-040000.partial"))
+        a = self.A()
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), self.job.text())
+        self.assertIn("something is already at", self.job.text())
+        os.makedirs(os.path.join(runs, "20261028-050000"))
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-050000"), ("failed", 64), "a run already at the name")
+        self.assertEqual(self.ran, [])
+        self.assertEqual(os.listdir(victim), ["precious"])
+
+    def test_a_folder_swapped_while_the_copy_runs_takes_nothing_elsewhere(self):
+        # The runs' folder renamed and a link left at its name while rsync
+        # runs: the copy, the rename and `latest` stay in the folder held.
+        victim = os.path.join(self.d, "victim")
+        os.makedirs(victim)
+        runs = os.path.join(self.dest, "media")
+        a = self.A()
+
+        def swap():
+            os.rename(runs, runs + ".moved")
+            os.symlink(victim, runs)
+        a.during = swap
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("succeeded", 0), self.job.text())
+        self.assertEqual(os.listdir(victim), [])
+        self.assertEqual(sorted(os.listdir(runs + ".moved")), ["20261028-040000", "latest"])
+        self.assertEqual(os.readlink(os.path.join(runs + ".moved", "latest")), "20261028-040000")
+
+    @unittest.skipUnless(shutil.which("rsync"), "no rsync here")
+    def test_rsync_itself_copies_into_the_held_folder(self):
+        import subprocess
+        victim = os.path.join(self.d, "victim")
+        os.makedirs(victim)
+        open(os.path.join(victim, "precious"), "w").write("root's own")
+        runs = os.path.join(self.dest, "media")
+        a = self.A()
+
+        def rsync(job, argv, timeout=0, pass_fds=()):
+            # The runs' folder swapped for a link just before rsync starts.
+            os.rename(runs, runs + ".moved")
+            os.symlink(victim, runs)
+            self.ran.append(argv)
+            return subprocess.run([shutil.which("rsync"), "-a", "--delete"] + argv[-2:], pass_fds=pass_fds, check=False).returncode
+        a._sh = rsync
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("succeeded", 0), self.job.text())
+        self.assertEqual(os.listdir(victim), ["precious"])
+        self.assertEqual(open(os.path.join(runs + ".moved", "20261028-040000", "a.txt")).read(), "hello")
+
+    def test_a_latest_that_leads_out_is_not_linked_to(self):
+        a = self.A()
+        self.run_job(a, {"name": "media"}, "20261028-040000")
+        elsewhere = os.path.join(self.d, "etc")
+        os.makedirs(elsewhere)
+        latest = os.path.join(self.dest, "media", "latest")
+        os.unlink(latest)
+        os.symlink(elsewhere, latest)
+        self.run_job(a, {"name": "media"}, "20261029-040000")
+        self.assertNotIn("--link-dest", self.ran[-1])
 
     def test_what_fails_leaves_nothing_and_a_missing_mount_is_refused(self):
         a = self.A()

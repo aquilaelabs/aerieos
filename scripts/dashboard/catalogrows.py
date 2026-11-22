@@ -1,0 +1,302 @@
+"""A shipped toolchain's recipe, read from the catalog when the catalog's is
+newer (R234 step 4).
+
+Every toolchain AerieOS ships is a row of config/toolchains.json, and each
+is also an official pack in the catalog, written from that row
+(manifest_of; tools/packs-export.py). A row's recipe is mostly other
+people's facts: where a release is downloaded from, how its version is
+found, which system packages it needs. When one of those moves upstream the
+fix used to wait for a release of AerieOS. Now a row has a `rev`, its
+catalog entry repeats it (`shipped_rev`), and an install that reads a signed
+index whose rev is higher than its own row's fetches that pack at its pin,
+under its sha256, holds the row to its shape and to no less than the
+shipped row is held to (packformat.held: a higher rev never puts a weaker
+recipe in a pinned one's place), and keeps it under the state:
+the controller's own table then carries the newer row in the shipped one's
+place, and the bundle every node installs from carries the rows so merged as
+a file of their own beside the shipped one (config/toolchains.catalog.json),
+which a node reads where it is there: config/toolchains.json itself goes as
+its release signed it. The image's copy is what runs with no network, at
+first boot, and whenever the catalog's is no newer.
+
+What a row may say is the format's, not the catalog's: its source kind, its
+version resolvers and its checksum kinds are a closed set this build
+carries the code for (the primitives below, docs/tool-packs.md), and its
+probe is the shipped row's, since what reads a toolchain's version is this
+build's own. A row that names anything else is one this build is too old
+for: refused, and the shipped row stays.
+
+A toolchain nobody ships is not a row here: it is a pack, with its own
+install steps, which the catalog adds with no release at all.
+"""
+import json
+import re
+import threading
+import time
+
+import packformat
+
+FILE = None            # the state's catalog-toolchains.json
+write_json = None
+audit = None           # db.audit: a row taken from the catalog, or refused, is a line there
+_refused = set()       # {(name, commit)} said in the audit already: a refused pack is tried again every RETRY_S
+_lock = threading.RLock()
+_trying = {}           # {(name, commit): when it was last tried}, so a pack that fails is asked again in an hour, not on every read
+
+# The format's primitives a recipe names (docs/tool-packs.md): each is code
+# in scripts/lib (sdk.sh's five install shapes, sdkmeta.py's resolvers and
+# checksum readers). A new one is a new pack format, never a new meaning
+# for one of these.
+KINDS = ("tarball", "script", "git", "command", "sdkmanager")
+# The resolvers are the ones that say what a download weighs and the ones
+# that find a version (packformat.TRACK_RESOLVERS: a row's source.version, a
+# declared download's track, a repository's source.track); the checksums are
+# the ones that ask a file's origin (packformat.FOUND_FROM, which a pin's
+# `found` is held to as well) and the pin.
+RESOLVERS = ("approximate", "android-repo", "command-urls", "url-matches", *packformat.TRACK_RESOLVERS)
+CHECKSUMS = (*packformat.FOUND_FROM, "pin")
+SHIPPED_KEYS = ("probe", "source", "system", "requires", "updatable", "tool")
+PLATFORM = re.compile(r"^(linux|darwin)/(amd64|arm64|\*)$")
+# A recipe with every file a package manager installs declared, and the
+# lock it installs by, is the largest there is: a tool with two hundred
+# packages under it comes to about 120 KB.
+MAX_BYTES = 192 * 1024
+RETRY_S = 3600
+
+
+def configure(*, state, write_json, audit=None):
+    globals().update(FILE=f"{state}/catalog-toolchains.json", write_json=write_json, audit=audit)
+
+
+def _audit(action, name, was, now):
+    """One line in the audit, by the catalog, for a shipped row: the revs
+    are in its target, since the audit keeps a digest of the parameters
+    and not the parameters."""
+    if audit:
+        audit("catalog", action, f"{name} rev {was} to {now}", {})
+
+
+def rev_of(row):
+    """A row's rev: a whole number from 1, 1 when it says none."""
+    v = (row or {}).get("rev", 1)
+    return v if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= 9999 else 1
+
+
+def manifest_of(row):
+    """A shipped row as its official pack's manifest: the one format's own
+    keys at the top, the rest of the recipe under `shipped`. row_of is its
+    inverse, to the key."""
+    lay = row.get("layout") or {}
+    shipped = {k: row[k] for k in SHIPPED_KEYS if k in row}
+    for k in ("reports", "needs"):
+        if lay.get(k):
+            shipped[k] = lay[k]
+    if rev_of(row) > 1:
+        shipped["rev"] = rev_of(row)
+    # The format its recipe needs, where what it says of its downloads is
+    # past format 1 (packformat.source_format): an install that does not
+    # read it then leaves the entry, and its own shipped row stays.
+    fmt = packformat.source_format(row.get("source"))
+    numbered = {**row, "format": fmt} if fmt > 1 else row
+    return {"name": row["name"], "label": row["label"], "about": row.get("about", ""), "tier": "official",
+            **({"format": fmt} if fmt > 1 else {}),
+            # Who the tool is by, and each of them where it carries several
+            # makers' (packformat.maker_of), where the row says.
+            **{k: row[k] for k in ("maker", "credits") if row.get(k)},
+            **({"framework": packformat.least(numbered)} if packformat.least(numbered) else {}),
+            "platforms": row.get("platforms") or ["linux/amd64"], "terms": row.get("terms") or [],
+            "layout": {k: v for k, v in lay.items() if k in ("bin", "env", "tool")},
+            "shipped": shipped}
+
+
+def row_of(m):
+    """An official pack's manifest as the row it was written from."""
+    sh = m.get("shipped") or {}
+    lay = dict(m.get("layout") or {})
+    for k in ("reports", "needs"):
+        if sh.get(k):
+            lay[k] = sh[k]
+    row = {"name": m.get("name"), "label": m.get("label"), "about": m.get("about", ""),
+           "platforms": m.get("platforms") or [], "terms": m.get("terms") or [], "layout": lay}
+    row.update({k: sh[k] for k in SHIPPED_KEYS if k in sh})
+    row.update({k: m[k] for k in ("maker", "credits") if m.get(k)})
+    if rev_of(sh) > 1:
+        row["rev"] = rev_of(sh)
+    return row
+
+
+def _named(v, key):
+    """Every value a recipe gives `key`, however deep."""
+    if isinstance(v, dict):
+        for k, x in v.items():
+            if k == key and isinstance(x, str):
+                yield x
+            yield from _named(x, key)
+    elif isinstance(v, list):
+        for x in v:
+            yield from _named(x, key)
+
+
+def checked(row, shipped):
+    """(row, why): a catalog's row as this build takes it in the shipped
+    one's place, or why it does not."""
+    if not isinstance(row, dict) or not isinstance(shipped, dict):
+        return None, "it is not a toolchain this AerieOS ships"
+    if len(json.dumps(row)) > MAX_BYTES:
+        return None, "it is larger than a recipe is"
+    if row.get("name") != shipped.get("name") or row.get("probe") != shipped.get("probe"):
+        return None, "its name or its probe is not the shipped row's: what reads a toolchain's version is this AerieOS's own"
+    if not all(isinstance(row.get(k), str) and row.get(k) for k in ("label", "about")):
+        return None, "it has no label or no about"
+    plats = row.get("platforms")
+    if not (isinstance(plats, list) and plats and all(isinstance(p, str) and PLATFORM.fullmatch(p) for p in plats)):
+        return None, "its platforms are not ones AerieOS names"
+    src = row.get("source")
+    if not isinstance(src, dict) or src.get("kind") not in KINDS:
+        return None, f"its source is not one of {', '.join(KINDS)}: a newer AerieOS reads it"
+    odd = sorted({r for r in _named(row, "resolver") if r not in RESOLVERS})
+    if odd:
+        return None, f"it finds a version with {', '.join(odd)}, which this AerieOS does not carry: a newer AerieOS reads it"
+    ck = src.get("checksum")
+    if isinstance(ck, dict) and ck.get("from") not in (None, *CHECKSUMS):
+        return None, f"it checks a download by {ck.get('from')}, which this AerieOS does not carry: a newer AerieOS reads it"
+    # What it says of its downloads is the row's own word for what they
+    # are (its pin, the downloads it declares, the keys it carries, whether
+    # its steps keep the network), so its shape is held here: said wrong, an
+    # install of the row would be refused on every node.
+    if packformat.source_refused(src):
+        return None, packformat.source_refused(src)
+    if not isinstance(row.get("layout"), dict):
+        return None, "it has no layout"
+    # What it sets on every job of a node, and what it has a node's package
+    # manager install as root, are held to the format's two shapes.
+    env = row["layout"].get("env")
+    if env is not None and not (isinstance(env, dict) and all(packformat.env_name_ok(k) for k in env)):
+        return None, f"its layout.env sets variables of the tool's own, each {packformat.ENV_SAID}"
+    if packformat.system_refused(row.get("system")):
+        return None, packformat.system_refused(row.get("system"))
+    if rev_of(row) <= rev_of(shipped):
+        return None, "it is no newer than the shipped row"
+    # A higher rev is the catalog's word alone, so it never buys a weaker
+    # hold: the row is held to as much as the one it replaces.
+    weak = packformat.replaces_refused(packformat.held(row)[0], packformat.held(shipped)[0])
+    if weak:
+        return None, weak
+    return row, ""
+
+
+def kept():
+    """{name: {rev, commit, at, row}}: the rows taken from the catalog."""
+    try:
+        with open(FILE, encoding="utf-8") as f:
+            d = json.load(f)
+        rows = d.get("rows") if isinstance(d, dict) else None
+        return {k: v for k, v in rows.items() if isinstance(v, dict) and isinstance(v.get("row"), dict)} if isinstance(rows, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def merged(rows):
+    """The shipped rows with the catalog's newer one in each one's place:
+    every kept row is held to its shape again against the row it replaces,
+    so one this build would no longer take (an upgrade caught up with it, a
+    downgrade does not read it) is simply not used."""
+    if not FILE or not isinstance(rows, list):
+        return rows
+    mine = kept()
+    if not mine:
+        return rows
+    out = []
+    for r in rows:
+        rec = mine.get(r.get("name")) if isinstance(r, dict) else None
+        row, _why = checked(rec["row"], r) if rec else (None, "")
+        out.append(row or r)
+    return out
+
+
+def text(shipped_text):
+    """What the bundle carries beside config/toolchains.json, as
+    config/toolchains.catalog.json: the shipped file's text with the
+    catalog's newer rows in the shipped ones' places, or "" when none
+    applies and the bundle carries the shipped file alone."""
+    try:
+        doc = json.loads(shipped_text)
+        rows = doc["toolchains"]
+    except (ValueError, KeyError, TypeError):
+        return ""
+    new = merged(rows)
+    if new == rows or new is rows:
+        return ""
+    return json.dumps({**doc, "toolchains": new}, indent=1) + "\n"
+
+
+def wanted(index, shipped_rows):
+    """The index's official entries whose shipped_rev is past the row this
+    install would use today (its own, or one kept already). Each entry is
+    read at the pin this build takes (packformat.pin_for), so the rev and
+    the commit are those of a recipe written in a format it reads; an
+    entry with no such pin is left, and the shipped row stays."""
+    have = {r["name"]: rev_of(r) for r in merged(list(shipped_rows)) if isinstance(r, dict) and r.get("name")}
+    out = []
+    for listed in (index or {}).get("packs") or []:
+        e = packformat.pin_for(listed)
+        if e is None:
+            continue
+        # An index names a toolchain with its colon as a hyphen.
+        name = next((n for n in have if n.replace(":", "-") == e.get("name")), None)
+        rev = e.get("shipped_rev")
+        if name and e.get("tier") == "official" and not e.get("withdrawn") and e.get("kind", "pack") == "pack" \
+                and isinstance(rev, int) and not isinstance(rev, bool) and rev > have[name]:
+            out.append((name, e))
+    return out
+
+
+def refresh(index, fetch, shipped_rows, validate=None):
+    """Take the catalog's newer rows: each fetched at its pin under its
+    sha256 (`fetch` is toolpacks.fetch_folder), its manifest held to the
+    pack format (`validate`, toolpacks.validate) and its row to its shape
+    and to as much as the shipped row is held to (checked). Each row taken
+    is a line in the audit, by the catalog, with the revs it moved between,
+    and each one refused a line too, once. Rows an upgrade caught up with
+    are dropped. [(name, "" or why)] for what
+    was tried; nothing when nothing was wanted."""
+    shipped = {r["name"]: r for r in shipped_rows if isinstance(r, dict) and r.get("name")}
+    said = []
+    with _lock:
+        mine = kept()
+        # What this build's own rows are as new as, or no longer ships.
+        stale = [n for n, rec in mine.items() if n not in shipped or rev_of(rec["row"]) <= rev_of(shipped[n])]
+        for name, e in wanted(index, shipped_rows):
+            key = (name, e["commit"])
+            if time.time() - _trying.get(key, 0) < RETRY_S:
+                continue
+            _trying[key] = time.time()
+            got = fetch(e["url"], e["commit"], e["sha256"], e.get("path", ""), ("bbtool.json",))
+            if got.get("error"):
+                said.append((name, got["error"]))
+                continue
+            try:
+                m = json.loads(got["files"]["bbtool.json"].decode("utf-8"))
+            except (ValueError, UnicodeDecodeError, KeyError):
+                said.append((name, "its bbtool.json is not JSON"))
+                continue
+            # Official by the signed index's word, not the manifest's: wanted
+            # took this pin from an entry at tier official that names a row
+            # this build ships, and fetch held its folder to the entry's sha256.
+            errors = validate(m, official=True)[1] if validate else []
+            row, why = (None, "; ".join(errors)) if errors else checked(row_of(m), shipped[name])
+            was = rev_of(mine[name]["row"] if name in mine and name not in stale else shipped[name])
+            if not row:
+                said.append((name, why))
+                if key not in _refused:
+                    _refused.add(key)
+                    _audit("catalog-row-refused", name, was, e.get("shipped_rev"))
+                continue
+            mine[name] = {"rev": rev_of(row), "commit": e["commit"], "at": int(time.time()), "row": row}
+            said.append((name, ""))
+            _audit("catalog-row-taken", name, was, rev_of(row))
+        if stale or any(not why for _n, why in said):
+            for n in stale:
+                mine.pop(n, None)
+            write_json(FILE, {"rows": mine})
+    return said

@@ -22,12 +22,13 @@ the same way; the nodes take it as a git bundle that travels in the bundle
 beside config/toolpacks.json, and install it with the same pinned fetch.
 
     configure(state=, write_json=, unpack=)
-    validate(manifest)          (clean, [errors])
+    validate(manifest)          (clean, [errors]); official= is the caller's word that AerieOS ships it
     fetch(url, commit="")       the repository at a commit: {commit, manifest, guidance} or {error}
     stage(text=, archive=)      a pack made here, checked and held for Add: {staged, manifest, ...}
     add(url, commit, by) / add_staged(staged, by) / remove(name) / source(name)
     packs() / recipes() / hosted_files()
 """
+import hashlib
 import json
 import os
 import re
@@ -38,6 +39,12 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+
+import agents
+import packformat
+import seams
+import services
+import statefile
 
 FILE = None
 write_json = None
@@ -92,13 +99,17 @@ def configure(*, state, write_json, unpack=None):
                      HOSTED=Path(state) / "toolpacks", unpack=unpack)
 
 
-def _load():
-    try:
-        d = json.loads(FILE.read_text())
-    except (OSError, ValueError, AttributeError):
-        d = {}
-    packs = d.get("packs") if isinstance(d, dict) and isinstance(d.get("packs"), dict) else {}
+def _packs_only(d):
+    packs = d.get("packs") if isinstance(d.get("packs"), dict) else {}
     return {"packs": {k: v for k, v in packs.items() if isinstance(v, dict)}}
+
+
+_store = statefile.Store(lambda: FILE, validate=_packs_only)
+
+
+def _load():
+    # No pack is installed before the module is told where its file is.
+    return _store.load() if FILE is not None else _packs_only({})
 
 
 def _words(v, what, errors, placeholders=PLACEHOLDERS):
@@ -128,10 +139,14 @@ TIERS = ("official", "vetted", "url")
 # Library as Configure on the card, the answers kept sealed on the
 # controller and handed to the node. A `list` field is rows of `fields`.
 CONFIG_KINDS = ("secret", "text", "choice", "list", "switch", "projects")
+# Declared downloads (install.fetch): how many a pack may name, and the
+# pack format that brought them.
+FETCH_MAX, FETCH_FORMAT = packformat.FETCH_MAX, 3
 CONFIG_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
-# A deployed thing an official pack stands for (R172): the model router.
-SERVICES = ("router",)
+# A deployed thing an official pack stands for (R172): the model router,
+# nginx and the Scanners, the kinds services.py's table holds.
+SERVICES = services.KINDS
 AGENT_FIELDS = ("product", "command", "provider", "reported", "update_job", "login_job", "logout_job",
                 "briefing", "guards", "state", "transcripts", "latest_url", "tool")
 AGENT_BRIEFING = ("system-prompt-file", "instructions-file")
@@ -167,7 +182,57 @@ def _agent(a, errors):
         errors.append("agent.transcripts is a path under the account's home")
     if out["latest_url"] and not re.fullmatch(r"https://[A-Za-z0-9._~:/@+?=&%-]{3,300}", out["latest_url"]):
         errors.append("agent.latest_url is an https address")
+    _agent_allow(a, out, errors)
+    # How it is installed (R169 step 13): a shipped agent's alone, since a
+    # pack agent is installed by its pack's own steps.
+    recipe, why = agents.install_checked(a.get("install"))
+    if why:
+        errors.append(why)
+    elif recipe:
+        out["install"] = recipe
+    # How it signs in (R234 step 6), in a pack agent's own words: the
+    # command that starts it and the flow, held by the one validator.
+    si = a.get("signin")
+    if si is not None:
+        got = signin_checked(si, out["command"], errors)
+        if got:
+            out["signin"] = got
     return out
+
+
+def signin_checked(si, command, errors):
+    """A shipped agent's `signin` checked as a pack agent's is: {login, env,
+    flow}, or None with why in `errors`."""
+    if not isinstance(si, dict):
+        errors.append("agent.signin is an object: login, env, flow")
+        return None
+    bad = len(errors)
+    login = si.get("login") if si.get("login") is not None else []
+    if not (isinstance(login, list) and len(login) <= 6 and all(isinstance(x, str) and ARG.fullmatch(x) for x in login)):
+        errors.append("agent.signin.login lists up to 6 plain words")
+        login = []
+    if login and login[0] != command:
+        errors.append("agent.signin.login runs the agent's own command, e.g. [\"foo\", \"login\"]")
+    env = si.get("env") if si.get("env") is not None else {}
+    if not (isinstance(env, dict) and len(env) <= 8 and all(packformat.env_name_ok(k) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
+                                                          for k, v in env.items())):
+        errors.append(f"agent.signin.env maps up to 8 NAME to plain words its sign-in runs with (an updater off), each {packformat.ENV_SAID}")
+        env = {}
+    flow = _signin_flow(si.get("flow"), {"command": command, "login": list(login)}, errors) if si.get("flow") is not None else None
+    if len(errors) != bad:
+        return None
+    return {"login": list(login), **({"env": dict(env)} if env else {}), **({"flow": flow} if flow else {})}
+
+
+def _agent_allow(a, out, errors):
+    """An agent's `allow` (R231): how it is told the aerie verbs the
+    controller decides need no asking, checked by agents.allow_checked and
+    kept only where it says a way."""
+    spec, why = agents.allow_checked(a.get("allow"))
+    if why:
+        errors.append(why)
+    elif spec:
+        out["allow"] = spec
 
 
 # A coding agent from a vetted pack (R169 step 8): an adapter of data, never
@@ -179,14 +244,141 @@ def _agent(a, errors):
 # Copilot), so bb-agent-hook holds it to the same guards with no code of its
 # own. Before a tool, a prompt and the stop are required: an agent that
 # cannot take the guards is not listed.
+#
+# An agent whose hooks are none of those says its own as data (R234 step 3),
+# so a protocol nobody has met is a manifest and no release of AerieOS:
+# hooks.document lays its hooks file out, hooks.payload is the paths its
+# payload keeps each thing at, hooks.answers the JSON it reads back for a
+# refusal, a pass, words for the model and an approval. The named shapes are
+# those descriptions under a name (bb-agent-hook DOCUMENTS, PAYLOADS) and
+# stay what they are: a manifest written with them is valid for good.
 PACK_AGENT = re.compile(r"^[a-z][a-z0-9]{1,15}$")
 PACK_AGENT_SHAPES = ("grouped", "flat")
 PACK_AGENT_PAYLOADS = ("snake", "camel")
-PACK_AGENT_EVENTS = ("pre", "prompt", "stop", "recall", "asking")
+# `start` is a conversation's start, for an agent handed the briefing by its
+# hooks (briefing.how hook); the rest are AerieOS's guards.
+PACK_AGENT_EVENTS = ("pre", "prompt", "stop", "recall", "asking", "start")
 PACK_AGENT_NEEDS = ("pre", "prompt", "stop")
-PACK_AGENT_BRIEFING = ("flag-text", "flag-file", "env-file", "none")
+PACK_AGENT_BRIEFING = ("flag-text", "flag-file", "env-file", "hook", "none")
+# When its prompt event is raised: once for each thing a person sends, or
+# before every call to its model, where the hooks of a prompt run on the
+# first of a turn alone.
+PACK_AGENT_PROMPT_FIRES = ("once", "each-call")
+# What a payload's paths may name, and a tool's arguments under `args`.
+PACK_AGENT_PATHS = ("session", "cwd", "tool", "input", "prompt", "stop_active", "transcript", "call")
+PACK_AGENT_ARGS = ("command", "file", "pattern")
+PACK_AGENT_ANSWERS = ("refuse", "pass", "say", "approve")
+DOTTED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,40}(\.[A-Za-z_][A-Za-z0-9_]{0,40}){0,5}$")
+# A template is JSON an agent reads, so what it may hold is narrow: keys
+# that are names, numbers, true and false, and strings that are either one
+# placeholder, whole, or a single plain word (command, allow, deny, *). No
+# string in one can carry a command line, a path or an address: the one
+# command a hooks file runs is AerieOS's own, in {command}'s place.
+TEMPLATE_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,40}$")
+TEMPLATE_WORD = re.compile(r"^[A-Za-z0-9_.*-]{0,40}$")
+
+
+def _template(v, holes, what, errors, depth=0, count=None):
+    """A template held to its shape, or an error said once: `holes` are the
+    placeholders it may carry."""
+    count = count if count is not None else [0]
+    count[0] += 1
+    bad = None
+    if depth > 6 or count[0] > 60:
+        bad = "is deeper or larger than a hook's answer is"
+    elif isinstance(v, bool) or v is None:
+        bad = None if isinstance(v, bool) else "holds a null"
+    elif isinstance(v, int):
+        bad = None if -1 <= v <= 86400 else "holds a number no hook is given"
+    elif isinstance(v, str):
+        bad = None if v in holes or TEMPLATE_WORD.fullmatch(v) else \
+            f"holds {v[:30]!r}: a string is one of {', '.join(holes)}, whole, or one plain word"
+    elif isinstance(v, list):
+        if len(v) > 8:
+            bad = "holds a list of more than 8"
+        else:
+            return all([_template(x, holes, what, errors, depth + 1, count) for x in v])
+    elif isinstance(v, dict):
+        if not all(isinstance(k, str) and TEMPLATE_KEY.fullmatch(k) for k in v):
+            bad = "has a key that is not a name"
+        else:
+            return all([_template(x, holes, what, errors, depth + 1, count) for x in v.values()])
+    else:
+        bad = "holds something that is not JSON's"
+    if bad:
+        errors.append(f"{what} {bad}")
+    return not bad
+
+
+def _paths(v):
+    """One path or a short list of them, or None."""
+    if isinstance(v, str):
+        v = [v]
+    return list(v) if isinstance(v, list) and 1 <= len(v) <= 4 and all(isinstance(x, str) and DOTTED.fullmatch(x) for x in v) else None
+
+
+def _hooks_data(h, errors):
+    """What an adapter says of its own protocol, checked: (document,
+    payload, answers), each None where it names a shape or gives none."""
+    doc = h.get("document")
+    if doc is not None:
+        ok = isinstance(doc, dict) and set(doc) <= {"under", "with", "keep", "handler", "entry", "entries"}
+        under = doc.get("under") if ok else None
+        if not (ok and isinstance(under, list) and 1 <= len(under) <= 4 and all(isinstance(k, str) and TEMPLATE_KEY.fullmatch(k) for k in under)):
+            errors.append("agent.hooks.document is an object: under (the keys down to its events), handler, entry, and optionally with, keep and entries")
+            doc = None
+        else:
+            ok = _template(doc.get("handler"), ("{command}", "{seconds}"), "agent.hooks.document.handler", errors) and isinstance(doc.get("handler"), dict)
+            if ok and "{command}" not in json.dumps(doc["handler"]):
+                errors.append("agent.hooks.document.handler names no {command}: a hook that does not call AerieOS holds nothing")
+                ok = False
+            ok = _template(doc.get("entry", ["{handler}"]), ("{handler}",), "agent.hooks.document.entry", errors) and ok
+            entries = doc.get("entries") if doc.get("entries") is not None else {}
+            if not (isinstance(entries, dict) and all(k in PACK_AGENT_EVENTS for k in entries)):
+                errors.append(f"agent.hooks.document.entries gives one of AerieOS's events its own entry: {', '.join(PACK_AGENT_EVENTS)}")
+                ok = False
+            else:
+                ok = all([_template(v, ("{handler}",), f"agent.hooks.document.entries.{k}", errors) for k, v in entries.items()]) and ok
+            for k, v in [("entry", doc.get("entry", ["{handler}"])), *entries.items()] if ok else []:
+                if "{handler}" not in json.dumps(v):
+                    errors.append(f"agent.hooks.document.{k} names no {{handler}}: an event with no hook holds nothing")
+                    ok = False
+            ok = _template(doc.get("with", {}), (), "agent.hooks.document.with", errors) and isinstance(doc.get("with", {}), dict) and ok
+            doc = {"under": list(under), "with": dict(doc.get("with") or {}), "keep": doc.get("keep") is True,
+                   "handler": doc["handler"], "entry": doc.get("entry", ["{handler}"]), "entries": dict(entries)} if ok else None
+    pay = h.get("payload")
+    if isinstance(pay, dict):
+        args = pay.get("args") if pay.get("args") is not None else {}
+        ok = set(pay) <= {*PACK_AGENT_PATHS, "args"} and all(_paths(pay[k]) for k in pay if k != "args") \
+            and isinstance(args, dict) and set(args) <= set(PACK_AGENT_ARGS) and all(_paths(v) for v in args.values())
+        if not ok or not all(k in pay for k in ("session", "tool", "input")):
+            errors.append("agent.hooks.payload as paths names where the session, the tool and its input are (session, tool, input), and optionally "
+                          "cwd, prompt, stop_active, transcript, call and args (command, file, pattern): each a dotted path or up to 4 of them")
+            pay = None
+        else:
+            pay = {**{k: _paths(pay[k]) for k in pay if k != "args"}, "args": {k: _paths(v) for k, v in args.items()}}
+    else:
+        pay = None
+    ans = h.get("answers")
+    if ans is not None:
+        ok = isinstance(ans, dict) and all(k in PACK_AGENT_EVENTS and isinstance(v, dict) and set(v) <= set(PACK_AGENT_ANSWERS) for k, v in ans.items())
+        if not ok:
+            errors.append(f"agent.hooks.answers gives an event ({', '.join(PACK_AGENT_EVENTS)}) what it is answered: {', '.join(PACK_AGENT_ANSWERS)}")
+            ans = None
+        else:
+            holes = {"refuse": ("{reason}",), "pass": (), "say": ("{text}",), "approve": ()}
+            ok = all([_template(t, holes[kind], f"agent.hooks.answers.{ev}.{kind}", errors) and isinstance(t, dict)
+                      for ev, kinds in ans.items() for kind, t in kinds.items()])
+            if ok and not all((ans.get(ev) or {}).get("refuse") for ev in PACK_AGENT_NEEDS):
+                errors.append("agent.hooks.answers says how a refusal is written before a tool, on a prompt and at the stop (pre, prompt and stop each a refuse): "
+                              "an agent that cannot be refused cannot take AerieOS's guards")
+                ok = False
+            ans = {ev: dict(kinds) for ev, kinds in ans.items()} if ok else None
+    return doc, pay, ans
+
+
 PACK_AGENT_FIRST = ("after-dashdash", "flag", "none")
-SHIPPED_AGENTS = ("claude", "codex", "copilot", "grok", "open")
+SHIPPED_AGENTS = tuple(a.id for a in agents.TABLE)
 FLAG = re.compile(r"^-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 ARG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._=:,/-]{0,80}$|^-{1,2}[A-Za-z0-9][A-Za-z0-9._=:,/-]{0,80}$")
@@ -194,7 +386,7 @@ EVENT_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9._]{0,40}$")
 TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,60}$")
 
 
-def _pack_agent(name, a, errors):
+def _pack_agent(name, a, errors, newer=False):
     """The adapter of a coding agent a vetted pack brings, checked and cut
     down to what bb-tty and bb-agent-hook read, or None."""
     if not isinstance(a, dict):
@@ -225,7 +417,7 @@ def _pack_agent(name, a, errors):
             errors.append(f"agent.briefing.flag is the option {how} hands the briefing with, e.g. --rules")
         out["briefing"]["flag"] = str(b.get("flag") or "")
     elif how == "env-file":
-        if not (isinstance(b.get("env"), str) and ENV_NAME.fullmatch(b["env"])):
+        if not (isinstance(b.get("env"), str) and packformat.env_name_ok(b["env"])):
             errors.append("agent.briefing.env is the variable that names the briefing's file")
         out["briefing"]["env"] = str(b.get("env") or "")
     h = a.get("hooks")
@@ -234,10 +426,13 @@ def _pack_agent(name, a, errors):
         h = {}
     if not (isinstance(h.get("file"), str) and REL.fullmatch(h["file"])):
         errors.append("agent.hooks.file is its hooks file's path under the account's home, e.g. .foo/hooks/builderbot.json")
-    if h.get("shape") not in PACK_AGENT_SHAPES:
-        errors.append(f"agent.hooks.shape is one of {', '.join(PACK_AGENT_SHAPES)}")
-    if h.get("payload") not in PACK_AGENT_PAYLOADS:
-        errors.append(f"agent.hooks.payload is one of {', '.join(PACK_AGENT_PAYLOADS)}")
+    document, paths, answers = _hooks_data(h, errors)
+    if h.get("document") is None and h.get("shape") not in PACK_AGENT_SHAPES:
+        errors.append(f"agent.hooks.shape is one of {', '.join(PACK_AGENT_SHAPES)}, or agent.hooks.document lays the file out")
+    elif h.get("document") is not None and h.get("shape") not in (None, ""):
+        errors.append("agent.hooks names a shape or lays its file out as document, not both")
+    if not isinstance(h.get("payload"), dict) and h.get("payload") not in PACK_AGENT_PAYLOADS:
+        errors.append(f"agent.hooks.payload is one of {', '.join(PACK_AGENT_PAYLOADS)}, or the paths its payload keeps each thing at")
     evs = h.get("events") if isinstance(h.get("events"), dict) else {}
     for k in evs:
         if k not in PACK_AGENT_EVENTS:
@@ -251,16 +446,30 @@ def _pack_agent(name, a, errors):
     for k, v in tools.items():
         if k not in ("shell", "edit", "grep") or not (isinstance(v, list) and len(v) <= 8 and all(isinstance(t, str) and TOOL_NAME.fullmatch(t) for t in v)):
             errors.append("agent.hooks.tools maps shell, edit and grep to the agent's own tool names")
-    out["hooks"] = {"file": str(h.get("file") or ""), "shape": h.get("shape"), "payload": h.get("payload"),
+    fires = h.get("prompt_fires", "once")
+    if fires not in PACK_AGENT_PROMPT_FIRES:
+        errors.append(f"agent.hooks.prompt_fires is one of {', '.join(PACK_AGENT_PROMPT_FIRES)}")
+    elif fires == "each-call" and not answers:
+        errors.append("agent.hooks.prompt_fires each-call is for an agent answered from hooks.answers")
+    # What only an answer can do is asked of an adapter that says the answer.
+    if how == "hook" and not any((answers or {}).get(ev, {}).get("say") for ev in ("start", "prompt")):
+        errors.append("agent.briefing.how hook needs hooks.answers to say how words reach the model at a start or on a prompt (a say)")
+    out["hooks"] = {"file": str(h.get("file") or ""), "shape": h.get("shape") or "", "payload": paths or h.get("payload"),
                     "events": {k: v for k, v in evs.items() if k in PACK_AGENT_EVENTS},
                     "tools": {k: list(v) for k, v in tools.items() if k in ("shell", "edit", "grep") and isinstance(v, list)}}
+    if document:
+        out["hooks"]["document"] = document
+    if answers:
+        out["hooks"]["answers"] = answers
+    if fires == "each-call":
+        out["hooks"]["prompt_fires"] = fires
     env = a.get("env") if a.get("env") is not None else {}
-    if not (isinstance(env, dict) and len(env) <= 8 and all(ENV_NAME.fullmatch(str(k)) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
+    if not (isinstance(env, dict) and len(env) <= 8 and all(isinstance(k, str) and ENV_NAME.fullmatch(k) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
                                                           for k, v in env.items())):
         errors.append("agent.env maps up to 8 NAME to plain words (an updater off, a telemetry switch), never a path or a secret")
         env = {}
-    if any(k.startswith("BB_") or k in ("PATH", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH") for k in env):
-        errors.append("agent.env sets none of PATH, HOME, LD_* or AerieOS's own BB_ names")
+    if not all(packformat.env_name_ok(k) for k in env):
+        errors.append(f"agent.env sets variables of the agent's own, each {packformat.ENV_SAID}")
     out["env"] = dict(env)
     si = a.get("signin") if isinstance(a.get("signin"), dict) else {}
     for k, v in (("respawn", a.get("respawn")), ("signin.login", si.get("login"))):
@@ -282,9 +491,28 @@ def _pack_agent(name, a, errors):
     sf, se = si.get("file", ""), si.get("env", "")
     if sf and not (isinstance(sf, str) and REL.fullmatch(sf)):
         errors.append("agent.signin.file is where its sign-in is kept, under the account's home")
-    if se and not (isinstance(se, str) and ENV_NAME.fullmatch(se)):
+    if se and not (isinstance(se, str) and packformat.env_name_ok(se)):
         errors.append("agent.signin.env is a variable whose presence signs it in (an API key)")
     out["signin"] = {"file": str(sf or ""), "env": str(se or "")}
+    if si.get("flow") is not None:
+        before = len(errors)
+        flow = _signin_flow(si["flow"], out, errors)
+        # ...and one that carries a key this build does not know is left
+        # out whole too: half a flow read (a sign-out that forgets keys
+        # read as one that removes the file) is worse than none.
+        if flow and newer and isinstance(si["flow"], dict) and set(si["flow"]) - FLOW_KEYS:
+            flow = None
+        if flow:
+            out["signin"]["flow"] = flow
+        elif newer:
+            # Written for a later second number of the framework than this
+            # build reads (R234 step 7): a flow said in a way it does not
+            # know is left out, and the agent signs in in its terminal;
+            # the manifest is not refused for it.
+            del errors[before:]
+    _agent_allow(a, out, errors)
+    if (out.get("allow") or {}).get("how") == "hook" and not ((answers or {}).get("pre") or {}).get("approve"):
+        errors.append("agent.allow.how hook needs hooks.answers.pre to say how a tool is approved (an approve)")
     tr = a.get("transcripts") if isinstance(a.get("transcripts"), dict) else {}
     td, tf = tr.get("dir", ""), tr.get("file", "")
     if td and not (isinstance(td, str) and REL.fullmatch(td)):
@@ -304,6 +532,169 @@ def _pack_agent(name, a, errors):
         errors.append("agent.model_flag is the option a model is picked with, e.g. --model")
     out["model_flag"] = str(a.get("model_flag") or "") if models else ""
     return out if len(errors) == bad else None
+
+
+# A sign-in's flow as its pack describes it (R233 step 6), so the page signs
+# an account in to a pack's agent as it does to a shipped one: the words a
+# screen shows are plain ones, the link is named by how it starts, and what
+# is typed back is a key or a short word. No pattern comes from a manifest.
+FLOW_WORDS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .,:;'()/&-]{1,79}$")
+FLOW_URL = re.compile(r"^https://[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){1,6}(?:/[A-Za-z0-9._~/-]{0,120})?$")
+FLOW_SEND = re.compile(r"^[A-Za-z0-9]{0,8}$")
+# Every key of a flow this build reads.
+FLOW_KEYS = frozenset(("answers", "url", "prompt", "code_after", "refused", "kept", "logout", "ends", "who", "forget"))
+
+
+def _signin_flow(f, out, errors):
+    """A pack agent's sign-in flow checked and cut down to what the node's
+    driver reads (scripts/lib/login-flow.py), or None: `url` is how the link
+    it prints starts; `prompt` the words it waits at for the code the
+    provider's page hands back, or `code_after` the words a one-time code
+    follows, for one typed on the provider's page; `refused` the words it
+    shows when it does not take a code; `answers` what it asks
+    before the link, each the words it shows and what is typed (Enter
+    follows); `kept` the file under the account's home whose arrival says
+    it is signed in, which is sealed where a node seals sign-ins and removed
+    on a sign-out unless `logout` names its own command."""
+    if not isinstance(f, dict):
+        errors.append("agent.signin.flow is an object: url, prompt or code_after, answers, kept")
+        return None
+    bad = len(errors)
+    if not out.get("login"):
+        errors.append("agent.signin.flow is run by agent.signin.login, the command that starts its sign-in")
+    # How its link starts, or the few ways it may (a program that signs in
+    # at one of several hosts): each https and its host.
+    url = f.get("url")
+    urls = url if isinstance(url, list) else [url]
+    if not (1 <= len(urls) <= 4 and all(isinstance(u, str) and FLOW_URL.fullmatch(u) for u in urls)):
+        errors.append("agent.signin.flow.url is how the link it prints starts: https and its host, e.g. https://auth.example.com/, or up to 4 of them")
+    # How the flow ends: by the kept file's arrival, for a program that stays
+    # up once signed in (its first-run screens are the person's own), or by
+    # the program ending itself, signed in when it says so by its exit.
+    ends = f.get("ends", "kept")
+    if ends not in ("kept", "exit"):
+        errors.append("agent.signin.flow.ends is kept (the kept file's arrival ends it) or exit (the program ends itself once signed in)")
+    words = {}
+    for k in ("prompt", "code_after", "refused"):
+        v = f.get(k, "")
+        if v and not (isinstance(v, str) and FLOW_WORDS.fullmatch(v)):
+            errors.append(f"agent.signin.flow.{k} is the plain words its screen shows there, 2 to 80 of them")
+            v = ""
+        words[k] = str(v or "")
+    if bool(words["prompt"]) == bool(words["code_after"]):
+        errors.append("agent.signin.flow names prompt (where a code is pasted back) or code_after (a code typed on the provider's page), one of them")
+    answers = f.get("answers") if f.get("answers") is not None else []
+    if not (isinstance(answers, list) and len(answers) <= 4 and all(
+            isinstance(a, dict) and isinstance(a.get("when"), str) and FLOW_WORDS.fullmatch(a["when"])
+            and isinstance(a.get("send", ""), str) and FLOW_SEND.fullmatch(a.get("send", "")) for a in answers)):
+        errors.append("agent.signin.flow.answers lists up to 4 of {when, send}: the words a screen shows and the key or short word typed there, Enter after it")
+        answers = []
+    kept = f.get("kept")
+    if not (isinstance(kept, str) and REL.fullmatch(kept)):
+        errors.append("agent.signin.flow.kept is the file its sign-in is kept in, under the account's home")
+        kept = ""
+    logout = f.get("logout") if f.get("logout") is not None else []
+    if not (isinstance(logout, list) and len(logout) <= 6 and all(isinstance(x, str) and ARG.fullmatch(x) for x in logout)) \
+            or (logout and logout[0] != out.get("command")):
+        errors.append("agent.signin.flow.logout runs the agent's own command, e.g. [\"foo\", \"logout\"]; left out, a sign-out removes the kept file")
+        logout = []
+    who, forget = _flow_who(f.get("who"), errors), _flow_forget(f.get("forget"), errors)
+    if forget and logout:
+        errors.append("agent.signin.flow names logout (its own sign-out command) or forget (the keys a sign-out takes out of a file), not both")
+    if len(errors) != bad:
+        return None
+    return {"url": url, "prompt": words["prompt"], "code_after": words["code_after"], "refused": words["refused"],
+            "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout),
+            **({"ends": "exit"} if ends == "exit" else {}), **({"who": who} if who else {}), **({"forget": forget} if forget else {})}
+
+
+# One step on the way to a value in a JSON file: a key's name, as written.
+FLOW_KEY = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:/@-]{0,79}$")
+
+
+def _flow_path(v):
+    return isinstance(v, list) and 1 <= len(v) <= 6 and all(isinstance(x, str) and FLOW_KEY.fullmatch(x) for x in v)
+
+
+def _flow_who(w, errors):
+    """Who is signed in, read from a file the agent keeps (framework 2.2):
+    `file` under the account's home (the kept file when left out), `email`
+    and `plan` each the keys to follow to the value, a token on the way
+    opened to what it says of its holder; `key` the keys to an API key, and
+    `key_named` what the account is called then; `named`, what it is called
+    when the file names nobody. Left out, the address a token in the kept
+    file names, else its provider's account."""
+    if w is None:
+        return None
+    if not isinstance(w, dict):
+        errors.append("agent.signin.flow.who is an object: file, email, plan, key, key_named, named")
+        return None
+    out = {}
+    if w.get("file"):
+        if not (isinstance(w["file"], str) and REL.fullmatch(w["file"])):
+            errors.append("agent.signin.flow.who.file is the file that says who is signed in, under the account's home")
+        else:
+            out["file"] = w["file"]
+    for k in ("email", "plan", "key"):
+        if w.get(k) is not None:
+            if not _flow_path(w[k]):
+                errors.append(f"agent.signin.flow.who.{k} lists the keys to follow to it in that file, up to 6, e.g. [\"account\", \"email\"]")
+            else:
+                out[k] = list(w[k])
+    for k in ("named", "key_named"):
+        if w.get(k):
+            if not (isinstance(w[k], str) and FLOW_WORDS.fullmatch(w[k])):
+                errors.append(f"agent.signin.flow.who.{k} is plain words for the account, e.g. an Example account")
+            else:
+                out[k] = w[k]
+    if out.get("key_named") and not out.get("key"):
+        errors.append("agent.signin.flow.who.key_named says what an API key's account is called, so who.key says where the key is")
+    return out or None
+
+
+def _flow_forget(g, errors):
+    """A sign-out that takes keys out of a JSON file and leaves the rest
+    (framework 2.2), for a program with no sign-out command whose sign-in
+    is kept in a file of its settings: `file` under the home (the kept file
+    when left out), `keys` the top-level keys forgotten, `like` a word, any
+    key that carries it forgotten too."""
+    if g is None:
+        return None
+    keys = g.get("keys") if isinstance(g, dict) and g.get("keys") is not None else []
+    like = g.get("like", "") if isinstance(g, dict) else ""
+    if not (isinstance(g, dict) and isinstance(keys, list) and len(keys) <= 8 and all(isinstance(k, str) and FLOW_KEY.fullmatch(k) for k in keys)
+            and isinstance(like, str) and re.fullmatch(r"[a-z]{3,20}|", like) and (keys or like)
+            and (not g.get("file") or (isinstance(g["file"], str) and REL.fullmatch(g["file"])))):
+        errors.append("agent.signin.flow.forget is {keys, like, file}: up to 8 top-level keys a sign-out takes out of the kept file (or the file named), and a word any forgotten key carries")
+        return None
+    return {"keys": list(keys), **({"like": like} if like else {}), **({"file": g["file"]} if g.get("file") else {})}
+
+
+def _agent_uses(a):
+    """What a cleaned adapter uses that a second number of the framework
+    brought, each (version, what it is)."""
+    flow = ((a or {}).get("signin") or {}).get("flow")
+    if not flow:
+        return []
+    out = [((2, 1), "its agent's signin.flow")]
+    if flow.get("ends") == "exit":
+        out.append(((2, 2), "signin.flow.ends"))
+    if isinstance(flow.get("url"), list):
+        out.append(((2, 2), "signin.flow.url as a list"))
+    if flow.get("who"):
+        out.append(((2, 2), "signin.flow.who"))
+    if flow.get("forget"):
+        out.append(((2, 2), "signin.flow.forget"))
+    return out
+
+
+def _agent_format(a):
+    """The pack format a cleaned adapter needs: 2 when it describes its own
+    protocol or uses what came with that (R234 step 3), else 1."""
+    h = a.get("hooks") or {}
+    two = h.get("document") or isinstance(h.get("payload"), dict) or h.get("answers") or h.get("prompt_fires") \
+        or "start" in (h.get("events") or {}) or (a.get("briefing") or {}).get("how") == "hook" or (a.get("allow") or {}).get("how") == "hook"
+    return 2 if two else 1
 
 
 def _config(c, errors, depth=0):
@@ -337,7 +728,7 @@ def _config(c, errors, depth=0):
         if scope == "person":
             field["scope"] = "person"
         env = str(f.get("env") or "")
-        if env and not ENV_NAME.fullmatch(env):
+        if env and not packformat.env_name_ok(env):
             errors.append(f"config field {name}: env is a NAME a verb reads it as")
         elif env:
             field["env"] = env
@@ -357,19 +748,41 @@ def _config(c, errors, depth=0):
     return out
 
 
-def validate(m, shipped=()):
+def validate(m, shipped=(), official=False):
     """A manifest checked and cut down to what AerieOS reads: (clean,
     errors). Nothing in it is run here; the errors say what to fix. An
     official pack (tier official, R169 step 1) may carry a shipped
     toolchain's recipe or an agent's adapter in place of install steps and
-    verbs, and may take a shipped name, being the shipped thing itself."""
+    verbs, and may take a shipped name, being the shipped thing itself.
+
+    Whether a manifest is one AerieOS ships is the caller's to say
+    (`official`), never the manifest's: what official unlocks (a shipped
+    name, shipped, service, an agent's table row, a layout under root:) is
+    the shipped packs' alone, and a manifest that could award itself the
+    tier would take all of it. The callers that say it are the ones that hold a
+    shipped table's own manifest (services.rows, tools/packs-export.py) or
+    a pin the signed index names official (fetch's `official`, for a
+    shipped agent's newer recipe; catalogrows.refresh). A pack a person
+    adds, by address, pasted, uploaded or from the catalog's Install, is
+    never one, and tier official on it is refused."""
     errors = []
     if not isinstance(m, dict):
         return None, [f"{MANIFEST} is a JSON object"]
+    # The format it needs (R234), said before anything else is read: a
+    # manifest of a format this build has not met is not judged by rules
+    # written before it, so it is refused in one sentence, never a list.
+    fmt = packformat.of(m)
+    if fmt is None:
+        return None, ["format is the pack format the manifest needs, a whole number from 1 (left out, it is 1)"]
+    if fmt > packformat.FORMAT:
+        return None, [f"{str(m.get('name') or 'this pack')} {packformat.too_new(fmt)}"]
     tier = str(m.get("tier") or "url")
     if tier not in TIERS:
         errors.append(f"tier is one of {', '.join(TIERS)}")
-    official = tier == "official"
+    elif tier == "official" and not official:
+        errors.append("tier official is said by AerieOS of the packs it ships, never by a manifest of itself: a pack leaves tier out")
+    # Official is both: the caller's word, and the manifest written as one.
+    official = bool(official) and tier == "official"
     name = str(m.get("name") or "")
     # A shipped toolchain's name may carry a colon (android:emulator), the
     # store's own family form; a person's pack never does.
@@ -379,22 +792,43 @@ def validate(m, shipped=()):
         errors.append(f"{name} is a toolchain AerieOS ships; a pack takes a name of its own")
     elif name in BB_TOOL_WORDS and not official:
         errors.append(f"{name} is one of aerie tool's own words; a pack takes a name of its own")
-    out: dict = {"name": name, "tier": tier,
+    out: dict = {"name": name, "tier": tier, "format": fmt,
            "label": str(m.get("label") or name)[:80],
            "about": str(m.get("about") or "")[:400]}
     if official and isinstance(m.get("shipped"), dict):
         out["shipped"] = m["shipped"]
+        # What its recipe says of its downloads (a pin, declared downloads,
+        # the keys it carries, steps that keep the network) is the format's
+        # as a pack's is: held to its shape, and to the number it says.
+        src = m["shipped"].get("source")
+        if isinstance(src, dict) and packformat.source_refused(src):
+            errors.append(f"shipped.source: {packformat.source_refused(src)}")
+        if packformat.source_format(src) > fmt:
+            errors.append(f'what shipped.source says of its downloads is pack format {packformat.source_format(src)}\'s: '
+                          f'the manifest says "format": {packformat.source_format(src)}')
     elif m.get("shipped") is not None:
         errors.append("shipped (a toolchain's recipe) is an official pack's alone")
     if m.get("agent") is not None:
         if not official:
-            a = _pack_agent(name, m["agent"], errors)
+            a = _pack_agent(name, m["agent"], errors, newer=(packformat.framework_of(m) or (0, 0))[1] > packformat.MINOR)
             if a:
                 out["pack_agent"] = a
+                # What it uses says the format it needs, and the manifest
+                # says that number: an install that reads only an earlier
+                # one then knows the entry is past it without fetching it.
+                needs = _agent_format(a)
+                if needs > fmt:
+                    errors.append(f"what its agent says of its own hooks is pack format {needs}'s: the manifest says \"format\": {needs}")
         else:
             a = _agent(m["agent"], errors)
             if a:
                 out["agent"] = a
+                # A recipe held to what it carries (its downloads declared,
+                # its steps run from them) is the format's as a pack's
+                # declared install is, and the manifest says that number.
+                if (a.get("install") or {}).get("steps") and fmt < packformat.HELD_FORMAT:
+                    errors.append(f"agent.install's fetch and steps are pack format {packformat.HELD_FORMAT}'s: "
+                                  f'the manifest says "format": {packformat.HELD_FORMAT}')
     # A deployed thing (R172): the model router, deployed and configured
     # from its card; an official pack's alone, like an agent's adapter.
     if m.get("service") is not None:
@@ -405,6 +839,18 @@ def validate(m, shipped=()):
             errors.append(f"service.kind is one of {', '.join(SERVICES)}")
         else:
             out["service"] = {"kind": str(sv["kind"])}
+    # The images a deployed thing runs, each by its tag and its digest
+    # (pack format 5): its entry's own, as a pack's downloads are.
+    if m.get("images") is not None:
+        refs, bad = packformat.images_checked(m["images"])
+        if "service" not in out:
+            errors.append("images (what a deployed thing of AerieOS's runs) is an official service pack's alone")
+        elif bad:
+            errors += bad
+        elif fmt < packformat.HELD_FORMAT:
+            errors.append(f'images is pack format {packformat.HELD_FORMAT}\'s: the manifest says "format": {packformat.HELD_FORMAT}')
+        else:
+            out["images"] = refs
     if m.get("config") is not None:
         out["config"] = _config(m["config"], errors)
     stands_in = "shipped" in out or "agent" in out or "service" in out or "pack_agent" in out
@@ -420,6 +866,17 @@ def validate(m, shipped=()):
         errors.append("terms lists what it is under, each {label, url}")
         terms = []
     out["terms"] = [{"label": str(t["label"])[:120], "url": str(t.get("url") or "")[:300]} for t in terms]
+    # Who the tool is by, and each of them where it carries several makers'
+    # (packformat.maker_of): said wrong is said, not dropped in silence.
+    if m.get("maker") is not None and not packformat.maker_of(m):
+        errors.append(f"maker is who the tool is by, an organization or a person: one line of up to {packformat.MAKER_MAX} plain characters")
+    if m.get("credits") is not None and (not isinstance(m["credits"], list) or len(packformat.credits_of(m)) != len(m["credits"])):
+        errors.append(f"credits lists up to {packformat.CREDITS_MAX} of {{name, maker}}: each tool the pack carries and who it is by")
+    out["maker"], out["credits"] = packformat.maker_of(m), packformat.credits_of(m)
+    # The framework's version it is written for (packformat): what it uses
+    # must be in the version it says. A coding agent's part is added to this
+    # once its adapter is read, below.
+    out["framework"] = packformat.said(packformat.framework_of(m) or (fmt, 0))
     # What it touches (R169 step 4): the hosts its install fetches from and
     # whether it needs root on the node, said on Look before it is added; a
     # pack that needs root is an administrator's to add.
@@ -453,6 +910,67 @@ def validate(m, shipped=()):
             steps.append(w)
     out["steps"] = steps
     out["verify"] = _words(inst["verify"], "install verify", errors, ("{dir}",)) if inst.get("verify") else None
+    # Declared downloads (R234, pack format 3; the operator, 13 Nov: what an
+    # install takes from somewhere else had no paper trail): each file with
+    # the address it comes from, the sha256 of what that address answers,
+    # and where inside the pack it is kept. AerieOS fetches and checks each
+    # before the steps run, and the steps then run with no network, so what
+    # is not declared cannot arrive.
+    #
+    # From pack format 5 (the operator, 20 Nov: everything an install takes
+    # from somewhere else is held to something its entry carries, by one
+    # mechanism): a download may name the platform it is for, and may be
+    # held by its publisher's signature in the sha256's place (signed),
+    # under a key the pack carries (install.keyring); and a pack whose
+    # installer downloads the rest by itself says so in a sentence
+    # (install.online), which keeps the network for its steps. The shapes
+    # are the format's (packformat), the same a shipped row's source takes.
+    fetch, raw, new = [], inst.get("fetch"), []
+    if raw is not None:
+        fetch, said, parts = packformat.fetch_checked(raw, "install.fetch", reserved=(MANIFEST,))
+        errors.extend(said)
+        new += [f"install.fetch's {p}" for p in sorted(parts)]
+        if fmt < FETCH_FORMAT:
+            errors.append(f'install.fetch (declared downloads) is pack format {FETCH_FORMAT}\'s: the manifest says "format": {FETCH_FORMAT}')
+        # The hosts it fetches from are its touches too, said or not.
+        hosts = out["touches"]["hosts"]
+        mine = {u.split("/")[2].split(":")[0].lower() for f in fetch for u in (f["url"], (f.get("signed") or {}).get("sig")) if u}
+        out["touches"]["hosts"] = hosts + sorted(mine - set(hosts))
+    out["fetch"] = fetch
+    # An empty list is a declaration from format 5 on: this pack downloads
+    # nothing, so its steps run with no network (packformat.declares_none).
+    # Before it an empty list declared nothing, and is kept as it was.
+    if packformat.declares_none(m):
+        out["offline"] = True
+    # Kept only where the manifest says them, so a pack from before them is
+    # kept as it was.
+    if inst.get("keyring") is not None:
+        out["keyring"], said = packformat.keyring_checked(inst["keyring"], "install.keyring")
+        errors.extend(said)
+        new.append("install.keyring")
+    if inst.get("online") is not None:
+        out["online"], said = packformat.online_checked(inst["online"], "install.online")
+        errors.extend(said)
+        new.append("install.online")
+    # What it asks a package manager for (packformat.lock_checked): how the
+    # set of files its steps install from is found again. The files are
+    # declared downloads like any other, kept under the lock's directory;
+    # the requirements or the lock its steps install by are in its
+    # repository, as all its files are.
+    if inst.get("lock") is not None:
+        out["lock"], said = packformat.lock_checked(inst["lock"], "install.lock")
+        errors.extend(said)
+        new.append("install.lock")
+    if new and fmt < packformat.HELD_FORMAT:
+        errors.append(f'{", ".join(new)} {"is" if len(new) == 1 else "are"} pack format {packformat.HELD_FORMAT}\'s: '
+                      f'the manifest says "format": {packformat.HELD_FORMAT}')
+    # A pack carries the key its downloads are checked with: the release's
+    # own publishers' keys (config/release-keys) are a shipped row's to name.
+    for f in fetch:
+        keys = (f.get("signed") or {}).get("keys")
+        if keys and not official and keys not in (out.get("keyring") or {}):
+            errors.append(f"install.fetch's {f['to']} is signed under {keys}, which install.keyring does not carry: "
+                          "a pack carries the public key its download is checked with")
     lay = m.get("layout") or {}
     if not isinstance(lay, dict):
         errors.append("layout is an object: bin, env and tool")
@@ -467,9 +985,14 @@ def validate(m, shipped=()):
         errors.append("layout.tool is a file inside the pack whose presence says it is installed")
         tool = ""
     env = lay.get("env") or {}
-    if not isinstance(env, dict) or not all(re.fullmatch(r"[A-Z][A-Z0-9_]{0,40}", k) and isinstance(v, str)
+    if not isinstance(env, dict) or not all(isinstance(k, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,40}", k) and isinstance(v, str)
                                             for k, v in env.items()):
         errors.append("layout.env maps NAME to a path inside the pack (\"\" for the pack itself) or =VALUE")
+        env = {}
+    # What it sets reaches every job on the node, so the names are held to
+    # the one rule (packformat.env_name_ok).
+    if not all(packformat.env_name_ok(k) for k in env):
+        errors.append(f"layout.env sets variables of the tool's own, each {packformat.ENV_SAID}")
         env = {}
     out["layout"] = {"bin": bins, "env": env, "tool": tool or MANIFEST}
     # System packages per package manager (R171), as the shipped recipes
@@ -477,12 +1000,12 @@ def validate(m, shipped=()):
     # and a node whose manager the pack names none for is not offered it.
     sysd = m.get("system") if isinstance(m.get("system"), dict) else {}
     keep = {}
-    for mgr, shape in SYSTEM_NAMES.items():
+    for mgr in SYSTEM_NAMES:
         names = sysd.get(mgr)
         if names is None:
             continue
-        if not (isinstance(names, list) and len(names) <= 60 and all(isinstance(a, str) and shape.fullmatch(a) for a in names)):
-            errors.append(f"system.{mgr} lists {SYSTEM_WORDS[mgr]} package names")
+        if not (isinstance(names, list) and len(names) <= 60 and all(packformat.system_name_ok(a, mgr) for a in names)):
+            errors.append(f"system.{mgr} lists {SYSTEM_WORDS[mgr]} package names, each starting with a letter or a digit and ending in neither - nor +")
             continue
         if names:
             keep[mgr] = names
@@ -528,6 +1051,9 @@ def validate(m, shipped=()):
         errors.append("icon names a PNG, WebP or SVG file inside the pack")
         ic = ""
     out["icon"] = ic
+    # What it uses is in the framework version it says (R234 step 7): the
+    # number on a manifest is what an install has to know to do all of it.
+    errors.extend(packformat.needs(m, [*packformat.uses_of(m), *_agent_uses(out.get("pack_agent")), *_agent_uses(out.get("agent"))]))
     return (out if not errors else None), errors
 
 
@@ -553,17 +1079,36 @@ def _source(url, commit):
     return ["--depth", "1", url, commit or "HEAD"]
 
 
-def fetch(url, commit="", shipped=(), sha256="", path=""):
+def _unvetted(tmp, url, commit, sha256, path=""):
+    """Why what was fetched into `tmp` is not what the catalog vetted, or
+    "": the sha256 of the archive of FETCH_HEAD (of `path` alone, for a
+    pack in a folder) against the index's. Git's own hashes pin the commit;
+    this pins the bytes the maintainers saw, and every fetch of a pin is
+    held to it by this one function: the look (fetch), a folder's files
+    (fetch_folder) and the second fetch that keeps a pack here
+    (_add_folder), so what is kept is what was checked and not only what
+    answers to the same commit id."""
+    r = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", "FETCH_HEAD", *([path] if path else [])], capture_output=True, timeout=120, check=False)
+    if r.returncode != 0 or hashlib.sha256(r.stdout).hexdigest() != sha256:
+        return f"{url} at {commit[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused"
+    return ""
+
+
+def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
     """The repository at `commit` (its default branch's head when none):
     {commit, manifest, guidance} with the manifest validated, or {error}.
     Fetched into a scratch directory that is gone when this returns. With
     `sha256` (the catalog's, of the archive at that commit, R169 step 4)
     the archive is made and compared, and a difference refuses the pack:
-    git's own hashes pin the commit, this pins what the maintainers saw."""
+    git's own hashes pin the commit, this pins what the maintainers saw.
+    `official` is said by a caller that read this pin from the signed
+    index as one of AerieOS's own shipped packs (agentcode.recipe), and
+    counts only beside that pin's sha256; a request never says it."""
     url = str(url or "").strip()
-    # A suite's pack is a repository on disk (BB_TOOLPACKS_FILE_URLS=1); a
-    # controller only ever fetches one over the network.
-    local = os.environ.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
+    # A suite's pack is a repository on disk (the seam BB_TOOLPACKS_FILE_URLS,
+    # read in the source tree alone: seams.py); a controller
+    # only ever fetches one over the network.
+    local = seams.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
     if not (URL.fullmatch(url) or local):
         return {"error": "a pack is a git repository's address: https://host/owner/repo"}
     if commit and not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -590,10 +1135,9 @@ def fetch(url, commit="", shipped=(), sha256="", path=""):
         if sha256:
             if not re.fullmatch(r"[0-9a-f]{64}", sha256):
                 return {"error": "the catalog's sha256 is 64 hex digits"}
-            import hashlib  # noqa: PLC0415
-            r = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", "FETCH_HEAD", *([path] if path else [])], capture_output=True, timeout=120, check=False)
-            if r.returncode != 0 or hashlib.sha256(r.stdout).hexdigest() != sha256:
-                return {"error": f"{url} at {got[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused"}
+            why = _unvetted(tmp, url, got, sha256, path)
+            if why:
+                return {"error": why}
 
         def read(rel, cap):
             r = subprocess.run(["git", "-C", tmp, "show", f"FETCH_HEAD:{at}{rel}"], capture_output=True,
@@ -601,7 +1145,8 @@ def fetch(url, commit="", shipped=(), sha256="", path=""):
             if r.returncode != 0:
                 return None
             return r.stdout[:cap + 1]
-        got_m = _examine(read, shipped, f"{url} has no {MANIFEST} at {('its ' + path) if path else 'its root'}")
+        got_m = _examine(read, shipped, f"{url} has no {MANIFEST} at {('its ' + path) if path else 'its root'}",
+                         official=bool(official and sha256))
         if got_m.get("error"):
             return {**got_m, "commit": got} if got_m.get("errors") else got_m
         return {"commit": got, **got_m, "plain": url.startswith("http://"), "path": path}
@@ -614,7 +1159,7 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
     bbapp.json and compose.yml), its archive's sha256 checked as a pack's
     is: {files: {name: bytes}} or {error}. Only the files named are read."""
     url = str(url or "").strip()
-    local = os.environ.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
+    local = seams.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
     if not (URL.fullmatch(url) or local):
         return {"error": "a catalog entry is a git repository's address: https://host/owner/repo"}
     if not re.fullmatch(r"[0-9a-f]{40}", str(commit or "")) or not re.fullmatch(r"[0-9a-f]{64}", str(sha256 or "")):
@@ -634,10 +1179,9 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
                 return {"error": f"could not fetch {url}: {said[-1] if said else 'git failed'}"}
         if _git(["-C", tmp, "rev-parse", "FETCH_HEAD"]).stdout.strip() != commit:
             return {"error": f"{url} did not answer with {commit[:12]}"}
-        import hashlib  # noqa: PLC0415
-        r = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", "FETCH_HEAD", path], capture_output=True, timeout=120, check=False)
-        if r.returncode != 0 or hashlib.sha256(r.stdout).hexdigest() != sha256:
-            return {"error": f"{url} at {commit[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused"}
+        why = _unvetted(tmp, url, commit, sha256, path)
+        if why:
+            return {"error": why}
         out = {}
         for name in files:
             g = subprocess.run(["git", "-C", tmp, "show", f"FETCH_HEAD:{path}/{name}"], capture_output=True, timeout=30, check=False)
@@ -651,10 +1195,11 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def _examine(read, shipped, missing):
+def _examine(read, shipped, missing, official=False):
     """The manifest and guidance a pack's files hold, read through `read(rel,
-    cap)`: {manifest, guidance} validated, or {error}. One reading for a
-    repository and a pack made here."""
+    cap)`: {manifest, held, downloads, guidance} validated, or {error}. One reading for a
+    repository and a pack made here. `official` is validate's: fetch alone
+    passes it on, so nothing pasted, uploaded or kept as a pack is official."""
     raw = read(MANIFEST, MANIFEST_MAX)
     if raw is None:
         return {"error": missing}
@@ -664,7 +1209,7 @@ def _examine(read, shipped, missing):
         m = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as e:
         return {"error": f"{MANIFEST} is not JSON: {e}"}
-    clean, errors = validate(m, shipped)
+    clean, errors = validate(m, shipped, official)
     if errors:
         return {"error": f"{MANIFEST} needs fixing: " + "; ".join(errors), "errors": errors}
     guidance = ""
@@ -683,7 +1228,12 @@ def _examine(read, shipped, missing):
         if why:
             return {"error": f"{clean['icon']}: {why}"}
         icon = (raw, ext)
-    return {"manifest": clean, "guidance": guidance, **({"icon_bytes": icon} if icon else {})}
+    # ...and what its downloads are held to, in a word and why, for Look to
+    # say before the pack is added (packformat.held), with each download it
+    # declares as a page reads one: how it is held (its sha256, or its
+    # publisher's signature and the keys' name) and the platform it is for.
+    return {"manifest": clean, "held": packformat.held_of(clean), "downloads": packformat.downloads_said(clean["fetch"]),
+            "guidance": guidance, **({"icon_bytes": icon} if icon else {})}
 
 
 def icon_refused(raw, ext):
@@ -908,11 +1458,9 @@ def packs():
         return _load()["packs"]
 
 
-# The package managers a node's family runs (provision-linux.sh's families),
-# each with the shape of its package names.
-SYSTEM_NAMES = {"apt": re.compile(r"[a-z0-9.+|-]{1,80}"), "dnf": re.compile(r"[A-Za-z0-9._+|-]{1,80}"),
-                "pacman": re.compile(r"[a-z0-9@._+|-]{1,80}"), "zypper": re.compile(r"[A-Za-z0-9._+|-]{1,80}"),
-                "apk": re.compile(r"[a-z0-9._+|-]{1,80}")}
+# The package managers a pack may name packages for (provision-linux.sh's
+# families); the shape of a name is the format's (packformat.system_name_ok).
+SYSTEM_NAMES = ("apt", "dnf", "pacman", "zypper", "apk")
 SYSTEM_WORDS = {"apt": "Debian and Ubuntu", "dnf": "Fedora and Red Hat", "pacman": "Arch", "zypper": "openSUSE", "apk": "Alpine"}
 
 
@@ -935,17 +1483,35 @@ def fits(manifest, version=None):
 
 
 def unfit():
-    """The bell's rows (kind pack) for each pack this install holds whose
-    works_with does not name the running release line."""
+    """The bell's rows (kind pack, `unfit` set) for each pack this install
+    holds whose works_with does not name the running release line. It comes
+    back by itself once a version that names this line is kept, which its
+    Library card offers when there is one."""
     line = line_of(running_version())
     out = []
     for n, r in packs().items():
         m = (r or {}).get("manifest") or {}
         if line and not fits(m):
-            out.append({"kind": "pack", "name": n, "key": f"pack:unfit:{n}:{line}",
-                        "said": f"the pack {n} says it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}: "
-                                "update it from the Library, or remove it"})
+            out.append({"kind": "pack", "unfit": True, "name": n, "key": f"pack:unfit:{n}:{line}",
+                        "said": f"the pack {n} works with AerieOS {', '.join(m.get('works_with') or [])}, not {line}, so it is "
+                                "switched off until a version of it that names this one is kept"})
     return out
+
+
+def disabled(rec):
+    """Why a pack this install holds is switched off, or "": its manifest
+    does not name the running release line (the operator, 12 Nov: a pack
+    that does not fit this AerieOS is disabled until one that does is
+    kept, as it would not have been offered at all). Switched off is not
+    removed: it stays where it is installed, and is in no session's PATH,
+    view or verbs, and offers no agent, until an update that fits."""
+    m = (rec or {}).get("manifest") or {}
+    return "" if fits(m) else _unfit_said(m)
+
+
+def _unfit_said(m):
+    line = line_of(running_version())
+    return f"switched off: it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}"
 
 
 def _unfit_why(m):
@@ -980,7 +1546,7 @@ def add(url, commit, by, shipped=(), sha256="", tier="url", path="", may_root=Fa
         d = _load()
         rec = {"name": m["name"], "url": url, "commit": got["commit"], "manifest": m,
                "guidance": got["guidance"], "by": str(by or ""), "at": int(time.time()),
-               "tier": tier if tier in ("vetted", "official") and sha256 else "url", "sha256": sha256 or ""}
+               "tier": tier if tier in packformat.TIERS and sha256 else "url", "sha256": sha256 or ""}
         was = d["packs"].get(m["name"])
         if was and was.get("url") != url:
             return {"error": f"a pack called {m['name']} is already here from {was.get('url')}; remove it first"}
@@ -990,33 +1556,54 @@ def add(url, commit, by, shipped=(), sha256="", tier="url", path="", may_root=Fa
     return {"ok": True, "pack": rec, "replaced": bool(was)}
 
 
-def _add_folder(url, commit, path, by, shipped, sha256, tier):
-    """A folder of a repository at a commit, staged as a pack made here and
-    kept, its record naming where it came from (R170 step 6)."""
-    _staging().mkdir(parents=True, exist_ok=True)
-    tok = secrets.token_hex(8)
-    d = _staging() / tok
-    d.mkdir()
+def _folder_into(d, url, commit, path, sha256):
+    """The files of a repository's folder at a commit, fetched and put in
+    `d`: "" or why not. This is a second fetch of what add's look already
+    checked, and what it brings is what is kept, so it is held to the pin
+    again: the commit that answered is the one asked for, and under the
+    catalog's sha256 the archive is the one the index vetted (_unvetted,
+    as the look's)."""
+    import io  # noqa: PLC0415
+    import tarfile  # noqa: PLC0415
     tmp = tempfile.mkdtemp(prefix="toolpack-")
     try:
         for args in (["init", "-q", tmp], ["-C", tmp, "fetch", "-q", *_source(url, commit)]):
             r = _git(args)
             if r.returncode != 0:
-                return {"error": f"could not fetch {url}: {(r.stderr or r.stdout).strip().splitlines()[-1:] or 'git failed'}"}
+                return f"could not fetch {url}: {(r.stderr or r.stdout).strip().splitlines()[-1:] or 'git failed'}"
+        got = _git(["-C", tmp, "rev-parse", "FETCH_HEAD"]).stdout.strip()
+        if got != commit:
+            return f"{url} answered {got[:12]} where {commit[:12]} was asked"
+        why = _unvetted(tmp, url, commit, sha256, path) if sha256 else ""
+        if why:
+            return why
         arc = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", f"FETCH_HEAD:{path}"], capture_output=True, timeout=120, check=False)
         if arc.returncode != 0:
-            return {"error": f"{url} at {commit[:12]} has no folder {path}"}
-        import io  # noqa: PLC0415
-        import tarfile  # noqa: PLC0415
+            return f"{url} at {commit[:12]} has no folder {path}"
         with tarfile.open(fileobj=io.BytesIO(arc.stdout), mode="r:") as tar:
             for ti in tar.getmembers():
                 if not (ti.isfile() or ti.isdir()) or ti.name.startswith(("/", "..")) or ".." in ti.name.split("/"):
-                    return {"error": f"{path} holds something a pack cannot: {ti.name}"}
+                    return f"{path} holds something a pack cannot: {ti.name}"
             tar.extractall(d, filter="data")
     except (subprocess.TimeoutExpired, OSError, tarfile.TarError) as e:
-        return {"error": f"could not take {path} from {url}: {e}"}
+        return f"could not take {path} from {url}: {e}"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return ""
+
+
+def _add_folder(url, commit, path, by, shipped, sha256, tier):
+    """A folder of a repository at a commit, staged as a pack made here and
+    kept, its record naming where it came from (R170 step 6). Nothing
+    refused is left staged."""
+    _staging().mkdir(parents=True, exist_ok=True)
+    tok = secrets.token_hex(8)
+    d = _staging() / tok
+    d.mkdir()
+    why = _folder_into(d, url, commit, path, sha256)
+    if why:
+        shutil.rmtree(d, ignore_errors=True)
+        return {"error": why}
     out = add_staged(tok, by, shipped)
     shutil.rmtree(d, ignore_errors=True)
     if out.get("error"):
@@ -1025,8 +1612,11 @@ def _add_folder(url, commit, path, by, shipped, sha256, tier):
         data = _load()
         rec = data["packs"].get(out["pack"]["name"])
         if rec:
-            rec.update({"url": url, "commit": commit, "path": path, "sha256": sha256 or "",
-                        "tier": tier if tier in ("vetted", "official") and sha256 else "url"})
+            # The record names where the folder came from and the commit the
+            # catalog pins; the commit it is kept under in its repository
+            # here is its own, and is what a node fetches from the bundle.
+            rec.update({"url": url, "commit": commit, "path": path, "sha256": sha256 or "", "kept_at": rec.get("commit") or "",
+                        "tier": tier if tier in packformat.TIERS and sha256 else "url"})
             write_json(FILE, data)
             out["pack"] = rec
     return out
@@ -1044,9 +1634,7 @@ def where_said(name, where):
     """The refusal for removing a pack still installed (B84): its files
     would stay in those stores with no row left to uninstall them from, and
     a pack added back would read as installed with no install run."""
-    return {"error": f"{name} is installed on {', '.join(where)}: uninstall it there first "
-                     f"(pick that node in the Library and press Remove on its card), "
-                     f"then remove the pack", "installed": list(where)}
+    return {"error": f"{name} is installed on {', '.join(where)}: uninstall it there first", "installed": list(where)}
 
 
 def remove(name, where=()):
@@ -1067,6 +1655,22 @@ def remove(name, where=()):
     return {"ok": True}
 
 
+def _bundle_commit(rec):
+    """The commit a node fetches a pack at. One kept from a folder of a
+    repository (R170 step 6) is in its repository here under a commit of
+    its own, which is the one its bundle holds: the record's `kept_at`, or,
+    for a record from before it said so, that repository's head. Any other
+    pack's is the commit it is pinned to."""
+    if rec.get("hosted") and rec.get("path"):
+        if rec.get("kept_at"):
+            return rec["kept_at"]
+        if HOSTED and NAME.fullmatch(str(rec.get("name") or "")):
+            r = _git_here(rec["name"], "rev-parse", "-q", "--verify", "refs/heads/main")
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+    return rec["commit"]
+
+
 def recipe(rec):
     """A pack as one catalog row: the recipe machinery's own shape, its
     source the pack's repository cloned at the approved commit, then its
@@ -1075,7 +1679,23 @@ def recipe(rec):
     # A pack made here is fetched from the bundle beside the catalog on the
     # node (sdkmeta.packs_at makes the path whole there).
     url = f"bundle:toolpacks/{m['name']}.bundle" if rec.get("hosted") else rec["url"]
-    src = {"kind": "git", "url": url, "commit": rec["commit"], "fresh_only": True}
+    src = {"kind": "git", "url": url, "commit": _bundle_commit(rec), "fresh_only": True}
+    # Its declared downloads (pack format 3), fetched and checked on the
+    # node before its steps, which then run with no network where the node
+    # can cut it (sdk.sh sdk_declared, sdk_net_cut); the keys it carries
+    # for the ones its publisher signs; and, for one whose installer
+    # downloads the rest by itself, the sentence that keeps the network for
+    # its steps in the cut's place (pack format 5).
+    if m.get("fetch"):
+        src["fetch"] = m["fetch"]
+    if m.get("keyring"):
+        src["keyring"] = m["keyring"]
+    # One that declares it downloads nothing (an empty list, format 5) is
+    # cut as one that declares downloads is.
+    if m.get("online"):
+        src["online"] = m["online"]
+    elif m.get("fetch") or m.get("offline"):
+        src["offline"] = True
     if m["steps"]:
         src["then"] = [{"run": s} for s in m["steps"]]
     if m.get("verify"):
@@ -1095,10 +1715,22 @@ def recipe(rec):
     # drawn (B106): the label stands in for it.
     row = {"name": m["name"], "label": m["label"], "probe": m["name"], "about": m["about"] or m["label"],
            "platforms": m["platforms"], "layout": m["layout"], "source": src, "terms": m["terms"],
+           "maker": m.get("maker") or "", "credits": m.get("credits") or [],
            "verbs": m["verbs"],
            "pack": {"url": rec["url"], "commit": rec["commit"], "path": rec.get("path", ""), "by": rec.get("by", ""), "at": rec.get("at", 0),
                     "tier": rec.get("tier") or ("here" if rec.get("hosted") else "url"),
-                    "guidance": rec.get("guidance", ""), "here": bool(rec.get("hosted")), "agent": bool(offers_agent(rec)),
+                    "guidance": rec.get("guidance", ""),
+                    # Made here: a person's own text or archive. A folder of
+                    # a repository is kept hosted too, so the nodes take it
+                    # from the controller, but it came from where its url
+                    # says, and a page that called it made here (every pack
+                    # of the catalog, each a folder of it) was wrong.
+                    "here": bool(rec.get("hosted")) and str(rec.get("url") or "").startswith(HERE),
+                    # It brings a coding agent: its card is filed with the
+                    # agents, switched off or not.
+                    "agent": brings_agent(rec),
+                    # Switched off for not fitting this AerieOS, and why.
+                    "disabled": disabled(rec),
                     # Whether it carries an icon of its own (R182).
                     "icon": bool(rec.get("icon"))}}
     # A coding agent it offers, for bb-tty and bb-agent-hook on the node,
@@ -1112,12 +1744,28 @@ def recipe(rec):
     return row
 
 
+# Whether a sideloaded pack may offer its agent here: the install's own
+# setting (Controller settings, Vetted catalog), which the server sets this
+# to; never, for a reader with no settings.
+sideload_agents = lambda: False    # noqa: E731
+
+
+def brings_agent(rec):
+    """Whether a pack's coding agent is one this install lists with its
+    agents: one the vetted catalog pinned or an official one, since the
+    adapter decides what runs in every session of it; or a sideloaded one
+    where the install's own setting offers those (somebody trying an agent
+    of theirs before submitting it)."""
+    m = (rec or {}).get("manifest") or {}
+    return bool(m.get("pack_agent")) and (rec.get("tier") in packformat.TIERS or bool(sideload_agents()))
+
+
 def offers_agent(rec):
     """The coding agent an installed pack offers (R169 step 9), its adapter,
-    or None: only one the vetted catalog pinned, or an official one, since
-    the adapter decides what runs in every session of it."""
+    or None: one this install lists (brings_agent), and never one switched
+    off for not fitting this AerieOS (disabled)."""
     m = (rec or {}).get("manifest") or {}
-    return m.get("pack_agent") if m.get("pack_agent") and rec.get("tier") in ("vetted", "official") else None
+    return m.get("pack_agent") if brings_agent(rec) and fits(m) else None
 
 
 _offered = {"stamp": None, "rows": ()}
@@ -1127,11 +1775,11 @@ def offered_agents():
     """[(name, label, adapter)] for every installed pack that offers a coding
     agent, in name order; read again only when the packs' file changes, since
     every session name is asked of it."""
-    try:
-        st = FILE.stat() if FILE else None
-        stamp = (str(FILE), st.st_mtime_ns, st.st_size) if st else None
-    except OSError:
-        stamp = None
+    # What the file is, looked at once a request (statefile.sig, R228 step
+    # 26): every session name asks, some two hundred times a status read.
+    st = statefile.sig(FILE) if FILE else None
+    # ...and again when the install's setting for sideloaded agents turns.
+    stamp = (str(FILE), st, bool(sideload_agents())) if st else None
     if stamp is None or stamp != _offered["stamp"]:
         rows = []
         for name, rec in sorted(packs().items()) if stamp is not None else ():

@@ -1,5 +1,7 @@
 {
  "about": "The .NET SDK plus the maui-android workload: Android apps from C#.",
+ "format": 5,
+ "framework": "5.1",
  "label": ".NET + MAUI",
  "layout": {
   "bin": [
@@ -11,6 +13,7 @@
   },
   "tool": "dotnet"
  },
+ "maker": "Microsoft",
  "name": "dotnet",
  "platforms": [
   "linux/*"
@@ -18,30 +21,20 @@
  "shipped": {
   "probe": "dotnet",
   "reports": "dotnet",
+  "rev": 3,
   "source": {
    "checksum": {
-    "from": "none",
-    "why": "dotnet-install.sh is Microsoft's installer script, which Microsoft publishes no checksum for; the SDK it fetches comes from Microsoft's own download servers"
+    "from": "pin",
+    "sha256": {
+     "linux-musl/amd64": "f8f983bc1f784a5e4d3eec83cd70878a590c8328cd25a6d94ac8d43cd50f8c46",
+     "linux-musl/arm64": "e4dae17cbf0c26afb05eda8c2f5365ab291cf32ffd7c115fc0525a9cba268d30",
+     "linux/amd64": "c0610757a818fde4b960d27a0ac421f273068a05dc5ec7abafc01dbf84e9cb4d",
+     "linux/arm64": "dcc820a4277ab6bb3f648c609d86f2a7912ba9a3d166545e7b95dff419c12f0f"
+    },
+    "version": "10.0.404"
    },
-   "download": {
-    "match": "URL #0[^:]*:\\s+(\\S+)",
-    "resolver": "command-urls",
-    "run": [
-     "bash",
-     "-c",
-     "curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel LTS --dry-run"
-    ]
-   },
-   "kind": "script",
-   "run": [
-    "bash",
-    "{script}",
-    "--channel",
-    "LTS",
-    "--install-dir",
-    "{dir}",
-    "--no-path"
-   ],
+   "kind": "tarball",
+   "online": "dotnet downloads the maui-android workload from api.nuget.org",
    "then": [
     {
      "env": {
@@ -54,12 +47,20 @@
       "{dir}/dotnet",
       "workload",
       "install",
-      "maui-android",
-      "--skip-sign-check"
+      "maui-android"
      ]
     }
    ],
-   "url": "https://dot.net/v1/dotnet-install.sh"
+   "url": {
+    "linux-musl/amd64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-musl-x64.tar.gz",
+    "linux-musl/arm64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-musl-arm64.tar.gz",
+    "linux/amd64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-x64.tar.gz",
+    "linux/arm64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-arm64.tar.gz"
+   },
+   "version": {
+    "resolver": "text",
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/LTS/latest.version"
+   }
   },
   "system": {
    "apk": [

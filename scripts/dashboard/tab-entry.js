@@ -9,24 +9,41 @@
 // installed thing's page's.
 
 let entryKey = "";   // KIND:NAME on show, on libNode
+// Its own read (R256): the Library's rows are a page of a narrowed list
+// now, which may not hold this entry, so the page asks for its one row.
+let entryLib = null;
+
+function loadEntry(){
+  if (!entryKey) return Promise.resolve();
+  return reading("entry", async () => {
+    if (nodesList === null || nodesStale) await nodesKnown();
+    if (!libNode && !libPick()) return;
+    const node = libNode, key = entryKey;
+    const got = await getJSON(`/api/library?node=${encodeURIComponent(node)}&key=${encodeURIComponent(key)}`);
+    if (libNode !== node || entryKey !== key) return;
+    entryLib = got;
+    if ((got.rows || []).some(r => r.running || r.queued)) setTimeout(() => { if (entryKey === key) loadEntry(); }, 3000);
+  }, {join: 500, about: `${libNode} ${entryKey}`});
+}
 
 // Open one Library entry's page on a node.
 function openEntry(node, key){
   if (node && node !== libNode){ libNode = node; lib = null; }
+  if (key !== entryKey) entryLib = null;
   entryKey = key;
   // Its own address, and where it was opened from kept before it draws (Back).
   const was = location.hash;
   const to = `#/build/library/${encodeURIComponent(libNode || "")}/${encodeURIComponent(entryKey)}`;
   shellCame(was, to);
   openTab({kind: "entry", arg: "__entry", label: "Library"});
-  libRev++;
+  readMoved("library");
   if (to !== was) shellPush(to, was);
   // Read afresh, as opening the Library is: a press is somebody asking now.
-  loadLibrary();
+  loadEntry();
 }
 
 function entryRow(){
-  return (lib?.rows || []).find(r => `${r.kind}:${r.name}` === entryKey) || null;
+  return (entryLib?.rows || []).find(r => `${r.kind}:${r.name}` === entryKey) || null;
 }
 function entryLabel(){ return entryRow()?.label || entryKey.split(":").slice(1).join(":") || "Library"; }
 
@@ -34,26 +51,32 @@ function renderEntryInto(i){
   const d = docSurface(i, "entry");
   if (!d) return;
   d.setBar("");
-  if (lib === null){
-    d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["Node", GHOST]]}) + docSection("entry", "about", "What it is", "", skRows(3)));
-    if (!libSeq) loadLibrary();
+  // A page that came back without the entry it was for (the browser's kept
+  // layout after a reload that did not land on its address): the Library.
+  if (!entryKey){ d.list.innerHTML = ""; setTimeout(() => { if (!entryKey) openLibrary(); }, 0); return; }
+  if (entryLib === null){
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["Node", GHOST]]}) + docSection("entry", "about", "What it is", "", skRows(3))));
+    if (!readRev("entry") && !readBusy("entry")) loadEntry();
     return;
   }
-  const r = entryRow();
-  if (lib.error || !r){
-    paint(d.list, `<div class="field"><div class="notice ${lib.error ? "bad" : "warn"}">${esc(lib.error
-      ? "could not read the Library: " + lib.error
-      : `${entryLabel()} is not in the Library for ${lib.name || "this node"} now.`)}</div></div>`);
+  const r = entryRow(), el = entryLib;
+  if (el.error || !r){
+    patch(d.list, `<div class="field"><div class="notice ${el.error ? "bad" : "warn"}">${esc(el.error
+      ? "could not read the Library: " + el.error
+      : `${entryLabel()} is not in the Library for ${el.name || "this node"} now.`)}</div></div>`);
     return;
   }
-  const may = lib.may || {};
+  const may = el.may || {};
   // The card's head: its icon beside its name and pills, where it stands at
   // the action bar's left as on the card's foot, then its one verb.
-  const head = pageHead({title: r.label, pills: libPills(r), facts: [["Node", lib.name || ""]],
-    actions: `${libState(r)}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);
-  const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && lib?.job?.errors?.[r.name] ? `<div class="field"><div class="sub bad">${esc(lib.job.errors[r.name])}</div></div>` : "";
+  // Where it stands, left out when it has no words: an empty one beside the
+  // one verb kept that verb off the head's line, alone under its facts (B976).
+  const st = libState(r), said = st.replace(/<[^>]*>/g, "").trim() ? st : "";
+  const head = pageHead({title: r.label, pills: libPills(r), facts: [["Node", el.name || ""]],
+    actions: `${said}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);
+  const bad = packJobErr(r, el.job), err = bad && `<div class="field">${bad}</div>`;
   const about = `${r.about ? `<span class="sub">${esc(r.about)}</span>` : ""}${r.machine && r.name === TC_DRIVER ? libDriverPick(r.machine) : ""}${libDetail(r)}`;
-  paint(d.list, `<div data-libnode="${esc(libNode)}" data-entry="${esc(entryKey)}">${head}${err}${
+  patch(d.list, `<div data-libnode="${esc(libNode)}" data-entry="${esc(entryKey)}">${head}${err}${
     docSection("entry", "about", "What it is", "", `<div class="field ldetail">${about}</div>`, {open: true})}</div>`);
   wireLibrary(d.el);
 }

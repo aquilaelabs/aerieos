@@ -36,6 +36,14 @@ function pageLimit(host, name, total, size = PAGE){
   return Math.min(total, size * Math.max(pageState[key] || 1, 1));
 }
 
+// ...and a row somebody is working in (one being edited, one just added)
+// kept on show: the pages shown grow to reach the first `count` rows.
+function pageReach(host, name, count, size = PAGE){
+  if (!host || !(count > 0)) return;
+  const key = pageKey(host, name);
+  pageState[key] = Math.max(pageState[key] || 1, Math.ceil(count / size));
+}
+
 function paginate(host, rowSel, opts = {}){
   if (!host) return;
   const key = pageKey(host, opts.key);
@@ -50,8 +58,9 @@ function paginate(host, rowSel, opts = {}){
     if (rows.length >= opts.total) return;
     const bar = document.createElement("div");
     bar.className = "pagemore";
-    bar.innerHTML = `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
-      <button type="button" class="next">Show more</button>`;
+    bar.setAttribute("data-own", "");      // the list's code's: a patch steps over it (R244)
+    drawHTML(bar, `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
+      <button type="button" class="next">Show more</button>`);
     const more = () => {
       if (!bar.isConnected) return;
       bar.__io?.disconnect();
@@ -78,8 +87,9 @@ function paginate(host, rowSel, opts = {}){
   if (shown >= rows.length) return;
   const bar = document.createElement("div");
   bar.className = "pagemore";
-  bar.innerHTML = `<span>${shown} of ${rows.length}${opts.noun ? " " + esc(opts.noun) : ""}</span>
-    <button type="button" class="next">Show more</button>`;
+  bar.setAttribute("data-own", "");
+  drawHTML(bar, `<span>${shown} of ${rows.length}${opts.noun ? " " + esc(opts.noun) : ""}</span>
+    <button type="button" class="next">Show more</button>`);
   const more = () => {
     if (!bar.isConnected) return;
     pageState[key] = Math.ceil(shown / size) + 1;

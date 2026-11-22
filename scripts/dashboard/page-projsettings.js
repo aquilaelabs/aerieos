@@ -4,8 +4,8 @@
 // turn. Unlinking and deleting a project start here too.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -37,7 +37,7 @@ const EFFORTS = [["", "Claude's default"], ["low", "low"], ["medium", "medium"],
 // a menu.
 let rnPrefWas = {git_name: "", git_email: "",
                  node: "", nodes: "", hosts: "", hosts_off: "", reads: "", tc_off: "", packs_on: "", sees: "", reaches: "", build: "", test: "", outputs: "",
-                 capture_days: "7", snapshot_days: "14", snapshots_on: "1", dev_keep: "3", gate: ""};
+                 capture_days: "7", snapshot_days: "14", dev_keep: "3", gate: "", release_gate: "refuse", files_table: "on"};
 // The colors a project can be, by the names prefs.py stores (COLORS there)
 // and the tone each is drawn in. Named at the store and mapped here so the
 // tone can be retuned for a scheme without touching what anybody saved.
@@ -122,8 +122,7 @@ function rnDialChoices(p, f, modes, dflt){
 // A project's settings as the form holds them, from its row: what the form
 // opens on, and what a section's Save compares with what is saved now.
 function rnPrefsOf(p){
-  return {git_name: p?.yours?.git_name || "", git_email: p?.yours?.git_email || "",
-               node: p?.prefs?.node || "",
+  return {node: p?.prefs?.node || "",
                nodes: (p?.prefs?.nodes || []).join(","),
                hosts: (p?.prefs?.hosts || []).join(","),
                hosts_off: (p?.prefs?.hosts_off || []).join(","),
@@ -131,30 +130,15 @@ function rnPrefsOf(p){
                tc_off: (p?.prefs?.tc_off || []).join(","), packs_on: (p?.prefs?.packs_on || []).join(","),
                agents_off: (p?.prefs?.agents_off || []).join(","),
                agent_default: p?.prefs?.agent_default || "claude",
-               agent_slots: String(p?.prefs?.agent_slots ?? 3),
                sees: (p?.prefs?.sees || []).join(", "),
                reaches: JSON.stringify(p?.prefs?.reaches || []),
-               build: p?.prefs?.build || "", test: p?.prefs?.test || "",
-               outputs: (p?.prefs?.outputs || []).join(", "),
-               capture_days: String(p?.prefs?.capture_days ?? 7),
-               snapshot_days: String(p?.prefs?.snapshot_days ?? 14),
-               snapshots_on: p?.prefs?.snapshots_on === false ? "0" : "1",
-               dev_keep: String(p?.prefs?.dev_keep ?? 3),
                gate: Object.keys(GATE_IDS).map(k => rnDialVal(p, "gate." + k, "auto")).join(","),
                tests_in: p?.prefs?.tests_in || "node", test_node: rnDialVal(p, "test_node", ""),
                test_change: rnDialVal(p, "test_change", "wait"),
-               gpu: p?.prefs?.gpu || "on",
-               reply: p?.yours?.reply || "", asks: p?.yours?.asks || "", term_scheme: p?.yours?.term_scheme || "",
-               devbuild: rnDialVal(p, "devbuild", "deny"),
-               makevms: rnDialVal(p, "makevms", "deny"),
-               installpacks: rnDialVal(p, "installpacks", "ask"),
                vm_caps: rnVmCapsOf(p),
-               report: rnDialVal(p, "report", "auto"),
-               sign: rnDialVal(p, "sign", "ask"),
-               release: rnDialVal(p, "release", "ask"),
-               keys: rnDialVal(p, "keys", "ask"),
-               pc: rnDialVal(p, "pc", "deny"),
-               version: p?.version_policy || "locked"};
+               version: p?.version_policy || "locked",
+               // The simple fields, each by its row of RN_FIELDS.
+               ...Object.fromEntries(RN_SIMPLE.map(f => [f.k, rnFieldOf(f, p)]))};
 }
 
 function rnFillPrefs(p){
@@ -162,14 +146,14 @@ function rnFillPrefs(p){
   // the last project's dialog left in it (the merged list, 13 Oct).
   const nm = $("rnNodesMore");
   if (nm) delete nm.dataset.drawn;
+  rnMore = null;
   rnPrefWas = rnPrefsOf(p);
-  // A select with no value of its own reads as its first option, and the
-  // form collects every field whichever section is saved: set here, with the
-  // rest that are always on the form, so saving another section never takes
-  // the cap down to 1 (R143).
-  $("rnAgentSlots").value = rnPrefWas.agent_slots;
-  $("rnGitName").value = rnPrefWas.git_name;
-  $("rnGitEmail").value = rnPrefWas.git_email;
+  // The simple fields (RN_FIELDS), each element set to its value; a dial is
+  // drawn with its choices in rnFillPrefsRest. A select with no value of
+  // its own reads as its first option, and the form collects every field
+  // whichever section is saved: set on every open, so saving another
+  // section never takes the sessions cap down to 1 (R143).
+  for (const f of RN_SIMPLE) if (!f.dial) $(f.id).value = rnPrefWas[f.k];
   // Said where it is typed: the Profile is the default, this is the exception,
   // and a commit needs both halves from somewhere.
   $("rnGitHint").textContent = rnPrefWas.git_name || rnPrefWas.git_email
@@ -180,6 +164,7 @@ function rnFillPrefs(p){
   // first draw would read them back into it.
   $("rnReachRows").innerHTML = "";
   rnReachDraft = JSON.parse(rnPrefWas.reaches || "[]");
+  rnReachEdit = null;
   rnFillNode();
   rnFillPrefsRest(p);
   rnFillReads();
@@ -255,11 +240,11 @@ function rnFillNode(){
     const row = (state?.projects || []).find(p => p.name === rnFor);
     const gone = row?.node_removed && rnPrefWas.node && !pick.some(n => n.id === rnPrefWas.node)
       ? `<option value="${esc(rnPrefWas.node)}" class="removed" selected>${esc(row.node_name || rnPrefWas.node)} (removed)</option>` : "";
-    sel.innerHTML = `<option value="">none: no builds, tests or sessions until one is picked</option>`
+    drawHTML(sel, `<option value="">none: no builds, tests or sessions until one is picked</option>`
       + gone
       + pick.map(n => `<option value="${esc(n.id)}"${n.id === rnPrefWas.node ? " selected" : ""}>${
           esc(n.name)} (${n.config?.own ? "this machine, " : ""}${esc(n.kind)}, ${esc(n.state)}${n.live === false ? ", quiet" : ""}${
-          tools(n).length ? " · " + esc(tools(n).slice(0, 4).join(", ")) : ""})</option>`).join("");
+          tools(n).length ? " · " + esc(tools(n).slice(0, 4).join(", ")) : ""})</option>`).join(""));
     sel.value = gone ? rnPrefWas.node : pick.some(n => n.id === rnPrefWas.node) ? rnPrefWas.node : "";
     // The closed picker is italic while the removed node is the one shown.
     sel.classList.toggle("removed", !!gone && sel.value === rnPrefWas.node);
@@ -279,67 +264,103 @@ function rnHostIds(){
 }
 
 // Also reaches (the operator, 7 Oct): addresses a session here may still
-// reach where its node filters, each on the project's nodes ticked beside
-// it, every one when the project is on one node. A draft until Save; all
-// ticked is stored as none named, which also covers a node added later.
+// reach where its node filters, each on the project's nodes ticked in its
+// form, every one when the project is on one node. All ticked is stored as
+// none named, which also covers a node added later.
 let rnReachDraft = [];
 
 function rnReachNodes(){
   const primary = $("rnNode").value;
   // The nodes a session may run on: a hosting-only row holds no session.
   const hosts = rnHostIds();
-  const more = [...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => !hosts.has(id));
+  const more = rnMoreIds().filter(id => !hosts.has(id));
   const ids = primary ? [primary, ...more.filter(x => x !== primary)] : [];
   return ids.map(id => (nodesList || []).find(n => n.id === id) || {id, name: id});
 }
 
-// What is typed and ticked, back into the draft before a redraw or a save.
-function rnReachSync(){
-  const ns = rnReachNodes();
-  $("rnReachRows").querySelectorAll(".rnreach").forEach(row => {
-    const e = rnReachDraft[+row.dataset.i];
-    if (!e) return;
-    e.addr = row.querySelector("[data-reach]").value.trim();
-    const ticks = [...row.querySelectorAll("[data-reachnode]")];
-    if (ticks.length){
-      const on = ticks.filter(t => t.checked).map(t => t.value);
-      e.nodes = on.length === ns.length ? [] : on;
-    }
-  });
-}
-
+// Also reaches as records (the record-lists rule; the operator, 17 Nov: a
+// record's Save writes it at once): an address a row with the nodes it is
+// on, read-only with Edit at its right, Edit opening it in place (its
+// address, its nodes where the space works on several, Delete, Cancel and
+// Save), Add an address over the table. A Save writes the space's list with
+// that one changed; the section's own Save is for its other fields.
+const REACH_COLS = [{label: "Address"}, {label: "On", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
+let rnReachEdit = null;           // {i, form: {addr, nodes}}: the row open, i -1 for a new one
 function rnDrawReach(focus){
   if (rnMode === "git") return;
   const box = $("rnReachRows");
-  if (box.childElementCount) rnReachSync();
   // Nodes Write, as the server asks (R255 step 3), not the administrator
-  // role: a role of anybody's may give it.
+  // role: a role of anybody's may give it. A repository's view draws the
+  // space's dead (rnSpaceRelock, after each draw).
   const ns = rnReachNodes(), ro = state?.areas ? state.areas.nodes !== "write" : !state?.admin;
-  box.innerHTML = rnReachDraft.map((e, i) => `<div class="rnreach" data-i="${i}">
-      <input data-reach value="${esc(e.addr)}" autocomplete="off" spellcheck="false" placeholder="192.168.1.20 or 192.168.1.20:8080"
-        aria-label="an address a session here may reach"${ro ? " disabled" : ""}>
-      ${ns.length > 1 ? `<span class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachnode value="${esc(n.id)}"${
-        !e.nodes.length || e.nodes.includes(n.id) ? " checked" : ""}${ro ? " disabled" : ""}> ${esc(n.name)}</label>`).join("")}</span>` : ""}
-      ${ro ? "" : rmIcon("data-reachrm", "remove this address", {title: "remove this address"})}
-    </div>`).join("");
+  const named = id => ns.find(n => n.id === id)?.name || (nodesList || []).find(n => n.id === id)?.name || id;
+  const ed = rnReachEdit;
+  const form = (f, i) => `<div class="ngform rnreachform" data-i="${i}">
+      <label class="setrow col ctlrow"><span class="lbl">Address</span><input data-reachf="addr" value="${esc(f.addr || "")}" autocomplete="off" spellcheck="false"
+        placeholder="192.168.1.20 or 192.168.1.20:8080" aria-label="an address a session here may reach"></label>
+      ${ns.length > 1 ? `<div class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachfnode value="${esc(n.id)}"${
+        !f.nodes.length || f.nodes.includes(n.id) ? " checked" : ""}> ${esc(n.name)}</label>`).join("")}</div>` : ""}
+      <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-reachdel>Delete</button>` : ""}
+        <button type="button" data-reachcancel>Cancel</button>
+        <button type="button" class="primary" data-reachsave>Save</button></div>
+    </div>`;
+  const rows = rnReachDraft.map((e, i) => `<div class="row rnreach${ed?.i === i ? " open" : ""}" data-i="${i}">${tblLine(REACH_COLS, [
+      `<code>${esc(e.addr)}</code>`, esc(e.nodes.length ? e.nodes.map(named).join(", ") : "every node it works on"),
+      ed?.i === i || ro ? "" : `<button type="button" data-reachedit="${i}">Edit</button>`])}${ed?.i === i ? form(ed.form, i) : ""}</div>`).join("");
+  const fresh = ed?.i === -1 ? `<div class="row rnreach open" data-i="-1">${form(ed.form, -1)}</div>` : "";
+  drawHTML(box, rows || fresh ? tblWrap(REACH_COLS, fresh + rows, "rnreaches") : "");
   // Empty is no box at all, so the field keeps its rhythm under the label.
-  box.hidden = !rnReachDraft.length;
+  box.hidden = !rows && !fresh;
   $("rnReachAdd").hidden = ro;
-  box.querySelectorAll("[data-reachrm]").forEach(b => b.onclick = () => {
-    rnReachSync();
-    rnReachDraft.splice(+b.closest(".rnreach").dataset.i, 1);
-    // Read already: the rows on screen no longer line up with the draft.
-    $("rnReachRows").innerHTML = "";
-    rnDrawReach();
+  $("rnReachAdd").disabled = ed?.i === -1;
+  const keep = () => {
+    if (!rnReachEdit) return;
+    const o = box.querySelector(".rnreach.open");
+    rnReachEdit.form.addr = o?.querySelector("[data-reachf]")?.value.trim() ?? rnReachEdit.form.addr;
+    const ticks = [...(o?.querySelectorAll("[data-reachfnode]") || [])];
+    if (ticks.length){
+      const on = ticks.filter(t => t.checked).map(t => t.value);
+      rnReachEdit.form.nodes = on.length === ns.length ? [] : on;
+    }
+  };
+  box.querySelectorAll("[data-reachf], [data-reachfnode]").forEach(el => { el.oninput = keep; el.onchange = keep; });
+  box.querySelectorAll("[data-reachedit]").forEach(b => b.onclick = () => {
+    const e = rnReachDraft[+b.dataset.reachedit];
+    rnReachEdit = {i: +b.dataset.reachedit, form: {addr: e.addr, nodes: [...e.nodes]}};
+    rnDrawReach(true);
   });
-  if (focus) box.querySelector(".rnreach:last-child [data-reach]")?.focus();
+  box.querySelectorAll("[data-reachcancel]").forEach(b => b.onclick = () => { rnReachEdit = null; rnDrawReach(); });
+  box.querySelectorAll("[data-reachsave]").forEach(b => b.onclick = () => {
+    keep();
+    const {i, form} = rnReachEdit;
+    const list = rnReachDraft.map(e => ({addr: e.addr, nodes: [...e.nodes]}));
+    const e = {addr: form.addr, nodes: [...form.nodes].sort()};
+    if (i < 0) list.push(e); else list[i] = e;
+    rnReachSave(list.filter(x => x.addr), b);
+  });
+  box.querySelectorAll("[data-reachdel]").forEach(b => b.onclick = () =>
+    rnReachSave(rnReachDraft.filter((_, j) => j !== rnReachEdit.i).map(e => ({addr: e.addr, nodes: [...e.nodes]})), b));
+  if (focus) box.querySelector(".rnreach.open [data-reachf]")?.focus();
+  rnSpaceRelock();
   // Every node keeps each session to its own project's network (R146).
   $("rnReachHint").textContent = !ns.length ? "" : "An address for the whole machine, or address:port for one service.";
 }
+// A record's Save: the space's list with that one changed, written now;
+// running sessions take it at once.
+async function rnReachSave(list, btn){
+  const word = btn.textContent;
+  busy(btn, "Saving");
+  const j = await postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", reaches: list});
+  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
+  rnReachDraft = list;
+  rnPrefWas.reaches = JSON.stringify(rnReachNow());
+  rnReachEdit = null;
+  rnDrawReach();
+  rnBars();
+}
 
-// What Save sends: the rows with an address, in the stored shape.
+// What the section's Save sends: the saved rows, in the stored shape.
 function rnReachNow(){
-  rnReachSync();
   return rnReachDraft.filter(e => e.addr).map(e => ({addr: e.addr, nodes: [...e.nodes].sort()}));
 }
 
@@ -348,39 +369,129 @@ const lrow = (value, name, sub, on) => `<label class="lrow"><input type="checkbo
     on ? " checked" : ""}><span>${esc(name)}</span>${sub ? `<span class="lsub">${esc(sub)}</span>` : ""}</label>`;
 
 // The rest of the set (R82) and the hosting-only nodes (prefs.hosts) in one
-// list (the operator, 13 Oct): every node but the primary, a listbox row
-// each, a hosting-only one marked so in its name, ticked for the ones the
-// project also works on or hosts containers on. Redrawn when the primary
-// changes, since the primary is never offered twice.
+// list (the operator, 13 Oct), as records (the record-lists rule; the
+// operator, 17 Nov: a record's Save writes it at once): a node a row with
+// what it takes (sessions and containers, or containers alone for one marked
+// Hosting only) and its bin, nothing on it to edit, as Hostnames' rows; Add
+// a node over the table, a pick of the ones not on it. Each written at once,
+// with the primary as it is saved; the primary is never listed twice.
+const MORE_COLS = [{label: "Node"}, {label: "Takes", w: "minmax(0,1fr)"}, {act: true, w: "3rem"}];
+let rnMore = null;                // the saved set: node ids, the primary's set and the hosting ones
+function rnMoreIds(){
+  const primary = $("rnNode").value;
+  return [...(rnMore || [])].filter(id => id && id !== primary);
+}
 function rnFillNodesMore(){
   const box = $("rnNodesMore"), hint = $("rnNodesMoreHint"), label = $("rnNodesLabel");
   if (!box) return;
   const primary = $("rnNode").value;
-  const was = new Set([...rnPrefWas.nodes.split(","), ...rnPrefWas.hosts.split(",")].filter(Boolean));
-  const checked = new Set([...box.querySelectorAll("input:checked")].map(i => i.value));
-  const first = !box.dataset.drawn;
+  // Read from what is saved on a fresh open, whether or not the node list
+  // has arrived (B796: a draw before it marked a saved second node gone).
+  if (!box.dataset.drawn || rnMore === null)
+    rnMore = new Set([...rnPrefWas.nodes.split(","), ...rnPrefWas.hosts.split(",")].filter(Boolean).filter(id => id !== rnPrefWas.node));
   // Without a primary there is nothing for a session to also work on, but
-  // a hosting-only node still takes the project's containers, so those
-  // rows stay on offer.
+  // a hosting-only node still takes the project's containers.
   const others = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired" && n.state !== "disabled" && n.id !== primary
                                             && (primary || n.config?.host_only));
-  // A hosting node named but gone, or no longer hosting-only, stays ticked
-  // so Save does not drop it without anybody seeing.
-  const gone = rnPrefWas.hosts.split(",").filter(id => id && !others.some(n => n.id === id) && id !== primary);
-  box.hidden = hint.hidden = label.hidden = rnMode === "git" || !(others.length || gone.length);
-  box.innerHTML = others.map(n => lrow(n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name,
-                                       `${n.config?.host_only ? "containers" : n.kind}, ${n.state}${n.live === false ? ", quiet" : ""}`,
-                                       first ? was.has(n.id) : checked.has(n.id))).join("")
-    + gone.map(id => lrow(id, `${id} (Hosting only)`, "not a hosting node now", first ? true : checked.has(id))).join("");
-  // Read-only without the `node` grant, like the primary above (R137 step 4).
-  if (state?.can?.node === false) box.querySelectorAll("input").forEach(i => { i.disabled = true; });
-  // Drawn from what is saved until a draw has had nodes to draw: one made
-  // before the node list arrived listed nothing, and marking it drawn made
-  // the real one read its own empty boxes, so a saved second node came up
-  // unticked and read as one to drop (B796, seen on dev, 16 Oct).
+  const ids = rnMoreIds();
+  box.hidden = hint.hidden = label.hidden = rnMode === "git" || !(others.length || ids.length);
+  // Without the `node` grant the list is read alone (R137 step 4); a
+  // repository's view draws it dead (rnSpaceRelock, at the end).
+  const ro = state?.can?.node === false;
+  const node = id => (nodesList || []).find(n => n.id === id);
+  const rows = ids.map(id => {
+    const n = node(id), host = n ? !!n.config?.host_only : rnPrefWas.hosts.split(",").includes(id);
+    return `<div class="row rnmore" data-id="${esc(id)}">${tblLine(MORE_COLS, [
+      `${esc(n?.name || id)}${host ? ` <span class="pill">Hosting only</span>` : ""}`,
+      esc(!n && host ? "not a hosting node now" : `${host ? "its containers" : "its sessions and containers"}${n ? `, ${n.state}${n.live === false ? ", quiet" : ""}` : ""}`),
+      ro ? "" : rmIcon(`data-morerm="${esc(id)}"`, `take ${n?.name || id} off`)])}</div>`;
+  }).join("");
+  const offer = others.filter(n => !ids.includes(n.id));
+  drawHTML(box, `${ro || !offer.length ? "" : `<div class="addbar ctlrow rnmoreadd">
+      <select data-moreadd aria-label="a node to add">${optionList(offer.map(n => [n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name]), "")}</select>
+      <button type="button" data-moreaddgo>Add a node</button></div>`}
+    ${rows ? tblWrap(MORE_COLS, rows, "rnmores") : `<div class="hint">none: its sessions and containers are on its node alone</div>`}`);
+  box.querySelector("[data-moreaddgo]")?.addEventListener("click", e => {
+    const id = box.querySelector("[data-moreadd]")?.value;
+    if (id) rnMoreSave(new Set([...(rnMore || []), id]), e.currentTarget);
+  });
+  box.querySelectorAll("[data-morerm]").forEach(b => b.onclick = () => {
+    const keep = new Set(rnMore || []); keep.delete(b.dataset.morerm);
+    rnMoreSave(keep, b);
+  });
+  // Drawn from what is saved until a draw has had nodes to draw (B796).
   if (nodesList !== null) box.dataset.drawn = "1";
+  rnSpaceRelock();
   // Also reaches ticks among these, so it is drawn after them.
   rnDrawReach();
+}
+// A record's Save: the set written now, with the primary as it is saved; a
+// session running keeps what it started with until it starts again.
+async function rnMoreSave(set, btn){
+  const word = btn.textContent;
+  busy(btn, "Saving");
+  const primary = rnPrefWas.node;
+  const hosting = id => !!(nodesList || []).find(n => n.id === id)?.config?.host_only
+    || (!(nodesList || []).some(n => n.id === id) && rnPrefWas.hosts.split(",").includes(id));
+  const more = [...set].filter(id => id && id !== primary);
+  const nodes = primary ? [primary, ...more.filter(id => !hosting(id))] : [];
+  const hosts = more.filter(hosting);
+  const j = await postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", nodes, hosts});
+  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
+  rnMore = new Set(more);
+  rnPrefWas.nodes = nodes.join(","); rnPrefWas.hosts = hosts.join(",");
+  if (myLiveSession(rnFor)) notify(`${projLabel(rnFor)}: saved. Its running session keeps the nodes it started with until it starts again.`);
+  rnFillNodesMore();
+  rnBars();
+}
+
+// ---- Releases: what each of a release's files is for (R255) ---------------
+// A list of records (the record-lists rule): a file's name and what it is
+// for, each row's Edit opening it in place and its Save writing the whole
+// list at once; Add a file over the table.
+const REL_COLS = [{label: "File", w: "minmax(0,14rem)"}, {label: "What it is for", w: "minmax(0,1fr)"}, {act: true, w: "4.5rem"}];
+let rnRelFiles = [], rnRelEdit = null;     // the saved rows; the row open for editing (-1: a new one)
+function rnDrawRelFiles(){
+  const box = $("rnRelFiles");
+  if (!box) return;
+  const ro = rnFor && (state?.projects || []).find(x => x.name === rnFor)?.may_settings === false;
+  const edit = (r, i) => `<div class="row rnrelf editing" data-relf="${i}">
+      <div class="two"><div><label>File</label><input data-relname maxlength="160" spellcheck="false" autocomplete="off"
+        value="${esc(r.name)}" placeholder="myapp-@VER@.apk"></div>
+      <div><label>What it is for</label><input data-relwhat maxlength="400" autocomplete="off"
+        value="${esc(r.what)}" placeholder="The Android app"></div></div>
+      <div class="actbar">${i >= 0 ? `<button type="button" class="danger" data-relrm="${i}">Delete</button>` : ""}<span class="sp"></span>
+        <button type="button" class="stop" data-relstop>Cancel</button>
+        <button type="button" class="primary" data-relsave>Save</button></div></div>`;
+  const rows = (rnRelEdit === -1 ? edit({name: "", what: ""}, -1) : "")
+    + rnRelFiles.map((r, i) => rnRelEdit === i ? edit(r, i)
+    : `<div class="row rnrelf" data-relf="${i}">${tblLine(REL_COLS, [
+        `<span class="data">${esc(r.name)}</span>`, esc(r.what || "not described: listed by its name"),
+        ro ? "" : `<button type="button" data-reledit>Edit</button>`])}</div>`).join("");
+  drawHTML(box, `${ro || rnRelEdit !== null ? "" : `<div class="addbar ctlrow"><button type="button" data-reladd>Add a file</button></div>`}
+    ${rows ? tblWrap(REL_COLS, rows, "rnrelfs") : `<div class="hint">none described: a release's files are listed by their names</div>`}`);
+  box.querySelector("[data-reladd]")?.addEventListener("click", () => { rnRelEdit = -1; rnDrawRelFiles(); box.querySelector("[data-relname]")?.focus(); });
+  box.querySelectorAll("[data-reledit]").forEach(b => b.onclick = () => { rnRelEdit = Number(b.closest("[data-relf]").dataset.relf); rnDrawRelFiles(); });
+  box.querySelectorAll("[data-relstop]").forEach(b => b.onclick = () => { rnRelEdit = null; rnDrawRelFiles(); });
+  box.querySelectorAll("[data-relrm]").forEach(b => b.onclick = () => rnSaveRelFiles(rnRelFiles.filter((_, i) => i !== Number(b.dataset.relrm)), b));
+  box.querySelectorAll("[data-relsave]").forEach(b => b.onclick = () => {
+    const row = b.closest("[data-relf]"), i = Number(row.dataset.relf);
+    const name = row.querySelector("[data-relname]").value.trim(), what = row.querySelector("[data-relwhat]").value.trim();
+    if (!name) return notify("a file's name is needed: myapp-@VER@.apk, or *.sha256", true);
+    if (rnRelFiles.some((r, k) => k !== i && r.name === name)) return notify(`${name} is described already`, true);
+    const next = rnRelFiles.slice();
+    if (i < 0) next.push({name, what}); else next[i] = {name, what};
+    rnSaveRelFiles(next, b);
+  });
+}
+async function rnSaveRelFiles(files, btn){
+  const word = btn.textContent;
+  busy(btn, "Saving");
+  const j = await postJSON("/api/prefs", {project: rnFor, scope: "repository", files});
+  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
+  rnRelFiles = files;
+  rnRelEdit = null;
+  rnDrawRelFiles();
 }
 
 // The projects a session here may read: every other project this account
@@ -391,17 +502,19 @@ function rnFillNodesMore(){
 // lists them, and every tool pack: a row each, ticked when its sessions may
 // use it. Fetched when the settings open; null until it has arrived.
 let rnToolsList = null;
-async function rnLoadTools(p){
-  rnToolsList = null;
-  // Not on the repository's own door (rnMode "git"), like Reads beside it.
-  $("rnToolsField").hidden = rnMode === "git";
-  if (rnMode === "git") return;
-  $("rnTools").innerHTML = `<div class="hint">reading the toolchains on its node…</div>`;
-  const node = p?.prefs?.node || "";
-  const j = await (await fetch("/api/toolchains" + (node ? `?node=${encodeURIComponent(node)}` : ""))).json().catch(() => ({}));
-  if (p?.name && p.name !== rnFor) return;          // another project's settings opened meanwhile
-  rnToolsList = (j.items || []).filter(i => i.installed || i.pack);
-  rnFillTools();
+function rnLoadTools(p){
+  return reading("rn.tools", async () => {
+    rnToolsList = null;
+    // Not on the repository's own door (rnMode "git"), like Reads beside it.
+    $("rnToolsField").hidden = rnMode === "git";
+    if (rnMode === "git") return;
+    drawHTML($("rnTools"), `<div class="hint">reading the toolchains on its node…</div>`);
+    const node = p?.prefs?.node || "";
+    const j = await getJSON("/api/toolchains" + (node ? `?node=${encodeURIComponent(node)}` : ""));
+    if (p?.name && p.name !== rnFor) return;          // another project's settings opened meanwhile
+    rnToolsList = (j.items || []).filter(i => i.installed || i.pack);
+    rnFillTools();
+  });
 }
 function rnFillTools(){
   const box = $("rnTools");
@@ -410,10 +523,10 @@ function rnFillTools(){
   const shipped = rnToolsList.filter(i => !i.pack).sort((a, b) => a.label.localeCompare(b.label));
   const packs = rnToolsList.filter(i => i.pack).sort((a, b) => a.label.localeCompare(b.label));
   const row = (i, attr, ticked, sub) => lrow(i.name, i.label, sub, ticked).replace("<input ", `<input ${attr} `);
-  box.innerHTML = shipped.map(i => row(i, "data-shipped", !off.has(i.name), i.version || "installed"))
+  drawHTML(box, shipped.map(i => row(i, "data-shipped", !off.has(i.name), i.version || "installed"))
     .concat(packs.map(i => row(i, "data-pack", on.has(i.name),
       `tool pack, added by ${i.pack.by || "an administrator"}${i.installed ? "" : "; not installed on its node yet"}`))).join("")
-    || `<div class="hint">nothing is installed on its node yet</div>`;
+    || `<div class="hint">nothing is installed on its node yet</div>`);
   box.querySelectorAll("input").forEach(i => i.onchange = () => rnBars());
   rnSpaceRelock();
 }
@@ -435,18 +548,18 @@ function rnFillAgents(off = rnPrefWas.agents_off, dflt = rnPrefWas.agent_default
   const box = $("rnAgents");
   if (!box) return;
   const was = new Set(String(off || "").split(",").filter(Boolean));
-  box.innerHTML = agentsLive().filter(a => a.id !== "claude")
-    .map(a => lrow(a.id, a.name, a.product, !was.has(a.id))).join("");
+  drawHTML(box, agentsLive().filter(a => a.id !== "claude")
+    .map(a => lrow(a.id, a.name, a.product, !was.has(a.id))).join(""));
   // Which guards hold for which agent (R95 step 6), said rather than implied.
   const g = $("rnAgentGuards");
-  if (g) g.innerHTML = agentsLive().map(a => `<div><b>${esc(a.name)}</b>: ${esc(AGENT_GUARDS[a.id] || "")}</div>`).join("");
+  if (g) drawHTML(g, agentsLive().map(a => `<div><b>${esc(a.name)}</b>: ${esc(AGENT_GUARDS[a.id] || "")}</div>`).join(""));
   // The one Start opens (R95 step 4): an agent left ticked, Claude first.
   const sel = $("rnAgentDefault");
   const offer = () => {
     const off2 = new Set([...box.querySelectorAll("input:not(:checked)")].map(i => i.value));
     const cur = sel.value || dflt || "claude";
-    sel.innerHTML = agentsLive().filter(a => !off2.has(a.id))
-      .map(a => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(a.name)}</option>`).join("");
+    drawHTML(sel, agentsLive().filter(a => !off2.has(a.id))
+      .map(a => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(a.name)}</option>`).join(""));
     if (!sel.value) sel.value = "claude";
   };
   if (sel){ sel.value = ""; offer(); box.querySelectorAll("input").forEach(i => i.addEventListener("change", offer)); }
@@ -465,23 +578,14 @@ function rnFillReads(){
   const own = reposOf(rnFor);
   const others = projectList().filter(c => c.key !== own).sort((a, b) => a.name.localeCompare(b.name));
   wrap.hidden = rnMode === "git" || !others.length;
-  box.innerHTML = others.map(c => lrow(c.key, c.name,
-    c.rows.length === 1 && c.rows[0].branch ? `git: ${c.rows[0].branch}` : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
-    was.has(c.key))).join("");
+  drawHTML(box, others.map(c => lrow(c.key, c.name,
+    c.rows.length === 1 ? (c.rows[0].git ? `git: ${c.rows[0].git}` : "no git") : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
+    was.has(c.key))).join(""));
   // AerieOS's owner's alone (the operator, 6 Oct): shown to everybody,
   // changed by the owner, and why not said on the row (not a tooltip).
   const mine = state?.can?.reads !== false;
   box.querySelectorAll("input").forEach(i => { i.disabled = !mine; });
   $("rnReadsWhy").hidden = mine;
-}
-
-// How this person's terminals here look with the colors picked, their
-// Profile's look and their own changes to that scheme with it.
-function rnTermPreview(){
-  const box = $("rnTermPreview");
-  if (!box) return;
-  const look = state?.term_look || {}, scheme = $("rnTermScheme").value || look.scheme || "default";
-  box.innerHTML = termPreview(termPalette(scheme, (look.colors || {})[scheme]), look);
 }
 
 // On the space's own door, under a dial, each repository that sets it apart
@@ -519,8 +623,8 @@ function rnFillTestNode(p){
   const named = id => names.get(id) || (nodesList || []).find(n => n.id === id)?.name || id;
   // A repository may set its own apart from its space's, as a dial (R223).
   const inh = rnDialMode(p) === "inherit", sv = p?.prefs?.project_dials?.test_node || "";
-  sel.innerHTML = (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
-    + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join("");
+  drawHTML(sel, (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
+    + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join(""));
   sel.dataset.proj = `${rnMode}:${p?.name || ""}`;
   const saved = inh ? rnDialVal(p, "test_node", "") : (p?.prefs?.test_node || "");
   sel.value = picked !== null && (picked === "" || picked === "inherit" || ids.includes(picked)) && picked !== saved ? picked
@@ -539,7 +643,7 @@ function rnFillTests(canDev){
   const opts = [...nodes.map(([v, t]) => [`node|${v}`, on(t)]),
                 ...(canDev ? [...nodes.map(([v, t]) => [`up|${v}`, `in its dev instance when it is up, else ${on(t)}`]),
                               ["only|", "only in its dev instance"]] : [])];
-  sel.innerHTML = optionList(opts);
+  drawHTML(sel, optionList(opts));
   const want = `${dev.value || "node"}|${dev.value === "only" ? "" : node.value}`;
   sel.value = opts.some(([v]) => v === want) ? want : opts[0]?.[0] || "";
   sel.onchange = () => {
@@ -549,8 +653,6 @@ function rnFillTests(canDev){
   };
 }
 function rnFillPrefsRest(p){
-  $("rnBuildCmd").value = p?.prefs?.build || "";
-  $("rnTestCmd").value = p?.prefs?.test || "";
   // Offered only where there is a container to run in: the Docker tab knows
   // which projects have one, and `has_compose` on the project row is the
   // same answer without asking it.
@@ -570,17 +672,9 @@ function rnFillPrefsRest(p){
     el.dataset.inherit = inh ? pv : "";
     el.value = rnDialVal(p, "test_change", "wait");
   }
-  $("rnGpu").value = p?.prefs?.gpu || "on";
-  $("rnReply").value = p?.yours?.reply || "";
-  $("rnAsks").value = p?.yours?.asks || "";
-  $("rnTermScheme").value = p?.yours?.term_scheme || "";
-  rnTermPreview();
-  $("rnTermScheme").onchange = rnTermPreview;
-  $("rnOutputs").value = (p?.prefs?.outputs || []).join(", ");
-  $("rnCaptureDays").value = String(p?.prefs?.capture_days ?? 7);
-  $("rnSnapDays").value = String(p?.prefs?.snapshot_days ?? 14);
-  $("rnSnapOn").checked = p?.prefs?.snapshots_on !== false;
-  $("rnDevKeep").value = String(p?.prefs?.dev_keep ?? 3);
+  rnRelFiles = (p?.prefs?.files || []).map(r => ({name: r.name, what: r.what}));
+  rnRelEdit = null;
+  rnDrawRelFiles();
   // Every dial here is a select filled once with its words and set to the
   // project's value: one helper for all of them (consistency pass), where
   // each was a copy of the same eight lines.
@@ -589,7 +683,7 @@ function rnFillPrefsRest(p){
     // Built again when its words change: "as the project (deny)" names
     // the project's value, which another project's door may differ on.
     if (el.dataset.built !== sig){
-      el.innerHTML = optionList(choices);
+      drawHTML(el, optionList(choices));
       el.dataset.built = sig;
     }
     el.value = value;
@@ -604,20 +698,26 @@ function rnFillPrefsRest(p){
     rnDialApart(el, p, f, modes);
     return el;
   };
+  // ...and a dial that is a row of RN_FIELDS, by its field: the row names
+  // its element and its default.
+  const fieldDial = (k, modes) => {
+    const f = RN_SIMPLE.find(x => x.k === k);
+    return dial(f.id, k, modes, f.dial);
+  };
   for (const [k, id] of Object.entries(GATE_IDS)) dial(id, "gate." + k, gateChoices(k), "auto");
   // Auto and deny only: a report has nothing to hold for approval.
-  dial("rnGateReport", "report", GATE_MODES.filter(([v]) => v !== "ask"), "auto");
-  dial("rnGateSign", "sign", GATE_MODES, "ask");
-  dial("rnGateRelease", "release", GATE_MODES, "ask");
-  dial("rnGateKeys", "keys", GATE_MODES, "ask");
+  fieldDial("report", GATE_MODES.filter(([v]) => v !== "ask"));
+  fieldDial("sign", GATE_MODES);
+  fieldDial("release", GATE_MODES);
+  fieldDial("keys", GATE_MODES);
   // A lent PC (R270 step 6): deny by default, it is somebody's own machine.
-  dial("rnGatePc", "pc", GATE_MODES, "deny");
+  fieldDial("pc", GATE_MODES);
   pick("rnGateVersion", Object.entries(POLICY_LABEL), p?.version_policy || "locked");
   // docker-write's to change (the grant, R137 step 4), so not offered otherwise.
-  dial("rnGateDocker", "devbuild", GATE_MODES, "deny").closest("label").hidden = state?.can?.["docker-write"] === false;
+  fieldDial("devbuild", GATE_MODES).closest("label").hidden = state?.can?.["docker-write"] === false;
   // ...and its VMs' (R91), the VMs area's to change, deny unless set.
-  dial("rnGateVms", "makevms", GATE_MODES, "deny").closest("label").hidden = state?.can?.["vms-write"] === false;
-  dial("rnGatePacks", "installpacks", GATE_MODES, "ask").closest("label").hidden = state?.can?.curate === false;
+  fieldDial("makevms", GATE_MODES).closest("label").hidden = state?.can?.["vms-write"] === false;
+  fieldDial("installpacks", GATE_MODES).closest("label").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
   // What its VMs may hold, only where it may make VMs at all (R223).
   const vmsCaps = () => {
@@ -653,7 +753,7 @@ function rnDrawPrefs(){
   // starts on the ones picked in the agent's menu each time (the operator,
   // 12 Oct).
   const shut = !!p?.locked_me;
-  $("rnReply").disabled = $("rnAsks").disabled = $("rnTermScheme").disabled = shut;
+  $("rnReply").disabled = $("rnAsks").disabled = shut;
   $("rnPrefHint").textContent = shut
     ? lockedWhy(p) + "."
     : "Applied the next time Claude starts here. The model and effort are picked each time a session starts, in the Claude button's menu.";
@@ -675,9 +775,8 @@ async function unlinkProject(name){
                       unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`); };
   busy($("rnUnlink"), "Unlinking");
   try{
-    const r = await postJSON("/api/unlink", {name});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) return stop(j.error || `unlink failed (HTTP ${r.status})`);
+    const j = await postJSON("/api/unlink", {name});
+    if (j.error) return stop(j.error);
     closeRename();
     notify(`${projLabel(name)} is unlinked: ${(j.removed || []).join(", ")}`
            + (j.others?.length ? `. Its other remotes are untouched: ${j.others.join(", ")}` : ""));
@@ -719,7 +818,7 @@ function settingsInto(name, host){
     // days kept, who is on it, the sessions running.
     rnLoadSnapshots(name, true);
     rnLoadPeople(name, true);
-    if (typeof rnSessionsLoad === "function") rnSessionsLoad(name);
+    rnSessionsLoad(name);
     return;
   }
   // Lent to another view still: taken back first, so the form is the
@@ -754,7 +853,8 @@ const RN_LIST = {
   claude: "what its sessions do on their own, ask about, or may not",
   yours: "your replies, questions and commit name here",
   repo: "how it pushes and pulls", runs: "the space's nodes, and where its containers go",
-  build: "commands, outputs, and what is kept", sees: "other spaces, shares, addresses",
+  build: "commands, outputs, and what is kept", releases: "what a release waits for, and its files described",
+  sees: "other spaces, shares, addresses",
   tools: "the toolchains and tool packs its sessions use",
   files: "its files over FTP and in an editor", snapshots: "the days kept, and putting one back",
   sessions: "every account's sessions here, to end",
@@ -811,7 +911,8 @@ function renameProject(name, mode = "all"){
   $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}`
     : proj ? `${projectName(name)} settings` : projLabel(name);
   for (const id of ["rnNameField", "rnMineField",
-                    "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField"])
+                    "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField",
+                    "rnRelGateF", "rnRelTableF", "rnRelFilesF"])
     $(id).hidden = git;
   // The project's name is renamed on its card's back; the field here
   // renames a repository, which the project's door is not about.
@@ -935,7 +1036,7 @@ function rnFillHostsOwn(p){
   if (f.hidden) return;
   const off = new Set(String(rnPrefWas.hosts_off || "").split(",").filter(Boolean));
   const named = id => (nodesList || []).find(n => n.id === id)?.name || id;
-  box.innerHTML = all.map(id => lrow(id, named(id), "hosting only", !off.has(id))).join("");
+  drawHTML(box, all.map(id => lrow(id, named(id), "hosting only", !off.has(id))).join(""));
 }
 // The space's parts locked again: People and Toolchains draw themselves once
 // their lists arrive, after the dialog has opened.
@@ -958,8 +1059,8 @@ function rnSpaceMarks(name, door){
   const band = () => {
     const d = document.createElement("div");
     d.className = "field rnspaceband";
-    d.innerHTML = `<div class="actbar"><span class="state">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</span>
-      <span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`;
+    drawHTML(d, `<div class="actbar"><span class="state">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</span>
+      <span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`);
     d.querySelector("[data-rnspacego]").onclick = () => renameProject(name, "project");
     return d;
   };
@@ -1007,7 +1108,6 @@ function rnLoadPeople(name, keep = false){
   }
   if (rnMode === "git") return;
   postJSON("/api/members", {action: "view", project: name})
-    .then(r => r.json())
     .then(j => { if (rnFor !== name || j.error) return;
                  if (keep && Object.keys(rnPeopleDraft).length) return;
                  rnPeople = j; rnDrawPeople(); })
@@ -1023,7 +1123,7 @@ function rnDrawPeople(){
   const invitable = v.accounts.filter(n => !v.members.includes(n) && !v.invites.some(i => i.name === n));
   $("rnPeopleField").hidden = false;
   setHidden($("rnPeopleField").closest("details"), false);
-  $("rnPeople").innerHTML = `
+  drawHTML($("rnPeople"), `
     <div class="setrow ctlrow">${v.may_manage
       ? `<label class="ndcap" for="rnOwner">Space owner</label>
          <select id="rnOwner">${optionList(v.accounts, owner)}</select>`
@@ -1043,7 +1143,7 @@ function rnDrawPeople(){
       <select id="rnInviteWho" aria-label="account to invite">${invitable.map(n => `<option>${esc(n)}</option>`).join("")}</select>
       <select id="rnInviteRole" aria-label="the role they are invited as">${v.roles.map(n => `<option>${esc(n)}</option>`).join("")}</select>
       <button type="button" id="rnInviteGo">Invite</button></div>`
-      : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`;
+      : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`);
   const o = $("rnOwner");
   if (o) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
   // What each person holds (R152): a name opens their roles, which a
@@ -1055,7 +1155,7 @@ function rnDrawPeople(){
   const io = $("rnInviteOnly");
   if (io && v.may_manage) io.onchange = () => { d.invite_only = io.checked; rnDrawPeople(); };
   const act = async body => {
-    const j = await (await postJSON("/api/members", body)).json();
+    const j = await postJSON("/api/members", body);
     if (j.error) return notify(j.error, true);
     rnPeople = j; rnDrawPeople();
   };
@@ -1075,8 +1175,8 @@ async function rnSavePeople(name){
   const owner = d.owner && d.owner !== v.owner ? d.owner : "";
   const only = d.invite_only !== undefined && d.invite_only !== v.invite_only ? d.invite_only : undefined;
   if (!owner && only === undefined) return "";
-  const j = await (await postJSON("/api/members", {action: "set", project: name, owner,
-                                                   ...(only !== undefined ? {invite_only: only} : {})})).json();
+  const j = await postJSON("/api/members", {action: "set", project: name, owner,
+                                                   ...(only !== undefined ? {invite_only: only} : {})});
   if (j.offered) notify(`${projLabel(name)}: offered to ${j.offered}, who becomes its owner on accepting from their bell`);
   return j.error || "";
 }
@@ -1095,7 +1195,6 @@ function rnLoadFtp(name){
   $("rnFtpField").hidden = true;
   if (rnMode === "git") return;
   postJSON("/api/project-ftp", {project: name})
-    .then(r => r.json())
     .then(j => { if (rnFor !== name || j.error) return; rnFtp = j; rnDrawFtp(); })
     .catch(() => {});
 }
@@ -1113,15 +1212,15 @@ function rnDrawFtp(){
   // Switched off on this install (R81): the sentence, and nothing to set.
   if (featureOff("ftp")){
     $("rnFtpField").hidden = false;
-    box.innerHTML = deadWhy(featureOff("ftp"));
+    drawHTML(box, deadWhy(featureOff("ftp")));
     return;
   }
   if (!v.may_set){
     $("rnFtpField").hidden = !v.on && !v.editor;
-    box.innerHTML = `${v.on ? `<div>Served over FTPS${where ? `, at ${esc(where)}` : ""}.</div>` : ""}
+    drawHTML(box, `${v.on ? `<div>Served over FTPS${where ? `, at ${esc(where)}` : ""}.</div>` : ""}
       ${v.editor ? `<div>Open from your own machine: AerieOS for VS Code and the Windows companion.</div>` : ""}
       <div class="hint">Sign in with your AerieOS name and password, if you were given access.
-        Who may is set by AerieOS's owner, or a role that grants ftp.</div>`;
+        Who may is set by AerieOS's owner, or a role that grants ftp.</div>`);
     return;
   }
   $("rnFtpField").hidden = false;
@@ -1133,7 +1232,7 @@ function rnDrawFtp(){
         your AerieOS name and password. The certificate is the node's own, so the client asks to trust it once.</div>`
     : st.why ? `<div class="hint bad">Not running: ${esc(st.why)}</div>`
     : `<div class="hint">Starting on its node.</div>`;
-  box.innerHTML = `
+  drawHTML(box, `
     <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this space's files over FTPS</label>
     <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
     ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
@@ -1150,7 +1249,7 @@ function rnDrawFtp(){
       const a = d.access?.[p.uid] ?? p.access;
       return `<div class="rnftprow"><span class="grow">${esc(p.name)}</span>
         <select data-ftpuid="${esc(p.uid)}" aria-label="${esc(p.name)}'s file access">${optionList(RN_FTP_ACCESS, a)}</select></div>`;
-    }).join("")}</div>`;
+    }).join("")}</div>`);
   $("rnFtpOn").onchange = e => { d.on = e.target.checked; rnDrawFtp(); };
   $("rnFtpEditor").onchange = e => { d.editor = e.target.checked; rnDrawFtp(); };
   const fo = $("rnFtpFor");
@@ -1180,7 +1279,7 @@ function rnFtpChange(){
 }
 
 async function rnSaveFtp(name, change){
-  const j = await (await postJSON("/api/project-ftp", {action: "set", project: name, ...change})).json();
+  const j = await postJSON("/api/project-ftp", {action: "set", project: name, ...change});
   return j.error || "";
 }
 
@@ -1192,7 +1291,7 @@ const rnSettingsWhy = name => (state?.projects || []).find(p => p.name === name)
 // server's own words naming the area and level that would open it (R255
 // step 4), not hidden as if there were nothing there.
 function rnWhyOff(field, body, why){
-  body.innerHTML = `<div class="sub bad">${esc(why)}</div>`;
+  drawHTML(body, `<div class="sub bad">${esc(why)}</div>`);
   field.hidden = false;
 }
 
@@ -1210,45 +1309,57 @@ function rnLoadSnapshots(name, keep = false){
   // Not asked for where the row already says it would be refused (B89), and
   // not drawn: what a role does not give is not shown (the operator, 21 Oct).
   if (rnSettingsWhy(name)) return;
-  fetch("/api/snapshots?project=" + encodeURIComponent(name))
-    .then(r => r.json())
-    .then(j => {
-      if (rnFor !== name) return;
-      if (j.error){ rnWhyOff($("rnSnapField"), $("rnSnapRows"), j.error); return; }
-      rnSnap = j; rnDrawSnapshots();
-    })
-    .catch(() => {});
+  return reading("rn.snapshots", async () => {
+    const j = await getJSON("/api/snapshots?project=" + encodeURIComponent(name));
+    if (rnFor !== name) return;
+    if (j.error){ rnWhyOff($("rnSnapField"), $("rnSnapRows"), j.error); return; }
+    rnSnap = j; rnDrawSnapshots();
+  });
 }
 
+// A space's snapshots as a record list (the record-lists rule): a day a row,
+// read-only in its columns (when, files, size, whether it is pinned), its
+// Restore opening the row in place, where a file is restored by its path or
+// the whole tree, and the day pinned or let go. Take one now is the
+// section's own bar, over the list.
+const SNAP_COLS = [{label: "Taken"}, {label: "Files", w: "5rem", num: true}, {label: "Size", w: "6rem", num: true},
+  {label: "Kept", w: "6rem"}, {act: true, w: "6rem"}];
+let rnSnapOpen = "";              // the day whose row is open
 function rnDrawSnapshots(){
   if (!rnSnap) return;
   const name = rnFor;
   $("rnSnapField").hidden = false;
   const days = rnSnap.days || [];
+  if (!days.some(d => d.day === rnSnapOpen)) rnSnapOpen = "";
   const when = d => d.at ? new Date(d.at * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : d.day;
-  $("rnSnapRows").innerHTML = (days.length ? days.map(d => `<div class="rnsnap actbar" data-day="${esc(d.day)}">
-      <span class="grow">${esc(when(d))}${d.pinned ? ` <span class="pill note" title="kept whatever the days kept say">pinned</span>` : ""}${d.why ? ` <span class="dim">(${esc(d.why.replace(/-/g, " "))})</span>` : ""}
-        <span class="dim">· ${d.files} files · ${esc(humanBytes(d.bytes))}</span></span>
-      <input type="text" data-snapfile placeholder="a file, from the tree's top" spellcheck="false" autocomplete="off"
-             aria-label="the file to restore from this day">
-      <button type="button" data-snapone disabled>Restore file</button>
-      <button type="button" data-snapall>Restore all</button>
-      <button type="button" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>
-    </div>`).join("")
-    : `<div class="dim">none yet: the first is taken within half an hour of the setting being above 0</div>`)
-    + `<div class="actbar"><button type="button" data-snaptake>Take one now</button></div>`;
+  const form = d => `<div class="snapform">
+      <label class="setrow col ctlrow snapfile"><span class="lbl">A file, from the tree's top</span>
+        <input type="text" data-snapfile placeholder="src/app.js" spellcheck="false" autocomplete="off"></label>
+      <div class="actbar"><button type="button" class="lead" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned
+        ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>
+        <span class="sp"></span>
+        <button type="button" data-snapcancel>Cancel</button>
+        <button type="button" data-snapone disabled>Restore file</button>
+        <button type="button" data-snapall>Restore all</button></div>
+    </div>`;
+  const row = d => `<div class="row snaprec${rnSnapOpen === d.day ? " open" : ""}" data-day="${esc(d.day)}">${tblLine(SNAP_COLS, [
+      `${esc(when(d))}${d.why ? ` <span class="dim">(${esc(d.why.replace(/-/g, " "))})</span>` : ""}`,
+      esc(String(d.files)), esc(humanBytes(d.bytes)),
+      d.pinned ? `<span class="pill note" title="kept whatever the days kept say">pinned</span>` : "",
+      rnSnapOpen === d.day ? "" : `<button type="button" data-snapopen>Restore</button>`])}${rnSnapOpen === d.day ? form(d) : ""}</div>`;
+  drawHTML($("rnSnapRows"), `<div class="addbar ctlrow"><button type="button" data-snaptake>Take one now</button></div>`
+    + (days.length ? tblWrap(SNAP_COLS, days.map(row).join(""), "snaprecords")
+       : `<div class="dim">none yet: the first is taken within half an hour of the setting being above 0</div>`));
   const pinned = days.filter(d => d.pinned).length;
-  $("rnSnapHint").textContent = (rnSnap.on === false
-    ? "Daily snapshots are off, so none are taken; the ones here go as they pass the days kept."
-    : rnSnap.keep
+  $("rnSnapHint").textContent = (rnSnap.keep
     ? `One a day, kept ${rnSnap.keep} day${rnSnap.keep === 1 ? "" : "s"}. A restore snapshots the tree first, so it can be undone from the line it leaves.`
-    : "Snapshots kept is 0, so none are taken; the ones here go at the next daily look.")
+    : days.length ? "Snapshots kept is 0, so none are taken; the ones here stay until some days are kept again and they pass them."
+    : "Snapshots kept is 0, so none are taken.")
     + (pinned ? ` ${pinned} pinned, kept until unpinned.` : "");
   const act = async (b, body, ask) => {
     if (ask && !await askYes(ask)) return;
     await pressing(b, async () => {
-      const r = await postJSON("/api/snapshots", {project: name, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/snapshots", {project: name, ...body});
       if (j.error) return notify(j.error, true);
       notify(body.action === "take" ? `snapshot taken: ${j.files} files`
         : body.action === "pin" ? `${j.day} pinned: kept until unpinned`
@@ -1257,8 +1368,12 @@ function rnDrawSnapshots(){
       rnLoadSnapshots(name);
     });
   };
-  $("rnSnapRows").querySelectorAll(".rnsnap").forEach(row => {
+  $("rnSnapRows").querySelectorAll(".snaprec").forEach(row => {
     const day = row.dataset.day;
+    const open = row.querySelector("[data-snapopen]");
+    if (open) open.onclick = () => { rnSnapOpen = day; rnDrawSnapshots(); row.closest(".body")?.querySelector(`.snaprec[data-day="${CSS.escape(day)}"] [data-snapfile]`)?.focus(); };
+    if (!row.classList.contains("open")) return;
+    row.querySelector("[data-snapcancel]").onclick = () => { rnSnapOpen = ""; rnDrawSnapshots(); };
     row.querySelector("[data-snapall]").onclick = e => act(e.target, {action: "restore", day},
       `Put all of ${name} back as it was on ${day}?\n\nFiles changed since are written back and files added since are removed, on the controller and then every node. The tree as it is now is snapshotted first.`);
     const pin = row.querySelector("[data-snappin]");
@@ -1297,10 +1412,7 @@ function rnLoadAuth(name){
   $("rnTestField").hidden = true;
   $("rnTestOut").hidden = true;
   if (rnMode !== "git") return;
-  fetch("/api/project-auth", {method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({name})})
-    .then(r => r.json())
+  postJSON("/api/project-auth", {name})
     .then(j => {
       if (rnFor !== name || j.error) return;   // closed, or reopened elsewhere
       rnAuthOpts = j;
@@ -1344,12 +1456,12 @@ function rnDrawStore(name){
   const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="setrow ctlrow"><span class="grow">Your ${
     esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}</span>
     <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this space"}</button></div>`).join("");
-  box.innerHTML = said + who + rows;
+  drawHTML(box, said + who + rows);
   box.hidden = !(said || who || rows);
   box.querySelectorAll("[data-rnstore]").forEach(b => b.onclick = async () => {
     busy(b, "Linking");
     try{
-      const j = await (await postJSON("/api/rename", {name, link_account: b.dataset.rnstore})).json();
+      const j = await postJSON("/api/rename", {name, link_account: b.dataset.rnstore});
       if (j.error) notify(j.error, true);
       else notify(`${projLabel(name)} uses your token for your pushes and pulls`);
     }catch(e){ notify("link: " + failWords(e), true); }
@@ -1358,7 +1470,7 @@ function rnDrawStore(name){
   box.querySelectorAll("[data-rnunlink]").forEach(b => b.onclick = async () => {
     busy(b, "Taking back");
     try{
-      const j = await (await postJSON("/api/rename", {name, unlink_mine: true})).json();
+      const j = await postJSON("/api/rename", {name, unlink_mine: true});
       if (j.error) notify(j.error, true);
       else notify(`your token is no longer given to ${projLabel(name)}`);
     }catch(e){ notify("take back: " + failWords(e), true); }
@@ -1377,10 +1489,10 @@ function rnDrawKey(){
   $("rnKeyPasteBtn").hidden = !!k;
   $("rnKeyPasteBtn").textContent = pasting ? "Keep it" : "Paste a key";
   $("rnKeyCopy").hidden = $("rnKeyForget").hidden = !k;
-  $("rnKeyHint").innerHTML = k
+  drawHTML($("rnKeyHint"), k
     ? `Add this on the host as a deploy key with write access${k.page ? `: <a href="${esc(k.page)}" target="_blank" rel="noopener">its deploy keys page</a>` : ""}, then pick Deploy key below and Save.`
     : pasting ? "Paste the whole private key, without a passphrase. It is kept where sessions can push with it and never read it."
-    : "None made here. Make one, or paste one you have.";
+    : "None made here. Make one, or paste one you have.");
 }
 
 async function rnKeyAct(action){
@@ -1388,8 +1500,8 @@ async function rnKeyAct(action){
   busy($(btn), action === "key-forget" ? "Forgetting" : action === "key-make" ? "Making" : "Keeping");
   let j;
   try{
-    j = await (await postJSON("/api/project-auth", {name, action,
-      key: action === "key-store" ? $("rnKeyPaste").value : ""})).json();
+    j = await postJSON("/api/project-auth", {name, action,
+      key: action === "key-store" ? $("rnKeyPaste").value : ""});
   }catch{ j = {error: "no answer from the dashboard"}; }
   $(btn).disabled = false;
   $(btn).removeAttribute("aria-busy");
@@ -1483,8 +1595,8 @@ async function rnTestAuth(){
   out.hidden = true;
   let j;
   try{
-    j = await (await postJSON("/api/project-auth", {name, action: "test",
-      token: $("rnToken").disabled ? "" : $("rnToken").value.trim()})).json();
+    j = await postJSON("/api/project-auth", {name, action: "test",
+      token: $("rnToken").disabled ? "" : $("rnToken").value.trim()});
   }catch{ j = {error: "no answer from the dashboard"}; }
   btn.disabled = false;
   btn.removeAttribute("aria-busy");
@@ -1494,10 +1606,10 @@ async function rnTestAuth(){
   const good = !j.error && !missing.length;
   out.classList.toggle("bad", !good);
   out.classList.toggle("ok", good && j.push !== null);
-  out.innerHTML = j.error ? esc(j.error)
+  drawHTML(out, j.error ? esc(j.error)
     : missing.length
       ? `With ${esc(j.using)} it is missing:<ul>${missing.map(m => `<li>${esc(m)}</li>`).join("")}</ul>`
-      : `With ${esc(j.using)} it can read${j.push ? " and push" : ""}.`;
+      : `With ${esc(j.using)} it can read${j.push ? " and push" : ""}.`);
   if (!j.error && (j.notes || []).length)
     out.innerHTML += `<div class="sub">${j.notes.map(esc).join(" ")}</div>`;
   out.hidden = false;
@@ -1564,25 +1676,94 @@ function closeRename(){
 // and moved on had saved nothing (Reads on AerieOS, 10 Oct). Where the
 // section holds something a running session takes only when it starts, its
 // bar offers both answers at once: Save, keep it running and Save and end it.
-const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "claude", "yours"];
+const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "releases", "claude", "yours"];
+// The settings' fields, a row each: `k` its name in rnPrefWas and in what
+// /api/prefs takes, `sect` the section whose Save writes it, `label` what a
+// change to it is called, `atStart` on one a running session takes only when
+// it starts. A section's bar names its changes in the rows' order.
+//
+// A row with an `id` is a simple field, one element holding one plain
+// value: `of` its value from a project's row, `read` its value off its
+// element (as it stands where the row has none), `out` the value /api/prefs
+// is sent where that is not the form's own, with undefined for one not sent
+// at all. A `dial` is one of the Agents may dials, by its default: it reads
+// through rnDialVal, and rnFillPrefsRest draws its choices. Opening the
+// form, comparing it, putting a section back and saving one each take every
+// simple field from here, so a new one is a row, and for a dial its line in
+// rnFillPrefsRest.
+//
+// A row with no `id` is a field with code of its own in each of those
+// places (rnPrefsOf, the fills, rnEnc, rnRevertSect, rnDec, rnSubmit): a
+// list, a set of ticks, several dials in one string.
+const RN_FIELDS = [
+  {k: "node", sect: "runs", label: "Node", atStart: true},
+  {k: "nodes", sect: "runs", label: "Node", atStart: true},
+  {k: "hosts", sect: "runs", label: "Hosts its containers on"},
+  {k: "hosts_off", sect: "runs", label: "Its containers may go to"},
+  {k: "gpu", id: "rnGpu", sect: "runs", label: "The node's GPU", atStart: true,
+   of: p => p?.prefs?.gpu || "on", read: el => el.value || "on"},
+  {k: "tests_in", sect: "build", label: "Tests run"},
+  {k: "test_node", sect: "build", label: "Tests run"},
+  {k: "reads", sect: "sees", label: "Reads", atStart: true},
+  {k: "sees", sect: "sees", label: "Also sees", atStart: true},
+  {k: "reaches", sect: "sees", label: "Also reaches"},
+  {k: "tc_off", sect: "tools", label: "Toolchains", atStart: true},
+  {k: "packs_on", sect: "tools", label: "Tool packs", atStart: true},
+  {k: "build", id: "rnBuildCmd", sect: "build", label: "Build",
+   of: p => p?.prefs?.build || "", read: el => el.value.trim()},
+  {k: "test", id: "rnTestCmd", sect: "build", label: "Test",
+   of: p => p?.prefs?.test || "", read: el => el.value.trim()},
+  // Typed as one line, stored as a list.
+  {k: "outputs", id: "rnOutputs", sect: "build", label: "Outputs",
+   of: p => (p?.prefs?.outputs || []).join(", "), read: el => el.value.trim(),
+   out: v => v.split(",").map(x => x.trim()).filter(Boolean)},
+  // A count left blank is not sent, and the server keeps the one it has.
+  {k: "capture_days", id: "rnCaptureDays", sect: "build", label: "Captures kept", atStart: true,
+   of: p => String(p?.prefs?.capture_days ?? 7), read: el => el.value.trim(), out: v => v !== "" ? +v : undefined},
+  {k: "snapshot_days", id: "rnSnapDays", sect: "build", label: "Snapshots kept", atStart: true,
+   of: p => String(p?.prefs?.snapshot_days ?? 14), read: el => el.value.trim(), out: v => v !== "" ? +v : undefined},
+  {k: "dev_keep", id: "rnDevKeep", sect: "build", label: "Dev builds kept", atStart: true,
+   of: p => String(p?.prefs?.dev_keep ?? 3), read: el => el.value.trim(), out: v => v !== "" ? +v : undefined},
+  {k: "release_gate", id: "rnRelGate", sect: "releases", label: "A fixed bug with no changelog line",
+   of: p => p?.prefs?.release_gate === "warn" ? "warn" : "refuse", read: el => el.value || "refuse"},
+  // Stored as a yes or no, picked as "on" or "off".
+  {k: "files_table", id: "rnRelTable", sect: "releases", label: "What each file is for",
+   of: p => p?.prefs?.files_table === false ? "off" : "on", read: el => el.value || "on", out: v => v !== "off"},
+  {k: "gate", sect: "claude", label: "Agents may"},
+  {k: "test_change", sect: "claude", label: "During a test run, a change asked for", atStart: true},
+  {k: "agents_off", sect: "claude", label: "Coding agents"},
+  {k: "agent_default", sect: "claude", label: "Start opens"},
+  {k: "agent_slots", id: "rnAgentSlots", sect: "claude", label: "Sessions of one agent",
+   of: p => String(p?.prefs?.agent_slots ?? 3), read: el => el?.value || "3"},
+  {k: "devbuild", id: "rnGateDocker", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "makevms", id: "rnGateVms", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "vm_caps", sect: "claude", label: "Its VMs may hold"},
+  {k: "installpacks", id: "rnGatePacks", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "report", id: "rnGateReport", sect: "claude", label: "Agents may", dial: "auto"},
+  {k: "sign", id: "rnGateSign", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "keys", id: "rnGateKeys", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "release", id: "rnGateRelease", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "pc", id: "rnGatePc", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "version", sect: "claude", label: "Move the version"},
+  {k: "reply", id: "rnReply", sect: "yours", label: "Replies", atStart: true, of: p => p?.yours?.reply || ""},
+  {k: "asks", id: "rnAsks", sect: "yours", label: "Questions", atStart: true, of: p => p?.yours?.asks || ""},
+  {k: "git_name", id: "rnGitName", sect: "yours", label: "Commit name and email", atStart: true,
+   of: p => p?.yours?.git_name || "", read: el => el.value.trim()},
+  {k: "git_email", id: "rnGitEmail", sect: "yours", label: "Commit name and email", atStart: true,
+   of: p => p?.yours?.git_email || "", read: el => el.value.trim()},
+];
+const RN_SIMPLE = RN_FIELDS.filter(f => f.id);
+// A simple field's value from a project's row; its value on the form now;
+// and every simple field as /api/prefs takes it, from what rnDec answers.
+const rnFieldOf = (f, p) => f.dial ? rnDialVal(p, f.k, f.dial) : f.of(p);
+const rnFieldNow = f => f.read ? f.read($(f.id)) : $(f.id).value || f.dial || "";
+const rnFieldsOut = v => Object.fromEntries(
+  RN_SIMPLE.map(f => [f.k, f.out ? f.out(v[f.k]) : v[f.k]]).filter(([, x]) => x !== undefined));
 // Which section each of rnPrefWas's fields is in, and what it is called.
-const RN_WAS = {
-  node: ["runs", "Node"], nodes: ["runs", "Node"], hosts: ["runs", "Hosts its containers on"], hosts_off: ["runs", "Its containers may go to"], gpu: ["runs", "The node's GPU"], tests_in: ["build", "Tests run"], test_node: ["build", "Tests run"],
-  reads: ["sees", "Reads"], sees: ["sees", "Also sees"], reaches: ["sees", "Also reaches"],
-  tc_off: ["tools", "Toolchains"], packs_on: ["tools", "Tool packs"],
-  build: ["build", "Build"], test: ["build", "Test"], outputs: ["build", "Outputs"],
-  capture_days: ["build", "Captures kept"], snapshot_days: ["build", "Snapshots kept"], snapshots_on: ["build", "Daily snapshots"], dev_keep: ["build", "Dev builds kept"],
-  gate: ["claude", "Agents may"], test_change: ["claude", "During a test run, a change asked for"], agents_off: ["claude", "Coding agents"], agent_default: ["claude", "Start opens"], agent_slots: ["claude", "Sessions of one agent"],
-  devbuild: ["claude", "Agents may"], makevms: ["claude", "Agents may"], vm_caps: ["claude", "Its VMs may hold"], report: ["claude", "Agents may"], sign: ["claude", "Agents may"],
-  keys: ["claude", "Agents may"], release: ["claude", "Agents may"], pc: ["claude", "Agents may"], version: ["claude", "Move the version"],
-  reply: ["yours", "Replies"], asks: ["yours", "Questions"], term_scheme: ["yours", "Terminal colors"],
-  git_name: ["yours", "Commit name and email"], git_email: ["yours", "Commit name and email"],
-};
+const RN_WAS = Object.fromEntries(RN_FIELDS.map(f => [f.k, [f.sect, f.label]]));
 // What a running session takes only when it starts (the briefing, the launch
 // flags, the view it runs in); everything else is read when it is used.
-const RN_AT_START = new Set(["reply", "asks", "git_name", "git_email", "node", "nodes",
-                             "reads", "sees", "test_change", "gpu", "capture_days", "snapshot_days", "snapshots_on", "dev_keep",
-                             "tc_off", "packs_on"]);
+const RN_AT_START = new Set(RN_FIELDS.filter(f => f.atStart).map(f => f.k));
 
 // The fields as they stand, in rnPrefWas's own shape, so each compares with
 // its saved value directly.
@@ -1592,12 +1773,11 @@ function rnEnc(){
   // bar on every open under load (the gate, 10 Oct).
   const drawn = nodesList !== null;
   const node = drawn ? $("rnNode").value : rnPrefWas.node;
-  return {git_name: $("rnGitName").value.trim(), git_email: $("rnGitEmail").value.trim(),
-          node, nodes: !drawn ? rnPrefWas.nodes
-            : (node ? [node, ...[...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => !rnHostIds().has(id))] : []).join(","),
+  return {node, nodes: !drawn ? rnPrefWas.nodes
+            : (node ? [node, ...rnMoreIds().filter(id => !rnHostIds().has(id))] : []).join(","),
           // The ticked rows marked Hosting only are prefs.hosts, the rest
           // prefs.nodes: one list on screen, two settings underneath.
-          hosts: !drawn ? rnPrefWas.hosts : [...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => rnHostIds().has(id)).join(","),
+          hosts: !drawn ? rnPrefWas.hosts : rnMoreIds().filter(id => rnHostIds().has(id)).join(","),
           // The space's hosting nodes this repository keeps its containers
           // off (R223): the rows unticked.
           hosts_off: $("rnHostsOwn")?.hidden !== false ? rnPrefWas.hosts_off
@@ -1611,21 +1791,13 @@ function rnEnc(){
             : rnRowsList(rnPrefWas.packs_on, $("rnTools").querySelectorAll("input[data-pack]"), i => i.checked),
           agents_off: [...$("rnAgents").querySelectorAll("input:not(:checked)")].map(i => i.value).join(","),
           agent_default: $("rnAgentDefault")?.value || "claude",
-          agent_slots: $("rnAgentSlots")?.value || "3",
           sees: $("rnSees").value.split(",").map(x => x.trim()).filter(Boolean).join(", "),
           reaches: JSON.stringify(rnReachNow()),
-          build: $("rnBuildCmd").value.trim(), test: $("rnTestCmd").value.trim(),
-          outputs: $("rnOutputs").value.trim(),
-          capture_days: $("rnCaptureDays").value.trim(), snapshot_days: $("rnSnapDays").value.trim(),
-          snapshots_on: $("rnSnapOn").checked ? "1" : "0",
-          dev_keep: $("rnDevKeep").value.trim(), gate: gateKey(rnGateNow()),
+          gate: gateKey(rnGateNow()),
           tests_in: $("rnDevTest").value || "node", test_node: $("rnTestNode")?.value || "", test_change: $("rnTestChange").value || "wait",
-          gpu: $("rnGpu").value || "on", reply: $("rnReply").value || "", asks: $("rnAsks").value || "",
-          term_scheme: $("rnTermScheme").value || "",
-          devbuild: $("rnGateDocker").value || "deny", makevms: $("rnGateVms").value || "deny", vm_caps: rnVmCapsNow(),
-          installpacks: $("rnGatePacks").value || "ask", report: $("rnGateReport").value || "auto",
-          sign: $("rnGateSign").value || "ask", release: $("rnGateRelease").value || "ask",
-          keys: $("rnGateKeys").value || "ask", pc: $("rnGatePc").value || "deny", version: $("rnGateVersion").value || "locked"};
+          vm_caps: rnVmCapsNow(), version: $("rnGateVersion").value || "locked",
+          // The simple fields, each read as its row of RN_FIELDS says.
+          ...Object.fromEntries(RN_SIMPLE.map(f => [f.k, rnFieldNow(f)]))};
 }
 
 // What one section holds unsaved, as the names its fields go by, and which
@@ -1707,6 +1879,8 @@ function rnBars(){
 // saved; the other sections keep what is typed in them.
 function rnRevertSect(sect){
   const w = rnPrefWas;
+  // The section's simple fields (RN_FIELDS), then what has code of its own.
+  for (const f of RN_SIMPLE) if (f.sect === sect) $(f.id).value = w[f.k];
   if (sect === "project"){
     $("rnName").value = projLabel(rnFor); rnShow();
     $("rnPreview").hidden = true; $("rnName").classList.remove("bad");
@@ -1719,8 +1893,11 @@ function rnRevertSect(sect){
   } else if (sect === "runs"){
     delete $("rnNodesMore").dataset.drawn;
     rnFillNode();
-    $("rnGpu").value = w.gpu; $("rnDevTest").value = w.tests_in; if ($("rnTestNode")) $("rnTestNode").value = w.test_node || "";
-  if ($("rnTests")) $("rnTests").value = `${w.tests_in || "node"}|${w.tests_in === "only" ? "" : (w.test_node || "")}`;
+  } else if (sect === "build"){
+    // Tests run is Build and test's own choice, put back by its Revert: it
+    // was put back by Where it runs', so Build and test's left it changed.
+    $("rnDevTest").value = w.tests_in; if ($("rnTestNode")) $("rnTestNode").value = w.test_node || "";
+    if ($("rnTests")) $("rnTests").value = `${w.tests_in || "node"}|${w.tests_in === "only" ? "" : (w.test_node || "")}`;
   } else if (sect === "files"){
     rnFtpDraft = {}; rnDrawFtp();
   } else if (sect === "tools"){
@@ -1730,25 +1907,15 @@ function rnRevertSect(sect){
     $("rnSees").value = w.sees;
     $("rnReachRows").innerHTML = "";
     rnReachDraft = JSON.parse(w.reaches || "[]");
+    rnReachEdit = null;
     rnDrawReach();
-  } else if (sect === "build"){
-    $("rnBuildCmd").value = w.build; $("rnTestCmd").value = w.test; $("rnOutputs").value = w.outputs;
-    $("rnCaptureDays").value = w.capture_days; $("rnSnapDays").value = w.snapshot_days;
-    $("rnSnapOn").checked = w.snapshots_on !== "0";
-    $("rnDevKeep").value = w.dev_keep;
   } else if (sect === "claude"){
     const g = String(w.gate).split(",");
     Object.values(GATE_IDS).forEach((id, i) => { $(id).value = g[i] || "auto"; });
-    $("rnTestChange").value = w.test_change; $("rnGateDocker").value = w.devbuild; $("rnGateVms").value = w.makevms; rnVmCapsSet(w.vm_caps);
-    $("rnGatePacks").value = w.installpacks;
+    $("rnTestChange").value = w.test_change; rnVmCapsSet(w.vm_caps);
     rnFillAgents(w.agents_off, w.agent_default);
-    $("rnAgentSlots").value = w.agent_slots;
-    $("rnGateReport").value = w.report; $("rnGateSign").value = w.sign;
-    $("rnGateRelease").value = w.release; $("rnGateKeys").value = w.keys;
-    $("rnGatePc").value = w.pc; $("rnGateVersion").value = w.version;
+    $("rnGateVersion").value = w.version;
   } else if (sect === "yours"){
-    $("rnReply").value = w.reply; $("rnAsks").value = w.asks; $("rnTermScheme").value = w.term_scheme;
-    $("rnGitName").value = w.git_name; $("rnGitEmail").value = w.git_email;
     rnDrawPrefs();
   }
   rnBarSay(sect, "");
@@ -1791,7 +1958,7 @@ async function rnSubmit(sect, end = false){
   // so their change is not written over unseen (the operator, 17 Oct); a
   // second press writes this one's over it. Read against the project as it
   // is now, the poll asked first.
-  if (typeof refresh === "function") await refresh().catch(() => {});
+  await refresh().catch(() => {});
   const now = rnPrefsOf((state?.projects || []).find(x => x.name === name));
   const theirs = mine.filter(k => k !== "version" && String(now[k] ?? "") !== String(rnPrefWas[k] ?? "")
                                && String(now[k] ?? "") !== String(enc[k] ?? ""));
@@ -1845,23 +2012,15 @@ async function rnSubmit(sect, end = false){
       // space's would have cut the space's own (R223).
       const only = new Set(mine.filter(k => !(rnSpaceOn && RN_GROUP.has(k))));
       const pick = o => Object.fromEntries(Object.entries(o).filter(([k]) => only.has(k)));
-      const r = await fetch("/api/prefs", {method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({project: name, restart: restartNow,
+      const j = await postJSON("/api/prefs", {project: name, restart: restartNow,
                               // The project's own door writes the project's defaults (R208 step 6);
                               // a notebook writes this repository's overrides.
                               scope: rnMode === "project" ? "project" : "repository",
-                              ...pick({git_name: v.git_name, git_email: v.git_email,
-                              node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
-                              tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default, agent_slots: v.agent_slots,
-                              build: v.build, test: v.test, gate: v.gate,
-                              tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change, gpu: v.gpu, reply: v.reply, asks: v.asks, term_scheme: v.term_scheme,
-                              devbuild: v.devbuild, makevms: v.makevms, vm_caps: JSON.parse(v.vm_caps || "{}"), report: v.report, sign: v.sign, keys: v.keys, release: v.release, pc: v.pc,
-                              outputs: v.outputs.split(",").map(x => x.trim()).filter(Boolean),
-                              ...(v.capture_days !== "" ? {capture_days: +v.capture_days} : {}),
-                              ...(v.snapshot_days !== "" ? {snapshot_days: +v.snapshot_days} : {}),
-                              snapshots_on: v.snapshots_on !== "0",
-                              ...(v.dev_keep !== "" ? {dev_keep: +v.dev_keep} : {})})})});
-      const j = await r.json();
+                              ...pick({node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
+                              tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default,
+                              gate: v.gate, tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change,
+                              vm_caps: JSON.parse(v.vm_caps || "{}"),
+                              ...rnFieldsOut(v)})});
       if (j.error) return stop(j.error);
       // Said out loud when the session was left on what it started with,
       // and why, and when it was ended.
@@ -1882,7 +2041,7 @@ async function rnSubmit(sect, end = false){
     // Move the version is version.py's policy: written where the Artifacts
     // tab writes it, so the two never disagree.
     if (sect === "claude" && enc.version !== rnPrefWas.version){
-      const j = await (await postJSON("/api/version", {project: name, action: "policy", policy: enc.version})).json();
+      const j = await postJSON("/api/version", {project: name, action: "policy", policy: enc.version});
       if (j.error) return stop(j.error);
     }
     const ftpChange = sect === "files" ? rnFtpChange() : null;
@@ -1892,8 +2051,7 @@ async function rnSubmit(sect, end = false){
       rnLoadFtp(name);
     }
     if (needRename){
-      const r = await postJSON("/api/rename", {name, to, token, auth, clear_token, address});
-      const j = await r.json();
+      const j = await postJSON("/api/rename", {name, to, token, auth, clear_token, address});
       if (j.error) return stop(j.error);
       notify(renaming ? `${j.from || projLabel(name)} is now ${j.label || to}`
         : address ? `${projLabel(name)}: ${(j.moved || []).find(m => /points at/.test(m)) || "saved"}`
@@ -1926,7 +2084,7 @@ async function rnSubmit(sect, end = false){
 async function deleteProject(name){
   // What keeps running with no project while it is in the trash (the
   // operator, 26 Oct), said before it is asked.
-  const own = await postJSON("/api/repos", {action: "owned", name}).then(r => r.json()).catch(() => ({}));
+  const own = await postJSON("/api/repos", {action: "owned", name});
   const left = [own.containers?.length ? `Its container${own.containers.length === 1 ? "" : "s"} ${own.containers.join(", ")} keep${own.containers.length === 1 ? "s" : ""} running, given to no space until it is put back.` : "",
                 own.vms?.length ? `Its VM${own.vms.length === 1 ? "" : "s"} ${own.vms.join(", ")} keep${own.vms.length === 1 ? "s" : ""} running under No space, an administrator's to act on.` : ""].filter(Boolean).join(" ");
   if (!await askYes(`Delete ${projLabel(name)}?\n\n`
@@ -1935,8 +2093,7 @@ async function deleteProject(name){
       + `and Put back in the trash returns all of it.${left ? "\n\n" + left : ""}\n\n`
       + `Close its terminals first.`)) return;
   try{
-    const r = await postJSON("/api/trash", {name});
-    const j = await r.json();
+    const j = await postJSON("/api/trash", {name});
     if (j.error){ notify(j.error, true); return; }
     // The path is named back because it may not be the one the dialog said:
     // a second delete of the same name is numbered rather than overwriting the

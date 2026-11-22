@@ -37,6 +37,9 @@ class Beating(unittest.TestCase):
         a.ctl = Ctl()
         a.census_take = lambda: (time.sleep(0.3), {"census": True})[1]
         self.assertEqual(a.census_beating(), {"census": True})
+        # A beat whose wait ran out as the census ended is still on its way:
+        # it is let land before the count, and none starts after it.
+        time.sleep(0.03)
         beats = len([c for c in a.ctl.calls if c[0] == "beat"])
         self.assertGreaterEqual(beats, 3, "beat while the census ran")
         time.sleep(0.2)

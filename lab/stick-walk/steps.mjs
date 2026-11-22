@@ -25,11 +25,19 @@ export const steps = {
     for (const c of cards.slice(3, 5)) console.log('-', c);
   },
   async moveland({ page, BASE, shot, tall, args }){
+    // What the controller answers the landing with, said whole: a refusal
+    // is a toast that is gone before a screenshot is.
+    page.on('response', async r => { if (/\/api\/move/.test(r.url()) && r.request().method() === 'POST') console.log('answered', r.status(), (await r.text().catch(() => '')).slice(0, 600)); });
     await page.goto(BASE); await sleep(7000);
+    // A browser that lost its place (a new sign-in as setup) is on the plain
+    // first run: back to the walk.
+    if (!await page.$('[data-moveland]')){ const w = page.locator('text=Walk me through it').first(); if (await w.count()){ await w.click(); await sleep(1500);
+      const mv = page.locator('[data-setwalk="move"]').first(); if (await mv.count()) await mv.click().catch(() => {}); await sleep(3000); } }
     await page.waitForSelector('[data-moveland]', { timeout: 30000 });
     await tall('73-walk-land', 2400);
     console.log('land enabled', await page.$eval('[data-moveland]', b => !b.disabled));
-    await page.fill('#landTok', readFileSync(new URL('run/move-token.txt', import.meta.url), 'utf8').trim());
+    // The token is asked for here only where the first page was not given it.
+    if (await page.$('#landTok')) await page.fill('#landTok', readFileSync(new URL('run/move-token.txt', import.meta.url), 'utf8').trim());
     await page.setInputFiles('#landFile', new URL('run/moved.aeriemove', import.meta.url).pathname);
     await page.click('[data-moveland]'); await sleep(1200);
     const m = await page.$('.modal:not([hidden])'); if (!m) throw new Error('Land asked nothing');
@@ -47,6 +55,67 @@ export const steps = {
     console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 900));
     await page.goto(BASE + '#/projects'); await sleep(5000); await tall('76-projects', 1200); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 600));
     await page.goto(BASE + '#/machines/nodes'); await sleep(5000); await tall('77-nodes', 1200); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 700));
+  },
+  // The first page as it is since the move token is all it asks (R175): yes,
+  // a controller is moving here, with the token kept in run/move-token.txt.
+  async movetoken({ page, BASE, shot, tall }){
+    await page.goto(BASE); await sleep(1500);
+    await page.check('input[name=walk][value=move]');
+    await page.fill('#mt', readFileSync(new URL('run/move-token.txt', import.meta.url), 'utf8').trim());
+    await Promise.all([page.waitForNavigation(), page.click('button[type=submit]')]);
+    await sleep(9000);
+    await tall('71-moving-here', 2400);
+    const cards = await page.evaluate(() => [...document.querySelectorAll('#setupPanel .setstep')].map(c => c.querySelector('h3')?.textContent + ' [' + (c.querySelector('.pill')?.textContent || '') + ']: ' + (c.querySelector('.setstepbody')?.innerText || '').replace(/\s+/g, ' ')));
+    for (const c of cards) console.log('-', c.slice(0, 500));
+    console.log(page.url());
+  },
+  // A backup taken from the controller signed in to: what its bundle would
+  // carry, then the bundle itself, its token and file kept in run/ as a
+  // move's are.
+  async backup({ page, BASE }){
+    await page.goto(BASE); await sleep(4000);
+    const pieces = await page.evaluate(async () => (await (await fetch('/api/move?pieces=1')).json()).pieces || []);
+    for (const p of pieces) console.log('piece:', p.label, '|', p.on ? 'carried' : 'not carried', '|', p.size, 'bytes |', (p.about || '').slice(0, 160));
+    const r = await page.evaluate(async () => (await fetch('/api/move', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'backup', carry_key: false, repos: false, stores: [] }) })).json());
+    if (!r.ok) throw new Error('no backup: ' + (r.error || JSON.stringify(r)));
+    writeFileSync(new URL('run/move-token.txt', import.meta.url), r.token + '\n', { mode: 0o600 });
+    console.log('bundle', r.bundle, r.size, 'bytes; counts', JSON.stringify(r.counts));
+    const got = await page.request.get(BASE + '/api/move-backup?name=' + encodeURIComponent(r.bundle));
+    writeFileSync(new URL('run/moved.aeriemove', import.meta.url), await got.body());
+    console.log('downloaded', (await got.body()).length, 'bytes');
+  },
+  // Sign in as an account the moved controller had: signin NAME PASSWORD.
+  async signin({ page, BASE, shot, args }){
+    await page.goto(BASE + '/login'); await sleep(1500);
+    await page.fill('#u', args[0]); await page.fill('#p', args[1] === '@token' ? readFileSync(new URL('run/move-token.txt', import.meta.url), 'utf8').trim() : args[1]);
+    await Promise.all([page.waitForNavigation().catch(() => {}), page.click('button[type=submit]')]);
+    await sleep(6000); await shot('75-signed-in');
+    console.log(page.url(), '|', (await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 300));
+  },
+  // Which machine each space and each container is on, as the controller
+  // signed in to says it: its nodes, its spaces' nodes, and the Containers
+  // page's rows under each node.
+  async where({ page, BASE }){
+    await page.goto(BASE); await sleep(4000);
+    const got = await page.evaluate(async () => {
+      const get = async u => { try { return await (await fetch(u)).json(); } catch (e){ return { error: String(e) }; } };
+      const nodes = (await get('/api/v1/nodes')).nodes || [];
+      const st = await get('/api/status');
+      const rows = [];
+      for (const n of nodes){
+        const d = await get('/api/docker?node=' + encodeURIComponent(n.id));
+        const list = d.instances || d.rows || d.containers || [];
+        rows.push([n.name, d.error ? 'says: ' + String(d.error).slice(0, 110) : list.map(r => `${r.project || r.space || '-'}/${r.name || r.instance || '?'}`).join('; ')]);
+      }
+      return { build: (await get('/api/meta')).version,
+               nodes: nodes.map(n => `${n.id} ${n.name} ${n.kind} state=${n.state} live=${!!n.live} own=${!!((n.config || {}).own || n.own)}`),
+               spaces: (st.projects || []).map(p => `${p.name} -> ${p.node_name || p.session_at || '-'}`), rows, moved: st.moved_to || '', arrived: !!(await get('/api/move')).arrived };
+    });
+    console.log('build', got.build, '| arrived by a move:', got.arrived);
+    console.log('nodes:'); for (const n of got.nodes) console.log('  ' + n);
+    console.log('spaces:'); for (const x of got.spaces) console.log('  ' + x);
+    console.log('containers, by the node the Containers page lists them under:'); for (const [n, x] of got.rows) console.log(`  ${n}: ${x || 'none'}`);
   },
   // The next machine's first page: yes, a controller is moving here.
   async movefirst({ page, BASE, shot, tall, phone }){
@@ -230,6 +299,25 @@ export const steps = {
     await page.goto(BASE); await page.fill('#u', 'ada'); await page.fill('#p', 'firstrun-pass'); await page.fill('#p2', 'firstrun-pass');
     await Promise.all([page.waitForNavigation(), page.click('button[type=submit]')]);
     await sleep(6000); await shot('02-after-account'); console.log(page.url());
+  },
+  // press HASH TEXT NAME: the page at HASH, the first visible button reading
+  // TEXT pressed, and the page photographed after.
+  async press({ page, BASE, tall, args }){
+    await page.goto(BASE + (args[0] || '')); await sleep(5000);
+    const b = page.locator('button:visible', { hasText: args[1] }).first();
+    await b.click(); await sleep(Number(args[3] || 5000));
+    await tall(args[2] || 'press', 1600);
+    console.log(page.url());
+    console.log((await page.evaluate(() => (document.querySelector('.modal:not([hidden])') || document.querySelector('.pane .doc.on') || document.body).innerText)).replace(/\n{2,}/g, '\n').slice(0, 1500));
+  },
+  // words HASH HEADING...: the text of each section of the page at HASH whose
+  // heading reads one of HEADING, as a person reads it.
+  async words({ page, BASE, args }){
+    await page.goto(BASE + (args[0] || '')); await sleep(9000);
+    const got = await page.evaluate(heads => [...document.querySelectorAll('.pane .doc.on details, .pane .doc.on section, .pane .doc.on .card')]
+      .filter(s => heads.some(h => (s.querySelector('summary, h2, h3, h4')?.innerText || '').trim().startsWith(h)))
+      .map(s => s.innerText.replace(/\n{2,}/g, '\n').slice(0, 3000)), args.slice(1));
+    console.log([...new Set(got)].join('\n=====\n'));
   },
   async look({ page, BASE, tall, phone, args }){
     await page.goto(BASE + (args[0] || '')); await sleep(Number(args[2] || 6000));

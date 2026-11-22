@@ -11,15 +11,17 @@ import version  # noqa: E402
 
 
 class Made(unittest.TestCase):
-    def run_release(self, dev, pushed=True):
+    def run_release(self, dev, pushed=True, unsealed="", code=200):
         made, forged = [], []
         parts = {"PANEL": lambda _n: {}, "GIT_ENV": lambda _w, _n: {}, "CREDS_ENV": dict,
                  "MAY_PUSH": lambda _n: True, "AUDIT": lambda *_a: None,
-                 "FORGE": lambda *a, **k: forged.append((a, k)) or {}, "MADE": lambda p, t: made.append((p, t))}
+                 "FORGE": lambda *a, **k: forged.append((a, k)) or {}, "MADE": lambda p, t: made.append((p, t)),
+                 "UNSEALED": lambda _n: unsealed}
         got = {"tag": "v1.2.3-dev.7" if dev else "v1.2.3", "target": "1.2.3", "sha": "abc1234", "pushed": pushed}
-        with mock.patch.multiple(version, **parts), mock.patch.object(version, "release", return_value=got):
-            _r, code = version.verb("app", "release", {"dev": dev}, {"name": "t"}, "p")
-        self.assertEqual(code, 200)
+        with mock.patch.multiple(version, **parts), mock.patch.object(version, "release", return_value=got) as cut:
+            self.said, got_code = version.verb("app", "release", {"dev": dev}, {"name": "t"}, "p")
+        self.assertEqual(got_code, code)
+        self.cut = cut.called
         return made, forged
 
     def test_a_dev_release_is_handed_on_beside_its_forge_page_marked_a_pre_release(self):
@@ -38,6 +40,16 @@ class Made(unittest.TestCase):
     def test_a_tag_not_pushed_is_not(self):
         made, _ = self.run_release(True, pushed=False)
         self.assertEqual(made, [])
+
+    def test_a_release_the_host_would_not_finish_is_refused_before_its_tag(self):
+        # v0.9.0-dev.6049: tagged, built and its APK attached, and then a
+        # draft for good, the workflow that signs its list of files being
+        # one GitHub would not start.
+        why = "GitHub starts a workflow only from the default branch, and main has no seal.yml it can start"
+        made, forged = self.run_release(True, unsealed=why, code=409)
+        self.assertFalse(self.cut, "no tag is made")
+        self.assertEqual((made, forged), ([], []))
+        self.assertEqual(self.said["error"], f"The release would stay a draft: {why}, so put it there first")
 
 
 if __name__ == "__main__":

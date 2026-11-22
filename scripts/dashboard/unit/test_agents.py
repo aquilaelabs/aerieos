@@ -444,6 +444,22 @@ class Sessions(unittest.TestCase):
         self.assertEqual(got, [("al", "claude", "Claude"), ("al", "shell", ""), ("al", "shell", ""),
                                ("bo", "claude", "Claude")])
 
+    def test_the_list_is_read_fresh_and_the_poll_s_token_may_be_kept(self):
+        # A list read on demand (a space's settings, an administrator's End)
+        # names a session started a moment ago; the revisions poll's token may
+        # use a listing a few seconds old (R228 step 2).
+        kept = [{"name": "claude-alpha", "claude": {"state": "working"}}]
+        projsessions.configure(
+            sessions=lambda: self.rows, live_sessions=lambda: kept,
+            base=lambda n: n.split("~", 1)[1] if "~" in n else n,
+            owner=lambda n: n.split("~", 1)[0] if "~" in n else "",
+            accounts=lambda: {"u_0123abcd": "bo"}, owner_name=lambda: "al",
+            end=lambda name, node: {"ok": True})
+        self.assertEqual(len(projsessions.of("alpha")), 4)
+        token = projsessions.live_token()
+        kept.append({"name": "shell-alpha"})
+        self.assertNotEqual(projsessions.live_token(), token)
+
     def test_the_maps_count_agent_sessions_as_before(self):
         m = projsessions.maps(self.rows, ["alpha"])
         self.assertEqual(sorted(m["claude_with"]["alpha"]), ["al", "bo"])

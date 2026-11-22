@@ -177,6 +177,16 @@ def note(project, session, path, symbol=""):
             syms.append(str(symbol)[:120])
             del syms[8:]
         rec["at"] = int(time.time())
+        # A session whose last note is past its hour is dropped here: read,
+        # it was skipped, and kept, it was written again with every edit
+        # anybody made, for as long as the install ran.
+        cut = rec["at"] - NOTE_TTL
+        for proj in list(d):
+            if isinstance(d[proj], dict):
+                for sess in [k for k, v in d[proj].items() if not isinstance(v, dict) or (v.get("at") or 0) < cut]:
+                    del d[proj][sess]
+                if not d[proj]:
+                    del d[proj]
         write_json(_file(), d)
 
 

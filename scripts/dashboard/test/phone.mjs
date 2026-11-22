@@ -8,22 +8,12 @@
 // a phone that is always present. That is not a shortcut: a real adb answers
 // from whatever is actually paired to the box the suite runs on, which makes
 // the result a fact about the room rather than the code.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, URL, DIR, asUser, OWNER as owner, asSession, mint, call as api, section, REPO } from './lib.mjs';
 import { execSync, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
@@ -52,8 +42,8 @@ ok(!(await page.$('details.sect[data-sect="nodes:phone"]')),
 // B114: a dead Connect or Pair says why under its row, in yellow (the
 // operator, 21 Oct: not an error), and the
 // reason follows what is typed; it was a tooltip, which a phone never shows.
-{
-  await page.evaluate(() => { phIp = ''; phConnPort = ''; phPort = ''; phCode = ''; phRev++; drawPanes(); });
+await section("B114: a dead Connect or Pair says why under its row, in yellow", async () => {
+  await page.evaluate(() => { phIp = ''; phConnPort = ''; phPort = ''; phCode = ''; readMoved('phone'); drawPanes(); });
   await page.waitForSelector('.doc.on [data-phwhy="connect"]:not([hidden])', { timeout: 10000 });
   const why = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.doc.on [data-phwhy]')]
     .map(e => [e.dataset.phwhy, e.hidden ? '' : e.textContent])));
@@ -72,17 +62,17 @@ ok(!(await page.$('details.sect[data-sect="nodes:phone"]')),
   // the focus with the old box, the keys went nowhere, and the port typed
   // was never there for the line to go.
   await page.focus('.doc.on #phConnPort');
-  await page.evaluate(() => { phRev++; drawPanes(); });
+  await page.evaluate(() => { readMoved('phone'); drawPanes(); });
   await page.keyboard.press('End');
   await page.keyboard.type('1');
   const kept = await page.evaluate(() => ({ at: document.activeElement?.id, port: phConnPort }));
   ok(kept.at === 'phConnPort' && kept.port === '55551',
      `...and the box being typed in keeps its caret across a redraw (${JSON.stringify(kept)})`);
-  await page.evaluate(() => { phIp = ''; phConnPort = ''; phRev++; drawPanes(); });
-}
+  await page.evaluate(() => { phIp = ''; phConnPort = ''; readMoved('phone'); drawPanes(); });
+});
 // ...and a link to a page this account's grants keep it from is its words,
 // not an address that lands on another page of the group.
-{
+await section("and a link to a page this account's grants keep it from is its words", async () => {
   const link = await page.evaluate(() => {
     const was = state.areas;
     // The Library is open to Install, Curate or Nodes (railAllows): all
@@ -96,7 +86,7 @@ ok(!(await page.$('details.sect[data-sect="nodes:phone"]')),
   });
   ok(link.off === 'Library' && /href="#\/build\/library"/.test(link.on),
      `a page link is a link only where the account may open the page (${JSON.stringify(link)})`);
-}
+});
 
 // ---- what the server refuses ----------------------------------------------
 for (const [what, body] of [
@@ -113,14 +103,14 @@ for (const [what, body] of [
 // probing a phone's ports across a VPN is port scanning), and a connect
 // adb says "connected to" that never gives a usable phone is no success
 // (B598): the stub lists 192.168.9.9:5555 alone as a device.
-{
+await section("The port is the phone's to say, never scanned for", async () => {
   const noPort = await api('/api/phone', { action: 'connect', node: sandbox.id, ip: '192.168.9.9' });
   ok(noPort.status === 400 && /connect port is needed/.test(noPort.body.error || '') && /IP address & port/.test(noPort.body.error),
      `a connect with no port is refused and says where to read it, rather than scanning the phone (${noPort.body.error})`);
   const wrong = await api('/api/phone', { action: 'connect', node: sandbox.id, ip: '192.168.9.9', port: '6000' });
   ok(wrong.status === 400 && /192\.168\.9\.9:6000, but the phone is not listed there, not usable/.test(wrong.body.error || ''),
      `a port adb "connects" to that gives no usable phone is reported as that, not as connected (${wrong.body.error})`);
-}
+});
 page.errors = [];
 
 // ---- connecting, and who then owns it --------------------------------------
@@ -143,7 +133,7 @@ ok(await page.$('.phonetab #phDisconnect') !== null, '...and offers Disconnect t
 // while anything watches: a probe, not a record. It was a job row per node
 // per minute on the Jobs tab, every one reading "exec adb devices -l", and
 // each moved the revision the Docker manager refetches its listing on.
-{
+await section("The listing behind that tab is `adb devices -l` on the node, once a minute", async () => {
   const revBefore = (await api('/api/revs')).body.devapp;
   const listed = await api('/api/phone?node=' + sandbox.id + '&probe=1');
   ok(listed.status === 200 && listed.body.nodes.some(n => n.id === sandbox.id && n.phone),
@@ -153,7 +143,7 @@ ok(await page.$('.phonetab #phDisconnect') !== null, '...and offers Disconnect t
      `...as a probe: no "exec adb devices" row on the Jobs page (${jobs.length} rows)`);
   ok((await api('/api/revs')).body.devapp === revBefore,
      '...and the Docker manager\'s revision did not move for it');
-}
+});
 
 // A second account sees the connection and cannot drive it.
 execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--role', 'admin'],
@@ -162,7 +152,7 @@ execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--rol
 const other = asUser('visitor', 'visitorpass1');
 // Given the project, so what is refused below is refused for ownership and
 // not for never having taken the project on.
-await api('/api/users', { action: 'projects', name: 'visitor', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'visitor', projects: ['alpha'] });
 const theirs = (await api('/api/phone?node=' + sandbox.id, undefined, other)).body;
 const seen = theirs.nodes.find(n => n.id === sandbox.id);
 ok(seen.phone && !seen.phone.model && !seen.phone.serial && !seen.mine && !seen.may_drive && seen.owner?.name === 'test',
@@ -176,11 +166,11 @@ const plain = asUser('plainuser', 'plainpass1');
 // A user-role account (B490): no address either, and no remembered rows
 // but its own (an administrator keeps both: they may disconnect anyone's).
 // On the project, so the node is listed to them at all.
-await api('/api/users', { action: 'projects', name: 'plainuser', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'plainuser', projects: ['alpha'] });
 const plainSeen = (await api('/api/phone?node=' + sandbox.id, undefined, plain)).body.nodes.find(n => n.id === sandbox.id);
 ok(plainSeen.phone && !plainSeen.phone.model && !plainSeen.ip && (plainSeen.known || []).length === 0 && plainSeen.owner?.name === 'test',
    `a user-role account is told the same, with no address and nobody else's remembered phones (${JSON.stringify([plainSeen.ip, plainSeen.known])})`);
-await api('/api/users', { action: 'projects', name: 'plainuser', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'plainuser', projects: ['alpha'] });
 const theirDisc = await api('/api/phone', { action: 'disconnect', node: sandbox.id }, plain);
 ok(theirDisc.status === 400 && /connected by test/.test(theirDisc.body.error) && /or an administrator/.test(theirDisc.body.error),
    'only the account that connected a phone, or an administrator, can disconnect it, and the refusal names them');
@@ -202,6 +192,8 @@ ok(/has no node/.test(noNode.body.error || ''),
 const since = (await api('/api/phone/wait?since=')).body.token;
 const t0 = Date.now();
 const held = api('/api/phone/wait?since=' + since);
+// Time for the wait to reach the server and be held there before the ask
+// lands: nothing outside the server says that it is.
 await sleep(700);
 const asked = await api('/api/phone', { action: 'ask', why: 'read the Firefox version',
                                         cmd: ['shell', 'getprop', 'ro.build.version.release'], project: 'alpha' });
@@ -260,10 +252,8 @@ ok(true, '...and the badge clears when nothing is waiting');
 // outcome is waited for, not read the instant the badge clears: read at
 // once it was still running in two whole gates of 13 Oct and passed alone.
 let done1 = await api('/api/phone', { action: 'outcome', id: asked.body.id });
-for (let i = 0; i < 40 && done1.body.state !== 'done'; i++){
-  await new Promise(r => setTimeout(r, 250));
-  done1 = await api('/api/phone', { action: 'outcome', id: asked.body.id });
-}
+await until(async () => done1.body.state === 'done'
+  || (done1 = await api('/api/phone', { action: 'outcome', id: asked.body.id })).body.state === 'done', 10000, 250);
 ok(done1.body.state === 'done', `Allow runs it: on the node, not in the session (${done1.body.state})`);
 const denied = await api('/api/phone', { action: 'ask', why: 'wipe something',
                                          cmd: ['shell', 'rm', '-rf', '/sdcard/x'], project: 'alpha' });
@@ -284,16 +274,8 @@ ok((await api('/api/phone', { action: 'allow', id: denied.body.id })).body.error
 // A request is answered only to the project that made it, and a session
 // reads the phone from the cache rather than asking a node it is not bound
 // to: ids are a small counter, and a probe is a job on somebody's machine.
-{
-  const mint = (proj) => execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("${proj}"))`], { encoding: 'utf8' }).trim();
-  const beta = { Authorization: 'Bearer ' + mint('beta'), 'Content-Type': 'application/json' };
+await section("A request is answered only to the project that made it, and a session", async () => {
+  const beta = asSession(mint('beta'));
   const peek = await api('/api/phone', { action: 'outcome', id: asked.body.id }, beta);
   ok(peek.body.error && peek.body.out === undefined,
      "another space's session cannot read the outcome of a request it did not make");
@@ -301,7 +283,7 @@ print(u.mint_session("${proj}"))`], { encoding: 'utf8' }).trim();
   const r = await fetch(base + '/api/phone?node=' + encodeURIComponent(sandbox.id) + '&probe=1', { headers: beta });
   ok(r.status === 200 && (await api('/api/v1/jobs')).body.jobs.length === before,
      'a session asking for a probe is answered from the cache, and no job is queued on the node');
-}
+});
 await page.keyboard.press('Escape');
 page.errors = [];   // the refusals above are 400s on purpose
 
@@ -317,12 +299,9 @@ const instState = async () => (await api('/api/artifacts?project=alpha')).body.i
 // that hands the page a Promise, which is truthy at once, and the wait is no
 // wait at all: the install is a job on the node now, and takes a moment.
 const instUntil = async (state) => {
-  for (let i = 0; i < 100; i++){
-    const st = await instState();
-    if (st.state === state) return st;
-    await new Promise(r => setTimeout(r, 250));
-  }
-  return await instState();
+  let st = {};
+  await until(async () => (st = await instState()).state === state, 25000, 250);
+  return st;
 };
 const inst = await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' });
 ok(inst.status === 200 && !inst.body.error, `Install on a space whose node holds a phone starts (${JSON.stringify(inst.body).slice(0, 60)})`);
@@ -358,10 +337,7 @@ const pushed = await api('/api/artifacts', { action: 'push', project: 'alpha', p
 ok(pushed.status === 200 && pushed.body.job,
    `the owner's push starts as a job on the node (${JSON.stringify(pushed.body).slice(0, 80)})`);
 let pushSt = {};
-for (let i = 0; i < 100 && pushSt.state !== 'running'; i++){
-  pushSt = (await summary()).push || {};
-  await new Promise(r => setTimeout(r, 250));
-}
+await until(async () => { pushSt = (await summary()).push || {}; return pushSt.running && pushSt.state === 'running'; }, 25000, 250);
 ok(pushSt.running && pushSt.state === 'running',
    `...and goes live once web-ext says the add-on is on the phone (${JSON.stringify(pushSt).slice(0, 100)})`);
 const again = await api('/api/artifacts', { action: 'push', project: 'alpha', path: 'dist/companion-0.2.0.xpi', apk: 'org.mozilla.firefox_beta' });
@@ -371,10 +347,7 @@ const theirStop = await api('/api/artifacts', { action: 'stop', project: 'alpha'
 ok(theirStop.status === 400 && /owner/.test(theirStop.body.error),
    'another account cannot stop it');
 await api('/api/artifacts', { action: 'stop', project: 'alpha' });
-for (let i = 0; i < 100 && pushSt.running; i++){
-  pushSt = (await summary()).push || {};
-  await new Promise(r => setTimeout(r, 250));
-}
+await until(async () => !(pushSt = (await summary()).push || {}).running, 25000, 250);
 ok(!pushSt.running, 'the owner stops it, and the job ends');
 
 // ---- browsing from the phone itself ----------------------------------------
@@ -397,10 +370,10 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
 // (R120: whether a session drives a phone is its owner's call each time, not
 // a project's), and an administrator's Allow is not the owner's. Take back
 // ends it.
-{
+await section("lent to a project", async () => {
   const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-  const session = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  const session = asSession(token);
   const use = (op, args) => api('/api/phone', { action: 'use', op, args, why: `${op} for the test` }, session);
   // Asked, allowed by the owner, and what it answered, as aerie phone reads it.
   const allowed = async (op, args) => {
@@ -408,11 +381,9 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
     if (!r.body.asked) return { status: r.status, body: r.body };
     const ok_ = await api('/api/phone', { action: 'allow', id: r.body.asked });
     if (ok_.body.error) return { status: 409, body: ok_.body };
-    for (let i = 0; i < 100; i++){
-      const o = (await api('/api/phone', { action: 'outcome', id: r.body.asked }, session)).body;
-      if (o.state === 'done') return { status: o.code ? 400 : 200, body: JSON.parse(o.out || '{}'), asked: r.body.asked };
-      await new Promise(res => setTimeout(res, 100));
-    }
+    let o = {};
+    await until(async () => (o = (await api('/api/phone', { action: 'outcome', id: r.body.asked }, session)).body).state === 'done', 10000, 100);
+    if (o.state === 'done') return { status: o.code ? 400 : 200, body: JSON.parse(o.out || '{}'), asked: r.body.asked };
     return { status: 504, body: {} };
   };
   ok((await use('shot')).status === 403, 'before a lease a session gets nothing without asking');
@@ -490,7 +461,7 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
   await page.click('.phonetab #phTakeBack');
   await page.waitForFunction(() => !document.querySelector('.phonetab .phlease'), null, { timeout: 15000 });
   ok((await use('shot')).status === 403, 'Take back ends it: the session is back to asking');
-}
+});
 
 // ---- the owner ends it ------------------------------------------------------
 await page.click('.phonetab #phDisconnect');
@@ -507,7 +478,7 @@ page.errors = [];
 // per phone: a pairing knows only the address, the connect that follows
 // fills the model in on the same row, and Forget drops the row and nothing
 // else: the pairing key on the node is adb's, not this list's.
-{
+await section("a phone it has met is remembered", async () => {
   const known = async () => (await api('/api/phone?node=' + sandbox.id)).body.nodes
     .find(n => n.id === sandbox.id).known || [];
   const after = await known();
@@ -550,7 +521,7 @@ page.errors = [];
   await page.click('.phonetab .phknown [data-kforget]');
   await page.waitForFunction(() => !document.querySelector('.phonetab .phknown'), null, { timeout: 20000 });
   ok(true, '...and Forget on the row takes it off the tab');
-}
+});
 
 // ---- what the bell says, and how loudly -----------------------------------
 const dots = await page.evaluate(() => {
@@ -586,7 +557,7 @@ ok(dots.asking === 'dot ask' && dots.loud === true,
 // Something new gone wrong flashes the button red twice and lets go (the
 // operator, 11 Oct); the same failure drawn again does not flash it again,
 // and an ask's amber is not held off by a flash left behind.
-{
+await section("Something new gone wrong flashes the button red twice and lets go", async () => {
   await page.evaluate(() => { notes = []; notesSeen = 0; drawBell(); notify('compose up failed', true); });
   const flashed = await page.$eval('#bBell', b => b.classList.contains('flash')
     && getComputedStyle(b).animationName === 'bellbad' && getComputedStyle(b).animationIterationCount === '2');
@@ -594,7 +565,7 @@ ok(dots.asking === 'dot ask' && dots.loud === true,
   const again = await page.evaluate(() => { drawBell(); return document.getElementById('bBell').classList.contains('flash'); });
   ok(flashed && !again, `a new failure flashes the bell red twice and lets go, and a redraw does not flash it again (${flashed}, ${again})`);
   await page.evaluate(() => { notes = []; notesSeen = 0; drawBell(); });
-}
+});
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);

@@ -6,15 +6,13 @@
 "use strict";
 
 function nbMemoryView({$, nb}){
-  async function loadMemory(gen){
-    let j;
-    try{
-      const r = await bootFetch("/api/memory?project=" + encodeURIComponent(nb.memProj));
-      j = await r.json();
-    }catch(e){ j = {error: String(e)}; }
-    if (gen !== nb.memGen) return;              // closed, or reopened elsewhere
-    if (j.error){ viewGlance($("memWhere"), [], esc("memory: " + j.error), "", "bad"); return; }
-    drawMemory(j);
+  function loadMemory(gen){
+    return reading(`${nb.memProj}:memory`, async () => {
+      const j = await getJSON("/api/memory?project=" + encodeURIComponent(nb.memProj));
+      if (gen !== nb.memGen) return;              // closed, or reopened elsewhere
+      if (j.error){ glanceBad($("memWhere"), "memory", j.error); return; }
+      drawMemory(j);
+    });
   }
 
   // The digest of the index as it was loaded, for the write that regenerates
@@ -45,7 +43,7 @@ function nbMemoryView({$, nb}){
     if (j.rev !== undefined) nb.memRev = j.rev;
     nb.memN = j.exists ? n : 0;
     briefingHead();
-    $("memWhere").title = j.dir;
+    setTitle($("memWhere"), j.dir);
     nb.memTypes = j.types || nb.memTypes;
     // The index and the files disagreeing is the one thing on this tab that is
     // not a memory, so it is a section rather than two loose orange paragraphs
@@ -58,7 +56,7 @@ function nbMemoryView({$, nb}){
     // with nothing changed (save_index drops them and keeps every other line
     // where it was), offered as its own press (B455).
     const dangling = j.issues.filter(i => i.fix === "tidy").length;
-    $("memDrift").innerHTML = j.issues.length
+    patch($("memDrift"), j.issues.length
       ? docSection("memory", "drift", "Index",
                    `${j.issues.length} problem${j.issues.length === 1 ? "" : "s"}`,
                    j.issues.map(i => `<div>${esc(i.text)}</div>`).join("")
@@ -66,7 +64,7 @@ function nbMemoryView({$, nb}){
                        ? "a line for a memory that is gone" : `${dangling} lines for memories that are gone`}</span>
                        <button type="button" id="memTidy">Take ${dangling === 1 ? "it" : "them"} out</button></div>` : ""),
                    {cls: "warn"})
-      : "";
+      : "");
     wireSections($("memDrift"));
     const tidy = $("memTidy");
     if (tidy) tidy.onclick = async () => {
@@ -106,8 +104,14 @@ function nbMemoryView({$, nb}){
     // A role that reads the project and does not write it (B86): no Edit
     // or Remove on a memory, and Write a memory dead with the reason.
     const ro = projWriteWhy(nb.memProj);
-    $("memList").innerHTML = j.memories.map(m => `
-    <details class="mem chev" data-file="${esc(m.file)}"${open.has(m.file) ? " open" : ""}>
+    // Patched (R244), each memory by its file: one being edited keeps its
+    // fields, caret and fold when another memory or the index moves.
+    // Only the rows on show are built, a page at a time (pageLimit, R228
+    // step 13); one being edited is always among them, kept in the first
+    // pages it was opened from.
+    const lim = pageLimit($("memList"), "memList", j.memories.length);
+    patch($("memList"), j.memories.slice(0, lim).map(m => `
+    <details class="mem chev" data-file="${esc(m.file)}" data-key="${esc(m.file)}"${open.has(m.file) ? " open" : ""}>
       <summary>
         ${m.type ? `<span class="tag mtype ${esc(m.type)}">${esc(m.type)}</span>` : ""}
         <span class="mname">${esc(m.name)}</span>
@@ -161,31 +165,37 @@ function nbMemoryView({$, nb}){
     </details>`).join("")
       // Said in the list, where every other view says it, rather than by
       // hiding the list and leaving a heading over nothing.
-      || `<div class="empty">none yet: sessions write these as they learn the space; Write a memory adds one by hand</div>`;
-    paginate($("memList"), ":scope > .mem", {noun: "memories"});
+      || `<div class="empty">none yet: sessions write these as they learn the space; Write a memory adds one by hand</div>`);
+    paginate($("memList"), ":scope > .mem", {key: "memList", noun: "memories", total: j.memories.length,
+                                            more: () => drawMemory(nb.memLast || j)});
     // The fold, driven rather than left to the browser's instant one: the same
     // height tween every fold uses (slideDetails), so a memory opens the way a
     // section does.
     $("memList").querySelectorAll(".mem > summary").forEach(sum => {
       sum.onclick = e => {
         e.preventDefault();                       // the browser's snap, replaced
-        slideDetails(sum.parentElement, !sum.parentElement.open);
+        slideDetails(sum.parentElement, !foldOpen(sum.parentElement));
       };
     });
+    // What is stored is what the markup drew (a field's default), not what
+    // the field holds: a patch keeps what was typed in it.
     $("memList").querySelectorAll("textarea[data-file], .ix input").forEach(t => {
-      t.dataset.was = t.value;
+      t.dataset.was = t.defaultValue;
       t.oninput = nb.syncSave;
     });
-    // ...and what was being typed goes back in, over the stored text `was`
-    // now remembers, so the redraw changed nothing about what is unsaved.
+    // ...and what was being typed stays, over the stored text `was` now
+    // remembers, even where a session changed the memory under it (the patch
+    // would follow the new text): the clash band says so, and the redraw
+    // changes nothing about what is unsaved. Written only where it differs,
+    // so the caret stays where it was.
     typed.forEach((v, file) => {
       const d = $("memList").querySelector(`.mem[data-file="${CSS.escape(file)}"]`);
       if (!d) return;
       const ta = d.querySelector("textarea[data-file]");
       const t = d.querySelector(".ixt"), h = d.querySelector(".ixh");
-      if (ta && v.text !== undefined) ta.value = v.text;
-      if (t && v.title !== undefined) t.value = v.title;
-      if (h && v.hook !== undefined) h.value = v.hook;
+      if (ta && v.text !== undefined && ta.value !== v.text) ta.value = v.text;
+      if (t && v.title !== undefined && t.value !== v.title) t.value = v.title;
+      if (h && v.hook !== undefined && h.value !== v.hook) h.value = v.hook;
     });
     $("memList").querySelectorAll(".mEdit").forEach(b => b.onclick = () => {
       nb.memEditing.add(b.closest(".mem").dataset.file);
@@ -226,7 +236,7 @@ function nbMemoryView({$, nb}){
     box.hidden = !nb.memClash;
     if (!nb.memClash){ box.innerHTML = ""; return; }
     const c = nb.memClash;
-    box.innerHTML = `
+    drawHTML(box, `
     <div class="hint bad">${esc(c.what)} changed on disk while you had it
       open${c.at ? " " + esc(ago(c.at)) : ""}. Nothing has been written; your version is still in the editor.</div>
     <div class="clashwho">What is on disk now</div>
@@ -234,7 +244,7 @@ function nbMemoryView({$, nb}){
     <div class="actbar">
       <button type="button" id="memClashDrop" title="reload what is on disk now; what you typed here is dropped">Keep theirs</button>
       <button type="button" id="memClashMine" class="primary" title="write your version over what is on disk now">Use mine</button>
-    </div>`;
+    </div>`);
     $("memClashDrop").onclick = () => { nb.memClash = null; drawMemClash();
                                         nb.memEditing.clear(); loadMemory(nb.memGen); };
     $("memClashMine").onclick = async () => {
@@ -247,28 +257,18 @@ function nbMemoryView({$, nb}){
     };
   }
 
-  // Wrapped so the poll can tell this panel's own write from somebody
-  // else's while it is still out. See nbWriting.
-  async function postMemory(body){ return nb.writing(() => postMemoryDo(body)); }
-  async function postMemoryDo(body){
-    if (nb.nbHeld() && body.action !== "history"){
-      notify("a session is part-way through changing this notebook: "
-             + "check the banner at the top", true);
+  // The memories' write (nbPoster), for the space that is open. One refused
+  // because the memory moved on disk is kept for the clash band, with what
+  // is stored, and nothing is written.
+  const postMemory = nbPoster(nb, "/api/memory", {
+    proj: () => nb.memProj, holdExcept: "history",
+    conflict: (j, body) => {
+      nb.memClash = {body, what: body.action === "index" ? "The index" : body.file,
+                  ...j.conflict};
+      drawMemClash();
       return null;
-    }
-    try{
-      const r = await postJSON("/api/memory", {project: nb.memProj, ...body});
-      const j = await r.json();
-      if (j.conflict){
-        nb.memClash = {body, what: body.action === "index" ? "The index" : body.file,
-                    ...j.conflict};
-        drawMemClash();
-        return null;
-      }
-      if (j.error){ notify(j.error, true); return null; }
-      return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
-  }
+    },
+  });
 
   // One button for the lot: any memory whose text or index line was touched.
   // Saving each field as it blurs would be fewer clicks and worse: an edit to
@@ -333,8 +333,8 @@ function nbMemoryView({$, nb}){
   function drawMemAdd(){
     const box = $("memAdd");
     if (projWriteWhy(nb.memProj)){ box.innerHTML = ""; return; }
-    box.innerHTML = `<div class="addbar ctlrow" data-add="memory">
-    <button type="button">Write a memory</button></div>`;
+    drawHTML(box, `<div class="addbar ctlrow" data-add="memory">
+    <button type="button">Write a memory</button></div>`);
     box.querySelector("button").onclick = openMemAdd;
   }
 
@@ -354,7 +354,7 @@ function nbMemoryView({$, nb}){
   }
 
   function paintMemAdd(box){
-    box.innerHTML = `<div class="memadd ctlrow">
+    drawHTML(box, `<div class="memadd ctlrow">
     <label for="naTitle">Title<span class="help" data-help="how it reads in the index" tabindex="0">?</span></label>
     <input id="naTitle" maxlength="80" autocomplete="off" placeholder="No parsed progress">
     <div class="two">
@@ -374,7 +374,7 @@ function nbMemoryView({$, nb}){
     <div class="actbar">
       <button type="button" class="stop" id="naCancel">Cancel</button>
       <button type="button" class="primary" id="naGo">Write it</button></div>
-  </div>`;
+  </div>`);
     // The file name follows the title until it is typed in, and then stops:
     // renaming a memory is a thing people do deliberately, once.
     const t = $("naTitle"), n = $("naName");

@@ -43,37 +43,50 @@ Refuses with exit 2 and the sentence on stderr, which Claude Code hands to the
 model; allows with exit 0. Silent on any failure of its own, except the
 controller not answering, which is the point.
 """
-import http.client
 import json
 import os
-import socket
 import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
-try:
-    # A hook runs under a timeout of its own: a call here never waits out a
-    # restarting controller (bbapi.request, R251), it says so at once.
-    os.environ["BB_CONTROLLER_WAIT"] = "0"
-    import bbapi                                                    # noqa: E402
-except ImportError:
-    bbapi = None
+_bbapi = False
+
+
+def api():
+    """bbapi, loaded the first time something is to be asked of the
+    controller, or None where it is not beside this file. Most runs ask
+    nothing (the last answer is seconds old), and loading an HTTP client and
+    TLS for them was most of what every tool call of every session waited."""
+    global _bbapi
+    if _bbapi is False:
+        try:
+            # A hook runs under a timeout of its own: a call here never waits
+            # out a restarting controller (bbapi.request, R251), it says so
+            # at once.
+            os.environ["BB_CONTROLLER_WAIT"] = "0"
+            import bbapi as found                                   # noqa: PLC0415
+            _bbapi = found
+        except ImportError:
+            _bbapi = None
+    return _bbapi
 
 CHECK_EVERY = 20
+# How often a working session's gate says which session it is.
+ALIVE_EVERY = 60
 
-def _uid():
-    """This account's id, which is what separates one account's cache from
-    another's: on a node every account's ~/.cache is a symlink to the base
-    home's, so the uid in the path is the whole separation (B159)."""
-    return os.environ.get("BB_ACCOUNT_UID") or "_none"
+def scope_dir(project, *parts):
+    """A path in this account's folder for the space, as scopedir builds it
+    for every hook, for bbapi and for this. Loaded when a path is first
+    asked for, so a gate with no library beside it ends as any failure of
+    its own does, saying nothing."""
+    import scopedir                                                 # noqa: PLC0415
+    return scopedir.scope_dir(project, *parts)
+
 
 def token(project):
     t = os.environ.get("BB_TOKEN", "")
-    home = os.environ.get("HOME", "")
-    d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-        or f"/tmp/bb-scope-{os.getuid()}"
     try:
-        with open(os.path.join(d, "builderbot", "u", _uid(), "project", project, "token")) as f:
+        with open(scope_dir(project, "token")) as f:
             t = f.read().strip() or t
     except OSError:
         pass
@@ -81,10 +94,7 @@ def token(project):
 
 
 def stamp_file(project):
-    home = os.environ.get("HOME", "")
-    d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-        or f"/tmp/bb-scope-{os.getuid()}"
-    return os.path.join(d, "builderbot", "u", _uid(), "project", project, "gate")
+    return scope_dir(project, "gate")
 
 
 def controller_answers(project):
@@ -101,17 +111,22 @@ def controller_answers(project):
     not one that is restarting (B719: four calls in a row refused while it
     was up the whole time, the operator watching). Only a connection nobody
     accepts is down."""
-    if bbapi is None:
+    if api() is None:
         return True                     # nothing to ask with; never refuse blind
+    import http.client                                              # noqa: PLC0415
+    import socket                                                   # noqa: PLC0415
     try:
-        c, base = bbapi._conn(8)
+        c, base = api()._conn(8)
         if c.sock is None:              # https is connected in _conn, for the pin
             c.connect()
     except (OSError, http.client.HTTPException):
         return False                    # nothing listening: down or restarting
     try:
-        c.request("GET", base + "/api/status", None,
-                  {"Authorization": "Bearer " + token(project)})
+        # The smallest thing it answers, which is all this asks: that it
+        # answers. It asked for the whole status read, two seconds of the
+        # controller's work for every session every twenty seconds, thrown
+        # away, and the tool call waited for it.
+        c.request("GET", base + "/api/meta")
         c.getresponse().read()
     except socket.timeout:
         return True                     # listening, and slow: busy, not down
@@ -132,13 +147,13 @@ def turn(project, wait, conv=""):
     when it waited `wait` seconds and still may not. `conv` is the
     conversation the prompt is in, which the controller keeps per session
     (R143)."""
-    if bbapi is None:
+    if api() is None:
         return 0
     deadline = time.time() + max(0, wait)
     auth = "Bearer " + token(project)
     last = {}
     while True:
-        status, r = bbapi.request("/api/v1/hook", {"kind": "turn", "agent": AGENT, "slot": SLOT, "conv": conv},
+        status, r = api().request("/api/v1/hook", {"kind": "turn", "agent": AGENT, "slot": SLOT, "conv": conv},
                                   auth=auth, timeout=10)
         if status != 200 or not isinstance(r, dict) or r.get("go", True):
             return 0                    # gone, refused, or a turn: the prompt goes
@@ -146,7 +161,7 @@ def turn(project, wait, conv=""):
         if time.time() + ASK_EVERY > deadline:
             break
         time.sleep(ASK_EVERY)
-    bbapi.request("/api/v1/hook", {"kind": "turn-done", "agent": AGENT, "slot": SLOT}, auth=auth, timeout=10)
+    api().request("/api/v1/hook", {"kind": "turn-done", "agent": AGENT, "slot": SLOT}, auth=auth, timeout=10)
     if last.get("why"):
         # Something on the node holds every turn (a store moving, R120):
         # said in its own words rather than as a limit.
@@ -188,8 +203,8 @@ def main():
                 conv = ""
         return turn((args[1:2] or [""])[0], wait, conv) if args[1:2] else 0
     if args[:1] == ["--turn-done"]:
-        if args[1:2] and bbapi is not None:
-            bbapi.request("/api/v1/hook", {"kind": "turn-done", "agent": AGENT, "slot": SLOT},
+        if args[1:2] and api() is not None:
+            api().request("/api/v1/hook", {"kind": "turn-done", "agent": AGENT, "slot": SLOT},
                           auth="Bearer " + token(args[1]), timeout=10)
         return 0
     if args[:1] == ["--asking"]:
@@ -197,12 +212,12 @@ def main():
         # the controller, so the dock and the bell show the session needs
         # somebody, which its pane title cannot. Claude Code's own words ride
         # along, read from the hook's JSON on stdin.
-        if args[1:2] and bbapi is not None:
+        if args[1:2] and api() is not None:
             try:
                 said = str((json.load(sys.stdin) or {}).get("message") or "")[:300]
             except (ValueError, OSError, AttributeError):
                 said = ""
-            bbapi.request("/api/v1/hook", {"kind": "asking", "text": said, "agent": AGENT, "slot": SLOT},
+            api().request("/api/v1/hook", {"kind": "asking", "text": said, "agent": AGENT, "slot": SLOT},
                           auth="Bearer " + token(args[1]), timeout=10)
         return 0
     if args[:1] == ["--prompt"]:
@@ -247,10 +262,21 @@ def main():
                "If it stays down, write where you are and what is next to your memory or "
                "your notes (that is allowed), then end the turn: the operator checks the "
                "container, and you pick up from your note.")
+    # ...and, once a minute, said as this session's (B1009): the question
+    # above names nobody, and the controller knows a session whose hooks
+    # have stopped running by hearing nothing from it while it works.
+    alive = float(last.get("alive") or 0)
+    if not why and api() is not None and now - alive >= ALIVE_EVERY:
+        alive = now
+        try:
+            api().request("/api/v1/hook", {"kind": "alive", "agent": AGENT, "slot": SLOT},
+                          auth="Bearer " + token(project), timeout=5)
+        except Exception:                                    # noqa: BLE001, S110 (a word is never worth a tool call)
+            pass
     try:
         os.makedirs(os.path.dirname(sf), mode=0o700, exist_ok=True)
         with open(sf, "w") as f:
-            json.dump({**last, "ok": not why, "at": now}, f)
+            json.dump({**last, "ok": not why, "at": now, "alive": alive}, f)
     except OSError:
         pass
     if why and own_notes():
@@ -323,11 +349,21 @@ def own_notes():
         return True
     if tool not in NOTE_TOOLS:
         return False
-    path = os.path.realpath(str((call.get("tool_input") or {}).get("file_path")
-                                or (call.get("tool_input") or {}).get("notebook_path") or ""))
-    home = os.path.realpath(os.environ.get("HOME", "/nonexistent"))
-    return bool(path) and (any(path.startswith(os.path.join(home, d) + os.sep) for d in NOTE_DIRS)
-                           or path.startswith("/tmp/claude-"))
+    given = str((call.get("tool_input") or {}).get("file_path")
+                or (call.get("tool_input") or {}).get("notebook_path") or "")
+    if not given:
+        return False
+    # The path as written with its `..` taken out, and the path its links
+    # lead to: a session's own folder holds links of AerieOS's making
+    # (~/.claude/projects leads to the store's copy of every account's
+    # projects), so a memory there resolves outside the home, and either
+    # one inside a folder of notes is a note.
+    said = os.path.normpath(os.path.join(os.getcwd(), given))
+    real = os.path.realpath(given)
+    home = os.environ.get("HOME", "/nonexistent")
+    roots = {os.path.join(h, d) for h in (home, os.path.realpath(home)) for d in NOTE_DIRS}
+    return any(p.startswith(r + os.sep) for p in (said, real) for r in roots) \
+        or any(p.startswith("/tmp/claude-") for p in (said, real))
 
 
 if __name__ == "__main__":

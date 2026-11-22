@@ -6,7 +6,7 @@
 // session; a tab popped out opens the same terminal on a page of its own
 // (terminal.html); a closed tab's socket goes with it. Driven through the
 // page, as a person at the dock would.
-import { launch, newPage, ok, done, ready, finger, URL, DIR, member, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey, OWNER, section } from './lib.mjs';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -31,14 +31,7 @@ const screen = () => page.evaluate(() => {
   for (let i = 0; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) || '');
   return out.join('\n');
 });
-const waitFor = async (re, ms = 20000) => {
-  const end = Date.now() + ms;
-  while (Date.now() < end){
-    if (re.test(await screen())) return true;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  return false;
-};
+const waitFor = (re, ms = 20000) => until(async () => re.test(await screen()), ms, 200);
 
 // The text is inset from the pane's edges, and the rows still fit: the
 // last row's bottom inside the box.
@@ -82,7 +75,7 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
 // The look is the person's (step 10): their Profile's size, cursor and
 // colors reach the open terminal; a project's colors in their own settings
 // for it win there.
-{
+await section("The look is the person's", async () => {
   const opts = () => page.evaluate(() => { const r = [...TERMS.values()].find(r => r.t.arg === 'sh:7:alpha' && r.term);
     return { size: r.term.options.fontSize, cursor: r.term.options.cursorStyle, bg: r.term.options.theme.background }; });
   const own = async prefs => page.evaluate(async prefs => {
@@ -98,7 +91,8 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   const said = await page.evaluate(async () => (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: 'red' }) })).status);
   await page.evaluate(() => refresh());
-  await page.waitForTimeout(1500);
+  // Time in which the space's color would have reached the terminal.
+  await quiet(1500);
   const there = await opts();
   const padThere = await page.evaluate(() => getComputedStyle(document.querySelector('#pane1 .slot.on.ownterm')).backgroundColor);
   // A space has no colors of its own now (R223): Profile's are every space's.
@@ -108,12 +102,12 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
      `a terminal takes its person's look from Profile, whatever a space once said (${JSON.stringify(mine)} then ${JSON.stringify(there)}; ${said})`);
   await page.evaluate(async () => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: '' }) }));
-}
+});
 
 // On a phone (step 11): a finger dragged down scrolls back through a
 // shell's history, by the line, in tmux's copy mode; a press held on a word
 // selects it, with grips and Copy; Copy puts it on the clipboard.
-{
+await section("On a phone (step 11)", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 800 }, hasTouch: true, isMobile: true });
   await phone.goto(URL);
   await ready(phone);
@@ -168,7 +162,9 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
     return null;
   });
   if (at) await finger(phone, at.x, at.y, at.x, at.y, 800);
-  await phone.waitForTimeout(800);
+  await phone.waitForFunction(() => [...TERMS.values()].find(r => r.t.arg === 'sh:9:alpha')?.term.getSelection() === 'pick-me-word'
+    && document.querySelectorAll('#pane1 .slot.on .xsel .xgrip').length === 2 && !!document.querySelector('#pane1 .slot.on .xsel .xcopy'),
+    null, { timeout: 10000 }).catch(() => {});
   const picked = await phone.evaluate(() => ({ sel: [...TERMS.values()].find(r => r.t.arg === 'sh:9:alpha').term.getSelection(),
     grips: document.querySelectorAll('#pane1 .slot.on .xsel .xgrip').length, copy: !!document.querySelector('#pane1 .slot.on .xsel .xcopy') }));
   ok(at && picked.sel === 'pick-me-word' && picked.grips === 2 && picked.copy,
@@ -179,14 +175,17 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   ok(clip === 'pick-me-word' && gone, `Copy puts the word on the clipboard and puts the selection away (${clip})`);
   await phone.evaluate(() => dropTab(tabs.find(t => t.arg === 'sh:9:alpha').id));
   await phone.close();
-}
+});
 
 // Popped out (R8): the same terminal on a page of its own, terminal.html on
 // /termws, the tmux session the tab had; Reattach brings it back.
-{
+await section("Popped out (R8)", async () => {
   const [win] = await Promise.all([page.waitForEvent('popup'), page.evaluate(id => popOut(id), id)]);
   await win.waitForSelector('.xterm', { timeout: 20000 });
-  await win.waitForTimeout(1500);
+  // Its socket open and the session's screen drawn: a key typed before
+  // the socket opens goes nowhere.
+  await win.waitForFunction(() => ws?.readyState === WebSocket.OPEN
+    && /\S/.test(document.querySelector('.xterm-rows')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
   await win.keyboard.type('echo popped-$((7*6))');
   await win.keyboard.press('Enter');
   const seen = await win.waitForFunction(() => /popped-42/.test(document.querySelector('.xterm-rows')?.textContent || ''),
@@ -197,7 +196,7 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   await page.evaluate(id => reattachTab(id), id);
   await page.waitForSelector('#pane1 .slot.on.ownterm .xterm', { timeout: 20000 });
   ok(win.isClosed() || await win.evaluate(() => true).catch(() => true), '...and Reattach brings it back into the dock');
-}
+});
 
 // The socket and the shell are one: closing the tab closes the socket.
 const before = await page.evaluate(() => [...TERMS.values()].filter(r => r.t.arg === 'sh:7:alpha').length);
@@ -207,7 +206,7 @@ const after = await page.evaluate(() => [...TERMS.values()].filter(r => r.t.arg 
 ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${before}: ${JSON.stringify(after)})`);
 
 // A log in the dock (R133 step 12): the page's own terminal, read-only, following the controller's log as it is written.
-{
+await section("A log in the dock", async () => {
   mkdirSync(`${DIR}/state/logs`, { recursive: true });
   appendFileSync(`${DIR}/state/logs/builderbot.log`, 'log-follow-first\n');
   await page.evaluate(() => openLogTab('log:controller', 'Log: the controller'));
@@ -215,7 +214,7 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   const logText = () => page.evaluate(() => { const r = [...TERMS.values()].find(r => r.t.arg === 'log:controller' && r.term);
     if (!r) return ''; const b = r.term.buffer.active, out = [];
     for (let i = 0; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) || ''); return out.join('\n'); });
-  const seen = async re => { for (let i = 0; i < 40; i++){ if (re.test(await logText())) return true; await new Promise(r => setTimeout(r, 250)); } return false; };
+  const seen = re => until(async () => re.test(await logText()), 10000, 250);
   const first = await seen(/log-follow-first/);
   appendFileSync(`${DIR}/state/logs/builderbot.log`, 'log-follow-second\n');
   const second = await seen(/log-follow-second/);
@@ -251,13 +250,13 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   ok(/no such container/.test(await page.evaluate(() => [...TERMS.values()].find(r => r.t.arg === 'log:dm::bad name')?.ended || '')),
      '...and a name that is no container is refused, saying so');
   await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:dm::bad name').id));
-}
+});
 
 // A grant taken away ends the terminal it opened (R133 step 9): an account
 // on alpha opens a shell there, is taken off alpha, and within the server's
 // re-check (every few seconds) its socket closes, saying why.
-{
-  const h = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+await section("A grant taken away ends the terminal it opened", async () => {
+  const h = OWNER;
   const base = URL.replace(/\/$/, '');
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'add', name: 'w.term', password: 'w.term-pass-1', role: 'user' }) });
@@ -271,7 +270,7 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'edit', name: 'w.term', profile: { full_name: 'W Term', email: 'w.term@example.invalid' } }) });
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'projects', name: 'w.term', projects: [projectKey('alpha')] }) });
+    body: JSON.stringify({ action: 'edit', name: 'w.term', projects: [projectKey('alpha')] }) });
   // The header sent up front, as lib's pages send theirs: a websocket's
   // handshake carries no credentials the browser was only asked for.
   const ctx = await browser.newContext({ extraHTTPHeaders: { Authorization: 'Basic ' + Buffer.from('w.term:w.term-pass-1').toString('base64') } });
@@ -290,7 +289,10 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   }), `u:${ownerUid}:sh:7:alpha`);
   const termUid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.term'].uid;
   let sessions = '';
-  try { sessions = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }); } catch { sessions = ''; }
+  await until(() => {
+    try { sessions = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }); } catch { sessions = ''; }
+    return sessions.split('\n').includes(`${termUid}~shell-alpha-7`);
+  });
   ok(!/own-42-terminal/.test(forged) && sessions.split('\n').includes(`${termUid}~shell-alpha-7`),
      `naming another account on a terminal's argument opens one of your own, never theirs (${forged.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)})`);
   const opened = await other.evaluate(() => new Promise(res => {
@@ -305,12 +307,90 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'assign', name: 'w.term', project_roles: { [projectKey('alpha')]: [] } }) });
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'projects', name: 'w.term', projects: [] }) });
+    body: JSON.stringify({ action: 'edit', name: 'w.term', projects: [] }) });
   const closed = await other.waitForFunction(() => window.bbClosed, null, { timeout: 20000 })
     .then(x => x.jsonValue(), () => null);
   await ctx.close();
   ok(opened === 'open' && closed && closed.reason,
      `a terminal whose grant is taken away while it is open is ended, saying why (${opened}; ${JSON.stringify(closed)})`);
-}
+});
+
+// A terminal closed while a frame of its own is still pending (B802): xterm
+// runs the frame after dispose() and reads a renderer that is gone, which
+// the console showed as "reading 'dimensions'" whenever a terminal's start
+// was a little slow and it was closed at once. Terminals made as termMount
+// makes them and dropped by termDrop at a few delays; disposed at once, 18
+// of 60 threw.
+await section("A terminal closed while a frame of its own is still pending", async () => {
+  const before = page.errors.length;
+  await page.evaluate(async () => {
+    await xtermReady();
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    for (let i = 0; i < 60; i++){
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:300px';
+      document.body.append(el);
+      const term = new window.Terminal({ scrollback: 5000 });
+      const fit = new window.FitAddon.FitAddon();
+      term.loadAddon(fit);
+      term.open(el);
+      try { fit.fit(); } catch (e) { /* a box with no size yet */ }
+      term.write('line\r\n'.repeat(1 + i % 40));
+      const key = `b802-${i}`;
+      TERMS.set(key, { key, el, term, fit, ws: null, ro: null });
+      const d = [0, 0, 1, 4, 8, 16, 30][i % 7];
+      if (d) await wait(d);
+      // Its slot goes before it or after it, as a closed tab's and a redrawn pane's do.
+      if (i % 2) el.remove();
+      termDrop(key);
+      if (!(i % 2)) el.remove();
+    }
+    await wait(1300);
+  });
+  const thrown = [...new Set(page.errors.slice(before))];
+  ok(thrown.length === 0 && await page.evaluate(() => ![...TERMS.keys()].some(k => k.startsWith('b802-'))),
+     `a terminal closed with a frame of its own still pending throws nothing${thrown.length ? ': ' + thrown.join(' | ').slice(0, 200) : ''}`);
+});
+
+// A terminal not on show writes nothing until it is shown (R228 step 14),
+// but answers a question as it comes: tmux asks who the terminal is as it
+// attaches, and an answer held until the tab was shown reached it after it
+// had stopped waiting and was typed into the shell as "1;2c0;276;0c".
+await section("A terminal not on show holds its output and answers its questions at once", async () => {
+  const got = await page.evaluate(async () => {
+    await xtermReady();
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:300px';
+    document.body.append(el);
+    const term = new window.Terminal({ scrollback: 100 });
+    term.open(el);
+    const answered = [];
+    term.onData(d => answered.push(d));
+    const rec = { term, el };
+    const enc = s => new TextEncoder().encode(s);
+    const text = () => { const b = term.buffer.active; const out = [];
+      for (let i = 0; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) || ''); return out.join('|'); };
+    const settle = () => new Promise(r => term.write('', r));
+    termShow(rec, false);
+    termOut(rec, enc('held line\r\n'));
+    await settle();
+    const whileAway = text();
+    termOut(rec, enc('\x1b[c\x1b[>c'));
+    await settle();
+    const asked = answered.join('');
+    termOut(rec, enc('after it\r\n'));
+    await settle();
+    const afterAsk = text();
+    termShow(rec, true);
+    await settle();
+    const shown = text();
+    term.dispose(); el.remove();
+    return { whileAway, asked: JSON.stringify(asked), afterAsk, shown };
+  });
+  ok(!/held line/.test(got.whileAway), `not on show, what it is sent is not drawn (${got.whileAway.replace(/\|+$/, '') || 'nothing'})`);
+  ok(/\\u001b\[\?/.test(got.asked) && /held line/.test(got.afterAsk) && !/after it/.test(got.afterAsk),
+     `...a question in it is answered as it comes, with what came before it drawn (${got.asked}; ${got.afterAsk.replace(/\|+$/, '')})`);
+  ok(/held line/.test(got.shown) && /after it/.test(got.shown), `...and shown, the rest is drawn (${got.shown.replace(/\|+$/, '')})`);
+});
 
 await done(browser);

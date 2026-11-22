@@ -5,7 +5,7 @@
 // allowed, and a bump must not sweep unrelated work into its commit. Both are
 // reachable through `aerie version`, which is the same module the notebook will
 // call, so testing the CLI tests the thing.
-import { launch, newPage, ready, ok, done, sleep, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo } from './lib.mjs';
+import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo, asSession, mint, section, call } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +13,6 @@ import { fileURLToPath } from 'node:url';
 // The checkout's bb, not the image's: the running image predates this
 // subcommand, which is exactly the case this repo's own CLAUDE.md warns about.
 const BB = fileURLToPath(new URL('../../aerie', import.meta.url));
-const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const WS = `${DIR}/ws`;
 const PROJ = 'versioned';
 const ROOT = `${WS}/${PROJ}`;
@@ -122,7 +121,7 @@ ok(r.code === 0 && readFileSync(`${ROOT}/VERSION`, 'utf8').trim() === '0.4.0', '
 //
 // Its own repository, because a tag is repo-wide state and the shared fixture
 // is read by everything after this.
-{
+await section("the release: the second gesture, and the outward-facing one", async () => {
   const R = `${WS}/relproj`;
   rmSync(R, { recursive: true, force: true });
   mkdirSync(R, { recursive: true });
@@ -162,10 +161,10 @@ print(json.dumps(m.release('relproj', **json.loads(${
   writeFileSync(`${R}/f`, 'edited and not committed');
   writeFileSync(`${R}/VERSION`, '1.3.0\n');
   rel = relOf({ push: false });
-  ok(!rel.ok && /uncommitted changes/.test(rel.error || ''),
-     '...and a dirty tree is refused: a tag marks a commit, not what is beside it');
+  ok(!rel.ok && /v1\.2\.0 already exists/.test(rel.error || ''),
+     `...and what is beside the commit is never read: with VERSION saying 1.3.0 uncommitted, the release is still the commit's 1.2.0 (${rel.error})`);
   rmSync(R, { recursive: true, force: true });
-}
+});
 
 // ---- the commit that ships is not always the one you are standing on -------
 // Work lands through a pull request, so what CI builds and the box runs is
@@ -177,7 +176,7 @@ print(json.dumps(m.release('relproj', **json.loads(${
 // A real bare remote rather than a stub: the whole question is what
 // origin/HEAD points at and whether HEAD is behind it, and a fake answer to
 // that would be testing the mock.
-{
+await section("the commit that ships is not always the one you are standing on", async () => {
   const P = `${WS}/shipproj`;
   const REMOTE = `${DIR}/shipproj.git`;
   rmSync(P, { recursive: true, force: true });
@@ -214,8 +213,8 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
     .toString().trim().split('\n').pop());
 
   let r = shipRel();
-  ok(!r.ok && new RegExp(behindAt).test(r.error || '') && new RegExp(tipAt).test(r.error || ''),
-     `a release on a commit the default branch has moved past is refused, naming both (${
+  ok(!r.ok && /has moved past this tree/.test(r.error || '') && !new RegExp(behindAt).test(r.error || '') && !new RegExp(tipAt).test(r.error || ''),
+     `a release on a commit the default branch has moved past is refused, in one sentence naming no commit (${
        (r.error || 'no error').slice(0, 76)})`);
   ok(/check out main and pull/i.test(r.error || ''),
      '...and says what to do about it rather than only that it will not');
@@ -231,13 +230,13 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
        r.tag || r.error})`);
   rmSync(P, { recursive: true, force: true });
   rmSync(REMOTE, { recursive: true, force: true });
-}
+});
 
 // ---- start: the first version, and nothing after ---------------------------
 // Creating a version and moving one are different decisions (the first has
 // no claim to overwrite), and until this policy existed the only way to let a
 // session write the first VERSION was to hand it the bumping too.
-{
+await section("start: the first version, and nothing after", async () => {
   const S = `${WS}/startpol`;
   rmSync(S, { recursive: true, force: true });
   mkdirSync(S, { recursive: true });
@@ -263,7 +262,7 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
      && readFileSync(`${S}/VERSION`, 'utf8').trim() === '0.1.0',
      '...and may not move it afterwards, which is the whole point of the policy');
   rmSync(S, { recursive: true, force: true });
-}
+});
 
 // ---- the bump commits one path -------------------------------------------
 // An uncommitted VERSION rides along in whatever a session commits next,
@@ -355,7 +354,7 @@ ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added')
 // repository's own changelog had none, because nothing anywhere said what the
 // categories were or when each applied. Refused with the rules rather than
 // filed in a heap above the headings.
-{
+await section("An entry goes under a category, and the tool is where a session learns", async () => {
   const none = yb('changelog', 'add', 'filed nowhere');
   ok(none.code !== 0 && /--cat NAME, one of/.test(none.out) && /Fixed\s+it was wrong, and now it is right/.test(none.out)
      && /a house rule is where a space says so/.test(none.out),
@@ -376,7 +375,7 @@ ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added')
   const once = readFileSync(`${Y}/CHANGELOG.md`, 'utf8').split('\n').find(l => l.includes('Named its own commit'));
   ok(once === `- Named its own commit (${head})`,
      `an entry that already ends with the commit it is stamped with carries it once (${once})`);
-}
+});
 setPolicyFor('young', 'open');
 yb('version', 'init', '0.1.0');
 const born = yb('changelog').out;
@@ -405,7 +404,7 @@ ok(bare('--code').out === '1',
 // session building in its worktree was handed the main checkout's commit as
 // its package name and shipped nothing rather than a file named after code
 // it did not hold (24 Sep).
-{
+await section("Asked from one of the project's worktrees, the answer is that tree's", async () => {
   const WT = `${WS}/.worktrees/unversioned/u_0badf00d`;
   mkdirSync(`${WS}/.worktrees/unversioned`, { recursive: true });
   execFileSync('git', ['-C', BARE, 'worktree', 'add', '-q', '-b', 'claude/side', WT], { env });
@@ -418,7 +417,7 @@ ok(bare('--code').out === '1',
   ok(inWt('--file') !== bare('--file').out,
      '...so a package built there is named after the commit it holds');
   execFileSync('git', ['-C', BARE, 'worktree', 'remove', '--force', WT], { env });
-}
+});
 ok(bare('--msi').code !== 0,
    '...but a format that cannot be produced without one refuses');
 ok(/no VERSION file/.test(bare().out), '...and says how to opt in');
@@ -528,7 +527,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
 //
 // On entries of its own, added and taken away again, so the lines the bump
 // below is about are the ones the cases above left.
-{
+await section("the section is the operator's to shape", async () => {
   const rows = () => (cl('unreleased').out.match(/^\s*\d+\s+.*$/gm) || []);
   const shasOf = line => (line.match(/[0-9a-f]{7}/g) || []);
   const find = (list, word) => list.find(l => l.includes(word)) || '';
@@ -590,7 +589,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
     cl('rm', l.trim().split(/\s/)[0]);
   ok(rows().length === before,
      `...and the section is back to what the cases above left (${before})`);
-}
+});
 
 // ---- categories: the shape a changelog reader already knows ---------------
 // A cycle's lines are written one at a time by whoever did the work; what a
@@ -602,7 +601,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
 // A session files an entry under a category. It does not get to decide where
 // the category SITS: a new one lands at the end, and the arrangement is the
 // operator's, on the editor the browser cases below drive.
-{
+await section("categories: the shape a changelog reader already knows", async () => {
   const rows = () => (cl('unreleased').out.match(/^\s*\d+\s+.*$/gm) || []);
   const numOf = word => (rows().find(l => l.includes(word)) || '').trim().split(/\s/)[0];
   const file = () => readFileSync(`${M}/CHANGELOG.md`, 'utf8');
@@ -711,7 +710,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
   cl('rm', numOf('CATME a fix, moved'));
   ok(rows().length === before && !/^### (Added|Fixed)$/m.test(file()),
      `...and emptying a category takes its heading with it (${before} left)`);
-}
+});
 
 // The bump dates the section, in the same commit that moves VERSION.
 mb('bump', 'patch');
@@ -743,7 +742,7 @@ ok(reopened.indexOf('## Unreleased') !== -1
 // 0.1.0, bumped to 0.2.0 (which dated every entry under 0.2.0), then set to
 // 0.5.0 before anything was released: 0.2.0's notes are 0.5.0's. A tagged
 // number keeps its section, and a plain bump keeps the one it leaves.
-{
+await section("set renumbers a version nobody released", async () => {
   const R = `${WS}/renumber`;
   rmSync(R, { recursive: true, force: true });
   mkdirSync(R, { recursive: true });
@@ -769,7 +768,7 @@ ok(reopened.indexOf('## Unreleased') !== -1
   rb('changelog', 'add', 'Third feature', '--cat', 'Added');
   rb('version', 'set', '0.6.0');
   ok(/## 0\.5\.0/.test(file()) && /## 0\.6\.0/.test(file()), 'a released number keeps its section when the version is set past it');
-}
+});
 
 // ---- what a review pass caught, kept caught ------------------------------
 // A project release tag must not stamp a component: the repo-wide vX.Y.Z
@@ -995,7 +994,7 @@ ok(r0['building towards'] === '0.4.0',
 // Build and Version are sections of this tab, and a shut one still answers:
 // the node on the first, the number on the second. They were three unnamed
 // bands stacked, which on a phone is one scroll with nothing labeling it.
-{
+await section("Build and Version are sections of this tab, and a shut one still answers", async () => {
   const sects = await page.$$eval(`${NB} .nbview[data-view="artifacts"] .sect > summary`,
     ss => ss.map(s => [s.querySelector('.t')?.textContent,
                        s.querySelector('.sst')?.textContent]));
@@ -1003,19 +1002,19 @@ ok(r0['building towards'] === '0.4.0',
      'the tab names what it is showing: Build and Version are sections');
   ok(sects.find(([t]) => t === 'Version')?.[1] === '0.4.0',
      '...and the version is the heading\'s status, so a shut one still answers');
-}
+});
 // The SHAPE, and the ordinal against git rather than against a literal. The
 // ordinal is the commit count, and alpha is the shared fixture: an earlier
 // file in a full run commits into it, so a hardcoded 3 was right when this
 // file ran alone and wrong when it ran after git.mjs (B85). What the
 // assertion is actually about is that the line is the version, built from the
 // target, the count and the sha.
-{
+await section("The SHAPE, and the ordinal against git rather than against a literal", async () => {
   const n = execFileSync('git', ['-C', A, 'rev-list', '--count', 'HEAD'],
                          { encoding: 'utf8' }).trim();
   ok(new RegExp(`^0\\.4\\.0-dev\\.${n}\\+[0-9a-f]{7}$`).test(r0['a build now'] || ''),
      `...and what a build right now would be called (${r0['a build now']}, ordinal ${n})`);
-}
+});
 ok(/since 0\.4\.0: 1 commit\b/.test(await boxText()),
    '...with the commits since the target last moved, as the case for a bump');
 
@@ -1060,8 +1059,8 @@ ok(!execFileSync('git', ['-C', A, 'status', '--porcelain'], { env }).toString().
 // beside every other dial (R223); that view writes it with the same call.
 ok(await page.$eval(`${NB} #verBox .verpol`, e => /Agent access/.test(e.textContent) && !!e.querySelector('[data-verpolgo]')),
    'the Version section says the agent\'s access and offers Change on Permissions');
-const polSet = await page.evaluate(async () => (await postJSON('/api/version', {project: 'alpha', action: 'policy', policy: 'minor'})).status);
-ok(polSet === 200, `the policy is written as the Permissions view writes it (${polSet})`);
+const polSet = await page.evaluate(async () => (await postJSON('/api/version', {project: 'alpha', action: 'policy', policy: 'minor'})).error || 'written');
+ok(polSet === 'written', `the policy is written as the Permissions view writes it (${polSet})`);
 await page.waitForFunction(async () => {
   const r = await fetch('/api/version?project=alpha');
   return (await r.json()).policy === 'minor';
@@ -1101,7 +1100,9 @@ for (let t = 0; t < 30 && !polOpts.length; t++){
   if (polOpts.length) break;
   await page.evaluate(() => openNotebook('beta'));
   await nbGo(page, 'permissions', NB).catch(() => {});
-  await sleep(300);
+  // What the next try reads; a view that never drew them is shown again.
+  await page.waitForFunction(() => [...document.querySelectorAll('#rnGateVersion option')].some(o => o.value !== 'inherit'),
+                             null, { timeout: 3000 }).catch(() => {});
 }
 ok(polOpts.join(",") === "locked,start,patch,minor,open",
    `a space with no version still offers the policy, the one that delegates `
@@ -1127,7 +1128,10 @@ async function initWith(val){
     if (okc) return;
     await page.evaluate(() => openNotebook('beta'));
     await nbGo(page, 'artifacts', NB).catch(() => {});
-    await sleep(300);
+    // What the next try needs, asked from this side: NB is a Playwright
+    // selector. A box that never shows them is shown again.
+    await until(() => page.$eval(`${NB} #verBox`, box =>
+      !!(box.querySelector(".vstart") && box.querySelector("[data-verinit]") && box.offsetParent)), 3000);
   }
   throw new Error("the init control never became usable");
 }
@@ -1160,8 +1164,15 @@ ok(await page.$(`${NB} #verBox .veradd .vdir`) !== null,
 // A starting number is arbitrary (nothing can derive it), so it is the one
 // value here that is typed. Which means it has to be checked.
 await initWith('v1.2');
-await page.waitForTimeout(400);
+await quiet(400);
 ok(!existsSync(`${B}/VERSION`), 'a malformed starting version is refused, not written');
+// ...by the server too, not only by the page's pattern, which sends nothing
+// for it (B820): asked directly, it says no and writes nothing.
+// Asked from here, not the page, whose console would carry the refusal.
+const malformed = await call('/api/version', { project: 'beta', action: 'init', value: 'v1.2', component: '' });
+malformed.body = malformed.body || {};
+ok(!!malformed.body.error && !existsSync(`${B}/VERSION`),
+   `...and the server refuses it asked directly (${malformed.status}: ${malformed.body.error || JSON.stringify(malformed.body)})`);
 
 await initWith('0.2.0');
 await waitTarget('0.2.0');
@@ -1190,14 +1201,13 @@ let paneText = "";
 // Ten seconds of 200ms polls on a quiet box, and BB_TEST_SLOW's multiple of
 // that on a busy one: this waits on a fetch the pane makes when it opens, and
 // CI runs it beside everything else this machine does (bug #13).
-for (let t = 0; t < 50 * SLOW; t++){
+await until(async () => {
   paneText = await page.$eval(`${NB} .verlogpane`, e => e.textContent).catch(() => "");
   // The pane's own words (nb-artifacts.js): "here" was never in them, so
   // this polled the whole ten seconds (twenty under BB_TEST_SLOW) every run
   // and then passed on the line below.
-  if (/no CHANGELOG\.md yet/.test(paneText)) break;
-  await sleep(200);
-}
+  return /no CHANGELOG\.md yet/.test(paneText);
+}, 10000, 200);
 ok(/no CHANGELOG\.md yet/.test(paneText),
    'the changelog pane says how to opt in when there is no file');
 // The flake this suite carried for weeks, as a rule instead. The pane used to
@@ -1206,7 +1216,9 @@ ok(/no CHANGELOG\.md yet/.test(paneText),
 // empty one back in the box, and "the changelog pane" was then whichever came
 // first in the document. Repaint under it and count.
 await page.evaluate(() => drawPanes());
-await sleep(400);
+// A repaint that asks for the version again draws the box when the answer
+// lands: counted with the page at rest, and nothing new asked for that long.
+await settled(page, { quiet: 400 });
 const panes = await page.$$eval('.verlogpane', es => es.map(e => ({
   inSheet: !!e.closest('#sheetSlot'), text: e.textContent.slice(0, 40) })));
 ok(panes.length === 1 && panes[0].inSheet && /no CHANGELOG/.test(panes[0].text),
@@ -1234,7 +1246,7 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
 //
 // Unreleased only: everything below it is a release somebody may have read,
 // and it renders as the text it is.
-{
+await section("the editor: the arrangement is a gesture, not a file to hand-edit", async () => {
   const seed = ['# Changelog', '', '## Unreleased', '',
                 '- a loose note (aaaaaaa)', '',
                 '### Fixed', '',
@@ -1262,13 +1274,7 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   // section would count per band. Index the handles instead.
   const press = async (i, sel) => (await page.$$(`${NB} .clog .clrow`))[i].$eval(
     sel, el => el.click());
-  const settled = async want => {
-    for (let n = 0; n < 50 * SLOW; n++){
-      if (await shape() === want) return true;
-      await sleep(100);
-    }
-    return false;
-  };
+  const settled = want => until(async () => await shape() === want, 10000, 100);
 
   let rs = await shown();
   ok(rs.length === 4
@@ -1293,16 +1299,14 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
 
   // The other half of the arrangement: the band itself moves.
   await page.$$eval(`${NB} .clog .clgroup [data-cmv="up"]`, bs => bs[bs.length - 1].click());
-  for (let n = 0; n < 50 * SLOW && (await cats()).join('|') !== 'Added|Fixed'; n++)
-    await sleep(100);
+  await until(async () => (await cats()).join('|') === 'Added|Fixed', 10000, 100);
   ok((await cats()).join('|') === 'Added|Fixed',
      `a category moves up and down the section on its own row (${(await cats()).join(', ')})`);
 
   // Rename: the entries under it follow, because the name IS where they sit.
   await page.$eval(`${NB} .clog .clname`, i => {
     i.value = 'Shipped'; i.dispatchEvent(new Event('change', { bubbles: true })); });
-  for (let n = 0; n < 50 * SLOW && !(await cats()).includes('Shipped'); n++)
-    await sleep(100);
+  await until(async () => (await shown()).filter(r => r.cat === 'Shipped').length === 2, 10000, 100);
   ok((await shown()).filter(r => r.cat === 'Shipped').length === 2,
      `renaming a category carries its entries with it (${(await cats()).join(', ')})`);
 
@@ -1310,15 +1314,12 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   const loose = await at('loose');
   await (await page.$$(`${NB} .clog .clrow`))[loose].$eval('.clcat', el => {
     el.value = 'Shipped'; el.dispatchEvent(new Event('change', { bubbles: true })); });
-  for (let n = 0; n < 50 * SLOW; n++){
-    if ((await shown()).every(r => r.cat)) break;
-    await sleep(100);
-  }
+  await until(async () => (await shown()).find(r => r.text === 'a loose note')?.cat === 'Shipped', 10000, 100);
   ok((await shown()).find(r => r.text === 'a loose note')?.cat === 'Shipped',
      `an uncategorised line is filed from its own row (${await shape()})`);
 
   await press(await at('another fix'), '[data-erm]');
-  for (let n = 0; n < 50 * SLOW && (await shown()).length !== 3; n++) await sleep(100);
+  await until(async () => (await shown()).length === 3, 10000, 100);
   ok(!(await shown()).some(r => r.text === 'another fix'),
      `a line that stopped being true is dropped from the section (${await shape()})`);
 
@@ -1329,12 +1330,12 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
      '...with the file untouched until Save: the section is applied whole, or not at all');
 
   const arranged = await shape();
+  // A mark on a row the editor drew before the Save: a redraw from the
+  // answer replaces the rows, so the mark going is the proof it drew (B820).
+  await page.$eval(`${NB} .clog .clrow`, r => { r.dataset.beforeSave = '1'; });
   await page.click(`${NB} .clog #clSave`);
-  for (let n = 0; n < 100 * SLOW; n++){
-    const s = await page.$eval(`${NB} #clState`, e => e.textContent).catch(() => '');
-    if (/saved/.test(s)) break;
-    await sleep(100);
-  }
+  await until(async () => /saved/.test(
+    await page.$eval(`${NB} #clState`, e => e.textContent).catch(() => '')), 20000, 100);
   const written = readFileSync(CL, 'utf8');
   ok(/## Unreleased\n\n### Shipped\n\n- a new tab \(ddddddd\)\n- a loose note \(aaaaaaa\)\n\n### Fixed\n\n- pairing works again \(bbbbbbb\)\n/
        .test(written),
@@ -1347,7 +1348,7 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   // And the editor is still showing what the file now holds: it redraws from
   // the section the server answers with, not from the one it sent, so a
   // refusal or a tidy-up on the way in cannot leave the two disagreeing.
-  ok(await shape() === arranged,
+  ok(await shape() === arranged && !(await page.$(`${NB} .clog .clrow[data-before-save]`)),
      `the editor redraws from what came back (${await shape()})`);
   const back = written.slice(0, written.indexOf('## 0.1.0'));
   const fromFile = back.split('\n').filter(l => l.startsWith('### ') || l.startsWith('- '))
@@ -1364,16 +1365,9 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   // rule. Asked from node rather than from the page: a deliberate 403 is a
   // failed resource in the console, and the clean-console assertion below is
   // worth more than the convenience.
-  const stok = execFileSync('python3', ['-c', `
-import importlib.util, json, os, sys
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
+  const stok = mint('beta');
   const res = await fetch(`${DURL}/api/changelog`, { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${stok}` },
+    headers: asSession(stok),
     body: JSON.stringify({ project: 'beta', groups: [] }) });
   const refused = await res.json();
   ok(res.status === 403 && /aerie changelog add/.test(refused.error || '')
@@ -1394,14 +1388,24 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   // have something long enough to wrap.
   {
     await page.setViewportSize({ width: 393, height: 851 });
-        await sleep(600);
+    // The page draws for a width in the frame after it changes: the
+    // breakpoint's listeners first, then the boxes that fit themselves to
+    // their width. Two frames on, both have run.
+    await page.waitForFunction(() => innerWidth === 393 && matchMedia('(max-width:900px)').matches,
+                               null, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const long = 'A minor version moves the compatibility window, so every '
       + "space bound to a node is held until that node's agent is updated, "
       + "and the sessions running on it end when the bump lands";
     await page.$eval(`${NB} .clog .clrow textarea.cltext`, (ta, v) => {
       ta.value = v; ta.dispatchEvent(new Event('input', { bubbles: true }));
     }, long);
-    await sleep(300);
+    // The box has grown to the words: what the check below measures.
+    await until(() => page.$eval(`${NB} .clog .clrow textarea.cltext`, (ta, v) => {
+      const cs = getComputedStyle(ta);
+      return ta.value === v && cs.whiteSpace === 'pre-wrap' && ta.scrollHeight <= ta.clientHeight + 2
+        && Math.round(ta.getBoundingClientRect().height / (parseFloat(cs.lineHeight) || 16)) > 3;
+    }, long), 10000);
     const shape = await page.$eval(`${NB} .clog`, el => {
       const ta = el.querySelector('.clrow textarea.cltext');
       const head = el.querySelector('.clhead input.clname');
@@ -1426,10 +1430,13 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
        `a category reads as a heading, not as another field the size of an entry (${
          JSON.stringify({bold: shape.headBold, unpainted: shape.headPlain})})`);
     await page.setViewportSize({ width: 1280, height: 1000 });
-        await sleep(400);
+    // Back at a desk, and drawn for it, before the sheet is closed.
+    await page.waitForFunction(() => innerWidth === 1280 && !matchMedia('(max-width:900px)').matches,
+                               null, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   }
   await page.click(`${NB} #sheetClose`);
-}
+});
 
 // The real delivery path, against the harness's own tmux server: alpha has a
 // claude-alpha session, so this exercises notify.tell rather than a stub.
@@ -1476,7 +1483,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
 // root with the new version and the part), so this exercises the mechanism on
 // a repository of its own rather than on AerieOS's two files, and rather
 // than on the shared fixture, whose ordinal everything above depends on.
-{
+await section("a repo's own stamps travel with the number", async () => {
   const S = `${WS}/stampproj`;
   rmSync(S, { recursive: true, force: true });
   mkdirSync(`${S}/tools`, { recursive: true });
@@ -1573,7 +1580,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
                                 body: JSON.stringify({ project: 'alpha', node: '' }) });
   });
   rmSync(S, { recursive: true, force: true });
-}
+});
 
 // A project with no session says so rather than silently doing nothing.
 const askDead = await page.evaluate(async () => {
@@ -1594,7 +1601,7 @@ ok((await page.errors).every(e => /400/.test(e)),
 // so: it was bumped to 0.8.0 on a branch already merged into main, unpushed,
 // while the tab showed 0.8.0 and main still read 0.7.0. Built here for real,
 // with a bare remote, the branch merged the way a pull request merges it.
-{
+await section("where a bump lands", async () => {
   const L = `${WS}/landproj`, REMOTE = `${DIR}/landproj.git`;
   rmSync(L, { recursive: true, force: true });
   rmSync(REMOTE, { recursive: true, force: true });
@@ -1627,7 +1634,11 @@ ok((await page.errors).every(e => /400/.test(e)),
     try { body = r.request().postDataJSON() || {}; } catch {}
     if (body.action === 'release-drafts') return r.fulfill({ json: { forge: 'GitHub', drafts: [
       { tag: 'v9.9.9-dev.1', prerelease: true, url: 'https://example.invalid/1', missing: ['the.iso'], notes: 'not whole' },
-      { tag: 'v9.9.9', prerelease: false, url: 'https://example.invalid/2', missing: [], notes: 'whole' }] } });
+      { tag: 'v9.9.9', prerelease: false, url: 'https://example.invalid/2', missing: [], notes: 'whole' },
+      { tag: 'v9.9.8', prerelease: false, url: 'https://example.invalid/3', missing: [], notes: 'AerieOS 9.9.8: see CHANGELOG.md.',
+        holds: [{ what: 'notes', why: 'the notes are the placeholder CI writes' }] },
+      { tag: 'v9.9.7', prerelease: false, url: 'https://example.invalid/4', missing: [], notes: 'whole',
+        holds: [{ what: 'tag', why: 'the tag v9.9.7 is not on GitHub' }] }] } });
     if (body.action === 'release-publish' || body.action === 'release-draft-notes'){
       asked.push(body);
       return r.fulfill({ json: { ok: true, tag: body.tag } });
@@ -1644,9 +1655,24 @@ ok((await page.errors).every(e => /400/.test(e)),
                     said: await draftRow('v9.9.9-dev.1').textContent() };
   ok(drafted.notes === 'whole' && drafted.shut && !drafted.open && /Not whole yet: the\.iso/.test(drafted.said),
      `a draft shows its notes to correct, and Publish waits until it is whole (${JSON.stringify(drafted).slice(0, 120)})`);
+  // What else holds a draft back is said on its row (R206 step 3): a tag
+  // that is not on the git host stops the press, placeholder notes are put
+  // right in the box, so its press stays.
+  const held = { notes: await draftRow('v9.9.8').locator('[data-drafthold="notes"]').textContent(),
+                 notesShut: await draftRow('v9.9.8').locator('[data-draftpub]').isDisabled(),
+                 tag: await draftRow('v9.9.7').locator('[data-drafthold="tag"]').textContent(),
+                 tagShut: await draftRow('v9.9.7').locator('[data-draftpub]').isDisabled(),
+                 none: await draftRow('v9.9.9').locator('[data-drafthold]').count() };
+  ok(/Not published yet: the notes are the placeholder/.test(held.notes) && !held.notesShut
+     && /Not published yet: the tag v9\.9\.7 is not on GitHub/.test(held.tag) && held.tagShut && held.none === 0,
+     `a draft says on its row what keeps it from being published, and only what the box cannot put right stops the press (${JSON.stringify(held).slice(0, 200)})`);
   await page.fill(`${LNB} #verDrafts [data-draft="v9.9.9"] textarea`, 'corrected');
   await page.click(`${LNB} #verDrafts [data-draft="v9.9.9"] [data-draftpub]`);
-  await page.waitForTimeout(1500);
+  // The press is asked, and over: the page reads the drafts again once it
+  // is answered, from the stub while the route stands, so the box holds the
+  // stub's notes once more.
+  await until(async () => asked.some(a => a.action === 'release-publish' && a.tag === 'v9.9.9' && a.notes === 'corrected')
+    && await page.$eval(`${LNB} #verDrafts [data-draft="v9.9.9"] textarea`, t => t.value === 'whole'), 20000);
   ok(asked.some(a => a.action === 'release-publish' && a.tag === 'v9.9.9' && a.notes === 'corrected'),
      `Publish sends the notes as they stand in the box (${JSON.stringify(asked).slice(0, 120)})`);
   await page.unroute('**/api/version');
@@ -1714,7 +1740,7 @@ ok((await page.errors).every(e => /400/.test(e)),
   await page.evaluate(() => { tabs.filter(t => t.kind === 'notebook' && t.arg === 'landproj').forEach(t => dropTab(t.id)); });
   rmSync(L, { recursive: true, force: true });
   rmSync(REMOTE, { recursive: true, force: true });
-}
+});
 
 // The briefing every session is handed. It is read into the prompt of every
 // session on every project, so a rendered example version in it is a number
@@ -1722,14 +1748,14 @@ ok((await page.errors).every(e => /400/.test(e)),
 // briefing does: a session asked to give a new project its first version read
 // 0.4.0 out of the file it had been briefed with and proposed it, having
 // derived nothing. The file changed under R63 step 3; the trap did not.
-{
+await section("The briefing every session is handed", async () => {
   const brief = readFileSync(new globalThis.URL(
     '../../../config/templates/briefing.md', import.meta.url), 'utf8');
   const rendered = brief.match(/\b\d+\.\d+\.\d+(-dev\.\d+)?/g) || [];
   ok(rendered.length === 0,
      `the briefing renders no example version${
        rendered.length ? ', got ' + rendered.join(', ') : ''}`);
-}
+});
 
 // fresh() removes stray projects but does not reach inside a fixture, so the
 // commits and the VERSION file this planted in alpha and beta have to go;
@@ -1749,7 +1775,7 @@ execFileSync('git', ['-C', A, 'remote', 'add', 'origin',
 // An owner who set every dial on the settings panel to auto still found the
 // version locked, since the policy lived on the Artifacts tab alone. The
 // panel carries it now and writes the same policy.
-{
+await section("Move the version, with the other Agents may dials", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not([hidden])').forEach(m => { m.hidden = true; }); renameProject('alpha'); });
   await page.waitForSelector('#rnmodal:not([hidden]) #rnGateVersion', { timeout: 15000 });
   const was = await page.$eval('#rnGateVersion', e => ({ v: e.value, opts: [...e.options].map(o => o.value).join() }));
@@ -1762,6 +1788,6 @@ execFileSync('git', ['-C', A, 'remote', 'add', 'origin',
   }, null, { timeout: 20000, polling: 500 });
   ok(true, '...and saving the dialog sets the policy the Artifacts view shows');
   await page.evaluate(() => postJSON('/api/version', { project: 'alpha', action: 'policy', policy: 'locked' }));
-}
+});
 
 await done(browser);

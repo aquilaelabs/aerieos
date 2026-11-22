@@ -4,8 +4,8 @@
 // from the chooser the Claude button opens.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -13,29 +13,55 @@
 
 // Which project's chooser is open, if any.
 let resumeFor = null;
-// Where the chooser was asked for (R218 step 3): the pane of the project's
-// page or of the Projects page; it is drawn in that one and positioned under
-// the Claude button there.
-let resumeHost = null;
+// The chooser is a dialog at every width, the page dimmed behind it, each
+// of its steps the dialog's box: floated beside its button it was hard to
+// see over the cards on a phone, and moved from above the button to below
+// it when a step changed its height. This is the dialog.
 function resumeHostNow(){
-  if (resumeHost?.isConnected) return resumeHost;
-  // Asked without a press (openClaude from code, a redraw): the pane where
-  // that project's Claude button is on show, a page's header or its card.
-  const b = resumeFor && [...document.querySelectorAll(`[data-c="${CSS.escape(resumeFor)}"]`)].find(x => x.offsetParent !== null);
-  return b?.closest(".pane") || null;
+  return document.getElementById("rmModal");
 }
-// The chooser kept in step with a redraw of its host: the same menu stays
-// where it is (drawn again on every poll, its buttons were replaced under
-// the pointer), a stale one goes, and one asked for is placed.
+// The project's Start agent on show, which a chooser needs to be asked for
+// from: none (Install Claude in its place, a role that may not, no node)
+// is nowhere to start, and nothing opens.
+function resumeButton(name){
+  return [...document.querySelectorAll(`[data-c="${CSS.escape(name)}"]`)].find(x => x.offsetParent !== null) || null;
+}
+// The chooser kept in step with a redraw of the page: the same one stays
+// as it is (drawn again on every poll, its buttons were replaced under the
+// pointer), a stale one goes, one asked for is drawn, and the dialog is up
+// exactly while one is.
 function syncResumeMenu(){
-  const host = resumeHostNow();
-  if (!host){ document.querySelectorAll(".resumemenu").forEach(n => n.remove()); return; }
-  const keep = resumePick && resumeFor === resumePick.project
-    ? host.querySelector(`.resumemenu[data-pick="${CSS.escape(resumePick.project)}"]`) : null;
-  const first = resumeFor && !keep
-    ? host.querySelector(`.resumemenu[data-for="${CSS.escape(resumeFor)}"]:not([data-pick])`) : null;
-  document.querySelectorAll(".resumemenu").forEach(n => { if (n !== keep && n !== first) n.remove(); });
+  const dlg = resumeHostNow();
+  if (!dlg) return;
+  // Its backdrop puts it away (Escape too, which presses the backdrop).
+  dlg.onclick = e => { if (e.target === dlg) closeResumeMenu(); };
+  const keep = resumeFor && resumePick && resumeFor === resumePick.project
+    ? dlg.querySelector(`:scope > .resumemenu[data-pick="${CSS.escape(resumePick.project)}"]`) : null;
   if (resumeFor && !keep) placeResumeMenu();
+  // Its title is named while it holds one (modalOpened names it as it
+  // opens), and not after, when no step is drawn.
+  if (!resumeFor){ dlg.replaceChildren(); dlg.removeAttribute("aria-labelledby"); }
+  if (dlg.hidden !== !resumeFor) dlg.hidden = !resumeFor;
+  // Held at its height once it is up: a box measured while the dialog was
+  // hidden has none.
+  const box = resumeFor && dlg.querySelector(":scope > .resumemenu");
+  if (box) rmHold(box, resumeFor);
+}
+// A step's box put in the dialog, in the place of the one up already:
+// without the entrance a box opening plays, and the focus kept in it.
+function rmPut(dlg, m, was){
+  const had = !!was && was.contains(document.activeElement);
+  if (was){ m.classList.add("still"); was.replaceWith(m); }
+  else dlg.appendChild(m);
+  if (had){ m.setAttribute("tabindex", "-1"); m.focus({preventScroll: true}); }
+}
+// The chooser put away: by its Close, its backdrop, Escape, or a press in
+// it that leaves for somewhere else.
+function closeResumeMenu(){
+  resumeFor = null;
+  resumePick = null;
+  if (state) drawProjects(state.projects);
+  syncResumeMenu();
 }
 // The second step of the Claude button's menu (the operator, 12 Oct): which
 // conversation on which node was picked, and the model and effort it is to
@@ -45,15 +71,14 @@ function syncResumeMenu(){
 let resumePick = null;
 // Which node the chooser's first step shows, of a project on several.
 let rmNode = {project: "", node: ""};
-// The chooser's size while it is open on a project (the operator, 26 Oct):
-// the largest it has been, so going to New, or Back, never shrinks it.
+// The chooser's height while it is open on a project: the most it has
+// been, so going to New, or Back, never shrinks the box.
 let rmSize = {project: "", w: 0, h: 0};
 function rmHold(m, project){
   if (rmSize.project !== project) rmSize = {project, w: 0, h: 0};
-  m.style.minWidth = m.style.minHeight = "";
-  const r = m.getBoundingClientRect();
-  rmSize.w = Math.max(rmSize.w, r.width); rmSize.h = Math.max(rmSize.h, r.height);
-  m.style.minWidth = `${Math.min(rmSize.w, innerWidth - 16)}px`;
+  // Its layout height, not its box on screen, which its entrance scales.
+  m.style.minHeight = "";
+  rmSize.h = Math.max(rmSize.h, m.offsetHeight);
   m.style.minHeight = `${rmSize.h}px`;
 }
 // The agent picked in the chooser's Start pulldown, kept across its redraws.
@@ -62,14 +87,18 @@ let rmAgent = {project: "", agent: ""};
 // band (R143): the Sessions view's list, read as it opens. rows null while
 // it is on its way.
 let rmConvs = {project: "", rows: null, error: ""};
-async function loadRmConvs(name){
-  rmConvs = {project: name, rows: null, error: ""};
-  try{
-    const j = await (await fetch("/api/transcripts?project=" + encodeURIComponent(name))).json();
-    if (rmConvs.project !== name) return;
-    rmConvs = j.error ? {project: name, rows: [], error: j.error} : {project: name, rows: j.rows || [], error: ""};
-  }catch(e){ if (rmConvs.project === name) rmConvs = {project: name, rows: [], error: "could not read your conversations: " + failWords(e)}; }
-  if (resumeFor === name && !resumePick) placeResumeMenu();
+// ...and the one its pulldown is on, the newest until another is picked.
+let rmConv = {project: "", id: ""};
+function loadRmConvs(name){
+  return reading("rmconvs", async () => {
+    rmConvs = {project: name, rows: null, error: ""};
+    try{
+      const j = await getJSON("/api/transcripts?project=" + encodeURIComponent(name));
+      if (rmConvs.project !== name) return;
+      rmConvs = j.error ? {project: name, rows: [], error: j.error} : {project: name, rows: j.rows || [], error: ""};
+    }catch(e){ if (rmConvs.project === name) rmConvs = {project: name, rows: [], error: "could not read your conversations: " + failWords(e)}; }
+    if (resumeFor === name && !resumePick) placeResumeMenu();
+  });
 }
 
 // `ps -o etime=` gives MM:SS under an hour, HH:MM:SS under a day, and
@@ -148,9 +177,10 @@ async function claudeEnd(name, n, several, slot = 1){
 // up again, which is how a session sees what changed since it started (a
 // toolchain on its node's PATH, AerieOS's briefing; the project row says
 // which). The menu turns to the model and effort first, the conversation it
-// was in already chosen; its Restart asks, and only then is the session
-// ended and started again (restartNow). Asked first and ended at once, it
-// left a person picking a model with no session running.
+// was in already chosen; its Restart is the yes, and only then is the
+// session ended and started again (restartNow). Ended at once, it left a
+// person picking a model with no session running; asked again after that
+// step, it was a third screen for one decision (the operator, 19 Nov).
 function claudeRestart(name, n, several, agent = "claude", slot = 1){
   const p = (state?.projects || []).find(x => x.name === name);
   const claude = agent === "claude", last = claude ? p?.last_claude : p?.last_agents?.[agent];
@@ -166,24 +196,36 @@ function claudeRestart(name, n, several, agent = "claude", slot = 1){
   if (state) drawProjects(state.projects);
 }
 
-// The restart itself, once the model and effort are picked and the person
-// said yes: end the session, wait until the controller no longer lists it,
-// then start the same conversation. Started while the old one was still
-// going down, the new tab attached to the dying session and showed it end,
-// and a second press was what got a session (the operator, 12 Oct).
-async function restartNow(name, r){
+// The restart itself, once the model and effort are picked and Restart is
+// pressed: end the session, the server answering once the node says it has
+// ended, then start the same conversation. Started while the old one was
+// still going down, the new tab attached to the dying session and showed it
+// end, and a second press was what got a session (the operator, 12 Oct).
+// A node that has not said so within the server's half minute is waited on
+// here, said as it goes, for RESTART_WAIT_S in all: its agent takes the end
+// at its next poll, which after the agent's own update is over a minute
+// away (its first census), and the page said to press Restart again for a
+// restart that was about to happen by itself (the operator, 19 Nov).
+async function restartNow(name, r, say = () => {}){
+  const RESTART_WAIT_S = 240;
   const n = r.restart, id = r.agent || "claude", slot = r.slot || 1;
-  const where = n.name ? ` on ${n.name}` : "";
-  const j = await endSession(myAgentSession(id, name, slot), n.id).catch(e => ({error: String(e)}));
+  const node = n.name || "the node";
+  const j = await endSession(myAgentSession(id, name, slot), n.id, true).catch(e => ({error: failWords(e)}));
   if (j.error) return j.error;
   dropAgentTab(id, name, n.several && n.id ? n.id : "", slot);
-  const live = () => id === "claude" ? claudeLiveOn(name, {id: n.id}, slot) : agentLiveOn(id, name, {id: n.id}, slot);
-  for (let i = 0; i < 40 && live(); i++){
-    await new Promise(res => setTimeout(res, 500));
-    await refresh();
+  if (j.gone === false){
+    const began = Date.now() - 25000;
+    let gone = false;
+    while (!gone && j.name && Date.now() - began < RESTART_WAIT_S * 1000){
+      say(`Waiting for ${node} to end it: its agent is busy or starting, ${Math.round((Date.now() - began) / 1000)} seconds so far`);
+      await new Promise(done => setTimeout(done, 2000));
+      gone = (await postJSON("/api/session", {action: "gone", node: j.node, name: j.name}).catch(() => ({}))).gone === true;
+    }
+    if (!gone)
+      return `${node} has not said your session ended in ${RESTART_WAIT_S / 60} minutes: its row on the Nodes page says whether its agent is away; Restart again once it is back`;
+    say("");
   }
-  if (live())
-    return `your session${where} is still going down; press Restart again in a moment`;
+  await refresh();
   return "";
 }
 
@@ -222,7 +264,6 @@ function openClaude(name, ev){
   resumeFor = resumeFor === name ? null : name;
   rmSize = {project: "", w: 0, h: 0};          // opened afresh: its own size
   resumePick = null;
-  resumeHost = ev?.currentTarget?.closest?.(".pane, .card") || null;
   if (resumeFor) loadRmConvs(name);
   drawProjects(state.projects);
   syncResumeMenu();
@@ -254,15 +295,12 @@ function resumeConversation(name, id, when, ev, agent = "claude"){
   // effort, on the project's node.
   const ns = claudeNodes(p), several = ns.length > 1;
   resumeFor = name;
-  // Under the project's own Start agent where it is on show (the notebook's
-  // header), not the box the row's button sits in, which holds no Start.
-  resumeHost = null;
   resumePick = {project: name, sessionId: id, when, node: several ? (ns[0]?.id || "") : "", slot,
                 ...(claude ? {} : {agent}),
                 model: p.yours?.[claude ? "model" : `${agent}_model`] || "", effort: p.yours?.[claude ? "effort" : `${agent}_effort`] || ""};
   drawProjects(state.projects);
   syncResumeMenu();
-  // Nowhere to start it (placeResumeMenu found no Start agent to open under):
+  // Nowhere to start it (placeResumeMenu found no Start agent on show):
   // said, rather than a press that does nothing.
   if (resumeFor !== name)
     notify(claude && claudeInstall(p) ? `Claude Code is not installed on ${p.node_name || "this space's node"}: install it from the Library, then resume`
@@ -324,8 +362,6 @@ function startClaude(name, sessionId, node, slot = 1){
 // one of the project's nodes, a new conversation in a tab of its own, named
 // for the agent. Its session is its own beside a Claude one, in a tree of
 // its own (session_dir), so one person may run both on a project at once.
-const agentLiveOn = (id, name, n, slot = 1) => (state?.sessions || []).some(s => s.name === myAgentSession(id, name, slot)
-  && (!n.id || s.node_id === n.id));
 function launchAgent(id, name, node, model = "", effort = "", sessionId = "", slot = 1){
   const a = agentById(id);
   if (!a) return;
@@ -358,8 +394,8 @@ async function agentEnd(id, name, n, several, slot = 1){
 function launchClaude(name, sessionId, node, slot = 1){
   resumeFor = null;
   resumePick = null;
-  // Redraw the card, not just the tabs: the chooser is a child of it and would
-  // otherwise sit there until the next poll, over a choice already made.
+  // The chooser put away now, not at the next poll, over a choice already
+  // made.
   if (state) drawProjects(state.projects);
   const p = (state?.projects || []).find(x => x.name === name);
   const nn = node ? (p?.session_nodes || []).find(x => x.id === node)?.name || node : "";
@@ -392,19 +428,19 @@ async function openBrief(name, node, agent = "claude"){
   if (agent === "claude"){
     for (const [id, table, cur] of [["briefModel", MODELS, p?.yours?.model || ""],
                                     ["briefEffort", EFFORTS, p?.yours?.effort || ""]]){
-      $(id).innerHTML = optionList(table, cur);
+      drawHTML($(id), optionList(table, cur));
     }
   } else {
     const t = agent === "open" ? routerModels(p) : (AGENT_MODELS[agent] || {models: [], efforts: []});
     for (const [id, xs, cur] of [["briefModel", t.models, p?.yours?.[`${agent}_model`] || ""],
                                  ["briefEffort", t.efforts, p?.yours?.[`${agent}_effort`] || ""]]){
-      $(id).innerHTML = optionList([["", `${a.name}'s default`], ...xs.map(v => Array.isArray(v) ? v : [v, v])], cur);
+      drawHTML($(id), optionList([["", `${a.name}'s default`], ...xs.map(v => Array.isArray(v) ? v : [v, v])], cur));
     }
   }
   for (const b of ["briefGo", "briefSkip"]) $(b).disabled = true;
   $("briefModal").hidden = false;
   try{
-    const j = await (await fetch("/api/brief?project=" + encodeURIComponent(name))).json();
+    const j = await getJSON("/api/brief?project=" + encodeURIComponent(name));
     if (briefFor?.name !== name) return;
     if (j.error) throw new Error(j.error);
     $("briefText").value = j.text || "";
@@ -434,11 +470,11 @@ async function briefGo(skip){
   try{
     const mk = f.agent === "claude" ? "model" : `${f.agent}_model`, ek = f.agent === "claude" ? "effort" : `${f.agent}_effort`;
     if (model !== (p?.yours?.[mk] || "") || effort !== (p?.yours?.[ek] || "")){
-      const j = await (await postJSON("/api/prefs", {project: f.name, [mk]: model, [ek]: effort})).json();
+      const j = await postJSON("/api/prefs", {project: f.name, [mk]: model, [ek]: effort});
       if (j.error) throw new Error(j.error);
     }
-    const j = await (await postJSON("/api/brief", skip ? {project: f.name, action: "aside"}
-                                                       : {project: f.name, action: "stage", text})).json();
+    const j = await postJSON("/api/brief", skip ? {project: f.name, action: "aside"}
+                                                       : {project: f.name, action: "stage", text});
     if (j.error) throw new Error(j.error);
   }catch(e){
     unbusy(b, was);
@@ -468,32 +504,31 @@ function claudeNodeFacts(n){
 // and Start. Saved as this account's own for the project, which is what the
 // launcher reads when the session starts, so nothing else changes.
 let resumeModelNow = {project: "", model: ""};
-function resumePicker(p, m, card, anchor, ns, several){
+function resumePicker(p, m, dlg, ns, several){
   const r = resumePick;
   const n = ns.find(x => x.id === r.node) || ns[0] || {};
-  if (r.agent && r.agent !== "claude") return agentPicker(p, m, card, anchor, n, several);
+  if (r.agent && r.agent !== "claude") return agentPicker(p, m, dlg, n, several);
   const opts = (table, cur) => table.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${
     esc(v === "" && table === MODELS && resumeModelNow.project === p.name && resumeModelNow.model
       ? `Claude's default (last session: ${(MODELS.find(([x]) => x === resumeModelNow.model) || [])[1] || resumeModelNow.model})` : l)}</option>`).join("");
   // What it will do as its head, the two picks labeled above their fields
-  // side by side, and Back and the press at its foot (the design 2.0 pass).
+  // side by side, and Back and the press at its foot (the Perch pass).
   // The head names the agent and its product, as the other agents' does.
   // Which of your Claude sessions it is, past the first (R143).
   const as = (r.slot || 1) > 1 ? ` as ${agentSlotName(agentById("claude"), r.slot)}` : "";
-  m.innerHTML = `<div class="rmhead"><b>${r.restart ? `Restart your ${esc(agentSlotName(agentById("claude"), r.slot || 1))} session`
+  drawHTML(m, `${rmTitle(p)}<div class="field rmhead"><b>${r.restart ? `Restart your ${esc(agentSlotName(agentById("claude"), r.slot || 1))} session`
       : r.sessionId ? "Resume the Claude conversation" : "A new Claude conversation"}</b><span class="rmfacts">${
       r.restart ? (r.when ? `ending the one running, resuming the one from ${esc(ago(r.when))} · ` : "ending the one running, resuming its conversation · ")
         : r.sessionId ? `from ${esc(ago(r.when ?? p.last_claude?.when))} · ` : ""}Claude Code${
       several || n.name ? ` on ${esc(n.name || "")}` : ""}${r.restart ? "" : esc(as)}</span></div>
-    <div class="rmfields">
+    <div class="field"><div class="fgrid rmfields">
       <div class="setrow col ctlrow"><label class="lbl" for="rmModel">Model</label><select id="rmModel" aria-label="model this session starts on">${opts(MODELS, r.model)}</select></div>
       <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(EFFORTS, r.effort)}</select></div>
-    </div>
-    <div class="actbar rmacts"><span class="state" id="rmSay"></span><span class="sp"></span>
-      <button type="button" data-back>Back</button>
-      <button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button></div>`;
+    </div></div>
+    ${dlgFoot(`<button type="button" data-back>Back</button>`,
+      `<button type="button" class="${r.restart ? "caution" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
   m.dataset.pick = p.name;
-  card.appendChild(m);
+  rmPut(dlg, m, dlg.querySelector(":scope > .resumemenu"));
   const say = () => { if (r.agent === "open"){ const w = routerSays(p, r.model); const el = m.querySelector("#rmSay"); el.textContent = w; el.classList.toggle("warn", !!w); } };
   m.querySelector("#rmModel").onchange = e => { r.model = e.target.value; say(); };
   m.querySelector("#rmEffort").onchange = e => { r.effort = e.target.value; };
@@ -501,18 +536,17 @@ function resumePicker(p, m, card, anchor, ns, several){
   m.querySelector("[data-back]").onclick = () => { resumePick = null; drawProjects(state.projects); };
   m.querySelector("[data-start]").onclick = async e => {
     const label = r.restart ? "Restart" : "Start";
-    if (r.restart && !await askYes(`Restart your ${agentSlotName(agentById("claude"), r.slot || 1)} session on ${projLabel(p.name)}${r.restart.name ? ` on ${r.restart.name}` : ""}?\n\n`
-        + (r.when ? "It ends now, and the conversation you picked is resumed in its place."
-                  : "It ends now and resumes the same conversation, starting fresh so it sees what changed since it started."))) return;
+    // No question here: this step is the question (what ends, what resumes,
+    // Back beside Restart), and a second one after two screens was one too
+    // many (the operator, 19 Nov).
     busy(e.target, r.restart ? "Restarting" : "Starting");
     if (r.model !== (p.yours?.model || "") || r.effort !== (p.yours?.effort || "")){
-      const j = await (await postJSON("/api/prefs", {project: p.name, model: r.model, effort: r.effort})).json()
-        .catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/prefs", {project: p.name, model: r.model, effort: r.effort});
       if (j.error){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = j.error; return; }
       if (p.yours) Object.assign(p.yours, {model: r.model, effort: r.effort});
     }
     if (r.restart){
-      const why = await restartNow(p.name, r);
+      const why = await restartNow(p.name, r, t => { const el = document.querySelector("#rmSay"); if (el) el.textContent = t; });
       if (why){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = why; return; }
     }
     resumePick = null;
@@ -521,7 +555,7 @@ function resumePicker(p, m, card, anchor, ns, several){
   // What the last session here answered on, for Claude's default to name.
   if (resumeModelNow.project !== p.name){
     resumeModelNow = {project: p.name, model: ""};
-    fetch(`/api/claude-now?project=${encodeURIComponent(p.name)}`).then(x => x.json())
+    getJSON(`/api/claude-now?project=${encodeURIComponent(p.name)}`)
       .then(j => {
         if (!j.model || resumeModelNow.project !== p.name) return;
         resumeModelNow.model = j.model;
@@ -530,7 +564,6 @@ function resumePicker(p, m, card, anchor, ns, several){
       })
       .catch(() => {});
   }
-  floatAt(m, anchor);
   rmHold(m, p.name);
 }
 
@@ -565,25 +598,24 @@ function routerSays(p, id){
     Math.round((p.router.briefing_tokens || 0) / 1000)}k): it starts without room for the conversation.`;
 }
 
-function agentPicker(p, m, card, anchor, n, several){
+function agentPicker(p, m, dlg, n, several){
   const r = resumePick, a = agentById(r.agent), t = r.agent === "open" ? routerModels(p) : (AGENT_MODELS[r.agent] || {models: [], efforts: []});
   const said = agentSlotName(a, r.slot || 1), as = (r.slot || 1) > 1 ? ` as ${said}` : "";
   const opts = (xs, cur) => [`<option value="">${esc(a.name)}'s default</option>`]
     .concat(xs.map(v => { const [val, label] = Array.isArray(v) ? v : [v, v]; return `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(label)}</option>`; })).join("");
-  m.innerHTML = `<div class="rmhead"><b>${r.restart ? `Restart your ${esc(said)} session`
+  drawHTML(m, `${rmTitle(p)}<div class="field rmhead"><b>${r.restart ? `Restart your ${esc(said)} session`
       : r.sessionId ? `Resume the ${esc(a.name)} conversation` : `A new ${esc(a.name)} conversation`}</b><span class="rmfacts">${
       r.restart ? (r.sessionId ? "ending the one running, resuming its conversation · " : "ending the one running · ")
         : r.sessionId && r.when ? `from ${esc(ago(r.when))} · ` : ""}${esc(a.product)}${
       several || n.name ? ` on ${esc(n.name || "")}` : ""}${r.restart ? "" : esc(as)}</span></div>
-    <div class="rmfields">
+    <div class="field"><div class="fgrid rmfields">
       <div class="setrow col ctlrow"><label class="lbl" for="rmModel">Model</label><select id="rmModel" aria-label="model this session starts on">${opts(t.models, r.model)}</select></div>
       <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(t.efforts, r.effort)}</select></div>
-    </div>
-    <div class="actbar rmacts"><span class="state" id="rmSay"></span><span class="sp"></span>
-      <button type="button" data-back>Back</button>
-      <button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button></div>`;
+    </div></div>
+    ${dlgFoot(`<button type="button" data-back>Back</button>`,
+      `<button type="button" class="${r.restart ? "caution" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
   m.dataset.pick = p.name;
-  card.appendChild(m);
+  rmPut(dlg, m, dlg.querySelector(":scope > .resumemenu"));
   const say = () => { if (r.agent === "open"){ const w = routerSays(p, r.model); const el = m.querySelector("#rmSay"); el.textContent = w; el.classList.toggle("warn", !!w); } };
   m.querySelector("#rmModel").onchange = e => { r.model = e.target.value; say(); };
   m.querySelector("#rmEffort").onchange = e => { r.effort = e.target.value; };
@@ -591,42 +623,39 @@ function agentPicker(p, m, card, anchor, n, several){
   m.querySelector("[data-back]").onclick = () => { resumePick = null; drawProjects(state.projects); };
   m.querySelector("[data-start]").onclick = async e => {
     const label = r.restart ? "Restart" : "Start";
-    if (r.restart && !await askYes(`Restart your ${said} session on ${projLabel(p.name)}${r.restart.name ? ` on ${r.restart.name}` : ""}?\n\n`
-        + "It ends now and resumes the same conversation, starting fresh so it sees what changed since it started.")) return;
     // Kept as this person's for the project, per agent (R95 step 9), so the
     // step opens on it next time; the session starts on it either way.
     const mk = `${r.agent}_model`, ek = `${r.agent}_effort`;
     busy(e.target, r.restart ? "Restarting" : "Starting");
     if (r.model !== (p.yours?.[mk] || "") || r.effort !== (p.yours?.[ek] || "")){
-      const j = await (await postJSON("/api/prefs", {project: p.name, [mk]: r.model, [ek]: r.effort})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/prefs", {project: p.name, [mk]: r.model, [ek]: r.effort});
       if (j.error){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = j.error; return; }
       if (p.yours) Object.assign(p.yours, {[mk]: r.model, [ek]: r.effort});
     }
     if (r.restart){
-      const why = await restartNow(p.name, r);
+      const why = await restartNow(p.name, r, t => { const el = document.querySelector("#rmSay"); if (el) el.textContent = t; });
       if (why){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = why; return; }
     }
     launchAgent(r.agent, p.name, r.node, r.model, r.effort, r.sessionId || "", r.slot || 1);
   };
-  floatAt(m, anchor);
   rmHold(m, p.name);
 }
 
+// The chooser's title, each step's: the space whose agents it starts and
+// holds.
+function rmTitle(p){
+  return `<h3 id="rmTitle">Agents on ${esc(projectName(p.name))}</h3>`;
+}
 function placeResumeMenu(){
   const p = (state?.projects || []).find(x => x.name === resumeFor);
-  const card = resumeHostNow();
-  const anchor = card?.querySelector(`[data-c="${CSS.escape(resumeFor)}"]`);
+  const dlg = resumeHostNow();
   const ns = claudeNodes(p), several = ns.length > 1;
-  if (!p || !anchor){ resumeFor = null; return; }
+  if (!p || !dlg || !resumeButton(p.name)){ resumeFor = null; return; }
   const m = document.createElement("div");
-  m.className = "pinmenu resumemenu";
+  m.className = "box resumemenu";
   m.id = "resumemenu";
-  if (resumePick?.project === p.name){
-    // The first step leaves as the second comes up.
-    card.querySelector(`.resumemenu[data-for="${CSS.escape(p.name)}"]:not([data-pick])`)?.remove();
-    resumePicker(p, m, card, anchor, ns, several);
-    return;
-  }
+  // The second step takes the first's place.
+  if (resumePick?.project === p.name) return resumePicker(p, m, dlg, ns, several);
   // Three bands (R143, the operator, 25 Oct): every session of yours on the
   // project, each agent's each slot on whichever node, with its state and
   // its Open, Restart and End; then Start, one line per agent installed on
@@ -654,10 +683,10 @@ function placeResumeMenu(){
     return line(agentSlotName(x.agent, x.slot), words, claude
       ? `<button data-open="1" data-node="${esc(at(nd))}"${sl} class="primary" title="open your session's tab">Open</button>`
         + `<button data-restart="${esc(nd.id)}"${sl} title="end it and resume the same conversation">Restart</button>`
-        + `<button data-end="${esc(nd.id)}"${sl} class="danger" title="end your session here">End</button>`
+        + `<button data-end="${esc(nd.id)}"${sl} class="caution" title="end your session here">End</button>`
       : `<button data-aopen="${esc(id)}" data-node="${esc(at(nd))}"${sl} class="primary" title="open your session's tab">Open</button>`
         + `<button data-arestart="${esc(id)}" data-nid="${esc(nd.id)}"${sl} title="end it and resume the same conversation">Restart</button>`
-        + `<button data-aend="${esc(id)}" data-nid="${esc(nd.id)}"${sl} class="danger" title="end your session here">End</button>`, " live");
+        + `<button data-aend="${esc(id)}" data-nid="${esc(nd.id)}"${sl} class="caution" title="end your session here">End</button>`, " live");
   };
   // Start: a new conversation of each agent on the node picked, in the
   // lowest slot free, or why there is none.
@@ -692,62 +721,89 @@ function placeResumeMenu(){
     const a = list.find(x => x.id === rmAgent.agent);
     return startLine(a, list.length > 1 ? `<select id="rmAgentSel" aria-label="the coding agent to start">${optionList(list.map(x => [x.id, x.name]), a.id)}</select>` : "");
   };
-  // Resume: your conversations here, newest first (the Sessions view's
-  // list), each its agent, when and its first words.
+  // Resume: your conversations here as one pulldown (R236, the operator,
+  // 12 Nov: a list of rows with a button each was the longest thing on the
+  // card), newest first, each said by its label, or its first words where
+  // it has none, its agent and when; one press beside it, the picked one's
+  // note under it (its first words where it has a label, or where they
+  // were cut), and the way to all of them, in the notebook's Sessions view.
   const convs = () => {
     if (rmConvs.project !== p.name || rmConvs.rows === null)
       return `<div class="rmstate">${rmConvs.error ? esc(rmConvs.error) : "Reading your conversations here…"}</div>`;
     const ok = new Set(here().map(a => a.id));
-    const rows = rmConvs.rows.filter(r => ok.has(r.agent || "claude")).slice(0, 8);
+    // One with nothing said in it and no label is not one to go on with (an
+    // agent started and ended before a word): the Sessions view lists it.
+    const rows = rmConvs.rows.filter(r => ok.has(r.agent || "claude") && (r.first || r.label));
     if (!rows.length) return `<div class="rmstate">None yet: a conversation started here is kept to go on with.</div>`;
-    return `<div class="rmconvs">${rows.map(r => {
-      const a = agentById(r.agent || "claude"), live = mine.find(x => x.row.claude?.conv === r.id);
-      // Every slot of its agent taken: said on the row, not offered and then
-      // refused on the press.
-      const full = !live && !freeSlot(p.name, a.id);
-      return `<div class="rmline rmconv"><span class="rmwho"><b>${esc(a.name)}</b><span class="rmsays">${esc(ago(r.at))}</span></span>${
+    if (rmConv.project !== p.name || !rows.some(r => r.id === rmConv.id)) rmConv = {project: p.name, id: rows[0].id};
+    const r = rows.find(x => x.id === rmConv.id);
+    const a = agentById(r.agent || "claude"), live = mine.find(x => x.row.claude?.conv === r.id);
+    // Every slot of its agent taken: said in the press's place, not offered
+    // and then refused on the press.
+    const full = !live && !freeSlot(p.name, a.id);
+    // Cut short enough that its agent and when still show in the closed
+    // pulldown; the whole of the picked one's first words is under it.
+    const CUT = 26;
+    const says = x => x.label || x.first;
+    const opt = x => { const w = says(x); return `<option value="${esc(x.id)}"${x.id === r.id ? " selected" : ""}>${
+      esc(w.length > CUT ? w.slice(0, CUT - 1).trimEnd() + "…" : w)} · ${esc(agentById(x.agent || "claude").name)} · ${esc(ago(x.at))}${x.kept ? " · kept" : ""}</option>`; };
+    const under = r.note || (r.first && (r.label || r.first.length > CUT) ? r.first : "");
+    return `<div class="rmline rmconv"><span class="rmwho rmpick"><select id="rmConvSel" aria-label="the conversation to go on with">${rows.map(opt).join("")}</select></span>${
         live ? `<span class="rmsays rmin">running in ${esc(agentSlotName(live.agent, live.slot))}</span>`
         : full ? `<span class="rmsays rmin">every ${esc(a.name)} session you may run here is running</span>`
              : `<div class="actbar rmacts"><button data-cv="${esc(r.id)}" data-cvagent="${esc(a.id)}" data-cvat="${esc(String(r.at))}" data-node="${esc(at(n))}" title="go on with this conversation">Resume</button></div>`}${
-        r.first ? `<div class="rmfirst">${esc(r.first)}</div>` : ""}</div>`; }).join("")}</div>`;
+        under ? `<div class="rmfirst${r.note ? " rmnote" : ""}">${esc(under)}</div>` : ""}</div>
+      <button type="button" class="link rmall" data-rmall title="every conversation of yours on this space: read, label, keep or delete one">${
+        rmConvs.rows.length === 1 ? "Your conversation here" : `All ${rmConvs.rows.length} conversations`}</button>`;
   };
   const facts = n && claudeNodeFacts(n);
-  const html = !ns.length
+  // Each line a dialog's field band, a group of them headed by a label as
+  // every dialog's are, and Close at its foot.
+  const html = rmTitle(p) + (!ns.length
     // No node, or one that refused, and there is nowhere else: a session
     // runs on a node and this container carries no Claude Code. The reason,
     // and no choice under it: a menu with nothing in it would be a button
     // that lies.
-    ? `<div class="rmstate bad">${esc(p.session_why)}</div>`
+    ? `<div class="field"><div class="rmstate bad">${esc(p.session_why)}</div></div>`
     // Several nodes are the house's node picker (nodePick, the node-switcher
     // rule), which holds any number of them; one where a session of yours
     // runs says so after its name.
-    : `<div class="rmnode">${several ? `<div class="rmnodes">${nodePick("rmNodeSel",
-          ns.map(x => ({id: x.id, name: runsOn(x) && mine.length ? `${x.name} · yours running` : x.name})), n.id)}</div>`
-        + (facts ? `<div class="rmfacts">${esc(facts)}</div>` : "")
-        : n.name ? `<div class="rmhead"><b>${esc(n.name)}</b>${facts ? `<span class="rmfacts">${esc(facts)}</span>` : ""}</div>` : ""}${
-        mine.length ? `<div class="rmgroup"><div class="rmtitle">Yours here</div>${mine.map(runningLine).join("")}</div>` : ""}${
-        n.where !== "node" ? `<div class="rmstate bad">${esc(n.why)}</div>`
-          : `<div class="rmgroup"><div class="rmtitle">Start</div>${startBand()}</div>
-             <div class="rmgroup"><div class="rmtitle">Resume</div>${convs()}</div>`}</div>`;
+    : `${several ? `<div class="field rmnodes">${nodePick("rmNodeSel",
+          ns.map(x => ({id: x.id, name: runsOn(x) && mine.length ? `${x.name} · yours running` : x.name})), n.id)}${
+          facts ? `<div class="rmfacts">${esc(facts)}</div>` : ""}</div>`
+        : n.name ? `<div class="field rmhead"><b>${esc(n.name)}</b>${facts ? `<span class="rmfacts">${esc(facts)}</span>` : ""}</div>` : ""}${
+        mine.length ? `<div class="field rmgroup"><label class="rmtitle">Yours here</label>${mine.map(runningLine).join("")}</div>` : ""}${
+        n.where !== "node" ? `<div class="field"><div class="rmstate bad">${esc(n.why)}</div></div>`
+          : `<div class="field rmgroup"><label class="rmtitle">Start</label>${startBand()}</div>
+             <div class="field rmgroup"><label class="rmtitle">Resume</label>${convs()}</div>`}`)
+    + `<div class="foot"><span class="sp"></span><button type="button" data-rmclose>Close</button></div>`;
   // The same menu as the one up already is left where it is (the operator,
   // 12 Oct): drawn again on every poll, its buttons were replaced under the
   // pointer and its entrance played again, so a press that began on one
   // button ended on another and did nothing, and it blinked.
-  const was = card.querySelector(`.resumemenu[data-for="${CSS.escape(p.name)}"]:not([data-pick])`);
-  if (was && was.dataset.sig === html) return;
+  const was = dlg.querySelector(":scope > .resumemenu");
+  if (was && was.dataset.for === p.name && !was.dataset.pick && was.dataset.sig === html) return;
   // ...and one drawn again with something new (your conversations landing,
-  // another node or agent picked) takes the old one's place without its
-  // entrance: it faded in twice on every open (the operator, 27 Oct).
-  if (was) m.classList.add("still");
-  was?.remove();
+  // another node or agent picked, Back from the second step) takes the old
+  // one's place without its entrance: it faded in twice on every open.
   m.dataset.for = p.name;
   m.dataset.sig = html;
-  m.innerHTML = html;
-  card.appendChild(m);
+  drawHTML(m, html);
+  rmPut(dlg, m, was);
+  m.querySelectorAll("[data-rmclose]").forEach(b => b.onclick = () => closeResumeMenu());
   const nsel = m.querySelector("#rmNodeSel");
   if (nsel) nsel.onchange = () => { rmNode = {project: p.name, node: nsel.value}; placeResumeMenu(); };
   const asel = m.querySelector("#rmAgentSel");
   if (asel) asel.onchange = () => { rmAgent = {project: p.name, agent: asel.value}; placeResumeMenu(); };
+  const csel = m.querySelector("#rmConvSel");
+  if (csel) csel.onchange = () => { rmConv = {project: p.name, id: csel.value}; placeResumeMenu(); };
+  // All of them: the notebook's Sessions view, where each is read, labeled,
+  // kept or deleted.
+  m.querySelectorAll("[data-rmall]").forEach(b => b.onclick = () => {
+    resumeFor = null;
+    drawProjects(state.projects);
+    openNotebook(p.name, "sessions");
+  });
   m.querySelectorAll("[data-signin-node]").forEach(b => b.onclick = () => {
     resumeFor = null;
     drawProjects(state.projects);
@@ -798,9 +854,5 @@ function placeResumeMenu(){
     drawProjects(state.projects);
     openNodeClaude(b.dataset.nid, b.dataset.asignin);
   });
-  // Over the page under its button, above it near the screen's foot, a
-  // sheet on a phone (floatAt), so it is never placed where it cannot be
-  // seen: a chooser out of sight read as a press that did nothing (bug #65).
-  floatAt(m, anchor);
   rmHold(m, p.name);
 }

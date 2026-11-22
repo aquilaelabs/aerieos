@@ -11,7 +11,7 @@ AerieOS comes in four editions, one controller in four shapes. This
 checklist is **Aerie Workshop**, the container edition, on any host with
 Docker. The **bare-metal install** puts the same controller on a Linux machine
 of its own, which is also its own node ([Bare metal](#bare-metal)). **AerieOS**
-is that install as an appliance, from an ISO or a VM image, and the
+is that install as an appliance, and the
 **USB edition** runs it from a stick ([image.md](image.md)); those two are
 new in 0.9 and experimental. A controller moves between any of them
 ([Moving a controller](#moving-a-controller)).
@@ -50,7 +50,8 @@ mkdir -p /mnt/user/appdata/Aerie-Workshop/secrets/ssh
 cp /path/to/git-key /mnt/user/appdata/Aerie-Workshop/secrets/ssh/id_ed25519
 
 # any publishing token a controller shell should use: any *.env file here
-# is loaded the same way. The install key is made here by the first start.
+# is loaded the same way, as NAME=value lines read as words and never run.
+# The install key is made here by the first start.
 cat > /mnt/user/appdata/Aerie-Workshop/secrets/aerie.env <<'EOF'
 NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
 EOF
@@ -216,19 +217,28 @@ and move it on when you choose to upgrade.
 
 **What is supported:**
 
-- From any release to any later release, in one step, from 0.9 on.
-- **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from any version
-  before it: install fresh, with a new `/config`, and add your spaces
-  again from their repositories.
+- From any release to any later release, in one step, from the first one
+  after `0.9.0-dev.5641` on.
+- **Nothing from `0.9.0-dev.5641` or earlier.** No release updates from one of
+  those: install fresh, with a new `/config`, and add your spaces again from
+  their repositories. A controller started on such a `/config` stops and says
+  so.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
-  below, with the older image.
+  below, with the older image. A node that holds the release key takes no
+  older agent than it runs, so going back across an agent's window holds
+  it until `sudo aerieos-agent older on` at its console
+  ([versions.md](versions.md#what-a-release-upgrades-from)).
 
 **What the controller does for you.** `/config` carries the version of its
 state. On start, a controller moves older state forward, one numbered step
 at a time, after copying `/config` to `/config/backups/before-VERSION` (the
 last three are kept). It refuses to start on state older than it can move
 forward, and it refuses state from
-a newer release rather than reading what it does not understand.
+a newer release rather than reading what it does not understand. A step
+that fails is undone: `/config` is put back from that copy, the container
+stops saying which step failed and why, and the release you came from starts
+on `/config` as it left it ([machines.md](machines.md#upgrades-and-config)
+has the whole of it).
 
 **Nodes and apps follow.** After the controller, update each node's agent
 from its page when the dashboard asks; a node on an agent from before a
@@ -236,8 +246,11 @@ breaking change is held until it is updated, and says so. The Android app
 tells you when it and the controller are too far apart.
 
 **Read the release notes first.** A release that needs anything from you
-(a setting that moved, a node to update) says so under **Upgrading** in its
-notes, and anything removed was marked deprecated a release before.
+(a setting that moved, a node to update) says so in its notes, on a line
+that begins **Upgrading**. Nothing is marked deprecated a release ahead of
+its removal: the next release is a clean break, which takes out what
+earlier builds kept for the ones before them, and its notes' Upgrading line
+says what that asks of you.
 
 **Rolling back.** Stop the container, put the image back to the release you
 came from, replace `/config` with `/config/backups/before-VERSION`, and start
@@ -278,7 +291,7 @@ container install. The setup page's first step is then **This machine**,
 the node the installer set up, with where it stands, and Finish waits for
 it to answer rather than for a node you enroll; Enroll another machine is
 there for more, and none is needed. `sudo aerie ...` is the container's `docker exec -it
-AerieOS aerie ...`.
+Aerie-Workshop aerie ...`.
 
 Options worth knowing: `--workspace PATH` (the spaces folder, by default
 `/srv/aerieos/projects`), `--port N`, `--no-node` (the controller alone),
@@ -294,24 +307,30 @@ account (`builder`), neither of which can read the controller's state, env
 file or secrets, reach its loopback ports or use docker. A session there is
 covered from all of it and runs in a network of its own, and none starts
 when any of that does not hold: the Doctor and the node's row say why. The
-node builds and runs sessions, and runs no containers (its job account is
-out of the docker group, since docker is root on the machine that holds the
-controller). The reasons and the threat model are in
+node builds and runs sessions and its containers; a session's build there
+waits for a person, since docker is root on the machine that holds the
+controller and its job account stays out of the docker group. The reasons and the threat model are in
 [decisions.md](decisions.md#a-controller-installed-bare-metal-and-its-own-node).
 
 **Updating** is the image pull's equivalent:
 
 ```bash
 sudo bash /opt/aerieos/nodes/install-controller.sh --update                 # the newest release
-sudo bash /opt/aerieos/nodes/install-controller.sh --update --release v0.7.0
+sudo bash /opt/aerieos/nodes/install-controller.sh --update --release vX.Y.Z   # a release named by its tag
 ```
 
 An update fetches the release's controller bundle
 (`aerieos-controller-X.Y.Z.tar.gz`, published by the release workflow
 with its sha256 beside it and a build attestation), checks the archive
-against the sha256 and, where `gh` is installed, against the attestation
-(a release from before the bundle falls back to its source archive, said
-as unverified), asks its own state check whether it would start on this
+against the sha256, where `gh` is installed against the attestation (held
+to the release workflow on a version's tag), and against the release's
+signed list of its files: `SHA256SUMS`, whose signature must verify
+against the install's own `config/release-signers`, in `aerieos-dev` or
+`aerieos-release` for a pre-release and in `aerieos-release` alone for a
+stable release, which so waits for its key holder's signature
+([image.md](image.md), The release keys). A release with no bundle or no
+signed list, every one made before releases were signed among them, is
+not taken, and the reason is said. It then asks its own state check whether it would start on this
 install's state (and changes nothing when it would not), lays it out beside
 the one in use, switches to it and restarts; the release before is kept.
 A new release that does not answer on its port within two minutes is
@@ -337,9 +356,10 @@ puts it back on them. `--remove --purge` takes all but the spaces.
 installed edition from the appliance image instead: Debian pinned to a
 snapshot with the controller staged in, a read-only root in two slots so an
 update is a whole image and a bad one falls back, and the machine its own
-node at its first boot. Each release carries it as an installer ISO, for a machine or a VM, and a
-USB stick's image; [image.md](image.md) says
-what it is, how each is installed and how it is built.
+node at its first boot. Each release carries it as a USB stick's image, which is how a new
+machine is set up today, and as an ISO that a machine already running it updates from (the ISO
+is not an installer: one on the machine's own screen is being built); [image.md](image.md) says
+what it is, how the stick is written and how it is built.
 
 ## Building locally instead of pulling
 
@@ -360,30 +380,49 @@ container to a machine of its own, and back.
    the bundle carries beyond the state and the deploy key (each store kept
    outside the state, with its size; the repositories, unless the new home
    reaches the same folder, a share both mount or the disks the new machine
-   adopts, where This machine names it as the spaces folder (see
+   adopts, where the Nodes page names it as the spaces folder (see
    [image.md](image.md)); the install key, when the new home should not ask
    for it), and press **Prepare to move**. That arms the move: it
    shows the **move token** once (write it down) and from its next hello
    every node hears the new address and a challenge of its own, which it
-   keeps. The move stays armed until it lands or you press **Forget it**,
+   keeps. A node knocks there once the old controller goes quiet, so the new
+   address must be one each node reaches. A node enrolled at the public
+   hostname of **Reach from outside** (the home tunnel, on the Network
+   page) is told that hostname instead and keeps it: the tunnel's settings
+   move with the state, so once the new home has landed and holds the
+   install key, the hostname reaches it there. Any other node that dials in
+   from outside the local network cannot reach a local address, and the
+   section names it while the move is armed: prepare the move with an
+   address it reaches, or enroll it again at the public hostname first. The move stays armed until it lands or you press **Forget it**,
    so a controller can be prepared days ahead, and the section says how
    many nodes have heard it.
 2. Install the new home (the image, an AerieOS stick or disk, or bare metal)
    and open its page. It asks whether you are moving a controller here: say yes
-   and make a setup account, and the next page, **Moving here**, walks through
+   and give the move token, with no account to make, and the next page, **Moving here**, walks through
    what the move takes, in order and on that page: on a stick its disks and where
-   the spaces go, then the token with the old controller's address, while it
+   the spaces go, then the bundle, or the old controller's address while it
    still runs (the new home pulls the bundle from it, packed at that moment,
-   under a proof derived from the token). The setup account goes when the move
-   lands. Anywhere but a stick, the first page also lands it at once with no
+   under a proof derived from the token). The token given on the first page
+   is kept for the landing, sealed, so it is not asked for again; where the
+   old controller ran on the same machine the step asks for the bundle alone.
+   Until the move lands, signing in from
+   another browser is the name `setup` with the move token; that account goes
+   when it lands. Anywhere but a stick, the first page also lands it at once with no
    account. If the old controller ran on the same machine it is off by then, so
    have the bundle with you before you shut it down. An old home that is already off is moved from
    a bundle instead: **Download the bundle** on the old controller (packed
    fresh each time it is pressed, with what was ticked) and give the file
    with the token. Either way the bundle is held to the version gate (a
-   move never lands on a build older than the state it carries: update the
-   new home first), its state put in place of the fresh one (which is moved
-   aside, not deleted), and the dashboard restarts on it. Sign in with an
+   move never lands on a build older than the state it carries: write the
+   stick again from that release or newer, or update the new home first), its
+   state put in place of the fresh one (which is moved aside, not deleted),
+   and the dashboard restarts on it. The landing's confirmation says when the
+   bundle was packed: what changed on the old controller after that does not
+   come, so download it last, right before you shut the old one down. What it
+   could not bring is said when it lands: a space whose folder is not here,
+   and the old install's key when it was not ticked. The state's own copies
+   (those taken before each update, and a stick's configuration copies) never
+   travel. Sign in with an
    account it had. A move lands only while the new home is first being set
    up, before its Finish: it replaces what is there, and is never merged into
    a controller already in use. On a stick, the accounts it made from the old
@@ -392,9 +431,16 @@ container to a machine of its own, and back.
    name the moved controller already has is that controller's account, and
    the landing says which. A bundle changed after it was made (its kind, where
    it came from, its versions) is refused before anything here changes. On a
-   machine of its own the secrets folder is root's, so a bundle carries none of
-   its `*.env` files or `ssh/`: the section says so, and they are copied to the
-   new home by hand, as root. **Download a backup**, beside Prepare to
+   machine of its own the secrets folder is root's, which the dashboard's
+   account can neither read nor write: AerieOS's root helper
+   (`scripts/secrets-carry`) packs its `*.env` files and `ssh/` keys into the
+   bundle there, and on a new home of that kind places them, saying what it
+   placed. What it places is held to plain words, since the controller's
+   start reads those files as root: a line is kept only as a secret the start
+   knows by name with a value that has no shell in it, and anything else is
+   left out and named, for you to copy by hand. A file already there of the
+   same name is kept beside the new one. The controller reads them at its
+   next start. **Download a backup**, beside Prepare to
    move, packs the same bundle under a token of its own without arming a
    move: no node hears of it and the controller it came from is never told
    when it lands. Neither the token nor the file expires, and the token is
@@ -407,8 +453,9 @@ container to a machine of its own, and back.
    controller then marks itself moved (or press **Mark as moved**, or just
    stop it): from then on it is read-only, saying where it went, and tells
    each node that comes to it that it moved, with that node's challenge in
-   the same answer, so a node that was off while the move was armed hears
-   it then. **If the new home fails before you trust it:** the old
+   the same answer and the key the new home answers under (its own, which
+   went with the state), so a node that was off while the move was armed
+   hears it then and knocks under that key. **If the new home fails before you trust it:** the old
    controller is read-only but still serves, so nothing of yours is gone,
    and **Download the bundle** still works there; land that bundle on a fresh
    install (or the same machine installed again) and the move finishes
@@ -421,7 +468,8 @@ container to a machine of its own, and back.
    and TLS pin, and goes on; its containers kept running and its synced
    copies kept meanwhile. The new controller's Nodes page lists the nodes
    not yet here since the move, each with one line to run on it as root
-   (`builderbot-agent follow ADDRESS CHALLENGE`) for a node that outlived
+   (`aerieos-agent follow ADDRESS CHALLENGE`, the address its public
+   hostname for a node enrolled at one) for a node that outlived
    the old controller and so was never told: it knocks there at once, and
    nothing is enrolled again (the node keeps its id, its token, its
    containers and its synced copies). The list empties as each says hello.

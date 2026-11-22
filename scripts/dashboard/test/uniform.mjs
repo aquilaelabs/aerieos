@@ -17,7 +17,10 @@
 //
 // What is deliberately NOT here: per-kind content checks. Those live in each
 // kind's own suite. This file only holds the language every kind shares.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring } from './lib.mjs';
+// (lib.mjs's quiet, a pause that is a check of absence, is quietFor here:
+// the idle block has a page of its own named quiet.)
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring, faded,
+         quiet as quietFor, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -67,8 +70,10 @@ const DRIVERS = {
   // A Library entry's own page (R183): the first toolchain's on the node.
   entry: {
     open: () => page.evaluate(async () => {
-      if (!lib || !lib.rows) await loadLibrary();
-      const r = (lib?.rows || []).find(x => x.kind === 'toolchain' && !x.wrong_platform);
+      // One the Library already holds (its shelves, R256), read for nothing
+      // more: the entry's page asks /api/library for its own row, and the
+      // opening's count holds the page to one ask of it.
+      const r = libKnown().find(x => x.kind === 'toolchain' && !x.wrong_platform);
       openEntry(libNode, r ? `toolchain:${r.name}` : 'agent:claude-code');
     }),
     readyWhen: '.entrytab details.sect, .entrytab .notice',
@@ -306,7 +311,7 @@ async function measure(kind){
       who[x] = who[x] || `${e.tagName.toLowerCase()}.${[...e.classList].join('.')}${
         e.id ? '#' + e.id : ''} in ${e.parentElement?.className || e.parentElement?.tagName}`;
     }
-    const ref = document.getElementById('mName');
+    const ref = document.getElementById('pName');
     const skin = el => { const c = getComputedStyle(el);
       return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor,
               c.fontFamily].join('|'); };
@@ -401,6 +406,30 @@ async function bring(kind){
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
   await settled(page, { quiet: 250 });
 }
+// The page on show has arrived: its entrance fade (docIn) is over, and what
+// it asked for has landed and been drawn, the last band with it.
+async function arrived(p = page){
+  await p.waitForFunction(() => !document.querySelector('.pane .doc.on')?.getAnimations().length,
+                          null, { timeout: 10000 }).catch(() => {});
+  await settled(p);
+}
+// Two frames on from a change to the page: what the change starts in the
+// frame after it (a breakpoint's listeners, a transition) has started.
+const frames = (p = page) => p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+// Nothing on the page is still moving: every transition and tween that ends
+// has ended. One that runs for good (a spinner, a pulse) is not waited for.
+async function motionOver(p = page){
+  await frames(p);
+  await p.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+}
+// A page at the width it was just given, and drawn for it: the breakpoint's
+// listeners run in the frame after the change, then the boxes that fit
+// themselves to their width, and what either of them slides comes to rest.
+async function atWidth(p, w){
+  await p.waitForFunction(w => innerWidth === w, w, { timeout: 10000 }).catch(() => {});
+  await motionOver(p);
+}
 
 
 // ---- the section and action-bar language -----------------------------------
@@ -438,7 +467,9 @@ async function bring(kind){
 // ...and a row of chips (the chips rule, R216): a view's groups, one in
 // force, never a set of verbs. No fixture drew two groups before the
 // Library's kinds (R170), which is when the row first met this check.
-const NOT_A_BAR = ['nbtabs', 'nbgroups', 'nbsub', 'foot', 'pagemore', 'pseg', 'rlist', 'chips'];
+// ...nor the Files page's places (the operator, 12 Nov: a file explorer's
+// column of the node's roots): rows you open, as a list of rows is.
+const NOT_A_BAR = ['nbtabs', 'nbgroups', 'nbsub', 'foot', 'pagemore', 'pseg', 'rlist', 'chips', 'fxplaces'];
 
 async function language(){
   return page.evaluate(({ NOT_A_BAR }) => {
@@ -622,7 +653,7 @@ async function lineup(){
     };
     const ctls = [...box.querySelectorAll(CTL)]
       .filter(e => e.offsetHeight > 0 && e.getBoundingClientRect().width > 0
-                   && !e.closest('.slot, .dmlog, .pagemore, .rlist') && !folded(e) && shown(e))
+                   && !e.closest('.slot, .dmlog, .pagemore, .rlist, .fxplaces') && !folded(e) && shown(e))
       .map(e => ({ e, r: e.getBoundingClientRect() }))
       .sort((a, b) => a.r.top - b.r.top);
     // One line = boxes whose vertical spans overlap by more than half the
@@ -709,6 +740,39 @@ async function unwrapped(){
 function rowsWearTheClass(){
   return page.evaluate(() => [...document.querySelectorAll('.doc.on :is(.setrow, .addbar, .prefrow, .histbar, .logdays, .imgadd, .memadd, .uadd, .ndpaths, .ndname)')]
     .filter(e => !e.classList.contains('ctlrow')).map(e => e.className.split(' ').slice(0, 3).join('.')));
+}
+// A pulldown in a bar or a row is as wide as its longest answer and no wider
+// (the operator, 18 Nov: Sort and the wiki's page stretched across a phone):
+// each one on show measured against itself with its longest answer chosen
+// and nothing sizing it, which is how wide its longest answer makes it. Wider
+// is stretched; narrower is allowed only where its row has no room left,
+// which clips it. The pulldowns are the page's own PICKERS (page-docs.js),
+// so the check and what sizes them cannot drift apart.
+function pickersFit(){
+  return page.evaluate(() => {
+    const ink = document.createElement('canvas').getContext('2d');
+    return [...document.querySelectorAll(PICKERS)].filter(s => s.checkVisibility() && s.options.length && s.closest('.doc.on, .pane .bar')).map(s => {
+      const name = s.id || s.getAttribute('aria-label') || '?';
+      const w = s.getBoundingClientRect().width;
+      const style = s.getAttribute('style'), at = s.selectedIndex;
+      ink.font = getComputedStyle(s).font;
+      const words = [...s.options].map(o => o.label || o.textContent || '');
+      const longest = words.reduce((j, t, i) => ink.measureText(t).width > ink.measureText(words[j]).width ? i : j, 0);
+      s.selectedIndex = longest;
+      s.style.cssText = (style || '') + ';flex:none;width:auto;max-width:none;min-width:0;justify-self:start';
+      const own = s.getBoundingClientRect().width;
+      s.selectedIndex = at;
+      if (style === null) s.removeAttribute('style'); else s.setAttribute('style', style);
+      if (w > own + 3) return `${name} is ${Math.round(w)}px for ${Math.round(own)}px of its longest answer`;
+      if (w >= own - 3) return '';
+      // Short of it: only where the row it sits in had no more to give.
+      const row = s.parentElement, rs = getComputedStyle(row), kids = [...row.children].filter(k => k.checkVisibility());
+      const used = kids.reduce((n, k) => n + k.getBoundingClientRect().width, 0) + (parseFloat(rs.columnGap) || 0) * Math.max(0, kids.length - 1);
+      const free = row.getBoundingClientRect().width - parseFloat(rs.paddingLeft) - parseFloat(rs.paddingRight) - used;
+      return free > 3
+        ? `${name} is ${Math.round(w)}px, short of the ${Math.round(own)}px its longest answer needs, with ${Math.round(free)}px free beside it` : '';
+    }).filter(Boolean);
+  });
 }
 // The forms rule (the operator, 4 Nov: fields crammed together, each page its
 // own way): a label over its field, never beside it, and fields that do not
@@ -863,11 +927,24 @@ if (runs('a')) {
 // the button language, what spans, what lines up) are taken on ONE visit to
 // each kind. They were four walks over 26 kinds, each paying the bring and
 // the settle again (R211: 0.5 to 0.8 s a visit, four times over).
+// The row a page's tabs sit in, by page: one height on every page, under a
+// group's header or standing alone, with an action in it or not.
+// A page a press opens wears its Back header there instead of tabs, and is
+// not measured as a tab row.
+const tabRow = () => page.evaluate(() => {
+  const bar = document.querySelector('#pane0 .bar.page');
+  if (!bar || bar.querySelector('.backhead')) return null;
+  const row = bar.querySelector(':scope > .subrow') || bar;
+  return Math.round(row.getBoundingClientRect().height);
+});
+const tabRows = {};
 for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
-  await sleep(250);   // the entrance animation settles, and the last band to arrive is part of the row
+  await arrived();   // the entrance animation settles, and the last band to arrive is part of the row
+  const row = await tabRow();
+  if (row !== null) tabRows[kind] = row;
   const m = await measure(kind);
   ok(!m.err, `[${kind}] a document box exists (${m.err || 'ok'})`);
   ok((m.ragged || []).length === 0,
@@ -886,6 +963,19 @@ for (const kind of kinds){
   if (m.colLefts.length) ok(m.colLefts.length === 1,
      `[${kind}] ...and every band in the column beside its list at one x of its own (${JSON.stringify(m.colLefts)}${
        m.colLefts.length > 1 ? ': ' + m.colLefts.map(x => `${x} is ${m.who[x]}`).join('; ') : ''})`);
+  // A fold that shows more of a row opens by the page's own triangle
+  // (.chev), never the browser's marker, which a summary drawn as a list
+  // item shows.
+  const marks = await page.evaluate(() => [...document.querySelectorAll('#pane0 details:not(.sect) > summary')]
+    .filter(x => x.checkVisibility() && getComputedStyle(x).display === 'list-item')
+    .map(x => x.parentElement.className || x.textContent.trim().slice(0, 30)));
+  ok(!marks.length, `[${kind}] every fold opens by the page's chevron, never the browser's marker${marks.length ? `; not: ${marks.join(', ')}` : ''}`);
+  // A search box in a page's bar keeps a search's room at a desk: the
+  // pickers beside it take their own width, never the whole bar.
+  const narrow = await page.evaluate(() => [...document.querySelectorAll('#pane0 input[type=search]')]
+    .filter(x => x.checkVisibility() && x.getBoundingClientRect().width < 12 * parseFloat(getComputedStyle(document.documentElement).fontSize))
+    .map(x => `${x.className || x.getAttribute('aria-label')} ${Math.round(x.getBoundingClientRect().width)}px`));
+  ok(!narrow.length, `[${kind}] a search box keeps a search's room${narrow.length ? `; not: ${narrow.join(', ')}` : ''}`);
   ok(m.offskin.length === 0,
      `[${kind}] every control wears the field skin${
        m.offskin.length ? `; not: ${m.offskin.join(', ')}` : ''} (${
@@ -1011,6 +1101,8 @@ for (const kind of kinds){
   ok(bare.length === 0, `[${kind}] every row of controls wears .ctlrow${bare.length ? `; not: ${[...new Set(bare)].join(', ')}` : ''}`);
   const forms = await formsHold();
   ok(forms.length === 0, `[${kind}] its forms hold the rule: a label over its field, fields not touching${forms.length ? `; not: ${forms.slice(0, 10).join('; ')}` : ''}`);
+  const wide = await pickersFit();
+  ok(wide.length === 0, `[${kind}] a pulldown in a bar or a row is as wide as its longest answer, never stretched${wide.length ? `; not: ${wide.slice(0, 8).join('; ')}` : ''}`);
   const G = await glance();
   if (!G.err && (G.tiles || G.facts))
     ok(G.bad.length === 0,
@@ -1022,6 +1114,50 @@ for (const kind of kinds){
 }
 ok(seenBars.size <= 1,
    `an action bar lays out the same on every tab (${JSON.stringify([...seenBars])})`);
+ok(new Set(Object.values(tabRows)).size === 1,
+   `a page's tab row is one height on every page, with an action in it or not (${JSON.stringify(tabRows)})`);
+// ...and on a phone, the pages that differed: a group's with actions and
+// without, and the pages standing alone.
+await section("a page's tab row on a phone", async () => {
+  await page.setViewportSize({ width: 393, height: 851 });
+  const phone = {};
+  for (const [g, t] of [['machines', 'nodes'], ['machines', 'storage'], ['containers', 'docker'], ['home'], ['projects'], ['jobs']]) {
+    await page.evaluate(([g, t]) => t ? railGo(g, t) : railGo(g), [g, t]);
+    await page.waitForSelector('#pane0 .bar.page', { timeout: 15000 }).catch(() => {});
+    await arrived();
+    const row = await tabRow();
+    if (row !== null) phone[t || g] = row;
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await arrived();
+  ok(new Set(Object.values(phone)).size === 1 && Object.values(phone).every(v => v === Object.values(tabRows)[0]),
+     `...and the same height on a phone (${JSON.stringify(phone)})`);
+});
+// A group's head (Machines, Build, Containers) is one row a little taller
+// than its tab row, at a desk and on a phone: the node's picker and its
+// state pill, no facts line under them (the operator, 17 Nov).
+await section("a group's head is one row", async () => {
+  const got = {};
+  for (const w of [1280, 393]){
+    await page.setViewportSize({ width: w, height: w > 900 ? 900 : 851 });
+    for (const [g, t] of [['machines', 'nodes'], ['build', 'library'], ['containers', 'docker']]){
+      await page.evaluate(([g, t]) => railGo(g, t), [g, t]);
+      await page.waitForSelector('#pane0 .bar.page.grouped .phead', { timeout: 15000 }).catch(() => {});
+      await arrived();
+      got[`${t}@${w}`] = await page.evaluate(() => {
+        const h = document.querySelector('#pane0 .bar.page.grouped .phead'), row = document.querySelector('#pane0 .bar.page.grouped > .subrow');
+        if (!h || !row) return null;
+        const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ghead-h'));
+        return { h: Math.round(h.getBoundingClientRect().height), row: Math.round(row.getBoundingClientRect().height), want, facts: !!h.querySelector('.pfacts') };
+      });
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await arrived();
+  const off = Object.entries(got).filter(([, m]) => !m || m.h !== m.want || m.h <= m.row || m.facts).map(([k, m]) => `${k} ${JSON.stringify(m)}`);
+  ok(!off.length, `a group's head is one row of --ghead-h, taller than its tab row, with no facts line, at a desk and on a phone${
+     off.length ? `; not: ${off.join('; ')}` : ''}`);
+});
 }
 
 if (runs('a')) {
@@ -1030,7 +1166,7 @@ if (runs('a')) {
 // `.empty` when there is nothing, inside the list. Read off the SOURCE, since
 // an empty state is only on screen when the data happens to be empty, and the
 // fixtures are not. Five classes were doing these two jobs (R70 step 3).
-{
+await section("one loading line and one empty state", async () => {
   const { readdirSync, readFileSync } = await import('node:fs');
   // Not `new URL`: URL in this file is the dashboard's address, from lib.mjs.
   const here = (await import('node:path')).resolve(import.meta.dirname, '..') + '/';
@@ -1046,7 +1182,7 @@ if (runs('a')) {
   }
   ok(off.length === 0, `a loading line is .loading and an empty state is .empty, in every script${
     off.length ? ': ' + off.join('; ') : ''}`);
-}
+});
 }
 
 if (runs('a')) {
@@ -1055,25 +1191,29 @@ if (runs('a')) {
 // is the default scheme leaking into the other eleven (a danger edge typed
 // six times, text on a filled accent in the default's --bg), and a radius
 // typed as a number is one a scheme cannot square. Read off the stylesheet.
-{
+await section("colors and corners are tokens", async () => {
   const { readFileSync } = await import('node:fs');
   const path = await import('node:path');
-  const html = readFileSync(path.resolve(import.meta.dirname, '..', 'index.html'), 'utf8');
-  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
-  const lines = css.split('\n');
-  const schemes = lines.findIndex(l => /^\*\{box-sizing:border-box\}/.test(l));
+  // The stylesheet's files, a cascade layer each (R9 step 4), rule by rule:
+  // a scheme's own rules (its tokens, and a hull of its own like Nostromo's,
+  // scoped by data-theme or data-mode) define hex; nothing else does.
+  const dir = path.resolve(import.meta.dirname, '..');
   const off = [];
-  lines.forEach((l, i) => {
-    if (i <= schemes) return;                      // the tokens and the schemes define hex
-    const t = l.replace(/\/\*.*?\*\//g, '');
-    // Black and white inside a color-mix() are not colors of a scheme, and
-    // #2b2b2b is the terminal's own ground (see .slot.ownterm), never a page color.
-    const hex = t.replace(/#000000|#ffffff|#2b2b2b/g, '');
-    if (/#[0-9a-fA-F]{6}\b/.test(hex)) off.push(`${i + 1}: ${t.trim().slice(0, 60)}`);
-    if (/border-radius:(8|6|4|10)px/.test(t)) off.push(`${i + 1}: ${t.trim().slice(0, 60)}`);
-  });
+  for (const name of ['page-skin.css', 'page-components.css', 'page-surfaces.css', 'page-overrides.css']){
+    const css = readFileSync(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
+    for (const m of css.matchAll(/([^{};]*)\{([^{}]*)\}/g)){
+      const sel = m[1].trim();
+      if (/data-theme|data-mode|^:root\b|^html\b/.test(sel)) continue;
+      const line = css.slice(0, m.index + m[1].length).split('\n').length;
+      // Black and white inside a color-mix() are not colors of a scheme, and
+      // #2b2b2b is the terminal's own ground (see .slot.ownterm), never a page color.
+      const hex = m[2].replace(/#000000|#ffffff|#2b2b2b/g, '');
+      if (/#[0-9a-fA-F]{6}\b/.test(hex)) off.push(`${name}:${line}: ${sel.slice(0, 50)}`);
+      if (/border-radius:(8|6|4|10)px/.test(m[2])) off.push(`${name}:${line}: ${sel.slice(0, 50)}`);
+    }
+  }
   ok(off.length === 0, `no hex color and no numbered corner outside the scheme blocks (${off.length ? off.slice(0, 4).join('; ') : 'none'})`);
-}
+});
 }
 
 if (runs('a')) {
@@ -1109,16 +1249,22 @@ for (const kind of kinds){
   // over a third status read, the first two letting the page's own fetches
   // land; the header's uptime and the doctor's "ran 2 min ago" are the
   // things that move with time (B814: it aged across a minute in the window).
+  // The first two reads and what they set off landed before the third is
+  // watched: two fixed pauses of 600 ms were not that under a whole run's
+  // load, and the Settings page's own read landed in the window (17 Nov).
+  await page.evaluate(async () => { await refresh(); await refresh(); });
+  await settled(page, { quiet: 600, cap: 20000 });
   const quietRead = await page.evaluate(async () => {
-    await refresh(); await new Promise(r => setTimeout(r, 600));
-    await refresh(); await new Promise(r => setTimeout(r, 600));
     const seen = [];
     const name = e => e ? (e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '')) : '?';
     const mo = new MutationObserver(ms => ms.forEach(m => {
       const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      // A clock's text, and a terminal's own drawing (what it prints, its
-      // cursor), are not the page drawing again for a read.
-      if (t?.closest('#uptime, #docWhen, .xterm')) return;
+      // A clock's text (an age a row says, marked .ago), a measure a read
+      // brings and the page writes in place (free space, marked .meas), and
+      // a terminal's own drawing (what it prints, its cursor), are not the
+      // page drawing again for a read: an age crosses a minute between two
+      // reads, and free space moves as anything is written.
+      if (t?.closest('#uptime, #docWhen, .xterm, .ago, .meas')) return;
       seen.push(`${name(t)} ${m.type === 'attributes' ? '@' + m.attributeName : m.type}`);
     }));
     // ...unless it did bring something: a token the page follows that moved
@@ -1134,6 +1280,58 @@ for (const kind of kinds){
   ok(quietRead.seen.length === 0 || quietRead.moved.length > 0,
      `[${kind}] a status read that brings nothing new writes nothing${quietRead.seen.length ? ': ' + quietRead.seen.slice(0, 6).join('; ') : ''}${
        quietRead.moved.length ? '; moved: ' + quietRead.moved.join(', ') : ''}`);
+  // A draw adds no listener to what the last draw kept (R244 step 3): a
+  // patch keeps the page's elements, so a handler wired with
+  // addEventListener at every draw is wired once more each time and a press
+  // runs it twice. Set as a property (onclick =) it is the same handler
+  // again. The page is drawn twice over (a page's render forced, a
+  // notebook view shown again, which reads and draws it), and every
+  // listener added in that window to an element that was already there, or
+  // to window or document, is named. Adding the same function again is
+  // nothing in the DOM and is not counted; nor is one that removes itself
+  // after its first event.
+  const wired = await page.evaluate(async view => {
+    if (!window.__lsn){
+      const seen = new WeakMap(), add = EventTarget.prototype.addEventListener;
+      window.__lsn = { on: false, got: [] };
+      EventTarget.prototype.addEventListener = function(type, fn, opts){
+        const once = typeof opts === 'object' && opts?.once;
+        const cap = typeof opts === 'boolean' ? opts : !!opts?.capture;
+        let m = seen.get(this); if (!m) seen.set(this, m = new Map());
+        const k = type + (cap ? ':c' : ''), fns = m.get(k) || new Set(); m.set(k, fns);
+        if (window.__lsn.on && !once && !fns.has(fn)) window.__lsn.got.push({ el: this, type });
+        fns.add(fn);
+        return add.call(this, type, fn, opts);
+      };
+    }
+    const name = e => e === window ? 'window' : e === document ? 'document' : e.id ? '#' + e.id
+      : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '');
+    const draw = async () => {
+      if (view) getNotebook('alpha').view(view);
+      else { const p = document.getElementById('pane0'); if (p) delete p.dataset.rev; drawPanes(); }
+      await new Promise(r => setTimeout(r, 1200));
+    };
+    await draw();                                    // the first draw's own additions are its first wiring
+    const before = new WeakSet([window, document, ...document.querySelectorAll('*')]);
+    window.__lsn.got = []; window.__lsn.on = true;
+    await draw(); await draw();
+    window.__lsn.on = false;
+    return [...new Set(window.__lsn.got.filter(x => before.has(x.el)).map(x => `${name(x.el)} ${x.type}`))];
+  }, kind.startsWith('notebook:') ? kind.slice('notebook:'.length) : '');
+  ok(wired.length === 0, `[${kind}] a draw adds no listener to what the last draw kept${wired.length ? ': ' + wired.slice(0, 6).join('; ') : ''}`);
+  // What a draw brings is the draw's own (R9 step 6, drawn): on the page as
+  // drawn, every proseline is wired, no title is left to show as a
+  // tooltip, and every data-style is applied. A draw that writes markup
+  // some way that does not call drawn() leaves one of these behind.
+  const brought = await page.evaluate(() => {
+    const on = e => !e.closest('template') && !(e instanceof SVGElement);
+    const prose = [...document.querySelectorAll('textarea.proseline:not([data-prose])')].filter(on);
+    const titled = [...document.querySelectorAll('[title]')].filter(on).filter(e => !e.closest('#termwin, .xterm'));
+    const unstyled = [...document.querySelectorAll('[data-style]')].filter(on).filter(e => !e.style.cssText);
+    const name = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '');
+    return [...prose.map(e => 'proseline ' + name(e)), ...titled.map(e => 'title ' + name(e)), ...unstyled.map(e => 'data-style ' + name(e))];
+  });
+  ok(brought.length === 0, `[${kind}] what a draw brings is there: proselines wired, no title left, every data-style applied${brought.length ? ': ' + brought.slice(0, 6).join('; ') : ''}`);
 }
 }
 
@@ -1190,7 +1388,7 @@ if (runs('a')) {
 // to a section is the first band inside it, above the list. Never at the
 // foot, where a phone scrolled past every row to find it. Measured on each
 // view that has one, against its head row and the first row of its list.
-{
+await section("adding goes at the top", async () => {
   await bring('notebook');
   const misplaced = [];
   for (const v of ['roadmap', 'bugs', 'briefing', 'signing', 'wiki']){
@@ -1242,7 +1440,8 @@ if (runs('a')) {
     const nbSel = w => `.nbview[data-view="${w}"]`;
     await page.waitForFunction(w => !![...document.querySelectorAll('.nb')].find(n => n.checkVisibility())
       ?.querySelector(`.nbview[data-view="${w}"] .nbhead`), v, { timeout: 15000 });
-    await sleep(150);
+    // ...and what the view read has landed: a foot is drawn with its section.
+    await settled(page);
     foots[v] = await page.evaluate(w => !![...document.querySelectorAll('.nb')]
       .find(n => n.checkVisibility())?.querySelector(`.nbview[data-view="${w}"] .sectbar[data-bar]`), v);
     void nbSel;
@@ -1251,7 +1450,7 @@ if (runs('a')) {
   // fixture's alpha, with no commits, cannot (version.mjs holds that one).
   ok(foots.roadmap && foots.briefing && foots.design && foots.signing && !foots.bugs && !foots.analysis && !foots.tests && !foots.git,
      `a section's own Save and Revert are on the views that stage and on no other (the operator, 5 Oct: there is no foot) (${JSON.stringify(foots)})`);
-}
+});
 }
 
 if (runs('b')) {
@@ -1261,7 +1460,7 @@ if (runs('b')) {
 // one height whichever tab is open. Measured rather than read from the
 // markup, because the Briefing tab once put a section above its head and
 // every other rule here still passed.
-{
+await section("the notebook's head row", async () => {
   await bring('notebook');
   await page.waitForSelector('.nb .nbview:not([hidden]) .field', { timeout: 20000 });
   const views = await page.$$eval('.nb .nbview', vs => vs.map(v => v.dataset.view));
@@ -1272,7 +1471,11 @@ if (runs('b')) {
   // three and this check went red for the suite rather than for the page
   // (B116). Two agreeing reads is the condition; the pause was never the
   // thing being tested.
-  const settled = async (w) => {
+  const still = async (w) => {
+    // The view's own reads landed first: a placeholder holds still for two
+    // reads 50 ms apart under a whole run's load, and Analysis was measured
+    // so, two pixels low (B927).
+    await settled(page, { quiet: 300, cap: 15000 });
     let last = null;
     for (let i = 0; i < 80; i++){
       // The head row and the view's first band (the glance, ordered over
@@ -1286,14 +1489,14 @@ if (runs('b')) {
       }, w);
       if (now !== null && now === last) return;
       last = now;
-      await sleep(50);
+      await sleep(50);   // the gap between the two reads that have to agree
     }
   };
   for (const v of views){
     await page.evaluate(w => getNotebook('alpha').view(w), v);
     await page.waitForFunction(w => document.querySelector(`.nb .nbview[data-view="${w}"]`)?.checkVisibility(),
                                v, { timeout: 20000 });
-    await settled(v);
+    await still(v);
     heads[v] = await page.evaluate(w => {
       const view = document.querySelector(`.nb .nbview[data-view="${w}"]`);
       const shown = [...view.children].filter(e => e.offsetHeight > 0 || e.offsetWidth > 0);
@@ -1332,6 +1535,11 @@ if (runs('b')) {
                  const g = view.querySelector(':scope > .nbglance');
                  if (w !== 'settings' && !g) bad.push('no glance');
                  if (g) for (const t of g.querySelectorAll('.tile')) if (!t.closest('.tiles') || !t.querySelector('.tv') || !t.querySelector('.tl')) bad.push('a tile out of shape');
+                 // Count-first: the row's first tile is how many of what
+                 // the view lists, a figure, before anything it says of them
+                 // (a tile still waiting on its read has no figure yet).
+                 const lead = g?.querySelector('.tiles .tile .tv')?.textContent.trim();
+                 if (lead && !/^\d/.test(lead)) bad.push(`its first tile reads ${lead.slice(0, 20)}, not a count`);
                  // Every group of chips the view narrows by in one band.
                  const bands = [...view.querySelectorAll(':scope > .lfilter')].filter(b => b.checkVisibility());
                  if (bands.length > 1) bad.push(`${bands.length} chip bands`);
@@ -1367,10 +1575,41 @@ if (runs('b')) {
   ok(glance.length === 0,
      `...and under it the glance: tiles in the tiles' shape, then a status line, then one band of chips, and no loose Save row (R109)${
        glance.length ? `; not: ${glance.join('; ')}` : ''}`);
-}
+});
+
+// Every row of a notebook's lists opens the room a .row does (--row-y)
+// above its first line: a bug, a memory, a rule, a roadmap item, a test, a
+// commit, a file and a conversation alike, so the lists read at one pace
+// from view to view.
+await section("the notebook's lists keep one rhythm", async () => {
+  await bring('notebook');
+  const views = await page.$$eval('.nb .nbview', vs => vs.map(v => v.dataset.view));
+  const off = [], seen = new Set();
+  for (const v of views){
+    await page.evaluate(w => getNotebook('alpha').view(w), v);
+    await page.waitForFunction(w => document.querySelector(`.nb .nbview[data-view="${w}"]`)?.checkVisibility(), v, { timeout: 20000 });
+    await sleep(300);
+    const got = await page.evaluate(w => {
+      const view = document.querySelector(`.nb .nbview[data-view="${w}"]`);
+      const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-y'));
+      const pad = e => parseFloat(getComputedStyle(e).paddingTop) || 0;
+      return [...view.querySelectorAll('.row,details.bug,details.mem,details.tst,details.grp,.artrow,.grow[data-sha]')]
+        .filter(r => r.checkVisibility()).map(r => {
+          // A row that opens has its line in its summary; a roadmap item's
+          // line sits in the summary's own line.
+          const line = r.matches('details') ? r.querySelector(':scope > summary') : r;
+          const inner = r.matches('details.grp') ? r.querySelector(':scope > summary > .roadmap') : null;
+          return { kind: r.className.split(/\s+/)[0], top: pad(line) + (line !== r ? pad(r) : 0) + (inner ? pad(inner) : 0), want };
+        });
+    }, v);
+    for (const g of got){ seen.add(g.kind); if (Math.abs(g.top - g.want) > 0.5) off.push(`${v} ${g.kind} ${g.top}px`); }
+  }
+  ok(!off.length && seen.size >= 4, `every row of a notebook's lists opens --row-y above its first line (${[...seen].join(', ')}${
+     off.length ? '; off: ' + [...new Set(off)].join(', ') : ''})`);
+});
 ok(seenSects.size <= 1,
    `a section heading wears one skin everywhere (${JSON.stringify([...seenSects])})`);
-{
+await section("B495: a password manager offers itself only where a password or an", async () => {
   // B495: a password manager offers itself only where a password or an
   // account is asked for; every other field on the page says so, drawn
   // late or not.
@@ -1397,8 +1636,8 @@ ok(seenSects.size <= 1,
       || said.some(v => /ssh(rsa|ed25519|dss)|ecdsasha2/.test(v));
   }).map(e => e.id || e.className));
   ok(sshy.length === 0, `...and no text box reads to Bitwarden as an SSH public key (${JSON.stringify(sshy)})`);
-}
-{
+});
+await section("The header's buttons are one box", async () => {
   // The header's buttons are one box (the operator, 5 Oct): the bell stood
   // taller and wider than the bug, gear and sign-out beside it on a desk.
   const hb = await page.$$eval('header > button', bs => bs.filter(b => b.offsetParent).map(b => {
@@ -1418,13 +1657,13 @@ ok(seenSects.size <= 1,
   }).filter(Boolean));
   const desk = await offCenter();
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(300);
+  await atWidth(page, 393);
   const phone = await offCenter();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await sleep(300);
+  await atWidth(page, 1280);
   ok(!desk.length && !phone.length, `...and each icon sits in the middle of its button, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
-}
-{
+});
+await section("The frame's lines of controls are one height each, as a page's are", async () => {
   // The frame's lines of controls are one height each, as a page's are
   // (B142): the header's search stood 32px beside 38px buttons, and the
   // dock's + and its pull 30px beside 34px tabs, at every width.
@@ -1439,20 +1678,20 @@ ok(seenSects.size <= 1,
   }));
   const desk = await frameLines();
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(300);
+  await atWidth(page, 393);
   const phone = await frameLines();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await sleep(300);
+  await atWidth(page, 1280);
   ok(!desk.length && !phone.length,
      `the header's and the dock's controls are one height each, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
-}
+});
 ok(seenReds.size <= 1,
    `a verb that cannot be undone is the same color everywhere (${JSON.stringify([...seenReds])})`);
 
 // The fence inside the one page: a renderer that throws must break its own
 // tab and nothing else: before renderGuarded, one bug in one kind's render
 // took drawPanes down, and with it the poll, the strip and every terminal.
-{
+await section("The fence inside the one page", async () => {
   // Opened here, not only found: part b runs without part a's walk, which
   // is what opened it in the whole file (R130).
   await bring('findings');
@@ -1462,7 +1701,7 @@ ok(seenReds.size <= 1,
   await page.evaluate(() => {
     window.__realFxRender = TABKINDS.findings.render;
     TABKINDS.findings.render = () => { throw new Error('boom (deliberate)'); };
-    fxRev++; drawPanes();
+    readMoved('findings'); drawPanes();
   });
   await page.waitForFunction(() => /renderer failed/.test(
     document.querySelector('.doc.on')?.textContent || ''), null, { timeout: 8000 });
@@ -1486,12 +1725,12 @@ ok(seenReds.size <= 1,
   await page.evaluate(() => {
     TABKINDS.findings.render = window.__realFxRender;
     delete window.__realFxRender;
-    fxRev++; drawPanes();
+    readMoved('findings'); drawPanes();
   });
   // Not waited for: the Docker tab is in front now, so the Analysis tab does
   // not draw until the loop below brings it, and a wait for its rows sat out
   // its whole timeout.
-}
+});
 
 // A stacked box may not be aligned across its own axis, on every tab, at
 // DESKTOP width, which is where it shows.
@@ -1507,7 +1746,7 @@ for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 }).catch(() => {});
-  await sleep(200);
+  await arrived();
   const skewed = await page.evaluate(() => {
     const surf = document.querySelector('.doc.on .doctab, .doc.on .nb');
     if (!surf) return [];
@@ -1531,7 +1770,7 @@ for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 }).catch(() => {});
-  await sleep(200);
+  await arrived();
   const alls = await page.evaluate(() => {
     const surf = document.querySelector('.doc.on .doctab, .doc.on .nb');
     if (!surf) return 0;
@@ -1556,7 +1795,7 @@ if (runs('b')) {
 // Read off the rendered pixels through a canvas rather than computed from the
 // tokens: --accent-deep is a relative color now, and the point is what the
 // engine actually paints.
-{
+await section("what reads on a filled accent surface, on every scheme", async () => {
   const SCHEMES = ['default', 'nostromo', 'slate', 'carbon', 'nocturne', 'moss',
                    'ember', 'abyss', 'plum', 'rust', 'ice', 'sepia'];
   const AA = 4.5;
@@ -1566,7 +1805,7 @@ if (runs('b')) {
   // bar's, showing through a tab with no fill of its own since 17 Oct.
   await page.evaluate(() => railGo('machines', 'nodes'));
   await page.waitForSelector('.pane .bar .subnav button.on', { timeout: 10000 });
-  await sleep(300);
+  await arrived();
   // ...in both halves of each (R216): the light half writes white on the
   // same darkened accent, and its icons the same.
   for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
@@ -1574,8 +1813,9 @@ if (runs('b')) {
       if (m) document.documentElement.dataset.mode = m; else delete document.documentElement.dataset.mode; }, [t, mode]);
     // Past the tab's own 150ms background transition: a dark half measured
     // 120ms after a light one read a blend of the two, and a fixed wait
-    // read one under load too (B811), so its transitions are waited out.
-    await sleep(60);
+    // read one under load too (B811), so its transitions are waited out:
+    // begun, by the frame drawn in the new scheme, and then ended, below.
+    await frames();
     const r = await page.evaluate(async () => {
       const el = document.querySelector('.pane .bar .subnav button.on');
       if (!el) return { err: 'no sub-nav on show' };
@@ -1606,11 +1846,105 @@ if (runs('b')) {
     if (r.icon !== null && !(r.icon >= AA)) bad.push(`${name} icons ${r.icon}`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
-  await sleep(120);
+  await motionOver();
   ok(bad.length === 0,
      `the active tab's words read on its ground in all ${SCHEMES.length} schemes, dark and light${
        bad.length ? `; under ${AA}:1: ${bad.join(', ')}` : ''}`);
-}
+});
+// Good, warning and error are one fixed trio (Perch, the warning a true
+// yellow): the same three colors on every scheme in each half, a warning's
+// band painted from its own wash whatever the scheme or a space's color
+// under it, and its words AA on that wash. Mixed over a space's panel, the
+// band read as a dirty olive.
+await section("good, warning and error are one trio on every scheme, and a warning's band reads", async () => {
+  const SCHEMES = await page.evaluate(() => THEMES.map(t => t[0]));
+  const bad = [], seen = { dark: new Set(), light: new Set() };
+  for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
+    const r = await page.evaluate(([th, m]) => {
+      const root = document.documentElement;
+      root.dataset.theme = th;
+      if (m) root.dataset.mode = m; else delete root.dataset.mode;
+      const host = document.createElement('div');
+      host.className = 'pane'; host.style.cssText = 'position:absolute;left:-9999px;top:0;width:400px';
+      // A space's color under it: the band must not follow it.
+      host.innerHTML = '<div class="bar proj" style="--panel:#5b2a6e;--line:#8a4fa0"><div class="pnote warn pband"><span class="grow">Restart your session</span></div></div>';
+      document.body.appendChild(host);
+      const band = host.querySelector('.pband'), cs = getComputedStyle(band), rs = getComputedStyle(root);
+      const c = document.createElement('canvas'); c.width = c.height = 1;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      const px = v => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 1, 1); ctx.fillStyle = v; ctx.fillRect(0, 0, 1, 1);
+                        const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
+      const lin = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+      const lum = a => 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
+      const R = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      // The wash as the page resolves it: a mix over --ground since the
+      // operator's see-through band (17 Nov), which a canvas cannot read
+      // from the token's text.
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--warn-wash)';
+      document.body.appendChild(probe);
+      const wantWash = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const out = { trio: ['--pass', '--warn', '--bad'].map(k => px(rs.getPropertyValue(k).trim()).join(',')).join(' '),
+                    wash: px(cs.backgroundColor).join(','), wantWash: px(wantWash).join(','),
+                    words: +R(cs.color, cs.backgroundColor).toFixed(2) };
+      host.remove();
+      return out;
+    }, [t, mode]);
+    const half = mode ? 'light' : 'dark', name = mode ? `${t} (light)` : t;
+    seen[half].add(r.trio);
+    if (r.wash !== r.wantWash) bad.push(`${name}: the band is ${r.wash}, not the wash ${r.wantWash}`);
+    if (!(r.words >= 4.5)) bad.push(`${name}: the band's words ${r.words}:1`);
+  }
+  await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
+  if (seen.dark.size !== 1) bad.push(`the dark half's trio differs by scheme: ${[...seen.dark].join(' | ')}`);
+  if (seen.light.size !== 1) bad.push(`the light half's trio differs by scheme: ${[...seen.light].join(' | ')}`);
+  ok(bad.length === 0, `one trio on all ${SCHEMES.length} schemes in each half, and a warning's band its own wash with its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
+});
+
+// What floats over the page stands off it (the operator, 18 Nov: a tour's
+// card read as part of the page): the tour, the header's pop-outs, a row's
+// menu, a help pop, the More sheet and a toast wear --float, a step brighter
+// than the panel in the dark half and white in the light, on every scheme,
+// with the ink and the quiet words on it at AA and a button on it still
+// standing off it.
+await section("what floats over the page stands off it on every scheme", async () => {
+  const SCHEMES = await page.evaluate(() => THEMES.map(t => t[0]));
+  const bad = [];
+  for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
+    const r = await page.evaluate(([th, m]) => {
+      const root = document.documentElement;
+      root.dataset.theme = th;
+      if (m) root.dataset.mode = m; else delete root.dataset.mode;
+      const host = document.createElement('div');
+      host.style.cssText = 'position:absolute;left:-9999px;top:0;width:400px';
+      host.innerHTML = '<div class="tourcard" style="position:static"><div class="tourstep">1 of 6</div><button type="button">Skip tour</button></div>'
+        + '<div class="bellpanel" style="position:static" hidden></div><div class="panelprobe" style="background:var(--panel)"></div>';
+      document.body.appendChild(host);
+      const card = host.querySelector('.tourcard'), cs = getComputedStyle(card);
+      const c = document.createElement('canvas'); c.width = c.height = 1;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      const px = v => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 1, 1); ctx.fillStyle = v; ctx.fillRect(0, 0, 1, 1);
+                        const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
+      const lin = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+      const lum = a => 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
+      const R = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const bg = cs.backgroundColor, panel = getComputedStyle(host.querySelector('.panelprobe')).backgroundColor;
+      const btn = getComputedStyle(card.querySelector('button')).backgroundColor;
+      const out = { lighter: lum(px(bg)) > lum(px(panel)), white: px(bg).join(',') === '255,255,255',
+                    ink: +R(cs.color, bg).toFixed(2), dim: +R(getComputedStyle(card.querySelector('.tourstep')).color, bg).toFixed(2),
+                    btnOff: px(btn).join(',') !== px(bg).join(',') };
+      host.remove();
+      return out;
+    }, [t, mode]);
+    const name = mode ? `${t} (light)` : t;
+    if (mode ? !r.white : !r.lighter) bad.push(`${name}: the float is not ${mode ? 'white' : 'brighter than the panel'}`);
+    if (!(r.ink >= 4.5) || !(r.dim >= 4.5)) bad.push(`${name}: the words on it ${r.ink}:1, the quiet ones ${r.dim}:1`);
+    if (!r.btnOff) bad.push(`${name}: a button on it is its own color`);
+  }
+  await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
+  ok(bad.length === 0, `what floats over the page stands off it on all ${SCHEMES.length} schemes in each half, its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
+});
 }
 
 if (runs('b')) {
@@ -1625,7 +1959,7 @@ if (runs('b')) {
 // frame has to be the ground the settled tab stands on (its commonest
 // color) with no black in it. Every kind in one scheme, the notebook in
 // every scheme, the schemes read off the page's own list.
-{
+await section("a document arrives on its own ground, on every scheme", async () => {
   const frame = async () => {
     const box = await page.$eval('.pane .doc.on', e => {
       const r = e.closest('.stack').getBoundingClientRect();
@@ -1707,7 +2041,11 @@ if (runs('b')) {
       (window.__aside || []).forEach(e => { e.style.visibility = ''; }); window.__aside = []; }));
     await release();
     await atRest();
-    await sleep(150);
+    // The page that went out has left the stack and nothing is still
+    // fading: the frame read next is the page at rest.
+    await page.waitForFunction(() => !document.querySelector('.pane .stack > .doc.leaving'),
+                               null, { timeout: 10000 }).catch(() => {});
+    await motionOver();
     const settled = await frame();
     const off = first.ground.some((v, i) => Math.abs(v - settled.ground[i]) > 2);
     return { ok: first.black < 0.005 && !off && held.includes('docIn'),
@@ -1791,7 +2129,7 @@ if (runs('b')) {
       return { out: (g?.getAnimations() || []).map(a => t(a).duration)[0] ?? 0, inert: !!g?.inert, ids: !!g?.querySelector('[id]'),
                in: (n?.getAnimations() || []).filter(a => a.id === 'fadein').map(a => `${t(a).duration}@${t(a).delay}`)[0] || '' };
     }, [press, ghost, fresh]);
-    await page.waitForTimeout(500);
+    await faded(page).catch(() => {});
     const left = await page.$$eval(ghost, gs => gs.length);
     // A pick opens its detail, which on a phone stands over the list: put
     // back, so the phone's pass later finds each list as it was.
@@ -1803,28 +2141,28 @@ if (runs('b')) {
   const bad = [];
   for (const t of schemes){
     await page.evaluate(th => { document.documentElement.dataset.theme = th; }, t);
-    await sleep(120);
+    await motionOver();
     const r = await arrive('notebook', 'projects');
     if (!r.ok) bad.push(`${t}: ${r.said}`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
-  await sleep(120);
+  await motionOver();
   ok(schemes.length > 1 && bad.length === 0,
      `a notebook brought to the front opens on its scheme's ground in all ${schemes.length} schemes, never black${
        bad.length ? `: ${bad.join('; ')}` : ''}`);
-}
+});
 
 // Every page's bar is one control high, whatever it holds, and a picker's
 // word sits on its line, to its left (the operator, 19 Oct: a picker's word
 // above it, a count alone and a count beside a button each made a bar of
 // its own height, and the content under each started somewhere else).
-{
+await section("Every page's bar is one control high, whatever it holds, and a picker's", async () => {
   const bars = {};
   for (const kind of kinds){
     if (!DRIVERS[kind]) continue;
     await bring(kind);
     await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
-    await sleep(250);
+    await arrived();
     const b = await page.evaluate(() => {
       const bar = document.querySelector('.pane .doc.on .doctab > .docbarrow:not([hidden])');
       if (!bar || !bar.offsetHeight) return null;
@@ -1838,7 +2176,7 @@ if (runs('b')) {
   ok(hs.length === 1, `every page's bar is one height, whatever it holds (${JSON.stringify(Object.fromEntries(Object.entries(bars).map(([k, b]) => [k, b.h])))})`);
   const above = Object.entries(bars).filter(([, b]) => !b.inline).map(([k]) => k);
   ok(above.length === 0, `...and a picker's word sits on its line, to its left${above.length ? `; above it: ${above.join(', ')}` : ''}`);
-}
+});
 
 // The same page, held to the same rules at phone width: nothing may scroll
 // the page sideways, and every text control is 16px so iOS does not zoom a
@@ -1846,7 +2184,7 @@ if (runs('b')) {
 // A modal leaves the way it arrived. The arrival is the stylesheet's; the
 // leaving is one observer on the hidden attribute, so this is what proves
 // every dialog on the page, including one added later, goes out with it.
-{
+await section("The same page, held to the same rules at phone width", async () => {
   await page.click('#bAbout');
   await page.waitForSelector('#aboutModal:not([hidden])');
   const left = await animatedDuring(page, async () => {
@@ -1855,11 +2193,11 @@ if (runs('b')) {
   });
   ok(left.some(k => /aboutModal/.test(k)),
      `a modal leaves with a tween rather than vanishing (${left.join(', ') || 'nothing animated'})`);
-}
+});
 await page.setViewportSize({ width: 393, height: 851 });
 // A card turns over to its controls on a tween (R138): Edit, and the back
 // is on the screen whole, at a phone's width as at a desk's.
-{
+await section("A card turns over to its controls on a tween", async () => {
   // The page on show's: the first card anywhere could be a page out of
   // sight's, never visible, and the wait ran out on it in a whole run.
   await page.evaluate(() => openProjectsTab());
@@ -1868,15 +2206,20 @@ await page.setViewportSize({ width: 393, height: 851 });
   const at = `.doc.on .pgrid .pcard[data-pkey="${card}"]`;
   await page.click(`${at} .pcfront [data-pedit]`);
   const mid = await page.$eval(`${at} .pcback`, e => getComputedStyle(e).transform);
-  await sleep(600);
+  // On its back and the turn over: no transition that ends still runs in it.
+  await page.waitForFunction(at => { const c = document.querySelector(at);
+    return !!c && c.classList.contains('flipped') && !c.getAnimations({ subtree: true }).some(a => a.playState === 'running'
+      && Number.isFinite(a.effect?.getComputedTiming().endTime)); }, at, { timeout: 10000 }).catch(() => {});
   const back = await page.$eval(at, c => { const r = c.querySelector('.pcback').getBoundingClientRect();
     return { flipped: c.classList.contains('flipped'), settled: getComputedStyle(c.querySelector('.pcback')).transform,
              on: r.left >= 0 && r.right <= innerWidth }; });
   ok(back.flipped && back.on && mid !== back.settled && /^(none|matrix\(1, 0, 0, 1, 0, 0\))$/.test(back.settled),
      `a card turns over on a tween on a phone, its back whole on the screen (${JSON.stringify({ mid, ...back })})`);
   await page.click(`${at} .pcback [data-pedit]`);
-}
-await sleep(400);
+});
+// The card is on its front again, its turn back over.
+await page.waitForFunction(() => !document.querySelector('.doc.on .pgrid .pcard.flipped'), null, { timeout: 10000 }).catch(() => {});
+await motionOver();
 // The same width rule at phone width, on every tab: the cap is min(--ctl-w,
 // 88%), and 88% is what bites here.
 //
@@ -1898,7 +2241,7 @@ for (const kind of kinds){
   ok(!S.err && S.wide.length === 0,
      `[${kind}] no control or row of controls spans the tab at phone width${
        S.err ? ` (${S.err})` : S.wide.length ? `: ${S.wide.join(', ')}` : ''}`);
-  await sleep(250);
+  await arrived();
   const L = await lineup();
   ok(!L.err && L.off.length === 0,
      `[${kind}] every control on a line ends at the same height at phone width${
@@ -1963,7 +2306,7 @@ await page.setViewportSize({ width: 393, height: 851 });
 // Each of these was in the order somebody wrote it in. The exceptions are
 // named rather than discovered: Default leads the schemes, and the catch-all
 // trails the git hosts.
-{
+await section("a list of choices is alphabetical", async () => {
   const lists = await page.evaluate(async () => {
     const out = {};
     out.themes = THEMES.map(t => t[1]);
@@ -1993,14 +2336,14 @@ await page.setViewportSize({ width: 393, height: 851 });
   if (lists.hypervisors.length)
     ok(sorted(lists.hypervisors),
        `the hypervisors are alphabetical (${lists.hypervisors.join(', ')})`);
-}
+});
 
 // The Tests view needs rows to be measured on, and one of them a continuation
 // (a "..." name whose "follows:" line is drawn under it), because that line
 // is exactly what scrolled the tab sideways once (a 100% flex basis plus a
 // margin, unable to shrink). A registry the fixture does not carry, so a
 // two-line run is ingested here; the file reset takes it away again.
-{
+await section("The Tests view needs rows to be measured on, and one of them a continuation", async () => {
   const { writeFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
@@ -2013,7 +2356,7 @@ await page.setViewportSize({ width: 393, height: 851 });
   execFileSync(join(HERE, '..', '..', 'aerie'), ['tests', 'ingest', '.bb-test-run.log'],
     { cwd: `${DIR}/ws/alpha`, env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
       DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
-}
+});
 // Measured on the document AND on the document box, because the box scrolls
 // on its own: the page reported no overflow while the Tests tab scrolled
 // sideways inside its pane. The widest offender is named, so the failure
@@ -2111,7 +2454,9 @@ for (const [kind, root, pick, head, open] of [
 for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
-  await sleep(250);
+  // A tab that was open already is only focused by bring: drawn, and at rest.
+  await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 }).catch(() => {});
+  await arrived();
   // The notebook is six views behind one tab, and each has its own layout;
   // the Tests view is the one that scrolled sideways while the Roadmap, the
   // one this check used to look at, did not.
@@ -2122,7 +2467,7 @@ for (const kind of kinds){
       await page.evaluate(w => getNotebook('alpha').view(w), v);
       await page.waitForFunction(w => document.querySelector(`.nb .nbview[data-view="${w}"]`)?.checkVisibility(),
                                  v, { timeout: 20000 });
-      await sleep(250);
+      await arrived();
     }
     const m = await sideways();
     const tag = v ? `${kind}/${v}` : kind;
@@ -2159,7 +2504,16 @@ for (const kind of kinds){
       // a tap is: a pointer click waits for the summary to be in view, and a
       // view that scrolls inside its pane kept one of them out of it.
       await page.evaluate(k => document.querySelector(`.doc.on details.sect[data-sect="${k}"] > summary`)?.click(), other);
-      await sleep(600);
+      // The one pressed is the one open, the other's slide shut over: a
+      // section sliding shut reads open until its slide ends.
+      await page.waitForFunction(k => {
+        const host = document.querySelector('.doc.on');
+        const all = [...(host?.querySelectorAll('details.sect') || [])].filter(d => d.dataset.sect && d.checkVisibility());
+        if (!all[0]) return false;
+        const mine = sectsOf(sectGroup(all[0])), open = mine.filter(d => d.open);
+        return open.length === 1 && open[0].dataset.sect === k
+          && !mine.some(d => d.getAnimations().some(a => a.id === 'fold' && a.playState === 'running'));
+      }, other, { timeout: 10000 }).catch(() => {});
       const after = await page.evaluate(k => {
         const host = document.querySelector('.doc.on');
         const all = [...(host?.querySelectorAll('details.sect') || [])].filter(d => d.dataset.sect && d.checkVisibility());
@@ -2181,7 +2535,7 @@ if (runs('c')) {
 // still names the old one, so every name the document uses is checked to be
 // real on the page, and every helper the framework exposes is checked to be
 // in the document: a rename without a rewrite fails here by name.
-{
+await section("the document and the framework are one thing", async () => {
   const { readFileSync } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
   const { dirname, join } = await import('node:path');
@@ -2200,7 +2554,7 @@ if (runs('c')) {
   const undocumented = classes.filter(c => !new RegExp(`\\b${c}\\b`).test(doc));
   ok(undocumented.length === 0,
      `...and names the classes the page is measured on${undocumented.length ? `; not: ${undocumented.join(', ')}` : ''}`);
-}
+});
 }
 
 if (runs('c')) {
@@ -2212,12 +2566,12 @@ if (runs('c')) {
 // opening a tab asks each endpoint at most once, whichever kind it is. The
 // polls, the layout save an open makes, and the node list a picker fills
 // are the allowed noise.
-{
+await section("a quiet page is quiet, and a tab opens once", async () => {
   const POLLS = new Set(['/api/status', '/api/revs', '/api/presence', '/api/layout', '/api/v1/nodes', '/api/live']);
   await page.evaluate(() => { for (const t of [...tabs]) if (t.kind !== 'term') dropTab(t.id); });
   // With every page put away the page lands on Home, the landing page, whose
   // one read on open is an open's and not a poll: counted from after it.
-  await page.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !homeFetching), null, { timeout: 20000 });
+  await page.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !readBusy('home')), null, { timeout: 20000 });
   // Which revisions moved over a window, read off the page's own tokens: a
   // re-read a moved token asked for is the page doing its job, not noise
   // (B757: an earlier kind's job finishing inside the window re-read Home,
@@ -2239,7 +2593,7 @@ if (runs('c')) {
     window.fetch = (...a) => { const s = String(a[0]), u = /^\/api\/home\?light=1/.test(s) ? '/api/home?light' : s.split('?')[0];
       window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
   await MARK();
-  await sleep(8000);
+  await quietFor(8000);
   const idle = await page.evaluate(() => window.__f);
   const idleMoved = await MOVED();
   // Home re-reads on the jobs token and on nothing else.
@@ -2256,10 +2610,13 @@ if (runs('c')) {
   const quiet = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await quiet.goto(URL); await ready(quiet);
   await quiet.evaluate(() => railGo('home'));
-  await sleep(5000);
+  // Left alone, and Home's own reads in by then, before the count starts.
+  await quietFor(5000);
+  await quiet.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !readBusy('home')),
+                              null, { timeout: 20000 }).catch(() => {});
   await quiet.evaluate(() => { window.__f = {}; const f = window.fetch;
     window.fetch = (...a) => { const u = String(a[0]).split('?')[0]; window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
-  await sleep(8000);
+  await quietFor(8000);
   const calm = await quiet.evaluate(() => window.__f);
   await quiet.close();
   ok(!calm['/api/v1/nodes'] && !calm['/api/presence'] && (calm['/api/status'] || 0) <= 1 && (calm['/api/revs'] || 0) <= 6,
@@ -2284,7 +2641,8 @@ if (runs('c')) {
         await page.evaluate(k => openTab({ kind: k, arg: '__' + k, label: k }), kind);
       await page.waitForFunction(k => tabs.some(t => t.kind === k), kind, { timeout: 10000 });
     } catch (e) { came = false; }
-    await sleep(1200);
+    // The window in which an open could ask a second time.
+    await quietFor(1200);
     const f = await page.evaluate(() => window.__f);
     if (!came){ ok(false, `[${kind}] opened for the request count (did not come up: ${Object.keys(f).join(', ') || 'no fetch at all'})`); }
     // Once for the open, and once more for each revision that moved inside
@@ -2296,7 +2654,7 @@ if (runs('c')) {
     await page.evaluate(k => { for (const t of [...tabs]) if (t.kind === k) dropTab(t.id); }, kind);
   }
   await page.evaluate(() => { for (const t of [...tabs]) if (t.kind !== 'term') dropTab(t.id); });
-}
+});
 }
 
 if (runs('c')) {
@@ -2309,7 +2667,7 @@ if (runs('c')) {
 // (the Docker manager redraws as its rows land) replaces the element
 // between the find and the close, and a close on a detached fold records
 // nothing, which read as the rule failing when only the sample had moved.
-{
+await section("a fold lasts for the page, and a reload starts it from the default", async () => {
   const kind = 'nodes', key = 'nodes:health';
   const sel = `.doc.on details.sect[data-sect="${key}"]`;
   // Opened if it is not there: the request-count block above closes every
@@ -2325,7 +2683,7 @@ if (runs('c')) {
   // A desk: the page was narrowed to a phone above, where one section is
   // open by rule, and this block is the desktop's rule (every default open).
   await page.setViewportSize({ width: 1280, height: 900 });
-  await sleep(300);
+  await atWidth(page, 1280);
   await focus();
   ok(await page.$eval(sel, d => d.open), `[${kind}] a section opens by default on a desktop (${key})`);
   // A press on the summary, not `open = false`: only a fold somebody pressed
@@ -2337,19 +2695,19 @@ if (runs('c')) {
   await focus();
   ok(await page.$eval(sel, d => d.open),
      `[${kind}] ...and a reload starts it from its default, open on a desktop`);
-}
+});
 }
 
 if (runs('c')) {
 // ---- hidden means hidden (design language, Sections and action bars) -----
 // Every element carrying the attribute is out of the layout, whatever class
 // it wears. A class with a display once beat it: a fold that never closed.
-{
+await section("hidden means hidden", async () => {
   const shown = await page.evaluate(() => [...document.querySelectorAll('[hidden]')]
     .filter(e => getComputedStyle(e).display !== 'none')
     .map(e => e.id || e.className || e.tagName).slice(0, 5));
   ok(shown.length === 0, `nothing carrying hidden is displayed${shown.length ? ': ' + shown.join(', ') : ''}`);
-}
+});
 }
 
 if (runs('c')) {
@@ -2364,7 +2722,7 @@ const DIALOGS = {
   about: () => openAbout(), newproject: () => openNewProject(), trash: () => openTrash(), out: () => askSignOut(),
   pending: () => openPending('alpha'), report: () => openReport('alpha'),
   phonelend: () => openPhoneLend('alpha'),
-  newcontainer: () => openNewContainer(), custom: () => editCustom(),
+  newcontainer: () => openNewContainer(),
   // A new project's first session: opened for a project with no brief, which
   // draws the same dialog with an empty text box.
   firstsession: () => openBrief('alpha', ''),
@@ -2383,20 +2741,53 @@ const DIALOGS = {
     $('cvBody').innerHTML = '<div class="empty">Nothing said in it yet.</div>';
     $('cvModal').hidden = false;
   },
+  // The agent chooser, the house dialog: opened from alpha's Start agent
+  // on the Spaces page.
+  chooser: async () => { railGo('projects');
+    for (let i = 0; i < 40 && !document.querySelector('.projtab [data-c="alpha"]'); i++) await new Promise(r => setTimeout(r, 250));
+    resumeFor = null; openClaude('alpha'); },
+  // The dialogs a page builds when it opens one, each as it opens empty.
+  newvm: () => openNewVm(), useradd: () => usersAddOpen(), rolenew: () => rolesNewOpen(),
+  // A repository's move, on a plan of the shape the server answers (one
+  // node to bring, nothing else going), and a space's roles for its owner.
+  move: () => { moveConfirm({ label: 'beta', from: 'gamma', to: 'alpha', node_why: '', busy: [], things: [], lose: [],
+                              nodes: [{ id: 'n_x', name: 'ubu', have: false, as: 'works', instances: [] }] }); },
+  roleaccess: () => rolesAccessOpen('test'),
+  // The Library's Add your own, a pack's dialog with nothing picked yet.
+  addown: () => new Promise(r => libWithToolchains(() => { tpOpen(''); r(); })),
+  // A notebook's sheet: alpha's Roadmap history, pressed as a person does.
+  sheet: async () => { openNotebook('alpha', 'roadmap');
+    let b = null;
+    for (let i = 0; i < 40 && !(b = [...document.querySelectorAll('.nb [id="roadmapLog"]')].find(x => x.checkVisibility())); i++)
+      await new Promise(r => setTimeout(r, 250));
+    b?.click(); },
+  // A schedule's form reads the Schedules page's nodes: opened from there.
+  schedule: async () => { railGo('jobs', 'schedules');
+    for (let i = 0; i < 40 && !schedData; i++) await new Promise(r => setTimeout(r, 250));
+    openSchedForm(null); },
+  // ...the harness's own answer to a question (lib.mjs) stood aside while
+  // it opens, or it is answered before it is measured.
+  question: () => { const was = window.__bbAsk; window.__bbAsk = null; ask({ title: 'A question', text: 'Is it so?' }); window.__bbAsk = was; },
   enroll: async () => { openNodesTab();
     for (let i = 0; i < 40 && !document.querySelector('.nodestab button'); i++) await new Promise(r => setTimeout(r, 250));
     [...document.querySelectorAll('.nodestab button')].find(b => /enroll/i.test(b.textContent))?.click(); },
 };
+// A dialog that keeps a press on the page around it, and why.
+const KEEPS_A_STRAY_PRESS = {
+  enroll: "it shows an enrollment's one-time token, which a stray press must not take away",
+};
 const opened = new Set();
 async function dialogShape(pg = page){
   return pg.evaluate(() => {
-    const m = [...document.querySelectorAll('.modal')].find(x => !x.hidden);
+    const m = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden);
     if (!m) return { err: 'no dialog opened' };
     const box = m.querySelector('.box');
     const loose = [...box.querySelectorAll('*')].filter(e => {
       // A section's heading is a heading, as the h3 is: a long dialog's
       // groups are sections (the project settings, 7 Oct).
-      if (e.offsetHeight === 0 || e.closest('h3, .field, .foot, details.sect > summary')) return false;
+      // ...and so is a fold's that shows more (.chev), which carries its own
+      // inset as a section's does.
+      if (e.offsetHeight === 0 || e.closest('h3, .field, .foot, details.sect > summary, details.chev > summary')) return false;
       return [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     }).map(e => `${e.tagName.toLowerCase()} "${e.textContent.trim().slice(0, 24)}"`);
     // One scroller, not two: a box that scrolls around a part that scrolls
@@ -2411,26 +2802,75 @@ async function dialogShape(pg = page){
     const nested = scrolls(box) && inner.length
       ? `the box scrolls ${box.scrollHeight - box.clientHeight}px around ${inner[0].id || inner[0].className || inner[0].tagName}, which scrolls too` : '';
     // A dialog of prose (About) may have headings; one of fields may not.
+    // The verbs at the foot's right, after its .sp (the dialog's layout
+    // rule): six dialogs had none and drew them at the left, under the
+    // toast stack's corner (B749).
+    const fb = box.querySelector('.foot');
+    const btns = fb ? [...fb.querySelectorAll('button')].filter(b => b.offsetWidth) : [];
+    const gap = btns.length ? Math.round(fb.getBoundingClientRect().right - Math.max(...btns.map(b => b.getBoundingClientRect().right))) : 0;
+    // The census of the one shape (R50 step 81): its title the box's first
+    // line, its foot the box's own, centered over the page, its width, and
+    // the order of its foot (a state, the spacer, the verbs).
+    const r = box.getBoundingClientRect();
+    const order = fb ? [...fb.children].filter(e => e.offsetWidth || e.classList.contains('sp')).map(e =>
+      e.classList.contains('sp') ? 'sp' : e.classList.contains('state') ? 'state' : e.tagName === 'BUTTON'
+        ? (e.classList.contains('primary') ? 'P' : e.classList.contains('danger') || e.dataset.danger ? 'D' : 'b') : e.tagName.toLowerCase()).join(' ') : '';
+    const census = { id: m.id || m.className, cls: [...box.classList].filter(c => c !== 'box').join('.') || '-', w: Math.round(r.width),
+      // Its title the first line, and one that shows: a notebook's rule hid
+      // the sheet's while the element stood first (the dialog walk, 17 Nov).
+      title: box.firstElementChild?.tagName === 'H3' && box.firstElementChild.offsetHeight > 0, ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
+      mid: r.height < innerHeight - 40 ? Math.round(r.top + r.height / 2 - innerHeight / 2) : 'tall', order };
     return { nested, loose: loose.slice(0, 3), h4: box.classList.contains('prose') ? 0 : box.querySelectorAll('h4').length,
-             foot: !!box.querySelector('.foot') && box.querySelector('.foot').offsetHeight > 0 };
+             foot: !!fb && fb.offsetHeight > 0, gap, census };
   });
 }
+// A button on the page that a dialog is opened from, as a person's press
+// leaves the focus on what they pressed; and what the dialog on show took
+// for its opener, kept to be found again once it is put away.
+const focusProbe = async () => {
+  // Once a dialog put away has finished leaving: focus given to the page
+  // while one still left went nowhere under a whole run's load, and the next
+  // dialog opened with no opener (17 Nov, About).
+  for (let i = 0; i < 80 && document.querySelector('.modal.leaving'); i++) await new Promise(r => setTimeout(r, 25));
+  let b = document.getElementById('dlgProbe');
+  if (!b){
+    b = document.createElement('button'); b.id = 'dlgProbe'; b.type = 'button'; b.textContent = 'probe';
+    b.style.cssText = 'position:fixed;left:0;top:0;width:8px;height:8px;opacity:.01';
+    document.body.appendChild(b);
+  }
+  b.focus();
+};
+const keepOpener = () => { window.__dlgOpener = [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.__opener || null; };
 for (const [name, open] of Object.entries(DIALOGS)) {
+  await page.evaluate(focusProbe);
   await page.evaluate(open);
-  const seen = await page.waitForFunction(() => [...document.querySelectorAll('.modal')].some(m => !m.hidden),
+  const seen = await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden),
     null, { timeout: 10000 }).then(() => true).catch(() => false);
-  await sleep(600);
+  // Its entrance over, and what it reads in and drawn.
+  await motionOver();
+  await settled(page, { quiet: 250 });
   const d = seen ? await dialogShape() : { err: 'nothing opened' };
-  const id = await page.evaluate(() => [...document.querySelectorAll('.modal')].find(m => !m.hidden)?.id || '');
+  const id = await page.evaluate(() => [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.id || '');
   if (id) opened.add(id);
+  // One shape for every dialog (R50 step 81): its title the box's first
+  // line, its foot the box's own, centered over the page, its foot in the
+  // rule's order (only a state before the spacer; the primary first among
+  // the verbs; anything destructive last), and Escape puts it away.
+  const c = d.census || {};
+  const toks = String(c.order || '').split(' ').filter(Boolean), sp = toks.indexOf('sp'), verbs = toks.slice(sp + 1);
+  const ordered = sp >= 0 && toks.slice(0, sp).every(t => t === 'state')
+    && (!verbs.includes('P') || verbs[0] === 'P') && verbs.every((t, i) => t !== 'D' || verbs.slice(i).every(x => x === 'D'));
+  ok(!d.err && c.title && c.ownFoot && (c.mid === 'tall' || Math.abs(c.mid) <= 2) && ordered,
+     `[dialog ${name}] titled first, its foot its box's own in the rule's order, centered (${JSON.stringify(c)})`);
   ok(!d.err && d.loose.length === 0 && d.h4 === 0 && d.foot,
      `[dialog ${name}] its lines in .field bands, no h4, buttons in a .foot${
        d.err ? ` (${d.err})` : d.loose.length ? `: loose ${d.loose.join(', ')}` : d.h4 ? `: ${d.h4} h4` : !d.foot ? ': no foot' : ''}`);
   ok(!d.nested, `[dialog ${name}] scrolls in one place${d.nested ? `: ${d.nested}` : ''}`);
+  ok(!d.err && d.gap <= 32, `[dialog ${name}] its verbs sit at the foot's right (${d.gap}px from its edge)`);
   // The jump bar's chips sit in a row (the operator, 11 Oct): the dialog's
   // field rule stacks a band's children, and the bar is a band.
   const jump = await page.evaluate(() => {
-    const bar = [...document.querySelectorAll('.modal')].find(x => !x.hidden)?.querySelector('.sectjump');
+    const bar = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden)?.querySelector('.sectjump');
     if (!bar || !bar.offsetHeight) return null;
     const a = [...bar.querySelectorAll('a')].slice(0, 2).map(e => Math.round(e.getBoundingClientRect().top));
     return { dir: getComputedStyle(bar).flexDirection, stacked: a.length === 2 && a[0] !== a[1] };
@@ -2441,7 +2881,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   // stacked children carried none, so one form read as three depending on
   // which container a field landed in. The token is --field-gap.
   const rhythm = await page.evaluate(() => {
-    const m = [...document.querySelectorAll('.modal')].find(x => !x.hidden);
+    const m = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden);
     const box = m?.querySelector('.box');
     if (!box) return { err: 'no dialog' };
     const css = getComputedStyle(document.documentElement);
@@ -2471,7 +2911,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   // the end of a dialog carries on into the page behind it, which is what
   // the operator saw on a phone: the whole page moving under the box.
   const still = await page.evaluate(() => {
-    const m = [...document.querySelectorAll('.modal')].find(x => !x.hidden);
+    const m = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden);
     if (!m) return { err: 'no dialog' };
     return { chain: getComputedStyle(m).overscrollBehaviorY,
              locked: getComputedStyle(document.documentElement).overflow };
@@ -2481,44 +2921,127 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   ok(!rhythm.err && rhythm.odd.length === 0,
      `[dialog ${name}] one rhythm down the band (${rhythm.want}px, ${rhythm.tight}px under a label)${
        rhythm.err ? ` (${rhythm.err})` : rhythm.odd.length ? `: ${rhythm.odd.join('; ')}` : ''}`);
-  await page.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
+  // ...a press on the dimmed page around it puts it away (R50 step 81),
+  // and so does Escape, each as a person shuts it: opened again for the
+  // second. A dialog holding something said once keeps a stray press.
+  const shut = () => page.waitForFunction(() => ![...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden),
+    null, { timeout: 3000 }).then(() => true).catch(() => false);
+  if (!KEEPS_A_STRAY_PRESS[name]){
+    await page.mouse.click(3, Math.round((await page.evaluate(() => innerHeight)) - 3));
+    ok(await shut(), `[dialog ${name}] a press on the page around it puts it away`);
+    await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
+    await page.evaluate(focusProbe);
+    await page.evaluate(open);
+    await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden), null, { timeout: 10000 }).catch(() => {});
+    await motionOver();
+  }
+  await page.evaluate(keepOpener);
+  const heldOpen = await page.evaluate(() => history.state?.dlg || 0);
+  await page.keyboard.press('Escape');
+  const escaped = await page.waitForFunction(() => ![...document.querySelectorAll('.modal')].some(m => !m.hidden && !m.classList.contains('inline')),
+    null, { timeout: 3000 }).then(() => true).catch(() => false);
+  ok(escaped, `[dialog ${name}] Escape puts it away`);
+  // ...and the focus goes back to what opened it, so a keyboard carries on
+  // from where the person was (R50 step 81).
+  const back = await page.evaluate(() => {
+    const o = window.__dlgOpener, a = document.activeElement;
+    const say = e => !e ? 'nothing' : e === document.body ? 'body' : e.id || e.dataset?.c || String(e.className || e.tagName.toLowerCase()).slice(0, 30);
+    return { opener: say(o), now: say(a), same: !!o && a === o };
+  });
+  ok(escaped && back.same, `[dialog ${name}] the focus goes back to what opened it (${back.opener}; now on ${back.now})`);
+  // ...and Back puts it away with the page under it staying where it was
+  // (the operator, 17 Nov). Put away by Escape it gave its entry in the
+  // history back, so Back is the dialog's alone; one that keeps a stray
+  // press holds none, and Back passes it by.
+  if (!KEEPS_A_STRAY_PRESS[name]){
+    const given = await page.waitForFunction(() => !history.state?.dlg, null, { timeout: 3000 }).then(() => true).catch(() => false);
+    ok(given, `[dialog ${name}] put away, it gives its entry in the history back`);
+    await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
+    await page.evaluate(open);
+    await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden), null, { timeout: 10000 }).catch(() => {});
+    await motionOver();
+    const was = await page.evaluate(() => ({ hash: location.hash, dlg: history.state?.dlg || 0 }));
+    await page.evaluate(() => history.back());
+    const away = await shut();
+    const now = await page.evaluate(() => location.hash);
+    ok(was.dlg && away && now === was.hash, `[dialog ${name}] Back puts it away and the page stays (${was.hash}${was.dlg ? '' : ', held no entry'}${away ? '' : ', still open'}; then ${now})`);
+  } else ok(!heldOpen, `[dialog ${name}] holds no entry in the history, so Back passes it by (${KEEPS_A_STRAY_PRESS[name]})`);
+  await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
 }
+await page.evaluate(() => document.getElementById('dlgProbe')?.remove());
+// A page opened the moment a dialog is put away stays open: the dialog's
+// entry is given back after it closes, and a page pushed meanwhile was
+// undone by that give-back (cards.mjs, 18 Nov: Settings canceled, then a
+// notebook's Signing opened, and the page went back to Spaces).
+await section("a page opened as a dialog is put away stays open", async () => {
+  await page.evaluate(() => { location.hash = '#/home'; });
+  await page.waitForFunction(() => location.hash === '#/home', null, { timeout: 5000 }).catch(() => {});
+  await page.evaluate(() => openAbout());
+  await page.waitForFunction(() => !document.getElementById('aboutModal').hidden && history.state?.dlg, null, { timeout: 5000 }).catch(() => {});
+  // The page opened just after the give-back has begun, as a second press
+  // lands: closed, then opened a moment later, in the window it had.
+  await page.evaluate(() => new Promise(r => { closeAbout(); setTimeout(() => { railGo('jobs'); r(); }, 2); }));
+  await new Promise(r => setTimeout(r, 1500));
+  const after = await page.evaluate(() => ({ hash: location.hash, kind: tabOf(panes[0])?.kind || '', dlg: history.state?.dlg || 0 }));
+  ok(/^#\/jobs/.test(after.hash) && after.kind === 'jobs' && !after.dlg,
+     `a page opened as a dialog is put away stays open, its address with it (${JSON.stringify(after)})`);
+});
 // ...and again on a small phone, where the room runs out first: every dialog
-// still scrolls in one place.
-{
+// is the whole screen, its foot at the bottom, and still scrolls in one place.
+await section("and again on a small phone, where the room runs out first", async () => {
   const phone = await newPage(browser, { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
   await phone.goto(URL); await ready(phone);
-  const twice = [];
+  const twice = [], short = [];
   for (const [name, open] of Object.entries(DIALOGS)) {
     await phone.evaluate(open);
     await phone.waitForFunction(() => [...document.querySelectorAll('.modal')].some(m => !m.hidden),
       null, { timeout: 10000 }).catch(() => {});
-    await sleep(600);
+    await motionOver(phone);
+    await settled(phone, { quiet: 250 });
     const d = await dialogShape(phone);
     if (d.nested) twice.push(`${name}: ${d.nested}`);
-    await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
+    // Its box from edge to edge and top to bottom, and its foot's bottom the
+    // screen's, however little the dialog holds.
+    const fill = await phone.evaluate(() => {
+      const modal = [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden);
+      const box = modal?.querySelector('.box');
+      if (!box) return 'no dialog';
+      const r = box.getBoundingClientRect(), f = box.querySelector(':scope > .foot, :scope > .dlgbody > .foot')?.getBoundingClientRect();
+      const off = [r.left, r.top, innerWidth - r.right, innerHeight - r.bottom].map(Math.round);
+      // But for a question (R265): a sheet at the foot, edge to edge, as tall
+      // as its words and no taller, the page showing above it.
+      if (modal.classList.contains('askdlg') && !modal.classList.contains('typed'))
+        return off[0] || off[2] || off[3] ? `a question's sheet ${off.join(',')} in from the edges`
+          : off[1] < 56 ? `a question's sheet leaves ${off[1]}px of the page showing`
+          : Math.abs(box.scrollHeight - r.height) > 2 ? `a question's sheet is ${Math.round(r.height)}px for ${box.scrollHeight}px of words` : '';
+      return off.some(v => Math.abs(v) > 1) ? `box ${off.join(',')} in from the edges`
+        : f && Math.abs(Math.round(innerHeight - f.bottom)) > 1 ? `foot ${Math.round(innerHeight - f.bottom)}px over the bottom` : '';
+    });
+    if (fill) short.push(`${name}: ${fill}`);
+    await phone.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
   }
+  ok(short.length === 0, `on a 360px phone every dialog is the whole screen, its foot at the bottom, and a question a sheet at the foot as tall as its words${short.length ? ': ' + short.join(' | ') : ''}`);
   ok(twice.length === 0, `on a 360px phone every dialog scrolls in one place${twice.length ? ': ' + twice.join(' | ') : ''}`);
   await phone.close();
-}
-{
+});
+await section("every dialog in the page is measured", async () => {
   const all = await page.evaluate(() => [...document.querySelectorAll('.modal[id]')].map(m => m.id));
   const undriven = all.filter(x => !opened.has(x));
   ok(undriven.length === 0, `every dialog in the page is measured${undriven.length
     ? `: no driver opens ${undriven.join(', ')} (add one to DIALOGS in uniform.mjs)` : ''}`);
-}
+});
 }
 
 if (runs('c')) {
 // ---- a finger, not a pointer (design language, Both sizes) ---------------
 // On a touch phone the controls a thumb meets are a thumb's size, and a bar
 // that spans the screen fits it even on a fold's 344px cover.
-{
+await section("a finger, not a pointer", async () => {
   const phone = await newPage(browser, { viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   await phone.goto(URL); await ready(phone);
   await phone.evaluate(() => { openNotebook('alpha', 'roadmap'); });
   await phone.waitForSelector('.nb .nbview:not([hidden])', { timeout: 20000 });
-  await sleep(600);
+  await arrived(phone);
   const small = await phone.evaluate(() => [...document.querySelectorAll(
       '.dockbar button, .nb button, .mobar button')]
     .filter(e => e.offsetHeight > 0)
@@ -2527,12 +3050,14 @@ if (runs('c')) {
   ok(small.length === 0, `on a touch phone the dock, the notebook and the bar are a thumb's size${small.length ? ': ' + small.slice(0, 4).join(', ') : ''}`);
   await phone.evaluate(() => openNewProject());
   await phone.waitForSelector('.modal:not([hidden]) .foot button', { timeout: 10000 });
-  const shortFoot = await phone.$$eval('.modal:not([hidden]) .foot button', bs => bs.filter(b => b.getBoundingClientRect().height < 36).length);
+  // (The page's own control height, --tap: never a number kept here.)
+  const shortFoot = await phone.$$eval('.modal:not([hidden]) .foot button', bs => { const tap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tap'));
+    return bs.filter(b => b.getBoundingClientRect().height < tap - 0.5).length; });
   ok(shortFoot === 0, `...and a dialog's buttons are the tap height (${shortFoot} short)`);
   await phone.setViewportSize({ width: 344, height: 882 });
-  await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
-  await sleep(400);
-  const cut = await phone.evaluate(() => [...document.querySelectorAll('.mobar button')]
+  await phone.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
+  await atWidth(phone, 344);
+  const cut = await phone.evaluate(() => [...document.querySelectorAll('.mobar > button')]
     .filter(b => b.offsetHeight > 0 && b.getBoundingClientRect().right > innerWidth + 1).map(b => b.textContent.trim()));
   ok(cut.length === 0, `...and the bar fits a fold's 344px cover${cut.length ? `: cut off ${cut.join(', ')}` : ''}`);
   // ...and the top bar's search keeps its 80px there, nothing in the header
@@ -2541,7 +3066,7 @@ if (runs('c')) {
     over: [...document.querySelectorAll('header > *')].filter(e => e.offsetWidth > 0 && e.getBoundingClientRect().right > innerWidth + 0.5).map(e => e.id || e.className) }));
   ok(top.jump >= 80 && top.over.length === 0, `...and the top bar's search is at least 80px wide at 344, the header inside the screen (${JSON.stringify(top)})`);
   await phone.context().close();
-}
+});
 }
 
 ok(page.errors.length === 0,

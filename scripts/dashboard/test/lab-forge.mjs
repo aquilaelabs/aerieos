@@ -15,7 +15,7 @@
 // token it minted), so it can run twice. The fixture project it links is
 // beta (no remote, one commit made here); delta is the second, for the
 // refusals.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, record, URL, DIR } from './lib.mjs';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -46,8 +46,10 @@ const forge = async (method, path, body, auth = null) => {
   try { j = await r.json(); } catch { j = null; }
   return { status: r.status, body: j };
 };
+let forgeSaid = '';
 {
   const v = await forge('GET', '/version');
+  forgeSaid = `${NAME} ${v.body?.version || ''}`.trim();
   ok(v.status === 200 && v.body?.version, `the lab's ${FORGE} answers at ${GITEA} (${v.body?.version})`);
   const t = await forge('POST', `/users/${USER}/tokens`,
     // write:user as well: creating a repository under the ACCOUNT goes
@@ -123,7 +125,7 @@ const made = [];   // owner/repo pairs to delete at the end
   ok(line === `${SCHEME}://${USER}:${token}@${HOST}`,
      `the credential line names the account the forge reported, the scheme and the host with its port (${line.replace(/:[^@]*@/, ':…@')})`);
   const cfg = readFileSync(`${DIR}/ws/beta/.git/config`, 'utf8');
-  ok(cfg.includes(`url = ${GITEA}/${repo}.git`) && /credential\]\s*\n\s*helper = \n\s*helper = store --file=/.test(cfg),
+  ok(cfg.includes(`url = ${GITEA}/${repo}.git`) && /credential\]\s*\n\s*helper = \n\s*helper = !\S*git-credential-bb \S*\/gitcreds\/beta\s*\n/.test(cfg),
      'the remote is spelled as asked and the repository is scoped to its own token and nothing else');
   // Release on the real forge (R124): a version, a changelog section and a
   // build of the commit, then the Artifacts tab's Release. The tag is pushed
@@ -247,4 +249,6 @@ if (tokenId){
   const d = await forge('DELETE', `/users/${USER}/tokens/${tokenId}`, null, basic);
   ok(d.status === 204, 'the run\'s token is revoked');
 }
+// Walked whole: a line for the lab's record, under the host's own version.
+record('lab-forge', FORGE, forgeSaid);
 await done(browser);

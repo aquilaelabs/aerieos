@@ -36,6 +36,15 @@ class JavaScript(unittest.TestCase):
         self.assertIn(("when", 2, 2), defs(s))
         self.assertIn(("select", 1, "open"), calls(s))
 
+    def test_an_arrow_in_a_conditionals_else_branch_is_no_key(self):
+        # B922: `? null : e => {` is no key `null` holding an arrow; the
+        # arrow's calls are the enclosing function's.
+        s = scan("function wire(grid){\n  grid.forEach(c => c.onclick = !c.x ? null : e => {\n"
+                 "    openCard(e);\n  });\n}\nconst t = {\n  open: () => {\n    load();\n  },\n};\n")
+        self.assertNotIn("null", {d["name"] for d in s.defs})
+        self.assertIn(("openCard", 3, "wire"), calls(s))
+        self.assertIn(("load", 8, "open"), calls(s), "a key on its own line is still one")
+
     def test_a_property_called_interface_is_no_class(self):
         s = scan("function f(net, rn){\n  if (net.interface && rn.interface) g();\n"
                  "  const x = {interface: '', routes: []};\n}\n")
@@ -85,6 +94,64 @@ class JavaScript(unittest.TestCase):
             out = codemap.q_defs(idx, "f.php")
         self.assertEqual(out, ["2-4  function (anonymous) passed to add_action",
                                "5  function (anonymous) passed to add_filter"])
+
+
+class MethodsInACall(unittest.TestCase):
+    """An object written inside a call's parentheses, and what is its."""
+
+    def test_a_method_of_an_object_handed_to_a_call_is_a_definition(self):
+        s = scan("const t = {};\n"
+                 "walk(parse(read(D), false), {Program(p){\n"
+                 "  for (const n of ['A', 'B'])\n"
+                 "    t[n] = (p.x || []).map(e => e.y);\n"
+                 "  p.stop();\n"
+                 "}});\n"
+                 "function f(){\n"
+                 "  walk(tree, {\n"
+                 "    Leaf(p){ note(p); },\n"
+                 "  }, {Other(q){ keep(q); }});\n"
+                 "}\n", "a.mjs")
+        self.assertIn(("Program", 2, 6), defs(s))
+        self.assertIn(("map", 4, "Program"), calls(s))
+        self.assertIn(("stop", 5, "Program"), calls(s))
+        self.assertNotIn("Program", {c["name"] for c in s.calls})
+        self.assertIn(("Other", 10, 10), defs(s))
+        self.assertIn(("keep", 10, "Other"), calls(s))
+
+    def test_a_call_in_a_method_s_own_parameters_is_still_a_call(self):
+        s = scan("class A {\n"
+                 "  bound(a, b = f(1), c = [g(2), h(3)]) {\n"
+                 "    go();\n"
+                 "  }\n"
+                 "  other(x = {k: pick(4)}) {\n"
+                 "    go();\n"
+                 "  }\n"
+                 "}\n", "a.js")
+        names = {d[0] for d in defs(s)}
+        self.assertIn("bound", names)
+        self.assertIn("other", names)
+        for n in ("f", "g", "h", "pick"):
+            self.assertNotIn(n, names)
+            self.assertIn(n, {c["name"] for c in s.calls})
+
+
+class Routes(unittest.TestCase):
+    """A route table's rows, which are how a python change reaches the
+    suites that ask its paths."""
+
+    def test_a_row_is_read_as_a_tuple_of_three_and_inside_a_longer_record(self):
+        s = scan('GET = (("exact", "/api/live", "_get_live"),\n'
+                 '       ("prefix", "/api/files/", "_get_files"))\n'
+                 'ROUTES = (Route("GET", "exact", "/api/home", "_get_home", "handler"),\n'
+                 '          Route("POST", "prefix", "/api/v1/files", "_files_post", "person", max_body=4096),\n'
+                 '          Route("POST", "door", "/api/upload", "_upload"))\n'
+                 'said = ("see", "/api/docs", "for more")  # three strings, and a path\n'
+                 'x = f("/api/alone")\n', "server.py")
+        got = {(r["path"], r["handler"]) for r in s.routes}
+        for want in [("/api/live", "_get_live"), ("/api/files/", "_get_files"), ("/api/home", "_get_home"),
+                     ("/api/v1/files", "_files_post"), ("/api/upload", "_upload")]:
+            self.assertIn(want, got)
+        self.assertNotIn("/api/alone", {p for p, _ in got})
 
 
 class OtherProjects(unittest.TestCase):

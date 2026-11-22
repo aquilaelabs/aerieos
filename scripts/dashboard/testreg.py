@@ -443,6 +443,22 @@ def _latest(t):
     return (t.get("ms") or [None])[-1]
 
 
+# A name that already says what its test protects is its description: a
+# sentence of four words or more ("a press on the page around it puts it
+# away", or test_a_release_whose_apk_never_came_is_said), where a terse one
+# (test_login, LoginWorks) is a name, and the test wants a line from aerie
+# tests note (the operator, 17 Nov: the view called all 8091 of this
+# repository's undescribed, every one a sentence).
+_NAME_WORDS = re.compile(r"[A-Za-z0-9']+")
+
+
+def name_says(name):
+    """Whether a test's name says what it protects."""
+    n = re.sub(r"^(?:\.\.\.|test_?|it[ _])", "", str(name or "").strip(), flags=re.I)
+    n = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", n).replace("_", " ")
+    return len(_NAME_WORDS.findall(n)) >= 4
+
+
 def payload(project):
     """Everything the Tests view shows, computed rather than stored.
 
@@ -465,6 +481,7 @@ def payload(project):
             "key": key, "suite": t.get("suite", ""), "ord": t.get("ord", 0),
             "name": t.get("name", ""), "status": t.get("status", ""),
             "protects": t.get("protects", ""), "notes": t.get("notes", ""),
+            "described": bool(t.get("protects")) or name_says(t.get("name", "")),
             "ms": ms, "history": hist[-KEEP:], "seen": t.get("seen", 0),
             # A continuation only reads correctly next to the test it follows,
             # and this view sorts by duration, which would otherwise strand
@@ -499,7 +516,7 @@ def payload(project):
         if t["suspect"]:
             s["suspect"] += 1
             s["recover"] += t["suspect"] * 1000
-        if not t["protects"]:
+        if not t["described"]:
             s["undocumented"] += 1
         if t["status"] == "fail":
             s["fail"] += 1
@@ -519,7 +536,7 @@ def payload(project):
         "suspect": sum(1 for t in tests if t["suspect"]),
         "recover_ms": sum(t["suspect"] * 1000 for t in tests if t["suspect"]),
         "accepted": sum(1 for t in tests if t["accepted"]),
-        "undocumented": sum(1 for t in tests if not t["protects"]),
+        "undocumented": sum(1 for t in tests if not t["described"]),
         # The last run's own wall time, for the honest gap between what the
         # tests cost and what the suite costs: the difference is the harness.
         "last_wall_ms": int((runs[-1].get("wall") or 0) * 1000) if runs else 0,

@@ -12,7 +12,10 @@ from aerieos_agent.base import DEFAULT_STORES  # noqa: E402
 
 class StoresKept(unittest.TestCase):
     def test_a_role_left_at_its_default_keeps_the_path_the_record_has(self):
-        had = {"stores": {"toolchains": "/mnt/SDK", "data": "/var/lib/builderbot/data"}}
+        # The record's own default, whichever name this machine has it under
+        # (the test ran against a literal, and failed on a node that had
+        # taken the new names).
+        had = {"stores": {"toolchains": "/mnt/SDK", "data": DEFAULT_STORES["data"]}}
         got = cli.stores_kept(dict(DEFAULT_STORES), set(), had)
         self.assertEqual(got["toolchains"], "/mnt/SDK")
         self.assertEqual(got["data"], DEFAULT_STORES["data"])

@@ -46,3 +46,17 @@ docker_install() {
             pkg $(pkg_names docker) \
                 || warn "docker did not install from the distribution's packages, so this machine is not a Docker host until it does"
 }
+# door_install NAME: a door's program from Alpine's own repositories, whose
+# index apk holds to the distribution's keys. Tailscale is in community;
+# cloudflared is in no repository of a release (edge's testing alone, 20 Nov
+# 2026) and its vendor publishes no apk, so there is nothing to hold one to.
+# 2 where this system has no verified source for it, DOOR_WHY saying why.
+door_install() {
+    case "$1" in
+        tailscale)   pkg tailscale || return 1
+                     svc_enable tailscale ;;
+        cloudflared) DOOR_WHY="no repository of an Alpine release carries it, and Cloudflare publishes no package for apk"
+                     return 2 ;;
+        *) return 2 ;;
+    esac
+}

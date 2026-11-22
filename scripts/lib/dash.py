@@ -26,7 +26,14 @@ def load(name, here):
     A notebook module puts its own directory on sys.path as it loads, so
     what it imports beside itself (ids, pending) is importable after this
     the way it is inside the server."""
-    spec = importlib.util.spec_from_file_location(name, os.path.join(here, name + ".py"))
+    return load_path(name, os.path.join(here, name + ".py"))
+
+
+def load_path(name, path):
+    """The module in the file PATH, registered nowhere and executed fresh,
+    under NAME: for a file a plain import cannot name (login-list.py) and
+    for a dashboard module a caller was handed by its whole path."""
+    spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

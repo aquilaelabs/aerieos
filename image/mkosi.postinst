@@ -24,6 +24,10 @@ done
 # network and the time.
 mkosi-chroot install -d -m 0700 /boot/efi
 mkosi-chroot systemctl enable systemd-networkd systemd-resolved systemd-timesyncd docker libvirtd >/dev/null 2>&1 || true
+# NUT's services stay off until the UPS feature is turned on, which
+# enables them with the config it writes: started with none, its monitor
+# ends as a failed unit on every machine without a UPS.
+mkosi-chroot systemctl disable nut-server.service nut-monitor.service nut-driver-enumerator.service nut-driver-enumerator.path nut-driver.target nut.target >/dev/null 2>&1 || true
 # AerieOS's own units, enabled here rather than as links in the extra
 # tree (a symlink in the repository does not travel with the tree, B417):
 # the first boot, the installer, which its condition keeps to the ISO, and

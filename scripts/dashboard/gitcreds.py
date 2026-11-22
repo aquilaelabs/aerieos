@@ -459,10 +459,10 @@ def helper(project):
 
 
 def names_helper(value, project):
-    """Whether a repository's credential.helper value is this project's, in
-    either form: git-credential-bb, or git's store from before R135."""
+    """Whether a repository's credential.helper value is this project's:
+    git-credential-bb on its token file (projects.scoped_to_token)."""
     f = str(path(project))
-    return f"store --file={f}" in value or (str(HELPER) in value and f in value)
+    return str(HELPER) in value and f in value
 
 
 def forget(project):

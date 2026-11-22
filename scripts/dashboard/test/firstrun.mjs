@@ -6,19 +6,12 @@
 // a node and lands on Home, whose Getting started card keeps what is left.
 // The fixture starts with setup done, so it is put back to first run here,
 // as making the owner does, and Finish puts it right again.
-import { URL, launch, newPage, ok, done, sleep, DIR, patience } from './lib.mjs';
+import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll, api, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, rmSync, openSync } from 'node:fs';
+import { mkdirSync, rmSync, openSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const firstRun = async on => api('/api/settings', { set: { setup_done: !on } });
 
 const browser = await launch();
@@ -142,7 +135,7 @@ await firstRun(false);
 // installer, and Finish waits for that one and for no other (the operator,
 // 22 Oct). Told by the install's marker in its env file, BB_INSTALL. Each
 // on a controller of its own, from a fresh state, beside the harness's.
-{
+await section("a bare-metal install's first run", async () => {
   const DASH = fileURLToPath(new globalThis.URL('..', import.meta.url));
   const LIB = fileURLToPath(new globalThis.URL('../../lib', import.meta.url));
   const freePort = () => new Promise(res => {
@@ -151,6 +144,11 @@ await firstRun(false);
   const OWNER = { username: 'firstowner', password: 'longenough1' };
   const H = { Authorization: 'Basic ' + Buffer.from(`${OWNER.username}:${OWNER.password}`).toString('base64'),
               'Content-Type': 'application/json' };
+  // Every controller started here ends with the suite, whatever stopped the
+  // section it was for: one a failed check left running outlived the run
+  // under the first process (B928).
+  const ctrls = [];
+  process.on('exit', () => ctrls.forEach(p => { try { p.kill('SIGKILL'); } catch (e) { /* gone */ } }));
   const controller = async (kind, { noOwner = false } = {}) => {
     const w = `${DIR}/firstrun-${kind}`;
     rmSync(w, { recursive: true, force: true });
@@ -164,14 +162,18 @@ await firstRun(false);
     const proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', out, out], env: {
       ...env, DASHBOARD_PORT: String(port), BUILDER_HOME: `${w}/home`,
       BB_DOCTOR_FIXTURE: `${DIR}/doctor.txt`, TC_AUTOCHECK: '0', BB_NODE_POLL: '3',
-      BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600', BB_NGINX_TAGS_URL: 'file:///nonexistent',
+      BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',
       BB_NGINX_CHECK_DELAY: '3600', BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
       BB_IMAGE_CHECK_DELAY: '3600', BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '',
       ...(kind === 'bare' ? { BB_INSTALL: 'bare-metal' } : {}) } });
+    ctrls.push(proc);
     const base = `http://127.0.0.1:${port}`;
-    for (let i = 0; i < patience(120); i++){
-      try { if ((await fetch(`${base}/login`)).status === 200) break; } catch { /* not up yet */ }
-      await sleep(250);
+    // Its own server, which under a whole run's load took more than 30 s to
+    // answer; when it never does, its log says why, not "fetch failed".
+    if (!await until(async () => (await fetch(`${base}/login`)).status === 200, 90000, 250)) {
+      let said = '';
+      try { said = readFileSync(`${w}/server.log`, 'utf8').trim().split('\n').slice(-6).join(' | '); } catch (e) { said = String(e); }
+      throw new Error(`the ${kind} controller did not answer in 90 s: ${said || 'its log is empty'}`);
     }
     const post = async (path, body, h = H) => (await fetch(base + path, { method: 'POST', headers: h, body: JSON.stringify(body) })).json();
     await post('/api/settings', { set: { setup_done: false } });
@@ -225,6 +227,14 @@ await firstRun(false);
   const page = await newPage(browser, { httpCredentials: OWNER, extraHTTPHeaders: { Authorization: H.Authorization } });
   await page.goto(bm.base);
   await page.waitForSelector('#setupPanel .setstep', { timeout: 20000 });
+  // Two frames on: what the page's last draw left for the next frame is on screen.
+  const painted = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  // The page at a width just set and laid out there: what crossing a
+  // breakpoint draws again is drawn a frame after the resize.
+  const atWidth = async w => {
+    await page.waitForFunction(w => innerWidth === w, w, { timeout: 10000 });
+    await painted();
+  };
   const draw = () => page.evaluate(async () => {
     await loadNodes(); setupSig = ''; drawSetup();
     const s = document.querySelector('#setupPanel .setstep');
@@ -284,6 +294,27 @@ await firstRun(false);
   });
   ok(card.second === 'Your disks' && card.rows === 5 && card.held && /A ZFS raidz1 of 3 disks/.test(card.plan) && /one disk may fail/.test(card.plan) && card.fast,
      `the first run's second step is the disks: each but the stick a row, one holding data kept unless ticked, the plan in words and the SSD a fast pool (${JSON.stringify(card)})`);
+  // A disk SMART calls failing says so on its row (B771: the page read a
+  // field nothing sends, so no disk could ever be marked).
+  const failing = await page.evaluate(() => {
+    const disks = setupDisks.own?.disks?.disks || setupDisks.own?.disks || [];
+    const d = disks.find(x => x.name === 'sdb') || disks.find(x => !x.system);
+    if (!d) return { none: true };
+    const was = d.smart;
+    const pills = () => [...document.querySelectorAll('#setupPanel .setdisk')].filter(r => r.querySelector('.pill.bad')?.textContent === 'failing')
+      .map(r => r.querySelector('input')?.dataset.setdiskuse);
+    d.smart = { health: 'ok', temp_c: 31 };
+    drawSetup();
+    const well = pills();
+    d.smart = { health: 'failing', temp_c: 52 };
+    drawSetup();
+    const ill = pills();
+    d.smart = was;
+    drawSetup();
+    return { disk: d.name, well, ill };
+  });
+  ok(!failing.none && failing.well.length === 0 && failing.ill.length === 1 && failing.ill[0] === failing.disk,
+     `a disk SMART calls failing wears it on its row, and a healthy one does not (${JSON.stringify(failing)})`);
   // The disks a stick's plan adopts are the old system's (B637): each a
   // row with whose it is and no box, left out of the plan and of Make it;
   // when every disk is theirs the step points at This machine and makes
@@ -318,6 +349,27 @@ await firstRun(false);
     ok(some.all.pill === 'in the walk' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
        && !some.all.make && some.all.boxes === 0 && some.all.walk === 'Walk me through it' && some.anyLink === 0,
        `...and with every disk theirs the step leads into the walk, offers nothing to make, and no link on the page leads where nothing can show (B662) (${JSON.stringify(some.all).slice(0, 300)})`);
+    // B945: a pool met by its disk, a disk the plan sets apart, and a disk
+    // with a partition that holds no filesystem (an old parity) are never
+    // offered to erase.
+    const apart = await page.evaluate(() => {
+      const keep = state.firstboot, disks = setupDisks.own?.disks?.disks || setupDisks.own?.disks || [];
+      const sdc = disks.find(x => x.name === 'sdc'), wasParts = sdc.parts;
+      setupWalk = 'fresh';
+      sdc.parts = [{ name: 'sdc1', holds: 'nothing' }];
+      state.firstboot = { ...(keep || {}), adopt: { want: { data: [], parity: [], pools: [{ name: 'cache', fs: 'btrfs', uuid: '', disk_id: 'Samsung_990_S-N' }] },
+                                                     skipped: [{ slot: 'disk2', id: 'WD_Red_WD-D', why: 'encrypted: its key is not asked for yet' }] } };
+      setupSig = ''; drawSetup();
+      const s = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
+      const out = { theirs: [...s.querySelectorAll('.setdisk.theirs')].map(x => x.textContent.replace(/\s+/g, ' ')).join(' | '),
+                    ticked: [...s.querySelectorAll('.setdisk:not(.theirs) input:checked')].map(i => i.dataset.setdiskuse),
+                    sdc: s.querySelector('[data-setdiskuse="sdc"]')?.closest('.setdisk')?.textContent.replace(/\s+/g, ' ') || '' };
+      sdc.parts = wasParts; state.firstboot = keep; setupWalk = ''; setupSig = ''; drawSetup();
+      return out;
+    });
+    ok(/old system's pool cache: adopted as it is/.test(apart.theirs) && /old system's disk2: not adopted \(encrypted/.test(apart.theirs)
+       && !apart.ticked.includes('sdc') && /holds a partition: kept unless you tick it/.test(apart.sdc),
+       `the old system's pool disk and a disk it set apart are its own, and a disk with a bare partition is kept unless ticked (${JSON.stringify(apart).slice(0, 400)})`);
   }
   // A new start on a stick (B666, B671; the operator, 4 Nov): the place for the
   // projects is a step, named by itself once a pool is made; a project waits for
@@ -333,8 +385,9 @@ await firstRun(false);
     const fresh = await page.evaluate(async () => {
       const keepFb = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported, keepD = setupDisks.own;
       // What is drawn here is said here: no read from the server lands under it.
-      const keepLoads = [loadNodes, setupDisksLoad];
-      loadNodes = async () => {}; setupDisksLoad = async () => {}; setupNodesAt = Date.now() + 60000; setupDisks.at = Date.now() + 60000;
+      // Each read is counted: it is the last thing a press here asks for, once its calls are answered.
+      const keepLoads = [loadNodes, setupDisksLoad], reads = { nodes: 0, disks: 0 };
+      loadNodes = async () => { reads.nodes++; }; setupDisksLoad = async () => { reads.disks++; }; setupNodesAt = Date.now() + 60000; setupDisks.at = Date.now() + 60000;
       const panel = () => document.getElementById('setupPanel');
       const step = t => [...panel().querySelectorAll('.setstep')].find(x => x.querySelector('h3')?.textContent === t);
       setupWalk = 'fresh'; state.firstboot = null; setupPlaceTried = '';
@@ -347,7 +400,8 @@ await firstRun(false);
       n.reported = { ...n.reported, pools: [{ name: 'tank', mount: '/mnt/tank' }, { name: 'fast', mount: '/mnt/fast' }] };
       setupDisks.own = { ...setupDisks.own, pools: [{ name: 'tank', mount: '/mnt/tank' }, { name: 'fast', mount: '/mnt/fast' }] };
       setupSig = ''; drawSetup(); setupSig = ''; drawSetup();
-      await sleep_(400);
+      // The call that names the place answered: the page reads the nodes then.
+      await until_(() => reads.nodes);
       out.card = step('Shares')?.innerText.replace(/\s+/g, ' '); out.pill = step('Shares')?.querySelector('.pill')?.textContent;
       out.exportOn = document.getElementById('setShareExport')?.checked;
       n.reported = { ...n.reported, os_stick: { ...n.reported.os_stick, pool: '/mnt/fast', ready: true } };
@@ -355,14 +409,15 @@ await firstRun(false);
       out.placed = step('Where the spaces and containers go')?.querySelector('.pill')?.textContent; out.projectLive = !step('A first space')?.querySelector('[data-setproject]')?.disabled;
       // Left unticked, a share is made and not exported.
       step('Shares').querySelector('[data-setshares]').click();
-      await sleep_(500);
+      // Both shares made, each call and its job answered: the page reads the disks then.
+      await until_(() => reads.disks);
       setupDisks.own = { ...setupDisks.own, shares: [{ name: 'Media', path: '/mnt/tank/media', smb: { on: false }, nfs: { on: false } }] };
       setupSig = ''; drawSetup();
       out.madeCard = step('Shares')?.innerText.replace(/\s+/g, ' ');
       [loadNodes, setupDisksLoad] = keepLoads; setupNodesAt = 0; setupDisks.at = 0;
       n.reported = was; setupDisks.own = keepD; state.firstboot = keepFb; setupWalk = ''; setupSig = ''; drawSetup();
       return out;
-      function sleep_(ms){ return new Promise(r => setTimeout(r, ms)); }
+      async function until_(f){ for (const end = Date.now() + 15000; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50)); }
     });
     await page.unroute('**/api/v1/nodes'); await page.unroute('**/api/v1/jobs?id=j_y');
     ok(fresh.titles.includes('Where the spaces and containers go') && fresh.projectDead === true && /Once the spaces have a place/.test(fresh.why),
@@ -381,7 +436,7 @@ await firstRun(false);
   // steps in the order they have to happen, each done in place with This
   // machine's and Controller settings' own controls, read from the machine.
   {
-    const walk = await page.evaluate(() => {
+    const walk = await page.evaluate(async () => {
       const keep = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported;
       const panel = () => document.getElementById('setupPanel');
       const titles = () => [...panel().querySelectorAll('.setstep h3')].map(h => h.textContent);
@@ -415,18 +470,22 @@ await firstRun(false);
       // says where it comes from.
       redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
       out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
-      // The screen's password: optional, offered while the screen is open,
-      // never waiting on the steps before it, and gone once set.
-      { redraw({ console: { os: true, set: false, open: true } });
-        const c = step('A password for this screen');
-        out.conPill = c?.querySelector('.pill')?.textContent;
-        out.conSaid = words('A password for this screen');
-        out.conLive = !!c && !c.querySelector('#conPw').disabled && !c.querySelector('[data-console=set]').disabled;
-        out.conHeld = c?.classList.contains('held');
+      // The two presses at the top (the operator, 9 Nov), in place of a step:
+      // live while nothing runs, dead for a job, and the login's says so once
+      // the machine has one. Generating shows the password once and sends it.
+      { const top = () => panel().querySelector('.setuptitle');
+        redraw({ console: { os: true, set: false, open: true } });
+        out.conGen = top()?.querySelector('[data-setconsole]')?.textContent;
+        out.conOffBtn = top()?.querySelector('[data-setoff]')?.textContent;
+        out.conLive = !top()?.querySelector('[data-setconsole]')?.disabled && !top()?.querySelector('[data-setoff]')?.disabled;
+        out.conNoStep = !titles().includes('A password for this screen');
+        const was = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt', started: Math.floor(Date.now() / 1000) }]; redraw({ console: { os: true, set: false, open: true } });
+        out.conDead = !!top()?.querySelector('[data-setconsole]')?.disabled && !!top()?.querySelector('[data-setoff]')?.disabled;
+        n.jobs = was;
+        redraw({ console: { os: true, set: false, open: true } });
         redraw({ console: { os: true, set: true, open: false } });
-        out.conDone = step('A password for this screen')?.querySelector('.pill')?.textContent;
-        out.conFields = !!step('A password for this screen')?.querySelector('#conPw');
-        redraw({}); out.conOff = !step('A password for this screen'); }
+        out.conAgain = top()?.querySelector('[data-setconsole]')?.textContent;
+        redraw({}); out.conNone = !top()?.querySelector('[data-setconsole]') && !!top()?.querySelector('[data-setoff]'); }
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
@@ -445,6 +504,28 @@ await firstRun(false);
       stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, owner: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.placed = pill('Where the spaces and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
+      // The old controller ran on this machine, so its address cannot answer:
+      // the bundle alone; and the token given on the first page is not asked
+      // again (the operator, 10 Nov).
+      out.oldNoFrom = !step('Land the controller')?.querySelector('#landFrom');
+      setupLand = { fresh: true, owner: true, stick: true, held: '', token_kept: true }; setupSig = ''; drawSetup();
+      out.keptNoTok = !step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile')
+        && /the one you gave on the first page/.test(words('Land the controller'));
+      // A bundle picked stays picked when the page draws again (B776: the
+      // redraw set the file field's value, which a file field refuses, so
+      // the file was gone and Land said to pick it first).
+      { const f = step('Land the controller')?.querySelector('#landFile'), dt = new DataTransfer();
+        dt.items.add(new File(['x'], 'moved.aeriemove'));
+        f.files = dt.files;
+        let threw = '';
+        try { setupSig = ''; drawSetup(); } catch (e){ threw = String(e); }
+        const now = step('Land the controller')?.querySelector('#landFile');
+        out.fileKept = { threw, kept: now === f, name: now?.files?.[0]?.name || '' }; }
+      // The two picks: each label over its field, the field and its verb on one line.
+      { const sp = step('Where the spaces and containers go'), sel = sp?.querySelector('#stickPool'), go = sp?.querySelector('[data-stickpool]'), lbl = sp?.querySelector('label[for="stickPool"]');
+        const r = e => e?.getBoundingClientRect();
+        out.pickLine = !!(sel && go && lbl) && Math.abs(r(sel).top + r(sel).height / 2 - (r(go).top + r(go).height / 2)) < 4 && r(lbl).bottom <= r(sel).top + 1; }
+      setupLand = { fresh: true, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       setupLand = { fresh: true, owner: true, stick: true, held: 'kept back for a reason' }; setupSig = ''; drawSetup();
       out.heldSaid = /kept back for a reason/.test(words('Land the controller'));
       setupLand = { fresh: false, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
@@ -466,14 +547,30 @@ await firstRun(false);
       out.fresh = { head: panel().querySelector('h2')?.textContent, kept: localStorage.getItem('bb.setupWalk'), ask: panel().querySelector('[data-setwalk="move"]')?.textContent };
       panel().querySelector('[data-setwalk="move"]').click();
       out.backIn = panel().querySelector('h2')?.textContent;
+      // Last, since it waits: a node list read meanwhile would take the
+      // block's fixtures with it.
+      { redraw({ console: { os: true, set: false, open: true } }); const top = () => panel().querySelector('.setuptitle');
+        const sent = [], keep = postJSON, keepAsk = ask; let shown = null;
+        const keepLoad = loadNodes; let read = false;
+        ask = async o => { shown = o; return true; }; loadNodes = async () => { read = true; };
+        postJSON = async (u, b) => { sent.push(b); return {ok: true}; };
+        top().querySelector('[data-setconsole]').click();
+        for (let t = 0; t < 40 && !shown; t++) await new Promise(r => setTimeout(r, 50));
+        out.conShown = shown?.field?.value;
+        out.conAsked = shown?.text;
+        out.conSent = sent[0];
+        // The press ends with its read of the nodes: made under the stub, not after it is lifted.
+        for (let t = 0; t < 100 && !read; t++) await new Promise(r => setTimeout(r, 50));
+        postJSON = keep; ask = keepAsk; loadNodes = keepLoad;
+      }
       return out;
     });
     if (process.env.BB_SHOTS){
-      await page.setViewportSize({ width: 1440, height: 2100 }); await sleep(300);
+      await page.setViewportSize({ width: 1440, height: 2100 }); await atWidth(1440);
       await page.screenshot({ path: `${process.env.BB_SHOTS}/walk-desk.png`, fullPage: true });
-      await page.setViewportSize({ width: 393, height: 3000 }); await sleep(300);
+      await page.setViewportSize({ width: 393, height: 3000 }); await atWidth(393);
       await page.screenshot({ path: `${process.env.BB_SHOTS}/walk-phone.png`, fullPage: true });
-      await page.setViewportSize({ width: 1280, height: 720 }); await sleep(200);
+      await page.setViewportSize({ width: 1280, height: 720 }); await atWidth(1280);
     }
     await page.evaluate(() => { try{ localStorage.removeItem('bb.setupWalk'); }catch(e){} setupWalk = ''; setupLand = null; state.firstboot = null; loadNodes(); setupSig = ''; drawSetup(); });
     ok(walk.walking && walk.head === 'Moving here' && walk.titles.join(' | ') === "Have these with you | This machine | The old system's disks | Where the spaces and containers go | Land the controller | After it lands | If you go back",
@@ -486,9 +583,12 @@ await firstRun(false);
     ok(/adopting the old system's disks/.test(walk.jobBand) && /mounting \/mnt\/disk2, 6 min so far/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
        `...and while a system job runs every step that would start another waits, the page saying what runs, its step and how long (${walk.jobBand})`);
     ok(walk.noTake, '...and the walk never offers to take the array over: that comes after it, from This machine');
-    ok(walk.conPill === 'optional' && /with no password/.test(walk.conSaid) && walk.conLive && !walk.conHeld,
-       `...a password for the screen is offered as optional, saying the screen is open until setup ends, and waits on no step (${walk.conPill}, ${walk.conLive}, ${walk.conHeld})`);
-    ok(walk.conDone === 'done' && !walk.conFields && walk.conOff, `...done with no fields once set, and not drawn where the machine has no such screen (${walk.conDone}, ${walk.conFields}, ${walk.conOff})`);
+    ok(walk.conGen === 'Generate console login' && walk.conOffBtn === 'Shut down' && walk.conLive && walk.conNoStep,
+       `...the top of the page has Generate console login and Shut down, live, and no step asks for a password (${walk.conGen}, ${walk.conOffBtn}, ${walk.conLive}, ${walk.conNoStep})`);
+    ok(walk.conDead, '...both dead while the machine runs a job');
+    ok(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/.test(walk.conShown || '') && walk.conSent?.action === 'console' && walk.conSent?.password === walk.conShown && /log in as admin/.test(walk.conAsked || ''),
+       `...Generate sends a password a person can type at a KVM and shows it once, with the name (${walk.conShown}, ${JSON.stringify(walk.conSent)})`);
+    ok(walk.conAgain === 'New console login' && walk.conNone, `...it reads New console login once one is set, and Shut down is there on a machine with no such screen (${walk.conAgain}, ${walk.conNone})`);
     ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);
@@ -499,6 +599,11 @@ await firstRun(false);
        `...naming a spaces folder says what it costs and when the spaces show (${walk.costs.slice(0, 260)})`);
     ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
        `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
+    ok(walk.oldNoFrom && walk.keptNoTok, `...the land form asks for the bundle alone where the old controller ran here, and not the token given on the first page (${JSON.stringify([walk.oldNoFrom, walk.keptNoTok])})`);
+    // The page is patched (R244): the field is the same one, its file still in it.
+    ok(walk.fileKept && !walk.fileKept.threw && walk.fileKept.kept && walk.fileKept.name === 'moved.aeriemove',
+       `...and a bundle picked there is still picked after the page draws again (${JSON.stringify(walk.fileKept)})`);
+    ok(walk.pickLine, '...the system pool is a label over its field, and the field and its button share a line');
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
     ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
@@ -513,10 +618,10 @@ await firstRun(false);
   await page.route('**/api/v1/jobs?id=j_x', async r => { inFlight = false; return r.fulfill({ json: { id: 'j_x', state: 'succeeded' } }); });
   await page.route('**/api/v1/nodes', async r => {
     const b = r.request().postDataJSON?.() || {};
-    // As the server answers: one system job at a time on a node, a second
-    // refused while the first runs (B670), until the job read says it ended.
+    // Each sent only once the last has ended, so one that fails stops the
+    // rest: a second sent while the first runs is counted here.
     if (r.request().method() === 'POST' && /^storage-/.test(b.action || '')){
-      if (inFlight) { refused++; return r.fulfill({ status: 400, json: { error: 'a system job is already in flight on this node; one at a time' } }); }
+      if (inFlight) { refused++; return r.fulfill({ status: 400, json: { error: 'sent before the last ended' } }); }
       sent.push(b); inFlight = true; return r.fulfill({ json: { ok: true, job: 'j_x' } });
     }
     return r.fallback();
@@ -524,11 +629,13 @@ await firstRun(false);
   const asked = page.dialogs.length;
   await page.click('#setupPanel [data-setdisksmake]');
   await page.waitForFunction(() => document.querySelector('#setupPanel [data-setdisksmake]')?.textContent.includes('Making') || false, null, { timeout: 10000 }).catch(() => {});
-  await sleep(500);
+  // Both pools sent and the second one's job answered, which is what the
+  // checks below count.
+  await until(() => sent.length >= 2 && !inFlight, 20000);
   await page.waitForFunction(() => !setupDisks.making, null, { timeout: 20000 });
   await page.unroute('**/api/v1/nodes');
   await page.unroute('**/api/v1/jobs?id=j_x');
-  ok(refused === 0, `Make it sends its pools one at a time, so neither is refused for the other (${refused} refused) (B670)`);
+  ok(refused === 0, `Make it sends its pools one at a time, each once the last has ended (${refused} sent early)`);
   const ask = page.dialogs.slice(asked).join(' ');
   ok(/WD-B/.test(ask) && /WD-C/.test(ask) && /WD-D/.test(ask) && /S-N/.test(ask) && !/SG-E/.test(ask) && !/STICK1/.test(ask) && /erased/.test(ask),
      `Make it names every disk it erases by serial first, and none it keeps (${ask.slice(0, 160)})`);
@@ -537,23 +644,33 @@ await firstRun(false);
      `...and makes it with the Storage page's own calls: the raidz1 and the fast pool (${JSON.stringify(sent)})`);
   const fin2 = await bm.finish();
   ok(!fin2.error, `a bare-metal first run finishes with only its own node (${fin2.error || 'ok'})`);
-  // This machine (R90 step 8): the rail's Controller group opens on it, its
-  // page draws the own node's row with the machine's head and the Updates
-  // section, the Nodes page's picker leaves it out, and a project's node
-  // picker names it This machine.
+  // This controller (R90 step 8; split the operator, 9 Nov): the rail's
+  // Controller group opens on it, with what is the controller's; the machine
+  // as a node is on the Nodes page, in its picker and every other node page's
+  // but the containers', and a project's node picker names it This machine.
   await page.evaluate(async () => { await refresh(); await loadNodes(); });
   await page.waitForFunction(() => !!state?.own_node, null, { timeout: 15000 }).catch(() => {});
   const rail = await page.evaluate(() => (railGroups().find(g => g.key === 'controller')?.tools || []).filter(([k]) => railAllows(k)).map(([k]) => k));
-  ok(rail[0] === 'machine', `the rail's Controller group offers This machine first on a bare-metal install (${rail.join(',')})`);
+  ok(rail[0] === 'machine', `the rail's Controller group offers This controller first on a bare-metal install (${rail.join(',')})`);
   await page.evaluate(() => openMachineTab());
-  await page.waitForSelector('.machinetab .ndrow[data-node]', { timeout: 15000 });
+  await page.waitForSelector('.machinetab .pghead', { timeout: 15000 });
   const mp = await page.evaluate(() => ({
     head: document.querySelector('.machinetab .pghead')?.textContent.replace(/\s+/g, ' ') || '',
-    tag: !!document.querySelector('.machinetab .ndrow .tag.ndown'),
+    link: document.querySelector('.machinetab .pghead a.pagelink')?.getAttribute('href') || '',
     updates: !!document.querySelector('.machinetab details[data-sect="nodes:updates"]'),
-    sects: [...document.querySelectorAll('.machinetab .ndsections details.sect')].map(d => d.dataset.sect) }));
-  ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.tag && mp.updates && mp.sects.includes('nodes:health') && mp.sects.includes('nodes:advanced'),
-     `This machine draws the machine's head, the Updates section and the own node's row with its sections (${mp.sects.join(',')})`);
+    row: !!document.querySelector('.machinetab .ndrow'),
+    own: ownMachine()?.id }));
+  ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.updates && !mp.row && mp.link === `#/machines/nodes/${mp.own}`,
+     `This controller draws the head and the Updates section, no node row, and links to the machine's row on the Nodes page (${mp.link})`);
+  await page.evaluate(() => { openNodesTab(ownMachine().id); readMoved('nodes'); drawPanes(); });
+  await page.waitForSelector('.nodestab .ndrow[data-node]', { timeout: 15000 });
+  const np = await page.evaluate(() => ({
+    tag: !!document.querySelector('.nodestab .ndrow .tag.ndown'),
+    sects: [...document.querySelectorAll('.nodestab .ndsections details.sect')].map(d => d.dataset.sect),
+    live: Object.fromEntries(['library', 'installed', 'files', 'emulator', 'docker', 'nginx'].map(k => [k, machinesLive(k).some(n => n.id === ownMachine().id)])) }));
+  ok(np.tag && np.sects.includes('nodes:health') && np.sects.includes('nodes:advanced'), `the machine is a row on the Nodes page, with a node's sections (${np.sects.join(',')})`);
+  ok(np.live.library && np.live.installed && np.live.files && np.live.emulator && np.live.docker && !np.live.nginx,
+     `its node is in the Library's and every node page's picker, the Containers page's too, and not the nginx page's (${JSON.stringify(np.live)})`);
   // A held start (R56 step 9): not held on this first boot, armed for the
   // next by its press, and Start says there was nothing to lift.
   const h0 = await page.evaluate(() => state?.held || null);
@@ -570,10 +687,10 @@ await firstRun(false);
   // (R161 step 11), ticked while armed, the head's button gone.
   {
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: true });
-    await page.evaluate(async () => { await refresh(); drawPanes(); });
+    await page.evaluate(async () => { await refresh(); readMoved('nodes'); drawPanes(); });
     const box = await page.evaluate(() => ({
-      row: !!document.querySelector('.machinetab details[data-sect="nodes:advanced"] [data-holdnextbox]:checked'),
-      head: !!document.querySelector('.machinetab .pghead [data-holdnext]') }));
+      row: !!document.querySelector('.nodestab details[data-sect="nodes:advanced"] [data-holdnextbox]:checked'),
+      head: !!document.querySelector('.nodestab .pghead [data-holdnext]') }));
     ok(box.row && !box.head, `hold the next start is a checkbox in the Reboot or shut down row, ticked while armed (${JSON.stringify(box)})`);
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: false });
   }
@@ -584,8 +701,8 @@ await firstRun(false);
       const n = ownMachine();
       n.reported = { ...n.reported, os_stick: { stick: true, pool: '', ready: false, on_stick: ['projects'], written_kb: 3145728, boot_written_kb: 20480 },
                      pools: [{ name: 'fast', mount: '/mnt/pools/fast' }] };
-      nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:stick"]');
+      readMoved('nodes'); drawPanes();
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:stick"]');
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '', pick: [...(sect?.querySelectorAll('#stickPool option') || [])].map(o => o.value) };
     });
     ok(st.there && /waiting for a system pool/.test(st.text) && /the configuration, and the spaces/.test(st.text) && /3\.0 GB in its life/.test(st.text)
@@ -596,6 +713,14 @@ await firstRun(false);
   // serial or not, the parity disk left alone, read only or writable, Check
   // and Adopt; once adopted, what is mounted and Release.
   {
+    // The status poll held for the block: everything here is said on the
+    // page (the machine's disks, what it adopted, the first boot's plan)
+    // and drawn from that, and a poll landing between the saying and the
+    // draw puts the server's own back, which has none of it.
+    await holdPoll(page);
+    // ...and the nodes' own re-read with it, which a node's every check-in
+    // asks for: it puts back a machine that has adopted nothing.
+    await page.evaluate(() => { if (!window.__heldLoadNodes){ window.__heldLoadNodes = loadNodes; loadNodes = async () => {}; } });
     const ad = await page.evaluate(() => {
       const n = ownMachine();
       n.reported = { ...n.reported, disks: [{ name: 'sdb', by_id: '/dev/disk/by-id/ata-WDC_X_SER111', serial: 'SER111' },
@@ -605,9 +730,9 @@ await firstRun(false);
                          parity: [{ slot: 'parity', id: 'ST_P_SERPPP' }], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u-1' }] },
                  skipped: [{ slot: 'disk3', id: 'WDC_Z_LOCK33', why: 'encrypted: its key is not asked for yet' }] } };
       window.__fbPlan = state.firstboot;
-      nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopt"]');
-      window.__machineSections = [...document.querySelectorAll('.machinetab details.sect')].map(d => `${d.dataset.sect}: ${d.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim()}`);
+      readMoved('nodes'); drawPanes();
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adopt"]');
+      window.__machineSections = [...document.querySelectorAll('.nodestab details.sect')].map(d => `${d.dataset.sect}: ${d.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim()}`);
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                radios: [...(sect?.querySelectorAll('input[name="adoptMode"]') || [])].map(r => r.value + (r.checked ? '*' : '')),
                acts: [...(sect?.querySelectorAll('[data-adopt]') || [])].map(x => x.dataset.adopt) };
@@ -615,13 +740,13 @@ await firstRun(false);
     if (process.env.BB_SHOTS){
       console.log('[machine sections] ' + (await page.evaluate(() => window.__machineSections.join(' | '))));
       const vp = page.viewportSize();
-      const openAll = () => page.evaluate(() => document.querySelectorAll('.machinetab details.sect').forEach(d => { d.open = true; }));
+      const openAll = () => page.evaluate(() => document.querySelectorAll('.nodestab details.sect').forEach(d => { d.open = true; }));
       await openAll();
-      await page.setViewportSize({ width: 1440, height: 7000 }); await sleep(500);
+      await page.setViewportSize({ width: 1440, height: 7000 }); await atWidth(1440);
       await page.screenshot({ path: `${process.env.BB_SHOTS}/machine-desk.png` });
-      await page.setViewportSize({ width: 393, height: 16000 }); await sleep(500);
+      await page.setViewportSize({ width: 393, height: 16000 }); await atWidth(393);
       await page.screenshot({ path: `${process.env.BB_SHOTS}/machine-phone.png` });
-      await page.setViewportSize(vp); await sleep(300);
+      await page.setViewportSize(vp); await atWidth(vp.width);
     }
     ok(ad.there && /here as sdb/.test(ad.text) && /WDC_Y_GONE22 · not on this machine/.test(ad.text) && /here as sdc, left alone/.test(ad.text)
        && /cache/.test(ad.text) && /encrypted/.test(ad.text) && /1 not here/.test(ad.text)
@@ -636,9 +761,9 @@ await firstRun(false);
       // since the step above: the plan is set again with its shares.
       state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
                                  notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
-      nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
-      return { there: !!sect, gone: !document.querySelector('.machinetab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
+      readMoved('nodes'); drawPanes();
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
+      return { there: !!sect, gone: !document.querySelector('.nodestab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
                release: !!sect?.querySelector('[data-adopt="release"]'), serve: !!sect?.querySelector('[data-adoptshares]') };
     });
     ok(done.serve && /1 share \(media\) can be served from \/mnt\/user/.test(done.text) && /docs: secure/.test(done.text),
@@ -654,8 +779,8 @@ await firstRun(false);
     const folders = await page.evaluate(() => {
       const n = ownMachine();
       n.reported = { ...n.reported, adopted: { ...n.reported.adopted, folders: ['media', 'TV Shows', 'appdata'] }, shares: [{ name: 'appdata', path: '/mnt/user/appdata', smb: { on: true }, nfs: { on: false } }] };
-      nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      readMoved('nodes'); drawPanes();
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       return { offered: [...(sect?.querySelectorAll('[data-adoptfolder]') || [])].map(x => x.dataset.adoptfolder),
                ticked: [...(sect?.querySelectorAll('[data-adoptfolder]:checked') || [])].length, btn: !!sect?.querySelector('[data-adoptfolders]') };
     });
@@ -664,9 +789,9 @@ await firstRun(false);
     // Taking the array over (R163 step 3) and the way back (step 5).
     const take = await page.evaluate(() => {
       const n = ownMachine(), was = n.reported.adopted;
-      const read = () => { nodesRev++; drawPanes();
-        const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
-        const back = document.querySelector('.machinetab details[data-sect="nodes:adoptback"]');
+      const read = () => { readMoved('nodes'); drawPanes();
+        const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
+        const back = document.querySelector('.nodestab details[data-sect="nodes:adoptback"]');
         return { take: [...(sect?.querySelectorAll('[data-adopttake]') || [])].map(x => x.dataset.adopttake), release: !!sect?.querySelector('[data-adopt="release"]'),
                  status: sect?.querySelector('summary')?.textContent.replace(/\s+/g, ' ') || '', back: back?.textContent.replace(/\s+/g, ' ') || '' }; };
       const old = read();
@@ -676,7 +801,7 @@ await firstRun(false);
       const fbWas = state.firstboot;
       state.firstboot = { ...fbWas, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *' };
       const offered = read();
-      const msect = () => document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      const msect = () => document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       offered.moves = [...(msect()?.querySelectorAll('[data-admove]') || [])].map(r => `${r.dataset.admove}:${r.querySelector('[data-moveland]').value}:${r.querySelector('[data-movemover]').value}`);
       offered.when = [...(msect()?.querySelectorAll('#adoptMoverWhen option') || [])].map(o => o.value);
       const isos = msect()?.querySelector('[data-admove="isos"]');
@@ -688,7 +813,7 @@ await firstRun(false);
       n.reported.adopted = { ...was, taken: true, writable: true };
       const taken = read();
       n.reported.adopted = was;
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       return { old, offered, taken };
     });
     ok(JSON.stringify(take.offered.moves) === '["TV Shows:cache:cache>array","isos:array:"]' && take.offered.when[0] === '0 4 * * *' && take.offered.when.includes('')
@@ -698,19 +823,19 @@ await firstRun(false);
     // its label does, and each bar keeps its buttons on one line apart.
     {
       const vp = page.viewportSize();
-      await page.setViewportSize({ width: 393, height: 1600 }); await sleep(400);
+      await page.setViewportSize({ width: 393, height: 1600 }); await atWidth(393);
       const lay = await page.evaluate(() => {
         const n = ownMachine(), was = [n.reported.adopted, state.firstboot];
         n.reported.adopted = { ...n.reported.adopted, taken: false };
         state.firstboot = { ...state.firstboot, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] };
-        nodesRev++; drawPanes();
-        const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); sect.open = true;
+        readMoved('nodes'); drawPanes();
+        const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); sect.open = true;
         const take = sect.querySelector('#adoptTake'), lbl = take.querySelector('label, .lblrow, .ctllbl') || take.firstElementChild;
         const left = el => Math.round(el.getBoundingClientRect().left);
         const bars = [...sect.querySelectorAll('.actbar')].map(b => { const bs = [...b.querySelectorAll(':scope > button')].map(x => x.getBoundingClientRect());
           return { n: bs.length, tops: new Set(bs.map(r => Math.round(r.top))).size, gaps: bs.slice(1).map((r, i) => Math.round(r.left - bs[i].right)) }; });
         const out = { label: left(lbl), groups: [...take.querySelectorAll('[data-admove]')].map(left), bars };
-        [n.reported.adopted, state.firstboot] = was; nodesRev++; drawPanes();
+        [n.reported.adopted, state.firstboot] = was; readMoved('nodes'); drawPanes();
         return out;
       });
       await page.setViewportSize(vp);
@@ -722,72 +847,113 @@ await firstRun(false);
       const vp = page.viewportSize();
       await page.evaluate(() => { const n = ownMachine(); window.__adWas = [n.reported.adopted, state.firstboot]; });
       for (const [w, name] of [[1440, 'desk'], [393, 'phone']]){
-        await page.setViewportSize({ width: w, height: 1600 }); await sleep(500);
+        await page.setViewportSize({ width: w, height: 1600 }); await atWidth(w);
         // Laid over again for each width: the page's poll puts the server's own back.
         await page.evaluate(() => { const n = ownMachine();
           n.reported.adopted = { ...window.__adWas[0], taken: false };
           state.firstboot = { ...window.__adWas[1], moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'appdata', land: 'cache', from: '', to: '' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *', mover_words: 'daily at 4:00' };
-          nodesRev++; drawPanes(); const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await sleep(200);
-        await page.locator('.machinetab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
+          readMoved('nodes'); drawPanes(); const d = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await painted();
+        await page.locator('.nodestab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
       }
       await page.setViewportSize(vp);
-      await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; nodesRev++; drawPanes(); });
+      await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; readMoved('nodes'); drawPanes(); });
     }
-    ok(!take.old.take.length && JSON.stringify(take.offered.take) === '["dry","go"]',
-       `an agent that has the takeover offers Check the takeover and Take the array over; an older one offers neither (${JSON.stringify([take.old.take, take.offered.take])})`);
+    // Every agent from 0.9.456 says whether it has taken the array over, so
+    // a record that names nothing is one not taken yet, and is offered both.
+    ok(JSON.stringify(take.old.take) === '["dry","go"]' && JSON.stringify(take.offered.take) === '["dry","go"]',
+       `an array not taken over offers Check the takeover and Take the array over (${JSON.stringify([take.old.take, take.offered.take])})`);
     ok(/taken over/.test(take.taken.status) && !take.taken.release && /parity sync that follows rebuilds/.test(take.taken.back)
        && /nothing on its data disks was written here/.test(take.old.back) && /never written/.test(take.old.back),
        `once taken over Release waits, and Going back says a parity sync there; read-only, it says nothing was written (${take.taken.back.slice(0, 160)})`);
     const onStorage = await page.evaluate(async () => {
-      window.__fbKeep = state.firstboot;
-      openStorageTab(); await new Promise(r => setTimeout(r, 400));
+      window.__fbKeep = state.firstboot || window.__fbPlan;
+      const till = async f => { for (const end = Date.now() + 15000; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50)); };
+      // The page's own reads counted while they are out: one landing after
+      // the list is said below would put the server's back over it.
+      const load = loadStorage; let out = 0;
+      loadStorage = async () => { out++; try { await load(); } finally { out--; } };
+      openStorageTab(); await till(() => storageList !== null && !out);
+      loadStorage = load;
       const own = ownMachine();
       storageList = [{ node: own.id, name: own.name, measured: true, age_s: 60, fs: [], disks: [], projects: [] }];
-      storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
+      // What the machine was said to have adopted, said again: a status
+      // poll landing while the page's reads were waited out puts the
+      // server's own back, as the steps below know and say again too.
+      state.firstboot = state.firstboot || window.__fbKeep;
+      readMoved('storage'); drawPanes(); await till(() => document.querySelector('.storagetab details[data-sect="storage:adopted"]'));
       const sect = document.querySelector('.storagetab details[data-sect="storage:adopted"]');
       return { there: !!sect, release: !!sect?.querySelector('[data-adopt="release"]'), folder: !!sect?.querySelector('[data-adoptfolder="TV Shows"]') };
     });
     ok(onStorage.there && onStorage.release && onStorage.folder,
        `the Storage page of the machine draws the same Adopted disks, Release and the folders to serve (${JSON.stringify(onStorage)})`);
-    await page.evaluate(() => { openMachineTab(); state.firstboot = state.firstboot || window.__fbKeep; nodesRev++; drawPanes(); });
+    // The Nodes page points to the Containers page, where they are (the
+    // operator, 10 Nov: looked for there and never found on the Nodes page).
+    const pointer = await page.evaluate(() => {
+      openNodesTab(ownMachine().id); state.firstboot = state.firstboot || window.__fbKeep;
+      state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
+                                    networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
+      window.__fbKeep = state.firstboot; readMoved('nodes'); drawPanes();
+      const p = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]');
+      return { there: !!p, button: !!p?.querySelector('[data-oldapps]'), read: !!p?.querySelector('[data-adoptapp]') };
+    });
+    ok(pointer.there && pointer.button && !pointer.read, `the Nodes page says the old system's containers and VMs are on the Containers page (${JSON.stringify(pointer)})`);
     // ...and what the old system ran (R163 steps 10, 11): read first, then
-    // its containers to make and start and its VMs to define and run.
-    const apps = await page.evaluate(async () => {
+    // its containers as compose files to download (the operator, 10 Nov:
+    // imported from New container, never made here on a press) and its VMs
+    // to define and run.
+    const apps = await page.evaluate(() => {
       const n = ownMachine();
+      openDockerOn(n.id);
       // A status poll between the two evaluates can bring the record back
       // without it (it crashed here under a whole gate's load).
       state.firstboot = state.firstboot || window.__fbKeep;
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
                                     networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
-      nodesRev++; drawPanes();
-      const unread = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]')?.textContent.replace(/\s+/g, ' ') || '';
+      readMoved('nodes'); drawPanes();
+      const unread = document.querySelector('.dmtab details[data-sect="docker:oldapps"]')?.textContent.replace(/\s+/g, ' ') || '';
       n.reported = { ...n.reported, vms_other: [{ name: 'Windows 11', state: 'shut off', autostart: false, vcpus: 4, mem_mb: 8192 }],
         adopted: { ...n.reported.adopted, apps: { docker: { autostart: ['plex'], digests: { plex: 'x@sha256:' + 'a'.repeat(64) } },
                                                    vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
                                                    said: ['Docker: 1 container ran, 1 started with the machine'] } } };
-      nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]');
+      readMoved('nodes'); drawPanes();
+      // The rows as the controller answers them, laid over the fetch this
+      // draw made (it lands after this evaluate).
+      adoptPlan = [{ name: 'plex', file: 'plex.yaml', autostart: true, notes: [], network: 'br0', ok: true }];
+      readMoved('nodes'); drawPanes();
+      const sect = document.querySelector('.dmtab details[data-sect="docker:oldapps"]');
       return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
-               acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
+               acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm),
+               tick: sect?.querySelector('[data-adoptvmauto="Windows 11"]')?.checked === false };
     });
     ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
        `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
-    ok(/1 started with the machine/.test(apps.text) && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
-       && ['br0', 'make', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)),
-       `once read: the networks and Make and start, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
+    ok(/1 started with the machine/.test(apps.text) && /plex br0 · starts with the machine/.test(apps.text) && /Import a compose file/.test(apps.text)
+       && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
+       && ['read', 'br0', 'zip', 'start', 'define'].every(x => apps.acts.includes(x)) && !apps.acts.includes('make') && apps.tick,
+       `once read: each container's row, the network it joins and Download compose files, each VM defined or not with Start and its Starts with the machine tick, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.tick}; ${apps.text.slice(0, 200)})`);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
+    // The VM's tick drawn: read a moment after the list was, it was not there yet.
+    await page.waitForSelector('.dmtab [data-adpick="v:Ubuntu"]', { state: 'attached', timeout: 15000 }).catch(() => {});
     const picked = await page.evaluate(() => {
-      const box = document.querySelector('.machinetab [data-adpick="v:Ubuntu"]');
+      const box = document.querySelector('.dmtab [data-adpick="v:Ubuntu"]');
       const was = box?.checked;
       box.checked = false; box.dispatchEvent(new Event('change'));
-      const b = document.querySelector('.machinetab [data-adoptapp="define"]');
+      const b = document.querySelector('.dmtab [data-adoptapp="define"]');
       const after = { was, label: b?.textContent.trim(), dead: !!b?.disabled };
       adoptSkip.clear();
       return after;
     });
     ok(picked.was === true && picked.label === 'Define the ticked' && picked.dead,
        `a VM untaken is left out and Define waits for one ticked (${JSON.stringify(picked)})`);
+    // The zip waits for a read's settings, and the controller makes no
+    // container of them on a press any more.
+    const own0 = await page.evaluate(() => ownMachine()?.id);
+    const zipNone = await (await fetch(bm.base + '/api/old-compose', { headers: bmH })).json().catch(() => ({}));
+    const noMake = await bmApi('/api/v1/nodes', { action: 'adopt-apps', op: 'make', id: own0, names: ['plex'] });
+    const rowsNone = await bmApi('/api/v1/nodes', { action: 'adopt-apps', op: 'plan', id: own0 });
+    ok(/nothing is read yet/.test(zipNone.error || '') && /Import a compose file|compose file/.test(noMake.error || '') && Array.isArray(rowsNone.apps) && rowsNone.networks,
+       `the compose files wait for a read, and make is refused for import (${zipNone.error}; ${noMake.error}; ${JSON.stringify(rowsNone)})`);
     // The verb checks before any job: a filesystem it does not take, and a
     // Release with nothing adopted, each refused with why and no job made.
     const own = await page.evaluate(() => ownMachine()?.id);
@@ -795,11 +961,13 @@ await firstRun(false);
     const noneHeld = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'release' });
     ok(/xfs, btrfs or zfs/.test(badFs.error || '') && !badFs.job && /nothing is adopted/.test(noneHeld.error || '') && !noneHeld.job,
        `storage-adopt refuses a filesystem it does not take and a Release with nothing adopted, before any job (${badFs.error}; ${noneHeld.error})`);
+    await page.evaluate(() => { if (window.__heldLoadNodes){ loadNodes = window.__heldLoadNodes; window.__heldLoadNodes = null; } });
+    await freePoll(page);
   }
   // Name and time (R161 step 3): the own machine's section, Apply asleep
   // until a field moves, and the press a system job on its node.
   const nt = await page.evaluate(() => {
-    const sect = document.querySelector('.machinetab details[data-sect="nodes:machine"]');
+    const sect = document.querySelector('.nodestab details[data-sect="nodes:machine"]');
     const b = sect?.querySelector('[data-nd="machine-apply"]'), tz = sect?.querySelector('[data-k="machinetz"]');
     const before = b?.disabled;
     if (tz){ tz.value = 'Europe/Paris'; tz.dispatchEvent(new Event('input')); }
@@ -814,8 +982,8 @@ await firstRun(false);
   await page.evaluate(() => openNodesTab());
   await page.waitForFunction(() => document.querySelector('#ndPick'), null, { timeout: 15000 }).catch(() => {});
   const picks = await page.evaluate(() => [...document.querySelectorAll('#ndPick option')].map(o => o.textContent));
-  ok(!picks.some(t => /thismachine/.test(t)) && picks.some(t => /otherbox/.test(t)),
-     `...and the Nodes page's picker offers the other node and not this machine (${picks.join(' | ')})`);
+  ok(picks.some(t => /thismachine.*\(this machine\)/.test(t)) && picks.some(t => /otherbox/.test(t)),
+     `...and the Nodes page's picker offers the other node and this machine, named as such (${picks.join(' | ')})`);
   await page.close();
   bm.stop();
 
@@ -847,7 +1015,13 @@ await firstRun(false);
          `the first page asks whether a controller is moving here, and anywhere but a stick can land it at once (${JSON.stringify(ask)})`);
       if (process.env.BB_SHOTS) await lp.screenshot({ path: `${process.env.BB_SHOTS}/landing-desk.png` });
       await lp.check('input[name="walk"][value="move"]');
-      await lp.fill('#u', 'setupper'); await lp.fill('#p', 'longenough1'); await lp.fill('#p2', 'longenough1');
+      const swap = await lp.evaluate(() => ({ acct: document.querySelector('#forNew').hidden, tok: !document.querySelector('#forMove').hidden, btn: document.querySelector('#setupGo').textContent }));
+      ok(swap.acct && swap.tok && swap.btn === 'Continue', `...yes asks for the move token in place of an account (${JSON.stringify(swap)})`);
+      await lp.fill('#mt', 'not a token');
+      await Promise.all([lp.waitForNavigation(), lp.click('button[type=submit]')]);
+      const said = await lp.evaluate(() => ({ err: document.querySelector('.err')?.textContent, moving: document.querySelector('input[name="walk"]:checked')?.value }));
+      ok(/not a move token/.test(said.err || '') && said.moving === 'move', `...something that is not one is refused, still on the move (${JSON.stringify(said)})`);
+      await lp.fill('#mt', 'A'.repeat(43));
       await Promise.all([lp.waitForNavigation(), lp.click('button[type=submit]')]);
       await lp.waitForFunction(() => document.querySelector('#setupPanel h2')?.textContent === 'Moving here', null, { timeout: 20000 });
       const arrived = await lp.evaluate(() => ({ search: location.search, kept: localStorage.getItem('bb.setupWalk'),
@@ -915,15 +1089,15 @@ await firstRun(false);
     // Restarted on the state: the process before it still answered from
     // its own memory for a moment, so the node list is what says it is the
     // new one.
-    const nodesThere = await (async () => { const end = Date.now() + patience(90000); while (Date.now() < end){
-      try { const ns = ((await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).nodes || []).map(n => n.name);
-        if (ns.includes('mover')) return ns; } catch { /* restarting */ }
-      await sleep(1000); } return []; })();
+    const nodesThere = await until(async () => {
+      const ns = ((await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).nodes || []).map(n => n.name);
+      return ns.includes('mover') && ns; }, 90000, 1000) || [];
     ok(nodesThere.includes('mover') && nodesThere.includes('late'), `restarted on the state, the destination knows the source's accounts and nodes (${nodesThere.join(',')})`);
     const knock = await (await fetch(dst.base + '/api/v1/agent/moved', { method: 'POST', headers: nH, body: JSON.stringify({ node: en.node_id }) })).json();
     ok(knock.answer === told.move.expect, `the node's knock is answered with the challenge it holds (${(knock.answer || '').slice(0, 12)})`);
+    ok(knock.url === '' && knock.pin === '', `...and names no address or pin, so a node on the network keeps the one it knocked at (${JSON.stringify({url: knock.url, pin: knock.pin})})`);
     const nh = (await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).move || {};
-    ok((nh.not_here || []).map(x => x.name).sort().join(',') === 'late,mover' && (nh.not_here || []).every(x => new RegExp(`^builderbot-agent follow \\S+ [0-9a-f]{64}$`).test(x.line)),
+    ok((nh.not_here || []).map(x => x.name).sort().join(',') === 'late,mover' && (nh.not_here || []).every(x => new RegExp(`^aerieos-agent follow \\S+ [0-9a-f]{64}$`).test(x.line)),
        `the destination's Nodes page lists both as not yet here, each with its follow line (${JSON.stringify((nh.not_here || []).map(x => x.name))})`);
     // The source learns the landing by asking (the destination has no page
     // address to tell it at), marks itself moved, and the late node, which
@@ -938,6 +1112,8 @@ await firstRun(false);
     const lateKnock = await (await fetch(dst.base + '/api/v1/agent/moved', { method: 'POST', headers: lH, body: JSON.stringify({ node: lateEn.node_id }) })).json();
     ok(lateKnock.answer === goneJ.move.expect, 'and the late node\'s knock is answered with that challenge');
     ok(/no move is prepared|not withdrawn/.test((await sApi('/api/move', { action: 'forget' })).error || ''), 'Forget it is refused once the move landed');
+    const again = await sApi('/api/move', { action: 'pack' });
+    ok(again.ok && /\.aeriemove$/.test(again.bundle || ''), `...and the moved source still packs its bundle, for a new home that is lost (${again.error || again.bundle})`);
     await fetch(dst.base + '/api/v1/agent/hello', { method: 'POST', headers: lH, body: JSON.stringify({ census: { cpu: 2, mem_mb: 4096, arch: 'x86_64', system: 'linux' }, version: '1', digest: 'sha256:' + '1'.repeat(64) }) });
     const nh2 = (await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).move || {};
     ok((nh2.not_here || []).map(x => x.name).join(',') === 'mover', `a node that said hello to the destination is off the not-yet-here list (${JSON.stringify((nh2.not_here || []).map(x => x.name))})`);
@@ -958,5 +1134,5 @@ await firstRun(false);
        'Forget it withdraws it: the next hello carries no move, and nothing is armed');
     src.stop();
   }
-}
+});
 await done(browser);

@@ -5,22 +5,19 @@
 // their gate, a log a person clears. Nothing goes back to the session that
 // made it: that loop worked only where AerieOS's own tracker sat beside
 // the sessions reporting to it (the operator, 8 Oct).
-import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf } from './lib.mjs';
+import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
-const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
-  { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const as = tok => ({ Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
+const token = project => aerie(['users', 'token', project, 'test'],
+  { env: { DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
+const as = asSession;
 const ALPHA = as(token('alpha'));
 const BETA = as(token('beta'));
 
@@ -172,7 +169,7 @@ page.dialogs.length = 0;
 await page.click('#setReportsClear');
 // The button counts first, then asks: the confirm is waited for in its own
 // right, so a slow count under load is a late dialog rather than a missing one.
-for (let i = 0; i < 100 && !page.dialogs.length; i++) await page.waitForTimeout(150);
+for (let i = 0; i < 100 && !page.dialogs.length; i++) await page.waitForTimeout(150);     // the loop's own period
 await page.waitForFunction(async () => (await (await fetch('/api/reports', { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'count' }) })).json()).all === 0,
   null, { timeout: 15000, polling: 300 });
@@ -198,7 +195,7 @@ ok(page.dialogs.length === 0, '...and with none kept, it says so rather than ask
 // The bug on the row opens a dialog: a category, what happened, how to make
 // it happen; Send puts it in the diagnostics under that project, marked as
 // from the dashboard, whatever the project's Claude dial says.
-{
+await section("a person's report, from a project's row", async () => {
   await page.evaluate(() => openProjectsTab?.());
   await page.waitForSelector('[data-bug="alpha"]', { timeout: 15000, state: 'attached' });
   await unfold(page, 'alpha');
@@ -222,12 +219,12 @@ ok(page.dialogs.length === 0, '...and with none kept, it says so rather than ask
   ok(mine && mine.project === 'alpha' && mine.area === 'The notebook' && /from the dashboard/.test(mine.by)
      && mine.repro === 'edit, switch tabs, come back',
      `...and Send puts it in the diagnostics under alpha, with its category, marked as from the dashboard (${JSON.stringify(mine || diag).slice(0, 200)})`);
-}
+});
 
 // A project's report can carry the reporter's latest conversation on it
 // (the operator, 2 Oct), ticked in the dialog, redacted, and carried by the
 // diagnostics and their download.
-{
+await section("A project's report can carry the reporter's latest conversation on it", async () => {
   const dir = `${DIR}/home/.claude/projects/${`${DIR}/ws/alpha`.replace(/\//g, '-')}`;
   mkdirSync(dir, { recursive: true });
   writeFileSync(`${dir}/feedface-0000.jsonl`, [
@@ -262,11 +259,11 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
   ok(r && r.conversation?.id === 'feedface-0000' && !('conversation_text' in r)
      && /make the wiki keep my edit/.test(got.text) && /Saving it now/.test(got.text) && !/ghp_abcdefghijklmnop/.test(got.text),
      `...ticked, it goes with the report: the diagnostics name its file and the download carries it beside them, the token taken out (${JSON.stringify(r?.conversation || null)})`);
-}
+});
 
 // The header's bug is the same dialog about no project in particular (the
 // operator, 2 Oct): any account sends one, and the diagnostics say general.
-{
+await section("The header's bug is the same dialog about no project in particular", async () => {
   await page.click('#bReport');
   await page.waitForSelector('#reportModal:not([hidden]) #reportCat', { timeout: 10000 });
   ok(await page.$eval('#reportTitle', e => e.textContent) === 'Report a bug',
@@ -280,20 +277,20 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
   const gen = (all.reports || []).find(r => r.text === 'the header is crowded on a phone');
   ok(gen && gen.project === '' && gen.area === 'The dashboard' && /from the dashboard/.test(gen.by),
      `...and Send puts it in the diagnostics with no space, marked as from the dashboard (${JSON.stringify(gen || {}).slice(0, 160)})`);
-}
+});
 
 // ...and only from a project the person works on (the operator, 2 Oct): an
 // administrator shown every project but not on this one cannot start a
 // session there, so has nothing of its to report.
-{
+await section("and only from a project the person works on", async () => {
   execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'repadmin', '--role', 'admin'],
     { input: 'repadminpass1\nrepadminpass1\n', encoding: 'utf8',
       env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } });
-  const as = { Authorization: 'Basic ' + Buffer.from('repadmin:repadminpass1').toString('base64'), 'Content-Type': 'application/json' };
+  const as = asUser('repadmin', 'repadminpass1');
   const send = async p => { const r = await fetch(URL.replace(/\/$/, '') + '/api/reports', { method: 'POST', headers: as,
     body: JSON.stringify({ action: 'add', project: p, text: 'seen from outside', area: 'Something else' }) }); return { status: r.status, body: await r.json() }; };
   await page.evaluate(() => fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'projects', name: 'repadmin', projects: ['beta'] }) }));
+    body: JSON.stringify({ action: 'edit', name: 'repadmin', projects: ['beta'] }) }));
   const refused = await send('alpha');
   ok(refused.status === 403 && /not on alpha/.test(refused.body.error || ''),
      `an administrator not on a space is refused a report from it (${refused.status} ${refused.body.error})`);
@@ -307,7 +304,7 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
      `...and the page is told which rows are its own, so a row it is not on draws no bug button (alpha ${row('alpha')?.mine}, beta ${row('beta')?.mine})`);
   await page.evaluate(() => fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'remove', name: 'repadmin' }) }));
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 

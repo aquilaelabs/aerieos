@@ -100,9 +100,9 @@ class Fstab(unittest.TestCase):
         text = adopt.render_fstab(plan())
         lines = text.splitlines()
         self.assertTrue(all(ln.endswith(adopt.MARK) for ln in lines))
-        self.assertIn("UUID=u-a /mnt/disk1 xfs ro,norecovery,defaults,nofail,noatime 0 0", text)
-        self.assertIn("UUID=u-b /mnt/disk2 btrfs ro,rescue=nologreplay,defaults,nofail,noatime 0 0", text)
-        self.assertIn("UUID=u-cache /mnt/cache btrfs defaults,nofail,noatime 0 0", text)
+        self.assertIn("UUID=u-a /mnt/disk1 xfs ro,norecovery,defaults,nofail,noatime,nosuid,nodev 0 0", text)
+        self.assertIn("UUID=u-b /mnt/disk2 btrfs ro,rescue=nologreplay,defaults,nofail,noatime,nosuid,nodev 0 0", text)
+        self.assertIn("UUID=u-cache /mnt/cache btrfs defaults,nofail,noatime,nosuid,nodev 0 0", text)
         user = next(ln for ln in lines if " /mnt/user fuse.mergerfs " in ln)
         self.assertTrue(user.startswith("/mnt/cache=RW:/mnt/disk1=RO:/mnt/disk2=RO "))
         self.assertIn("category.create=ff", user)
@@ -220,10 +220,53 @@ class FromTheStick(unittest.TestCase):
                          "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "btrfs"}, {"slot": "cache2", "id": "Crucial_Y", "fs": "LUKS:btrfs"}]}}
         got = self.want(cfg)
         self.assertEqual(got["want"]["pools"], [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_X"}])
-        self.assertEqual([(s["slot"], s["why"]) for s in got["skipped"]], [("cache2", "encrypted: its key is not asked for yet")])
+        # cache2 is that pool's second member, never a pool of its own (B941).
+        self.assertEqual(got["skipped"], [])
         # ...and not twice when a pool record names it already.
         cfg["pools"] = [{"name": "cache", "fs": "btrfs", "uuid": "u-1"}]
         self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache"])
+
+    def test_with_pool_records_the_cache_slots_are_their_members(self):
+        # B941: a ZFS pool's second member offered as the pool cache2 never
+        # imported, and the merged tree waited on it for good.
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}],
+                         "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "zfs"}, {"slot": "cache2", "id": "Samsung_Y", "fs": "zfs"},
+                                   {"slot": "vms", "id": "Crucial_Z", "fs": "btrfs"}]},
+               "pools": [{"name": "cache", "fs": "zfs", "uuid": "u-1"}, {"name": "vms", "fs": "btrfs", "uuid": "u-2"}]}
+        self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache", "vms"])
+
+    def test_a_degraded_array_is_said_and_its_disabled_disk_set_apart(self):
+        # B940: a disk the old system disabled, or one missing and emulated
+        # from the parity, holds files the parity alone has.
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs", "status": "DISK_OK"},
+                                   {"slot": "disk2", "id": "WDC_B2", "fs": "xfs", "status": "DISK_DSBL"},
+                                   {"slot": "disk3", "id": "", "fs": "xfs", "status": "DISK_NP_DSBL"},
+                                   {"slot": "disk4", "id": "", "status": "DISK_NP"}],
+                         "parity": [{"slot": "parity", "id": "ST_P", "status": "DISK_OK"}]}}
+        got = self.want(cfg)
+        self.assertEqual([d["slot"] for d in got["want"]["data"]], ["disk1"])
+        self.assertEqual([(d["slot"], d["status"]) for d in got["degraded"]], [("disk2", "DISK_DSBL"), ("disk3", "DISK_NP_DSBL")])
+        self.assertIn("DISK_DSBL", got["skipped"][0]["why"])
+        self.assertEqual(self.want({"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}]}})["degraded"], [],
+                         "a plan from before statuses reads as healthy")
+        # ...and the controller writes nothing to it: no writable adoption,
+        # no takeover, while the kept plan says so.
+        import firstboot
+        import nodes
+        from unittest import mock
+        with mock.patch.object(firstboot, "kept_config", return_value=cfg):
+            why = nodes._degraded_why("taking the array over formats the old parity")
+        self.assertIn("degraded: disk2 (DISK_DSBL), disk3 (DISK_NP_DSBL)", why)
+        with mock.patch.object(firstboot, "kept_config", return_value={}):
+            self.assertEqual(nodes._degraded_why("x"), "")
+        # B948: the takeover waits while a planned data disk is not adopted.
+        plan = {"array": {"disks": [{"slot": "disk1", "id": "A", "fs": "xfs"}, {"slot": "disk2", "id": "B", "fs": "xfs"},
+                                    {"slot": "disk3", "id": "C", "fs": "luks:xfs"}]}}
+        with mock.patch.object(firstboot, "kept_config", return_value=plan):
+            why = nodes._takeover_gaps_why({"mounts": [{"where": "/mnt/disk1"}]})
+            self.assertIn("disk2, disk3 are not adopted here", why)
+            plan["array"]["disks"] = plan["array"]["disks"][:2]
+            self.assertEqual(nodes._takeover_gaps_why({"mounts": [{"where": "/mnt/disk1"}, {"where": "/mnt/disk2"}]}), "")
 
     def test_a_pool_the_adopt_cannot_take_is_set_apart_not_the_whole_request(self):
         # B612: an encrypted pool, one with no filesystem the adopt takes, or
@@ -282,3 +325,61 @@ class SharesFromTheStick(unittest.TestCase):
         # Nobody on its lists: still a share, a folder, and not exported.
         self.assertFalse(by["lonely"]["smb"]["on"])
         self.assertEqual({n["name"] for n in notes}, {"lonely"})
+
+
+class Vetted(unittest.TestCase):
+    """An adopted domain or network, from a backup anybody could have
+    written, as it may be defined here (R247 step 5, B843)."""
+    ad = agent.module("adopt")
+    PLAIN = ("<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'><name>w</name>"
+             "<metadata><vmtemplate xmlns='unraid' name='Windows 11' icon='w.png'/></metadata>"
+             "<os><loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE_4M.fd</loader>"
+             "<nvram>/var/lib/libvirt/qemu/nvram/w_VARS.fd</nvram></os><devices>"
+             "<disk type='file' device='disk'><source file='/mnt/user/domains/w/vdisk1.img'/><target dev='hdc'/></disk>"
+             "<disk type='file' device='cdrom'><source file='/mnt/user/isos/virtio.iso'/><target dev='hda'/></disk>"
+             "<disk type='block' device='disk'><source dev='/dev/disk/by-id/nvme-X'/><target dev='vdb'/></disk>"
+             "%s</devices>%s</domain>")
+
+    def vet(self, devices="", tail=""):
+        return self.ad.vet_domain(self.PLAIN % (devices, tail))
+
+    def test_an_old_systems_ordinary_vm_is_kept_as_it_was(self):
+        xml, said, why = self.vet()
+        self.assertEqual((said, why), ([], ""))
+        self.assertIn("vmtemplate", xml, "its metadata kept")
+        self.assertIn("/dev/disk/by-id/nvme-X", xml)
+
+    def test_extra_qemu_settings_a_shared_root_and_a_console_to_a_file_are_left_out_and_said(self):
+        xml, said, why = self.vet(
+            "<filesystem type='mount'><driver type='virtiofs'/><source dir='/'/><target dir='r'/></filesystem>"
+            "<serial type='file'><source path='/etc/cron.d/x'/></serial>",
+            "<qemu:commandline><qemu:arg value='-x'/></qemu:commandline>")
+        self.assertEqual(why, "")
+        self.assertNotIn("commandline", xml)
+        self.assertNotIn("<filesystem", xml)
+        self.assertNotIn("/etc/cron.d", xml)
+        self.assertEqual(len(said), 3, said)
+
+    def test_an_iso_off_the_adopted_disks_is_ejected(self):
+        xml, said, why = self.ad.vet_domain(self.PLAIN.replace("/mnt/user/isos/virtio.iso", "/etc/shadow") % ("", ""))
+        self.assertEqual(why, "")
+        self.assertNotIn("/etc/shadow", xml)
+        self.assertIn("ejected", said[0])
+
+    def test_what_the_vm_cannot_run_without_from_anywhere_else_keeps_it_from_being_defined(self):
+        for old, new in (("/mnt/user/domains/w/vdisk1.img", "/etc/shadow"),
+                         ("/dev/disk/by-id/nvme-X", "/dev/sda"),
+                         ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/mnt/user/evil.fd"),
+                         ("/var/lib/libvirt/qemu/nvram/w_VARS.fd", "/root/.ssh/authorized_keys")):
+            _xml, _said, why = self.ad.vet_domain(self.PLAIN.replace(old, new) % ("", ""))
+            self.assertTrue(why, f"{new} was let through")
+
+    def test_a_networks_dnsmasq_options_and_tftp_root_are_left_out(self):
+        xml, said = self.ad.vet_network(
+            "<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'><name>n</name>"
+            "<ip address='10.0.0.1' netmask='255.255.255.0'><tftp root='/'/><dhcp><range start='10.0.0.2' end='10.0.0.9'/></dhcp></ip>"
+            "<dnsmasq:options><dnsmasq:option value='dhcp-script=/mnt/user/x.sh'/></dnsmasq:options></network>")
+        self.assertNotIn("dhcp-script", xml)
+        self.assertNotIn("tftp", xml)
+        self.assertIn("<range", xml)
+        self.assertEqual(len(said), 2, said)

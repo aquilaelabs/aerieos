@@ -5,8 +5,8 @@
 // from a project's Claude button when its node has no sign-in yet.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -66,8 +66,12 @@ function signinBlock(n, id = "claude"){
   const cannot = signinCannot(n, id);
   const key = id === "claude" ? n.id : `${n.id}:${id}`;
   const said = signinSaid[key] ? `<div class="sub bad">${esc(signinSaid[key])}</div>` : "";
+  // Which kind of flow it is, by what the flow says of itself (signin.py
+  // pastes): one that wants a code pasted back draws the field for it, one
+  // that shows a code draws the code to type on the provider's page.
+  const paste = lg.paste ?? id === "claude";
   let inner;
-  if (mine && lg.running && !me && id !== "claude"){
+  if (mine && lg.running && !me && !paste){
     // A device flow (Codex, Copilot): its link and its one-time code, which
     // the person enters on the provider's page; nothing is pasted back.
     inner = `
@@ -82,7 +86,7 @@ function signinBlock(n, id = "claude"){
   } else if (mine && lg.running && !me){
     inner = `
       <div class="sub">${lg.url
-        ? `<a href="${esc(lg.url)}" target="_blank" rel="noopener">Open the sign-in page ↗</a>, approve, and paste the code it gives you.`
+        ? `<a href="${esc(lg.url)}" target="_blank" rel="noopener">Open the sign-in page ↗</a>, ${id === "claude" ? "approve" : `sign in to ${esc(a.provider || a.name)}`}, and paste the code it gives you.`
         : `Starting the sign-in on ${esc(n.name)}<span class="dots"></span>`}</div>
       <div class="setrow col ctlrow">${lbl("authCode", "Code", "the code the sign-in page shows once you approve")}
         <input id="authCode" autocomplete="off" spellcheck="false" autocapitalize="none"
@@ -103,7 +107,11 @@ function signinBlock(n, id = "claude"){
   } else {
     const failed = mine && lg.done && !lg.ok;
     inner = `
-      <div class="actbar"><span class="state warn">You are not signed in to ${esc(a.name)} on ${esc(n.name)}: your ${esc(a.name)} sessions will not start here</span>
+      <div class="actbar"><span class="state warn">You are not signed in to ${esc(a.name)} on ${esc(n.name)}: ${a.pack
+        // A pack's agent starts not signed in and asks in its own terminal;
+        // here is the other way in, which a phone can use.
+        ? `sign in here, or in the terminal of a ${esc(a.name)} session there`
+        : `your ${esc(a.name)} sessions will not start here`}</span>
         <button type="button" class="primary" data-si="in"${cannot ? " disabled" : ""}>${failed ? "Try again" : "Sign in"}</button></div>
       ${cannot ? `<div class="hint warn">${esc(cannot)}.</div>`
         : failed ? `<div class="sub bad">${esc(lg.error || "the sign-in did not finish")}</div>` : ""}`;
@@ -158,13 +166,12 @@ async function signIn(nodeId, btn, id = "claude"){
   signinCode = "";
   let j = {};
   try{
-    const r = await postJSON("/api/signin", {node: nodeId, agent: id});
-    j = await r.json();
+    j = await postJSON("/api/signin", {node: nodeId, agent: id});
   }catch(e){ j = {error: "could not reach the server: " + e}; }
   signinSaid[id === "claude" ? nodeId : `${nodeId}:${id}`] = j.error || "";
   if (j.error) notify(j.error, true);
   await refresh();
-  nodesRev++; drawPanes();
+  readMoved("nodes"); drawPanes();
 }
 
 async function signinCancel(btn){
@@ -173,7 +180,7 @@ async function signinCancel(btn){
   catch(e){ notify("could not reach the server: " + failWords(e), true); }
   signinCode = "";
   await refresh();
-  nodesRev++; drawPanes();
+  readMoved("nodes"); drawPanes();
 }
 
 // While a sign-in is going, its row is worth more than one look every
@@ -195,13 +202,12 @@ async function sendCode(){
   if (!code) return f?.focus();   // pressed Send with nothing in it
   busy(b, "Sending");
   try{
-    const r = await postJSON("/api/login-code", {code});
-    const j = await r.json();
+    const j = await postJSON("/api/login-code", {code});
     if (j.error) notify(j.error, true);
     else { signinCode = ""; notify("sent: the row says what the sign-in makes of it"); }
   }catch(e){ notify("could not reach the server: " + failWords(e), true); }
   await refresh();
-  nodesRev++; drawPanes();
+  readMoved("nodes"); drawPanes();
 }
 
 // Sign this account out on one node. The login is that machine's, so the
@@ -213,12 +219,11 @@ async function signOut(nodeId, btn, id = "claude"){
   busy(btn, "Signing out");
   let j = {};
   try{
-    const r = await postJSON("/api/signout", {node: nodeId, agent: id});
-    j = await r.json();
+    j = await postJSON("/api/signout", {node: nodeId, agent: id});
   }catch(e){ j = {error: "could not reach the server: " + e}; }
   signinSaid[id === "claude" ? nodeId : `${nodeId}:${id}`] = j.error || "";
   if (j.error) notify(j.error, true);
   else notify(`signed out on ${j.on || "the node"}`);
   await refresh();
-  nodesRev++; drawPanes();
+  readMoved("nodes"); drawPanes();
 }

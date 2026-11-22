@@ -317,12 +317,24 @@ above and to nothing else; no address is ever made up. A space's
 notebook has **Sessions** beside Overview: the account's own conversations
 with each agent on that space (Claude, ChatGPT, Copilot, each marked),
 newest first with the first thing typed, each with **Resume**, which opens
-the Start chooser on that conversation (Start agent's menu resumes only each
-agent's last), **Read**, **Download**, and
+the Start chooser on that conversation, **Read**, **Edit**, **Download**, and
 behind its ⋯ **Make visible**, which lets every session on the space read
 it with `aerie transcripts` until **Make private**, and **Delete**, for good (one
 still being written by a running session is refused). A session never
-deletes or shares one. The download is a text file: what
+deletes or shares one.
+
+**Edit** gives a conversation a **Label**, the name it is listed and picked
+by in place of its first words, and a **Note** for whatever is worth
+remembering about it; both are yours alone (a conversation you make
+visible is read by the others under its label, without its note). **Keep a
+copy** keeps the conversation on the controller where its agent's own
+cleanup does not reach: a coding agent removes its old conversations by
+its own rule, and a kept one is still listed, read and resumed after that,
+marked kept. Kept copies are on the spaces' share beside the
+conversations, not in a backup of the controller's settings. A session of
+yours can say the same with `aerie transcripts label`, `note`, `keep` and
+`unkeep`. With more than five conversations, a field over the list finds
+one by its label, its note, its first words or its agent. The download is a text file: what
 was said on both sides, every command the agent ran and what the command
 answered, `aerie roadmap` and its reply included, from the transcript the agent
 writes as the session goes (transcripts.py reads the account's own: Claude

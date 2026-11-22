@@ -12,6 +12,7 @@ BB_ACCOUNT_UID which seat this session sits in.
 import contextlib
 import json
 import os
+import re
 import sys
 
 import dash
@@ -22,10 +23,10 @@ verb, here, proj = sys.argv[1], sys.argv[2], sys.argv[3]
 def set_field():
     sys.path.insert(0, here)
     import prefs, pending
-    def _w(path, obj):
-        tmp = str(path) + ".tmp"
-        with open(tmp, "w") as f: json.dump(obj, f)
-        os.replace(tmp, path)
+    # The dashboard's own writer: a temporary of its own name, synced, and
+    # the file's lock shared with the running server (statefile.py).
+    import statefile
+    _w = statefile.write_json
     prefs.configure(state=os.environ["DASHBOARD_STATE"], write_json=_w)
     pending.configure(state=os.environ["DASHBOARD_STATE"], write_json=_w)
     field, value = os.environ["BB_SET_FIELD"], os.environ["BB_SET_VALUE"]
@@ -118,11 +119,20 @@ def show():
     # shipped ones switched off here, and every tool pack not switched on.
     # bb-tty takes them out of a session's PATH and its view of the store.
     try:
-        packs = list((json.load(open(os.path.join(state, "toolpacks.json"))).get("packs") or {}))
+        held = json.load(open(os.path.join(state, "toolpacks.json"))).get("packs") or {}
     except (OSError, ValueError, AttributeError):
-        packs = []
+        held = {}
+    packs = list(held)
+    # ...and a pack that does not fit this AerieOS, which is switched off
+    # for every space until one that does is kept (toolpacks.disabled says
+    # the same of it: its works_with does not name this build's line).
+    m = re.match(r"^v?(\d+)\.(\d+)", os.environ.get("BB_VERSION", "").strip())
+    line = f"{m.group(1)}.{m.group(2)}" if m else ""
+    unfit = {n for n, r in held.items() if line and isinstance(r, dict)
+             and ((r.get("manifest") or {}).get("works_with") or []) and line not in r["manifest"]["works_with"]}
     on = set(rec.get("packs_on") or [])
-    rec["toolchains_off"] = sorted(set(rec.get("tc_off") or []) | {p for p in packs if p not in on})
+    rec["toolchains_off"] = sorted(set(rec.get("tc_off") or []) | {p for p in packs if p not in on} | unfit)
+    rec["packs_disabled"] = sorted(unfit)
     # Whether a push can happen at all (B734): the rights the controller
     # granted (push-rights.json, the clone dialog's or Link to a git host),
     # and what the remote authenticates with: an ssh address carries its
@@ -174,7 +184,7 @@ def show():
         nodes = dash.load("nodes", here)
         nodes.db.open_readonly(state)
         named = {n["id"]: n["name"] for n in nodes.node_list(all=True)}
-    # Hosting-only nodes ticked under Also works on (prefs' hosts), named
+    # Hosting-only nodes listed under Also works on (prefs' hosts), named
     # as the dialog shows them, so a session reads it has them (B712).
     for k in ("node", "nodes", "hosts", "reads", "sees", "model", "effort", "build", "test", "outputs", "policy", "locked",
               "toolchains_off"):
@@ -239,10 +249,10 @@ def set_node():
     running dashboard."""
     sys.path.insert(0, here)
     import prefs, dash
-    def _w(path, obj):
-        tmp = str(path) + ".tmp"
-        with open(tmp, "w") as f: json.dump(obj, f)
-        os.replace(tmp, path)
+    # The dashboard's own writer: a temporary of its own name, synced, and
+    # the file's lock shared with the running server (statefile.py).
+    import statefile
+    _w = statefile.write_json
     state = os.environ["DASHBOARD_STATE"]
     prefs.configure(state=state, write_json=_w)
     # The running dashboard's hooks, which a shell has none of: no container

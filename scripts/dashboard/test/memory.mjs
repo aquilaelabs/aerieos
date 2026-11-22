@@ -5,7 +5,7 @@
 //
 // The writes run for real against the scratch home, so this also checks the
 // part that matters most: a delete takes the index line out with the file.
-import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DIR, openFold, animatedDuring, refreshUntil, closePage, patience, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DIR, openFold, animatedDuring, refreshUntil, closePage, patience, nbGo, quiet, section } from './lib.mjs';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 
 // Named as Claude Code names a tree's folder: every character that is not a
@@ -102,7 +102,7 @@ ok(await page.$('#memDrift details[data-sect="memory:drift"]') !== null
 // The third kind of drift (roadmap #4): a [[link]] in a memory's body naming
 // no memory here, which is what a rename leaves behind. Written to disk the
 // way a session writes one, and taken away again so the counts below hold.
-{
+await section("The third kind of drift", async () => {
   const { unlinkSync } = await import('node:fs');
   writeFileSync(`${MEM}/linker.md`, '---\nname: linker\ndescription: points at one that was renamed\nmetadata:\n  type: space\n---\n\nSee [[tabs]] and [[gone-elsewhere]].\n');
   await page.evaluate(() => notebooks.get('alpha').reloadMemory());
@@ -117,7 +117,7 @@ ok(await page.$('#memDrift details[data-sect="memory:drift"]') !== null
   await page.evaluate(() => notebooks.get('alpha').reloadMemory());
   await page.waitForFunction(() => ![...document.querySelectorAll('#memDrift div')]
     .some(d => /gone-elsewhere/.test(d.textContent)), null, { timeout: 10000 });
-}
+});
 
 // The checks below read "the open memory", and every one opens by default
 // now (d890eda): the others are shut first, so the open one is the one named.
@@ -230,14 +230,14 @@ ok(true, 'which leaves the panel with nothing to warn about');
 // that in one frame threw the list under it down the page: the same jump the
 // folds, the drop boxes and the card headers all exist not to make. Height,
 // like all of them, so the lines below ride down instead of being teleported.
-{
+await section("writing one by hand", async () => {
   const seen = await animatedDuring(page, async () => {
     await page.click('#memAdd button');
     await page.waitForSelector('#naTitle');
   });
   ok(seen.some(n => /\bmemAdd\b/.test(n)),
      'the memory writer unrolls rather than appearing whole');
-}
+});
 ok(await page.evaluate(() => document.activeElement?.id !== 'naTitle'),
    'the form opens without a cursor in it, like the rest of this window');
 await page.type('#naTitle', 'No parsed progress');
@@ -264,7 +264,7 @@ ok(read('MEMORY.md').includes('- [No parsed progress here](no-parsed-progress.md
    '...and gets its line in the index in the same act, never one without the other');
 ok(await page.$('#naTitle') === null && await page.$('#memAdd button') !== null,
    'the form folds back to the button afterwards');
-{
+await section("and folding back is the same motion, in reverse", async () => {
   // ...and folding back is the same motion, in reverse: Cancel and a written
   // memory both roll it up rather than snapping the list upward.
   await page.click('#memAdd button');
@@ -283,7 +283,7 @@ ok(await page.$('#naTitle') === null && await page.$('#memAdd button') !== null,
   });
   ok(seen.some(n => /\bmemAdd\b/.test(n)),
      '...and Cancel rolls it back up, rather than the list jumping to meet it');
-}
+});
 
 // ---- the memory log --------------------------------------------------------
 // What the notebook changed here, with when. Claude's own memory writes are
@@ -450,7 +450,7 @@ ok(read('clash.md').includes('what the operator typed'),
 // not necessary, since two windows writing one thing are caught at the save
 // (above: the second is refused, both versions shown). A second window on
 // the same notebook draws no line about it.
-{
+await section("who else is in here", async () => {
   const other = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await other.goto(URL);
   await ready(other);
@@ -458,12 +458,12 @@ ok(read('clash.md').includes('what the operator typed'),
   await nbShown(other);
   await other.evaluate(() => refresh());
   await page.evaluate(() => refresh());
-  await page.waitForTimeout(1500);
+  await quiet(1500);     // a line that must not come: time in which it could have
   ok(!(await page.$('#nbHere')) && !/Also open|other window/.test(await page.$eval('.nb', e => e.textContent)),
      'a second window on the same notebook is not announced: no "Also open" line');
   await other.evaluate(() => notebooks.get('alpha')?.destroy());
   await closePage(other);
-}
+});
 
 // ---- closing -----------------------------------------------------------
 // It is a tab, so it closes the way tabs close and not on a stray Escape.
@@ -476,7 +476,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'notebook'
 // A notebook whose project this account no longer has (deleted) sends no
 // presence beat, which the server answers with a 400 on every poll (B65);
 // its project back, it beats again. Planted and read in one evaluate.
-{
+await section("A notebook whose project this account no longer has", async () => {
   const asked = await page.evaluate(async () => {
     const was = state.projects, realFetch = window.fetch;
     let n = 0;
@@ -492,7 +492,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'notebook'
   });
   ok(asked[0] === 0 && asked[1] === 1,
      `a deleted space's notebook sends no presence beat, and one it has again does (${asked.join(' then ')})`);
-}
+});
 await page.evaluate(() => hideTab(tabs.find(t => t.kind === 'notebook').id));
 await nbGone(page);
 ok(true, '...and closing that tab puts it away');
@@ -501,7 +501,7 @@ ok(true, '...and closing that tab puts it away');
 // line and writes it back, and nothing held the read and the write together,
 // so one rename won and the other memory was left on disk with no index line:
 // invisible to every session, which is what create() promises cannot happen.
-{
+await section("B196: two memories added at once", async () => {
   const mk = name => ({ action: 'create', project: 'alpha', name, title: `T ${name}`,
                         hook: `what ${name} is for`, type: 'user', body: `the body of ${name}` });
   const made = await page.evaluate(bodies => Promise.all(bodies.map(b =>
@@ -515,7 +515,7 @@ ok(true, '...and closing that tab puts it away');
      && orphans.length === 0,
      `four memories created at the same moment all get their line in the index (${
        orphans.length ? orphans.join(' | ') : files.filter(f => /^race-/.test(f)).length + ' of 4 listed, none orphaned'})`);
-}
+});
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);

@@ -12,8 +12,8 @@ A save or a removal is the project's dial, Agents may: Write the wiki:
 auto lands it, ask holds it for the operator, deny refuses it. A rewrite is
 checked against the page as it was when the save began, so a person's edit
 in between is refused rather than overwritten; --base REV checks against
-the one `aerie wiki show --rev` printed instead. BB_WIKI_AUTH is the auth
-header and BB_WIKI_PROJECT the project.
+the one `aerie wiki show --rev` printed instead. BB_PROJECT is the project.
+The auth header is bbapi's own (BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
@@ -21,6 +21,7 @@ import time
 import urllib.parse
 
 import bbapi
+from say import die
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard"))
 import records  # noqa: E402
@@ -29,21 +30,16 @@ import dash  # noqa: E402
 # `--format json|yaml|markdown` or `--json` on list or show (R167).
 fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
-auth = os.environ["BB_WIKI_AUTH"]
-proj = os.environ["BB_WIKI_PROJECT"]
+proj = os.environ["BB_PROJECT"]
 USAGE = ("usage: aerie wiki [list | show NAME [--rev] | save NAME FILE|- [--why \"...\"] [--base REV] | "
          "rm NAME [--why \"...\"] | mv OLD NEW | history]")
-
-
-def fail(msg):
-    sys.exit(f"[builderbot] ERROR: {msg}")
 
 
 def opt(name):
     if name in argv:
         i = argv.index(name)
         if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
-            fail(f"{name} takes a value")
+            die(f"{name} takes a value")
         v = argv[i + 1]
         del argv[i:i + 2]
         return v
@@ -52,18 +48,18 @@ def opt(name):
 
 def get(page=""):
     q = "/api/wiki?project=" + urllib.parse.quote(proj) + ("&page=" + urllib.parse.quote(page) if page else "")
-    r = bbapi.call(q, auth=auth)
+    r = bbapi.call(q)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a wiki")
+        die("the controller answered something that is not a wiki")
     return r
 
 
 def post(body):
-    r = bbapi.call("/api/wiki", dict(body, project=proj), auth=auth, timeout=60)
+    r = bbapi.call("/api/wiki", dict(body, project=proj), timeout=60)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a wiki")
+        die("the controller answered something that is not a wiki")
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     return r
 
 
@@ -79,7 +75,7 @@ if verb in ("-h", "--help"):
 if verb == "list":
     r = get()
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     if fmt != "text":
         sys.stdout.write(records.dump(records.document("wiki", r.get("pages") or [], proj), fmt)); raise SystemExit(0)
     rem = r.get("remote") or {}
@@ -91,7 +87,7 @@ if verb == "list":
 elif verb == "show" and len(argv) >= 2:
     r = get(argv[1])
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     if "--rev" in argv:
         print(r["rev"])
     elif fmt != "text":
@@ -103,7 +99,7 @@ elif verb == "save" and len(argv) >= 3:
     try:
         text = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
     except OSError as e:
-        fail(f"could not read {src}: {e}")
+        die(f"could not read {src}: {e}")
     if base is None:
         cur = get(name)
         base = "" if cur.get("error") else cur.get("rev", "")
@@ -125,8 +121,8 @@ elif verb == "mv" and len(argv) >= 3:
 elif verb == "history":
     r = get()
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     for h in r.get("history") or []:
         print(f"  {h['commit']}  {when(h['at'])}  {h['by']:<16} {h['what']}")
 else:
-    fail(USAGE)
+    die(USAGE)
