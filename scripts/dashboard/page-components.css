@@ -2576,15 +2576,18 @@ progress.pbar{display:block;width:100%;max-width:var(--ctl-w);height:6px;margin:
 progress.pbar::-webkit-progress-bar{background:var(--line)}
 progress.pbar::-webkit-progress-value{background:var(--accent);border-radius:3px;transition:width .4s ease-out}
 progress.pbar::-moz-progress-bar{background:var(--accent);border-radius:3px}
-/* A press still going after a moment (pressing(), tab-nodes.js): a small ring
-   after its word, so it reads as taken rather than missed. */
-button.working::after,a.btn.working::after{content:"";display:inline-block;width:.8em;height:.8em;margin-left:6px;vertical-align:-.1em;
-  border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
-/* ...and on a button that is an icon alone, the ring in place of the icon,
-   the button's size kept, rather than wrapped under it. */
-button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))>svg{visibility:hidden}
-button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))::after{position:absolute;left:50%;top:50%;margin:-.4em 0 0 -.4em}
-button.working:has(> svg):not(:has(> :not(svg, .dot, .meta))){position:relative}
+/* A press still going after a moment (pressHold, page-motion.js): a small
+   ring in place of its word or its picture, the button exactly its size, so
+   it reads as taken rather than missed and nothing beside it moves (the
+   operator, 22 Nov: a wheel only where it fits without making the button
+   bigger). The word stays in the box, unpainted, so the box keeps its
+   width; the ring is the word's color. pressRing makes a button that is not
+   positioned the ring's frame (.ringrel). */
+button.working,a.btn.working{-webkit-text-fill-color:transparent}
+button.working>*,a.btn.working>*{visibility:hidden}
+button.working::after,a.btn.working::after{content:"";position:absolute;left:50%;top:50%;width:.8em;height:.8em;margin:-.4em 0 0 -.4em;
+  box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+.ringrel{position:relative}
 /* A chip whose narrowing is being read: its count is the ring in the count's
    own room, the chip neither wider nor taller (pressCount, the operator,
    22 Nov). */

@@ -221,17 +221,24 @@ await section("no ring where it has no room", async () => {
     b.onclick = () => { getJSON('/api/home'); };
     return true;
   });
+  const size = () => page.evaluate(() => { const b = document.getElementById('ringProbe'); return `${b.offsetWidth}x${b.offsetHeight}`; });
+  const rest = await size();
   await page.click('#ringProbe');
   const wore = await until(async () => (await rings()).includes('Read it again'), 1500, 50);
-  // ...and the same button where one more thing does not fit: its row is as wide as it is.
-  await page.evaluate(() => { const b = document.getElementById('ringProbe'); b.classList.remove('working'); b.parentElement.style.cssText += ';width:auto;flex-wrap:wrap;max-width:' + b.offsetWidth + 'px'; });
-  // The first press over: the slow read it started has landed, and nothing is tied to the button.
+  // The ring is in place of the word, so the button is its own size wearing
+  // it (the operator, 22 Nov: a wheel only where it fits without making the
+  // button bigger)...
+  const worn = await size();
+  // ...and so the same button wears it in a row it just fits: its row is as wide as it is.
   await page.waitForFunction(() => { const b = document.getElementById('ringProbe'); return !b.__pending && !b.dataset.pressWorking; },
     null, { timeout: 10000 }).catch(() => {});
+  await page.evaluate(() => { const b = document.getElementById('ringProbe'); b.parentElement.style.cssText += ';width:auto;flex-wrap:wrap;max-width:' + b.offsetWidth + 'px'; });
   await page.click('#ringProbe');
   let tight = false;
   for (let i = 0; i < 12; i++){ await quiet(100); if ((await rings()).includes('Read it again')) tight = true; }
-  ok(ring && wore && !tight, `...while a button with room wears it, and the same button in a row it just fits does not (${wore}, ${tight})`);
+  const tightSize = await size();
+  ok(ring && wore && rest === worn, `...while a button with room wears it in place of its word, its size kept (${wore}, ${rest} then ${worn})`);
+  ok(tight && tightSize === rest, `...and in a row it just fits, where a ring after the word would have grown it (${tight}, ${tightSize})`);
   await page.unroute('**/api/**');
   await page.evaluate(() => document.getElementById('ringProbe').parentElement.remove());
   // The reads the route still holds let go and answered.

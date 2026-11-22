@@ -665,10 +665,16 @@ const PRESS_TIGHT = ".rail, .railbar, .railmore, .pseg, .nbtabs, .dockline, .chi
 function pressRing(b){
   if (b.closest(PRESS_TIGHT)) return false;
   const row = b.parentElement;
-  const was = {h: b.offsetHeight, rh: row ? row.offsetHeight : 0, over: row ? Math.max(0, row.scrollWidth - row.clientWidth) : 0};
+  const was = {w: b.offsetWidth, h: b.offsetHeight, rh: row ? row.offsetHeight : 0, over: row ? Math.max(0, row.scrollWidth - row.clientWidth) : 0};
+  // The ring sits in the word's place, centered in the button: a button the
+  // page has not positioned becomes its frame for as long as it wears it.
+  if (getComputedStyle(b).position === "static") b.classList.add("ringrel");
   b.classList.add("working");
-  if (b.offsetHeight <= was.h && (!row || (row.offsetHeight <= was.rh && row.scrollWidth - row.clientWidth <= was.over))) return true;
-  b.classList.remove("working");
+  // Never bigger: not wider, not taller, and its row not pushed (the
+  // operator, 22 Nov); a button the ring would grow wears none.
+  if (b.offsetWidth <= was.w && b.offsetHeight <= was.h
+      && (!row || (row.offsetHeight <= was.rh && row.scrollWidth - row.clientWidth <= was.over))) return true;
+  b.classList.remove("working", "ringrel");
   return false;
 }
 // The button a click is a press of: the button or a.btn it landed on. Not
@@ -743,7 +749,7 @@ function pressHold(b, p){
     b.__pending -= 1;
     if (b.__pending > 0) return;
     delete b.__noRing;
-    if (b.dataset.pressWorking){ b.classList.remove("working"); b.removeAttribute("aria-busy"); delete b.dataset.pressWorking; }
+    if (b.dataset.pressWorking){ b.classList.remove("working", "ringrel"); b.removeAttribute("aria-busy"); delete b.dataset.pressWorking; }
   };
   Promise.resolve(p).then(done, done);
 }
