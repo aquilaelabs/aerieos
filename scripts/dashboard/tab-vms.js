@@ -104,16 +104,22 @@ function vmRow(v){
   if (asked && !up) delete vmStopAsked[`${v.project}/${v.name}`];
   const ignored = asked && up && Date.now() - asked > 45000
     ? `<div class="sub dmstate warn">asked to shut down ${Math.max(1, Math.round((Date.now() - asked) / 60000))} min ago and still running: its system may not answer the power button, and Force stop under More ends it at once</div>` : "";
+  // Being made or removed, it takes nothing else (vms.act refuses it): its
+  // presses are drawn dead and the row says why, never left out, so the
+  // bar does not change shape under the person (the operator, 22 Nov).
+  const held = busy ? " disabled" : "";
+  const waitLine = v.state === "making" ? `<div class="sub dim vmwait">Its presses wait until it is made.</div>`
+    : v.state === "removing" ? `<div class="sub dim vmwait">It is being removed: nothing else runs on it.</div>` : "";
   const acts = !may ? "" : `
-    ${!up && !busy && v.state !== "failed" ? `<button type="button" class="primary" data-vm="start">Start</button>` : ""}
+    ${!up && v.state !== "failed" ? `<button type="button" class="primary" data-vm="start"${held}>Start</button>` : ""}
     ${up && v.screen ? `<button type="button" data-vmscreen title="its screen, keyboard and mouse, in the dock">Screen</button>` : ""}
     ${up && v.os !== "installer" ? `<button type="button" data-vmcon title="its serial console, in the dock">Console</button>` : ""}
     ${up ? `<button type="button" data-vm="stop" title="ask it to shut down, as its power button would">Stop</button>` : ""}
     ${actMore([
       up ? `<button type="button" data-vm="restart">Restart</button>` : "",
       up ? `<button type="button" data-vm="stop" data-force="1" title="pull the plug: it stops at once, unsaved work in it lost">Force stop</button>` : "",
-      !busy && v.state !== "failed" ? `<button type="button" data-vm="snapshot" title="its state saved under a name; a running VM's memory too">Snapshot…</button>` : "",
-      v.iso && !busy ? `<button type="button" data-vm="eject" title="take ${esc(v.iso)} out of its drive, so it boots from its disk">Eject ISO</button>` : "",
+      v.state !== "failed" ? `<button type="button" data-vm="snapshot"${held} title="its state saved under a name; a running VM's memory too">Snapshot…</button>` : "",
+      v.iso ? `<button type="button" data-vm="eject"${held} title="take ${esc(v.iso)} out of its drive, so it boots from its disk">Eject ISO</button>` : "",
       v.state === "stopped" ? `<button type="button" data-vm="disk-grow" title="make one of its disks larger; it never shrinks">Grow disk…</button>` : "",
       v.state === "stopped" && (v.disks || []).length < 3 ? `<button type="button" data-vm="disk-add" title="another disk, there at its next start">Add disk…</button>` : "",
       v.state === "stopped" ? `<button type="button" data-vmhw title="CPU threads, memory ceiling, network, a shared folder, devices">Hardware…</button>` : "",
@@ -129,7 +135,7 @@ function vmRow(v){
           ${inside ? `<div class="sub data dmorigin vmguest">${inside}</div>` : ""}
           ${asNode}
           ${vmHwLine(v)}
-          ${onLine}${ignored}
+          ${onLine}${ignored}${may ? waitLine : ""}
           ${may && v.state !== "making" ? `<label class="ndcap vmauto"><input type="checkbox" data-vmauto${v.autostart ? " checked" : ""}> starts with its host</label>` : ""}
           ${v.error ? `<div class="sub dmstate bad">${esc(v.error)}</div>` : ""}
         </div>

@@ -221,6 +221,11 @@ function loadDocker(){
     // ...and kept in this browser for the next reload's early read (dmBootLoad).
     if (dockerNode && !got.error) try{ localStorage.setItem("bb.dmnode", dockerNode); }catch(e){ /* private */ }
     dockerList = got;
+    // A press queued behind a job is said until that job is not at work.
+    for (const [k, q] of dmQueued){
+      const jb = got.job;
+      if (!jb?.running || jb.id !== q.behind || `${jb.project}|${jb.instance}` !== k) dmQueued.delete(k);
+    }
     // An Edit open on a row this read has down comes alive (cFollowRow).
     cFollowRow();
     loadDockerStats(got);
@@ -1001,7 +1006,7 @@ function dmOwnerLine(r, key){
 // Its containers, env and data stay as they are; a written container has no
 // project behind it and moves with the Project line above.
 const dmMoveDraft = {};
-function dmMoveLine(d){
+function dmMoveLine(d, busy = false){
   if (!mayDocker() || d.source === "file") return "";
   const key = `${d.project}|${d.instance}`, pick = dmMoveDraft[key] ?? d.project;
   // Built from a project since deleted: it is still that one's until moved.
@@ -1011,8 +1016,11 @@ function dmMoveLine(d){
   return `<div class="setcell dmmove">${lbl(id, "Built from",
       "The repository whose compose file and tree it is built from. Another one, applied, moves it "
       + "there, keeping its name, env and data; it then builds from that repository's tree.")}
-    <select id="${esc(id)}" data-dmmove="${esc(key)}" aria-label="the space it is built from">${
-      optionList(names.map(n => [n, gone && n === d.project ? `${n} (deleted)` : projLabel(n)]), pick)}</select></div>`;
+    <select id="${esc(id)}" data-dmmove="${esc(key)}" aria-label="the space it is built from"${busy ? " disabled" : ""}>${
+      optionList(names.map(n => [n, gone && n === d.project ? `${n} (deleted)` : projLabel(n)]), pick)}</select>${
+      // Refused while a job builds it, since the job names the old space:
+      // dead until it ends, and why said under it.
+      busy ? `<div class="hint">A job is running on it: it moves once that has ended.</div>` : ""}</div>`;
 }
 
 function dmTestSaid(d){
@@ -1208,26 +1216,45 @@ async function dmAction(project, instance, act, btn){
     }
   }
   if (btn) btn.disabled = true;
-  const j = await dmGo(project, instance, act, () => postJSON("/api/devapp", {project, instance, action:act, ack, beside}));
+  // A press while a job is at work on it is queued behind that one, never
+  // refused (nodes.job_waits): said on the press and on its row.
+  const ahead = dmAhead(project, instance);
+  const j = await dmGo(project, instance, act, () => postJSON("/api/devapp", {project, instance, action:act, ack, beside}), ahead);
   // What was done instead of what was asked: a remove whose daemon could
   // not be reached took the record and nothing else. Said, because the row
   // vanishing looks identical either way.
   if (!j.error && j.note) notify(j.note);
+  else if (!j.error && ahead && j.job !== ahead.id)
+    notify(`${dmCalled(project, instance)}: ${DM_VERB[act] || act} is ${j.already ? "already " : ""}queued behind ${DM_JOB_NOUN[ahead.action] || "the job"} running on it, and starts once that has ended`);
 }
+
+// The job at work on an instance, as the list has it, or null.
+function dmAhead(project, instance){
+  const jb = dockerJob();
+  return jb?.running && jb.project === project && jb.instance === instance ? jb : null;
+}
+// What a press is called, and what a job is, in the queued line.
+const DM_VERB = {up: "Up", down: "Down", rebuild: "Rebuild", update: "Update", remove: "Remove"};
+const DM_JOB_NOUN = {rebuild: "the rebuild", up: "the Up", down: "the Down", update: "the update", remove: "the removal",
+                     rename: "the rename", "relocate-out": "the move", "relocate-in": "the move", "relocate-unpack": "the unpack"};
 
 // A row's press drawn on the click (the operator, 22 Nov: Down read as
 // nothing for the 11 s its job took to reach the row): its state is the
 // press's word, by "project|instance", until the server has answered and the
 // read after it has the job, which says it from there. A refusal puts the
 // row back and says why (drawNow). The answer comes back.
-const dmGoing = new Map();
-async function dmGo(project, instance, act, send){
+// One pressed behind a job at work (`ahead`) is said on the row as queued
+// behind it from the click until that job has ended (dmQueued), which a read
+// of the list says.
+const dmGoing = new Map(), dmQueued = new Map();
+async function dmGo(project, instance, act, send, ahead = null){
   const key = `${project}|${instance}`;
   const redraw = () => { readMoved("docker"); drawPanes(); };
   const j = await drawNow(() => {
     dmGoing.set(key, act);
+    if (ahead && DM_VERB[act]) dmQueued.set(key, {act, behind: ahead.id});
     redraw();
-    return () => { dmGoing.delete(key); redraw(); };
+    return () => { dmGoing.delete(key); dmQueued.delete(key); redraw(); };
   }, send);
   dockerList = null; readMoved("docker");
   try{ await loadDocker(); }catch(e){ /* the read says its own failure */ }
@@ -1371,9 +1398,11 @@ function cNameSay(name){
     : C_RUNNING;
   return {down, managed, jobOn};
 }
-// ...and a space's instance's, whose name is its own.
-function cInstanceSay(project, running){
+// ...and a space's instance's, whose name is its own: not renamed while a
+// job is on it either (the server refuses it, the job naming the old one).
+function cInstanceSay(project, running, jobOn = false){
   return running ? C_RUNNING
+    : jobOn ? "A job is running on it: its name can change once that has ended."
     : `Its name is its own: its volumes and data directory follow a new one on the node. The compose file is ${projLabel(project)}'s, in its folder: `
       + "saving it is an uncommitted change there, which the Git view shows. The env is this container's.";
 }
@@ -1391,9 +1420,11 @@ function cFollowRow(){
   const row = (dockerList?.instances || []).find(d => d.project === at.project && d.instance === at.instance);
   if (!row || row.running) return;
   if (typeof cEditing === "object"){
-    $("cName").disabled = !cEditing.name;
-    $("cNameHint").textContent = cInstanceSay(at.project, false);
-    cUpHeld = false;
+    const jobOn = !!dmAhead(at.project, at.instance);
+    $("cName").disabled = !cEditing.name || jobOn;
+    $("cNameHint").textContent = cInstanceSay(at.project, false, jobOn);
+    // Held on while a job is on it, as a written container's is below.
+    cUpHeld = jobOn;
   }else{
     const {managed, jobOn} = cNameSay(cEditing);
     if (managed){ cUpHeld = false; return; }
@@ -1481,9 +1512,10 @@ async function openEditInstance(project, instance){
   const running = !!row?.running;
   key.name = row?.name || "";
   $("cName").value = key.name;
-  $("cName").disabled = running || !key.name;
-  $("cNameHint").textContent = cInstanceSay(project, running);
-  cUpHeld = running;
+  const jobOn = !!dmAhead(project, instance);
+  $("cName").disabled = running || !key.name || jobOn;
+  $("cNameHint").textContent = cInstanceSay(project, running, jobOn);
+  cUpHeld = running || jobOn;
   $("cNodeField").hidden = true;
   $("cUnderField").hidden = true;
   $("cTabForm").hidden = true;
@@ -2180,7 +2212,10 @@ function dmRowsHtml(ins, job, blind){
     const meta = !blind && d.running && !busy && !going && !(mine && job.error)
       ? [dmUptime(d.services), `${d.containers ?? (d.services || []).length} container${(d.containers ?? (d.services || []).length) === 1 ? "" : "s"}`].filter(Boolean).join(" · ")
       : "";
-    const said = meta ? "" : going ? `${esc(DM_JOB_WORD[going] || "working")}<span class="dots"></span>` : dmState(d, job, mine, busy, blind);
+    // ...and one queued behind its job, said after that job's step.
+    const q = busy ? dmQueued.get(`${d.project}|${d.instance}`) : null;
+    const queued = q && q.behind === job.id ? `<span class="dim"> · ${esc(DM_VERB[q.act] || q.act)} queued behind it</span>` : "";
+    const said = meta ? "" : going ? `${esc(DM_JOB_WORD[going] || "working")}<span class="dots"></span>` : dmState(d, job, mine, busy, blind) + queued;
     const origin = [
       !many && d.services?.[0]?.image ? dmImage(d.services[0].image) : "",
       d.built_rev ? `@ ${esc(String(d.built_rev).slice(0, 7))}` : "",
@@ -2253,8 +2288,9 @@ function dmRowsHtml(ins, job, blind){
                     : "edit the space's compose file and this container's env"}">${d.app ? "Configure" : "Compose and env"}</button>`,
           !mayDocker() || managed ? "" : `<button type="button" data-dmrel ${busy || d.relocating?.busy ? "disabled" : ""}
             title="to another node, its data with it: a copy beside it, or this one moved">Copy or move…</button>`,
+          // Live while a job runs: the server queues it behind that one.
           !mayDocker() ? "" : `<button type="button" class="danger" data-dm="remove" ${
-            busy || going === "remove" ? "disabled" : ""}
+            going === "remove" ? "disabled" : ""}
             title="take it down and drop it from this list; its env and data stay for a remake">Remove</button>`])}
         </div>
         </div>
@@ -2264,12 +2300,18 @@ function dmRowsHtml(ins, job, blind){
         blind ? "" : many ? dmServicesTable(d, finished) : dmStatStrip(d)}
         ${d.relocating ? `<div class="sub ${d.relocating.busy ? "" : d.relocating.archive ? "note" : "bad"} dmreloc">${esc(d.relocating.line)}${
           d.relocating.busy ? '<span class="dots"></span>'
-          : d.relocating.archive && mayDocker() && !busy && !going ? ` <a href="#" data-dmunpack>unpack it now</a>` : ""}</div>` : ""}
+          : d.relocating.archive && mayDocker() && !busy && !going ? ` <a href="#" data-dmunpack>unpack it now</a>`
+          : d.relocating.archive && mayDocker() && busy ? `<span class="dim">: unpack it once this job has ended</span>` : ""}</div>` : ""}
         ${
         // The notices, each a line (the words rule): what is wrong and the
         // one thing to do about it.
         d.astray ? `<div class="sub warn dmastray">Out of reach: ${esc(projLabel(d.owner || d.project))}'s sessions run on ${
           esc(d.astray)}, which does not host its containers. Tick this node under the space's Also works on, or Remove it and send it again.</div>` : ""}
+        ${
+        // What a job at work holds back, said where the row is (a dead
+        // control says why on its row): the server refuses a copy or move
+        // until it has ended, where Up, Down and the rest queue behind it.
+        busy && mayDocker() && !managed && !d.relocating?.busy ? `<div class="sub dim dmwait">Copy or move waits for this job to end.</div>` : ""}
         ${d.await_env ? `<div class="sub warn">built: fill in the env, then Up</div>`
           : (d.missing_env || []).length ? `<div class="sub warn dmenv">the env is missing ${esc(d.missing_env.join(", "))}: press Env</div>` : ""}
         ${d.nginx_to ? `<div class="sub warn dmnginx">${esc(d.nginx_to)} is out: Update pins it and rebuilds</div>` : ""}
@@ -2287,7 +2329,7 @@ function dmRowsHtml(ins, job, blind){
         // with a setting staged keeps it open.
         dmSetPills(dmInstPills(d, managed))}
         ${dmEditing.has(key) || dmRowDirty(key)
-          ? dmSetDialog(d.name, key, [dmOwnerLine(d, key), dmMoveLine(d), dmRefLine(d), dmOverrideLine(d), dmGpuLine(d), dmRouteLine(d),
+          ? dmSetDialog(d.name, key, [dmOwnerLine(d, key), dmMoveLine(d, busy), dmRefLine(d), dmOverrideLine(d), dmGpuLine(d), dmRouteLine(d),
                        dmNginxLine(d), d.exists ? dmBootLine(d.name, !!d.boot) : "", d.exists ? dmLanLine(d.name, !!d.lan) : ""]) : ""}
       </div>
       ${docSection("docker", `wire:${d.project}|${d.instance}`,

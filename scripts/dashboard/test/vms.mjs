@@ -76,6 +76,12 @@ ok(job?.spec?.action === 'create' && job.spec.domain === 'bbvm-alpha-db' && job.
 await page.waitForFunction(() => /being made/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 15000 });
 ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alpha/.test(e.querySelector('.dmgroup').textContent)),
    '...and the row stands in its space\'s card, being made');
+// What it cannot take while it is made is drawn dead, never left out, and
+// the row says why (the operator, 22 Nov).
+const making = await page.$eval('.vmtab [data-vm-key="alpha/db"]', e => ({
+  start: e.querySelector('[data-vm="start"]')?.disabled, why: e.querySelector('.vmwait')?.textContent || '' }));
+ok(making.start === true && /wait until it is made/.test(making.why),
+   `...its Start drawn dead while it is made, the row saying why (${JSON.stringify(making)})`);
 
 // The agent takes it, it succeeds, and its census says it runs with an address.
 const took = await agent('work', { running: [], wait: 0 });

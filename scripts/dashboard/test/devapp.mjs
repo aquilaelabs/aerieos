@@ -2757,6 +2757,25 @@ await section("except on a row whose own job is running, which knows what it is 
   ok(got.pill === 'rebuilding' && got.after.running === false && /port taken/.test(got.after.error) && got.after.shown,
      `a blind row with its own job running says what the job does, and an ended job is said at once (${got.pill}; ${JSON.stringify(got.after)})`);
 });
+// A press behind a job at work on its row is queued there, never refused
+// (nodes.job_waits), so Remove stays live and a press queued says so on the
+// row; what the server refuses meanwhile (Copy or move) is dead, and the row
+// says why (the operator, 22 Nov).
+await section("A press behind a job at work is queued and says so, and what the job holds is dead with why", async () => {
+  const got = await page.evaluate(() => {
+    const d = (dockerList?.instances || []).find(x => x.project === 'ep.silon' && x.owner !== 'System');
+    if (!d) return null;
+    const key = `${d.project}|${d.instance}`, job = { id: 'j_q', running: true, project: d.project, instance: d.instance, action: 'rebuild', step: 'building' };
+    dmQueued.set(key, { act: 'down', behind: 'j_q' });
+    const box = document.createElement('div');
+    try{ box.innerHTML = dmRowsHtml([{ ...d, relocating: null }], job, false); }finally{ dmQueued.delete(key); }
+    return { state: box.querySelector('.dmstate')?.textContent.replace(/\s+/g, ' ').trim() || '',
+             remove: box.querySelector('[data-dm="remove"]')?.disabled, rel: box.querySelector('[data-dmrel]')?.disabled,
+             why: box.querySelector('.dmwait')?.textContent.trim() || '' };
+  });
+  ok(got && /Down queued behind it/.test(got.state) && got.remove === false && got.rel === true && /Copy or move waits for this job to end/.test(got.why),
+     `a press behind a running job is said queued on its row, Remove stays live, and Copy or move is dead with why (${JSON.stringify(got)})`);
+});
 ok(await page.$$eval('.dmtab .row[data-inst] .dmpill,.dmtab .row[data-inst] .actbar .state',
                      es => es.every(e => !e.classList.contains('ok'))),
    '...and nothing shows as running: green is a claim about a daemon that is not answering');

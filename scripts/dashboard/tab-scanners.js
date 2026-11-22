@@ -32,13 +32,14 @@ function loadScanners(){
   });
 }
 
-async function scannersAct(body){
+async function scannersAct(body, {queued = false} = {}){
   const j = await postJSON("/api/scanners", body);
   if (j.error) notify(j.error, true);
   else if (j.note) notify(j.note, true);
   else if (body.action === "deploy") notify("deploying the scanners: the pull is a job on the Jobs page");
   else if (body.action === "deploy-all") notify(`deploying on ${Object.keys(j.nodes || {}).length} node${Object.keys(j.nodes || {}).length === 1 ? "" : "s"}`);
-  else if (body.action === "update") notify("updating the scanners: the pull is a job on the Jobs page");
+  else if (body.action === "update") notify(queued ? "updating the scanners: queued behind their deploy, it starts once that has ended"
+                                                       : "updating the scanners: the pull is a job on the Jobs page");
   else if (body.action === "run"){
     const errs = Object.values(j.nodes || {}).filter(x => x.error).map(x => x.error);
     notify(errs.length ? errs.join("; ") : "scanning: each node's run is a job on the Jobs page", errs.length > 0);
@@ -84,11 +85,16 @@ function scannersNodeSection(n){
                  ["Last run", scannersLastRun(n), {html: true}],
                  ["Reports", Object.keys(n.reports || {}).length ? Object.entries(n.reports).map(([k, r]) => `${SCAN_NAMES[k] || k} ${ago(r.at)}`).join(", ") : "none sent yet"]];
   const news = behind.length ? `${behind.map(k => `${SCAN_NAMES[k] || k} ${n.behind[k]}`).join(", ")} ${behind.length === 1 ? "is" : "are"} out: Update pins ${behind.length === 1 ? "it" : "them"} and pulls.` : "";
+  // A run still going holds Run now (scanners.run_now skips the node), so
+  // it is dead until that run ends and the row says why (the operator, 22
+  // Nov); Update queues behind a deploy and stays live.
+  const going = ["queued", "assigned", "running"].includes(n.last?.state);
   return docSection("scanners", key, n.name, status,
     `${factGrid(facts)}
      ${news ? `<div class="field"><div class="hint warn">${esc(news)}</div></div>` : ""}
+     ${going ? `<div class="field"><div class="hint scanwait">Run now waits for this run to end.</div></div>` : ""}
      <div class="field"><div class="actbar"><span class="sp"></span>
-       <button type="button" data-scanrun="${esc(n.node)}"${projects ? "" : " disabled"}>Run now</button>
+       <button type="button" data-scanrun="${esc(n.node)}"${projects && !going ? "" : " disabled"}>Run now</button>
        ${behind.length ? `<button type="button" class="primary" data-scanupdate="${esc(n.node)}">Update</button>` : ""}
        <button type="button" class="danger" data-scanremove="${esc(n.node)}">Remove</button></div></div>`,
     {cls: behind.length ? "warn" : ""});
@@ -161,7 +167,13 @@ function wireScannersTab(root){
   const act = (sel, fn) => root.querySelectorAll(sel).forEach(b => b.onclick = async () => { busyFor(b); await fn(b); });
   act("[data-scandeploy]", b => scannersAct({action: "deploy", node: b.dataset.scandeploy}));
   act("[data-scandeployall]", () => scannersAct({action: "deploy-all"}));
-  act("[data-scanupdate]", b => scannersAct({action: "update", node: b.dataset.scanupdate}));
+  // Behind a deploy still going on that node it is queued (one compose job
+  // at a time on the scanners' container), and said so.
+  act("[data-scanupdate]", b => {
+    const n = (scannersData?.nodes || []).find(x => x.node === b.dataset.scanupdate);
+    const queued = !!n?.deploy_state && !["succeeded", "failed", "canceled"].includes(n.deploy_state);
+    return scannersAct({action: "update", node: b.dataset.scanupdate}, {queued});
+  });
   act("[data-scanrun]", b => scannersAct({action: "run", node: b.dataset.scanrun}));
   act("[data-scanrunall]", () => scannersAct({action: "run"}));
   // Turn on and Turn off flip on the press (the operator, 22 Nov): the

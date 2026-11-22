@@ -701,9 +701,12 @@ function wireMachineSection(root, n){
     if (name.value.trim().toLowerCase() !== (r.hostname || n.name || "").toLowerCase()) body.hostname = name.value.trim();
     if (tz.value.trim() !== (r.timezone || "")) body.timezone = tz.value.trim();
     if (spin.value !== String(r.spindown ?? 0)) body.spindown = parseInt(spin.value, 10);
+    // Behind a system job at work there, queued and said so.
+    const ahead = ndAhead(nodeOf(n.id) || n);
     busy(b, "Applying");
     const j = await postJSON("/api/v1/nodes", body);
-    notify(j.error || "set on the machine: its next check-in says the new name and zone", !!j.error);
+    if (!j.error && ahead) ndQueuedSay(nodeOf(n.id) || n, ahead, "The name and time change");
+    else notify(j.error || "set on the machine: its next check-in says the new name and zone", !!j.error);
     await refresh();
   });
 }
@@ -754,9 +757,11 @@ function nodeFeaturesSection(n){
     : !n.reported.administers ? "This node's agent is not root on a managed machine, so its features are set on the machine itself."
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const row = (fid, title, has, about, cant, more = "") => {
+    // One pressed while another feature's job runs is queued behind it, so
+    // it stays live and the press says so (ndQueuedSay).
     const mine = job?.feature === fid;
     const btn = ahead === fid ? `<button type="button" disabled>Done, the node is reporting back…</button>`
-      : why || cant || (job && !mine) ? ""
+      : why || cant ? ""
       : `<button type="button" data-nd="feature" data-feature="${fid}" data-op="${has ? "remove" : "install"}"${mine ? " disabled" : ""}>${
           mine ? (job.op === "remove" ? "Uninstalling…" : "Installing…") : has ? "Uninstall" : "Install"}</button>`;
     const fail = failed?.feature === fid ? `<div class="sub bad">The last try failed${failed.error ? `: ${esc(failed.error)}` : ""}; its job's log says more.</div>` : "";
@@ -794,7 +799,7 @@ function nodeFeaturesSection(n){
       // A shared folder needs virtiofsd, which an install from before it did
       // not bring; installing again adds what is missing and keeps the rest.
       + (vm.installed && vm.virtiofs === false ? `<div class="sub">A VM's shared folder needs virtiofsd and VM host's wrapper for it, which are not all here yet.
-        ${why || job ? "" : `<button type="button" data-nd="feature" data-feature="vmhost" data-op="install">Bring in shared folders</button>`}</div>` : ""))];
+        ${why || (job?.feature === "vmhost") ? "" : `<button type="button" data-nd="feature" data-feature="vmhost" data-op="install">Bring in shared folders</button>`}</div>` : ""))];
   if (n.config?.host_only)
     rows.push(row("firewall", "Hosting firewall", !!fe?.firewall?.installed,
       "Takes in only 80 and 443, a port a container publishes included; port 22 as the SSH door leaves it.", ""));
@@ -2844,6 +2849,35 @@ const ND_ASK = {
 // table's (BUSY_WORDS, page-motion.js).
 const ND_BUSY = {disable: "Disabling", enable: "Enabling", "reenroll-now": "Making", "sess-save": "Saving"};
 
+// The verbs this page sends as a system job on the node, which queue behind
+// one already at work there (nodes.system_job_for).
+const ND_SYSTEM_VERBS = new Set(["feature", "reboot", "poweroff", "door", "lockdown"]);
+// A system job's apply, as a sentence names it.
+const ND_APPLY_WORD = {storage: "a storage apply", network: "a network apply", runner: "a runner's install or removal",
+  machine: "a change of its name and time", gpu: "the GPU display's setup", "gpu-off": "the GPU display's removal",
+  door: "a change to its SSH door", lockdown: "its lock down", uninstall: "its uninstall", reboot: "a reboot",
+  poweroff: "a shut down", console: "a console password change", "os-kept": "a change to its older versions",
+  "os-update": "a system update", "host-update": "a system update", "controller-update": "the controller's update",
+  "projects-folder": "the spaces folder's change", "system-pool": "the move to a pool", "storage-pool": "a pool's job",
+  "storage-snapshot": "a snapshot's job", "storage-array": "an array job", "storage-share": "a share change",
+  "storage-backup": "a backup run", "storage-adopt": "an adoption job", "storage-key": "a pool key's change"};
+const ND_FEATURE_WORD = {vmhost: "VM host", firewall: "the hosting firewall", iommu: "the IOMMU", gpuvm: "the NVIDIA card to a VM",
+  storage: "Storage", shares: "Shares", ups: "the UPS"};
+// The system job at work on a node, in words, or "": one pressed meanwhile
+// is queued behind it, never refused, and the press says so (the operator,
+// 22 Nov). A quick root command neither waits nor is waited for.
+function ndAhead(n){
+  const j = (n?.jobs || []).find(x => x.type === "system" && (x.state === "assigned" || x.state === "running") && x.apply !== "root");
+  if (!j) return "";
+  const a = n.applying?.id === j.id ? n.applying : null;
+  if (j.apply === "feature" && a?.feature) return `the ${a.op === "remove" ? "removal" : "install"} of ${ND_FEATURE_WORD[a.feature] || a.feature}`;
+  return ND_APPLY_WORD[j.apply] || "a change to this node";
+}
+// ...said on a press that went in behind it: `what` is the press's own word.
+function ndQueuedSay(n, ahead, what){
+  if (ahead) notify(`${what} is queued behind ${ahead} on ${n?.name || "the node"}, and starts once that has ended`);
+}
+
 function wireNodesTab(root){
   // A node's own version check's cadence (R176), saved on its pick: the
   // pick shows as made, and a refusal puts the saved one back and says why
@@ -2896,6 +2930,12 @@ function wireNodesTab(root){
       if (asks && !await askYes(asks, ND_ASK_AS[act] || {})) return;
       // The verb, said on the button for the round trip and, for the
       // actions whose effect the row cannot see at once: beyond it.
+      // A system job pressed while another is at work on the node is queued
+      // behind it, never refused (nodes.system_job_for): said once it is in,
+      // by the press's own name.
+      const ahead = ND_SYSTEM_VERBS.has(act) ? ndAhead(nodeOf(id)) : "";
+      const named = act === "feature" ? `The ${b.dataset.op === "remove" ? "removal" : "install"} of ${ND_FEATURE_WORD[b.dataset.feature] || b.dataset.feature}`
+        : b.textContent.trim();
       busyFor(b, act, {...ND_BUSY, feature: b.dataset.op === "remove" ? "Uninstalling" : "Installing"});
       // The verbs whose press is more than one post, each with its own steps.
       if (act === "update-agent"){
@@ -2983,13 +3023,14 @@ function wireNodesTab(root){
                                : "sessions started here from now on find no card to compute on");
         }
         if (ge && !ge.disabled && ge.checked !== emuWas){
-          const want = ge.checked;
+          const want = ge.checked, ahead = ndAhead(nodeOf(id));
           const k = await nodeAct({action: "gpu-display", id, on: want});
           if (k.error) return;
           // Kept as asked until the node reports the new state, which moves
           // gpuEmuFrom and puts the box on the machine's word again.
           if (c && c.draft){ c.draft.gpuEmu = want; c.draft.gpuEmuFrom = emuWas; }
-          said.push(ge.checked ? "setting the emulator up on the card" : "taking the emulator off the card");
+          said.push((ge.checked ? "setting the emulator up on the card" : "taking the emulator off the card")
+                    + (ahead ? `, queued behind ${ahead}` : ""));
         }
         notify(said.length ? said.join("; ") : "nothing changed");
         return;
@@ -3016,6 +3057,10 @@ function wireNodesTab(root){
       const j = await nodeAct({action: act, id, ...(act === "door" ? {on: b.dataset.on === "1"} : {}),
                                ...(act === "feature" ? {feature: b.dataset.feature, op: b.dataset.op} : {})});
       if (act === "to-sync" && j.ok && !j.error) notify("Moved: each space is copied down now");
+      // A reboot waits for an install, which the answer names; anything
+      // else behind the system job at work, which the row named.
+      if (!j.error && j.waits) notify(`queued: ${j.waits}`);
+      else if (!j.error && ahead) ndQueuedSay(nodeOf(id), ahead, named);
     }));
     // Ticked on the click; a refusal takes the tick back and says why once.
     box.querySelectorAll("[data-ndvmlan]").forEach(c => c.onchange = async () => {

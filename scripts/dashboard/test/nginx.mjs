@@ -264,10 +264,18 @@ await page.waitForFunction(s => !document.querySelector(s + ' .ngform'), sect, {
 await page.click(`${sect} [data-ngedit="1"]`);
 await page.waitForSelector(`${sect} .ngform [data-ngdel]`, { timeout: 5000 });
 await page.click(`${sect} .ngform [data-ngdel]`);
-await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.length === 1, sandbox.node, { timeout: 15000 });
+// Off the list on the press (the operator, 22 Nov), before the server has
+// answered, so the server's own list is asked until it says the same.
+const offAtOnce = await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.length === 1, sandbox.node, { timeout: 15000 })
+  .then(() => true, () => false);
+let served = [];
+for (const end = Date.now() + 15000; Date.now() < end; await new Promise(f => setTimeout(f, 250))){
+  served = (await api('/api/nginx')).nodes.find(n => n.node === sandbox.node).routes;
+  if (served.length === 1) break;
+}
 ok(/Delete the route api\.example\.com to port 8083/.test(page.dialogs.at(-1) || '')
-   && (await api('/api/nginx')).nodes.find(n => n.node === sandbox.node).routes.every(r => r.host === 'www.example.com'),
-   `...and Delete asks, naming the route, then takes it out (${page.dialogs.at(-1)})`);
+   && offAtOnce && served.length === 1 && served.every(r => r.host === 'www.example.com'),
+   `...and Delete asks, naming the route, takes it off the list on the press, then out on the server (${page.dialogs.at(-1)})`);
 await api('/api/nginx', { action: 'save', node: sandbox.node, routes: [...row.routes, { host: 'api.example.com', path: '/', port: 8081, tls: true }] });
 await section("a hostname a route uses is not deleted, and the refusal names where", async () => {
   const busyName = await api('/api/nginx', { action: 'host-remove', name: 'api.example.com' });

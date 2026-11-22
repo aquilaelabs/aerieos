@@ -1900,6 +1900,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       const inst = await featJob();
       ok(inst?.spec?.config?.id === 'vmhost' && inst.spec.config.op === 'install',
          `...and Install queues the feature system job (${JSON.stringify(inst?.spec)})`);
+      // While it is at work another system verb stays live and, pressed, is
+      // queued behind it: named so on the press (the operator, 22 Nov).
+      const ahead = await page.evaluate(() => ndAhead({ name: 'shed', applying: { id: 'j_a', feature: 'vmhost', op: 'install' },
+        jobs: [{ id: 'j_q', type: 'system', state: 'queued', apply: 'door' }, { id: 'j_a', type: 'system', state: 'running', apply: 'feature' }] }));
+      ok(ahead === 'the install of VM host',
+         `...and a system verb pressed meanwhile is said to be queued behind the one at work, by its name (${ahead})`);
       // The agent takes it and it succeeds: until the census after it, the
       // row waits rather than offering Install again (B162).
       const took = await (await agent('work', { running: [], wait: 0 })).json();

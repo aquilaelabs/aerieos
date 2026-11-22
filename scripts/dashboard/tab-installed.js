@@ -99,11 +99,13 @@ function instState(r){
 // step with it), Remove where it is here (a pack's Remove is the dialog's
 // own, which asks where it is still installed), and a service's Install
 // once something is behind it.
+// While its own job runs they are drawn dead, never taken away (the
+// operator, 22 Nov), and its state line says what runs.
 function instActs(r, may){
-  const a = (act, words, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} data-instact="${act}" data-instkind="${esc(r.kind)}" data-instname="${esc(r.name)}">${esc(words)}</button>`;
-  if (r.running) return "";
+  const off = r.running ? " disabled" : "";
+  const a = (act, words, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} data-instact="${act}" data-instkind="${esc(r.kind)}" data-instname="${esc(r.name)}"${off}>${esc(words)}</button>`;
   if (r.kind === "service") return !may.configure ? "" : r.installed ? a("remove", "Remove", "danger")
-    : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
+    : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready || r.running ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
   // Software update, as the Library's card says it (the operator, 13 Nov).

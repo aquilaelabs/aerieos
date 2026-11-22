@@ -71,17 +71,26 @@ function nginxKeepTyping(){
 }
 
 async function nginxAct(body){
+  const ahead = nginxBuilding(body.node);
   const j = await postJSON("/api/nginx", body);
   if (j.error) notify(j.error, true);
-  return nginxLanded(body, j);
+  return nginxLanded(body, j, ahead);
+}
+// Whether nginx's own build is at work on a node: a job pressed meanwhile is
+// queued behind it (one compose job at a time on a container), never
+// refused, and the press says so (the operator, 22 Nov). Read at the press.
+function nginxBuilding(nid){
+  return !!nid && !!(nginxList || []).find(x => x.node === nid)?.state?.job?.running;
 }
 // ...and what its answer changes, for a press that said a refusal itself
-// (drawNow, which draws its result on the click).
-async function nginxLanded(body, j){
+// (drawNow, which draws its result on the click). `ahead`: a build was at
+// work when it was pressed.
+async function nginxLanded(body, j, ahead = false){
   if (j.error){ await loadNginx(); return j; }
   if (j.note) notify(j.note, true);
   else if (j.job) notify(`${body.action === "deploy" ? "deploying" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx"}${
-    body.action === "deploy" ? " nginx" : ""}: its row on the Containers page has the build`);
+    body.action === "deploy" ? " nginx" : ""}${ahead ? ": queued behind the build already running, it starts once that has ended"
+      : ": its row on the Containers page has the build"}`);
   // A hostname added or deleted comes back with the list as it now is, so
   // the pull-downs hold it the moment the answer lands rather than after
   // the whole tab is read again (every node's daemon, B721).
@@ -545,13 +554,14 @@ function wireNginxTab(root){
   sect.querySelectorAll("[data-nghostrm]").forEach(b => b.onclick = async () => {
     nginxReadDraft(sect, n);
     const name = b.dataset.nghostrm, body = {action: "host-remove", name};
+    const ahead = nginxBuilding(nid);
     const j = await drawNow(() => {
       const was = nginxHostnames;
       nginxHostnames = (was || []).filter(h => h.name !== name);
       nginxRedraw();
       return () => { nginxHostnames = was; nginxRedraw(); };
     }, () => postJSON("/api/nginx", body));
-    await nginxLanded(body, j);
+    await nginxLanded(body, j, ahead);
     nginxRedraw();
   });
   // A route at a time: Add route and Edit open the one form, Cancel folds it
@@ -585,7 +595,7 @@ function wireNginxTab(root){
       // Out of the list with its form folded on the press (the operator, 22
       // Nov), the rebuild's word on the row with the answer; a refusal puts
       // both back and says why.
-      const body = {action: "save", node: nid, routes: (n.routes || []).filter((_, k) => k !== i)};
+      const body = {action: "save", node: nid, routes: (n.routes || []).filter((_, k) => k !== i)}, ahead = nginxBuilding(nid);
       const j = await drawNow(() => {
         const was = n.routes, at = nginxEdit, typed = nginxForm;
         n.routes = body.routes.map(x => ({...x}));
@@ -593,7 +603,7 @@ function wireNginxTab(root){
         nginxRedraw();
         return () => { n.routes = was; nginxEdit = at; nginxForm = typed; nginxRedraw(); };
       }, () => postJSON("/api/nginx", body));
-      await nginxLanded(body, j);
+      await nginxLanded(body, j, ahead);
       nginxRedraw();
     };
   }

@@ -53,6 +53,14 @@ async function storageForget(key, path, body, said){
   refresh();
   return j;
 }
+// What a machine job's press says once it is in: `what`, then how it runs,
+// or, with a system job already at work on the node, that it is queued
+// behind that one (nodes.system_job_for: queued, never refused) and starts
+// once it has ended (the operator, 22 Nov). Read when the press is made.
+function storageJobSaid(n, what, runs){
+  const ahead = ndAhead(nodeOf(n.node));
+  return ahead ? `${what}: queued behind ${ahead} on the machine, and starts once that has ended` : `${what}: ${runs}`;
+}
 // A node's schedules as this page draws them, less any removed on the way.
 const storageScheds = n => (n.snapshot_schedules || []).filter(x => !storageGoing.has(`sched:${x.id}`));
 
@@ -357,7 +365,7 @@ function wireStorageShares(root, n){
       await refresh();
       return;
     }
-    notify(j.error || `${act === "set" ? "saved" : "removed"}: the job runs on the machine; the page follows its next check-in`, !!j.error);
+    notify(j.error || storageJobSaid(n, act === "set" ? "saved" : "removed", "the job runs on the machine; the page follows its next check-in"), !!j.error);
     await refresh();
   }));
 }
@@ -474,7 +482,7 @@ function wireStoragePools(root, n){
     // A pool exported cleanly is imported with no question (R265: a press asks only where its yes costs something): it
     // is taken as it is, never upgraded, and Export lets it go again.
     busyFor(b, act);
-    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
+    await sayPost(null, "", "/api/v1/nodes", body, storageJobSaid(n, act, "the job runs on the machine; the page follows its next check-in"), () => refresh());
   }));
 }
 
@@ -542,7 +550,7 @@ function wireStorageSnapshots(root, n){
       body.kind = "manual"; body.keep = 50;
     }
     busyFor(b, act);
-    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
+    await sayPost(null, "", "/api/v1/nodes", body, storageJobSaid(n, act, "the job runs on the machine; the page follows its next check-in"), () => refresh());
   }));
   root.querySelectorAll("[data-stsnapsched]").forEach(b => b.onclick = () => pressing(b, async () => {
     const x = (n.snapshot_schedules || []).find(y => y.id === b.dataset.stsnapsched);
@@ -684,7 +692,7 @@ function wireStorageArray(root, n){
       body.confirm = "array";
     }
     busyFor(b, act);
-    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, () => refresh());
+    await sayPost(null, "", "/api/v1/nodes", body, storageJobSaid(n, act, "the job runs on the machine; its log is on the Jobs page and the page follows the next check-in"), () => refresh());
   }));
 }
 
@@ -843,7 +851,7 @@ function wireStorageBackups(root, n){
       return;
     }
     await sayPost(b, "Copying", "/api/v1/nodes", {action: "storage-backup", id: n.node, name: b.dataset.name},
-      "copying: the job runs on the machine; its log is on the Jobs page and the row follows the next check-in", () => refresh());
+      storageJobSaid(n, "copying", "the job runs on the machine; its log is on the Jobs page and the row follows the next check-in"), () => refresh());
   }));
 }
 

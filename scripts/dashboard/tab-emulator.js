@@ -103,12 +103,14 @@ function emuAddRows(d, why){
                 : `<span class="sub data where">${[r.size, r.id].filter(Boolean).map(esc).join(" · ")}</span>`}
         </span>`;
       // Selecting: the row is its tick's label. Otherwise its Install at
-      // its right, gone while the image is on its way.
+      // its right, gone while the image is on its way. Live while another
+      // job runs: the server queues it behind that one (store_gate), and
+      // the press says so (emuAct).
       return emuSelecting
         ? `<label class="tc emnew" data-emuid="${esc(r.id)}">
             <input type="checkbox" value="${esc(r.id)}"${dead || now ? " disabled" : ""}${emuTicked.has(r.id) || now ? " checked" : ""}>${body}</label>`
         : `<div class="tc emnew" data-emuid="${esc(r.id)}">${body}${now ? "" : `<button type="button" data-emuadd="${esc(r.id)}"${
-            dead || job.running ? " disabled" : ""}${why ? ` title="${esc(why)}"` : ""}>Install</button>`}</div>`;
+            dead ? " disabled" : ""}${why ? ` title="${esc(why)}"` : ""}>Install</button>`}</div>`;
     }).join("") || `<div class="tchead">every ${esc(flavors.find(f => f.kind === chosen)?.label || "")} image is here already</div>`}</div>`;
 }
 
@@ -173,9 +175,9 @@ function emuAddBar(d, held, job){
       <span class="sp"></span>
       ${!(d.addable || []).length ? ""
         : emuSelecting ? `<button type="button" data-emu="unselect">Cancel</button>
-      <button class="primary" data-emu="install"${held || job.running || !emuTickedHere(d).length ? " disabled" : ""}>Install selected${
+      <button class="primary" data-emu="install"${held || !emuTickedHere(d).length ? " disabled" : ""}>Install selected${
         emuTickedHere(d).length > 1 ? ` (${emuTickedHere(d).length})` : ""}</button>`
-        : `<button type="button" data-emu="select"${held || job.running ? " disabled" : ""}>Select several</button>`}
+        : `<button type="button" data-emu="select"${held ? " disabled" : ""}>Select several</button>`}
     </div>`;
 }
 
@@ -335,9 +337,11 @@ async function emuAct(action, image, btn){
   else {
     if (many) image.forEach(id => emuTicked.delete(id));
     if (action === "add") emuSelecting = false;
+    // Behind a job already writing the store it is queued, never refused
+    // (toolchains.store_gate), and the answer's `waits` says so.
     notify(`${action === "add" ? "adding" : "removing"} ${many && image.length > 1
       ? `${image.length} images` : (many ? image[0] : image)} on ${
-      emu?.name || "the node"}; this can take minutes`);
+      emu?.name || "the node"}${j.waits ? ": queued behind the job running there, it starts once that has ended" : "; this can take minutes"}`);
   }
   loadEmulator();
 }
