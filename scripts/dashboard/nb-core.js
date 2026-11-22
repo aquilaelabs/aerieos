@@ -767,7 +767,7 @@ async function nbCoreBeat(nb, leave, keepalive){
     // page: keepalive is what lets it arrive after the page has gone.
     const j = await postJSON("/api/presence", {project: nb.memProj, client: nbClient,
                                                where: nb.nbWhere, ...(leave ? {leave: 1} : {})},
-                             {keepalive: !!keepalive});
+                             {keepalive: !!keepalive, background: true});
     if (leave || !j.ok) return;
     nb.nbRead = j.read || 0;
     nbCoreDrawHere(nb);

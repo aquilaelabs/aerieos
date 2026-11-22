@@ -556,13 +556,25 @@ function attRow(a){
 // attention" group and Home's Attention card (R218 step 5) draw the same
 // ones. From the poll, never stored here, so a row leaves the moment it
 // stops being true.
+// The rows put away and not yet answered (Dismiss draws its row gone on the
+// press, the operator 22 Nov): a row whose every key is here is left out of
+// each drawing of them, the poll's included, until the server has it.
+// Held as each row's markup has them, escaped.
+const bellGoing = new Set();
+function bellLeft(rows){
+  if (!bellGoing.size) return rows;
+  return rows.filter(h => {
+    const m = /data-bdismiss="([^"]*)"/.exec(h);
+    return !m || !m[1].split(" ").every(k => bellGoing.has(k));
+  });
+}
 function needsRows(){
   const att = state?.attention || [], ciRed = state?.ci_red || [], syncC = state?.sync_conflicts || [];
   // What needs doing but is not a question: a node behind, a red CI run, a
   // file changed in two places. One quiet shape (attRow): a title, one line
   // of what, the action on the row, the long part folded (the operator,
   // 10 Oct: the amber wall of versions and project names).
-  return [
+  return bellLeft([
     // ...and the nodes. Out of window is red and names the projects it
     // stops; behind is amber and waits for a press on the Nodes tab.
     // A window move holds every project at once, so several of these is the
@@ -583,7 +595,7 @@ function needsRows(){
         <div class="bt">Changed in two places: ${esc(projLabel(c.project))}</div>
         <div class="bsum">${esc(c.path)} was changed on ${esc(c.node)} after another copy had changed it; that version is kept as ${esc(c.kept_as)}</div>
         <div class="bfoot"><span>until that copy is deleted · ${esc(ago(c.at))}</span></div></div>`),
-  ];
+  ]);
 }
 
 // What an ask is, in one line: the machine and that it is root there, the
@@ -893,11 +905,20 @@ function toggleBell(open){
 function wireNeeds(root, after = () => {}){
   // Dismiss (bellseen.py): the update to that version, for this account, on
   // every browser it opens; a newer version notes again.
-  root.querySelectorAll("[data-bdismiss]").forEach(a => a.onclick = async e => {
+  // The row goes on the press, from the bell and from Home at once, and comes
+  // back saying why if the server refuses; it stays gone through the reads
+  // before the server has it, and the next read after leaves it out itself.
+  root.querySelectorAll("[data-bdismiss]").forEach(a => a.onclick = e => {
     e.preventDefault();
-    const j = await postJSON("/api/bell", {action: "dismiss", keys: a.dataset.bdismiss.split(" ")});
-    if (j.error) notify(j.error, true);
-    refresh();
+    const keys = a.dataset.bdismiss.split(" "), held = keys.map(k => esc(k));
+    const redraw = () => { drawBell(); render(); };
+    return drawNow(() => {
+      held.forEach(k => bellGoing.add(k));
+      redraw();
+      return () => { held.forEach(k => bellGoing.delete(k)); redraw(); };
+    }, () => postJSON("/api/bell", {action: "dismiss", keys})).then(j => {
+      if (!j.error) refresh().finally(() => held.forEach(k => bellGoing.delete(k)));
+    });
   });
   // Resume (R251): the session an outage held is told to pick up from its
   // note; the row goes once the line was sent. One send at a time: a second

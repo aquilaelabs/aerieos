@@ -666,9 +666,49 @@ function pressQuiet(b){
   for (const m of document.querySelectorAll(".modal:not([hidden]):not(.inline)")) if (!m.contains(b)) return true;
   return false;
 }
+// A pick shows on the click (the operator, 22 Nov: a press must never look
+// as if nothing happened): a chip in its band, or a segment of a segmented
+// control, wears `on` before its handler's work, and its siblings let go.
+// One already on is left as it is, for a handler that lets it go itself.
+// The draw that follows says the same, or puts it right.
+function pressPick(b){
+  const band = b?.classList?.contains("chip") ? b.parentElement : b?.parentElement?.closest?.(".pseg");
+  if (!band || b.classList.contains("on") || b.disabled) return;
+  const sibs = b.classList.contains("chip") ? band.querySelectorAll(":scope > .chip") : band.querySelectorAll("button");
+  for (const s of sibs){
+    const me = s === b;
+    s.classList.toggle("on", me);
+    if (s.hasAttribute("aria-pressed")) s.setAttribute("aria-pressed", String(me));
+  }
+}
+// ...and a chip whose press waits (a narrowing the server reads) turns its
+// count into the ring, where the count already has room: no ring grows a
+// chip (pressRing), and a count is never taller than its chip.
+function pressCount(b){
+  const pill = b?.classList?.contains("chip") ? b.querySelector(":scope > .pill") : null;
+  if (!pill) return false;
+  if (!pill.classList.contains("counting")){
+    pill.style.minWidth = pill.offsetWidth + "px";
+    pill.classList.add("counting");
+  }
+  return true;
+}
+function pressCountDone(b){
+  const pill = b?.querySelector?.(":scope > .pill.counting");
+  if (!pill) return;
+  pill.classList.remove("counting");
+  pill.style.minWidth = "";
+}
 function pressHold(b, p){
   if (!b) return;
   b.__pending = (b.__pending || 0) + 1;
+  // A chip's count is the ring at once: the list under it is its
+  // placeholder at the same moment, so the two say it together.
+  if (pressCount(b)){
+    const done = () => { b.__pending -= 1; if (b.__pending <= 0){ b.__pending = 0; pressCountDone(b); } };
+    Promise.resolve(p).then(done, done);
+    return;
+  }
   const t = setInterval(() => {
     if (!b.__pending || !b.isConnected || b.dataset.pressWorking || b.__noRing) return;
     if (pressQuiet(b)) return;
@@ -715,6 +755,7 @@ function pressHook(){
 function pressRun(el, e, fn){
   const b = pressOf(e, el), was = pressNow;
   if (b) pressNow = b;
+  if (b) pressPick(b);
   let out;
   try{ out = fn.call(el, e); }finally{ pressNow = was; }
   if (b && out && typeof out.then === "function") pressHold(b, out);

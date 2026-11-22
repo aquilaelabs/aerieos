@@ -60,6 +60,7 @@ html[data-motion="reduce"] .tourring{transition:none}
 @media(prefers-reduced-motion:reduce){ .st.working{animation:none}
 }
 @media(prefers-reduced-motion:reduce){ button.working::after,a.btn.working::after{animation:none;border-right-color:currentColor;opacity:.6}
+  .chip .pill.counting::after{animation:none;border-right-color:var(--dim);opacity:.6}
 }
 @media(prefers-reduced-motion:reduce){
   .loading{animation:none} .justpainted{animation:none} .skel .sk-b,.skv{animation:none}

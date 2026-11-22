@@ -32,10 +32,17 @@ function loadNotices(){
   });
 }
 
-async function noticesAct(body){
-  const j = await postJSON("/api/notices", body);
-  if (j.error) notify(j.error, true);
-  await loadNotices();
+// A notice deleted or cleared goes from the page on the press (`gone` picks
+// which), and comes back saying why if the server refuses; the list is read
+// again once it has answered.
+function noticesAct(body, gone){
+  const was = noticesData;
+  return drawNow(() => {
+    if (!gone || !noticesData) return null;
+    noticesData = noticesData.filter(n => !gone(n));
+    drawPanes();
+    return () => { noticesData = was; drawPanes(); };
+  }, () => postJSON("/api/notices", body)).then(async j => { await loadNotices(); return j; });
 }
 
 const NOTICE_KINDS = {said: "Said", ask: "Answers", job: "Jobs"};
@@ -131,11 +138,12 @@ function wireNotices(root){
   if (clear) clear.onclick = async () => {
     const kind = noticesChip && noticesChip !== "bad" ? noticesChip : "";
     if (!await askYes(kind ? `Clear every ${NOTICE_KINDS[kind].toLowerCase()} notice?` : "Clear every notice kept for your account?")) return;
-    noticesAct({action: "clear", kind});
+    return noticesAct({action: "clear", kind}, n => !kind || n.kind === kind);
   };
   root.querySelectorAll("[data-ntchip]").forEach(b => b.onclick = () =>
     chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; readMoved("notices"); drawPanes(); }));
-  root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () => noticesAct({action: "delete", id: b.dataset.ntdel}));
+  root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () =>
+    noticesAct({action: "delete", id: b.dataset.ntdel}, n => String(n.id) === b.dataset.ntdel));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));
   root.querySelectorAll("[data-ntdeny]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntdeny), false));

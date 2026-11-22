@@ -89,7 +89,9 @@ async function pushLayout(){
   const body = lastSaved;
   let ok = false;
   try{
-    const j = await postJSON("/api/layout", JSON.parse(body));
+    // The layout follows the page by itself, so it holds no question as
+    // the page goes (writeOut).
+    const j = await postJSON("/api/layout", JSON.parse(body), {background: true});
     if (typeof j.rev === "number"){ myRev = j.rev; ok = true; }
   }catch(e){ /* below */ }
   pushing = false;

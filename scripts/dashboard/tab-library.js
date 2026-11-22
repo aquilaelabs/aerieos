@@ -507,6 +507,17 @@ function libShelves(may){
   return mine + kinds + packsSaid + appsSaid || `<div class="empty">Nothing here yet.</div>`;
 }
 
+// A card in the page's placeholder, as a card is laid out.
+function libSkCard(){
+  return `<div class="lcard skcard"><div class="lchead"><span class="lcicon"></span><div class="lctitle">${skv(7, "name")}${skv(4)}</div></div>${skRows(1)}</div>`;
+}
+// The list a narrowing is reading, as its placeholder: drawn on the press,
+// under the chip already lit and its count turned to the ring, and replaced
+// by the server's page when it lands (the operator, 22 Nov).
+function libListSkel(){
+  return skTpl(`<div class="libgroup libone"><div class="lgrid">${Array.from({length: 6}, libSkCard).join("")}</div></div>`);
+}
+
 // A list (a chip, a topic or the search): one sorted list, a page at a time.
 function libList(may){
   const rows = lib.rows || [];
@@ -525,7 +536,7 @@ function renderLibraryInto(i){
   if (!d) return;
   if (lib === null){
     d.setBar("");
-    const skcard = () => `<div class="lcard skcard"><div class="lchead"><span class="lcicon"></span><div class="lctitle">${skv(7, "name")}${skv(4)}</div></div>${skRows(1)}</div>`;
+    const skcard = libSkCard;
     drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
       + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name, maker or what it does"><span class="libnarrow"><label class="pick libsort"><select disabled aria-label="order"><option>By name</option></select></label>${viewSeg("libviewsk", libViewNow(), "", "", " disabled", ["Cards", "Rows"])}</span><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
       + `<div class="field libgroups">${[["installed", "On this node"], ...LIB_KINDS].map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}<button type="button" class="link libshelfall" disabled>All ›</button></h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
@@ -624,7 +635,14 @@ function wireLibrary(root){
   wireSignin(root);
   // Each narrowing asks the server again (R256), the address following it,
   // and a list starts from its first page.
-  const ask = set => { set(); if (lib) lib.moreAsked = false; libPagesFrom(); shellSync(); loadLibrary(); };
+  // The list under it becomes its placeholder on the press, and the read is
+  // the press's own, so a chip's count is the ring until it lands.
+  const ask = set => {
+    set(); if (lib) lib.moreAsked = false; libPagesFrom(); shellSync();
+    const groups = root.querySelector(".libgroups");
+    if (groups) drawHTML(groups, libListSkel());
+    return loadLibrary();
+  };
   const q = root.querySelector("#libFind");
   if (q){
     onTyping(q, () => { if (q.value === libQ) return; ask(() => { libQ = q.value; if (!libQ.trim() && libSort === "") libSort = ""; }); });

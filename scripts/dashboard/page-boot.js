@@ -398,6 +398,11 @@ function bootNotebooks(){
   // seconds: "your other window" about a window that is gone is the one line
   // presence exists to avoid (roadmap #26, B144).
   addEventListener("pagehide", () => notebooks.forEach(n => n.leave()));
+  // A write still unanswered asks before the page goes (writeOut): the
+  // browser's own question, in its own words.
+  addEventListener("beforeunload", e => {
+    if (writesOut > 0){ e.preventDefault(); e.returnValue = ""; }
+  });
 }
 
 // ---- a new project's first session ----------------------------------------

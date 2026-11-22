@@ -66,14 +66,43 @@ const lbl = (id, text, help) => `<label class="lbl"${id ? ` for="${esc(id)}"` : 
 // button's ring (pressTie). With {blob: true} the answer is a file:
 // {blob, name} where it landed.
 function postJSON(path, body, opts = {}){
-  return pressTie(answerOf(fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
-                                        body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {})}), opts));
+  return pressTie(writeOut(answerOf(fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+                                                 body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {})}), opts), opts));
 }
 // ...a file's bytes as the body, for an upload the server spools (an archive,
 // an ISO), answered the same way...
 function postFile(path, file, type = ""){
-  return pressTie(answerOf(fetch(path, {method: "POST", body: file,
-                                        ...(type ? {headers: {"Content-Type": type}} : {})}), {}));
+  return pressTie(writeOut(answerOf(fetch(path, {method: "POST", body: file,
+                                                 ...(type ? {headers: {"Content-Type": type}} : {})}), {}), {}));
+}
+// Every write is counted while it is unanswered, and leaving the page then
+// asks first (the operator, 22 Nov: a press's change is drawn at once and
+// the server follows, so a page left early could lose one unsaid). The
+// page's own writes on a timer (presence, the layout) say {background: true}
+// and hold nothing, and one sent as the page goes (keepalive) is meant to
+// outlive it.
+let writesOut = 0;
+function writeOut(p, opts){
+  if (opts.background || opts.keepalive) return p;
+  writesOut += 1;
+  const done = () => { writesOut -= 1; };
+  p.then(done, done);
+  return p;
+}
+// A press whose result the page knows before the server answers: `now`
+// draws it on the click and gives back how to take it away, `send` makes the
+// request (postJSON's promise, or a function returning it). A refusal puts
+// the page as it was and says why in one sentence; the answer comes back
+// either way, for a caller with a step of its own.
+async function drawNow(now, send){
+  let undo = null;
+  try{ undo = now(); }catch(e){ console.error(e); }
+  const j = await (typeof send === "function" ? send() : send);
+  if (j?.error){
+    try{ if (typeof undo === "function") undo(); }catch(e){ console.error(e); }
+    notify(j.error, true);
+  }
+  return j;
 }
 // ...and the same for a read: a GET's JSON, or {error} in words, taken from
 // the head's early read of it where there is one (bootFetch).

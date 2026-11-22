@@ -2585,6 +2585,12 @@ button.working::after,a.btn.working::after{content:"";display:inline-block;width
 button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))>svg{visibility:hidden}
 button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))::after{position:absolute;left:50%;top:50%;margin:-.4em 0 0 -.4em}
 button.working:has(> svg):not(:has(> :not(svg, .dot, .meta))){position:relative}
+/* A chip whose narrowing is being read: its count is the ring in the count's
+   own room, the chip neither wider nor taller (pressCount, the operator,
+   22 Nov). */
+.chip .pill.counting{color:transparent;position:relative}
+.chip .pill.counting::after{content:"";position:absolute;left:50%;top:50%;width:.8em;height:.8em;margin:-.4em 0 0 -.4em;
+  border:2px solid var(--dim);border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;box-sizing:border-box}
 /* An empty state, one style everywhere (consistency batch 5): the page's
    own was 9px 11px, a document's the tokens and a list box's 8px 10px. */
 /* An empty state is one dim line in the hint voice (the operator, 29 Oct:
