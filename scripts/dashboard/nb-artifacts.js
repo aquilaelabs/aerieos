@@ -112,6 +112,11 @@ function nbArtLoad(av, kept){
     const deadSaid = [
       (apks || xpis) && phoneWhy ? `${apks && xpis ? "Install and Push" : apks ? "Install" : "Push"} cannot go: ${phoneWhy}.` : "",
       xpis && !phoneWhy && !art.webext ? `Push cannot go: web-ext is not on ${art.node_name || "the node"}; install it there first.` : "",
+      // One at a time on the phone, and the server refuses a second
+      // (phone.py): the rows' Install or Push are dead while one runs, and
+      // say why here, live again when it ends (the operator, 22 Nov).
+      apks && !phoneWhy && inst.running ? `Install waits: one install at a time, and ${inst.what || "one"} is installing now.` : "",
+      xpis && !phoneWhy && art.webext && job.running ? `Push waits: one push at a time, and ${job.what || "one"} is on the phone now; Stop ends it.` : "",
     ].filter(Boolean).map(t => `<div class="hint artwhy">${esc(t)}</div>`).join("");
     const filesBody = !rows.length
       ? `<div class="hint">Nothing in <b>dist/</b> yet: a build copies what it keeps there.</div>`

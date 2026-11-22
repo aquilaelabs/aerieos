@@ -200,8 +200,9 @@ function libPills(r){
 function libState(r){
   const w = packState;
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.kind === "agent" && r.installed ? "updating" : "installing")}<span class="dots"></span>`);
-  // Pressed while another job ran: it goes when that one ends.
-  if (r.queued) return w("queued, after the job running now");
+  // Pressed while another job ran: it goes when that one ends, and says
+  // which job that is (the operator, 22 Nov).
+  if (r.queued) return w(esc(`queued behind ${tcBehind(lib?.job) || tcBehind(entryLib?.job) || tcBehind() || "the job running now"}`));
   // One this AerieOS is too old for: said plainly, in the muted voice, since
   // nothing is wrong with the card or the machine.
   if (r.too_new) return w(esc(r.too_new.charAt(0).toUpperCase() + r.too_new.slice(1).replace(/ \(.*$/, "")));
@@ -669,14 +670,19 @@ function wireLibrary(root){
   const ab = root.querySelector("[data-libabort]");
   if (ab) ab.onclick = async () => { await tcAct("abort"); loadLibrary(); };
   const sd = root.querySelector("[data-libsysdeps]");
-  if (sd) sd.onclick = () => pressing(sd, async () => { busy(sd, "Installing"); await tcAct("sysdeps"); await loadLibrary(); });
+  // ...its word Queuing while a job runs, which it waits behind (tcAct says
+  // which).
+  if (sd) sd.onclick = () => pressing(sd, async () => { busy(sd, tcBehind() ? "Queuing" : "Installing"); await tcAct("sysdeps"); await loadLibrary(); });
   const cl = root.querySelector("[data-libclean]");
   if (cl) cl.onclick = async () => {
     const dirs = (lib?.cleanable || []).map(c => c.dir);
     if (!dirs.length || !await askYes(`Take ${dirs.join(", ")} off the store?\n\nNo node runs from ${dirs.length === 1 ? "it" : "them"}; what is in ${dirs.length === 1 ? "it" : "them"} is gone for good.`, {verb: "Remove", danger: true})) return;
-    busy(cl, "Removing");
+    // While a job writes the store it waits behind it, and says so.
+    const ahead = tcBehind();
+    busy(cl, ahead ? "Queuing" : "Removing");
     const j = await postJSON("/api/toolchains", {action: "clean", node: libNode, names: dirs});
     if (j.error) notify(j.error, true);
+    else if (ahead || j.waits) notify(`taking ${dirs.join(", ")} off the store: queued behind ${ahead || "the job writing it"}`);
     loadLibrary();
   };
   const dsel = root.querySelector("#libDrvSel");
@@ -721,8 +727,26 @@ async function libAct(b, act, kind, name){
   if (act === "edit"){ await libWithToolchains(() => tpOpen(r.name)); return; }
   if (act === "repin"){ await libWithToolchains(() => tpOpen(r.name, r.repin)); return; }
   // Install or update a toolchain or an added pack: the Toolchains job,
-  // with its agreements asked the way that page asks them.
-  busy(b, r.installed ? "Updating" : "Installing");
-  await tcAct("install", [r.name]);
+  // with its agreements asked the way that page asks them. While another
+  // job runs on the node it is queued behind it, never refused (the
+  // operator, 22 Nov): the card says so once its questions are answered,
+  // behind what, and its toast says it too (tcAct).
+  if (tcBehind()){
+    await tcAct("install", [r.name], {now: () => libQueuedNow(kind, name)});
+  } else {
+    busy(b, r.installed ? "Updating" : "Installing");
+    await tcAct("install", [r.name]);
+  }
   await libReload();
+}
+
+// A card pressed while a job runs, drawn queued behind it at once, every
+// copy of it the page holds (a shelf, the list, its entry page); what this
+// gives back takes the mark off again, for a press refused or not sent.
+// The read after the answer says the same from the server's queue.
+function libQueuedNow(kind, name){
+  const rows = libKnown().filter(x => x.kind === kind && x.name === name && !x.queued && !x.running);
+  rows.forEach(x => { x.queued = true; });
+  readMoved("library"); drawPanes();
+  return () => { rows.forEach(x => { x.queued = false; }); readMoved("library"); drawPanes(); };
 }

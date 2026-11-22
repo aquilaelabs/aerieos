@@ -723,7 +723,26 @@ function tcToolkitLine(m){
       : `<span class="sub warn">installed; a container sees the card once the driver above is running it</span>`;
   }
 }
-async function tcAct(action, only){
+// What a press now waits behind on this node, in words ("the install of
+// Flutter"), or "" while no job runs there: one toolchain job at a time on a
+// node, and a press while one runs is queued behind it, never refused
+// (toolchains.start_job, store_gate). `job` is the read's record of it.
+function tcBehind(job = toolchains?.job){
+  if (!job?.running) return "";
+  if (job.action === "check") return "the check for updates";
+  if (job.action === "sysdeps") return "the install of the system packages";
+  const on = job.current || (job.queue || [])[0] || "";
+  const what = {install: "install", update: "update", remove: "removal", clean: "clean-up"}[job.action];
+  if (!on || !what) return "the job running now";
+  const row = (toolchains?.items || []).find(i => i.name === on) || (typeof libFind === "function" ? libFind(x => x.name === on) : null);
+  return `the ${what} of ${row?.label || on}`;
+}
+// A press on the store's job: asked what it must ask first, then sent.
+// `now`, where the page draws the press's own result (a card queued behind
+// the job running), is drawn once the questions are answered and just
+// before it is sent, and taken back by what it returns when nothing was
+// queued. The answer comes back, or null when there was none to give.
+async function tcAct(action, only, {now} = {}){
   // A press while a job runs is queued behind it, here and on a node alike.
   if (action === "abort"){
     // On a node the install is a job, and stopping it is the queue's Cancel.
@@ -739,8 +758,10 @@ async function tcAct(action, only){
   // one row is. Sending a selection made it answer for that one toolchain
   // and leave the others showing yesterday's answer.
   const names = only || [];
-  if (!names.length && action !== "check" && action !== "sysdeps")
-    return notify("nothing selected", true);
+  if (!names.length && action !== "check" && action !== "sysdeps"){
+    notify("nothing selected", true);
+    return null;
+  }
   // The driver is the one row whose install ends at a restart: said once,
   // before anything is queued.
   const drv = names.includes(TC_DRIVER) && action === "install";
@@ -750,16 +771,26 @@ async function tcAct(action, only){
   if ((drv || kit) && !await askYes("", {title: `Install on ${toolchains?.name || "this node"}?`, verb: "Install", parts: [
     {head: "NVIDIA's driver", lines: drv ? ["It takes the card only when the machine restarts, which ends every session on it."] : []},
     {head: "The NVIDIA container toolkit", lines: kit ? ["It adds NVIDIA's own package source to the machine. Running containers keep running."] : []}]}))
-    return;
+    return null;
+  // What it will wait behind, read before it is sent: the answer from this
+  // container's own store says nothing of it.
+  const ahead = tcBehind();
+  let undo = null;
+  const draw = () => { try{ undo = now?.() || null; }catch(e){ console.error(e); } };
+  const back = () => { try{ undo?.(); }catch(e){ console.error(e); } undo = null; };
   try{
     const body = {action, names, node: tcNode, ...(drv && tcDriverPick ? {driver: tcDriverPick} : {})};
+    draw();
     let j = await postJSON("/api/toolchains", body);
     // An agreement a toolchain installs under (Google's Android SDK terms,
     // NVIDIA's CUDA license) is the person's to accept, named, before
     // anything is fetched: the server says which, and keeps who accepted.
+    // Nothing was queued meanwhile, so what was drawn goes while it asks.
     if (Array.isArray(j.accept) && j.accept.length){
+      back();
       if (!await askYes(`Installing ${names.join(", ")} accepts ${j.accept.map(t => t.label).join(" and ")}.\n\n${
-            j.accept.map(t => `${t.label}: ${t.url}`).join("\n")}\n\nAccept and install?`)) return;
+            j.accept.map(t => `${t.label}: ${t.url}`).join("\n")}\n\nAccept and install?`)) return null;
+      draw();
       j = await postJSON("/api/toolchains", {...body, accept: j.accept.map(t => t.label)});
     }
     // A toolchain that needs another used to be installed without it and fail
@@ -768,13 +799,19 @@ async function tcAct(action, only){
     // extra name appearing in the queue unexplained.
     if (j?.added?.length)
       notify(`also installing ${j.added.join(", ")}: needed by what you picked`);
-    if (j.error) return notify(j.error, true);
+    if (j.error){ back(); notify(j.error, true); return j; }
     // The job's own toast where there is one (R218 step 6): it follows the
-    // job to its end, which is kept on the record.
+    // job to its end, which is kept on the record. One queued behind the
+    // job running says so, and behind what (the operator, 22 Nov): the
+    // job's toast reads "queued" beside it, one with no job of its own
+    // says the word itself.
     const on = tcNode !== "local" ? " on " + ((nodesList || []).find(n => n.id === tcNode)?.name || "the node") : "";
-    notifyJob(j.job, (action === "check" ? "checking for updates" + on
+    const said = action === "check" ? "checking for updates" + on
       : action === "sysdeps" ? "installing the system packages" + on
-      : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`) + (j.waits ? ", once the job running there ends" : ""));
+      : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`;
+    const behind = ahead || (j.waits ? "the job running there" : "");
+    notifyJob(j.job, !behind ? said : j.job ? `${said}, behind ${behind}` : `${said}: queued behind ${behind}`);
     loadToolchains();
-  }catch(e){ notify("could not start: " + failWords(e), true); }
+    return j;
+  }catch(e){ back(); notify("could not start: " + failWords(e), true); return null; }
 }

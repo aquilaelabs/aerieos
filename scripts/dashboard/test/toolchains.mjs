@@ -233,6 +233,20 @@ await section("One operation at a time", async () => {
   ok(g.check && g.abort && g.install,
      `while a job runs, Check for updates and every card's Install stay live, a press queueing behind it, and Abort is there (${
        Object.entries(g).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'all'})`);
+  // A card queued behind it says behind what (the operator, 22 Nov), and so
+  // does the press's toast, from the same words (tcBehind).
+  const q = await page.evaluate(() => {
+    const was = lib.job;
+    lib.job = { ...(was || {}), running: true, action: 'install', current: 'swift' };
+    const said = libState({ kind: 'toolchain', name: 'a-card', queued: true }).replace(/<[^>]*>/g, '').trim();
+    const behind = tcBehind(lib.job);
+    lib.job = { ...(was || {}), running: true, action: 'check' };
+    const check = tcBehind(lib.job);
+    lib.job = was;
+    return { said, behind, check, idle: tcBehind({ running: false }) };
+  });
+  ok(/^queued behind the install of \S/.test(q.said) && q.said.endsWith(q.behind) && q.check === 'the check for updates' && q.idle === '',
+     `...and a card queued behind it says behind what, as its toast does (${q.said}; ${q.check})`);
   // A check the operator did not start still has to reach the page, and the
   // button says which job is in the way; the head keeps to the store (B31).
   const c = await page.evaluate(() => {
