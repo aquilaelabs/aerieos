@@ -125,7 +125,7 @@ ok(await page.evaluate(() => !!document.querySelector('.doc .librarytab .libgrou
 // placeholder drawn by the page's render, so the next draw is never taken
 // for the last one: a cleared search left its words' list on the screen
 // whenever its read was slow, 22 Nov).
-{
+await section('the search emptied while its read is out', async () => {
   let held = 0;
   await page.route('**/api/library?*', async r => { if (held) await sleep(held); r.continue().catch(() => {}); });
   held = 2500;
@@ -137,7 +137,7 @@ ok(await page.evaluate(() => !!document.querySelector('.doc .librarytab .libgrou
   held = 0;
   await page.unroute('**/api/library?*');
   ok(back && await page.evaluate(() => document.activeElement?.id === 'libFind'), '...and emptied while the read for its words is out, the shelves come back all the same, the caret kept');
-}
+});
 if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
   await page.click('.doc .librarytab [data-libkind="toolchain"]');
   await page.waitForFunction(() => libKind === 'toolchain' && !readBusy('library') && !!document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
