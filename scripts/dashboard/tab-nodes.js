@@ -760,12 +760,13 @@ function nodeFeaturesSection(n){
     // it stays live and the press says so (ndQueuedSay).
     const mine = job?.feature === fid;
     // Its own job running, or done and the node not yet reporting it: its
-    // word kept and the ring in its place (runAttr), saying which.
-    const running = ahead === fid || mine;
-    const saying = ahead === fid ? "Done, the node is reporting back" : job?.op === "remove" ? "Uninstalling" : "Installing";
-    const btn = !running && (why || cant) ? ""
-      : `<button type="button" data-nd="feature" data-feature="${fid}" data-op="${has ? "remove" : "install"}"${runAttr(running, saying)}>${
-          has ? "Uninstall" : "Install"}</button>`;
+    // word kept and the ring in its place (runAttr), saying which; done, it
+    // is no press at all until the node has said so (B162).
+    const word = has ? "Uninstall" : "Install";
+    const btn = ahead === fid ? `<button type="button"${runAttr(true, "Done, the node is reporting back")}>${word}</button>`
+      : why || cant ? ""
+      : `<button type="button" data-nd="feature" data-feature="${fid}" data-op="${has ? "remove" : "install"}"${
+          runAttr(mine, job?.op === "remove" ? "Uninstalling" : "Installing")}>${word}</button>`;
     const fail = failed?.feature === fid ? `<div class="sub bad">The last try failed${failed.error ? `: ${esc(failed.error)}` : ""}; its job's log says more.</div>` : "";
     return `<div class="row ndfeat" data-feat="${fid}"><div class="grow">
         <div class="name">${esc(title)} <span class="pill${has ? " ok" : ""}">${has ? "installed" : "not installed"}</span></div>

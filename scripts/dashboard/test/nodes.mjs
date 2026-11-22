@@ -1911,10 +1911,11 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       const took = await (await agent('work', { running: [], wait: 0 })).json();
       await agent('result', { job: took.id, state: 'succeeded', exit: 0 });
       await page.evaluate(async () => { await refresh(); await loadNodes(); });
-      await page.waitForFunction(sel => /reporting back/.test(document.querySelector(sel)?.textContent || ''), VM, { timeout: 10000 }).catch(() => {});
-      const waiting = await page.$eval(VM, e => ({ text: e.textContent.replace(/\s+/g, ' '), live: !!e.querySelector('[data-nd="feature"]') }));
-      ok(took?.id === inst?.id && /Done, the node is reporting back/.test(waiting.text) && !waiting.live,
-         `...and once it has succeeded the row waits for the node's next report, with nothing to press (${waiting.text.slice(-60)})`);
+      // Its button keeps its word and wears the ring, saying it (runAttr).
+      await page.waitForFunction(sel => /reporting back/.test(document.querySelector(sel)?.querySelector('[data-running]')?.dataset.running || ''), VM, { timeout: 10000 }).catch(() => {});
+      const waiting = await page.$eval(VM, e => ({ said: e.querySelector('[data-running]')?.getAttribute('aria-label') || '', live: !!e.querySelector('[data-nd="feature"]') }));
+      ok(took?.id === inst?.id && /Done, the node is reporting back/.test(waiting.said) && !waiting.live,
+         `...and once it has succeeded the row waits for the node's next report, with nothing to press (${waiting.said})`);
       await hello({ ...CENSUS, features: feats({ kvm: false }) });
       await page.evaluate(async () => { await refresh(); await loadNodes(); });
       await page.waitForFunction(sel => /host-passthrough/.test(document.querySelector(sel)?.textContent || ''), VM, { timeout: 10000 });
@@ -2822,8 +2823,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   await pickNode(page, minted.id);
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
+  // Grayed with the ring in its word's place, saying it updates (runAttr).
   await page.waitForFunction(sel => /Updating/.test(
-    document.querySelector(sel + ' [data-nd="update-agent"]')?.textContent || ''),
+    document.querySelector(sel + ' [data-nd="update-agent"]')?.getAttribute('aria-label') || ''),
     ROW, { timeout: 10000 });
   ok(await page.$eval(`${ROW} [data-nd="update-agent"]`, b => b.disabled),
      '...and stays grayed while the update is queued, not only for the round trip');
@@ -3640,10 +3642,11 @@ await section("Uninstall from the row", async () => {
     await page.waitForSelector(`.ndrow[data-node="${plain.id}"]`, { timeout: 20000 });
     const drawn = await page.evaluate(id => {
       const box = document.querySelector(`.ndrow[data-node="${CSS.escape(id)}"]`);
-      return box ? [!!box.querySelector('[data-nd="reboot"]'), !!box.querySelector('[data-nd="poweroff"]'),
-                    box.querySelector('[data-nd="reboot"]')?.textContent] : null;
+      const rb = box?.querySelector('[data-nd="reboot"]');
+      return box ? [!!rb, !!box.querySelector('[data-nd="poweroff"]'), rb?.getAttribute('aria-label') || '', rb?.textContent.trim(), !!rb?.disabled] : null;
     }, plain.id);
-    ok(drawn && drawn[0] && drawn[1] && /Rebooting/.test(drawn[2] || ''),
+    // In flight, Reboot keeps its word and wears the ring, saying so (runAttr).
+    ok(drawn && drawn[0] && drawn[1] && /Rebooting/.test(drawn[2]) && drawn[3] === 'Reboot' && drawn[4],
        `the row carries Reboot and Shut down, and says the reboot is in flight (${JSON.stringify(drawn)})`);
     await napi('/api/v1/jobs', { action: 'cancel', id: rb.job });
     // The controller's own row, drawn as the tab draws it: neither verb.

@@ -919,7 +919,9 @@ await section("Sampled rather than waited for, so a miss says what the row said 
   page.off('response', onResp);
 });
 ok(await page.$(`${DM} .dmlog`) === null, "the row carries the job's phase and no tail of its output");
-ok(await page.$(`${DM} [data-dm="abort"]`) !== null,
+// The row says building on the press; its Abort follows once the job it
+// stops exists, with the server's answer and the read after it.
+ok(await page.waitForSelector(`${DM} [data-dm="abort"]`, { timeout: 15000 }).then(() => true, () => false),
    '...with an Abort beside it, which a build never had');
 // Aborted once it is really running: pressed while the job was still in the
 // queue it was canceled before it started, which keeps nothing and says so,

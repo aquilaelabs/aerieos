@@ -46,7 +46,11 @@ def entry(name="hexkit", **more):
 
 
 def parsed(*entries, **more):
-    idx, why = catalogindex.parse(json.dumps({"version": 1, "generated": "2026-11-20T00:00:00Z", "packs": list(entries), **more}).encode())
+    # Made at the floor this build ships (config/catalog-floor), which moves
+    # forward with each release: one made before it is refused before what a
+    # test asks about is read.
+    made = catalogindex.floor()[1] or "2026-11-20T00:00:00Z"
+    idx, why = catalogindex.parse(json.dumps({"version": 1, "generated": made, "packs": list(entries), **more}).encode())
     assert not why, why
     return idx
 
