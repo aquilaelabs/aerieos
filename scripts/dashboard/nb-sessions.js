@@ -125,12 +125,12 @@ function nbSessionsView({$, nb, project, root}){
       closeMore();
       if (shut){ m.hidden = false; b.setAttribute("aria-expanded", "true"); floatAt(m, b); }
     });
-    list.querySelectorAll("[data-cvshare]").forEach(b => b.onclick = () => act(b, b.dataset.cvshare, b.dataset.on ? "share" : "unshare"));
+    list.querySelectorAll("[data-cvshare]").forEach(b => b.onclick = () => act(b.dataset.cvshare, b.dataset.on ? "share" : "unshare"));
     list.querySelectorAll("[data-cvdel]").forEach(b => b.onclick = async () => {
       const r = mine.find(x => x.id === b.dataset.cvdel);
       if (!await askYes(`Delete your conversation of ${r ? fmtTime(r.at * 1000) : "this session"}?\n\n`
           + "It is gone for good: nothing can resume, read or download it again.")) return;
-      act(b, b.dataset.cvdel, "delete");
+      return act(b.dataset.cvdel, "delete");
     });
     list.querySelectorAll("[data-cvread]").forEach(b => b.onclick = () => openConversation(project, b.dataset.cvread));
     // Go on with this one: the project's chooser opens on it (resumeConversation).
@@ -157,15 +157,26 @@ function nbSessionsView({$, nb, project, root}){
     editing = "";
     await loadSessions();
   }
-  // Delete, Make visible and Make private: a person's, on the press.
-  async function act(b, id, action){
+  // Delete, Make visible and Make private: a person's, on the press. Each is
+  // drawn at once from the view's own rows (the operator, 22 Nov: the press
+  // is under a menu that shuts on it, so a word on its button was never
+  // seen), and put back saying why if the controller refuses.
+  async function act(id, action){
     closeMore();
-    busy(b, {delete: "Deleting", share: "Making visible", unshare: "Making private"}[action]);
-    try{
-      const j = await postJSON("/api/transcripts", {project, id, action});
-      if (j.error) notify(j.error, true);
-      else notify({delete: "deleted", share: "visible to every session on this space", unshare: "yours alone again"}[action]);
-    }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
+    const j = await drawNow(() => {
+      const t = rows, list = t?.rows || [], i = list.findIndex(x => x.id === id);
+      if (i < 0) return null;
+      const was = list[i], now = action === "delete" ? null : {...was, shared: action === "share"};
+      if (now) list[i] = now; else list.splice(i, 1);
+      drawSessions();
+      return () => {
+        if (rows !== t) return;
+        if (now){ const at = list.indexOf(now); if (at >= 0) list[at] = was; }
+        else if (!list.includes(was)) list.splice(Math.min(i, list.length), 0, was);
+        drawSessions();
+      };
+    }, () => postJSON("/api/transcripts", {project, id, action}));
+    if (!j.error) notify({delete: "deleted", share: "visible to every session on this space", unshare: "yours alone again"}[action]);
     await loadSessions();
   }
   return {loadSessions};

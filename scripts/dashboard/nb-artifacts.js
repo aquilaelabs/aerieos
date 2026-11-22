@@ -379,15 +379,14 @@ function nbArtCaptures(av, art, caps){
             </span>
           </div>`).join("")));
     wireSections(capBox);
+    // Gone from the list on the press, and back saying why if the server
+    // refuses (nbArtNow).
     capBox.querySelectorAll("[data-artcap]").forEach(b => b.onclick = async () => {
       const c = caps[+b.dataset.artcap];
       if (!c) return;
-      busy(b, "Removing");
-      try{
-        const j = await postJSON("/api/artifacts", {project, action: "forget-capture", name: c.name});
-        if (j.error) return notify(j.error, true);
-      }catch(e){ return notify(String(e), true); }
-      nbArtLoad(av);
+      const j = await drawNow(nbArtNow(av, "captures", x => x.name === c.name),
+                              () => postJSON("/api/artifacts", {project, action: "forget-capture", name: c.name}));
+      if (!j.error) nbArtLoad(av);
     });
   }
 }
@@ -495,26 +494,24 @@ function nbArtWireList(av, list, rows, cf, cfFiles){
     try{ await navigator.clipboard.writeText(fp); notify(`copied ${a.name}'s signing fingerprint`); }
     catch(e){ notify(`copy it by hand: ${fp}`, "warn"); }
   });
+  // Remove, once asked, and a pin are drawn on the press (nbArtNow): the row
+  // goes, or wears its pin, and is put back saying why on a refusal.
   list.querySelectorAll("[data-artunnamed]").forEach(b => b.onclick = async () => {
     const a = rows[+b.dataset.artunnamed];
     if (!a || !await askYes(`Remove ${a.name} from dist/?\n\nIt is gone for everybody.`)) return;
-    b.disabled = true;
-    try{
-      const j = await postJSON("/api/artifacts", {project, action: "forget-unnamed", path: a.path});
-      if (j.error){ b.disabled = false; return notify(j.error, true); }
-      notify(`removed ${a.name}`);
-    }catch(e){ b.disabled = false; return notify(String(e), true); }
+    const j = await drawNow(nbArtNow(av, "artifacts", x => x.path === a.path),
+                            () => postJSON("/api/artifacts", {project, action: "forget-unnamed", path: a.path}));
+    if (j.error) return;
+    notify(`removed ${a.name}`);
     nbArtLoad(av);
   });
   list.querySelectorAll("[data-artpin]").forEach(b => b.onclick = async () => {
     const a = rows[+b.dataset.artpin];
     if (!a) return;
-    b.disabled = true;
-    try{
-      const j = await postJSON("/api/artifacts", {project, action: a.pinned ? "unpin" : "pin", path: a.path});
-      if (j.error){ b.disabled = false; return notify(j.error, true); }
-      notify(j.pinned ? `pinned ${a.name}: it stays` : `unpinned ${a.name}`);
-    }catch(e){ b.disabled = false; return notify(String(e), true); }
+    const j = await drawNow(nbArtNow(av, "artifacts", x => x.path === a.path, x => ({...x, pinned: !a.pinned})),
+                            () => postJSON("/api/artifacts", {project, action: a.pinned ? "unpin" : "pin", path: a.path}));
+    if (j.error) return;
+    notify(j.pinned ? `pinned ${a.name}: it stays` : `unpinned ${a.name}`);
     nbArtLoad(av);
   });
   list.querySelectorAll("[data-artview]").forEach(b => b.onclick = async () => {
@@ -543,6 +540,27 @@ function nbArtPoll(av, job, inst){
   if ((job.running || inst.running)
       && !root.querySelector('[data-view="artifacts"]').hidden)
     av.artTimer = setTimeout(() => nbArtLoad(av), 2000);
+}
+
+// A change to a file or a capture that the page knows before the answer
+// (the operator, 22 Nov): made to the view's own read, `key` its list and
+// `match` the row, and drawn from it at once; `change` answers the row as it
+// will be, and without one the row goes. For drawNow, whose refusal puts the
+// row back; a read landed since is the server's, and stands.
+function nbArtNow(av, key, match, change){
+  return () => {
+    const art = av.art, list = art?.[key] || [], i = list.findIndex(match);
+    if (i < 0) return null;
+    const was = list[i], now = change ? change(was) : null;
+    if (now) list[i] = now; else list.splice(i, 1);
+    nbArtLoad(av, true);
+    return () => {
+      if (av.art !== art) return;
+      if (now){ const at = list.indexOf(now); if (at >= 0) list[at] = was; }
+      else if (!list.includes(was)) list.splice(Math.min(i, list.length), 0, was);
+      nbArtLoad(av, true);
+    };
+  };
 }
 
 // An action on this space's artifacts, its error said, and the view read
@@ -1268,17 +1286,23 @@ function nbArtDrawChangelog(av, pane, comp, j){
       };
     });
     // The tracker's half (R255): a tie to a saved line is written at once,
-    // one to a line written here waits for Save.
-    const tie = async (e, n, on) => {
+    // one to a line written here waits for Save. The one written at once is
+    // drawn on the press, and put back saying why if the tracker refuses.
+    const tie = (e, n, on) => {
       if (e.orig === undefined){
         e.pend = on ? [...new Set([...(e.pend || []), n])] : (e.pend || []).filter(x => x !== n);
         return draw(e, "[data-cltie]");
       }
-      const r = await postJSON("/api/bugs", {project, action: on ? "tie" : "untie", id: n, line: e.orig});
-      if (r?.error) return notify(r.error, true);
-      const have = meta.ties[e.orig] || [];
-      meta.ties[e.orig] = on ? [...new Set([...have, n])] : have.filter(x => x !== n);
-      draw(e, "[data-cltie]");
+      const m = meta, had = m.ties[e.orig];
+      return drawNow(() => {
+        m.ties[e.orig] = on ? [...new Set([...(had || []), n])] : (had || []).filter(x => x !== n);
+        draw(e, "[data-cltie]");
+        return () => {
+          if (meta !== m) return;
+          if (had) m.ties[e.orig] = had; else delete m.ties[e.orig];
+          draw(e, "[data-cltie]");
+        };
+      }, () => postJSON("/api/bugs", {project, action: on ? "tie" : "untie", id: n, line: e.orig}));
     };
     q(".clrow", row => {
       const e = gs[Number(row.dataset.g)].entries[Number(row.dataset.e)];
@@ -1317,11 +1341,14 @@ function nbArtDrawChangelog(av, pane, comp, j){
         if (r.querySelector(".dropbox")) return;
         dropBox(r, {q: "Why does it need no line?", sub: ": kept in its notes, which the release check reads",
                     placeholder: "no release had it; nobody using it meets it", verb: "Needs no line",
-                    go: async why => {
-                      const a = await postJSON("/api/bugs", {project, action: "noline", id: n, why});
-                      if (a?.error) return notify(a.error, true);
-                      meta.owed = meta.owed.filter(o => o.id !== n);
-                      draw();
+                    // Off the owed list on the press, back if the tracker refuses.
+                    go: why => {
+                      const m = meta, had = m.owed;
+                      return drawNow(() => {
+                        m.owed = had.filter(o => o.id !== n);
+                        draw();
+                        return () => { if (meta === m){ m.owed = had; draw(); } };
+                      }, () => postJSON("/api/bugs", {project, action: "noline", id: n, why}));
                     }});
       };
     });

@@ -3,7 +3,7 @@
 // report is a form submitted once, not a list curated in place), and nothing
 // is ever deleted: a bug closes as fixed or wontfix, each with a note, because
 // a closed bug is the record that stops the same report being chased twice.
-import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo, section, pageCall } from './lib.mjs';
+import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo, section, pageCall, until } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -130,9 +130,10 @@ ok(page.dialogs.length === 0 && /Close as fixed/.test(await page.$eval('#bugList
 await page.fill('#bugList .bug[data-id="1"] .dropbox textarea', 'the select re-measures on rotate now');
 await page.click('#bugList .bug[data-id="1"] .dropbox .primary');
 await page.waitForFunction(() => document.querySelector('#bugList .bug[data-id="1"] .bstat')?.textContent === 'fixed', { timeout: 10000 });
-ok(read().find(b => b.id === 1).status === 'fixed'
-   && read().find(b => b.id === 1).status_note === 'the select re-measures on rotate now',
-   'marking one fixed asks what fixed it, and keeps the answer on the bug');
+// Drawn closed on the press (the operator, 22 Nov); the tracker follows.
+ok(await until(() => read().find(b => b.id === 1).status === 'fixed'
+   && read().find(b => b.id === 1).status_note === 'the select re-measures on rotate now', 10000),
+   'marking one fixed asks what fixed it, shows it closed on the press, and keeps the answer on the bug');
 ok(!/picker loses/.test(bbBug()), '...and it leaves the open list');
 // What a report knows is facts above its verbs (R254 step 3): who reported
 // it and when, how it was closed and when, with the note; the verbs are an
@@ -370,7 +371,8 @@ await page.fill('.bug .dropbox textarea', 'filed against the wrong space');
 await page.click('.bug .dropbox .danger');
 await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 2,
                            { timeout: 10000 });
-ok(!read().some(b => b.id === 3), 'Delete it takes the row for good');
+// The row goes on the press (the operator, 22 Nov); the tracker follows.
+ok(await until(() => !read().some(b => b.id === 3), 10000), 'Delete it takes the row on the press, and for good');
 ok(/wrong space/.test(bbBug('history', '--find', 'wrong space')),
    '...leaving the reason in the log, which is all that is left of it');
 
@@ -399,7 +401,8 @@ await page.click(`#bugList .bug[data-id="${naId}"] .dropbox .primary`);
 await page.waitForFunction(n => document.querySelector(
   `#bugList .bug[data-id="${n}"] .bstat`)?.textContent === 'n/a', naId,
   { timeout: 10000 });
-const naBug = read().find(b => String(b.id) === naId);
+const naBug = await until(() => { const b = read().find(x => String(x.id) === naId); return b?.status === 'na' && b; }, 10000)
+  || read().find(b => String(b.id) === naId);
 ok(naBug.status === 'na' && naBug.status_note === 'the picker was removed entirely',
    'Not applicable closes it with what stopped it applying');
 ok(!/picker drops focus/.test(bbBug('--prompt')) && /bug tracker with \d+ open/.test(bbBug('--prompt')),

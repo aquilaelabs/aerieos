@@ -146,12 +146,14 @@ if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
 await section("a reload of a list lands on the same list", async () => {
   const word = (HERE.find(r => r.kind === 'toolchain')?.name || 'jdk').slice(0, 3);
   await page.fill('.doc .librarytab #libFind', word);
-  await page.waitForFunction(q => libQ === q && /[?&]q=/.test(location.hash) && !!document.querySelector('.doc .librarytab .libone .lcard'), word, { timeout: 15000 });
-  const before = await page.$$eval('.doc .librarytab .libone .lcard', cs => cs.map(c => c.dataset.lrow).join());
+  // The list's own cards, never its placeholder's: a narrowing draws six
+  // shimmering cards on the press (the operator, 22 Nov), which carry no row.
+  await page.waitForFunction(q => libQ === q && /[?&]q=/.test(location.hash) && !!document.querySelector('.doc .librarytab .libone .lcard[data-lrow]'), word, { timeout: 15000 });
+  const before = await page.$$eval('.doc .librarytab .libone .lcard[data-lrow]', cs => cs.map(c => c.dataset.lrow).join());
   await page.reload();
   await ready(page);
-  await page.waitForFunction(() => !!document.querySelector('.doc .librarytab .libone .lcard'), null, { timeout: 20000 }).catch(() => {});
-  const after = await page.evaluate(() => ({ q: libQ, rows: [...document.querySelectorAll('.doc .librarytab .libone .lcard')].map(c => c.dataset.lrow).join(), box: document.querySelector('#libFind')?.value }));
+  await page.waitForFunction(() => !!document.querySelector('.doc .librarytab .libone .lcard[data-lrow]'), null, { timeout: 20000 }).catch(() => {});
+  const after = await page.evaluate(() => ({ q: libQ, rows: [...document.querySelectorAll('.doc .librarytab .libone .lcard[data-lrow]')].map(c => c.dataset.lrow).join(), box: document.querySelector('#libFind')?.value }));
   ok(after.q === word && after.box === word && after.rows === before, `a reload of a list lands on the same list (${JSON.stringify({ word, before: before.slice(0, 60), after: { ...after, rows: after.rows.slice(0, 60) } })})`);
   await page.fill('.doc .librarytab #libFind', '');
   await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });

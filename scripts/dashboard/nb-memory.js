@@ -417,7 +417,19 @@ function nbMemoryView({$, nb}){
 
 The file goes, and its line comes out of the`
       + ` index. A running session keeps what it already read.`)) return;
-    if (await postMemory({action:"delete", file})){
+    // Off the list once it is asked (the operator, 22 Nov), from the page's
+    // own copy of the book, and back saying why if the server refuses.
+    const now = () => {
+      const j = nb.memLast, list = j?.memories || [], i = list.findIndex(m => m.file === file);
+      if (i < 0) return null;
+      const [m] = list.splice(i, 1);
+      drawMemory(j);
+      return () => {
+        if (nb.memLast === j && !list.includes(m)) list.splice(Math.min(i, list.length), 0, m);
+        drawMemory(nb.memLast);
+      };
+    };
+    if (await postMemory({action:"delete", file}, {now})){
       nb.memEditing.delete(file);
       notify(`${file} forgotten`);
       await loadMemory(nb.memGen);

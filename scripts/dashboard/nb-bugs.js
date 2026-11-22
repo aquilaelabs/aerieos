@@ -41,6 +41,9 @@ function bugFacts(b, rel, words, refs, untie = false){
 // naming its fix commit, or its notes saying why it needs none.
 const BUG_ANSWER = /(?:^|\n)(?:\[[^\]\n]*\]\s*)?Changelog:\s*(.+)/;
 const bugOwed = (b, refs) => b.status === "fixed" && !(refs || []).length && !BUG_ANSWER.test(b.notes || "");
+// An unreleased line tied to a report, as the tracker's answer carries one
+// (roadmap.py's refs): drawn on the press until the answer brings its own.
+const bugTiedTo = words => ({in: "Unreleased", text: words, words, tied: true});
 
 // Whether a report's steps reproduce it (R124), in the order a reader
 // weighs them: every time first, the ones nobody has tried last.
@@ -93,6 +96,40 @@ function nbBugsView({$, nb, project}){
       if (!keepOpen) drawBugs(true);
     },
   });
+
+  // A report changed on the press (the operator, 22 Nov: a press must never
+  // look as if nothing happened): done to the page's own copy of the
+  // tracker and drawn before the server answers, as nbPoster's opts.now.
+  // `bug` changes a copy of the report, `refs` answers its changelog lines
+  // anew, `gone` takes the report away. What it gives back puts both as
+  // they were; a tracker read since is the server's, and stands.
+  const bugNow = (id, {bug, refs, gone} = {}) => () => {
+    const t = nb.bugs, rows = t?.bugs || [], i = rows.findIndex(x => x.id === id);
+    if (i < 0) return null;
+    const was = rows[i], key = "B" + id, hadRefs = t.changelog?.[key];
+    let now = null;
+    if (gone) rows.splice(i, 1);
+    else if (bug){ now = {...was}; bug(now); rows[i] = now; }
+    if (refs) t.changelog = {...(t.changelog || {}), [key]: refs(hadRefs || [])};
+    drawBugs(true);
+    return () => {
+      if (nb.bugs !== t) return drawBugs(true);
+      if (gone && !rows.includes(was)) rows.splice(Math.min(i, rows.length), 0, was);
+      if (now){ const at = rows.indexOf(now); if (at >= 0) rows[at] = was; }
+      if (refs){ t.changelog = {...t.changelog}; if (hadRefs) t.changelog[key] = hadRefs; else delete t.changelog[key]; }
+      drawBugs(true);
+    };
+  };
+  // A closed report as the server words it: the status, its note and when.
+  const bugClosed = (status, note) => b => {
+    if (status === "open"){
+      b.status = "open";
+      for (const k of ["status_note", "status_by", "fixed_in", "closed_at", "commits"]) delete b[k];
+      return;
+    }
+    Object.assign(b, {status, status_note: String(note || "").trim().replace(/\s+/g, " "), status_by: "you",
+                      closed_at: Math.floor(Date.now() / 1000)});
+  };
 
   const SEVS = ["low", "medium", "high", "critical"];
 
@@ -356,12 +393,15 @@ function nbBugsView({$, nb, project}){
       // The closing note typed in the row (R254 step 6), the box the Delete
       // below and the roadmap's drop open, not the browser's prompt: one
       // shape for every question this view asks, and one a phone lays out.
+      // A close, a reopen, a tie and an untie are drawn on the press
+      // (bugNow), and put back saying why if the server refuses.
       const ask = (status, q, verb) => {
         closeMore();
         const body = d.querySelector(".body");
         if (body.querySelector(".dropbox")) return;
         dropBox(body, {q, sub: ": kept on the bug", placeholder: "a commit, a word", verb,
-                       go: note => postBug({action: "status", id, status, note}), cancel: () => drawBugs(true)});
+                       go: note => postBug({action: "status", id, status, note}, {now: bugNow(id, {bug: bugClosed(status, note)})}),
+                       cancel: () => drawBugs(true)});
       };
       onPress(d, ".bFix",
         () => ask("fixed", "What fixed it?", "Close as fixed"));
@@ -370,11 +410,13 @@ function nbBugsView({$, nb, project}){
       onPress(d, ".bNa",
         () => ask("na", "What stopped it applying?", "Close: not applicable"));
       onPress(d, ".bReopen",
-        () => postBug({action: "status", id, status: "open", note: ""}));
+        () => postBug({action: "status", id, status: "open", note: ""}, {now: bugNow(id, {bug: bugClosed("open")})}));
       // The changelog's half of a fixed bug (R255): kept in the notebook,
       // the public line naming its commits alone.
-      d.querySelectorAll("[data-untie]").forEach(x => x.onclick = () =>
-        postBug({action: "untie", id, line: x.dataset.untie}));
+      d.querySelectorAll("[data-untie]").forEach(x => x.onclick = () => {
+        const line = x.dataset.untie;
+        return postBug({action: "untie", id, line}, {now: bugNow(id, {refs: r => r.filter(e => !(e.tied && e.words === line))})});
+      });
       onPress(d, ".bTie", () => {
         closeMore();
         const body = d.querySelector(".body");
@@ -395,7 +437,7 @@ function nbBugsView({$, nb, project}){
         box.querySelector("[data-tiego]").onclick = () => {
           const line = box.querySelector("select").value;
           box.remove();
-          if (line) postBug({action: "tie", id, line});
+          if (line) return postBug({action: "tie", id, line}, {now: bugNow(id, {refs: r => [...r, bugTiedTo(line)]})});
         };
       });
       onPress(d, ".bLine", () => {
@@ -406,10 +448,13 @@ function nbBugsView({$, nb, project}){
         const box = dropBox(body, {q: "The changelog's line for this fix", sub: ": what a person upgrading now finds right, filed under Fixed with its commits",
                                    placeholder: "A move lands on a stick that keeps deploy keys", verb: "Add the line", max: 300,
                                    cancel: () => drawBugs(true),
+                                   // The line is tied to the report on the press, as a tie
+                                   // is, and read back once the file has it.
                                    go: async text => {
-                                     const j = await postJSON("/api/changelog", {project, action: "line", text, cat: "Fixed",
-                                                                                 shas: b?.commits || [], bugs: [id]});
-                                     if (j?.error){ notify(j.error, true); drawBugs(true); return; }
+                                     const j = await drawNow(bugNow(id, {refs: r => [...r, bugTiedTo(text)]}),
+                                       () => postJSON("/api/changelog", {project, action: "line", text, cat: "Fixed",
+                                                                         shas: b?.commits || [], bugs: [id]}));
+                                     if (j?.error){ drawBugs(true); return; }
                                      loadBugs(true);
                                    }});
         const ta = box.querySelector("textarea");
@@ -420,9 +465,14 @@ function nbBugsView({$, nb, project}){
         closeMore();
         const body = d.querySelector(".body");
         if (body.querySelector(".dropbox")) return;
+        // Kept in its notes on the press, in the words the server writes,
+        // so the row stops asking for a line at once.
         dropBox(body, {q: "Why does it need no line?", sub: ": kept in its notes, which the release check reads",
                        placeholder: "no release had it; nobody using it meets it", verb: "Needs no line",
-                       cancel: () => drawBugs(true), go: why => postBug({action: "noline", id, why})});
+                       cancel: () => drawBugs(true), go: why => postBug({action: "noline", id, why}, {now: why.trim() ? bugNow(id, {bug: x => {
+                         const day = new Date().toLocaleDateString("en-GB", {day: "2-digit", month: "short"});
+                         x.notes = (String(x.notes || "") + `\n\n[${day}] Changelog: needs no line: ${why.trim().replace(/\s+/g, " ")}`).trim();
+                       }}) : null})});
       });
       // Handing a bug over. Same box the roadmap opens under a step, opened
       // under the report instead; it asks the same question and the pickers
@@ -470,11 +520,12 @@ function nbBugsView({$, nb, project}){
         const body = d.querySelector(".body");
         if (body.querySelector(".dropbox")) return;
         // Removed first, then redrawn: the box is what defers the redraw,
-        // so anything that arrived while it was open lands now.
+        // so anything that arrived while it was open lands now. The report
+        // leaves the list on the press, and comes back if the server refuses.
         dropBox(body, {q: "Delete this report?", sub: ": it is gone for good; to keep a record, close it instead",
                        placeholder: "why it should not have been filed (optional, kept in the log)",
                        verb: "Remove it", tone: "danger", cancel: () => drawBugs(true),
-                       go: why => postBug({action: "remove", id, why})});
+                       go: why => postBug({action: "remove", id, why}, {now: bugNow(id, {gone: true})})});
       });
       onPress(d, ".bEdit", () => {
         const body = d.querySelector(".body");

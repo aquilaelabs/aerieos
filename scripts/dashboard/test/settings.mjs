@@ -437,6 +437,9 @@ await section("global rules", async () => {
   await openFold(page, srow);
   await page.click(`${srow} .grEvery`);
   await page.waitForFunction(n => (document.querySelector(`.nb #rlGlobal`)?.textContent || '').includes('off everywhere'), first, { timeout: 15000 });
+  // Drawn off on the press (the operator, 22 Nov); stored once the server
+  // has it, asked until it says so.
+  await until(async () => (await globals()).find(r => r.name === first)?.disabled === true, 15000, 200);
   ok((await globals()).find(r => r.name === first)?.disabled === true
      && !(await pre('beta')).includes((await globals()).find(r => r.name === first).text.slice(0, 40)),
      `an administrator turns a shipped rule off for every space from there (${first})`);

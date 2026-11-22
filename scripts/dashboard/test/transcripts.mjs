@@ -2,7 +2,7 @@
 // newest first with the first thing typed, and each downloadable as a text
 // that carries the words, every command Claude ran and what came back, and
 // never Claude's private reasoning nor another account's file.
-import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section, REPO, aerie } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section, REPO, aerie, until } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -242,14 +242,17 @@ await pressInMenu('conv-two-2025', '[data-cvshare]');
 // The row's text, not a pill: its agent already wears one.
 await page.waitForFunction(sel => /visible to every session/.test(document.querySelector(sel)?.textContent || ''),
                            rowOf('conv-two-2025'), { timeout: 10000 }).catch(() => {});
-const shared = await page.evaluate(async () => ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || [])
-  .find(r => r.id === 'conv-two-2025')?.shared);
+// Drawn on the press (the operator, 22 Nov: under a menu that shuts on it);
+// the controller follows.
+const convRows = () => page.evaluate(async () => (await (await fetch('/api/transcripts?project=alpha')).json()).rows || []);
+const shared = await until(async () => (await convRows()).find(r => r.id === 'conv-two-2025')?.shared, 10000);
 ok(shared === true && /visible to every session/.test(await page.$eval(rowOf('conv-two-2025'), e => e.textContent)),
-   `Make visible marks it visible to every session on the space (${shared})`);
+   `Make visible marks it visible to every session on the space, on the press (${shared})`);
 await pressInMenu('conv-two-2025', '[data-cvdel]');
 await page.waitForFunction(id => !document.querySelector(`[data-cvresume="${id}"]`), 'conv-two-2025', { timeout: 10000 }).catch(() => {});
-const gone = await page.evaluate(async () => ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || []).map(r => r.id));
-ok(!gone.includes('conv-two-2025') && gone.includes('conv-one-2026'), `Delete removes that conversation and no other (${gone.join(', ')})`);
+await until(async () => !(await convRows()).some(r => r.id === 'conv-two-2025'), 10000);
+const gone = (await convRows()).map(r => r.id);
+ok(!gone.includes('conv-two-2025') && gone.includes('conv-one-2026'), `Delete removes that conversation on the press and no other (${gone.join(', ')})`);
 const onRead = await (await sfetch('/api/transcripts?project=beta')).json();
 ok(onRead.rows?.length === 1 && onRead.rows[0].id === 'beta-chat-1' && /Make the beta page blue/.test(onRead.rows[0].first),
    `...and on a space its own reads (${JSON.stringify(onRead.rows?.[0] || onRead)})`);

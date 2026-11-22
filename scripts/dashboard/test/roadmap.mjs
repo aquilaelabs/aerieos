@@ -1049,7 +1049,9 @@ await page.click(`.nb #roadmapDoneList .grp.done[data-done="${finId}"] > summary
 await page.waitForSelector(`.nb #roadmapDoneList .grp.done[data-done="${finId}"][open] [data-reopen]`, { state: 'visible', timeout: 5000 });
 await page.click(`.nb #roadmapDoneList [data-reopen="${finId}"]`);
 await page.waitForFunction(id => [...document.querySelectorAll('.nb #roadmapList > .grp')].some(g => g.dataset.id === id), finId, { timeout: 10000 });
-ok(read().projects.alpha.some(r => String(r.id) === finId), 'Reopen on a finished item puts it back on the list, from the page');
+// Drawn back on the press (the operator, 22 Nov), and the file follows.
+ok(await until(() => read().projects.alpha.some(r => String(r.id) === finId), 10000),
+   'Reopen on a finished item puts it back on the list on the press, and the server has it');
 // Its fold carries what it knows (R254 step 3): when it was added and by
 // whom; and what shipped a thing is read off the CHANGELOG's dated
 // releases, never typed (step 4).
@@ -1078,9 +1080,10 @@ if (await page.$eval(`.nb #roadmapList > .grp[data-id="${finId}"] .rowacts`, a =
 await page.waitForSelector(`.nb #roadmapList > .grp[data-id="${finId}"] .dn`, { state: 'visible', timeout: 5000 });
 await page.click(`.nb #roadmapList > .grp[data-id="${finId}"] .dn`);
 await page.waitForFunction(id => ![...document.querySelectorAll('.nb #roadmapList > .grp')].some(g => g.dataset.id === id), finId, { timeout: 10000 });
-ok(!read().projects.alpha.some(r => String(r.id) === finId)
-   && read().history.alpha.some(e => e.act === 'done' && String(e.id) === finId && e.by === 'you' && e.step == null),
-   '...and Done on its row ticks it off from the page, logged as the person\'s');
+// Off the list on the press (the operator, 22 Nov), the file following.
+ok(await until(() => !read().projects.alpha.some(r => String(r.id) === finId)
+   && read().history.alpha.some(e => e.act === 'done' && String(e.id) === finId && e.by === 'you' && e.step == null), 10000),
+   '...and Done on its row ticks it off from the page on the press, logged as the person\'s');
 await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForSelector(`.nb #roadmapDoneList .grp.done[data-done="${finId}"]`, { timeout: 10000 });
 // The search narrows the list and the Finished section alike, by words or
@@ -2252,6 +2255,8 @@ await section("Steps between items", async () => {
   await page.waitForFunction(id => document.querySelector(`#roadmapList .roadmap[data-id="${id}"][data-step="1"] .txt`)?.textContent === 'move this',
                              dst, { timeout: 10000 });
   await unfold(dst);
+  // Drawn on the press (the operator, 22 Nov); the file follows it.
+  await until(() => read().projects.alpha.find(r => String(r.id) === dst)?.steps?.[1]?.sid, 10000);
   const after = read().projects.alpha;
   const moved = after.find(r => String(r.id) === dst).steps[1];
   ok(moved.text === 'move this' && String(moved.sid[0]) === src && moved.sid[1] === 2
@@ -2271,10 +2276,13 @@ await section("Steps between items", async () => {
   await page.$eval('#roadmapList .splitbox .primary', b => b.click());
   await page.waitForFunction(() => [...document.querySelectorAll('#roadmapList .roadmap[data-step="-1"] .txt')].some(t => t.textContent === 'r168 the cut-off part'),
                              null, { timeout: 10000 });
-  const cut = read().projects.alpha.find(r => r.text === 'r168 the cut-off part');
+  // The new item is drawn on the press, wearing "new" until the answer
+  // brings its number (the operator, 22 Nov); the file follows.
+  const cut = await until(() => read().projects.alpha.find(r => r.text === 'r168 the cut-off part'), 10000);
   ok(cut && cut.steps.length === 1 && cut.steps[0].text === 'split this' && /Split from R/.test(cut.info || '')
      && read().projects.alpha.find(r => String(r.id) === src).steps.length === 1,
-     'Split makes a new item of the ticked steps, pointing back at the old one');
+     'Split makes a new item of the ticked steps on the press, pointing back at the old one');
+  await page.waitForSelector(`#roadmapList .grp[data-id="${cut.id}"]`, { timeout: 10000 });
   // Fold the new item into the other one.
   await unfold(cut.id);
   await rowOpen(`#roadmapList .roadmap[data-id="${cut.id}"][data-step="-1"]`);
@@ -2283,6 +2291,7 @@ await section("Steps between items", async () => {
   await page.fill('#roadmapList .askline input', `R${dst}`);
   await page.click('#roadmapList .askline [data-askok]');
   await page.waitForFunction(id => !document.querySelector(`#roadmapList .roadmap[data-id="${id}"]`), cut.id, { timeout: 10000 });
+  await until(() => !read().projects.alpha.find(r => String(r.id) === String(cut.id)), 10000);
   const folded = read().projects.alpha.find(r => String(r.id) === dst).steps.map(s => s.text);
   ok(!read().projects.alpha.find(r => String(r.id) === String(cut.id)) && folded.join('|') === 'its own|move this|r168 the cut-off part|split this',
      `Fold into makes the item a step of the other, its own step following (${folded.join('|')})`);

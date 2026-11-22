@@ -3,7 +3,7 @@
 // no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
 // against a repository on disk: the harness has no forge.
-import { launch, newPage, ok, done, ready, URL, DIR, section, REPO, aerie } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, REPO, aerie, until } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
@@ -82,7 +82,10 @@ await page.fill(`${NB} #wkText`, '# Welcome back');
 await page.click(`${NB} #wkSave`);
 await page.waitForFunction(() => /Welcome back/.test(document.querySelector('.nb .wkarticle[data-name="Home"] .wkpage')?.textContent || ''),
   null, { timeout: 15000 });
-ok(true, 'the Edit tab swaps the editor in and Save writes the page');
+// The page reads as typed on the press (the operator, 22 Nov); the wiki
+// follows.
+ok(await until(async () => /Welcome back/.test((await api(`/api/wiki?project=${P}&page=Home`)).text || ''), 15000),
+   'the Edit tab swaps the editor in, Save reads the page as typed on the press and writes it');
 const stale = await api('/api/wiki', { project: P, action: 'save', name: 'Home', text: 'old', base: home.rev });
 ok(stale.status === 409 && /changed since/.test(stale.error), `a save against an old read is refused (${stale.status} ${stale.error})`);
 
@@ -156,8 +159,10 @@ await section("Rename asks in a box under the article's tabs, not the browser's 
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /Building it/.test(document.querySelector('.nb .wkarticle .wktitle')?.textContent || ''), null, { timeout: 15000 });
   ok(was === 'Build and test' && gone && page.dialogs.length === nd,
-     `Rename asks in a box in the page with the name to change, Escape leaves it and Enter renames (${was})`);
-  const after = await api(`/api/wiki?project=${P}&page=Home`);
+     `Rename asks in a box in the page with the name to change, Escape leaves it and Enter renames, the title moving on the press (${was})`);
+  // The wiki follows the press: asked until the link on Home has moved.
+  const after = await until(async () => { const a = await api(`/api/wiki?project=${P}&page=Home`); return /Building it/.test(a.text || '') && a; }, 15000)
+    || await api(`/api/wiki?project=${P}&page=Home`);
   ok(after.text === 'See [[Building it]].\n', `...and a link to it on another page follows it (${JSON.stringify(after.text)})`);
   ok(await page.evaluate(() => /links to it on 1 page now use its new name/.test(document.body.textContent)),
      '...and the page says how many pages it changed');

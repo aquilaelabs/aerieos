@@ -113,17 +113,28 @@ function nbRulesView({$, nb, project}){
 
   // An administrator's change to the global rules, written at once for
   // every project: the operator's own list whole, and which shipped ones
-  // are off everywhere, as /api/global-rules takes them.
-  async function saveGlobal(mutate){
+  // are off everywhere, as /api/global-rules takes them. `drawn`, where the
+  // page knows the result (a rule switched off everywhere, one removed),
+  // answers the rows as they will be, drawn on the press and put back if
+  // the server refuses (drawNow); a write of this panel's own, so no poll
+  // reads the rules back over it before the answer (nb.writing).
+  async function saveGlobal(mutate, drawn){
     const gs = (nb.ruleData?.global || []).map(g => ({...g}));
     const own = gs.filter(g => !g.builtin);
     const shippedOff = new Set(gs.filter(g => g.builtin && g.disabled).map(g => g.name));
     mutate(own, shippedOff);
-    const j = await postJSON("/api/global-rules", {action: "save",
+    const now = () => {
+      const d = nb.ruleData, was = d?.global;
+      if (!drawn || !was) return null;
+      d.global = drawn(was.map(g => ({...g})));
+      drawRules();
+      return () => { if (nb.ruleData === d){ d.global = was; drawRules(); } };
+    };
+    const j = await nb.writing(() => drawNow(now, () => postJSON("/api/global-rules", {action: "save",
       rules: own.map(g => ({name: g.name, text: g.text, paths: g.paths || [], words: g.words || [],
                             doc: g.doc || "", check: g.check || "", refuse: g.refuse || [], why: g.why || ""})),
-      disabled: [...shippedOff]});
-    if (j.error){ notify(j.error, true); return false; }
+      disabled: [...shippedOff]})));
+    if (j.error) return false;
     nb.globalEditing = null;
     await loadRules(true);
     return true;
@@ -365,16 +376,17 @@ function nbRulesView({$, nb, project}){
         nb.globalOffPending = same ? null : off;
         drawRules(); nb.syncSave();
       };
-      on(".grEvery", async ev => {
-        busy(ev.target, "Saving");
-        await saveGlobal((own, shippedOff) => { if (g.disabled) shippedOff.delete(g.name); else shippedOff.add(g.name); });
-      });
+      // Off or on everywhere, and Remove, show on the press: the row flips
+      // or goes, and comes back saying why if the server refuses.
+      on(".grEvery", () =>
+        saveGlobal((own, shippedOff) => { if (g.disabled) shippedOff.delete(g.name); else shippedOff.add(g.name); },
+                   rows => rows.map(x => x.builtin && x.name === g.name ? {...x, disabled: !g.disabled} : x)));
       on(".grEdit", () => { nb.globalEditing = {i, r: {...g, paths: [...(g.paths || [])], words: [...(g.words || [])]}}; drawRules(); });
       on(".grCancel", () => { nb.globalEditing = null; drawRules(); });
-      on(".grRm", async ev => {
+      on(".grRm", async () => {
         if (!await askYes(`Remove the global rule ${g.name}? Every space's sessions stop being handed it.`)) return;
-        busy(ev.target, "Removing");
-        await saveGlobal(own => { const k = own.findIndex(x => x.name === g.name); if (k >= 0) own.splice(k, 1); });
+        return saveGlobal(own => { const k = own.findIndex(x => x.name === g.name); if (k >= 0) own.splice(k, 1); },
+                          rows => rows.filter(x => x.builtin || x.name !== g.name));
       });
       const put = (cls, key, list) => {
         const f = el.querySelector(cls);

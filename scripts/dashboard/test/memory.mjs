@@ -5,7 +5,7 @@
 //
 // The writes run for real against the scratch home, so this also checks the
 // part that matters most: a delete takes the index line out with the file.
-import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DIR, openFold, animatedDuring, refreshUntil, closePage, patience, nbGo, quiet, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DIR, openFold, animatedDuring, refreshUntil, closePage, patience, nbGo, quiet, section, until } from './lib.mjs';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 
 // Named as Claude Code names a tree's folder: every character that is not a
@@ -181,7 +181,9 @@ await page.click(`#memList .mem:has(.mname:text-is("tabs")) [data-del]`);
 await page.waitForFunction(() => document.querySelectorAll('#memList .mem').length === 1);
 ok(page.dialogs.some(d => d.includes('Forget tabs.md')),
    'forgetting asks first');
-ok(!existsSync(`${MEM}/tabs.md`), 'the file is gone');
+// Off the list once it is asked (the operator, 22 Nov); the file follows.
+ok(await until(() => !existsSync(`${MEM}/tabs.md`) && !read('MEMORY.md').includes('tabs.md'), 10000),
+   'the file is gone, the row having gone on the press');
 ok(!read('MEMORY.md').includes('tabs.md') && read('MEMORY.md').includes('vanished.md'),
    '...and its index line went with it, leaving the other lines alone');
 ok((await page.$eval('#memWhere', el => el.textContent.replace(/\s+/g, ' '))).includes('1 memory'),

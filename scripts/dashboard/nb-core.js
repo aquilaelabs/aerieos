@@ -1210,6 +1210,13 @@ function nbRevRead(nb, o, again = false){
 // body)` takes a write the server refused because somebody else wrote
 // first, and what it answers is the post's; `ok(j, opts)` takes a write
 // that landed, with whatever the caller passed after the body.
+//
+// `opts.now`, where the page knows the result before the answer (a row
+// ticked, moved or deleted), draws it on the press as drawNow does (the
+// operator, 22 Nov): after the hold has had its say, so a held notebook
+// draws nothing, and inside the write, so no poll reads the list back over
+// it before the answer. What it gives back puts the page as it was when
+// nothing was written: a refusal, a clash, or no answer at all.
 function nbPoster(nb, url, {proj = () => nb.project, hold = true, holdExcept, conflict, ok} = {}){
   return async (body, opts) => nb.writing(async () => {
     if (hold && nb.nbHeld() && (holdExcept === undefined || body.action !== holdExcept)){
@@ -1217,13 +1224,16 @@ function nbPoster(nb, url, {proj = () => nb.project, hold = true, holdExcept, co
              + "check the banner at the top", true);
       return null;
     }
+    let undo = null;
+    try{ undo = opts?.now?.(); }catch(e){ console.error(e); }
+    const back = () => { try{ if (typeof undo === "function") undo(); }catch(e){ console.error(e); } };
     try{
       const j = await postJSON(url, {project: proj(), ...body});
-      if (conflict && j.conflict) return conflict(j, body);
-      if (j.error){ notify(j.error, true); return null; }
+      if (conflict && j.conflict){ back(); return conflict(j, body); }
+      if (j.error){ back(); notify(j.error, true); return null; }
       ok?.(j, opts);
       return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
+    }catch(e){ back(); notify("could not reach the server: " + failWords(e), true); return null; }
   });
 }
 

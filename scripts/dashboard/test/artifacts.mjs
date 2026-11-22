@@ -1,7 +1,7 @@
 // The notebook's Artifacts view: what a project has built, from its dist/.
 // The convention IS the feature: the tab lists dist/ and nothing else, so a
 // build worth keeping has to be copied there, and an empty tab says that.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section, REPO, pageCall } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section, REPO, pageCall, until } from './lib.mjs';
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync, existsSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -168,6 +168,10 @@ await section("alpha-1.2.0-dev.4-abcdef4-debug.apk", async () => {
     .find(r => r.querySelector('b')?.textContent === n)?.querySelector('[data-artpin]')?.click(), oldest);
   await page.waitForFunction(n => [...document.querySelectorAll('#artList .artrow')]
     .some(r => r.querySelector('b')?.textContent === n && /pinned/.test(r.textContent)), oldest, { timeout: 15000 });
+  // Drawn pinned on the press (the operator, 22 Nov); kept once the server
+  // has it, asked until it says so.
+  await until(() => page.evaluate(async n => (await (await fetch('/api/artifacts?project=alpha')).json()).artifacts
+    .some(a => a.name === n && a.pinned), oldest), 15000, 200);
   const t1 = Math.floor(Date.now() / 1000);
   for (const n of [6, 7]){
     const f = `${DIR}/ws/alpha/dist/alpha-1.2.0-dev.${n}-abcdef${n}-debug.apk`;
@@ -266,8 +270,10 @@ await section("the captures", async () => {
   await page.click('#artCaptures .artrow:has(b:text-is("loose.png")) [data-artcap]');
   await page.waitForFunction(() => !document.querySelector('#artCaptures .artrow b')
     || ![...document.querySelectorAll('#artCaptures .artrow b')].some(b => b.textContent === 'loose.png'), null, { timeout: 15000 });
+  // Gone from the list on the press (the operator, 22 Nov); the file follows.
+  await until(() => !existsSync(`${DIR}/ws/alpha/dist/emu/loose.png`), 15000);
   ok(!existsSync(`${DIR}/ws/alpha/dist/emu/loose.png`) && await page.$eval('#artCaptures summary', e => /2, kept/.test(e.textContent)),
-     'Remove takes one away now, and the fold recounts');
+     'Remove takes one away on the press, and the fold recounts');
   // 0 keeps them: a stale one seeded again survives the read, and the fold
   // says so. A number that is not days is refused by name.
   const pref = async body => page.evaluate(async b => (await (await fetch('/api/prefs', { method: 'POST',
@@ -498,7 +504,7 @@ await section("Put alpha back as it was found", async () => {
     .find(x => x.querySelector('b')?.textContent === 'app-debug.apk')?.querySelector('[data-artunnamed]')?.click());
   await page.waitForFunction(() => ![...document.querySelectorAll('#artList .artrow b')].some(b => b.textContent === 'app-debug.apk'),
                              null, { timeout: 15000 });
-  ok(!existsSync(`${DIR}/ws/alpha/dist/app-debug.apk`), '...and Remove takes it out of dist/');
+  ok(await until(() => !existsSync(`${DIR}/ws/alpha/dist/app-debug.apk`), 15000), '...and Remove takes it out of dist/, the row going on the press');
 });
 
 // a file that plants a dist/ tree and a symlink there has to clear them

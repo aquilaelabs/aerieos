@@ -714,9 +714,12 @@ async function libAct(b, act, kind, name){
   }
   if (kind === "service"){ await packDeploy(b, libNode, r, "install", libReload); return; }
   if (kind === "agent"){ await agentUpdate(b, libNode, r, libReload); return; }
-  if (act === "add"){ libWithToolchains(() => tpOpenCatalog({...r.catalog, name: r.name, tier: r.tier, about: r.about, platforms: r.platforms})); return; }
-  if (act === "edit"){ libWithToolchains(() => tpOpen(r.name)); return; }
-  if (act === "repin"){ libWithToolchains(() => tpOpen(r.name, r.repin)); return; }
+  // Add, Edit and Update a pin open the pack's dialog once the store's rows
+  // are read, which is a round trip where they are not held: awaited, so
+  // the press wears its ring until the dialog is up (pressHold).
+  if (act === "add"){ await libWithToolchains(() => tpOpenCatalog({...r.catalog, name: r.name, tier: r.tier, about: r.about, platforms: r.platforms})); return; }
+  if (act === "edit"){ await libWithToolchains(() => tpOpen(r.name)); return; }
+  if (act === "repin"){ await libWithToolchains(() => tpOpen(r.name, r.repin)); return; }
   // Install or update a toolchain or an added pack: the Toolchains job,
   // with its agreements asked the way that page asks them.
   busy(b, r.installed ? "Updating" : "Installing");

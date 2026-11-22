@@ -377,29 +377,59 @@ function nbWikiView({$, nb, project}){
     const ta = box.querySelector("#wkText");
     if (ta) ta.oninput = () => { nb.wkEdit.text = ta.value; };
     on("wkCancel", () => { nb.wkEdit = null; drawWiki(); });
-    on("wkSave", async ev => {
-      busy(ev.target, "Saving");
-      const j = await post({action: "save", name, text: nb.wkEdit.text, base: nb.wkPages[name]?.rev || ""});
-      if (ev.target.isConnected) unbusy(ev.target, "Save");
-      if (!j) return;
-      nb.wkEdit = null;
-      delete nb.wkPages[name];
-      loadWiki();
+    // Save reads the page as typed on the press, its editor put away (the
+    // operator, 22 Nov); a refusal (somebody saved over it first) brings the
+    // editor back holding the typing, and says why.
+    on("wkSave", () => {
+      const text = nb.wkEdit.text, was = nb.wkPages[name];
+      const back = () => { if (was) nb.wkPages[name] = was; else delete nb.wkPages[name]; };
+      return drawNow(() => {
+        nb.wkPages[name] = {...(was || {}), text}; nb.wkEdit = null; drawWiki();
+        return () => { back(); nb.wkEdit = {name, text}; drawWiki(); };
+      }, () => postJSON("/api/wiki", {project, action: "save", name, text, base: was?.rev || ""})).then(j => {
+        if (j.error) return;
+        // The page drawn is the page written: it keeps its text under the
+        // revision the answer gives, so the read after leaves it be.
+        if (nb.wkPages[name] && j.rev) nb.wkPages[name].rev = j.rev; else delete nb.wkPages[name];
+        loadWiki();
+      });
     });
+    // Remove takes the page off the list once it is asked, and puts it back
+    // saying why if the server refuses.
     on("wkRm", async () => {
       if (!await askYes(`Remove ${byName(name)?.title || name} from the wiki? Its history keeps it, and a push takes it off the forge's wiki too.`)) return;
-      if (await post({action: "remove", name, base: nb.wkPages[name]?.rev || ""})){
-        nb.wkCur = ""; loadWiki();
-      }
+      const j = await drawNow(() => {
+        const d = nb.wkData, was = d?.pages;
+        if (!was) return null;
+        // ...on to the page the wiki opens on, as a read without it would.
+        d.pages = was.filter(p => p.name !== name);
+        nb.wkCur = (byName("Home") || articles()[0])?.name || "";
+        drawWiki();
+        if (nb.wkCur && !nb.wkPages[nb.wkCur]) readPage(nb.wkCur);
+        return () => { if (nb.wkData === d) d.pages = was; nb.wkCur = name; drawWiki(); };
+      }, () => postJSON("/api/wiki", {project, action: "remove", name, base: nb.wkPages[name]?.rev || ""}));
+      if (!j.error) loadWiki();
     });
     on("wkRename", async () => {
       const at = $("wkBody")?.querySelector(".wktabs");
       const to = at ? await askInline(at, {label: "The page's new name", value: byName(name)?.title || name, ok: "Rename"})
         : await askText("Rename the page", {value: byName(name)?.title || name, verb: "Rename", label: "New name"});
       if (!to || !to.trim()) return;
-      const j = await post({action: "rename", name, to});
-      if (!j) return;
+      // The page wears the name typed on the press, in its title and the
+      // list, and the old one again saying why if the server refuses.
+      const j = await drawNow(() => {
+        const p = byName(name);
+        if (!p) return null;
+        const was = p.title;
+        p.title = to.trim(); drawWiki();
+        return () => { p.title = was; drawWiki(); };
+      }, () => postJSON("/api/wiki", {project, action: "rename", name, to}));
+      if (j.error) return;
       if (j.relinked) notify(`Renamed; the links to it on ${j.relinked} page${j.relinked === 1 ? "" : "s"} now use its new name`);
+      // The page as read goes with it to its new name, so the read after
+      // draws it rather than its placeholder; one whose text moved is read
+      // again all the same (loadWiki).
+      if (j.name && j.name !== name && nb.wkPages[name]){ nb.wkPages[j.name] = nb.wkPages[name]; delete nb.wkPages[name]; }
       nb.wkCur = j.name; loadWiki();
     });
     const nn = box.querySelector("#wkNewName"), nt = box.querySelector("#wkNewText");

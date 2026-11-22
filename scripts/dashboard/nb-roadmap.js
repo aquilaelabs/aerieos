@@ -517,14 +517,15 @@ function nbRmDraw($, nb, j, force){
     const rm = row.querySelector(".rm");
     if (rm) rm.onclick = () => nbRmOpenDrop($, nb, row, id, step);
     // Ticking off acts on the press (R254 step 2): Reopen under Finished
-    // undoes it, so it does not ask.
+    // undoes it, so it does not ask. The row goes to Finished at once and
+    // comes back saying why if the server refuses (nbRmDrawDone).
     const dn = row.querySelector(".dn");
     if (dn) dn.onclick = async () => {
-      const j = await nbRmPost($, nb, {action: "done", id});
+      const j = await nbRmPost($, nb, {action: "done", id}, false, () => nbRmDrawDone($, nb, id));
       if (!j) return;
       notify(`R${id} finished: it is under Finished, and Reopen there puts it back`);
-      nb.roadmapDone = null;
       if ($("roadmapDoneSect").open) nbRmLoadFinished($, nb);
+      else nb.roadmapDone = null;
     };
     // A pencil, and the words themselves. The pencil because a tap target you
     // can see is the only one a thumb finds; the words because that is where
@@ -556,15 +557,18 @@ function nbRmDraw($, nb, j, force){
     if (step >= 0 && !ro) row.querySelector(".txt").onclick = reword;
     // Between items (R168): a step moved to another, an item split into
     // new ones, or folded into another. Each lands at once, not staged:
-    // what moves is on two items, and the page's staging is per row.
+    // what moves is on two items, and the page's staging is per row. Each
+    // is drawn on the press, and put back if the server refuses it.
     const mvto = row.querySelector(".mvto");
     if (mvto) mvto.onclick = () => nbRmPickItem(nb, row, `Move step ${step + 1} to`, "Move", id, to =>
-      nbRmPost($, nb, {action: "step-mv", id, step, to}).then(j => j && notify(`step ${step + 1} of R${id} is R${to} step ${j.step + 1} now`)));
+      nbRmPost($, nb, {action: "step-mv", id, step, to}, false, () => nbRmDrawStepMv($, nb, id, step, to))
+        .then(j => j && notify(`step ${step + 1} of R${id} is R${to} step ${j.step + 1} now`)));
     const sp = row.querySelector(".split");
     if (sp) sp.onclick = () => nbRmOpenSplit($, nb, row, id);
     const fi = row.querySelector(".foldin");
     if (fi) fi.onclick = () => nbRmPickItem(nb, row, `Fold R${id} into`, "Fold", id, into =>
-      nbRmPost($, nb, {action: "fold", id, into}).then(j => j && notify(`R${id} is R${into} step ${j.folded[1]} now; Put back under History undoes it`)));
+      nbRmPost($, nb, {action: "fold", id, into}, false, () => nbRmDrawFold($, nb, id, into))
+        .then(j => j && notify(`R${id} is R${into} step ${j.folded[1]} now; Put back under History undoes it`)));
     if (row.getAttribute("draggable") === "true"){
       row.ondragstart = e => { e.dataTransfer.setData("text/plain", `${id}:${step}`); e.dataTransfer.effectAllowed = "move"; row.classList.add("dragging"); };
       row.ondragend = () => row.classList.remove("dragging");
@@ -576,7 +580,7 @@ function nbRmDraw($, nb, j, force){
         e.preventDefault(); row.classList.remove("dropat");
         const [fid, fstep] = String(e.dataTransfer.getData("text/plain") || "").split(":").map(Number);
         if (!fid || isNaN(fstep) || fstep < 0 || fid === id) return;
-        nbRmPost($, nb, {action: "step-mv", id: fid, step: fstep, to: id})
+        nbRmPost($, nb, {action: "step-mv", id: fid, step: fstep, to: id}, false, () => nbRmDrawStepMv($, nb, fid, fstep, id))
           .then(j => j && notify(`step ${fstep + 1} of R${fid} is R${id} step ${j.step + 1} now`));
       };
     }
@@ -767,7 +771,9 @@ async function nbRmReallySend($, nb){
 // The roadmap's write (nbPoster), for the space that is open. No hold is
 // asked about here: a session's batch holds the staged changes at their
 // Save (nbCoreBarSays), and a send or a step marked done goes through.
-function nbRmPost($, nb, body, quiet){
+// `now` draws what the write will do on the press, and gives back how to
+// put it back (nbPoster's opts.now).
+function nbRmPost($, nb, body, quiet, now){
   return nbPoster(nb, "/api/roadmap", {
     proj: () => nb.memProj, hold: false,
     // Somebody else wrote this item first (roadmap #26). Not a toast: the op
@@ -778,7 +784,103 @@ function nbRmPost($, nb, body, quiet){
     // quiet: one of a run of moves being flushed, where redrawing between
     // each would flicker the list through every intermediate arrangement.
     ok: j => { if (!quiet){ nbRmDraw($, nb, j, true); refresh(); } },
-  })(body);
+  })(body, {now});
+}
+
+// ---- drawn on the press ----------------------------------------------------
+// What a write between items will do, done to the page's own copy and drawn
+// before the server answers (the operator, 22 Nov: a press must never look
+// as if nothing happened). Each answers how to put it back, which nbPoster
+// calls when the write is refused; one that landed is drawn again from the
+// answer, so the guess stands only for the round trip.
+
+// An item ticked off: off the list and into Finished, its count with it.
+function nbRmDrawDone($, nb, id){
+  const i = nb.roadmapItems.findIndex(r => String(r.id) === String(id));
+  if (i < 0) return null;
+  const [r] = nb.roadmapItems.splice(i, 1);
+  const went = {...r, done_at: Math.floor(Date.now() / 1000), reopenable: true};
+  if (nb.roadmapDone) nb.roadmapDone.unshift(went);
+  nb.roadmapFinishedN = (nb.roadmapFinishedN || 0) + 1;
+  nbRmRedraw($, nb); nbRmDrawFinished($, nb);
+  return () => {
+    if (!nbRmFindRow(nb, id)) nb.roadmapItems.splice(Math.min(i, nb.roadmapItems.length), 0, r);
+    if (nb.roadmapDone) nb.roadmapDone = nb.roadmapDone.filter(x => x !== went);
+    nb.roadmapFinishedN = Math.max(0, (nb.roadmapFinishedN || 0) - 1);
+    nbRmRedraw($, nb); nbRmDrawFinished($, nb);
+  };
+}
+
+// ...and one reopened: out of Finished and back among the live ones, as it
+// was when it went.
+function nbRmDrawReopen($, nb, id){
+  const i = (nb.roadmapDone || []).findIndex(r => String(r.id) === String(id));
+  if (i < 0) return null;
+  const [r] = nb.roadmapDone.splice(i, 1);
+  const {done_at, done_by, reopenable, ...row} = r;
+  nb.roadmapItems.splice(nb.roadmapItems.filter(x => !x.shelved).length, 0, row);
+  nb.roadmapFinishedN = Math.max(0, (nb.roadmapFinishedN || 0) - 1);
+  nbRmRedraw($, nb); nbRmDrawFinished($, nb);
+  return () => {
+    nb.roadmapItems = nb.roadmapItems.filter(x => x !== row);
+    if (nb.roadmapDone && !nb.roadmapDone.includes(r)) nb.roadmapDone.splice(Math.min(i, nb.roadmapDone.length), 0, r);
+    nb.roadmapFinishedN = (nb.roadmapFinishedN || 0) + 1;
+    nbRmRedraw($, nb); nbRmDrawFinished($, nb);
+  };
+}
+
+// A step moved to another item (Move to, or dragged onto its row): out of
+// this one's plan and onto the end of that one's, saying the item and number
+// it was, as the server marks it.
+function nbRmDrawStepMv($, nb, id, step, to){
+  const r = nbRmFindRow(nb, id), t = nbRmFindRow(nb, to);
+  const st = r?.steps?.[step];
+  if (!st || !t) return null;
+  const went = {...st, sid: Array.isArray(st.sid) ? st.sid : [Number(id), step + 1]};
+  r.steps.splice(step, 1);
+  (t.steps = t.steps || []).push(went);
+  nbRmRedraw($, nb);
+  return () => {
+    const at = (t.steps || []).indexOf(went);
+    if (at >= 0) t.steps.splice(at, 1);
+    if (!(r.steps || []).includes(st)) (r.steps = r.steps || []).splice(Math.min(step, r.steps.length), 0, st);
+    nbRmRedraw($, nb);
+  };
+}
+
+// An item folded into another: its line a step at the end of that one's
+// plan, its own steps after it.
+function nbRmDrawFold($, nb, id, into){
+  const i = nb.roadmapItems.findIndex(r => String(r.id) === String(id)), t = nbRmFindRow(nb, into);
+  if (i < 0 || !t) return null;
+  const [r] = nb.roadmapItems.splice(i, 1);
+  const came = [{text: r.text, ...(r.info ? {info: r.info} : {}), sent: r.sent || 0}, ...(r.steps || [])];
+  const had = (t.steps || []).slice();
+  t.steps = [...had, ...came];
+  nbRmRedraw($, nb);
+  return () => {
+    t.steps = had;
+    if (!nbRmFindRow(nb, id)) nb.roadmapItems.splice(Math.min(i, nb.roadmapItems.length), 0, r);
+    nbRmRedraw($, nb);
+  };
+}
+
+// An item split: the ticked steps leave it for a new item under the title
+// typed, which wears "new" until the answer brings its number.
+function nbRmDrawSplit($, nb, id, picked, text){
+  const r = nbRmFindRow(nb, id);
+  if (!r) return null;
+  const had = (r.steps || []).slice();
+  const made = {id: --nb.tmpId, text, by: "you", sent: 0, shelved: 0,
+                steps: had.filter((_, i) => picked.includes(i + 1))};
+  r.steps = had.filter((_, i) => !picked.includes(i + 1));
+  nb.roadmapItems.splice(nb.roadmapItems.filter(x => !x.shelved).length, 0, made);
+  nbRmRedraw($, nb);
+  return () => {
+    r.steps = had;
+    nb.roadmapItems = nb.roadmapItems.filter(x => x !== made);
+    nbRmRedraw($, nb);
+  };
 }
 
 // ---- two writers, one item ------------------------------------------------
@@ -901,7 +1003,8 @@ function nbRmOpenSplit($, nb, row, id){
     if (!picked.length){ notify("tick the steps that go", true); return; }
     if (!text){ notify("the new item needs a title", true); box.querySelector(".title").focus(); return; }
     shut();
-    const j = await nbRmPost($, nb, {action: "split", id, groups: [{text, steps: picked}]});
+    const j = await nbRmPost($, nb, {action: "split", id, groups: [{text, steps: picked}]}, false,
+                             () => nbRmDrawSplit($, nb, id, picked, text));
     if (j?.held) notify("the split is held for approval on this notebook");
     else if (j) notify(`R${j.made[0].id} made with ${picked.length} step${picked.length === 1 ? "" : "s"} from R${id}`);
   };
@@ -1284,11 +1387,13 @@ function nbRmDrawFinished($, nb){
       ? `<button type="button" data-reopen="${r.id}" title="put it back on the list as it was, for more work on the same goal">Reopen</button>`
       : `<span class="state">shipped in a release: more work on it is a new item</span>`}</div>
     </details>`).join(""));
+  // Reopen puts it back on the list on the press (nbRmDrawReopen), and
+  // Finished is read again once the server has it.
   host.querySelectorAll("[data-reopen]").forEach(b => b.onclick = async () => {
-    const j = await nbRmPost($, nb, {action: "reopen", id: b.dataset.reopen});
+    const id = b.dataset.reopen;
+    const j = await nbRmPost($, nb, {action: "reopen", id}, false, () => nbRmDrawReopen($, nb, id));
     if (!j) return;
-    notify(`R${b.dataset.reopen} is back on the list`);
-    nb.roadmapDone = null;
+    notify(`R${id} is back on the list`);
     nbRmLoadFinished($, nb);
   });
   paginate(host, ":scope > .grp", {key: "roadmapDone", noun: "finished", total: vis.length, more: () => nbRmDrawFinished($, nb)});
