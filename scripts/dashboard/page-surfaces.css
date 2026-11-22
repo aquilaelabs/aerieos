@@ -876,10 +876,12 @@ body.firstrun #panes{display:none}
   .librarytab .libnarrow .dmviewseg{margin-left:auto}
   /* A pulldown is as wide as its longest answer (fitPickers), and the
      catalog's topics made the topic's wider than a phone's line with the
-     order beside it: the line wraps rather than running off the side, and
-     no pulldown is wider than the line (the operator, 22 Nov: what would
-     be cut off on a phone wraps). */
-  .librarytab .libnarrow>label.pick,.librarytab .libnarrow select{max-width:100%}
+     order beside it, running the page off the side. On a phone the two
+     share the line, each as wide as the room left beside the view, showing
+     the answer picked (its list opens whole); so the line is one height
+     whatever the topics are, which is the height its placeholder draws. */
+  .librarytab .libnarrow>label.pick{flex:1 1 0;min-width:0;max-width:100%}
+  .librarytab .libnarrow select{min-width:0;max-width:100%;text-overflow:ellipsis}
 }
 .librarytab .libgname .libshelfall{margin-left:auto;font:var(--f-ui)}
 .librarytab .libgroup>.libhidden{margin:0 0 8px;color:var(--dim)}
