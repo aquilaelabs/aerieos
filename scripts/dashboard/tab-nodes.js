@@ -2239,14 +2239,7 @@ function renderNodesInto(i){
   patch(d.list, ndOffLine() + ndNotHereHtml() + rows + none
     + (!nodesList.length ? `<div class="empty">The node list could not be read.</div>` : ""));
   d.el.querySelectorAll("[data-ndcopyline]").forEach(b => b.onclick = async () => {
-    const code = b.parentElement.querySelector("code");
-    try{ await navigator.clipboard.writeText(code.textContent); }
-    catch(e){
-      const r = document.createRange(); r.selectNodeContents(code);
-      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-      document.execCommand("copy");
-    }
-    notify("the line is on the clipboard");
+    await copyText(b.parentElement.querySelector("code").textContent, "the line is on the clipboard");
   });
   wireNodesTab(d.el);
   if (state?.bare_metal && n?.config?.own) wireHeld(d.el);
@@ -2720,16 +2713,7 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
     body.querySelector("#vmCancel").onclick = shut;
     const copy = body.querySelector("#vmCopy");
     if (copy) copy.onclick = async () => {
-      // The clipboard API wants a secure context; over plain http the
-      // selection route is what works, the same as the deploy key's Copy.
-      const pre = body.querySelector("#vmXml");
-      try{ await navigator.clipboard.writeText(pre.textContent); }
-      catch(e){
-        const r = document.createRange(); r.selectNodeContents(pre);
-        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-        document.execCommand("copy");
-      }
-      notify(`the ${made.artifact} is on the clipboard`);
+      await copyText(body.querySelector("#vmXml").textContent, `the ${made.artifact} is on the clipboard`);
     };
     const go = body.querySelector("#vmGo");
     go.onclick = () => pressing(go, async () => {

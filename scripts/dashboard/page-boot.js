@@ -429,12 +429,7 @@ function bootNewProject(){
   $("pKey").onchange = pShowKey;
   $("pForge").onchange = () => { pForgeId = $("pForge").value; pDraw(); };
   $("pCopy").onclick = async () => {
-    // clipboard API needs a secure context; plain-http access to the dashboard
-    // falls back to the selection route, which works everywhere a click does.
-    const pub = $("pPub").textContent;
-    try { await navigator.clipboard.writeText(pub); }
-    catch { getSelection().selectAllChildren($("pPub")); document.execCommand("copy"); }
-    notify("public key copied: paste it under the repo's Settings → Deploy keys");
+    await copyText($("pPub").textContent, "public key copied: paste it under the repo's Settings → Deploy keys");
   };
   $("pCancel").onclick = closeNewProject;
   $("pmodal").onclick = e => { if (e.target.id === "pmodal") closeNewProject(); };
@@ -547,10 +542,7 @@ function bootProjectSettings(){
   };
   $("rnKeyForget").onclick = () => rnKeyAct("key-forget");
   $("rnKeyCopy").onclick = async () => {
-    const pub = $("rnKeyPub").textContent;
-    try { await navigator.clipboard.writeText(pub); }
-    catch { getSelection().selectAllChildren($("rnKeyPub")); document.execCommand("copy"); }
-    notify("public key copied: add it on the host as a deploy key with write access");
+    await copyText($("rnKeyPub").textContent, "public key copied: add it on the host as a deploy key with write access");
   };
   $("rnUnlink").onclick = () => unlinkProject(rnFor);
   $("rnDelete").onclick = () => { const n = rnFor; closeRename(); deleteProject(n); };

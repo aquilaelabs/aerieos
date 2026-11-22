@@ -130,6 +130,26 @@ function toastGone(el){
   out.onfinish = out.oncancel = () => el.remove();
 }
 
+// Text put on the clipboard and said in a toast: the browser's way where it
+// allows it, and a hidden field's copy where it does not (a page not served
+// over TLS). Where neither copies, the toast says so in one sentence and
+// never prints the text: a key or a fingerprint is not toast words (the
+// operator, 20 Nov). Every Copy on the page is this.
+async function copyText(text, said){
+  let ok = true;
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.append(ta); ta.select();
+    try{ ok = document.execCommand("copy"); }catch(e2){ ok = false; }
+    ta.remove();
+  }
+  if (ok) notify(said || "Copied");
+  else notify("could not copy: this browser keeps the page from its clipboard", true);
+  return ok;
+}
+
 // A job's toast (R218 step 6): it stays while the job runs, its line the
 // job's state and step as the queue reports them, read again each time the
 // jobs token moves; when the job ends it takes the outcome's tone, starts

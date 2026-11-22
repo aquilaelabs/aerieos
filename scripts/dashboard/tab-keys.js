@@ -150,8 +150,7 @@ function wireKeys(root){
   });
   on("bKeyHide", () => { keysShown = ""; readMoved("keys"); drawPanes(); });
   on("bKeyCopy", async () => {
-    try{ await navigator.clipboard.writeText(keysShown); notify("install key copied"); }
-    catch(e){ notify("copy: " + failWords(e), true); }
+    await copyText(keysShown, "install key copied");
   });
   on("bKeyDown", () => {
     const a = document.createElement("a");

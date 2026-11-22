@@ -496,8 +496,7 @@ function nbArtWireList(av, list, rows, cf, cfFiles){
   list.querySelectorAll("[data-artfp]").forEach(b => b.onclick = async () => {
     const a = rows[+b.dataset.artfp];
     const fp = String(a?.prov?.signed?.cert || "").toLowerCase();
-    try{ await navigator.clipboard.writeText(fp); notify(`copied ${a.name}'s signing fingerprint`); }
-    catch(e){ notify(`copy it by hand: ${fp}`, "warn"); }
+    await copyText(fp, `copied ${a.name}'s signing fingerprint`);
   });
   // Remove, once asked, and a pin are drawn on the press (nbArtNow): the row
   // goes, or wears its pin, and is put back saying why on a refusal.

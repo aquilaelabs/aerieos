@@ -129,6 +129,24 @@ await section("a signed build", async () => {
      && /SHA-256 65:57:99:0C:CC:68:E1:9D:2F:4C:E5:73:1C:8D:59:F9:84:5D:87:C9:95:2D:F0:9D:30:DF:F0:56:09:48:8C:2D/.test(r.text)
      && r.copy && !r.sign,
      `a signed build says so, with the key, what verified and the whole fingerprint to copy, and offers no Sign again (${r.text.slice(0, 120)})`);
+  // Copied where the browser lets the page, and where it does not the toast
+  // says so in one sentence, the fingerprint never in it (the operator's
+  // rule for toast words).
+  await page.evaluate(() => {
+    window.__cpSaid = []; window.__cpWas = { n: window.notify, w: navigator.clipboard?.writeText, x: document.execCommand };
+    window.notify = (m, bad) => window.__cpSaid.push([String(m), !!bad]);
+    navigator.clipboard.writeText = async () => { throw new Error('refused'); };
+    document.execCommand = () => false;
+  });
+  await page.$eval('.artrow:has(b:text-is("alpha-1.2.0-signed.apk"))', e => e.querySelector('[data-artfp]').click());
+  await page.waitForTimeout(200);
+  const cp = await page.evaluate(() => {
+    const w = window.__cpWas;
+    window.notify = w.n; navigator.clipboard.writeText = w.w; document.execCommand = w.x;
+    return window.__cpSaid;
+  });
+  ok(cp.length === 1 && cp[0][1] && !/65:?57:?99|6557990c/i.test(cp[0][0]) && !cp[0][0].includes('\n'),
+     `a copy the browser refuses says so in one sentence, and never prints the fingerprint (${JSON.stringify(cp)})`);
   // Closed, the row is its one line; a press on the line opens it to what
   // built and signed it, and again shuts it. Its buttons past two are
   // behind its More.

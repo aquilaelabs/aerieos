@@ -108,7 +108,7 @@ function termLinksFill(rec, box, shut){
     ? found.map((u, i) => `<div class="xlrow"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u.length > 64 ? u.slice(0, 44) + "…" + u.slice(-16) : u)}</a><button
         type="button" data-hcopy="${i}">Copy</button></div>`).join("")
     : `<div class="xlnone">None on its screen or in the lines before it.</div>`));
-  box.querySelectorAll("[data-hcopy]").forEach(b => b.onclick = async () => { await termCopyText(found[+b.dataset.hcopy]); notify("Copied"); });
+  box.querySelectorAll("[data-hcopy]").forEach(b => b.onclick = () => copyText(found[+b.dataset.hcopy]));
   box.querySelectorAll("a").forEach(a => a.onclick = () => shut());
 }
 
@@ -185,20 +185,6 @@ function termLinks(rec, back = 400){
     }
   }
   return out.slice(-12).reverse();
-}
-
-// Text put on the clipboard, by the page's way where the browser allows it
-// and through a field where it does not (a page not served over TLS).
-async function termCopyText(text){
-  try{
-    await navigator.clipboard.writeText(text);
-  }catch(e){
-    const ta = document.createElement("textarea");
-    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
-    document.body.append(ta); ta.select();
-    try{ document.execCommand("copy"); }catch(e2){ /* nothing more to try */ }
-    ta.remove();
-  }
 }
 
 // The URL the socket opens: the tab's words, boot stamp and all, and the
@@ -495,8 +481,7 @@ function termSelText(rec){
 async function termCopy(rec){
   if (!rec.sel) return;
   const text = termSelText(rec);
-  await termCopyText(text);
-  notify("Copied");
+  await copyText(text);
   termSelectEnd(rec);
 }
 
