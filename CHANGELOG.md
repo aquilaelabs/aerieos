@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A second container's rebuild that finds new settings in its repository's .env.example rewrites its own env, where it wrote over the main container's and lost its values (573a04c)
+- A button whose work ends as the page redraws it loses its spinning ring, where Measure now and Check for updates kept spinning until a reload, and the doctor's ↻ keeps its symbol after a run (48a51cd)
+- A build, a test run or a command on a node with 4 GB of memory or less starts once a quarter of its memory is free, where each waited five minutes, and inside a container its own memory limit is what is counted (89918bf)
+- A job's log on a Mac node no longer starts with an error about /proc (446e66f)
+- House rules written when the command was called bb say aerie, so a session is no longer told to run a command that is not there, and aerie status and the companion app say aerie too (21f6fea)
+- A copy the browser refuses says so in one sentence, where a signing key's fingerprint was printed in the toast (a62ca92)
+- On a phone a field too narrow for its hint shows a short one on every page, where it showed the first words of a long one cut off (843904d)
+
 ## 0.9.0-dev.6094: 2026-11-22
 
 ### Changed
