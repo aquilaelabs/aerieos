@@ -126,7 +126,13 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'signIn', 'signOut', 'slideDetails', 'foldOpen',
   'slideHidden', 'fadeIn', 'ghostOf', 'ghostOut', 'fadeThrough', 'moveKey', 'onScreen', 'chipMove', 'slideMark', 'swapBox', 'startClaude', 'sendSure', 'launchClaude',   'openBrief', 'closeBrief', 'briefGo', 'pArchivePicked',
   'tabLabel', 'tabLabels', 'tabTitle', 'untitle', 'untitleIn', 'helpToggle', 'helpShow', 'helpHide', 'cLock', 'dmUnrouted', 'nodeDoorConfig', 'nginxUndeployed', 'resumePicker', 'toggleBell', 'toggleUiMenu', 'unveil', 'watchSignin', 'wireConsole', 'wireLogSection', 'wireJobsTab', 'wireNodeConf', 'wireNodesTab', 
-  'wireProjectRows'
+  'wireProjectRows',
+  // A press drawn on the click (the operator, 22 Nov): the spaces' marks and
+  // deletes, a session ended, a report, a profile row, a sent message.
+  'projHeldLay', 'projMarkNow', 'pjGone', 'trashList', 'sessEndNow', 'sessEndRead', 'sessShown', 'agentTab',
+  'reportsGone', 'pfReachNow', 'pfGone', 'pfDeviceGone', 'pfTfNow', 'chatShown',
+  // ...and a press the server queues behind a running job says so (the operator, 22 Nov).
+  'sysJobAhead', 'sysSaid', 'setupAhead'
 ];
 
 const browser = await launch();

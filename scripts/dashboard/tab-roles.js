@@ -35,9 +35,12 @@ function loadRoles(){
   });
 }
 
-async function rolesAct(body, said){
-  const j = await postJSON("/api/roles", body);
-  if (j.error){ notify(j.error, true); return false; }
+// `now`, where the page knows the result before the answer, draws it on the
+// press and gives back how to take it away (drawNow), which a refusal does
+// before it is said.
+async function rolesAct(body, said, now = () => null){
+  const j = await drawNow(now, () => postJSON("/api/roles", body));
+  if (j.error) return false;
   notify(said);
   await loadRoles();
   return true;
@@ -478,9 +481,20 @@ function wireRoles(el){
     if (rolesExp.has(k)) rolesExp.delete(k); else rolesExp.add(k);
     rolesRedraw();
   });
+  // The box is the role's on the press (the operator, 22 Nov), held there
+  // through any draw until the answer, and put back saying why on a refusal.
   const tf = el.querySelector("#rolesTf");
-  if (tf) tf.onchange = () => rolesAct({action: "two-factor", name: rolesDraft.name, on: tf.checked},
-    tf.checked ? `${rolesDraft.name}: two-factor sign-in required` : `${rolesDraft.name}: two-factor sign-in no longer required`);
+  if (tf) tf.onchange = () => {
+    const name = rolesDraft.name, on = tf.checked, role = rolesData.roles[name];
+    return rolesAct({action: "two-factor", name, on},
+      on ? `${name}: two-factor sign-in required` : `${name}: two-factor sign-in no longer required`,
+      () => {
+        const was = role?.two_factor;
+        if (role) role.two_factor = on;
+        rolesRedraw();
+        return () => { if (role) role.two_factor = was; rolesRedraw(); };
+      });
+  };
   const note = el.querySelector("#rolesNote");
   if (note) note.oninput = () => {
     rolesDraft.note = note.value;
@@ -528,11 +542,20 @@ function wireRoles(el){
     rolesRedraw();
   };
   const rm = el.querySelector("#rolesRemove");
+  // The role leaves the list on the press (the operator, 22 Nov), and comes
+  // back saying why on a refusal.
   if (rm) rm.onclick = async () => {
-    if (!await askYes(`Remove the role ${rolesDraft.name}? Accounts that hold it lose what it gave.`)) return;
-    if (await rolesAct({action: "remove", name: rolesDraft.name}, `${rolesDraft.name} removed`)){
+    const name = rolesDraft.name;
+    if (!await askYes(`Remove the role ${name}? Accounts that hold it lose what it gave.`)) return;
+    await rolesAct({action: "remove", name}, `${name} removed`, () => {
+      const was = {roles: rolesData.roles, pick: rolesPick, draft: rolesDraft};
+      const left = {...rolesData.roles};
+      delete left[name];
+      rolesData.roles = left;
       rolesPick = ""; rolesDraft = null;
-    }
+      rolesRedraw();
+      return () => { rolesData.roles = was.roles; rolesPick = was.pick; rolesDraft = was.draft; rolesRedraw(); };
+    });
     rolesRedraw();
   };
 }

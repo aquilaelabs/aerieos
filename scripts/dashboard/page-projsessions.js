@@ -42,21 +42,23 @@ function rnSessionsDraw(name, rows){
   list.querySelectorAll("[data-rnsessend]").forEach(b =>
     // Its own attribute: data-rnend is a section bar's End and save, which
     // the dialog's delegated click took this press for as well.
-    b.onclick = () => rnSessionEnd(name, rows[Number(b.dataset.rnsessend)], b));
+    b.onclick = () => rnSessionEnd(name, rows[Number(b.dataset.rnsessend)], rows));
   $("rnSessField").hidden = false;
 }
 
-async function rnSessionEnd(name, r, btn){
+// Its row goes on the press (the operator, 22 Nov: a press must never look
+// as if nothing happened), and comes back saying why on a refusal; the list
+// is read again once the server has it. `rows` is the list it was drawn in.
+async function rnSessionEnd(name, r, rows){
   const whose = r.who === state?.me ? "your" : `${r.who}'s`;
   if (!await askYes(r.kind === "claude"
       ? `End ${whose} Claude session on ${projLabel(name)}?\n\nThe work in flight stops; the conversation resumes from the Claude button.`
       : `End ${whose} shell on ${projLabel(name)}?\n\nWhatever is running in it stops.`)) return;
-  busy(btn, "Ending");
-  try{
-    const j = await postJSON("/api/project-sessions",
-      {project: name, action: "end", session: r.name, node: r.node_id || ""});
-    if (j.error){ notify(j.error, true); unbusy(btn, "End"); return; }
-    notify(`ended ${whose} ${r.kind === "claude" ? "Claude session" : "shell"} on ${projLabel(name)}`);
-  }catch(e){ notify("could not end it: " + failWords(e), true); unbusy(btn, "End"); return; }
+  const j = await drawNow(() => {
+    rnSessionsDraw(name, rows.filter(x => x !== r));
+    return () => rnSessionsDraw(name, rows);
+  }, () => postJSON("/api/project-sessions", {project: name, action: "end", session: r.name, node: r.node_id || ""}));
+  if (j.error) return;
+  notify(`ended ${whose} ${r.kind === "claude" ? "Claude session" : "shell"} on ${projLabel(name)}`);
   rnSessionsLoad(name);
 }

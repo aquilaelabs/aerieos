@@ -1481,11 +1481,16 @@ ok(await page.$eval('#tList .dropbox .danger', b => b.disabled),
 await page.fill('#tList .dropbox input', 'oldproj');
 ok(!await page.$eval('#tList .dropbox .danger', b => b.disabled),
    '...and wakes on the name itself');
+// Its row goes on the press, before the server has answered (the operator,
+// 22 Nov: a press must never look as if nothing happened).
+const purged = page.waitForResponse(r => r.url().includes('/api/trash-purge'), { timeout: 15000 });
 await page.click('#tList .dropbox .danger');
-await page.waitForFunction(() => !document.querySelector('#tList .trow[data-t="oldproj"]'),
-                           { timeout: 10000 });
+ok(await page.evaluate(() => !document.querySelector('#tList .trow[data-t="oldproj"]')),
+   'Delete for good takes its row away on the press');
+await purged;
+await page.waitForFunction(() => !document.querySelector('#tList .loading'), { timeout: 10000 });
 ok(!existsSync(`${DIR}/ws/.trash/oldproj`),
-   'and then it is gone, files and all: the one thing here with nothing after it');
+   'and once the server has answered it is gone, files and all: the one thing here with nothing after it');
 await page.click('#tClose');
 await page.waitForFunction(() => document.getElementById('tmodal').hidden);
 

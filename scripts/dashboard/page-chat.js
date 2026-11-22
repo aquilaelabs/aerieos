@@ -8,6 +8,10 @@
 let chatWith = null;                 // {who} or {project}, or null for the list
 let chatMsgs = [], chatDraft = {}, chatSeenRev = -1;
 let chatDrawn = "";                  // what the open conversation was last painted from
+// Messages sent and not yet answered for, drawn at the log's end on the press
+// (the operator, 22 Nov: a press must never look as if nothing happened)
+// over every read of it, each until the answer or a read that has it.
+let chatSending = [];                // {key, who, at, text}
 
 const chatKey = w => w?.project ? `p:${w.project}` : w?.who ? `dm:${w.who}` : "";
 
@@ -125,8 +129,9 @@ function drawChatThread(el){
   // Sep). And when it is painted, the reader keeps their place unless they
   // were at the end, where the newest message is what they want. The minute
   // is in it so "3 min ago" still moves, once a minute.
+  const msgs = chatShown(key);
   const sig = key + "\n" + Math.floor(Date.now() / 60000) + "\n"
-    + chatMsgs.map(m => `${m.at}\t${m.who}\t${m.kind}\t${m.text}`).join("\n");
+    + msgs.map(m => `${m.at}\t${m.who}\t${m.kind}\t${m.text}`).join("\n");
   if (sig === chatDrawn && el.querySelector("#chatlog")) return;
   chatDrawn = sig;
   const was = el.querySelector("#chatlog");
@@ -138,7 +143,7 @@ function drawChatThread(el){
       <b class="grow">${esc(title)}</b>
     </div>
     ${chatWith.project ? `<div class="sub chatnote">everyone on this space sees this</div>` : ""}
-    <div class="chatlog" id="chatlog">${chatMsgs.map(m => `
+    <div class="chatlog" id="chatlog">${msgs.map(m => `
       <div class="chatmsg${m.kind === "did" || m.kind === "asked" ? " ev" : ""}">
         <span class="dim">${esc(m.who || "?")} · ${ago(m.at)}</span>
         <div>${esc(m.text)}</div>
@@ -151,15 +156,28 @@ function drawChatThread(el){
   const inp = el.querySelector("#chatIn");
   inp.value = chatDraft[key] || "";
   inp.oninput = () => { chatDraft[key] = inp.value; };
+  // The message is in the log on the press, and back in the box saying why
+  // on a refusal.
   const send = async () => {
-    const text = inp.value;
+    const text = inp.value, w = chatWith;
     if (!text.trim()) return;
-    inp.value = ""; chatDraft[key] = "";
-    try{
-      const r = await postJSON("/api/chat", { action: "send", ...chatWith, text });
-      if (r.error){ notify(r.error, true); inp.value = text; chatDraft[key] = text; }
-      else { chatMsgs = r.messages || []; drawChat(); }
-    }catch(e){ inp.value = text; chatDraft[key] = text; }
+    const mine = {key, who: state?.me || "", at: Date.now() / 1000, text};
+    const r = await drawNow(() => {
+      inp.value = ""; chatDraft[key] = "";
+      chatSending.push(mine);
+      drawChat();
+      return () => {
+        chatSending = chatSending.filter(m => m !== mine);
+        chatDraft[key] = text;
+        const box = document.querySelector("#chatIn");
+        if (box && chatKey(chatWith) === key) box.value = text;
+        drawChat();
+      };
+    }, () => postJSON("/api/chat", { action: "send", ...w, text }));
+    if (r.error) return;
+    chatSending = chatSending.filter(m => m !== mine);
+    if (chatKey(chatWith) === key) chatMsgs = r.messages || [];
+    drawChat();
   };
   inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); send(); } };
   el.querySelector("#chatSend").onclick = send;
@@ -168,6 +186,14 @@ function drawChatThread(el){
   // bottom the way the job logs are. One who scrolled up stays where they were.
   const log = el.querySelector("#chatlog");
   if (log) log.scrollTop = atEnd ? log.scrollHeight : keep;
+}
+
+// The open conversation's messages as the log draws them: what was read,
+// and after it what this page sent and has no answer for yet, less any a read
+// already has.
+function chatShown(key){
+  const mine = chatSending.filter(m => m.key === key && !chatMsgs.some(x => x.who === m.who && x.text === m.text && x.at >= m.at - 60));
+  return mine.length ? [...chatMsgs, ...mine] : chatMsgs;
 }
 
 async function sendKey(key){

@@ -43,10 +43,20 @@ ok(/the harness/.test(row) && /session asking/.test(row) && !/two places/.test(r
 
 // The switch (R173): off keeps the destination with its settings and says
 // so; on brings it back; more than one kind is on at once, each its own block.
+// The row reads off on the press (the operator, 22 Nov: a press must never
+// look as if nothing happened), and the switch's answer is waited for before
+// the next press, so a Test is never sent ahead of it.
+const switched = () => page.waitForResponse(r => r.url().endsWith('/api/profile') && /"reach-on"/.test(r.request().postData() || ''), { timeout: patience(15000) });
+let answer = switched();
 await page.evaluate(() => document.querySelector('details[data-sect="profile:reach-webhook"] [data-reachon]').click());
+ok(await page.evaluate(() => /\boff\b/.test(document.querySelector('details[data-sect="profile:reach-webhook"] .row[data-reach]')?.textContent || '')),
+   'switched off, the row reads off on the press');
+await answer;
 await page.waitForFunction(() => /\boff\b/.test(document.querySelector('details[data-sect="profile:reach-webhook"] .row[data-reach]')?.textContent || ''), null, { timeout: patience(15000) });
-ok(await page.evaluate(() => (pfReach.dest || []).every(d => d.on === false) && pfReach.dest.length === 1), 'switched off, it stays with its settings and reads off');
+ok(await page.evaluate(() => (pfReach.dest || []).every(d => d.on === false) && pfReach.dest.length === 1), '...and once answered it stays with its settings and reads off');
+answer = switched();
 await page.evaluate(() => document.querySelector('details[data-sect="profile:reach-webhook"] [data-reachon]').click());
+await answer;
 await page.waitForFunction(() => (pfReach?.dest || []).some(d => d.on === true), null, { timeout: patience(15000) });
 ok(await page.$$eval('details[data-sect^="profile:reach-"]', ds => ds.length >= 8 && ds.every(d => d.querySelector('[data-reachadd]'))),
    `every kind is a block of its own with Set up or Add another, so more than one is on at once (${await page.$$eval('details[data-sect^="profile:reach-"]', ds => ds.length)} blocks)`);

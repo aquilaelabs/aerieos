@@ -152,9 +152,12 @@ const claudeLiveOn = (name, n, slot = 1) => (state?.sessions || []).some(s => s.
 // with what it was opened on (a resumed conversation, a model, an effort)
 // taken off, which only the node it runs on is left beside.
 function dropAgentTab(id, name, node, slot = 1){
-  const arg = agentArg(id, name) + slotArg(slot) + (node ? `:n:${node}` : "");
-  const t = tabs.find(x => x.kind === "term" && String(x.arg).replace(/:[rme]:[^:]*/g, "") === arg);
+  const t = agentTab(id, name, node, slot);
   if (t) dropTab(t.id);
+}
+function agentTab(id, name, node, slot = 1){
+  const arg = agentArg(id, name) + slotArg(slot) + (node ? `:n:${node}` : "");
+  return tabs.find(x => x.kind === "term" && String(x.arg).replace(/:[rme]:[^:]*/g, "") === arg) || null;
 }
 
 // End this account's session of a project on one node, asked first, and
@@ -164,13 +167,15 @@ async function claudeEnd(name, n, several, slot = 1){
   if (!await askYes(`End your ${said} session on ${projLabel(name)}${where}?\n\nThe transcript is kept and can be resumed later, but the conversation stops now.`)) return;
   resumeFor = null;
   if (state) drawProjects(state.projects);
-  try{
-    const j = await endSession(myClaude(name, slot), n.id);
-    if (j.error) return notify(j.error, true);
-    dropAgentTab("claude", name, several && n.id ? n.id : "", slot);
-    notify(`ended your ${said} session on ${projLabel(name)}${where}`);
-  }catch(e){ notify("could not end it: " + failWords(e), true); }
-  refresh();
+  // Its tab and its row go on the press, and come back saying why on a
+  // refusal (sessEndNow).
+  const s = myClaude(name, slot);
+  const j = await drawNow(() => sessEndNow(s, agentTab("claude", name, several && n.id ? n.id : "", slot)),
+                          () => endSession(s, n.id));
+  if (j.error) return;
+  notify(`ended your ${said} session on ${projLabel(name)}${where}`);
+  await refresh();
+  sessEndRead(s);
 }
 
 // Restart (the operator, 12 Oct): end the session and pick its conversation
@@ -382,13 +387,14 @@ async function agentEnd(id, name, n, several, slot = 1){
   if (!await askYes(`End your ${said} session on ${projLabel(name)}${where}?\n\nThe transcript is kept and can be resumed later, but the conversation stops now.`)) return;
   resumeFor = null;
   if (state) drawProjects(state.projects);
-  try{
-    const j = await endSession(myAgentSession(id, name, slot), n.id);
-    if (j.error) return notify(j.error, true);
-    dropAgentTab(id, name, several && n.id ? n.id : "", slot);
-    notify(`ended your ${said} session on ${projLabel(name)}${where}`);
-  }catch(e){ notify("could not end it: " + failWords(e), true); }
-  refresh();
+  // As claudeEnd: gone on the press, back on a refusal.
+  const s = myAgentSession(id, name, slot);
+  const j = await drawNow(() => sessEndNow(s, agentTab(id, name, several && n.id ? n.id : "", slot)),
+                          () => endSession(s, n.id));
+  if (j.error) return;
+  notify(`ended your ${said} session on ${projLabel(name)}${where}`);
+  await refresh();
+  sessEndRead(s);
 }
 
 function launchClaude(name, sessionId, node, slot = 1){

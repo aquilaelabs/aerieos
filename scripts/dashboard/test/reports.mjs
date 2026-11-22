@@ -156,10 +156,15 @@ await page.waitForSelector('#setReportsClear', { timeout: 15000 });
 await page.waitForSelector(`.settingstab [data-report="${lastId}"] [data-repdel="${lastId}"]`, { timeout: 15000 });
 const onPage = await page.$$eval('.settingstab [data-report]', rs => rs.map(r => +r.dataset.report));
 ok(onPage.length === before.all && onPage.includes(lastId), `the section lists every report, each with its delete (${onPage.length} of ${before.all})`);
+// Its row goes on the press, before the server has answered (the operator,
+// 22 Nov: a press must never look as if nothing happened).
+const deleted = page.waitForResponse(r => r.url().endsWith('/api/reports') && /"delete"/.test(r.request().postData() || ''), { timeout: 15000 });
 await page.click(`.settingstab [data-repdel="${lastId}"]`);
-await page.waitForSelector(`.settingstab [data-report="${lastId}"]`, { state: 'detached', timeout: 15000 });
+ok(await page.evaluate(id => !document.querySelector(`.settingstab [data-report="${id}"]`), lastId),
+   `its delete takes the row away on the press (#${lastId})`);
+await deleted;
 const after = (await call('/api/reports', { action: 'list' })).reports.map(r => r.id);
-ok(!after.includes(lastId) && after.length === before.all - 1, `...and its delete takes that one out and no other (#${lastId})`);
+ok(!after.includes(lastId) && after.length === before.all - 1, `...and once the server has answered, that one is out and no other (#${lastId})`);
 const dl = await page.evaluate(() => document.querySelector('.settingstab details[data-sect="settings:reports"] a[href="/logs/download?what=diag"]')?.textContent.trim());
 ok(dl === 'Download diagnostics', `...with Download diagnostics under the list (${dl})`);
 const delBySession = await call('/api/reports', { action: 'delete', id: after[0] }, ALPHA);

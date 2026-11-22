@@ -146,16 +146,24 @@ function byProjectGroup(list){
 // The job is the poll's (state.project_job), read here per draw and kept
 // nowhere else, so it cannot drift from the poll.
 function projectJobHtml(){
-  const pJob = state?.project_job || null;
+  let pJob = state?.project_job || null;
+  // A press on the row is drawn before the server answers (pJobAct): Dismiss
+  // takes the failed rows away, Abort says Stopping.
+  if (pJob && pJobPress === "dismiss") pJob = {...pJob, earlier: [], error: ""};
+  if (pJob && pJobPress === "abort") pJob = {...pJob, aborting: true};
   // One pressed while another ran is queued behind it, named under it; one
   // that failed with another starting after it is kept until dismissed.
   const after = (pJob?.waiting || []).length ? ` · then ${esc(pJob.waiting.join(", "))}` : "";
+  // The server takes no Dismiss while a job runs (projects.dismiss), so the
+  // row's is drawn dead then, saying why beside it in the muted voice, and
+  // live again once the job has ended (the operator, 22 Nov).
   const earlier = (pJob?.earlier || []).map(e => `<div class="row jobfail">
          <div class="grow">
            <div class="name">${esc(e.name)}</div>
            <div class="sub bad">${esc(e.error)}</div>
          </div>
-         ${pJob?.running ? "" : `<span class="acts"><button data-jobok>Dismiss</button></span>`}
+         <span class="acts">${pJob?.running ? `<span class="sub dim">waits until ${esc(pJob.name)} is done</span><button data-jobok disabled>Dismiss</button>`
+           : `<button data-jobok>Dismiss</button>`}</span>
        </div>`).join("");
   return earlier + (pJob?.running
     ? `<div class="row job">
@@ -185,6 +193,7 @@ function projectJobHtml(){
 // keeps the Claude chooser in step wherever it was asked for.
 function drawProjects(all){
   void all;
+  projHeldLay();
   panes.forEach((id, i) => { if ((i === 0 || isSplit()) && tabOf(id)?.kind === "projects") renderProjectsInto(i); });
   syncResumeMenu();
 }
@@ -212,6 +221,7 @@ function pJobWire(){
 // page it lives in state.project_job and nowhere else: this poll writes the
 // same slot the status poll fills, and the card reads it from there.
 let pJobTimer = null;
+let pJobPress = "";               // a press on the row the job's next read has not answered
 
 function pJobSeen(j){
   const was = state?.project_job?.running;
@@ -227,18 +237,25 @@ function pJobSeen(j){
   if (state) drawProjects(state.projects);
 }
 
-async function pJobPoll(){
+// `landed`, when given, runs as the read lands and before it is drawn.
+async function pJobPoll(landed){
   pJobTimer = null;
-  try{ pJobSeen(await getJSON("/api/project-job")); }
-  catch{ pJobTimer = setTimeout(pJobPoll, 3000); }   // a blip, not a finish
+  try{ const j = await getJSON("/api/project-job"); landed?.(); pJobSeen(j); }
+  catch{ landed?.(); pJobTimer = setTimeout(pJobPoll, 3000); }   // a blip, not a finish
 }
 
+// Abort and Dismiss are drawn on the press (the operator, 22 Nov: a press
+// must never look as if nothing happened), held over the reads until the
+// job's own read after the answer, which the row then draws from; a refusal
+// puts the row back and says why.
 async function pJobAct(action){
-  try{
-    const j = await postJSON("/api/project-job", {action});
-    if (j.error) notify(j.error, true);
-  }catch(e){ notify("could not reach the server: " + failWords(e), true); }
-  pJobPoll();
+  const redraw = () => { if (state) drawProjects(state.projects); };
+  await drawNow(() => {
+    pJobPress = action;
+    redraw();
+    return () => { pJobPress = ""; redraw(); };
+  }, () => postJSON("/api/project-job", {action}));
+  return pJobPoll(() => { pJobPress = ""; });
 }
 
 // ---- a project's archive and lock ----------------------------------------
@@ -248,14 +265,14 @@ async function pJobAct(action){
 
 async function setArchived(name, on){
   const key = reposOf(name) || name;
-  try{
-    const j = await postJSON("/api/archive", {name, archived: on});
-    if (j.error){ notify(j.error, true); return; }
-    applyNow((p, k) => { if (k === key) p.archived = !!j.archived; });
-    notify(on ? `${projectName(key)} archived for you: in Archived at the foot of your Spaces page, and working as before`
-              : `${projectName(key)} unarchived`);
-  }catch(e){ notify("archive failed: " + failWords(e), true); }
-  refresh();
+  const j = await projMarkNow({
+    lay: (p, k) => { if (k === key) p.archived = on; },
+    back: (p, k) => { if (k === key) p.archived = !on; },
+    send: () => postJSON("/api/archive", {name, archived: on}),
+    landed: j => applyNow((p, k) => { if (k === key) p.archived = !!j.archived; })});
+  if (j.error) return;
+  notify(on ? `${projectName(key)} archived for you: in Archived at the foot of your Spaces page, and working as before`
+            : `${projectName(key)} unarchived`);
 }
 
 async function setLocked(name, on){
@@ -274,18 +291,20 @@ async function setLocked(name, on){
         + `It stays on the Spaces page with its lock mark.`
       : `Lock ${name}?\n\nEvery session here but yours ends now. Nobody but you starts a session `
         + `in it or changes it until you unlock it. It stays on the Spaces page with its lock mark.`)) return;
-  try{
-    const j = await postJSON("/api/lock", {name: key, locked: on});
-    if (j.error){ notify(j.error, true); return; }
-    for (const s of j.ended || []){
-      const t = tabs.find(x => x.kind === "term" && sessionOf(x.arg) === s);
-      if (t) dropTab(t.id);
-    }
-    notify(on ? `${name} locked${j.ended?.length ? `: ${j.ended.length === 1 ? "a session" : `${j.ended.length} sessions`} ended` : ""}`
-              : `${name} unlocked`);
-    applyNow((x, k) => { if (k === key){ x.locked = !!j.locked; x.locked_admin = !!j.admin; } });
-  }catch(e){ notify("lock failed: " + failWords(e), true); }
-  refresh();
+  // The padlock turns on the press; which sessions it ended is the answer's.
+  const wasAdmin = !!p.locked_admin;
+  const j = await projMarkNow({
+    lay: (x, k) => { if (k === key){ x.locked = on; x.locked_admin = on && held; } },
+    back: (x, k) => { if (k === key){ x.locked = !on; x.locked_admin = wasAdmin; } },
+    send: () => postJSON("/api/lock", {name: key, locked: on}),
+    landed: j => applyNow((x, k) => { if (k === key){ x.locked = !!j.locked; x.locked_admin = !!j.admin; } })});
+  if (j.error) return;
+  for (const s of j.ended || []){
+    const t = tabs.find(x => x.kind === "term" && sessionOf(x.arg) === s);
+    if (t) dropTab(t.id);
+  }
+  notify(on ? `${name} locked${j.ended?.length ? `: ${j.ended.length === 1 ? "a session" : `${j.ended.length} sessions`} ended` : ""}`
+            : `${name} unlocked`);
 }
 
 // ---- a project's group ----------------------------------------------------
@@ -302,14 +321,16 @@ async function askProjectGroup(btn){
   const groups = [...new Set(Object.values(state?.repos || {}).map(x => x.group).filter(Boolean))].sort();
   const got = await askInline(at, {label: `Group ${projectName(key)} with`, value: p?.group || "", ok: "Save",
                                    options: groups, allowEmpty: true});
-  if (got === null || got === (p?.group || "")) return;
-  try{
-    const j = await postJSON("/api/project-group", {name: key, group: got});
-    if (j.error){ notify(j.error, true); return; }
-    applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
-    notify(got ? `${projectName(key)} is in ${got}` : `${projectName(key)} is in no group`);
-  }catch(e){ notify("group: " + failWords(e), true); }
-  refresh();
+  const had = p?.group || "";
+  if (got === null || got === had) return;
+  // In its group on the Save; the answer, every space's group, follows.
+  const j = await projMarkNow({
+    lay: (x, k) => { if (k === key) x.group = got; },
+    back: (x, k) => { if (k === key) x.group = had; },
+    send: () => postJSON("/api/project-group", {name: key, group: got}),
+    landed: j => applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; })});
+  if (j.error) return;
+  notify(got ? `${projectName(key)} is in ${got}` : `${projectName(key)} is in no group`);
 }
 
 // ---- a project's color ----------------------------------------------------
@@ -353,17 +374,19 @@ function pickProjectColor(btn){
   pop.__done = done;
   setTimeout(() => { document.addEventListener("pointerdown", away, true); document.addEventListener("keydown", esc_, true); });
   pop.querySelector(`[data-color="${cur}"]`)?.focus();
-  pop.onclick = async e => {
+  // The card wears the color on the press; the answer, every space's color,
+  // follows.
+  pop.onclick = e => {
     const b = e.target.closest("[data-color]");
     if (!b) return;
     const color = b.dataset.color;
     done();
     if (color === cur) return;
-    try{
-      const j = await postJSON("/api/project-color", {name: key, color});
-      if (j.error){ notify(j.error, true); return; }
-      applyNow((x, k) => { x.color = (j.colors || {})[k] || ""; });
-    }catch(err){ notify("color: " + err, true); }
+    return projMarkNow({
+      lay: (x, k) => { if (k === key) x.color = color; },
+      back: (x, k) => { if (k === key) x.color = cur; },
+      send: () => postJSON("/api/project-color", {name: key, color}),
+      landed: j => applyNow((x, k) => { x.color = (j.colors || {})[k] || ""; })});
   };
 }
 
@@ -378,17 +401,17 @@ function pickProjectColor(btn){
 // _pin: were the COMMAND pin's already, and taking them shadowed it in all
 // three places at once. Nothing failed loudly; the commands card simply began
 // asking the projects endpoint about a command.
-async function setProjectPinned(name, on){
-  try{
-    const j = await postJSON("/api/project-pin", {name: reposOf(name) || name, pinned:on});
-    if (j.error){ notify(j.error, true); return; }
-    // The answer IS the new state: the server sends back the whole pinned
-    // set, so the page adopts it and redraws now. Waiting for the next
-    // /api/status put a poll's latency between the click and the button
-    // moving, on a control whose whole job is instant.
-    applyNow((p, k) => { p.pinned = (j.pinned || []).includes(k); });
-  }catch(e){ notify("the favorite was not saved: " + failWords(e), true); }
-  refresh();                       // ...and reconcile, in the background
+// The star fills on the press: waiting even for the answer put a round trip
+// between the click and the button moving, on a control whose whole job is
+// instant. The answer IS the new state, the whole pinned set, and the page
+// adopts it when it lands; the poll after it reconciles.
+function setProjectPinned(name, on){
+  const key = reposOf(name) || name;
+  return projMarkNow({
+    lay: (p, k) => { if (k === key) p.pinned = on; },
+    back: (p, k) => { if (k === key) p.pinned = !on; },
+    send: () => postJSON("/api/project-pin", {name: key, pinned: on}),
+    landed: j => applyNow((p, k) => { p.pinned = (j.pinned || []).includes(k); })});
 }
 
 // Adopt a server answer into the projects already on screen and redraw.
@@ -405,4 +428,35 @@ function applyNow(fn){
   Object.entries(state?.repos || {}).forEach(([k, r]) => fn(r, k));
   drawProjects(state?.projects || []);
   drawPanes();                     // the Projects page shows the same rows
+}
+
+// ...and a press's own change, before any answer (the operator, 22 Nov: a
+// press must never look as if nothing happened). A mark set on a space (a
+// favorite, an archive, a lock, a group, a color, a name) is drawn on the
+// click and held over every read of the spaces until the server answers: a
+// poll landing between the two would put the old mark back for a moment.
+// The answer is then adopted as applyNow adopts one, which drops a read
+// still out from before it; a refusal puts back what was (`back`) and says
+// why. `lay` sets the mark on a row, as applyNow's function does; `landed`
+// adopts the answer where it carries the new state, else the mark stands
+// until the read after it; `draw` wraps the first drawing (slideCards, for a
+// change that moves a card). The answer comes back, refused or not.
+const projHeld = new Set();
+function projHeldLay(){
+  for (const fn of projHeld){
+    (state?.projects || []).forEach(p => fn(p, p.project || p.name));
+    Object.entries(state?.repos || {}).forEach(([k, r]) => fn(r, k));
+  }
+}
+async function projMarkNow({lay, back, send, landed = () => applyNow(lay), draw = f => f()}){
+  const j = await drawNow(() => {
+    projHeld.add(lay);
+    draw(() => applyNow(lay));
+    return () => { projHeld.delete(lay); applyNow(back); };
+  }, send);
+  projHeld.delete(lay);
+  if (j.error) return j;
+  landed(j);
+  refresh();
+  return j;
 }

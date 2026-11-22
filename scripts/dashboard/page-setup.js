@@ -153,15 +153,19 @@ function drawSetup(){
 // like move on every read and are not the page's business.
 // The two presses at the top of the page on a machine that is its own
 // controller (the operator, 9 Nov): off, and a login for its screen. Neither
-// is a step, so neither waits for one; one job runs on a machine at a time,
-// and the page's band says which while they are dead for it.
+// is a step, so neither waits for one. One job runs on a machine at a time,
+// and either pressed while one runs is queued behind it by the server, not
+// refused: so both stay live, a muted line under them saying so while one
+// runs, and the press says it is queued and behind what (setupAhead; the
+// operator, 22 Nov).
 function setupTopActs(s){
   if (!s.own) return "";
   const c = s.own.reported?.console;
-  const dead = !s.node || (s.own.jobs || []).some(j => j.apply) ? " disabled" : "";
+  const dead = !s.node ? " disabled" : "", job = (s.own.jobs || []).find(j => j.apply);
   return `<div class="actbar">${c?.os ? `<button type="button" data-setconsole${dead}>${c.set ? "New console login" : "Generate console login"}</button>${
       helpIcon(`For this machine's screen or a KVM: the name admin, sudo gives root. ${c.open ? "Until setup ends that screen takes admin with no password; generating one ends that, and keeps a way in afterwards." : "Not your dashboard password."}`)}` : ""}<button type="button" class="danger" data-setoff${dead}>Shut down</button></div>${
-      s.node ? "" : `<div class="sub dim setupwait">These wait for this machine's agent to answer.</div>`}`;
+      !s.node ? `<div class="sub dim setupwait">These wait for this machine's agent to answer.</div>`
+      : job ? `<div class="sub dim setupwait">Pressed now, either is queued: this machine is ${esc(SETUP_JOB_WORDS[job.apply] || String(job.apply).replace(/-/g, " "))} first.</div>` : ""}`;
 }
 // Sixteen characters a person can read off a page and type at a KVM: no
 // look-alikes, in fours.
@@ -172,14 +176,22 @@ function consoleLogin(){
   }
   return out.join("").replace(/(.{4})(?=.)/g, "$1-");
 }
+// What a press on the machine waits behind, said in one sentence, or "": the
+// system job it is running (the band's words), which the server finishes first.
+function setupAhead(n, what){
+  const job = (n?.jobs || []).find(j => j.apply);
+  return job ? `${what} is queued: ${n.name || "this machine"} is ${SETUP_JOB_WORDS[job.apply] || String(job.apply).replace(/-/g, " ")} first, and it follows once that has finished` : "";
+}
 async function setupGenerateConsole(b){
   const n = ownMachine();
   if (n?.reported?.console?.set && !await askYes("Make a new console login?\n\nThe password this machine has now stops working.", {title: "New console login?", verb: "Make a new one"})) return;
   const was = b.textContent;
   busy(b, "Generating");
   const password = consoleLogin();
+  const ahead = setupAhead(n, "The console login");
   const j = await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", password});
   if (j.error){ notify(j.error, true); unbusy(b, was); return; }
+  if (ahead) notify(ahead);
   await ask({title: "Console login", text: "At this machine's screen or a KVM, log in as admin with this password; sudo gives root. It takes a few seconds to reach the machine.\n\nIt is shown this once and never kept here, so note it now.",
              choices: [{label: "Done", value: true}], cancel: null, field: {value: password, label: "Password"}});
   await loadNodes();
@@ -188,9 +200,10 @@ async function setupShutDown(b){
   const n = ownMachine();
   if (!await askYes(`Shut ${n?.name || "this machine"} down?\n\nIt stays off until somebody switches it on. Setup picks up where it was when it starts again.`, {title: "Shut down?", verb: "Shut down"})) return;
   busy(b, "Shutting down");
+  const ahead = setupAhead(n, "Shutting down");
   const j = await postJSON("/api/v1/nodes", {action: "poweroff", id: n?.id || ""});
   if (j.error){ notify(j.error, true); unbusy(b, "Shut down"); return; }
-  notify("shutting down");
+  notify(j.waits || ahead || "shutting down");
   await loadNodes();
 }
 

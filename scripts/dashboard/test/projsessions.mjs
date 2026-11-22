@@ -116,15 +116,19 @@ ok(drawn.some(t => /w\.sess/.test(t) && /Claude/.test(t)) && drawn.some(t => /w\
 const last = await page.$eval('#rnmodal .box', b => [...b.querySelectorAll('.field:not([hidden]):not(.rnhead)')]
   .filter(f => f.offsetParent).pop()?.id);
 ok(last === 'rnSessField', `...at the foot of the dialog (${last})`);
+// Its row goes once the question is answered, before the server has (the
+// operator, 22 Nov); the session itself is looked for once it has.
+const endAnswer = page.waitForResponse(r => r.url().endsWith('/api/project-sessions') && r.request().method() === 'POST', { timeout: 15000 });
 await page.evaluate(() => [...document.querySelectorAll('#rnSessList .rnsess')]
   .find(r => /w\.sess/.test(r.textContent) && /Claude/.test(r.textContent))
   ?.querySelector('[data-rnsessend]').click());
 await page.waitForFunction(() => ![...document.querySelectorAll('#rnSessList .rnsess')]
   .some(r => /w\.sess/.test(r.textContent) && /Claude/.test(r.textContent)), null, { timeout: 15000 });
+await endAnswer;
 const gone = (() => { try { execFileSync('tmux', ['has-session', '-t', '=' + here[0]]); return false; }
                       catch { return true; } })();
 ok(gone && page.dialogs.some(d => /End w\.sess's Claude session on alpha\?/.test(d)),
-   `End asks first, naming whose, and the session is gone (${page.dialogs.join(' | ').slice(0, 90)})`);
+   `End asks first, naming whose, takes the row away, and the session is gone once answered (${page.dialogs.join(' | ').slice(0, 90)})`);
 
 // ---- ...and not for anybody else ------------------------------------------------
 const plainPage = await newPage(browser, { viewport: { width: 1280, height: 900 },

@@ -386,9 +386,11 @@ function wireReach(root){
     if (d){ pfReachForm = {kind: d.kind, id: d.id}; readMoved("profile"); drawPanes(); }
   });
   // The switch: off keeps its settings, so a kind is turned on again as it was.
+  // The row says it on the press (pfReachNow), and the list is read after.
   root.querySelectorAll("[data-reachon]").forEach(i => i.onchange = async () => {
-    const r = await pfTf({action: "reach-on", id: i.dataset.reachon, on: i.checked});
-    if (r.error) notify(r.error, true);
+    const id = i.dataset.reachon, on = i.checked;
+    await drawNow(() => pfReachNow(dest => dest.map(d => d.id === id ? {...d, on} : d)),
+                  () => pfTf({action: "reach-on", id, on}));
     loadReach();
   });
   root.querySelectorAll("[data-reachcancel]").forEach(b => b.onclick = () => { pfReachForm = null; readMoved("profile"); drawPanes(); });
@@ -413,32 +415,59 @@ function wireReach(root){
     loadReach();
   });
   root.querySelectorAll("[data-reachrm]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.reachrm;
     if (!await askYes("Remove this destination? The bell stays on the page.", {verb: "Remove", danger: true})) return;
-    busy(b, "Removing");
-    await pfTf({action: "reach-remove", id: b.dataset.reachrm});
+    await drawNow(() => pfReachNow(dest => dest.filter(d => d.id !== id)),
+                  () => pfTf({action: "reach-remove", id}));
     loadReach();
   });
 }
+// A destination's switch or its removal, drawn on the press (the operator,
+// 22 Nov: a press must never look as if nothing happened): `to` is the list
+// as it will be. drawNow's first half; what it gives back puts it back.
+function pfReachNow(to){
+  const was = pfReach;
+  pfReach = {...was, dest: to(was?.dest || [])};
+  readMoved("profile"); drawPanes();
+  return () => { pfReach = was; readMoved("profile"); drawPanes(); };
+}
 
+// A browser signed out or a device disconnected leaves its table on the press
+// (the operator, 22 Nov), and comes back saying why on a refusal; the list
+// is read again after.
 function wireDeviceOut(root){
   root.querySelectorAll("[data-pfsignout]").forEach(b => b.onclick = async () => {
     // Signing a browser out asks nothing (R265): it signs in again.
-    busy(b, "Signing out");
-    const j = await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout});
-    if (j.error) notify(j.error, true);
-    else if (j.this){ signOutGo("/login"); return; }
+    const id = b.dataset.pfsignout;
+    const j = await drawNow(() => pfGone("signins", id), () => postJSON("/api/profile", {action: "signin-out", id}));
+    // This very browser signed out: a sign-out, so the next sign-in here
+    // opens on Home (signOutGo).
+    if (j.this && !j.error){ signOutGo("/login"); return; }
     await loadProfile();
   });
   root.querySelectorAll("[data-pfdevout]").forEach(b => b.onclick = async () => {
-    const of = b.dataset.devof || "";
-    const d = [...(profile?.devices || []), ...(usersList || []).flatMap(u => u.devices || [])].find(x => x.id === b.dataset.pfdevout);
+    const of = b.dataset.devof || "", id = b.dataset.pfdevout;
+    const d = [...(profile?.devices || []), ...(usersList || []).flatMap(u => u.devices || [])].find(x => x.id === id);
     if (!await askYes(`Disconnect ${d ? d.name : "this device"}${of ? ` of ${of}` : ""}? It stops syncing at once and signs in again to come back.`)) return;
-    busy(b, "Disconnecting");
-    const j = await postJSON(of ? "/api/users" : "/api/profile",
-      of ? {action: "device-signout", name: of, device: b.dataset.pfdevout} : {action: "device-signout", device: b.dataset.pfdevout});
-    if (j.error) notify(j.error, true);
+    await drawNow(() => of ? pfDeviceGone(of, id) : pfGone("devices", id), () => postJSON(of ? "/api/users" : "/api/profile",
+      of ? {action: "device-signout", name: of, device: id} : {action: "device-signout", device: id}));
     await (of ? loadUsers() : loadProfile());
   });
+}
+// drawNow's first half for one row of the profile's own lists (`key`, as
+// the profile read has it), and for a device of another account on the
+// Users page; what each gives back puts the row back.
+function pfGone(key, id){
+  const was = profile;
+  profile = {...was, [key]: (was?.[key] || []).filter(x => x.id !== id)};
+  readMoved("profile"); drawPanes();
+  return () => { profile = was; readMoved("profile"); drawPanes(); };
+}
+function pfDeviceGone(of, id){
+  const was = usersList;
+  usersList = (usersList || []).map(u => u.name === of ? {...u, devices: (u.devices || []).filter(x => x.id !== id)} : u);
+  readMoved("users"); drawPanes();
+  return () => { usersList = was; readMoved("users"); drawPanes(); };
 }
 
 // A conversation read here (R83): its turns as the reader route gives them,
@@ -631,8 +660,12 @@ function wireTwoFactor(root){
         return redraw();
       }catch(e){ if (e.name !== "NotAllowedError") notify("the passkey was not made: " + (e.message || e), true); return; }
     }
+    // A remembered browser forgotten, or a factor removed, leaves its row on
+    // the press (pfTfNow), and comes back saying why on a refusal.
     if (what === "trust-remove"){
-      await pfTf({action: "2fa-trust-remove", id: b.dataset.id});
+      const id = b.dataset.id;
+      await drawNow(() => pfTfNow(tf => ({...tf, trusted: (tf.trusted || []).filter(x => x.id !== id)})),
+                    () => pfTf({action: "2fa-trust-remove", id}));
       return redraw();
     }
     // A removal or new recovery codes: a fresh second factor first.
@@ -640,13 +673,26 @@ function wireTwoFactor(root){
       if (what !== "recovery" && !await askYes(what === "totp-remove" ? "Remove the authenticator app from your sign-in?" : "Remove this passkey from your sign-in?", {verb: "Remove", danger: true})) return;
       const fresh = await pfFresh();
       if (!fresh) return;
+      const id = b.dataset.id;
       const r = what === "recovery" ? await pfTf({action: "2fa-recovery", ...fresh})
-        : await pfTf({action: "2fa-remove", what: what === "totp-remove" ? "totp" : "passkey:" + b.dataset.id, ...fresh});
-      if (r.error){ notify(r.error, true); return; }
+        : await drawNow(() => pfTfNow(tf => what === "totp-remove" ? {...tf, totp: {...(tf.totp || {}), on: false}}
+                                                                    : {...tf, passkeys: (tf.passkeys || []).filter(k => k.id !== id)}),
+                        () => pfTf({action: "2fa-remove", what: what === "totp-remove" ? "totp" : "passkey:" + id, ...fresh}));
+      if (r.error){ if (what === "recovery") notify(r.error, true); return; }
       if (r.recovery?.length) pfCodes = r.recovery;
       return redraw();
     }
   });
+}
+
+// The two-factor section as it will be (`to` of what the profile read has),
+// drawn on the press: drawNow's first half, and what it gives back puts it
+// back.
+function pfTfNow(to){
+  const was = profile;
+  profile = {...was, two_factor: to(was?.two_factor || {})};
+  readMoved("profile"); drawPanes();
+  return () => { profile = was; readMoved("profile"); drawPanes(); };
 }
 
 // Profile opened at its Two-factor section: the bell's Set up.

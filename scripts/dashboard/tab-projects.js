@@ -10,13 +10,20 @@ async function openTrash(){
   await drawTrash();
 }
 
+// What the bin holds, as last read: a purge takes its row out of it on the
+// press and draws the list again from it (trashList).
+let trashItems = [];
 async function drawTrash(){
   const el = $("tList");
   drawHTML(el, `${skel("rows", 3)}`);
   const j = await getJSON("/api/trash");
   // A refusal is said, never read as an empty bin (B87).
   if (j?.error){ drawHTML(el, `<div class="hint bad">${esc(j.error)}</div>`); return; }
-  const items = j?.items || [];
+  trashItems = j?.items || [];
+  trashList();
+}
+function trashList(){
+  const el = $("tList"), items = trashItems;
   if (!items.length){
     drawHTML(el, `<div class="empty">nothing deleted</div>`);
     return;
@@ -77,10 +84,16 @@ function askPurge(name){
   input.oninput = () => { go.disabled = input.value.trim() !== name; };
   input.focus();
   box.querySelector(".stop").onclick = () => box.remove();
+  // The row goes on the press and comes back saying why on a refusal; the
+  // bin is read again once the server has it.
   go.onclick = async () => {
-    go.disabled = true;
-    const r = await postJSON("/api/trash-purge", {name, confirm: input.value.trim()});
-    if (r?.error){ notify(r.error, true); go.disabled = false; return; }
+    const confirm = input.value.trim(), was = trashItems;
+    const r = await drawNow(() => {
+      trashItems = trashItems.filter(t => t.name !== name);
+      trashList();
+      return () => { trashItems = was; trashList(); };
+    }, () => postJSON("/api/trash-purge", {name, confirm}));
+    if (r?.error) return;
     notify(`${name} is gone`);
     await drawTrash();
   };
@@ -122,13 +135,25 @@ const pidMark = pid => pid ? `<span class="pid" title="this space's id, which ne
 // A repository's branch and that it may push, or that it has no git: the
 // same words on a space's card, its notebook's header and Home's glance.
 const repoFacts = p => p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git";
+// A space or a repository deleted by a press goes on the press (the
+// operator, 22 Nov: a press must never look as if nothing happened): left out
+// of the list every card is drawn from ("space:" and its key, "repo:" and its
+// name) until the read after the server's answer. pjGone is drawNow's first
+// half for one, and what it gives back puts it back.
+const pjGoing = new Set();
+function pjGone(id){
+  pjGoing.add(id);
+  drawProjects(state?.projects || []);
+  drawPanes();
+  return () => { pjGoing.delete(id); drawProjects(state?.projects || []); drawPanes(); };
+}
 // A project (R138, the operator, 25 Oct) is made first, with a name alone,
 // and its repositories are added to it; every repository is in one. The
 // page reads the projects off the status read's `repos` and each one's
 // repositories off its rows, so a project with nothing in it yet has a card.
 function projectList(){
-  const rows = state?.projects || [];
-  return Object.entries(state?.repos || {}).map(([key, r]) => {
+  const rows = (state?.projects || []).filter(p => !pjGoing.has("repo:" + p.name));
+  return Object.entries(state?.repos || {}).filter(([key]) => !pjGoing.has("space:" + key)).map(([key, r]) => {
     const reps = r.members.map(m => rows.find(p => p.name === m)).filter(Boolean);
     // A project with no repository (R208) has a row of its own in the
     // list (work: true), which its card's Start agent, notes and Settings
@@ -367,15 +392,17 @@ function slideCards(key, change){
 
 // The project's name, asked in a box under it: taken at once from the
 // answer, where the card sorts by it, without waiting for the next read.
+// The card wears the new name, and sorts by it, on the press (projMarkNow).
 async function renameProjectCard(btn){
   const key = btn.dataset.prn, was = projectName(key);
   const got = await askInline(btn.closest(".pcname"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
-  const j = await postJSON("/api/repos", {action: "rename", key, to: got});
-  if (j.error){ notify(j.error, true); return; }
-  slideCards(key, () => applyNow((x, k) => { if (k === key && "members" in x) x.name = j.name || got; }));
+  const named = to => (x, k) => { if (k === key && "members" in x) x.name = to; };
+  const j = await projMarkNow({lay: named(got), back: named(was), draw: f => slideCards(key, f),
+    send: () => postJSON("/api/repos", {action: "rename", key, to: got}),
+    landed: j => applyNow(named(j.name || got))});
+  if (j.error) return;
   notify(`${was} is now ${j.name || got}`);
-  await refresh();
 }
 
 // A repository's shown name, asked in a box under its row (the folder stays).
@@ -385,10 +412,14 @@ async function renameRepository(btn){
   // card's back opens (the operator, 26 Oct): the label names the repository.
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
-  const j = await postJSON("/api/rename", {name, to: got});
-  if (j.error){ notify(j.error, true); return; }
+  // Its row wears the new name on the press (projMarkNow).
+  const label = (state?.projects || []).find(x => x.name === name)?.label;
+  const named = to => x => { if (!("members" in x) && x.name === name) x.label = to; };
+  const j = await projMarkNow({lay: named(got), back: named(label),
+    send: () => postJSON("/api/rename", {name, to: got}),
+    landed: j => applyNow(named(j.label || got))});
+  if (j.error) return;
   notify(`${was} is now ${j.label || got}`);
-  await refresh();
 }
 
 // A repository into another project, picked from the ones this account may
@@ -406,15 +437,23 @@ async function moveRepository(btn){
   if (plan.error){ notify(plan.error, true); return; }
   const picked = await moveConfirm(plan);
   if (picked === null) return;
-  const j = await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give});
-  if (j.error){ notify(j.error, true); return; }
+  // On the Move, the repository's row leaves its card for the other one
+  // (projMarkNow); what else the move did is the answer's to say.
+  const had = [...(state?.repos?.[from]?.members || [])];
+  const into = (to, left) => (x, k) => {
+    if (!("members" in x)){ if (x.name === name) x.project = to; return; }
+    if (k === left && x.members.includes(name)) x.members = x.members.filter(m => m !== name);
+    if (k === to && !x.members.includes(name)) x.members = to === from ? [...had] : [...x.members, name];
+  };
+  const j = await projMarkNow({lay: into(c.key, from), back: into(from, c.key),
+    send: () => postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give})});
+  if (j.error) return;
   const nn = id => plan.nodes.find(n => n.id === id)?.name || id;
   notify(`${projLabel(name)} is in ${j.project}${
     j.added?.length ? `, which now has ${j.added.map(nn).join(" and ")} too` : ""}${
     j.readers?.length ? `; ${j.readers.join(", ")} now read${j.readers.length === 1 ? "s" : ""} it too` : ""}${
     j.kept?.length ? `; ${plan.from} keeps ${j.kept.join(", ")}` : ""}`);
   if (j.owner_errors?.length) notify(j.owner_errors.join("; "), true);
-  await refresh();
 }
 
 // Are you sure, with what the move changes (the operator, 26 Oct): the
@@ -455,7 +494,7 @@ function moveConfirm(plan){
       ${vms_.length ? `<div class="field"><div class="lbl">VMs, which go with ${esc(plan.label)}</div>
         ${vms_.map(t => `<div class="ndcap" data-mvvm="${esc(t.node)}" data-reach="${t.reach ? 1 : 0}">${esc(t.name)}<span class="dim"> (on ${esc(t.node_name)})</span><span class="sub warn" data-mvvmwhy hidden> ${esc(plan.to)} will not have ${esc(t.node_name)}: its sessions cannot reach it</span></div>`).join("")}</div>` : ""}
       ${plan.lose.length ? `<div class="field"><div class="sub warn">${esc(plan.lose.join(", "))} ${plan.lose.length === 1 ? "reaches" : "reach"} it through ${esc(plan.from)} alone and ${plan.lose.length === 1 ? "loses" : "lose"} it: a role on ${esc(plan.to)} keeps it.</div></div>` : ""}
-      ${busy ? `<div class="field"><div class="sub warn">${esc(plan.busy.join(", "))} running on ${esc(plan.from)} or ${esc(plan.to)}: end ${plan.busy.length === 1 ? "it" : "them"} first, then move it.</div></div>` : ""}
+      ${busy ? `<div class="field"><div class="sub dim">${esc(plan.busy.join(", "))} running on ${esc(plan.from)} or ${esc(plan.to)}: end ${plan.busy.length === 1 ? "it" : "them"} first, then move it.</div></div>` : ""}
       ${dlgFoot(`<button type="button" id="mvCancel">Cancel</button>`, `<button type="button" class="primary" id="mvGo"${busy ? " disabled" : ""}>Move</button>`)}</div>`);
     // A container or VM is in reach when the new project has its node, or
     // that node is ticked to bring along; out of reach, a container's box is
@@ -497,11 +536,13 @@ async function deleteProjectCard(key){
   const left = own.containers?.length ? `\n\nThe container${own.containers.length === 1 ? "" : "s"} given to it, ${own.containers.join(", ")}, keep${
     own.containers.length === 1 ? "s" : ""} running, given to no space.` : "";
   if (!await askYes(`Delete the space ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
-  const j = await postJSON("/api/repos", {action: "delete", key});
-  if (j.error){ notify(j.error, true); return; }
+  // Its card goes on the press (pjGone), and comes back saying why on a refusal.
+  const j = await drawNow(() => pjGone("space:" + key), () => postJSON("/api/repos", {action: "delete", key}));
+  if (j.error) return;
   pjEditing.delete(key);
   notify(`${n} is gone`);
   await refresh();
+  pjGoing.delete("space:" + key);
 }
 
 // The card's own presses, beside wireProjectRows' shared ones.
@@ -694,11 +735,14 @@ async function renameProjectGroup(btn){
                                      also: {key: "delete", label: "Delete group"}});
   if (got === null || got === was) return;
   const gone = got?.also === "delete";
-  const j = await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got});
-  if (j.error){ notify(j.error, true); return; }
-  applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
+  // Its spaces wear the new name, or none, on the press (projMarkNow).
+  const had = new Set(Object.entries(state?.repos || {}).filter(([, r]) => r.group === was).map(([k]) => k));
+  const named = to => (x, k) => { if (had.has(k)) x.group = to; };
+  const j = await projMarkNow({lay: named(gone ? "" : got), back: named(was),
+    send: () => postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got}),
+    landed: j => applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; })});
+  if (j.error) return;
   notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
-  refresh();
 }
 
 // Whether a session in this project may rebuild its dev instance: the
@@ -1189,9 +1233,13 @@ async function createProject() {
     // accepted, not finished. The dialog gets out of the way and the Projects
     // card carries it from here, which is also what happens if this page is
     // closed a second later.
+    // One pressed while another runs is queued behind it, never refused
+    // (projects._start): said on the answer, and the running job's row
+    // names it after that one (the operator, 22 Nov).
     if (j.started){
-      pJobSeen({running: true, kind: mode === "link" ? "link" : "clone",
-                name: j.name || linkName, step: "starting", for: 0});
+      const named = j.name || linkName, ahead = state?.project_job?.running ? state.project_job.name || "" : "";
+      if (ahead) notify(`${named} is queued behind ${ahead}: it starts once that is done`);
+      else pJobSeen({running: true, kind: mode === "link" ? "link" : "clone", name: named, step: "starting", for: 0});
       pJobPoll();
     } else {
       notify(`${mode === "link" ? projLabel(linkName) : j.label || name || j.name} ${mode === "link" ? "linked" : "created"}: ${j.note || "ready"}`);

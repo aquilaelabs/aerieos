@@ -738,15 +738,22 @@ await section("a project's daily snapshots", async () => {
     const day = await page.$eval('#rnSnapRows .snaprec:not([data-day*="before"])', r => r.dataset.day);
     if (!await page.$(`#rnSnapRows .snaprec.open[data-day="${day}"]`)) await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snapopen]`);
     await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
+    // The row says pinned on the press (the operator, 22 Nov), and the
+    // server's list is read once it has answered.
+    const pinned = page.waitForResponse(r => r.url().endsWith('/api/snapshots') && /"pin"/.test(r.request().postData() || ''), { timeout: 15000 });
     await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
+    const atOnce = await page.$eval(`#rnSnapRows .snaprec[data-day="${day}"]`, r => /pinned/.test(r.textContent) && !!r.querySelector('[data-snappin="unpin"]'));
+    await pinned;
     await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="unpin"]`, { timeout: 15000 });
     const marked = await page.$eval(`#rnSnapRows .snaprec[data-day="${day}"]`, r => /pinned/.test(r.textContent));
     const listed = (await page.evaluate(async () => (await (await fetch('/api/snapshots?project=alpha')).json())));
     const hint = await page.$eval('#rnSnapHint', h => h.textContent);
+    const unpinned = page.waitForResponse(r => r.url().endsWith('/api/snapshots') && /"unpin"/.test(r.request().postData() || ''), { timeout: 15000 });
     await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
     await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
-    ok(marked && listed.days.find(d => d.day === day)?.pinned === true && /1 pinned/.test(hint),
-       `Pin keeps a day and its row says pinned, Unpin lets it go again (${day} ${hint})`);
+    await unpinned;
+    ok(atOnce && marked && listed.days.find(d => d.day === day)?.pinned === true && /1 pinned/.test(hint),
+       `Pin keeps a day and its row says pinned on the press, Unpin lets it go again (${day} ${hint})`);
   }
   // The daily snapshot switch is gone (0 days kept takes none), and the API
   // does not take the key back: nothing is stored for it and nothing reads it.

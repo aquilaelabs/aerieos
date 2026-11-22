@@ -59,7 +59,7 @@ const SESS_COLS = [{label: "Session"}, {label: "Space", w: "minmax(0,.7fr)"}, {l
 function renderSessionsInto(i){
   const d = docSurface(i, "sessions");
   if (!d) return;
-  const ss = state?.sessions;
+  const ss = sessShown();
   if (!ss){
     d.setBar("");
     patch(d.list, skTpl(skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
@@ -130,19 +130,58 @@ async function killSession(name, node = ""){
         ? `End ${said}?\n\nThe transcript is kept and can be `
           + `resumed later, but the conversation stops now.`
         : `End ${said}?\n\nAnything running in it is terminated.`)) return;
-  try{
-    const j = await endSession(name, node);
-    if (j.error){ notify(j.error, true); return; }
-    // Its tab, if one is open, is now pointing at nothing.
-    const t = tabs.find(x => x.kind === "term" && sessionOf(x.arg) === name);
-    if (t) dropTab(t.id);
-    notify(`ended ${said}`);
-  }catch(e){ notify("could not end it: " + failWords(e), true); }
+  // Its row and its tab go on the press (sessEndNow); a refusal brings them
+  // back and says why.
+  const t = tabs.find(x => x.kind === "term" && sessionOf(x.arg) === name);
+  const j = await drawNow(() => sessEndNow(name, t), () => endSession(name, node));
+  if (j.error) return;
+  notify(`ended ${said}`);
   await refresh();
+  sessEndRead(name);
   // Nowhere near another End (B54): with focus left on the list, a keyboard
   // Enter after the redraw could end a second session.
   const a = document.activeElement;
   if (a?.matches?.("[data-k], .consend")) a.blur();
+}
+
+// A session ended by a press is gone from the page on the press (the
+// operator, 22 Nov: a press must never look as if nothing happened): its
+// tab closed and its row on the Sessions page held out of every read until
+// a read no longer lists it, or half a minute has passed, since a node's
+// census of its sessions can come a while after the answer. drawNow's first
+// half: what it gives back puts the row and the tab back as they were.
+const sessEnding = new Map();         // session name -> when its End was pressed
+const SESS_END_HOLD_MS = 30000;
+function sessEndNow(name, t){
+  const at = Date.now(), place = t ? tabs.indexOf(t) : -1, panesWas = [...panes], activeWas = active;
+  sessEnding.set(name, at);
+  if (t) dropTab(t.id); else drawPanes();
+  return () => {
+    if (sessEnding.get(name) === at) sessEnding.delete(name);
+    if (t && !tabs.includes(t)){
+      tabs.splice(Math.min(place, tabs.length), 0, t);
+      panesWas.forEach((id, i) => { if (id === t.id) panes[i] = id; });
+      if (panesWas[activeWas] === t.id) active = activeWas;
+      render();
+    } else drawPanes();
+  };
+}
+// ...and let go once a read has it gone, its time is up, or the one a read
+// lists under that name was started after the press: a session started
+// again is never hidden.
+function sessEndRead(name){
+  const at = sessEnding.get(name);
+  if (at === undefined) return;
+  const s = (state?.sessions || []).find(x => x.name === name);
+  if (!s || Date.now() - at > SESS_END_HOLD_MS || (s.created || 0) * 1000 > at) sessEnding.delete(name);
+}
+// The status poll's sessions as the page draws them: less any ended on a
+// press and still listed.
+function sessShown(){
+  const ss = state?.sessions;
+  if (!ss || !sessEnding.size) return ss;
+  for (const n of [...sessEnding.keys()]) sessEndRead(n);
+  return ss.filter(s => !sessEnding.has(s.name));
 }
 
 // End a session, no questions asked. killSession is this with the dialog in

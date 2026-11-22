@@ -42,11 +42,13 @@ function loadUsers(){
 }
 
 // `say`, when given, is where a refusal is written (a dialog's own line);
-// without it a refusal is a toast. True when it landed.
-async function usersAct(body, say = null){
+// without it a refusal is a toast. `now`, where the page knows the result
+// before the answer, draws it on the press and gives back how to take it
+// away (drawNow), which a refusal does. True when it landed.
+async function usersAct(body, say = null, now = null){
   const refuse = t => { if (say) say(t); else notify(t, true); return false; };
-  const j = await postJSON("/api/users", body);
-  if (j.error) return refuse(j.error);
+  const j = now ? await drawNow(now, () => postJSON("/api/users", body)) : await postJSON("/api/users", body);
+  if (j.error) return now ? false : refuse(j.error);
   if (body.action === "add"){ usersAddDraft = {name: "", pw: "", role: "user"}; usersPick = body.name; usersPhoneOpen = true; }
   if (body.action === "remove"){ usersPick = ""; usersPhoneOpen = false; }
   notify(body.action === "remove" ? `${body.name} removed`
@@ -220,10 +222,22 @@ function wireUsers(el){
   // An account's key store purged for them (R154), for one that cannot sign
   // in to purge its own.
   const pg = el.querySelector("#uePurge");
-  if (pg) pg.onclick = async () => { busy(pg, "Purging"); await keyStorePurge(usersPick); loadUsers(); };
+  // Its question comes first and the button holds its ring after it, until
+  // the purge has answered (the press's own promise).
+  if (pg) pg.onclick = async () => { await keyStorePurge(usersPick); loadUsers(); };
   const rm = el.querySelector("#ueRemove");
+  // The account leaves the list on the press (the operator, 22 Nov), and
+  // comes back saying why on a refusal.
   if (rm) rm.onclick = async () => {
-    if (await askYes(`Remove ${usersPick}? They lose access immediately.`)) usersAct({action: "remove", name: usersPick});
+    const name = usersPick;
+    if (!await askYes(`Remove ${name}? They lose access immediately.`)) return;
+    return usersAct({action: "remove", name}, null, () => {
+      const was = {list: usersList, pick: usersPick, open: usersPhoneOpen, edit: usersEdit};
+      usersList = usersList.filter(x => x.name !== name);
+      usersPick = ""; usersPhoneOpen = false; usersEdit = null;
+      usersRedraw();
+      return () => { usersList = was.list; usersPick = was.pick; usersPhoneOpen = was.open; usersEdit = was.edit; usersRedraw(); };
+    });
   };
 }
 

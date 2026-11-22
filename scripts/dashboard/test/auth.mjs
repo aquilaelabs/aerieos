@@ -1126,9 +1126,13 @@ await section("the Users tab", async () => {
   ok(notYours.status === 403, 'accounts are an administrator\'s');
 
   await pick('tabmade');
+  // The account leaves the list on the press, before the server has answered
+  // (the operator, 22 Nov), once its question is answered.
+  const removed = page.waitForResponse(r => r.url().endsWith('/api/users') && /"remove"/.test(r.request().postData() || ''), { timeout: 15000 });
   await page.click('.userstab #ueRemove');
   await page.waitForFunction(() => !document.querySelector(
     '.userstab [data-upick="tabmade"]'), null, { timeout: 15000 });
+  await removed;
   ok((await as('/api/status')).status === 401,
      'Remove ends it: the account it made can no longer sign in');
 });

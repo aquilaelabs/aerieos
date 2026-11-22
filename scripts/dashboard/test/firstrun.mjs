@@ -471,8 +471,10 @@ await section("a bare-metal install's first run", async () => {
       redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
       out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
       // The two presses at the top (the operator, 9 Nov), in place of a step:
-      // live while nothing runs, dead for a job, and the login's says so once
-      // the machine has one. Generating shows the password once and sends it.
+      // live while nothing runs, and live for a job too, since the server
+      // queues either behind it and the press says so (the operator, 22 Nov);
+      // the login's says so once the machine has one. Generating shows the
+      // password once and sends it.
       { const top = () => panel().querySelector('.setuptitle');
         redraw({ console: { os: true, set: false, open: true } });
         out.conGen = top()?.querySelector('[data-setconsole]')?.textContent;
@@ -480,7 +482,9 @@ await section("a bare-metal install's first run", async () => {
         out.conLive = !top()?.querySelector('[data-setconsole]')?.disabled && !top()?.querySelector('[data-setoff]')?.disabled;
         out.conNoStep = !titles().includes('A password for this screen');
         const was = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt', started: Math.floor(Date.now() / 1000) }]; redraw({ console: { os: true, set: false, open: true } });
-        out.conDead = !!top()?.querySelector('[data-setconsole]')?.disabled && !!top()?.querySelector('[data-setoff]')?.disabled;
+        out.conQueued = !top()?.querySelector('[data-setconsole]')?.disabled && !top()?.querySelector('[data-setoff]')?.disabled
+          && /^Shutting down is queued: .+ is adopting the old system's disks first/.test(setupAhead(n, 'Shutting down'))
+          && /Pressed now, either is queued: this machine is adopting the old system's disks first/.test(top()?.textContent || '');
         n.jobs = was;
         redraw({ console: { os: true, set: false, open: true } });
         redraw({ console: { os: true, set: true, open: false } });
@@ -585,7 +589,7 @@ await section("a bare-metal install's first run", async () => {
     ok(walk.noTake, '...and the walk never offers to take the array over: that comes after it, from This machine');
     ok(walk.conGen === 'Generate console login' && walk.conOffBtn === 'Shut down' && walk.conLive && walk.conNoStep,
        `...the top of the page has Generate console login and Shut down, live, and no step asks for a password (${walk.conGen}, ${walk.conOffBtn}, ${walk.conLive}, ${walk.conNoStep})`);
-    ok(walk.conDead, '...both dead while the machine runs a job');
+    ok(walk.conQueued, '...both live while the machine runs a job, a line under them and a press saying it is queued behind that job');
     ok(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/.test(walk.conShown || '') && walk.conSent?.action === 'console' && walk.conSent?.password === walk.conShown && /log in as admin/.test(walk.conAsked || ''),
        `...Generate sends a password a person can type at a KVM and shows it once, with the name (${walk.conShown}, ${JSON.stringify(walk.conSent)})`);
     ok(walk.conAgain === 'New console login' && walk.conNone, `...it reads New console login once one is set, and Shut down is there on a machine with no such screen (${walk.conAgain}, ${walk.conNone})`);

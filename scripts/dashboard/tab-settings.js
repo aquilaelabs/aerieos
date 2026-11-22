@@ -254,7 +254,7 @@ function renderSettingsInto(i){
   if (rs) rs.onclick = () => askReset();
   d.el.querySelectorAll("[data-repdel]").forEach(b => b.onclick = () => deleteReport(b));
   const rc = d.el.querySelector("#setReportsClear");
-  if (rc) rc.onclick = () => clearReports(rc);
+  if (rc) rc.onclick = () => clearReports();
 }
 
 // A section's Revert beside its Apply: the first Apply button in the markup
@@ -285,8 +285,11 @@ const reportsCount = () => reportsList === null ? null : reportsList.length;
 // A bare-metal install's updates (R90 step 5): the release running, the
 // newest published, and Update, which runs the installer through this
 // machine's own node; the container edition has no such section.
+// The channel picked and not yet answered for, drawn over every read until
+// the read after the answer has it (wireUpdates).
+let relChannelHeld = "";
 function updatesSection(){
-  const r = state?.release || {};
+  const r = {...(state?.release || {}), ...(relChannelHeld ? {channel: relChannelHeld} : {})};
   const when = r.at ? `checked ${esc(ago(r.at))}` : "not checked yet";
   const os = r.os && r.os.version ? r.os : null;
   // AerieOS (R160 step 4): the image whole into the other slot, a
@@ -596,23 +599,55 @@ function wireMove(root){
   }));
 }
 
+// The system job at work on a node, in words, or "": an update or a restart
+// pressed meanwhile is queued behind it, never refused
+// (nodes.system_job_for), and the press says so in one sentence (the
+// operator, 22 Nov). The node list is read again at the press, since one
+// drawn earlier may be from before that job started or ended.
+const SYS_JOB_SAID = {"host-update": "the system packages' update", "os-update": "an AerieOS update",
+  "controller-update": "the controller's update", reboot: "a restart", poweroff: "a shutdown"};
+async function sysJobAhead(nodeId){
+  if (!nodeId) return "";
+  await loadNodes();
+  const j = ((nodesList || []).find(n => n.id === nodeId)?.jobs || [])
+    .find(x => x.type === "system" && x.apply && x.apply !== "root" && ["queued", "assigned", "running"].includes(x.state));
+  return j ? SYS_JOB_SAID[j.apply] || "another change to this machine" : "";
+}
+// ...and what such a press says once it is answered: the server's own words
+// where it has them (a draft being fetched, a restart that waits), queued
+// where a job is ahead of it, else `words`.
+function sysSaid(ahead, words){
+  return j => j.said || j.waits || (ahead ? `queued behind ${ahead} on this machine: it starts once that has finished`
+    : typeof words === "function" ? words(j) : words);
+}
 function wireUpdates(root){
   // The channel's pick (R179): saved, then the newest asked for again.
+  // The section says the channel picked at once (the operator, 22 Nov), and
+  // puts the one before it back, saying why, on a refusal.
   root.querySelectorAll("[data-relchannel]").forEach(s => s.onchange = async () => {
-    const j = await postJSON("/api/settings", {set: {release_channel: s.value}});
-    if (j.error){ notify(j.error, true); return; }
+    const to = s.value, redraw = () => { readMoved("settings"); drawPanes(); };
+    const j = await drawNow(() => {
+      relChannelHeld = to;
+      redraw();
+      return () => { relChannelHeld = ""; redraw(); };
+    }, () => postJSON("/api/settings", {set: {release_channel: to}}));
+    if (j.error) return;
     await postJSON("/api/v1/nodes", {action: "release-check"}).catch(() => {});
     await refresh();
+    if (relChannelHeld === to) relChannelHeld = "";
   });
   root.querySelectorAll("[data-hostupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     const reboot = !!$("hostReboot")?.checked;
     if (!await askYes(`Update the system's own packages?\n\napt brings every package to its newest with the configuration files kept as they are${reboot ? ", and the machine restarts after if the update asks for it" : "; a restart, if one is needed, is yours to press after"}. The log is on the Jobs page.`, {title: "Apply updates?", verb: "Update"})) return;
+    const ahead = await sysJobAhead(b.dataset.hostupdate);
     await sayPost(b, "Updating", "/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot},
-      "updating: the job runs on this machine; its log is on the Jobs page");
+      sysSaid(ahead, "updating: the job runs on this machine; its log is on the Jobs page"));
   }));
   root.querySelectorAll("[data-hostreboot]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart"})) return;
-    await sayPost(b, "Restarting", "/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot}, "restarting: the page comes back when the machine does");
+    const ahead = await sysJobAhead(b.dataset.hostreboot);
+    await sayPost(b, "Restarting", "/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot},
+      sysSaid(ahead, "restarting: the page comes back when the machine does"));
   }));
   root.querySelectorAll("[data-relcheck]").forEach(b => b.onclick = () => pressing(b, async () => {
     await sayPost(b, "Checking", "/api/v1/nodes", {action: "release-check"}, "", () => refresh());
@@ -621,26 +656,30 @@ function wireUpdates(root){
     const from = ($("osFrom")?.value || "").trim();
     if (!from){ notify("name the folder on this machine that holds the release's ISO with its .sha256 and .attestation.jsonl", true); return; }
     if (!await askYes(`Write the ISO in ${from} into the other slot?\n\nThe ISO is checked against the sha256 beside it; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
+    const ahead = await sysJobAhead(b.dataset.osfrom);
     await sayPost(b, "Updating", "/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from},
-      "updating: the job writes the other slot; restart from the Nodes page when it is done");
+      sysSaid(ahead, "updating: the job writes the other slot; restart from the Nodes page when it is done"));
   }));
   root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tag = $("relPick")?.value;
     if (!tag || !await askYes(`Install ${tag} on this machine?\n\nIt is fetched and checked as any update is. An older build may refuse this machine's state, and a dev build may not come up.`, {title: "Install this version?", verb: "Install"})) return;
+    const ahead = await sysJobAhead(b.dataset.relpick);
     await sayPost(b, "Installing", "/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag},
-      j => j.said || `installing ${tag}: its job is on the Jobs page`);
+      sysSaid(ahead, `installing ${tag}: its job is on the Jobs page`));
     unbusy(b, "Install this version");
   }));
   root.querySelectorAll("[data-relupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (b.dataset.os){
       if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from the Nodes page, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
+      const ahead = await sysJobAhead(b.dataset.relupdate);
       await sayPost(b, "Updating", "/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer},
-        j => j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done");
+        sysSaid(ahead, "updating: the job writes the other slot; restart from the Nodes page when it is done"));
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
+    const ahead = await sysJobAhead(b.dataset.relupdate);
     await sayPost(b, "Updating", "/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate},
-      "updating: the job runs on this machine's node; the page comes back on the new release");
+      sysSaid(ahead, "updating: the job runs on this machine's node; the page comes back on the new release"));
   }));
 }
 function reportsSection(){
@@ -660,27 +699,32 @@ function reportsSection(){
       ${mayDelete && rows.length ? `<button type="button" class="danger" id="setReportsClear">Clear reports</button>` : ""}</div></div>`;
 }
 
+// A report deleted, or every report cleared, goes from the list on the press
+// (the operator, 22 Nov: a press must never look as if nothing happened),
+// and comes back saying why on a refusal; the list is read again after.
+function reportsGone(keep){
+  const was = reportsList;
+  reportsList = (reportsList || []).filter(keep);
+  readMoved("settings"); drawPanes();
+  return () => { reportsList = was; readMoved("settings"); drawPanes(); };
+}
 async function deleteReport(btn){
   const id = Number(btn.dataset.repdel);
-  busy(btn, "");
-  const j = await postJSON("/api/reports", {action: "delete", id});
-  if (j.error){ notify(j.error, true); unbusy(btn, ""); return; }
+  const j = await drawNow(() => reportsGone(r => r.id !== id), () => postJSON("/api/reports", {action: "delete", id}));
+  if (j.error) return;
   notify(`report #${id} deleted`);
   await loadReports();
 }
 
-async function clearReports(btn){
+async function clearReports(){
   // Read again first: a report may have come in, or gone, since the draw.
   await loadReports();
   const n = reportsList?.length || 0;
   if (!n) return notify("there are no reports to clear");
   const s = n === 1 ? "" : "s";
   if (!await askYes(`Delete all ${n} report${s} about AerieOS?`)) return;
-  busy(btn, "Clearing");
-  const j = await postJSON("/api/reports", {action: "clear"});
-  if (j.error) notify(j.error, true);
-  else notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
-  unbusy(btn, "Clear reports");
+  const j = await drawNow(() => reportsGone(() => false), () => postJSON("/api/reports", {action: "clear"}));
+  if (!j.error) notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
   loadReports();
 }
 
@@ -900,8 +944,11 @@ function wireChecks(root){
 // tools/catalog-mirror.py made on a machine with the network. The mirror and
 // the index in use are the status read's own keys, beside its settings part,
 // which is what the groups are handed.
+// A mirror forgotten on a press and not yet answered for: drawn gone over
+// every read until the server has it (wireCatalogMirror).
+let mirrorGoing = false;
 function catalogIntro(){
-  const m = state?.catalog_mirror, i = state?.catalog_index;
+  const m = mirrorGoing ? null : state?.catalog_mirror, i = state?.catalog_index;
   // When the index in use was made: an address that keeps answering an
   // old one shows here, where nothing else would say it.
   const made = i ? `The index in use was made ${esc(i.made || "at an unknown time")}${i.read ? `, read ${esc(ago(i.read))}` : ""}.` : "No index has been read yet.";
@@ -916,7 +963,7 @@ function catalogIntro(){
       <button type="button" data-mirrorimport>${m ? "Import a newer mirror" : "Import a mirror"}</button></div>`;
 }
 function catalogStatus(){
-  const m = state?.catalog_mirror;
+  const m = mirrorGoing ? null : state?.catalog_mirror;
   return m ? `a mirror made ${m.generated || "earlier"} answers when the catalog does not · applies at once` : "applies at once";
 }
 function wireCatalogMirror(root){
@@ -937,14 +984,20 @@ function wireCatalogMirror(root){
     readMoved("settings"); drawPanes(); refresh();
   };
   const fg = root.querySelector("[data-mirrorforget]");
-  if (fg) fg.onclick = async e => {
-    const b = e.currentTarget;
+  // Its row goes on the press, and comes back saying why on a refusal.
+  if (fg) fg.onclick = async () => {
     if (!await askYes("Forget the catalog's mirror? The Library reads the catalog's address alone again; packs kept from the mirror stay.")) return;
-    busy(b, "Forgetting");
-    const j = await postJSON("/api/catalog-mirror", {action: "forget"});
-    notify(j.error || "the mirror is forgotten", !!j.error);
-    if (state && !j.error) state.catalog_mirror = null;
-    readMoved("settings"); drawPanes();
+    const redraw = () => { readMoved("settings"); drawPanes(); };
+    const j = await drawNow(() => {
+      mirrorGoing = true;
+      redraw();
+      return () => { mirrorGoing = false; redraw(); };
+    }, () => postJSON("/api/catalog-mirror", {action: "forget"}));
+    if (j.error) return;
+    if (state) state.catalog_mirror = null;
+    notify("the mirror is forgotten");
+    await refresh();
+    mirrorGoing = false;
   };
 }
 

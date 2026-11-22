@@ -336,27 +336,29 @@ function rnDrawReach(focus){
     const list = rnReachDraft.map(e => ({addr: e.addr, nodes: [...e.nodes]}));
     const e = {addr: form.addr, nodes: [...form.nodes].sort()};
     if (i < 0) list.push(e); else list[i] = e;
-    rnReachSave(list.filter(x => x.addr), b);
+    return rnReachSave(list.filter(x => x.addr));
   });
   box.querySelectorAll("[data-reachdel]").forEach(b => b.onclick = () =>
-    rnReachSave(rnReachDraft.filter((_, j) => j !== rnReachEdit.i).map(e => ({addr: e.addr, nodes: [...e.nodes]})), b));
+    rnReachSave(rnReachDraft.filter((_, j) => j !== rnReachEdit.i).map(e => ({addr: e.addr, nodes: [...e.nodes]}))));
   if (focus) box.querySelector(".rnreach.open [data-reachf]")?.focus();
   rnSpaceRelock();
   // Every node keeps each session to its own project's network (R146).
   $("rnReachHint").textContent = !ns.length ? "" : "An address for the whole machine, or address:port for one service.";
 }
 // A record's Save: the space's list with that one changed, written now;
-// running sessions take it at once.
-async function rnReachSave(list, btn){
-  const word = btn.textContent;
-  busy(btn, "Saving");
-  const j = await postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", reaches: list});
-  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
-  rnReachDraft = list;
-  rnPrefWas.reaches = JSON.stringify(rnReachNow());
-  rnReachEdit = null;
-  rnDrawReach();
-  rnBars();
+// running sessions take it at once. The list is drawn as saved on the press
+// (the operator, 22 Nov), and a refusal opens the record again as it was
+// typed, saying why.
+function rnReachSave(list){
+  const was = {draft: rnReachDraft, edit: rnReachEdit, saved: rnPrefWas.reaches};
+  return drawNow(() => {
+    rnReachDraft = list;
+    rnPrefWas.reaches = JSON.stringify(rnReachNow());
+    rnReachEdit = null;
+    rnDrawReach();
+    rnBars();
+    return () => { rnReachDraft = was.draft; rnReachEdit = was.edit; rnPrefWas.reaches = was.saved; rnDrawReach(); rnBars(); };
+  }, () => postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", reaches: list}));
 }
 
 // What the section's Save sends: the saved rows, in the stored shape.
@@ -411,13 +413,13 @@ function rnFillNodesMore(){
       <select data-moreadd aria-label="a node to add">${optionList(offer.map(n => [n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name]), "")}</select>
       <button type="button" data-moreaddgo>Add a node</button></div>`}
     ${rows ? tblWrap(MORE_COLS, rows, "rnmores") : `<div class="hint">none: its sessions and containers are on its node alone</div>`}`);
-  box.querySelector("[data-moreaddgo]")?.addEventListener("click", e => {
+  box.querySelector("[data-moreaddgo]")?.addEventListener("click", () => {
     const id = box.querySelector("[data-moreadd]")?.value;
-    if (id) rnMoreSave(new Set([...(rnMore || []), id]), e.currentTarget);
+    if (id) rnMoreSave(new Set([...(rnMore || []), id]));
   });
   box.querySelectorAll("[data-morerm]").forEach(b => b.onclick = () => {
     const keep = new Set(rnMore || []); keep.delete(b.dataset.morerm);
-    rnMoreSave(keep, b);
+    return rnMoreSave(keep);
   });
   // Drawn from what is saved until a draw has had nodes to draw (B796).
   if (nodesList !== null) box.dataset.drawn = "1";
@@ -426,23 +428,25 @@ function rnFillNodesMore(){
   rnDrawReach();
 }
 // A record's Save: the set written now, with the primary as it is saved; a
-// session running keeps what it started with until it starts again.
-async function rnMoreSave(set, btn){
-  const word = btn.textContent;
-  busy(btn, "Saving");
+// session running keeps what it started with until it starts again. The row
+// is added or taken off on the press (the operator, 22 Nov), and put back
+// saying why on a refusal.
+async function rnMoreSave(set){
   const primary = rnPrefWas.node;
   const hosting = id => !!(nodesList || []).find(n => n.id === id)?.config?.host_only
     || (!(nodesList || []).some(n => n.id === id) && rnPrefWas.hosts.split(",").includes(id));
   const more = [...set].filter(id => id && id !== primary);
   const nodes = primary ? [primary, ...more.filter(id => !hosting(id))] : [];
   const hosts = more.filter(hosting);
-  const j = await postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", nodes, hosts});
-  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
-  rnMore = new Set(more);
-  rnPrefWas.nodes = nodes.join(","); rnPrefWas.hosts = hosts.join(",");
-  if (myLiveSession(rnFor)) notify(`${projLabel(rnFor)}: saved. Its running session keeps the nodes it started with until it starts again.`);
-  rnFillNodesMore();
-  rnBars();
+  const was = {more: rnMore, nodes: rnPrefWas.nodes, hosts: rnPrefWas.hosts}, name = rnFor;
+  const j = await drawNow(() => {
+    rnMore = new Set(more);
+    rnPrefWas.nodes = nodes.join(","); rnPrefWas.hosts = hosts.join(",");
+    rnFillNodesMore();
+    rnBars();
+    return () => { rnMore = was.more; rnPrefWas.nodes = was.nodes; rnPrefWas.hosts = was.hosts; rnFillNodesMore(); rnBars(); };
+  }, () => postJSON("/api/prefs", {project: name, scope: rnMode === "project" ? "project" : "repository", nodes, hosts}));
+  if (!j.error && myLiveSession(name)) notify(`${projLabel(name)}: saved. Its running session keeps the nodes it started with until it starts again.`);
 }
 
 // ---- Releases: what each of a release's files is for (R255) ---------------
@@ -473,7 +477,7 @@ function rnDrawRelFiles(){
   box.querySelector("[data-reladd]")?.addEventListener("click", () => { rnRelEdit = -1; rnDrawRelFiles(); box.querySelector("[data-relname]")?.focus(); });
   box.querySelectorAll("[data-reledit]").forEach(b => b.onclick = () => { rnRelEdit = Number(b.closest("[data-relf]").dataset.relf); rnDrawRelFiles(); });
   box.querySelectorAll("[data-relstop]").forEach(b => b.onclick = () => { rnRelEdit = null; rnDrawRelFiles(); });
-  box.querySelectorAll("[data-relrm]").forEach(b => b.onclick = () => rnSaveRelFiles(rnRelFiles.filter((_, i) => i !== Number(b.dataset.relrm)), b));
+  box.querySelectorAll("[data-relrm]").forEach(b => b.onclick = () => rnSaveRelFiles(rnRelFiles.filter((_, i) => i !== Number(b.dataset.relrm))));
   box.querySelectorAll("[data-relsave]").forEach(b => b.onclick = () => {
     const row = b.closest("[data-relf]"), i = Number(row.dataset.relf);
     const name = row.querySelector("[data-relname]").value.trim(), what = row.querySelector("[data-relwhat]").value.trim();
@@ -481,17 +485,24 @@ function rnDrawRelFiles(){
     if (rnRelFiles.some((r, k) => k !== i && r.name === name)) return notify(`${name} is described already`, true);
     const next = rnRelFiles.slice();
     if (i < 0) next.push({name, what}); else next[i] = {name, what};
-    rnSaveRelFiles(next, b);
+    return rnSaveRelFiles(next, {name, what});
   });
 }
-async function rnSaveRelFiles(files, btn){
-  const word = btn.textContent;
-  busy(btn, "Saving");
-  const j = await postJSON("/api/prefs", {project: rnFor, scope: "repository", files});
-  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
-  rnRelFiles = files;
-  rnRelEdit = null;
-  rnDrawRelFiles();
+// The list drawn as saved on the press (the operator, 22 Nov); a refusal
+// opens the row again with what was `typed` in it, saying why.
+function rnSaveRelFiles(files, typed = null){
+  const was = {files: rnRelFiles, edit: rnRelEdit};
+  return drawNow(() => {
+    rnRelFiles = files;
+    rnRelEdit = null;
+    rnDrawRelFiles();
+    return () => {
+      rnRelFiles = was.files; rnRelEdit = was.edit;
+      rnDrawRelFiles();
+      const row = typed && $("rnRelFiles")?.querySelector(`[data-relf="${was.edit}"]`);
+      if (row){ row.querySelector("[data-relname]").value = typed.name; row.querySelector("[data-relwhat]").value = typed.what; }
+    };
+  }, () => postJSON("/api/prefs", {project: rnFor, scope: "repository", files}));
 }
 
 // The projects a session here may read: every other project this account
@@ -1154,17 +1165,27 @@ function rnDrawPeople(){
     rolesAccessOpen(x.dataset.rnaccess, () => rnLoadPeople(pn, true)));
   const io = $("rnInviteOnly");
   if (io && v.may_manage) io.onchange = () => { d.invite_only = io.checked; rnDrawPeople(); };
-  const act = async body => {
-    const j = await postJSON("/api/members", body);
-    if (j.error) return notify(j.error, true);
-    rnPeople = j; rnDrawPeople();
+  // An invitation is listed, and a withdrawn one gone, on the press (the
+  // operator, 22 Nov): `to` is the list as it will be. A refusal puts it back
+  // and says why; the answer is the list as the server has it.
+  const act = (body, to) => {
+    const was = rnPeople;
+    return drawNow(() => { rnPeople = to(was); rnDrawPeople(); return () => { rnPeople = was; rnDrawPeople(); }; },
+                   () => postJSON("/api/members", body))
+      .then(j => { if (!j.error){ rnPeople = j; rnDrawPeople(); } return j; });
   };
   const go = $("rnInviteGo");
-  if (go) go.onclick = () => act({action: "invite", project: rnFor, name: $("rnInviteWho").value,
-                                   role: $("rnInviteRole").value})
-    .then(() => notify(`invited to ${projLabel(rnFor)}: they say yes or no from their bell`));
-  $("rnPeople").querySelectorAll("[data-withdraw]").forEach(b =>
-    b.onclick = () => act({action: "withdraw", id: Number(b.dataset.withdraw)}));
+  if (go) go.onclick = () => {
+    const name = $("rnInviteWho").value, role = $("rnInviteRole").value, proj = rnFor;
+    return act({action: "invite", project: proj, name, role},
+               v => ({...v, invites: [...v.invites, {name, role, by: state?.me || "", at: Date.now() / 1000}]}))
+      .then(j => { if (!j.error) notify(`invited to ${projLabel(proj)}: they say yes or no from their bell`); });
+  };
+  $("rnPeople").querySelectorAll("[data-withdraw]").forEach(b => b.onclick = () => {
+    const id = Number(b.dataset.withdraw);
+    return act({action: "withdraw", id},
+               v => ({...v, invites: v.invites.filter(i => i.id !== id), offer: v.offer?.id === id ? null : v.offer}));
+  });
   rnSpaceRelock();
 }
 
@@ -1356,16 +1377,30 @@ function rnDrawSnapshots(){
     : days.length ? "Snapshots kept is 0, so none are taken; the ones here stay until some days are kept again and they pass them."
     : "Snapshots kept is 0, so none are taken.")
     + (pinned ? ` ${pinned} pinned, kept until unpinned.` : "");
+  // A take or a restore holds its button until it is done; the list is read
+  // again in place after it.
   const act = async (b, body, ask) => {
     if (ask && !await askYes(ask)) return;
     await pressing(b, async () => {
       const j = await postJSON("/api/snapshots", {project: name, ...body});
       if (j.error) return notify(j.error, true);
       notify(body.action === "take" ? `snapshot taken: ${j.files} files`
-        : body.action === "pin" ? `${j.day} pinned: kept until unpinned`
-        : body.action === "unpin" ? `${j.day} unpinned: it goes with the rest when it is old enough`
         : `restored: ${j.wrote} written, ${j.removed} removed; undo from ${j.undo}`);
-      rnLoadSnapshots(name);
+      rnLoadSnapshots(name, true);
+    });
+  };
+  // A pin, or its letting go, is drawn on the press (the operator, 22 Nov),
+  // and put back saying why on a refusal.
+  const pinNow = (day, action) => {
+    const was = rnSnap;
+    return drawNow(() => {
+      rnSnap = {...was, days: (was.days || []).map(d => d.day === day ? {...d, pinned: action === "pin"} : d)};
+      rnDrawSnapshots();
+      return () => { rnSnap = was; rnDrawSnapshots(); };
+    }, () => postJSON("/api/snapshots", {project: name, action, day})).then(j => {
+      if (j.error) return;
+      notify(action === "pin" ? `${j.day} pinned: kept until unpinned` : `${j.day} unpinned: it goes with the rest when it is old enough`);
+      rnLoadSnapshots(name, true);
     });
   };
   $("rnSnapRows").querySelectorAll(".snaprec").forEach(row => {
@@ -1377,7 +1412,7 @@ function rnDrawSnapshots(){
     row.querySelector("[data-snapall]").onclick = e => act(e.target, {action: "restore", day},
       `Put all of ${name} back as it was on ${day}?\n\nFiles changed since are written back and files added since are removed, on the controller and then every node. The tree as it is now is snapshotted first.`);
     const pin = row.querySelector("[data-snappin]");
-    pin.onclick = e => act(e.target, {action: pin.dataset.snappin, day}, "");
+    pin.onclick = () => pinNow(day, pin.dataset.snappin);
     // Restore file wakes once a file is typed (the operator, 18 Oct).
     const one = row.querySelector("[data-snapone]"), file = row.querySelector("[data-snapfile]");
     file.oninput = () => { one.disabled = !file.value.trim(); };
@@ -2092,13 +2127,15 @@ async function deleteProject(name){
       + `roadmap, bugs, versions and memories stay where they are, `
       + `and Put back in the trash returns all of it.${left ? "\n\n" + left : ""}\n\n`
       + `Close its terminals first.`)) return;
-  try{
-    const j = await postJSON("/api/trash", {name});
-    if (j.error){ notify(j.error, true); return; }
-    // The path is named back because it may not be the one the dialog said:
-    // a second delete of the same name is numbered rather than overwriting the
-    // first, and the first is exactly the copy somebody would want back.
-    notify(`${projLabel(name)} moved to ${j.to}`);
-  }catch(e){ notify("delete failed: " + failWords(e), true); }
-  refresh();
+  // Its row leaves its card on the press (pjGone), and comes back saying why
+  // on a refusal.
+  const label = projLabel(name);
+  const j = await drawNow(() => pjGone("repo:" + name), () => postJSON("/api/trash", {name}));
+  if (j.error) return;
+  // The path is named back because it may not be the one the dialog said:
+  // a second delete of the same name is numbered rather than overwriting the
+  // first, and the first is exactly the copy somebody would want back.
+  notify(`${label} moved to ${j.to}`);
+  await refresh();
+  pjGoing.delete("repo:" + name);
 }

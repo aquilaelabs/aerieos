@@ -129,7 +129,10 @@ ok((await btn('claude-alpha').textContent()).trim() === 'End', 'a Claude session
 const nd = page.dialogs.length;
 await btn('claude-alpha').click();
 await page.waitForFunction(() => !document.querySelector('[data-go="claude-alpha"]'), { timeout: 15000 });
-ok(page.dialogs.length === nd + 1 && page.dialogs[nd].includes('Claude'), 'End asked first, then ended the session');
+// The row goes once the question is answered, before the server has (the
+// operator, 22 Nov); the session is gone from the read after the answer.
+await page.waitForFunction(() => !(state.sessions || []).some(s => s.name === 'claude-alpha'), null, { timeout: 15000 });
+ok(page.dialogs.length === nd + 1 && page.dialogs[nd].includes('Claude'), 'End asked first, took its row away, then ended the session');
 // B58: by the project's name, as its row is, never the tmux name.
 const alphaLabel = await page.evaluate(() => projLabel('alpha'));
 ok(page.dialogs[nd].includes(`Claude session on ${alphaLabel}?`) && !page.dialogs[nd].includes('claude-alpha'),
