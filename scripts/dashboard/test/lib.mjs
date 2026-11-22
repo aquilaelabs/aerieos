@@ -1062,7 +1062,10 @@ export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrow
       if (b.top < bottom - 1) wrong.push(`${c.dataset.lrow}: its ${x.className || x.tagName} is on the card's own lines, not under them`);
       if (b.width < (card.width - 2 * 24) * 0.9) wrong.push(`${c.dataset.lrow}: its ${x.className || x.tagName} is ${Math.round(b.width)}px of the card's ${Math.round(card.width)}`);
     }
-    if (innerWidth < 600 && card.height - extra > 96) wrong.push(`${c.dataset.lrow}: ${Math.round(card.height)}px tall on a phone`);
+    // A long name wraps on a phone rather than being cut (the operator, 22
+    // Nov): its own lines past the first are the name's, not the row's.
+    const nameLines = Math.max(0, n.height - parseFloat(getComputedStyle(name).fontSize) * 1.5);
+    if (innerWidth < 600 && card.height - extra - nameLines > 96) wrong.push(`${c.dataset.lrow}: ${Math.round(card.height)}px tall on a phone`);
     if (c.scrollWidth > c.clientWidth + 1) wrong.push(`${c.dataset.lrow}: runs past its card`);
     return wrong;
   }));
