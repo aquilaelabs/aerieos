@@ -1663,8 +1663,12 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
         # `missing` list still answers about what is STORED, so the hint
         # under the box stays true while the box is only a draft.
         stored = devapp.read_env(project, instance)
-        return {"text": stored or devapp.starter(project, instance),
-                "seeded": not stored,
+        start = "" if stored else devapp.starter(project, instance)
+        # Seeded only when the box opens on an example: a tree with none
+        # opens empty, and was said to have started from one (the website's,
+        # 22 Nov).
+        return {"text": stored or start,
+                "seeded": bool(start),
                 "missing": devapp.missing_env(project, instance)}, 200
     elif action == "env-set":
         r = devapp.write_env(project, req.get("text") or "", instance)
