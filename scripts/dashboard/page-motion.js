@@ -810,14 +810,22 @@ async function pressing(btn, fn){
 // A press that says in a word what it set going (the progress rule: a word
 // and an animated ellipsis, never a bar of the page's own guessing), dead
 // while it runs; the ring stands down for it.
+// What busy() keeps for a button that had no name of its own before it.
+const BUSY_UNNAMED = "\u0000";
 function busy(btn, word){
   if (!btn) return;
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  drawHTML(btn, `${esc(word)}<span class="dots"></span>`);
-  // The one ticker every .dots on the page shares; it stops itself when
-  // the last one is repainted away.
-  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
+  // The ring in its word's place at once, the button its own size (the
+  // operator, 22 Nov: "Checking..." grew the button); the word is what a
+  // screen reader says of it while it runs, and the toast says it in full.
+  // Where even the ring would grow it (pressRing), it is dead and says
+  // nothing more.
+  if (word){
+    if (btn.dataset.busyNamed === undefined) btn.dataset.busyNamed = btn.getAttribute("aria-label") ?? BUSY_UNNAMED;
+    btn.setAttribute("aria-label", word);
+  }
+  if (!btn.dataset.busyRing && pressRing(btn)) btn.dataset.busyRing = "1";
 }
 
 // ...and the other half, for a press that can fail without a repaint behind
@@ -828,6 +836,12 @@ function busy(btn, word){
 function unbusy(btn, word){
   if (!btn) return;
   btn.removeAttribute("aria-busy");
+  if (btn.dataset.busyRing){ btn.classList.remove("working", "ringrel"); delete btn.dataset.busyRing; }
+  if (btn.dataset.busyNamed !== undefined){
+    const was = btn.dataset.busyNamed;
+    delete btn.dataset.busyNamed;
+    if (was === BUSY_UNNAMED) btn.removeAttribute("aria-label"); else btn.setAttribute("aria-label", was);
+  }
   // A button a patched surface drew (R244) is given back as its markup has
   // it now: the redraw the press brought may have drawn it with another
   // label (a branch switched to) or disabled, and the word kept from before

@@ -115,11 +115,13 @@ function dropBox(at, {q, sub = "", placeholder = "", max = 1000, verb, tone = "p
 }
 
 // A running job's Abort, the same on every page that has one (consistency
-// pass J11): while its stop is on the way it reads Stopping, busy and dead.
-// `attrs` is the page's own data key, `title` what stopping keeps.
+// pass J11): while its stop is on the way it is dead and wears the ring in
+// its word's place, its size kept, saying Stopping to a screen reader (the
+// operator, 22 Nov: a word that changed grew the button). `attrs` is the
+// page's own data key, `title` what stopping keeps.
 function abortBtn(attrs, aborting, title = ""){
   return `<button type="button" ${attrs}${title ? ` title="${esc(title)}"` : ""}${
-    aborting ? ` disabled aria-busy="true">Stopping…` : ">Abort"}</button>`;
+    aborting ? ' disabled aria-busy="true" aria-label="Stopping" class="working ringrel">Abort' : ">Abort"}</button>`;
 }
 
 // A field on its way: its real label over a control's box shimmering, as

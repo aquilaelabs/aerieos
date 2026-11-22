@@ -865,8 +865,13 @@ body.firstrun #panes{display:none}
 .librarytab .libnarrow>label.pick,.librarytab .libnarrow select{flex:none;max-width:none}
 .librarytab .libfilter .libsearchrow{flex-wrap:wrap}
 @media(max-width:600px){
-  /* On a phone the search keeps its line with Check and Add, and the
-     narrowing takes the next, the view at its right. */
+  /* On a phone the search keeps its line with the page's buttons (the
+     operator, 22 Nov: they had wrapped under it): the field gives up its
+     width to them down to 7rem, the buttons never wrap among themselves,
+     and only where 7rem is not left do they take a line under it. The
+     narrowing takes the next line, the view at its right. */
+  .librarytab .libfilter .libsearchrow>input[type=search]{flex:1 1 7rem;min-width:7rem}
+  .librarytab .libfilter .libsearchrow>.actbar{flex-wrap:nowrap}
   .librarytab .libfilter .libsearchrow>.libnarrow{order:3;flex:1 1 100%}
   .librarytab .libnarrow .dmviewseg{margin-left:auto}
 }

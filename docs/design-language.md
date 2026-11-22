@@ -866,6 +866,8 @@ Something that is running says so with a word and an animated ellipsis, `busy(bt
 
 **A press never looks ignored (the operator, 22 Nov).** On the click a press changes its own state: a chip in its band or a segment of a segmented control is lit before its handler's work (`pressPick`). A result the page knows before the server answers is drawn at once (`drawNow`): a row dismissed or deleted is gone, a narrowing of the rows in hand is narrowed; a refusal puts it back and says why in one sentence. A result it cannot know shows where it will land: the section under it becomes its placeholder, and a chip's count becomes the ring in the count's own room (`pressCount`), the chip neither wider nor taller. While any write the page sent is unanswered, leaving or reloading the page asks first, in the browser's own words (`writeOut`); the page's own writes on a timer (presence, the layout) say `{background: true}` and hold nothing.
 
+**What waits is dead, what queues says so.** While an operation runs, a press it blocks (one the server would refuse) is drawn dead, its reason on its row in the muted voice, and live again when the operation ends; a press the server queues behind it stays live, and its press says in one sentence that it is queued and behind what, in a toast and on its row's own state where it has one (the operator, 22 Nov).
+
 ### meters
 
 Applies to: scripts/dashboard/tab-nodes.js; meter, gauge, bar, track
