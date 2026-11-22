@@ -907,15 +907,17 @@ function oneOpen(g){
 // skipped, a single leftover is drawn inline (a menu of one is a detour),
 // and two or more make the menu; `always` makes the menu of one too, for a
 // table's buttons column, whose width is the ⋯'s whatever the row offers.
+// `face` names another press for it where the verbs are of one kind (a +
+// for what makes something new), and `dead` draws it so when they all are.
 // wireMore() wires the button; the page's one click listener (page-boot.js)
 // shuts every open menu.
-function actMore(items, always = false){
+function actMore(items, always = false, {glyph = DOTS, said = "More", title = "the rest of what can be done to it", dead = false} = {}){
   const have = items.filter(Boolean);
   if (have.length < (always ? 1 : 2)) return have.join("");
   // ⋯, as a project's header has it (the operator, 17 Oct): the rest of a
   // row's verbs behind one small press, named for a screen reader.
-  return `<span class="more"><button type="button" class="moreb" aria-haspopup="menu" aria-expanded="false" aria-label="More"
-      title="the rest of what can be done to it">${DOTS}</button>
+  return `<span class="more"><button type="button" class="moreb" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(said)}"
+      title="${esc(title)}"${dead ? " disabled" : ""}>${glyph}</button>
     <div class="actmenu" hidden role="menu">${have.join("")}</div></span>`;
 }
 function wireMore(root){

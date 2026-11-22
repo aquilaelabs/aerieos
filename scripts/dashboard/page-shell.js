@@ -795,10 +795,15 @@ function openNodePage(nid){
 }
 // The Machines group's actions, on the sub-nav's line: dead with the enroll
 // feature off (the reason is on the Nodes page) and until the node list lands.
+// At a desk the two buttons; on a phone, where they cut the tabs short behind
+// the strip's arrow, one + whose menu holds them, so the tabs are whole and
+// the row keeps its one height (the operator, 22 Nov; the group-header rule).
 function machinesActions(){
   const dead = nodesList === null || featureOff("enroll") ? " disabled" : "";
-  return `<span class="actbar"><button type="button" id="ndVm"${dead}>${"New VM"}</button>
-    <button type="button" class="primary" id="ndEnroll"${dead}>${barSaid("Enroll node", "Enroll")}</button></span>`;
+  const fold = actMore([`<button type="button" data-ndvm${dead}>New VM</button>`, `<button type="button" data-ndenroll${dead}>Enroll node</button>`],
+    true, {glyph: "+", said: "New VM or Enroll node", title: "a new VM, or a machine to enroll", dead: !!dead});
+  return `<span class="actbar mcacts"><span class="mcwide"><button type="button" id="ndVm"${dead}>${"New VM"}</button>
+    <button type="button" class="primary" id="ndEnroll"${dead}>${barSaid("Enroll node", "Enroll")}</button></span>${fold}</span>`;
 }
 function wireGroupHeader(bar){
   const go = bar.querySelector("[data-ndgo]");
@@ -806,11 +811,12 @@ function wireGroupHeader(bar){
   const pick = bar.querySelector("#ndPick");
   // A pick is a history entry (B31), so Back returns to the node before.
   if (pick) pick.onchange = () => navPush(() => groupPick(groupOf(tabOf(panes[0])?.kind || "nodes") || groupOf("nodes"), pick.value));
-  const vm = bar.querySelector("#ndVm"), en = bar.querySelector("#ndEnroll");
-  if (vm || en){
+  const vms = bar.querySelectorAll("#ndVm, [data-ndvm]"), ens = bar.querySelectorAll("#ndEnroll, [data-ndenroll]");
+  if (vms.length || ens.length){
     const d = ndDialogs();
-    if (vm) vm.onclick = d.openVm;
-    if (en) en.onclick = d.openEnroll;
+    vms.forEach(b => { b.onclick = () => { closeMore(); d.openVm(); }; });
+    ens.forEach(b => { b.onclick = () => { closeMore(); d.openEnroll(); }; });
+    wireMore(bar);
   }
 }
 
