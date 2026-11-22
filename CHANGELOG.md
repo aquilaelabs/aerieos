@@ -5,17 +5,18 @@
 ### Changed
 
 - Pressing something now shows its result straight away and the server catches up: a dismissed or deleted row folds away, a ticked roadmap step or closed bug moves at once, a filter chip lights and its list shows a placeholder, and a refusal puts it back with the reason. Leaving the page while a change is still saving asks first (d4422de, b85c911, ab04860, 1f1a8ba, db8e33f, 5694b7d)
-- A button whose work is running shows a spinning ring in place of its word and never grows; a press that would wait behind a running job says it is queued and behind what, and one a running job blocks is greyed out with the reason beside it (fa921ac, 2175214, 09a4ba0, 6818031, b99ccb4)
+- A button whose work is running shows a spinning ring in place of its word and never grows; a press that would wait behind a running job says it is queued and behind what, and one a running job blocks is greyed out with the reason beside it (fa921ac, 2175214, 09a4ba0, 6818031, b99ccb4, 8d3466b, b172743)
 - Signing in after Sign out opens on Home, and the placeholder shown while a page loads is the page that then opens (0e6726e)
 - The Library has no Abort of its own, and on a phone its Check, Add and Remove share the search's line (09a4ba0, 2175214)
 
 ### Fixed
 
 - On a phone the Library no longer scrolls sideways now that the catalog's entries carry topics: its topic and order share their line, flush to its Cards and Rows buttons (b3c703e, a96a2f6, 5e75993)
+- On a phone a group's tabs are whole: Machines' New VM and Enroll node take the line under them, where they cut Installed short, and a tab whose feature the node lacks drops its word "not here" there, keeping its dimmed name; a Library row's long name wraps rather than ending in an ellipsis, the line saying what runs only on other systems ends in a link rather than a button of its own, and the Design view's new-page pickers fill their lines up to Add page (9408477)
 - A release's red signing row on the bell goes once the release is deleted, where it stayed until dismissed (23ea37b)
 - Down on a container's row says it is stopping on the click, and its Edit dialog left open turns editable once the container is down, where it stayed read-only until a reload (db8e33f)
 - A container's env no longer says it started from .env.example when its repository has none, and its empty box no longer shows PUID, PGID and a time zone as if they were set (fecc77d, e015718)
-- A node no longer runs out of memory and drops its sessions when a CI run, a build and an emulator run on it together: its GitHub runner is held to a share of the machine's memory (an installed runner takes it the next time it is idle), builds, test runs and the emulator are what the kernel takes first, ahead of the coding agents' sessions, a test run runs no more suites at once than its memory holds, and a build or aerie run started with under 2 GB free waits up to five minutes for room, saying so (d23a747)
+- A node no longer runs out of memory and drops its sessions when a CI run, a build and an emulator run on it together: its GitHub runner is held to a share of the machine's memory (an installed runner takes it the next time it is idle), builds, test runs and the emulator are what the kernel takes first, ahead of the coding agents' sessions, a test run runs no more suites at once than its memory holds, and a build or aerie run started with under 2 GB free waits up to five minutes for room, saying so (d23a747, 29b2bb0)
 
 ## 0.9.0-dev.6054: 2026-11-21
 
