@@ -2925,7 +2925,7 @@ def _gate_env(project, instance=MAIN):
             f"# 'old:' comments at the bottom) and then press Up.\n\n"
             f"{example.rstrip()}\n\n"
             f"# ---- what this file held before the rebuild ----\n{kept}\n")
-    write_env(project, text)
+    write_env(project, text, instance)
 
 
 # ---------------------------------------------------------------------------
