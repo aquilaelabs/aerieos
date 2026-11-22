@@ -602,7 +602,10 @@ OpenSSH keys by `tools/release-signers.py` and held there by `aerie lint`.
 A stable release is signed in `aerieos-release` by its key's holder, on
 their own machine (`tools/release-sign.py sign TAG`), with a key that is
 never in CI, the repository or a controller, so a stable release waits for
-its holder's signature. A pre-release tag (`vX.Y.Z-dev.N`, `-rc.N`) takes a
+its holder's signature. That machine needs `gh` and the Android SDK's
+`apksigner`, since the signing holds every file to its attestation and
+the app to its signature exactly as the seal does, and stops where it
+cannot. A pre-release tag (`vX.Y.Z-dev.N`, `-rc.N`) takes a
 list signed in either namespace; a stable tag (`vX.Y.Z`) takes
 `aerieos-release` alone, so the key CI holds can never sign a stable
 release. A release whose list is missing (every release made before

@@ -461,12 +461,24 @@ esac
         def attests(name):
             out = {}
             for job, body in load(name)["jobs"].items():
-                for s in body.get("steps") or []:
-                    if str(s.get("uses", "")).startswith("actions/attest-build-provenance@"):
-                        self.assertRegex(s["uses"], r"@[0-9a-f]{40}$", "pinned by commit")
-                        perms = body["permissions"]
-                        self.assertEqual((perms.get("id-token"), perms.get("attestations")), ("write", "write"), f"{name} {job}")
-                        out[job] = (s["with"]["subject-path"].split(), s.get("if"))
+                steps = body.get("steps") or []
+                for i, s in enumerate(steps):
+                    if not str(s.get("uses", "")).startswith("actions/attest-build-provenance@") or s["id"].endswith("-again"):
+                        continue
+                    self.assertRegex(s["uses"], r"@[0-9a-f]{40}$", "pinned by commit")
+                    perms = body["permissions"]
+                    self.assertEqual((perms.get("id-token"), perms.get("attestations")), ("write", "write"), f"{name} {job}")
+                    # Asked once more after a wait where the transparency
+                    # log did not answer (v0.9.0-dev.6094): the same files,
+                    # by the same action, only where the first failed.
+                    self.assertIs(s["continue-on-error"], True, f"{name} {job}")
+                    wait, again = steps[i + 1], steps[i + 2]
+                    first = f"steps.{s['id']}.outcome == 'failure'"
+                    self.assertEqual(wait["run"], "sleep 60")
+                    self.assertEqual((again["id"], again["uses"], again["with"]), (s["id"] + "-again", s["uses"], s["with"]))
+                    for later in (wait, again):
+                        self.assertEqual(later["if"], f"{s['if']} && {first}" if s.get("if") else first, f"{name} {job}")
+                    out[job] = (s["with"]["subject-path"].split(), s.get("if"))
             return out
         got = {name: attests(name) for name in tool.WORKFLOWS}
         self.assertEqual(sorted(got["companion-app.yml"]), ["build", "portable"])
@@ -484,7 +496,11 @@ esac
                 self.assertTrue(any(fnmatch.fnmatchcase(pat.replace("*", "1.2.3"), s) for s in subjects), f"{name} attests no {pat}")
             for s in subjects:
                 self.assertTrue(any(fnmatch.fnmatchcase(s.replace("*", "1.2.3"), p) for p in pats), f"{name} attests {s}, which the seal's table does not name")
-        self.assertEqual(load("build-image.yml")["jobs"]["bundle"]["steps"][-3]["with"], {"subject-path": "${{ steps.pack.outputs.name }}"})
+        bundle = {s.get("id"): s for s in load("build-image.yml")["jobs"]["bundle"]["steps"]}
+        self.assertEqual(bundle["attest-bundle"]["with"], {"subject-path": "${{ steps.pack.outputs.name }}"})
+        # The release is made with the bundle of whichever asking answered.
+        made = next(s for s in load("build-image.yml")["jobs"]["release"]["steps"] if s.get("name") == "Make the release, with every file and the notes")
+        self.assertEqual(made["env"]["BUNDLE"], "${{ steps.attest-again.outputs.bundle-path || steps.attest.outputs.bundle-path }}")
         # Both callers grant what the called jobs name.
         for name in ("build-image.yml", "release-rehearsal.yml"):
             self.assertEqual(load(name)["jobs"]["apps"]["permissions"],
@@ -515,7 +531,7 @@ esac
         for s in steps[1:]:
             self.assertIn("steps.tag.outputs.seal == 'true'", s["if"])
         text = runs(job)
-        self.assertIn('python3 tools/release-sign.py seal "$TAG" --commit "$GITHUB_SHA" --attested --wait 600 --out "$RUNNER_TEMP/sealed"', text)
+        self.assertIn('python3 tools/release-sign.py seal "$TAG" --commit "$GITHUB_SHA" --wait 600 --out "$RUNNER_TEMP/sealed"', text)
         self.assertIn('bash tools/release-attach.sh "$TAG" "$RUNNER_TEMP/sealed/SHA256SUMS" "$RUNNER_TEMP/sealed/SHA256SUMS.sig"', text)
         last = steps[-1]
         self.assertIn("contains(inputs.tag, '-dev.')", last["if"])

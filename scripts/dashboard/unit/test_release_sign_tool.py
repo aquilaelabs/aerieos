@@ -7,13 +7,15 @@ with real keys and ssh-keygen: `seal` (CI, the release build's key from
 AERIEOS_RELEASE_KEY, the namespace aerieos-dev) refuses a stable tag, a
 release short of a file and a key no install names, and makes a signature
 the verifiers take for a dev build; `sign` (the stable key's holder,
-aerieos-release) hashes each file's bytes, stops at a sha256 file that
-lies and at a file nothing vouches for, and holds an attestation to the
-release workflow at the tag. Under --attested each file is held to the
-workflow that builds it and the Android app, which no build attests, to
-its signature by a certificate config/apk-signers names (stand-ins for gh
-and apksigner); a release sealed already is sealed again the same, and a
-folder is sealed dry with a key made for the run, as the rehearsal does."""
+aerieos-release) hashes each file's bytes and stops at a sha256 file that
+lies. Either way each file of a release is held to the build attestation
+of the workflow that builds it, whatever sha256 sits beside it, and the
+Android app, which no build attests, to its signature by a certificate
+config/apk-signers names (stand-ins for gh and apksigner), and neither
+tool missing is let by; a release sealed already is sealed again the
+same, and a folder is sealed dry with a key made for the run, as the
+rehearsal does. GitHub's answers, a download and gh's check are asked
+again where the network failed them, and a 404 is not."""
 import contextlib
 import hashlib
 import importlib.util
@@ -57,8 +59,9 @@ except ImportError:
 COMMIT = "7" * 40
 # The certificate the stand-in apksigner says signed the app, and another.
 CERT, OTHER_CERT = "de66" * 16, "0bad" * 16
-# What the stand-in serves: {tag: {name: bytes}}.
-RELEASES = {}
+# What the stand-in serves: {tag: {name: bytes}}; the paths it answers 503
+# for, as many times as each says; and every path it was asked.
+RELEASES, FLAKY, HITS = {}, {}, []
 
 
 class GitHub(BaseHTTPRequestHandler):
@@ -68,6 +71,11 @@ class GitHub(BaseHTTPRequestHandler):
     def do_GET(self):
         base = f"http://127.0.0.1:{self.server.server_port}"
         path = self.path.split("?")[0]
+        HITS.append(path)
+        if FLAKY.get(path):
+            FLAKY[path] -= 1
+            self.send_error(503)
+            return
         body = None
         if path == "/releases":
             body = json.dumps([{"tag_name": t, "draft": True,
@@ -117,6 +125,8 @@ class Tool(unittest.TestCase):
 
     def setUp(self):
         RELEASES.clear()
+        FLAKY.clear()
+        HITS.clear()
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
         self.signers = os.path.join(self.d, "release-signers")
@@ -126,7 +136,8 @@ class Tool(unittest.TestCase):
                     "aerieos-app-@VER@.apk\naerieos-os-@VER@.iso\naerieos-os-@VER@.attestation.jsonl\nSHA256SUMS\nSHA256SUMS.sig\n")
         self.out = os.path.join(self.d, "out")
         # Neither gh nor apksigner is here unless a test stands one in, on
-        # whatever machine this runs: a hosted runner carries both.
+        # whatever machine this runs: a hosted runner carries both. Seal and
+        # Sign stand both in, and a test takes one away.
         self.gh = self.aps = None
         self.apk_signers = os.path.join(self.d, "apk-signers")
         with open(self.apk_signers, "w") as f:
@@ -138,7 +149,7 @@ class Tool(unittest.TestCase):
             self.made.append(real_mkdtemp(*a, **k))
             return self.made[-1]
         for p in (mock.patch.multiple(tool, API=f"http://127.0.0.1:{self.srv.server_port}", SIGNERS=self.signers, FILES=self.files,
-                                      APK_SIGNERS=self.apk_signers, POLL=0.2),
+                                      APK_SIGNERS=self.apk_signers, POLL=0.2, RETRY_WAIT=0),
                   mock.patch.object(tool.shutil, "which",
                                     side_effect=lambda n: self.gh if n == "gh" else self.aps if n == "apksigner" else real_which(n)),
                   mock.patch.object(tool.tempfile, "mkdtemp", side_effect=mkdtemp),
@@ -214,6 +225,8 @@ class Seal(Tool):
         with open(self.signers, "w") as f:
             f.write(f'# dev builds\naerieos-dev namespaces="aerieos-dev" {gen.ssh_key(pub)}\n')
         self.env = {"AERIEOS_RELEASE_KEY": self.seed}
+        self.fake_gh()
+        self.fake_apksigner()
 
     def test_a_stable_tag_is_refused_before_anything_is_read(self):
         with mock.patch.object(tool, "API", "http://127.0.0.1:9/unreachable"):
@@ -297,19 +310,12 @@ class Seal(Tool):
         self.assertEqual(code, 1)
         self.assertIn("the tag was moved", said)
 
-    def test_under_attested_the_app_is_held_to_its_signature_and_every_other_file_to_its_builder(self):
+    def test_the_app_is_held_to_its_signature_and_every_other_file_to_its_builder(self):
         tag, apk = "v0.9.1-dev.7", "aerieos-app-0.9.1-dev.7.apk"
         RELEASES[tag] = release("0.9.1-dev.7")
         RELEASES[tag]["aerieos-companion-0.9.1-dev.7.exe"] = b"the companion"
         RELEASES[tag]["aerieos-companion-0.9.1-dev.7.exe.sha256"] = (sha(b"the companion") + "  the companion\n").encode()
-        self.fake_gh()
-        # With no apksigner the app cannot be checked, and nothing is signed.
-        code, said = self.run_tool("seal", tag, "--attested", "--out", self.out, env=self.env)
-        self.assertEqual(code, 1)
-        self.assertIn("apksigner is not here to check the Android app's signature with", said)
-        self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS")))
-        self.fake_apksigner()
-        code, said = self.run_tool("seal", tag, "--attested", "--out", self.out, env=self.env)
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env)
         self.assertEqual(code, 0, said)
         self.assertIn(f"{apk}  ({apk}.sha256 matches and apksigner verifies it as signed by a certificate config/apk-signers names)", said)
         self.assertIn("verify --print-certs ", self.asked("apksigner"))
@@ -335,7 +341,7 @@ class Seal(Tool):
             (self.assertRegex if takes else self.assertNotRegex)(at + f"{flow}@refs/tags/{tag}", new)
         # Signed by a certificate the file does not name: refused, naming it.
         os.remove(os.path.join(self.out, "SHA256SUMS"))
-        code, said = self.run_tool("seal", tag, "--attested", "--out", self.out, env=self.env | {"FAKE_APS_CERT": OTHER_CERT})
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env | {"FAKE_APS_CERT": OTHER_CERT})
         self.assertEqual(code, 1)
         self.assertIn(f"{apk} is signed by a certificate config/apk-signers does not name ({tool.fingerprint(OTHER_CERT)})", said)
         self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS")))
@@ -343,29 +349,33 @@ class Seal(Tool):
         mine = os.path.join(self.d, "mine")
         with open(mine, "w") as f:
             f.write(f"{OTHER_CERT}  # a fork's own key\n")
-        self.assertEqual(self.run_tool("seal", tag, "--attested", "--apk-signers", mine, "--out", self.out,
+        self.assertEqual(self.run_tool("seal", tag, "--apk-signers", mine, "--out", self.out,
                                        env=self.env | {"FAKE_APS_CERT": OTHER_CERT})[0], 0)
         # Not signed at all: refused with apksigner's own reason.
-        code, said = self.run_tool("seal", tag, "--attested", "--out", self.out, env=self.env | {"FAKE_APS_RC": "1"})
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env | {"FAKE_APS_RC": "1"})
         self.assertEqual(code, 1)
         self.assertIn(f"{apk} is not an APK apksigner verifies as signed: DOES NOT VERIFY", said)
-        # A file with no attestation is refused, naming who should have made it.
-        code, said = self.run_tool("seal", tag, "--attested", "--out", self.out, env=self.env | {"FAKE_GH_RC": "1"})
+        # A file with no attestation is refused, naming who should have made
+        # it, though its sha256 matches: whoever replaced the file could
+        # replace that too.
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env | {"FAKE_GH_RC": "1"})
         self.assertEqual(code, 1)
         self.assertIn("aerieos-companion-0.9.1-dev.7.exe has no build attestation by companion-app.yml at v0.9.1-dev.7, "
-                      f"from commit {COMMIT[:12]}, that verifies", said)
+                      f"from commit {COMMIT[:12]}, that verifies (gh said: it gave no reason)", said)
 
-    def test_without_attested_an_app_that_cannot_be_checked_is_said_and_one_that_can_is_held(self):
+    def test_a_release_is_not_sealed_where_gh_or_apksigner_is_not_here_to_check_it(self):
         tag = "v0.9.1-dev.7"
         RELEASES[tag] = release("0.9.1-dev.7")
+        self.aps = None
         code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env)
-        self.assertEqual(code, 0, said)
-        self.assertIn("apksigner is not here, so the Android app's signing certificate is not checked", said)
-        self.assertIn("its signing certificate is not checked)", said)
-        self.fake_apksigner()
-        code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env | {"FAKE_APS_CERT": OTHER_CERT})
         self.assertEqual(code, 1)
-        self.assertIn("does not name", said)
+        self.assertIn("apksigner is not here to check the Android app's signature with", said)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS")))
+        self.gh = None
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env)
+        self.assertEqual(code, 1)
+        self.assertIn("gh is not here to verify each file's build attestation with", said)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS")))
 
     def test_each_way_apksigner_says_a_signer_is_read_and_a_source_stamp_is_never_one(self):
         tag, apk = "v0.9.1-dev.7", "aerieos-app-0.9.1-dev.7.apk"
@@ -400,6 +410,7 @@ class Seal(Tool):
             with open(os.path.join(sdk, "build-tools", ver, "apksigner"), "w") as f:
                 f.write("#!/bin/sh\n")
             os.chmod(os.path.join(sdk, "build-tools", ver, "apksigner"), stat.S_IRWXU)
+        self.aps = None
         self.assertEqual(tool.apksigner(), "")
         with mock.patch.dict(os.environ, {"ANDROID_HOME": sdk}):
             self.assertEqual(tool.apksigner(), os.path.join(sdk, "build-tools", "35.0.1", "apksigner"))
@@ -409,7 +420,7 @@ class Seal(Tool):
                              ["DE:66:E7:9C:EE:81:22:51:55:AB:7D:00:85:79:64:CE:9F:F8:0A:FF:A5:56:BA:D9:73:9C:EB:F1:57:D4:D7:0F"])
         self.assertEqual(tool.apk_signers(os.path.join(self.d, "none")), [])
 
-    def test_a_release_sealed_already_is_sealed_again_the_same_and_replaced_only_where_every_file_is_vouched_for(self):
+    def test_a_release_sealed_already_is_sealed_again_the_same_and_replaced_with_each_change_said(self):
         tag, apk = "v0.9.1-dev.7", "aerieos-app-0.9.1-dev.7.apk"
         RELEASES[tag] = release("0.9.1-dev.7")
         self.assertEqual(self.run_tool("seal", tag, "--out", self.out, env=self.env)[0], 0)
@@ -425,19 +436,13 @@ class Seal(Tool):
         for n, was in first.items():
             with open(os.path.join(again, n), "rb") as f:
                 self.assertEqual(f.read(), was, n)
-        # The app replaced since (signed again on a controller): by the
-        # release's own word alone no new list is made.
+        # The app replaced since (signed again on a controller): its
+        # signature vouches for it, so the list is replaced, and it says
+        # what changed.
         RELEASES[tag][apk] = b"the app signed again"
         RELEASES[tag][apk + ".sha256"] = f"{sha(b'the app signed again')}  {apk}\n".encode()
         third = os.path.join(self.d, "third")
-        code, said = self.run_tool("seal", tag, "--out", third, env=self.env)
-        self.assertEqual(code, 1)
-        self.assertIn(f"carries a signed list already and its files are not that list's ({apk} was ", said)
-        self.assertFalse(os.path.exists(third))
-        # Under --attested it is, and says what changed.
-        self.fake_gh()
-        self.fake_apksigner()
-        code, said = self.run_tool("seal", tag, "--attested", "--out", third, env=self.env | {"GITHUB_ACTIONS": "true"})
+        code, said = self.run_tool("seal", tag, "--out", third, env=self.env | {"GITHUB_ACTIONS": "true"})
         self.assertEqual(code, 0, said)
         self.assertIn(f"its files have changed since: {apk} was {sha(b'the bytes of ' + apk.encode())[:12]} and is", said)
         self.assertIn("so the list is replaced by the one made now", said)
@@ -461,7 +466,6 @@ class Seal(Tool):
         for n, b in release("0.9.1-dev.7", without=("aerieos-app-0.9.1-dev.7.apk",)).items():
             with open(os.path.join(files, n), "wb") as f:
                 f.write(b)
-        self.fake_gh()
         with mock.patch.object(tool, "API", "http://127.0.0.1:9/unreachable"):
             code, said = self.run_tool("seal", "v0.9.1-dev.0", "--from", files, "--signers", mine, "--out", self.out, env=env)
         self.assertEqual(code, 0, said)
@@ -499,9 +503,11 @@ class Sign(Tool):
             kt, kb = f.read().split()[:2]
         with open(self.signers, "w") as f:
             f.write(f'aerieos-release namespaces="aerieos-release" {kt} {kb} aerieos-release\n')
+        self.fake_gh()
+        self.fake_apksigner()
 
-    def sign(self, tag, *more):
-        return self.run_tool("sign", tag, "--key", self.key, "--commit", COMMIT, "--out", self.out, *more)
+    def sign(self, tag, *more, env=None):
+        return self.run_tool("sign", tag, "--key", self.key, "--commit", COMMIT, "--out", self.out, *more, env=env)
 
     def test_a_stable_release_is_signed_from_its_files_bytes_in_the_stable_namespace(self):
         RELEASES["v0.9.1"] = release("0.9.1")
@@ -510,7 +516,8 @@ class Sign(Tool):
         want = {n: sha(b) for n, b in RELEASES["v0.9.1"].items() if not n.endswith((".sha256", ".attestation.jsonl"))}
         self.assertEqual(self.lists(), want)
         self.assertEqual(self.taken("v0.9.1"), (want, "AerieOS's release key", ""))
-        self.assertIn("gh is not here, so no build attestation is checked", said)
+        self.assertIn("aerieos-os-0.9.1.iso  (aerieos-os-0.9.1.iso.sha256 matches and its build attestation verifies)", said)
+        self.assertIn("aerieos-app-0.9.1.apk  (aerieos-app-0.9.1.apk.sha256 matches and apksigner verifies it", said)
 
     def test_a_sha256_file_that_lies_is_caught_because_the_bytes_are_hashed(self):
         # What the audit found: the list was written from these files, so a
@@ -522,22 +529,39 @@ class Sign(Tool):
         self.assertIn("aerieos-app-0.9.1.apk.sha256 says", said)
         self.assertIn("the release contradicts itself", said)
         self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS")))
-        # ...and with both replaced, the list holds the bytes that are there,
-        # which is what its signer is shown before the signature is made.
+        # ...and with both replaced, what holds is what vouches for the
+        # file beyond the release's word: a build's file with no
+        # attestation is refused (what the review of 22 Nov found sign let
+        # by), and the app is held to its signature.
+        RELEASES["v0.9.1"] = release("0.9.1")
+        RELEASES["v0.9.1"]["aerieos-os-0.9.1.iso"] = b"another image"
+        RELEASES["v0.9.1"]["aerieos-os-0.9.1.iso.sha256"] = (sha(b"another image") + "  x\n").encode()
+        code, said = self.sign("v0.9.1", env={"FAKE_GH_RC": "1"})
+        self.assertEqual(code, 1)
+        self.assertIn("aerieos-controller-0.9.1.tar.gz has no build attestation by build-image.yml at v0.9.1", said)
+        self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS")))
+        RELEASES["v0.9.1"]["aerieos-app-0.9.1.apk"] = b"another app"
         RELEASES["v0.9.1"]["aerieos-app-0.9.1.apk.sha256"] = (sha(b"another app") + "  x\n").encode()
-        code, said = self.sign("v0.9.1")
-        self.assertEqual(code, 0, said)
-        self.assertEqual(self.lists()["aerieos-app-0.9.1.apk"], sha(b"another app"))
+        code, said = self.sign("v0.9.1", env={"FAKE_APS_CERT": OTHER_CERT})
+        self.assertEqual(code, 1)
+        self.assertIn("aerieos-app-0.9.1.apk is signed by a certificate config/apk-signers does not name", said)
 
-    def test_a_file_nothing_vouches_for_is_refused_and_an_attestation_is_held_to_the_tags_workflow(self):
+    def test_a_release_is_not_signed_without_gh_or_apksigner_and_an_attestation_is_held_to_the_tags_workflow(self):
         RELEASES["v0.9.1"] = release("0.9.1")
         del RELEASES["v0.9.1"]["aerieos-os-0.9.1.iso.sha256"]
+        # Neither tool missing is let by on the stable key holder's machine:
+        # a sha256 beside a file is the release's own word.
+        gh, self.gh = self.gh, None
         code, said = self.sign("v0.9.1")
         self.assertEqual(code, 1)
-        self.assertIn("aerieos-os-0.9.1.iso has neither a sha256 beside it that matches nor a build attestation that verifies", said)
+        self.assertIn("gh is not here to verify each file's build attestation with", said)
+        self.gh, self.aps = gh, None
+        code, said = self.sign("v0.9.1")
+        self.assertEqual(code, 1)
+        self.assertIn("apksigner is not here to check the Android app's signature with", said)
+        self.fake_apksigner()
         # A gh that verifies: the file is taken on its attestation, asked
         # for by the release workflow at this very tag.
-        self.fake_gh()
         code, said = self.sign("v0.9.1")
         self.assertEqual(code, 0, said)
         self.assertIn("aerieos-os-0.9.1.iso  (its build attestation verifies)", said)
@@ -557,13 +581,11 @@ class Sign(Tool):
                       at + "companion-app.yml@refs/tags/v0.9.1",
                       "https://github.com/somebody/aerieos/.github/workflows/build-image.yml@refs/tags/v0.9.1"):
             self.assertNotRegex(other, iso)
-        # --attested: a file with a sha256 and no attestation is refused too.
-        with mock.patch.dict(os.environ, {"FAKE_GH_RC": "1"}):
-            RELEASES["v0.9.1"] = release("0.9.1")
-            self.assertEqual(self.sign("v0.9.1")[0], 0)
-            code, said = self.sign("v0.9.1", "--attested")
+        # A file with a sha256 that matches and no attestation is refused.
+        RELEASES["v0.9.1"] = release("0.9.1")
+        code, said = self.sign("v0.9.1", env={"FAKE_GH_RC": "1"})
         self.assertEqual(code, 1)
-        self.assertIn("--attested asks for one", said)
+        self.assertIn(f"has no build attestation by build-image.yml at v0.9.1, from commit {COMMIT[:12]}, that verifies", said)
 
     def test_a_release_short_of_a_file_or_on_another_commit_is_not_signed(self):
         RELEASES["v0.9.1"] = release("0.9.1", without=("aerieos-os-0.9.1.iso",))
@@ -583,6 +605,48 @@ class Sign(Tool):
         self.assertEqual(code, 1)
         self.assertIn("is not the stable signer config/release-signers names", said)
         self.assertFalse(os.path.exists(os.path.join(self.out, "SHA256SUMS.sig")))
+
+
+class Retried(Tool):
+    """What the network drops is asked again; what the server says is not."""
+
+    def test_a_download_and_an_answer_dropped_once_are_asked_again_and_a_404_is_not(self):
+        RELEASES["v0.9.1"] = release("0.9.1")
+        FLAKY["/asset/v0.9.1/aerieos-os-0.9.1.iso"] = 2
+        FLAKY["/releases"] = 1
+        work = os.path.join(self.d, "work")
+        os.makedirs(work)
+        rel = tool.release_of("v0.9.1")
+        self.assertEqual(HITS.count("/releases"), 2)
+        _path, digest, _ = tool.Release(rel).fetch("aerieos-os-0.9.1.iso", work)
+        self.assertEqual(digest, sha(b"the bytes of aerieos-os-0.9.1.iso"))
+        self.assertEqual(HITS.count("/asset/v0.9.1/aerieos-os-0.9.1.iso"), 3)
+        # Dropped more times than it is asked: the last answer is raised.
+        FLAKY["/asset/v0.9.1/aerieos-os-0.9.1.iso"] = tool.TRIES
+        with self.assertRaises(tool.urllib.error.HTTPError):
+            tool.Release(rel).fetch("aerieos-os-0.9.1.iso", work)
+        HITS.clear()
+        with self.assertRaises(tool.urllib.error.HTTPError):
+            tool.get(tool.API + "/asset/v0.9.1/nothing", raw=True)
+        self.assertEqual(HITS, ["/asset/v0.9.1/nothing"], "a 404 is the same the next time")
+
+    def test_gh_is_asked_again_and_its_last_reason_is_said(self):
+        # The transparency log's 404 for a minute after an attestation is
+        # made (v0.9.0-dev.6094's run): the second asking verifies.
+        count = os.path.join(self.d, "count")
+        gh = self.stand_in("gh", f'echo x >> "{count}"\n'
+                                 f'[ "$(wc -l < "{count}")" -ge "${{FAKE_GH_OK_AT:-2}}" ] && exit 0\n'
+                                 'echo "error fetching tlog entry - (404) Not Found" >&2; exit 1')
+        f = os.path.join(self.d, "file")
+        with open(f, "wb") as out:
+            out.write(b"x")
+        self.assertEqual(tool.attested(gh, f, "v0.9.1", "aerieos-os-0.9.1.iso", COMMIT), "")
+        self.assertEqual(self.asked("gh").count("attestation verify"), 2)
+        os.remove(count)
+        with mock.patch.dict(os.environ, {"FAKE_GH_OK_AT": "99"}):
+            self.assertEqual(tool.attested(gh, f, "v0.9.1", "aerieos-os-0.9.1.iso", COMMIT),
+                             "error fetching tlog entry - (404) Not Found")
+        self.assertEqual(self.asked("gh").count("attestation verify"), 2 + tool.TRIES)
 
 
 class TheList(unittest.TestCase):

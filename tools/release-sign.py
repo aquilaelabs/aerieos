@@ -8,14 +8,14 @@ so who holds the key:
         make the stable release key with ssh-keygen (Ed25519; --hardware on
         a security key: ed25519-sk) and print the line for
         config/release-signers
-    tools/release-sign.py sign TAG [--key PATH] [--commit SHA] [--attested] [--apk-signers FILE] [--upload]
+    tools/release-sign.py sign TAG [--key PATH] [--commit SHA] [--apk-signers FILE] [--upload]
         on the stable key holder's own machine, never in the repository, CI
         or a controller: sign in the namespace aerieos-release, which a
         stable release must carry and a pre-release may. Shows the commit
         the tag names (it must be one you cut: --commit holds it to one) and
         asks; with --upload attaches both files with gh, else says where
         they are to attach
-    tools/release-sign.py seal TAG [--commit SHA] [--attested] [--wait SECONDS] [--out DIR]
+    tools/release-sign.py seal TAG [--commit SHA] [--wait SECONDS] [--out DIR]
                                [--apk-signers FILE] [--signers FILE] [--from FOLDER]
         in CI, for a build that publishes by itself: sign in the namespace
         aerieos-dev with the release build's key, the 64 hex characters in
@@ -27,8 +27,7 @@ so who holds the key:
         to carry every file .release-files names (the signed Android app is
         attached on a controller's clock); exit 3 when it still lacks one.
         A release sealed already is sealed again with the same list; one
-        whose files have changed since gets a new list only under
-        --attested, each change said, and is refused otherwise.
+        whose files have changed since gets a new list, each change said.
         --from FOLDER seals the files of a folder and reads no release: a
         rehearsal's (release-rehearsal.yml), with a key made for the run and
         --signers naming the file written for it. The folder is held to no
@@ -42,23 +41,30 @@ release is downloaded and its bytes hashed here, never read from the sha256
 beside it, since whoever can replace a file on a release can replace that
 too. A file whose sha256 file says otherwise stops the signing; so does a
 release short of a file .release-files names, since a file attached after
-the list is one no install takes. Where gh is here each file's build
-attestation is verified against the workflow that builds it, run on this
-tag (WORKFLOWS), at the commit the tag names and on a hosted runner (gh
+the list is one no install takes. Each file's build attestation is
+verified with gh against the workflow that builds it, run on this tag
+(WORKFLOWS), at the commit the tag names and on a hosted runner (gh
 attestation verify's --source-digest and --deny-self-hosted-runners): a
 tag's name can be moved to another commit and a run started again there,
-and the name alone would take that run's files. A file with neither a
-matching sha256 beside it nor an attestation that verifies is refused;
---attested refuses any file without one.
+and the name alone would take that run's files. A file with no
+attestation that verifies is refused, whatever sha256 sits beside it,
+since whoever replaced the file could replace that too; gh missing
+refuses the release. A rehearsal's folder (seal --from) is the one
+exception: nothing attests a branch's files, so each is held to the
+sha256 beside it.
 
 The Android app is the one file no build attests: its build hands it over
 unsigned, and a controller signs it with the app's own key and attaches it
 later (scripts/dashboard/releasesign.py). What vouches for it is that
 signature: apksigner must verify it as signed by a certificate
-config/apk-signers names (--apk-signers names another file). seal under
---attested refuses an APK it cannot check, apksigner missing included; sign,
-on a machine that may hold no Android SDK, checks it where apksigner is
-there and says it is not checked where it is not.
+config/apk-signers names (--apk-signers names another file), and an APK it
+cannot check is refused, apksigner missing included, so the stable key's
+holder signs where the Android SDK's build-tools are.
+
+GitHub's answers, a download and gh's check are each asked again after a
+short wait where they failed: the transparency log answers 404 for a
+minute after an attestation is made, and a dropped connection on the ISO
+would end the signing.
 
 SHA256SUMS lists every file but itself, its signature, the .sha256 files and
 the attestation bundles.
@@ -80,6 +86,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from typing import NoReturn
 
@@ -117,6 +124,9 @@ WORKFLOWS = {
 LISTS = ("SHA256SUMS", "SHA256SUMS.sig")
 # How often a release that is not whole yet is looked at again, in seconds.
 POLL = 30
+# How many times a network question is asked, and the first wait between
+# two, in seconds (doubled after each).
+TRIES, RETRY_WAIT = 3, 10
 
 
 def die(s) -> NoReturn:
@@ -145,20 +155,41 @@ def _open(url, raw):
     return urllib.request.urlopen(req, timeout=60)  # noqa: S310 (GitHub's own addresses)
 
 
+def retried(fn):
+    """fn's answer, asked again after a wait where the network failed it: a
+    dropped connection, a timeout, a 5xx or a 429. Any other answer from
+    the server (a 404, a 403) is the same the next time, and is raised."""
+    for n in range(TRIES):
+        try:
+            return fn()
+        except urllib.error.HTTPError as e:
+            if (e.code < 500 and e.code != 429) or n == TRIES - 1:
+                raise
+        except OSError:
+            if n == TRIES - 1:
+                raise
+        time.sleep(RETRY_WAIT * 2 ** n)
+
+
 def get(url, raw=False):
-    with _open(url, raw) as r:
-        body = r.read()
+    def ask():
+        with _open(url, raw) as r:
+            return r.read()
+    body = retried(ask)
     return body if raw else json.loads(body)
 
 
 def download(url, dest):
-    """A release's file into `dest`, by chunks; the sha256 of its bytes."""
-    h = hashlib.sha256()
-    with _open(url, True) as r, open(dest, "wb") as f:
-        for chunk in iter(lambda: r.read(1 << 20), b""):
-            h.update(chunk)
-            f.write(chunk)
-    return h.hexdigest()
+    """A release's file into `dest`, by chunks, from the start again where
+    the connection dropped; the sha256 of its bytes."""
+    def fetch():
+        h = hashlib.sha256()
+        with _open(url, True) as r, open(dest, "wb") as f:
+            for chunk in iter(lambda: r.read(1 << 20), b""):
+                h.update(chunk)
+                f.write(chunk)
+        return h.hexdigest()
+    return retried(fetch)
 
 
 def release_of(tag):
@@ -225,15 +256,25 @@ def identity(tag, name=""):
 
 
 def attested(gh, path, tag, name="", commit=""):
-    """Whether gh verifies a build attestation for the file, made by the
+    """"" when gh verifies a build attestation for the file, made by the
     workflow that builds it at this tag, on a hosted runner, and, where
     `commit` is the commit the tag names, from that very commit: the
-    certificate's source digest, which a tag moved since does not carry."""
+    certificate's source digest, which a tag moved since does not carry.
+    Else gh's own last line on why. gh is asked again after a wait where it
+    said no: it says no alike for a transparency log or an API that did
+    not answer and for a file nothing attested."""
     held = ["--source-digest", commit] if re.fullmatch(r"[0-9a-f]{40}", commit or "") else []
-    r = subprocess.run([gh, "attestation", "verify", path, "--repo", REPO, "--cert-identity-regex", identity(tag, name),
-                        "--deny-self-hosted-runners", *held],
-                       capture_output=True, text=True, check=False)
-    return r.returncode == 0
+    why = ""
+    for n in range(TRIES):
+        if n:
+            time.sleep(RETRY_WAIT * 2 ** (n - 1))
+        r = subprocess.run([gh, "attestation", "verify", path, "--repo", REPO, "--cert-identity-regex", identity(tag, name),
+                            "--deny-self-hosted-runners", *held],
+                           capture_output=True, text=True, check=False)
+        if r.returncode == 0:
+            return ""
+        why = ((r.stderr or r.stdout).strip().splitlines() or ["it gave no reason"])[-1][-300:]
+    return why
 
 
 def apk_signers(path=None):
@@ -339,27 +380,26 @@ class Folder:
             return f.read()
 
 
-def gather(tag, source, work, need_attested=False, need_apk=False, apk_file=None, attest=True, commit=""):
+def gather(tag, source, work, release=True, apk_file=None, commit=""):
     """SHA256SUMS' lines for the files of `source`, a release or a folder:
     every listed file's bytes hashed (a release's downloaded into `work`),
     held to the sha256 beside it and to what vouches for it, its build
     attestation or, for the Android app, its signature; stops at a file the
     release itself contradicts, or one nothing vouches for. Each is said as
-    it is read. `attest` off asks for no attestation: a folder's files are a
-    rehearsal's, which nothing attested. `commit` is the commit the tag
-    names, which each attestation is held to."""
+    it is read. `release` off is a rehearsal's folder, which nothing
+    attested: each file is held to the sha256 beside it, and the app to its
+    signature where apksigner is here. `commit` is the commit the tag names,
+    which each attestation is held to."""
     names = source.names()
-    gh = shutil.which("gh") if attest else None
-    if attest and not gh:
-        if need_attested:
-            die("gh is not here to verify the build attestations with (cli.github.com), and --attested asks for them: not signed")
-        print("gh is not here, so no build attestation is checked: the sha256 beside each file is what vouches for it")
+    gh = shutil.which("gh") if release else None
+    if release and not gh:
+        die("gh is not here to verify each file's build attestation with (cli.github.com): not signed")
     aps, named = None, []
     if any(n.endswith(".apk") for n in names if listed(n)):
         aps, named = apksigner(), apk_signers(apk_file)
-        if not aps and need_apk:
+        if not aps and release:
             die("apksigner is not here to check the Android app's signature with (the Android SDK's build-tools, on PATH or "
-                "under ANDROID_HOME), and --attested asks for every file to be vouched for: not signed")
+                "under ANDROID_HOME): not signed")
         if not aps:
             print("apksigner is not here, so the Android app's signing certificate is not checked")
     lines = []
@@ -377,20 +417,19 @@ def gather(tag, source, work, need_attested=False, need_apk=False, apk_file=None
         # The Android app: its signature is what says whose it is, and no
         # build attests the file a controller signed.
         app = name.endswith(".apk")
-        att = bool(gh) and not app and attested(gh, path, tag, name, commit)
+        unattested = attested(gh, path, tag, name, commit) if gh and not app else None
         why = apk_signed(aps, path, named) if app and aps else ""
         if mine:
             os.unlink(path)
         if why:
             die(f"{name} {why}: not signed")
-        signed = app and bool(aps)
-        if beside is None and not att and not signed:
-            die(f"{name} has neither a sha256 beside it that matches nor a build attestation that verifies: "
-                "nothing says it is this release's build, so it is not signed")
-        if need_attested and not att and not app:
+        att, signed = unattested == "", app and bool(aps)
+        if release and not app and not att:
             flow = " or ".join(builders(name))
             die(f"{name} has no build attestation by {flow} at {tag}" + (f", from commit {commit[:12]}," if commit else "")
-                + " that verifies, and --attested asks for one: not signed")
+                + f" that verifies (gh said: {unattested}): nothing says it is this release's build, so it is not signed")
+        if beside is None and not att and not signed:
+            die(f"{name} has no sha256 beside it, and nothing else vouches for it: not signed")
         how = " and ".join(([f"{name}.sha256 matches"] if beside is not None else [])
                            + (["its build attestation verifies"] if att else [])
                            + (["apksigner verifies it as signed by a certificate config/apk-signers names"] if signed else
@@ -501,7 +540,7 @@ def cmd_sign(a):
     os.makedirs(out, exist_ok=True)
     work = tempfile.mkdtemp(prefix="files-", dir=out)
     try:
-        lines = gather(a.tag, Release(rel), work, a.attested, apk_file=a.apk_signers, commit=sha)
+        lines = gather(a.tag, Release(rel), work, apk_file=a.apk_signers, commit=sha)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     sums = write_sums(out, lines)
@@ -572,7 +611,7 @@ def cmd_seal(a):
     old, sha = None, ""
     if a.folder:
         # A folder's files: a rehearsal's, which no release carries and
-        # nothing attested unless --attested says to ask.
+        # nothing attested.
         if not os.path.isdir(a.folder):
             die(f"{a.folder} is not a folder of files to seal")
         source = Folder(a.folder)
@@ -590,27 +629,20 @@ def cmd_seal(a):
         if a.commit and not sha.startswith(a.commit.lower()):
             die(f"{a.tag} names {sha[:12]}, not {a.commit}: not signed (the tag was moved since this build started)")
     out = a.out or tempfile.mkdtemp(prefix=f"seal-{a.tag}-")
-    made = not os.path.isdir(out)
     os.makedirs(out, exist_ok=True)
     work = tempfile.mkdtemp(prefix="files-", dir=out)
     try:
-        lines = gather(a.tag, source, work, a.attested, need_apk=a.attested, apk_file=a.apk_signers,
-                       attest=a.attested or not a.folder, commit=sha)
+        lines = gather(a.tag, source, work, release=not a.folder, apk_file=a.apk_signers, commit=sha)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     # A release sealed before: the same list is signed again and changes
-    # nothing; another list would replace a signature installs may hold a
-    # file to, so it is made only where every file was vouched for by more
-    # than the release's own word, and each change is said.
+    # nothing; another list replaces a signature installs may hold a file
+    # to, which every file's attestation or signature vouches for, and each
+    # change is said.
     if old is not None:
         differs = changed(old, lines)
         if not differs:
             print(f"{a.tag} is sealed already with this very list: the same list is signed again")
-        elif not a.attested:
-            if made:
-                shutil.rmtree(out, ignore_errors=True)
-            die(f"{a.tag} carries a signed list already and its files are not that list's ({'; '.join(differs)}): a new list "
-                "is made only under --attested, where each file's build attestation or signature vouches for it: not signed")
         else:
             said = (f"{a.tag} carries a signed list already, and its files have changed since: {'; '.join(differs)}. "
                     "Each is vouched for by its build attestation or its signature, so the list is replaced by the one made now")
@@ -664,7 +696,6 @@ def main(argv=None):
     g.set_defaults(fn=cmd_signer)
     for p in (s, c):
         p.add_argument("--commit", help="the commit the tag must name")
-        p.add_argument("--attested", action="store_true", help="refuse a file with no build attestation that verifies")
         p.add_argument("--apk-signers", help="the certificates the Android app may be signed by (default config/apk-signers)")
         p.add_argument("--out", help="the folder SHA256SUMS and SHA256SUMS.sig are left in (default: a new temporary one)")
     a = ap.parse_args(argv)

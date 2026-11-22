@@ -14,13 +14,12 @@
 # the controller was down: Actions, seal release, Run workflow, Use workflow
 # from the tag, and the tag typed again.
 #
-# What the seal checks before it signs (tools/release-sign.py seal
-# --attested): the release carries every file .release-files names; the tag
-# still names the commit this run is on; each file's bytes hash to the
-# sha256 beside it; each file has a build attestation by the workflow that
-# builds it, run on this tag; and the Android app, which no build attests,
-# verifies with apksigner as signed by a certificate config/apk-signers
-# names. A stable release is not sealed here: its key's holder signs it on
+# What the seal checks before it signs (tools/release-sign.py seal): the
+# release carries every file .release-files names; the tag still names the
+# commit this run is on; each file's bytes hash to the sha256 beside it;
+# each file has a build attestation by the workflow that builds it, run on
+# this tag; and the Android app, which no build attests, verifies with
+# apksigner as signed by a certificate config/apk-signers names. A stable release is not sealed here: its key's holder signs it on
 # their own machine, and it stays a draft for that.
 #
 # Run again for a release that is sealed, it makes the same list and the
@@ -149,7 +148,7 @@ jobs:
           # A few minutes' wait for a file still landing; the tool uploads
           # nothing and leaves the two files in the folder named.
           rc=0
-          python3 tools/release-sign.py seal "$TAG" --commit "$GITHUB_SHA" --attested --wait 600 --out "$RUNNER_TEMP/sealed" || rc=$?
+          python3 tools/release-sign.py seal "$TAG" --commit "$GITHUB_SHA" --wait 600 --out "$RUNNER_TEMP/sealed" || rc=$?
           if [ "$rc" = 3 ]; then
             echo "::error::$TAG is not whole yet, so its list is not signed: run this again once the file named above is on the release"
           fi

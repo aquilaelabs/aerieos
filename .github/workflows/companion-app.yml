@@ -22,8 +22,8 @@
 #
 # Each file built for a release carries a build attestation, made by the
 # job that built it (R199): the release's list of its files is signed only
-# over files whose attestation verifies (tools/release-sign.py seal
-# --attested), and these four had none. The attestation's certificate names
+# over files whose attestation verifies (tools/release-sign.py seal and
+# sign), and these four had none. The attestation's certificate names
 # this file at the ref the run is on, also where a tag's run calls it, so
 # the seal takes a companion file from this workflow run on the release's
 # tag and from nothing else. A run by hand for a release is its tag's only
@@ -115,7 +115,23 @@ jobs:
 
       # For a release alone: a rehearsal's files are no release's.
       - name: Attest the .pyz and the .vsix
+        id: attest-portable
         if: env.TAG != ''
+        continue-on-error: true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            dist/aerieos-companion-*.pyz
+            dist/aerieos-vscode-*.vsix
+      # The transparency log answers 404 for a while after an attestation
+      # is made, on and off (v0.9.0-dev.6094, twice in one run): once more,
+      # after a wait, and the run goes red only where that fails too.
+      - name: Wait for the transparency log
+        if: env.TAG != '' && steps.attest-portable.outcome == 'failure'
+        run: sleep 60
+      - name: Attest the .pyz and the .vsix, again
+        id: attest-portable-again
+        if: env.TAG != '' && steps.attest-portable.outcome == 'failure'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: |
@@ -227,7 +243,23 @@ jobs:
       # After the code signing, which changes the bytes: what is attested
       # is the file a person downloads. For a release alone.
       - name: Attest the two .exe
+        id: attest-exe
         if: env.TAG != ''
+        continue-on-error: true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            dist/aerieos-companion-*.exe
+            dist/aerieos-usb-maker-*.exe
+      # The transparency log answers 404 for a while after an attestation
+      # is made, on and off (v0.9.0-dev.6094, twice in one run): once more,
+      # after a wait, and the run goes red only where that fails too.
+      - name: Wait for the transparency log
+        if: env.TAG != '' && steps.attest-exe.outcome == 'failure'
+        run: sleep 60
+      - name: Attest the two .exe, again
+        id: attest-exe-again
+        if: env.TAG != '' && steps.attest-exe.outcome == 'failure'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: |

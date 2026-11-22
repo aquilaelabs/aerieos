@@ -530,7 +530,7 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
   build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); on a tag, the one run that builds everything the release carries (the image, the bundle, the apps, the OS image) behind the tag's checks, the agent signed once by the one job that reads the release key, every file attested, its last job making the release once with every file and the image's digest, a draft
-  seal-release.yml               a release's signed list of its files (R199), started for a tag by the controller once the signed Android app is attached, or by hand: tools/release-sign.py seal --attested, the two files attached, and a dev build published once it is whole
+  seal-release.yml               a release's signed list of its files (R199), started for a tag by the controller once the signed Android app is attached, or by hand: tools/release-sign.py seal, the two files attached, and a dev build published once it is whole
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
   lint.yml                       aerie lint itself with nothing skipped, and the unit tier, on a pull request and before a release's tag publishes, on this runner; the root tier beside them, in a container on a hosted one

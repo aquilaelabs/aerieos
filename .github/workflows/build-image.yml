@@ -641,6 +641,20 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Attest the bundle
+        id: attest-bundle
+        continue-on-error: true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: ${{ steps.pack.outputs.name }}
+      # The transparency log answers 404 for a while after an attestation
+      # is made, on and off (v0.9.0-dev.6094, twice in one run): once more,
+      # after a wait, and the run goes red only where that fails too.
+      - name: Wait for the transparency log
+        if: steps.attest-bundle.outcome == 'failure'
+        run: sleep 60
+      - name: Attest the bundle, again
+        id: attest-bundle-again
+        if: steps.attest-bundle.outcome == 'failure'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: ${{ steps.pack.outputs.name }}
@@ -823,6 +837,22 @@ jobs:
           held "the stick's image" "$STICK" "$(find out -maxdepth 1 -name 'aerieos-os-*.stick.raw.xz' | head -1)"
       - name: Attest the ISO, the stick and the image's digest
         id: attest
+        continue-on-error: true
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            out/aerieos-os-*.iso
+            out/aerieos-os-*.stick.raw.xz
+            out/aerieos-image-*.digest
+      # The transparency log answers 404 for a while after an attestation
+      # is made, on and off (v0.9.0-dev.6094, twice in one run): once more,
+      # after a wait, and the run goes red only where that fails too.
+      - name: Wait for the transparency log
+        if: steps.attest.outcome == 'failure'
+        run: sleep 60
+      - name: Attest the ISO, the stick and the image's digest, again
+        id: attest-again
+        if: steps.attest.outcome == 'failure'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: |
@@ -833,7 +863,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          BUNDLE: ${{ steps.attest-again.outputs.bundle-path || steps.attest.outputs.bundle-path }}
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
