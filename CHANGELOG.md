@@ -10,7 +10,7 @@
 - A job's log on a Mac node no longer starts with an error about /proc (446e66f)
 - House rules written when the command was called bb say aerie, so a session is no longer told to run a command that is not there, and aerie status and the companion app say aerie too (21f6fea)
 - A copy the browser refuses says so in one sentence, where a signing key's fingerprint was printed in the toast (a62ca92)
-- On a phone a field too narrow for its hint shows a short one on every page, where it showed the first words of a long one cut off (843904d)
+- On a phone a field too narrow for its hint shows a short one on every page, where it showed the first words of a long one cut off (843904d, 50c3a1f)
 
 ## 0.9.0-dev.6094: 2026-11-22
 
