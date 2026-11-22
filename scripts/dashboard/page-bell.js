@@ -618,11 +618,12 @@ function askTag(a){
           : "needs your answer");
 }
 
-// The command an ask would run, with the prompt it runs at: root's #, bb's
-// verbs, adb's for a phone.
+// The command an ask would run, with the prompt it runs at: root's #,
+// aerie's verbs, adb's for a phone. The companion app's askCommand says the
+// same of the same kinds.
 function askCmd(a){
   const pre = a.kind === "root" ? "# " : a.kind === "phone-use" ? ""
-    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push", "pack"].includes(a.kind) ? "aerie " : "adb ";
+    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push", "pack", "vm"].includes(a.kind) ? "aerie " : "adb ";
   return pre + esc((a.cmd || []).join(" "));
 }
 

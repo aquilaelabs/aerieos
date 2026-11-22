@@ -390,7 +390,7 @@ object Watch {
     }
     fun askCommand(a: JSONObject): String = when (a.str("kind")) {
         "root" -> "# "
-        "rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push", "vm" -> "bb "
+        "rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push", "pack", "vm" -> "aerie "
         else -> "adb "
     } + a.strs("cmd").joinToString(" ")
 }

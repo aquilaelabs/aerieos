@@ -3707,7 +3707,7 @@ bb_token_line() {
     else
         when="$(bb_token_when "$now")"
         if [ -n "$t" ] && bb_token_dead "$t"; then
-            printf 'the kept copy, expires%s; the environment'"'"'s ran out%s and is not what bb sends' \
+            printf 'the kept copy, expires%s; the environment'"'"'s ran out%s and is not what aerie sends' \
                 "$when" "$(bb_token_when "$t")"
         else
             printf 'the kept copy (renewed by calls and the agent), expires%s' "$when"
