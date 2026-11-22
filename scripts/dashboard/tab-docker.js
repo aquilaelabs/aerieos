@@ -1815,7 +1815,7 @@ function cAppOwns(on){
   $("cByHandSaid").textContent = on ? `${name}'s file as the catalog wrote it. Its fields above fill it in.` : "";
   // Never a variable of its own as the example (the operator, 22 Nov: a
   // static site's empty box showed PUID and TZ, which it reads nothing of,
-  // and the grey example was taken for its env): what a line is, in words.
+  // and the gray example was taken for its env): what a line is, in words.
   $("cEnv").placeholder = on ? "OTHER=value, one a line: what its fields above do not set" : "NAME=value, one a line: what the compose file reads as ${NAME}";
   $("cEnvHint").hidden = !on;
   if (on) $("cEnvHint").textContent = `The other variables for ${name}. Its fields above set the rest, and one of theirs typed here is refused by name.`;

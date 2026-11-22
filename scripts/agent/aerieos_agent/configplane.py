@@ -523,7 +523,7 @@ class ConfigPlaneMixin:
         kernel kills any process in it for memory, and everything a session
         starts (a build, a suite, the emulator) is in this unit, so a node out
         of memory killing one build stopped the agent and restarted it,
-        cancelling its jobs and dropping every terminal (the dev VM, 22 Nov).
+        canceling its jobs and dropping every terminal (the dev VM, 22 Nov).
         The build is what goes; the agent and the sessions stay.
         Not on a guest, whose services are its owner's (R23)."""
         if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not shutil.which("systemctl"):

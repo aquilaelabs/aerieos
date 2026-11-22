@@ -5,7 +5,7 @@
 ### Changed
 
 - Pressing something now shows its result straight away and the server catches up: a dismissed or deleted row folds away, a ticked roadmap step or closed bug moves at once, a filter chip lights and its list shows a placeholder, and a refusal puts it back with the reason. Leaving the page while a change is still saving asks first (d4422de, b85c911, ab04860, 1f1a8ba, db8e33f, 5694b7d)
-- A button whose work is running shows a spinning ring in place of its word and never grows; a press that would wait behind a running job says it is queued and behind what, and one a running job blocks is greyed out with the reason beside it (fa921ac, 2175214, 09a4ba0, 6818031, b99ccb4, 8d3466b, b172743)
+- A button whose work is running shows a spinning ring in place of its word and never grows; a press that would wait behind a running job says it is queued and behind what, and one a running job blocks is grayed out with the reason beside it (fa921ac, 2175214, 09a4ba0, 6818031, b99ccb4, 8d3466b, b172743)
 - Signing in after Sign out opens on Home, and the placeholder shown while a page loads is the page that then opens (0e6726e)
 - The Library has no Abort of its own, and on a phone its Check, Add and Remove share the search's line (09a4ba0, 2175214)
 

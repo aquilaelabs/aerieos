@@ -895,7 +895,7 @@ on a full node slows down or fails red; the node, its sessions and their
 network stay up. Both the runner's unit and the agent's carry
 `OOMPolicy=continue`: systemd's default stops a whole unit when the kernel
 kills any process in it, and the agent's holds every session's builds, so
-one build killed for memory stopped the agent, cancelled its jobs and cut
+one build killed for memory stopped the agent, canceled its jobs and cut
 every terminal. The agent puts it in its own unit's drop-in, beside
 `KillMode=process`, on a node provisioned before.
 
