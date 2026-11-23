@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The warning color on every dark theme is a warmer gold (e5105b3)
+
+### Fixed
+
+- On a phone the Containers page in list view stays inside the screen, and a container's image named by its id alone shows its first twelve characters, where a long image id made the page scroll sideways (03ad3f9)
+
 ## 0.9.0-dev.6168: 2026-11-23
 
 ### Fixed
