@@ -928,6 +928,23 @@ def declares_none(doc):
     return isinstance(inst, dict) and isinstance(inst.get("fetch"), list) and not inst["fetch"] and (of(doc) or 1) >= HELD_FORMAT
 
 
+# What a download held by its publisher's signature alone is said as, where
+# its entry names no version: a signature says who published a file and
+# never which release it is, so every build that publisher ever signed
+# passes it, an older one included.
+UNVERSIONED_SAID = ("its publisher's signature says who made {what}, and its entry names no version, "
+                    "so what arrives is whatever the publisher serves that day")
+
+
+def versioned(url, version):
+    """Whether a download held by its publisher's signature names the one
+    release it is: a version said, and {version} in every address it is
+    fetched from (one, or one per platform)."""
+    urls = list(url.values()) if isinstance(url, dict) else [url]
+    return (isinstance(version, str) and bool(PIN_VERSION.fullmatch(version))
+            and bool(urls) and all(isinstance(u, str) and "{version}" in u for u in urls))
+
+
 def held(doc):
     """(word, why): what a toolchain row's or a manifest's downloads are
     held to, one of HELD_WORDS, and the sentence that says why: for open,
@@ -961,6 +978,8 @@ def held(doc):
         elif not ((how == "signature" and ck.get("sig") and ck.get("keys")) or (how == "file" and signed.get("sig") and signed.get("keys"))):
             return "open", (f"its download is checked against what its own origin says at the moment of the install ({how}), "
                             "not against a pin or a signature its entry carries")
+        elif not versioned(src.get("url"), ck.get("version")):
+            return "open", UNVERSIONED_SAID.format(what="its download")
     elif kind == "sdkmanager":
         # A package of another row's program: it has no download of its
         # own, and the program that installs it (the row it requires)
@@ -982,7 +1001,9 @@ def held(doc):
         # A pack carries the key itself; a row AerieOS ships may name one
         # of the release's own (config/release-keys).
         if signed.get("sig") and signed.get("keys") and (not pack or signed["keys"] in keyring):
-            continue
+            if versioned(f.get("url"), f.get("version")):
+                continue
+            return "open", UNVERSIONED_SAID.format(what=f.get("to") or "a download it declares")
         return "open", f"{f.get('to') or 'a download it declares'} is held to nothing its entry carries: no sha256, and no signature under a key in it"
     # What runs, and whether it can fetch.
     online = src.get("online")

@@ -96,8 +96,8 @@ commit of your pack, and a new pin in the catalog.
 nothing AerieOS can see, and the pack's card says **open**. A manifest that
 declares each file instead (`install.fetch`, pack format 5, as above: its
 address, the sha256 of what the address answers or its publisher's
-signature, and where in the pack it is kept) has each one fetched and
-checked, and its steps run with no network. The card of such a pack says
+signature with the version it is, and where in the pack it is kept) has
+each one fetched and checked, and its steps run with no network. The card of such a pack says
 **pinned**. One whose pinned installer has to
 download the rest from its vendor says so in one sentence
 (`install.online`), and its card says **installer**, with the sentence.

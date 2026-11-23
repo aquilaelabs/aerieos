@@ -253,8 +253,13 @@ class Row(unittest.TestCase):
     def test_a_well_formed_source_is_taken_and_a_malformed_one_refused(self):
         fetch = [{"url": "https://example.com/extra.bin", "sha256": H, "to": "dl/extra.bin", "platform": "linux/amd64"}]
         for good in ({"fetch": fetch}, {"offline": True}, {"keyring": {"go.asc": KEY}},
-                     {"fetch": [{"url": "https://example.com/e.bin", "to": "e.bin", "signed": {"sig": "https://example.com/e.sig", "keys": "node.asc"}}]}):
+                     {"fetch": [{"url": "https://example.com/{version}/e.bin", "version": "1.0", "to": "e.bin",
+                                 "signed": {"sig": "https://example.com/{version}/e.sig", "keys": "node.asc"}}]}):
             self.assertEqual(catalogrows.checked(self.newer(**good), self.shipped)[1], "", good)
+        # Its publisher's signature at an address that names no version is
+        # whatever that publisher serves the day it is fetched.
+        loose = self.newer(fetch=[{"url": "https://example.com/e.bin", "to": "e.bin", "signed": {"sig": "https://example.com/e.sig", "keys": "node.asc"}}])
+        self.assertTrue(catalogrows.checked(loose, self.shipped)[1])
         # One whose installer keeps the network is a row an installer's row
         # is replaced by, and never a pinned one's.
         online = self.newer(fetch=fetch, online=SENTENCE)
@@ -395,18 +400,37 @@ class Held(unittest.TestCase):
         self.word({"name": "i", "source": {"kind": "script", "url": "https://example.com/i.sh", "run": ["sh", "{script}"], "checksum": pin}}, "pinned")
         self.word({"name": "t", "source": {"kind": "script", "url": "https://example.com/i.sh", "run": ["sh", "{script}"], "checksum": pin,
                                            "fetch": [{"url": "https://example.com/a", "sha256": H, "to": "a"}]}}, "pinned")
-        # A publisher's signature under a key the entry names holds a download as a pin does.
-        self.word({"name": "s", "source": {"kind": "tarball", "url": "https://example.com/s.tgz", "verify": ["x"],
-                                           "checksum": {"from": "signature", "sig": "{url}.sig", "keys": "swift.asc"}}}, "pinned")
-        self.word({"name": "n", "source": {"kind": "tarball", "url": "https://example.com/n.tgz", "verify": ["x"],
-                                           "checksum": {"from": "file", "url": "{base}/SUMS", "signed": {"sig": "{base}/SUMS.sig", "keys": "node.asc"}}}}, "pinned")
+        # A publisher's signature under a key the entry names holds a download
+        # as a pin does, where the entry names the version it is.
+        sig = {"from": "signature", "sig": "{url}.sig", "keys": "swift.asc", "version": "6.4.3"}
+        sums = {"from": "file", "url": "{base}/SUMS", "signed": {"sig": "{base}/SUMS.sig", "keys": "node.asc"}, "version": "v26.13.1"}
+        self.word({"name": "s", "source": {"kind": "tarball", "url": "https://example.com/{version}/s.tgz", "verify": ["x"], "checksum": sig}}, "pinned")
+        self.word({"name": "n", "source": {"kind": "tarball", "url": {"linux/amd64": "https://example.com/{version}/n-x64.tgz",
+                                                                       "linux/arm64": "https://example.com/{version}/n-arm64.tgz"},
+                                           "verify": ["x"], "checksum": sums}}, "pinned")
+        # ...and with none, or an address that does not take it, what arrives
+        # is whatever the publisher serves that day: a signature says who
+        # made a file, never which release it is (review of 22 Nov).
+        for url, ck in (("https://example.com/{version}/s.tgz", {k: v for k, v in sig.items() if k != "version"}),
+                        ("https://example.com/s.tgz", sig),
+                        ({"linux/amd64": "https://example.com/{version}/n.tgz", "linux/arm64": "https://example.com/n.tgz"}, sums),
+                        ("https://example.com/{version}/s.tgz", {**sig, "version": "../6"})):
+            word, why = packformat.held({"name": "s", "source": {"kind": "tarball", "url": url, "verify": ["x"], "checksum": ck}})
+            self.assertEqual((word, why), ("open", packformat.UNVERSIONED_SAID.format(what="its download")), (url, ck))
         # A pack is fetched at a commit; what it declares is held, and its steps are cut.
         self.word(kept(3, "hexkit"), "pinned")
         self.word(kept(5, "quill"), "pinned")
-        self.word(kept(5, "tern"), "pinned")
         self.word(kept(5, "osprey"), "pinned")
-        # ...as the validator keeps it, and as the row a node is handed.
-        clean, _ = toolpacks.validate(kept(5, "tern"))
+        # The kept tern's signed download names no version; with one it is
+        # pinned, raw, as the validator keeps it and as the row a node is handed.
+        tern = kept(5, "tern")
+        self.word(tern, "open", "its publisher's signature says who made dl/tern.tar.xz, and its entry names no version")
+        f = tern["install"]["fetch"][0]
+        f.update(version="2.4.0", url=f["url"].replace("2.4.0", "{version}"))
+        f["signed"]["sig"] = f["signed"]["sig"].replace("2.4.0", "{version}")
+        self.word(tern, "pinned")
+        clean, errors = toolpacks.validate(tern)
+        self.assertEqual(errors, [])
         self.word(clean, "pinned")
         self.word(toolpacks.recipe({"manifest": clean, "url": "https://example.com/tern", "commit": "c" * 40}), "pinned")
         # One that runs nothing and fetches nothing more is its commit.
@@ -535,9 +559,12 @@ class AgentInstall(unittest.TestCase):
         # A download held to nothing the recipe carries reads open, by name.
         loose = packformat.agent_held(self.pinned(fetch=[{**self.BIN, "sha256": ""}]))
         self.assertEqual((loose["word"], "dl/x.tar.gz is held to nothing its entry carries" in loose["why"]), ("open", True))
-        signed = {"url": "https://x.example/x.tar.gz", "to": "dl/x.tar.gz", "signed": {"sig": "https://x.example/x.tar.gz.sig", "keys": "tern.asc"}}
+        signed = {"url": "https://x.example/{version}/x.tar.gz", "version": "2.4.0", "to": "dl/x.tar.gz",
+                  "signed": {"sig": "https://x.example/{version}/x.tar.gz.sig", "keys": "tern.asc"}}
         self.assertEqual(packformat.agent_held(self.pinned(fetch=[signed], keyring={"tern.asc": KEY}))["word"], "pinned")
         self.assertEqual(packformat.agent_held(self.pinned(fetch=[signed]))["word"], "open", "a key the recipe does not carry holds nothing")
+        unnamed = packformat.agent_held(self.pinned(fetch=[{**signed, "url": "https://x.example/x.tar.gz", "version": None}], keyring={"tern.asc": KEY}))
+        self.assertEqual((unnamed["word"], unnamed["why"]), ("open", packformat.UNVERSIONED_SAID.format(what="dl/x.tar.gz")))
         # From a manifest, raw and as the validator keeps it; one that hands an installer to a shell reads open.
         m = kept(5, "merlin")
         self.assertEqual(packformat.held(m)[0], "installer")
@@ -609,7 +636,9 @@ class Said(unittest.TestCase):
         with mock.patch.object(toolchains, "nodes", Nodes), mock.patch.object(toolchains, "TOOLCHAINS", packed):
             payload = toolchains.payload_for_node("n_1")
         items = {i["name"]: i for i in payload["items"]}
-        self.assertEqual(items["tern"]["held"], {"word": "pinned", "why": packformat.PINNED_SAID})
+        # The kept format-5 manifest's signed download names no version, so
+        # it reads open, said by its file's name.
+        self.assertEqual(items["tern"]["held"], {"word": "open", "why": packformat.UNVERSIONED_SAID.format(what="dl/tern.tar.xz")})
         self.assertEqual((items["playwright"]["held"]["word"], items["go"]["held"]["word"]), ("installer", "pinned"))
         rows = {r["name"]: r for r in library.rows(payload, [], [], {"packs": []}, {})}
         self.assertEqual(rows["tern"]["held"], items["tern"]["held"])

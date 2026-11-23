@@ -144,9 +144,10 @@ pack carries the key:
 "format": 5,
 "install": {
   "fetch": [
-    {"url": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz",
+    {"url": "https://downloads.tern.example.org/{version}/tern-{version}-linux.tar.xz",
+     "version": "2.4.0",
      "to": "dl/tern.tar.xz",
-     "signed": {"sig": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz.sig", "keys": "tern.asc"}}
+     "signed": {"sig": "https://downloads.tern.example.org/{version}/tern-{version}-linux.tar.xz.sig", "keys": "tern.asc"}}
   ],
   "keyring": {
     "tern.asc": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEaw...\n-----END PGP PUBLIC KEY BLOCK-----\n"
@@ -161,6 +162,14 @@ which maps up to four names to an armored public key of at most 32 KB
 each. AerieOS checks the file with `gpgv` against that key and no other,
 never a keyring of the machine's. A publisher's key that changes is a new
 commit of the pack, and no release of AerieOS.
+
+A signature says who published a file, never which release it is: every
+build that publisher ever signed passes it, an older one included. So a
+signed download names the version it is in `version`, filled into
+`{version}` in its address and its signature's, and one at an address
+that does not take a version reads `open`: what arrives is whatever the
+publisher serves that day. A version moves the way a pin does, in a new
+commit of the pack.
 
 **An installer that keeps the network.** Some installers download the rest
 by themselves: a language's own installer fetching its compiler, a package
@@ -329,7 +338,8 @@ one word, worked out from the entry alone, the same way for a shipped
 toolchain, an official pack, a vetted one and one you sideload:
 
 - **pinned**: every download it makes is a pin, a publisher's signature
-  under a key it carries, or a commit, and its steps run with no network.
+  under a key it carries for the version it names, or a commit, and its
+  steps run with no network.
 - **installer**: the same for everything it declares, and it says `online`:
   its pinned installer downloads the rest from its vendor. The word comes
   with the entry's sentence.
@@ -379,7 +389,8 @@ its vendor names.
 
 A row whose own download is held to something it carries, a pin as here or
 its publisher's signature (the `signature` checksum kind, or `file` with
-`signed`), has said by that alone what arrives: everything it runs after
+`signed`) for the version its `checksum.version` names and its `url` takes
+as `{version}`, has said by that alone what arrives: everything it runs after
 its download, its installer's run, its follow-up steps, a warm-up and its
 verify, runs with no network, and `online` is the one way to keep it. It
 need not say `offline: true`; a row that does, or a command or a

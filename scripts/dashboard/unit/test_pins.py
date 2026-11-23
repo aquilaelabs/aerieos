@@ -678,7 +678,9 @@ class Signed(Case):
             self.gone(url)
 
     def test_one_with_no_version_is_said_and_pin_gives_it_the_one_its_resolver_finds(self):
-        self.assertEqual(packformat.held(self.row("kit"))[0], "pinned", "it reads pinned, and so it must carry its version")
+        # A signature says who published a file, never which release it is:
+        # with no version the row reads open, and once pinned, pinned.
+        self.assertEqual(packformat.held(self.row("kit"))[0], "open")
         rc, out = self.run_tool("check")
         self.assertEqual(rc, 3, out)
         for name in ("kit", "lst"):
@@ -690,6 +692,7 @@ class Signed(Case):
             row = self.row(name)
             self.assertEqual((row["source"]["checksum"]["version"], row["rev"], sdkmeta.signed_version(row)), ("go1.99.0", 2, "go1.99.0"))
             self.assertNotIn("sha256", row["source"]["checksum"], "the signature stays the check")
+            self.assertEqual(packformat.held(row)[0], "pinned")
         rc, out = self.run_tool("check")
         self.assertEqual(rc, 0, out)
         self.assertIn("kit: its version is at go1.99.0 (its resolver finds the version it carries)", out)
