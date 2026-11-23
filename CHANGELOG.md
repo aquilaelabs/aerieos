@@ -8,12 +8,16 @@
 - A dialog's title is a band in the same voice as the pages' sections, no longer small capitals, and the page behind a dialog is softened in the theme's own color rather than blacked out (151147d)
 - Dialogs lay out their fields on the same grid as the pages: a new space's name beside its version, a container's name beside its space, an account beside its person's name, each label over its field (d5f6edb, c02819b)
 - aerie version release refuses a pre-release on a commit no release rehearsal passed on, in a repository that has one, and says to rehearse it first (f9d77fc)
+- A repository's git host settings are drawn in its Settings under Repository, where the chain on its card and its menu now lead, and a space whose Authentication is Disabled says over its tokens that pushes are off (bf3b7c3)
+- A page says what is news on one line under its name, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4)
 
 ### Fixed
 
 - On a phone the Containers page in list view stays inside the screen, and a container's image named by its id alone shows its first twelve characters, where a long image id made the page scroll sideways (03ad3f9)
 - aerie git policy says a space can push when the controller holds its token, where a space linked to its git host since the credential helper changed was told it held none (9ced03a)
 - A session whose coding agent ends on its own is shown as ended, with Start offered again, where its space went on showing it running until Restart was pressed a second time (2bcb03e)
+- A session's push from a space whose Authentication is Disabled is refused at once, saying where to turn it back on, where it ran for minutes saying nothing and aerie git policy said to link the space again (bf3b7c3)
+- A space's git host settings no longer list the token it uses a second time as another to use instead (bf3b7c3)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
