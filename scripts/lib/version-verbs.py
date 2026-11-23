@@ -229,6 +229,20 @@ if argv and argv[0] == "release":
         print(f"no release on the forge: {forge['error']}")
     raise SystemExit(0)
 
+if argv and argv[0] == "rehearse-roll":
+    # The changelog rolled before a rehearsal (R190 step 2), run by aerie
+    # version rehearse before it pushes and starts the run: stdout is the
+    # version rolled and its commit, or nothing where nothing was rolled.
+    r = version.rehearsal_section(proj, comp)
+    if r.get("error"):
+        fail(f"[builderbot] ERROR: no rehearsal: {r['error']}")
+    if r.get("rolled"):
+        print(f"the changelog's section for {r['rolled']} is committed ({r['commit']})"
+              + (f", {r['folded']}'s, which no tag carries, folded into it" if r.get("folded") else "")
+              + ": the rehearsal and the release are of that commit", file=sys.stderr)
+        print(f"{r['rolled']} {r['commit']}")
+    raise SystemExit(0)
+
 if argv and argv[0] == "rehearse":
     # A release rehearsed (R190 step 2): the project's release-rehearsal
     # workflow started on this branch through the controller, which holds
@@ -237,6 +251,8 @@ if argv and argv[0] == "rehearse":
     if any(x in ("-h", "--help") for x in argv[1:]):
         print("aerie version rehearse   run every build a release's tag runs on this branch, as it is pushed,\n"
               "    publishing nothing (.github/workflows/release-rehearsal.yml); tag once it is green.\n"
+              "    First the changelog's Unreleased becomes the dev build's own section in a commit of its\n"
+              "    own, pushed, so the release finds nothing to roll and tags the very commit rehearsed.\n"
               "    The run's summary lists the files the release would carry (.release-files).")
         raise SystemExit(0)
     if argv[1:]:

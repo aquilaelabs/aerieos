@@ -1415,6 +1415,49 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre
     return out
 
 
+def rehearsal_section(project, comp="", env=None):
+    """The changelog's section for the dev build a rehearsal is run for,
+    written and committed before the rehearsal (R190 step 2), so the
+    release later tags the very commit that was rehearsed rather than a
+    changelog commit made after it: {"rolled": VERSION, "commit": SHA};
+    {} where there is nothing to roll (Unreleased empty, and the newest
+    section is either released or this commit's own); {"error"} where the
+    changelog still owes a Fixed line, which would be a commit after the
+    rehearsal. A section an earlier rehearsal wrote whose tag was never made
+    is dissolved back into Unreleased first, so the release says
+    everything since the last tag once, under the commit it is cut from."""
+    where = _sub(project, comp)
+    if changelog is None or where is None:
+        return {}
+    tgt, err = target(project, comp)
+    if err or tgt is None:
+        return {"error": err or "there is no version to rehearse a release of yet"}
+    here, err = _pre_tgt(project, comp, tgt, "dev")
+    if err:
+        return {"error": err}
+    secs = [x for x in changelog.sections(changelog.read(where) or "") if x["title"] != "Unreleased"]
+    m = re.match(r"([0-9][^\s:]*)", secs[0]["title"]) if secs else None
+    newest = m.group(1) if m else ""
+    prefix = f"{comp}-v" if comp else "v"
+    untagged = bool(newest) and changelog.is_pre(newest) \
+        and _git(project, "rev-parse", "--verify", "--quiet", f"refs/tags/{prefix}{newest}") is None
+    owed = _owes_section(project, comp)
+    if not owed and (not untagged or newest == here):
+        return {}
+    why, _ = _gaps_check(project, comp)
+    if why:
+        return {"error": why}
+    if untagged and not changelog.unroll(where, newest):
+        return {"error": f"the changelog's section for {newest}, which no tag carries, could not be folded back into Unreleased"}
+    title, err = _pre_tgt(project, comp, tgt, "dev", 1)
+    if err:
+        return {"error": err}
+    if why := _section_commit(project, comp, title, env=env):
+        return {"error": why}
+    return {"rolled": title, "commit": _git(project, "rev-parse", "--short=7", "HEAD") or "",
+            **({"folded": newest} if untagged else {})}
+
+
 def _release_in_tree(project, comp, env, may_push, push, label):
     """release()'s own work, in a tree of the commit it tags."""
     dev = bool(label)
