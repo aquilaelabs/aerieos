@@ -1,10 +1,6 @@
 # Changelog
 
-## 0.9.0-dev.6150: 2026-11-23
-
-### Changed
-
-- aerie roadmap lists an item a line with how many of its steps are open, and --full prints each whole, where the bare listing printed every item's details and steps (4c9a739)
+## 0.9.0-dev.6163: 2026-11-23
 
 ### Fixed
 
@@ -35,12 +31,18 @@
 - The audit keeps a session waiting on an ask to one row for the ask and one for the answer, where its wait wrote a row every second and pushed older history out (91d9786)
 - The Library opens at once when the vetted catalog cannot be reached, where it waited up to 40 seconds every few minutes to ask it again (45436ae)
 - Keys or a message sent to a session on a node that is not answering are dropped after two minutes, where they were typed, Enter included, into whatever session had that name when the node came back (2b9a5be)
+- A member held out of a locked space can still read its roadmap's, bugs' and memories' history, where the lock refused the reads as well as the changes (341ac42)
 
 ### Security
 
 - A session's aerie verbs and the helper that opens a node's terminals check the controller's certificate against the system's authorities where the node holds no pin, where they took any certificate (2c29486)
 - A node refuses a signed bundle of its tools that does not say which build it is from, where one from before bundles said so could be served to it again (3cac664)
 - The VS Code extension, set to accept the controller's own certificate, pins the controller's key at the first sign-in and refuses any other, where it sent your name and password to whatever answered (37b352f)
+- A node locked to its own console refuses a console password set from its page, as it refuses every other system change there (48db2e4)
+
+### Changed
+
+- aerie roadmap lists an item a line with how many of its steps are open, and --full prints each whole, where the bare listing printed every item's details and steps (4c9a739)
 
 ## 0.9.0-dev.6094: 2026-11-22
 
