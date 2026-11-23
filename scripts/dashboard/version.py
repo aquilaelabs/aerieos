@@ -1254,6 +1254,7 @@ def _plan_in_tree(project, comp, dev, stable, label):
     # A pre-release writes its changelog section in a commit of its own
     # first (R217), so its tag is on the commit after this one.
     ahead = 1 if dev and _owes_section(project, comp) else 0
+    base = tgt
     if dev:
         # The dev build's own number, as its stamp reads it: the branch's
         # line where that is newer than VERSION (R112), so a 0.9.0 branch
@@ -1276,9 +1277,12 @@ def _plan_in_tree(project, comp, dev, stable, label):
     # Every kind ships an install, and a fresh install's floor is the one it carries.
     if why := floor_behind(project, comp):
         return {"error": why}
-    # A dev build is no release an install upgrades from, so it needs no
-    # snapshot, as release() has it; planned with one, it was refused.
-    if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
+    # A dev build is a release an install upgrades from as much as any
+    # (B988: 6054 and 6094 shipped at state 29 while the newest snapshot the
+    # upgrade suite started from was 27), so it needs its snapshot at this
+    # tree's state too, as release() has it: its version's, the one its
+    # stable release keeps.
+    if why := no_upgrade_snapshot(project, comp, base):
         return {"error": why}
     return {"tag": name, "sha": sha, "target": tgt, "dev": dev, "pre": label, "channel": channel,
             **({"section": True} if ahead or (not dev and _owes_stable_section(project, comp, tgt)) else {})}
@@ -1505,7 +1509,9 @@ def _release_in_tree(project, comp, env, may_push, push, label):
                          "published tag is not moved from here: bump to the next number"}
     if why := floor_behind(project, comp):
         return {"error": why}
-    if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
+    # A dev build's too (B988): every install is a released one. Its
+    # snapshot is its version's, the one its stable release keeps.
+    if why := no_upgrade_snapshot(project, comp, base):
         return {"error": why}
     # The commit that SHIPS is not always the commit you are standing on.
     #

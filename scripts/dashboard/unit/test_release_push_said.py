@@ -148,13 +148,24 @@ class DevTag(unittest.TestCase):
         version.configure(workspace=str(ws), state=str(ws / "state"), write_json=lambda *a, **k: None)
         self.assertIn("already exists", version.release_plan("app").get("error", ""))
         self.assertEqual(version.release_plan("app", dev=True).get("tag"), "v1.2.3-dev.2")
-        # ...and needs no /config snapshot where the tree keeps them, as
-        # release() has it: a dev build is no release an install upgrades from.
-        (d / version.UPGRADE_SNAPSHOTS).mkdir(parents=True)
-        self.assertEqual(version.release_plan("app", dev=True).get("tag"), "v1.2.3-dev.2")
+        # ...and needs its /config snapshot where the tree keeps them, as a
+        # release does (B988): a dev build is a release an install upgrades
+        # from, and one shipped at a state no snapshot was taken at.
+        # A plan is judged in a tree of the commit, so the folder is one.
+        (d / version.UPGRADE_SNAPSHOTS / "0.1.0").mkdir(parents=True)
+        (d / version.UPGRADE_SNAPSHOTS / "0.1.0" / "manifest.json").write_text('{"state": 1}')
+        git(d, "add", "-A")
+        git(d, "commit", "-q", "-m", "an older release's snapshot")
+        self.assertIn("1.2.3 has no /config snapshot", version.release_plan("app", dev=True).get("error", ""))
+        for v in ("1.2.3", "1.3.0"):
+            (d / version.UPGRADE_SNAPSHOTS / v).mkdir()
+            (d / version.UPGRADE_SNAPSHOTS / v / "manifest.json").write_text('{"state": 1}')
+        git(d, "add", "-A")
+        git(d, "commit", "-q", "-m", "this one's")
+        self.assertEqual(version.release_plan("app", dev=True).get("tag"), "v1.2.3-dev.4")
         with mock.patch.object(version, "line", lambda project: "1.3.0"):
-            self.assertEqual(version.release_plan("app", dev=True).get("tag"), "v1.3.0-dev.2")
-            self.assertEqual(version.release("app", push=False, dev=True).get("tag"), "v1.3.0-dev.2")
+            self.assertEqual(version.release_plan("app", dev=True).get("tag"), "v1.3.0-dev.4")
+            self.assertEqual(version.release("app", push=False, dev=True).get("tag"), "v1.3.0-dev.4")
 
 
 class Finish(unittest.TestCase):
