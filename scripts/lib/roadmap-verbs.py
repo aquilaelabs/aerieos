@@ -106,7 +106,12 @@ def ident(word):
     return n
 
 
-def show(target=None):
+def show(target=None, full=False):
+    """The list, an item a line with how many of its steps are open (B993:
+    every item's details and every step, finished ones included, were 557 KB
+    for 121 items, and an agent keeps only the start of an answer that long,
+    while the listing marked the whole of it read). `full` prints each whole,
+    as `aerie roadmap show N` prints one."""
     rows = roadmap.items(proj)
     # `aerie roadmap --target 0.6.0`: the items meant for one release, and
     # `--target none` the ones meant for none yet.
@@ -132,9 +137,14 @@ def show(target=None):
         # asking for anything.
         who = " (claude)" if r.get("by") == "claude" else ""
         mark = "~" if r.get("shelved") else " "
+        steps = r.get("steps") or []
+        left = sum(1 for st in steps if not st.get("done"))
         print(f" {mark}{R(r['id']):>4}  {r['text']}{who}"
               + (f"  [for {r['target']}]" if r.get("target") else "")
-              + ("  [shelved]" if r.get("shelved") else ""))
+              + ("  [shelved]" if r.get("shelved") else "")
+              + ("" if full or not steps else f"  ({left} of {len(steps)} steps open)"))
+        if not full:
+            continue
         if r.get("info"):
             print("       details: " + r["info"].replace("\n", "\n                "))
         for i, st in enumerate(r.get("steps") or []):
@@ -144,6 +154,8 @@ def show(target=None):
             if st.get("info"):
                 print("             details: "
                       + st["info"].replace("\n", "\n                      "))
+    if not full:
+        print("\naerie roadmap show N prints one whole, its details and steps; aerie roadmap --full prints every one so")
 
 
 # Which seat this session sits in, for the two questions roadmap #26 and #27
@@ -173,7 +185,8 @@ def fresh():
         sys.exit(2)
 
 
-if op in ("list", "ls", "--target"):
+if op in ("list", "ls", "--target", "--full"):
+    full = op == "--full" or "--full" in rest
     if op == "--target" or "--target" in rest:
         at = rest if op == "--target" else rest[rest.index("--target") + 1:]
         if not at:
@@ -183,11 +196,11 @@ if op in ("list", "ls", "--target"):
             rows = roadmap.items(proj)
             dump_records([r for r in rows if roadmap.for_release(r, want)] if want else [r for r in rows if not r.get("target")], as_of_now())
         else:
-            show(at[0])
+            show(at[0], full=full)
     elif fmt != "text":
         dump_records(roadmap.items(proj), as_of_now())
     else:
-        show()
+        show(full=full)
     # Read, so what arrives on the next prompt is what has moved SINCE this,
     # and so the guard above stops holding a session that has just looked.
     roadmap.mark_seen(proj, _who, "roadmap")
