@@ -196,12 +196,20 @@ def _pick(releases, want):
     return (live[0], False) if live else (None, False)
 
 
+def _named(rel, prefix, suffix):
+    """The name release `rel`'s build gives a file: PREFIX VERSION SUFFIX."""
+    tag = str(rel.get("tag_name") or "")
+    return f"{prefix}{tag[1:] if tag.startswith('v') else tag}{suffix}"
+
+
 def _asset(rel, prefix, suffix):
-    for a in rel.get("assets") or []:
-        n = str(a.get("name") or "")
-        if n.startswith(prefix) and n.endswith(suffix) and SAFE.match(n):
-            return a
-    return None
+    """Release `rel`'s file named for its version (_named): never another
+    file with the prefix, which may be an older release's attached to this
+    one with that release's own list."""
+    want = _named(rel, prefix, suffix)
+    if not SAFE.match(want):
+        return None
+    return next((a for a in rel.get("assets") or [] if isinstance(a, dict) and a.get("name") == want), None)
 
 
 def signers():
@@ -308,7 +316,7 @@ def check():
         for prefix, suffix in a["files"]:
             asset = _asset(rel, prefix, suffix)
             if not asset:
-                missing.append(f"{prefix}*{suffix}")
+                missing.append(_named(rel, prefix, suffix))
                 continue
             sums = {str(x.get("name")): x for x in rel.get("assets") or []}
             sha_asset = sums.get(asset["name"] + ".sha256")

@@ -109,8 +109,21 @@ class Apps(unittest.TestCase):
         self.assertEqual(rows["android"]["absent"], "v0.7.0")
         self.assertEqual(rows["android"]["files"], [])
         self.assertEqual(rows["vscode"]["absent"], "")
-        self.assertIn("aerieos-companion-*.pyz not in v0.7.0", v["problem"])
+        self.assertIn("aerieos-companion-0.7.0.pyz not in v0.7.0", v["problem"])
         self.assertNotIn("Android", v["problem"])
+
+    def test_the_file_named_for_the_release_is_taken_never_an_older_ones(self):
+        # An older release's file and its signed list attached to the newest
+        # were served as current (review of 22 Nov): the version in the
+        # name is the one asked for, as the OS updater and the installer ask.
+        rel = self.release("v0.7.0", ["aerieos-app-0.6.9.apk", "aerieos-vscode-0.6.9.vsix", "aerieos-vscode-0.7.0.vsix"])
+        (self.tmp / "releases.json").write_text(json.dumps([rel]))
+        apps.RELEASES_URL = f"file://{self.tmp / 'releases.json'}"
+        v = apps.check()
+        rows = {a["name"]: a for a in v["apps"]}
+        self.assertEqual([f["file"] for f in rows["vscode"]["files"]], ["aerieos-vscode-0.7.0.vsix"])
+        self.assertEqual((rows["android"]["files"], rows["android"]["absent"]), ([], "v0.7.0"))
+        self.assertIsNone(apps.path("android", "aerieos-app-0.6.9.apk"))
 
     def test_the_companion_and_the_extension_are_dev_features(self):
         # The operator, 20 Oct: offered, fetched and served only with Offer
