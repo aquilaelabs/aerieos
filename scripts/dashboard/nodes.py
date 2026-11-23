@@ -7346,18 +7346,36 @@ def session_kill_wait(node_id, name, timeout=25):
 # queued the same way, taken by the same poll. Each is {"session", "argv"}
 # with the node's own session name already in argv, or {"session", "page"}
 # for the paging decision the agent has to make on the pane it can see.
+# Kept beside when each was asked, and typed only while that is recent
+# (B999): keys sent as a node dropped were kept with no age and typed,
+# Enter and all, into whatever session held that name when it came back a
+# day later. A kill queued the same way carries its age already.
 _tmux_ops = {}
+TMUX_KEEP_S = 120
+TMUX_OPS_MAX = 64
 
 
 def session_tmux(node_id, ops):
     n = node(node_id)
     if not n or n["kind"] != "agent":
         return {"error": "no such node"}
+    now = time.time()
     with _wake:
-        _tmux_ops.setdefault(node_id, []).extend(ops[:16])
+        q = _tmux_ops.setdefault(node_id, [])
+        q.extend((now, op) for op in ops[:16])
+        del q[:-TMUX_OPS_MAX]
         _wake_gen[0] += 1
         _wake.notify_all()
     return {"ok": True, "queued": True}
+
+
+def _tmux_take(node_id):
+    """The node's queued tmux commands asked within TMUX_KEEP_S, in order;
+    older ones are dropped, never typed."""
+    with _wake:
+        q = _tmux_ops.pop(node_id, None) or []
+    since = time.time() - TMUX_KEEP_S
+    return [op for at, op in q if at >= since]
 
 
 def node_sessions():
@@ -7635,8 +7653,7 @@ def _job_next_scan(node_id, runner):
             now = time.time()
             return {"kill_sessions": sorted(kills),
                     "kill_ages": {k: round(now - at, 1) for k, at in kills.items()}}
-        with _wake:
-            ops = _tmux_ops.pop(node_id, None)
+        ops = _tmux_take(node_id)
         if ops:
             return {"tmux": ops}
         # ...and a request for a fresh census, when something has
