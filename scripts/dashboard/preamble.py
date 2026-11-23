@@ -698,7 +698,10 @@ def repos_part(project):
              f"This session is {name} ({pid}), a space of {len(members)} repositories, and works in every one: "
              f"each is its own repository with its own notebook, git host, CI and releases. Each tree below is "
              f"yours to write (a worktree of it on this session's branch, where you have one); aerie answers for "
-             f"the repository whose tree you run it in, and `aerie -p NAME` for another.",
+             f"the repository whose tree you run it in, and `aerie -p NAME` for another. To act in another, "
+             f"change into its tree in a call of its own and run the verb bare: the coding agent's own check "
+             f"lets an aerie verb the space allows through only as a bare command, so one behind `cd ... &&` or "
+             f"`-p` is judged by it, and may be refused though the space allows it.",
              ""]
     for d, label in members:
         lines.append(f"- {label}: {ws}/{d}{' (this briefing is its own, above)' if d == project else ''}")
