@@ -1,0 +1,32 @@
+#!/bin/sh
+# AerieOS's own part of what a release owes once it is out (aerie version
+# follow, R190 step 7): the catalog floor (config/catalog-floor) moves to the
+# catalog's newest signed index once that index lists the release, since the
+# next release is refused with an older floor. The commit is left here for
+# the branch's next gate and push. --check says whether it is still owed.
+#   .aerie/after-release TAG [--check]
+set -eu
+tag="$1"
+check="${2:-}"
+base="https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main"
+listed="$(curl -fsS --max-time 30 "$base/aerieos-releases")" \
+    || { echo "owed: the catalog's list of releases could not be read from $base"; exit 1; }
+if ! printf '%s\n' "$listed" | grep -qx "$tag"; then
+    echo "owed: the catalog's main does not list $tag yet: once its signed listing is merged, follow again to move the floor"
+    exit 1
+fi
+made="$(curl -fsS --max-time 30 "$base/index.json" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("generated") or "")')"
+floor="$(grep -v '^#' config/catalog-floor | tail -1)"
+[ -n "$made" ] || { echo "owed: the catalog's index says no moment it was made"; exit 1; }
+if [ "$made" \> "$floor" ]; then
+    if [ "$check" = --check ]; then
+        echo "owed: the catalog floor ($floor) is older than the catalog's newest signed index ($made)"
+        exit 1
+    fi
+    sed -i "s/^$floor\$/$made/" config/catalog-floor
+    git add config/catalog-floor
+    git commit -q -m "The catalog floor moves to the index the catalog signed at $made, which lists $tag"
+    echo "the catalog floor moves to $made ($(git rev-parse --short=7 HEAD)): gate and push it with the branch"
+    exit 0
+fi
+echo "done: the catalog floor is at its newest signed index ($floor)"

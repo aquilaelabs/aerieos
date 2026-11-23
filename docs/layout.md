@@ -527,6 +527,7 @@ docs/nodes.md                    design: controller + nodes, homelab-default and
 docs/users.md                    design: accounts, roles, and what each one may reach
 docs/design-language.md          what the dashboard's surfaces owe each other: held by the
                                  house rule `design` and measured by test/uniform.mjs
+.aerie/after-release            what an AerieOS release owes this repository once it is out (aerie version follow): the catalog floor moved to the catalog's newest signed index once it lists the release
 .hadolint.yaml                   Dockerfile lint config, shared by CI and aerie lint
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting

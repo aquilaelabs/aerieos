@@ -259,6 +259,10 @@ def _over(project, rec, raw):
         rec["space_hosts"] = list(rec.get("hosts") or [])
         rec["hosts"] = [h for h in rec["space_hosts"] if h not in off]
         rec["repos_of"] = key
+        # ...and the folders of its repositories, this one among them, as a
+        # session's verb that works across them reads them (aerie version
+        # follow, R190 step 7).
+        rec["space_repos"] = list(_rp()[1](key))
     return rec
 
 

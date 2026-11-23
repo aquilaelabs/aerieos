@@ -225,6 +225,13 @@ aerie version rehearse  run every build a release's tag runs on this branch as i
                    would carry (.release-files). The changelog's section for
                    the dev build is committed and pushed first, so the
                    release tags the very commit rehearsed. Tag once it is green
+aerie version follow [TAG] [--check]
+                   what a published release owes, done: each repository of the
+                   space that carries an executable .aerie/after-release runs
+                   it in its own folder, given the tag and a checkout of it
+                   (AERIEOS_TAG, AERIEOS_TREE); --check says what is still
+                   owed. Runs here, never on the controller; it may rebuild
+                   containers, so run it in the background
 aerie version --list  every version this repo carries: its own, and any component
 aerie version --for DIR   ask about a component: a directory with its own VERSION
 aerie version line [X.Y.Z|none]   the release this branch works toward: a branch

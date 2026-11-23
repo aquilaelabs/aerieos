@@ -57,6 +57,9 @@ USAGE = ("aerie version [--for DIR] "
          "                                     the changelog's sections placed by version\n"
          "aerie version backport COMMIT           a fix from a later line onto this patch line, its\n"
          "                                     changelog entries under this line's Unreleased\n"
+         "aerie version follow [TAG] [--check]  do what a published release owes in each of the space's\n"
+         "                                     repositories (.aerie/after-release in each); --check says\n"
+         "                                     what is still owed\n"
          "aerie version [--for DIR] release --why \"...\"   tag this commit and publish the release, as\n"
          "                                     Release on the Artifacts view does (Agents may: Tag and\n"
          "                                     publish a release)\n"
@@ -228,6 +231,11 @@ if argv and argv[0] == "release":
         print(f"the release: {forge['url']}")
     elif forge.get("error"):
         print(f"no release on the forge: {forge['error']}")
+    # What it owes once it is out (R190 step 7): the last line names the verb
+    # that does it, where this repository says it owes something.
+    if not comp and (version.root(proj) / ".aerie" / "after-release").is_file():
+        print("once it is published: aerie version follow does what the space's repositories owe it, "
+              "and aerie version follow --check says what is still owed")
     raise SystemExit(0)
 
 if argv and argv[0] == "rehearse-roll":

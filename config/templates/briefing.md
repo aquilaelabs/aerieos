@@ -467,7 +467,10 @@ session does not publish it, and says the draft is waiting.
 From a branch other than main a release is a dev pre-release unless
 `--stable` is said, and its first line names the channel. `aerie version
 rehearse` runs every build a tag would on the pushed branch and publishes
-nothing: rehearse until it is green, then tag once. A release cut by
+nothing: rehearse until it is green, then tag once. What a release owes once it is
+out (another repository listing it, a page offering it) is each repository's own
+`.aerie/after-release`, which `aerie version follow` runs in each, and `aerie version
+follow --check` says what is still owed. A release cut by
 mistake goes with `aerie version release --withdraw TAG --why "..."`, its tag
 with it, always the owner's answer.
 Shippable build output goes in this space's dist/, named with `aerie version

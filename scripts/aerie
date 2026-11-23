@@ -127,6 +127,13 @@ aerie version rehearse  run every build a release's tag runs on this branch as i
                    would carry (.release-files). The changelog's section for
                    the dev build is committed and pushed first, so the
                    release tags the very commit rehearsed. Tag once it is green
+aerie version follow [TAG] [--check]
+                   what a published release owes, done: each repository of the
+                   space that carries an executable .aerie/after-release runs
+                   it in its own folder, given the tag and a checkout of it
+                   (AERIEOS_TAG, AERIEOS_TREE); --check says what is still
+                   owed. Runs here, never on the controller; it may rebuild
+                   containers, so run it in the background
 aerie version --list  every version this repo carries: its own, and any component
 aerie version --for DIR   ask about a component: a directory with its own VERSION
 aerie version line [X.Y.Z|none]   the release this branch works toward: a branch
@@ -6402,10 +6409,85 @@ cmd_forge() {
     api_py forge-verbs.py "$proj" "$@"
 }
 
+# aerie version follow [TAG] [--check] (R190 step 7, the operator 23 Nov):
+# what a release owes once it is published, in one verb. Each repository of
+# the space says its own part in its own tree, as an executable
+# .aerie/after-release taking the tag, so a repository that is named in
+# public nowhere is named nowhere but in itself: run in its folder, with the
+# tag (AERIEOS_TAG) and a checkout of it (AERIEOS_TREE) beside it, in the
+# space's order. With --check each says whether its part is still owed
+# (exit 1, and what) or done; without, each does its part and says what is
+# left to a person. A repository with no such file owes nothing.
+version_follow() {
+    local proj="$1"; shift
+    local tag="" check="" a
+    for a in "$@"; do
+        case "$a" in
+            --check) check=--check ;;
+            -h|--help) printf '%s\n' "aerie version follow [TAG] [--check]   do what a published release owes in each of the" \
+                "    space's repositories (.aerie/after-release in each, given the tag and a checkout of it);" \
+                "    --check says what is still owed. TAG is the newest release tag here unless named. It can" \
+                "    rebuild containers and take minutes: run it in the background."; return 0 ;;
+            -*) die "aerie version follow [TAG] [--check]: no $a" ;;
+            *) [ -z "$tag" ] || die "aerie version follow takes one tag"; tag="$a" ;;
+        esac
+    done
+    local top="$WORKSPACE/$proj"
+    [ -n "$tag" ] || tag="$(git -C "$top" describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null)" \
+        || die "no release tag here to follow: name one"
+    git -C "$top" rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null \
+        || die "no tag $tag here: aerie git fetch, or name one this repository has"
+    # Done only once it is out: what a repository owes may be read off the
+    # published release (its signed list of files), which a draft has not.
+    if [ -z "$check" ]; then
+        local pub
+        pub="$(BB_PROJECT="$proj" cmd_forge release view "$tag" 2>&1)" \
+            || die "$tag is not published yet, so nothing follows it: once its release is out, aerie version follow ($pub)"
+        case "$pub" in *"/releases/tag/$tag"*) ;; *) die "$tag is still a draft, so nothing follows it yet: once it is published, aerie version follow" ;; esac
+    fi
+    local repos
+    repos="$(BB_PROJECT="$proj" BB_SETTINGS_JSON=1 cmd_settings --json 2>/dev/null \
+        | python3 -c 'import json, sys
+try:
+    print("\n".join(json.load(sys.stdin).get("space_repos") or []))
+except ValueError:
+    pass')"
+    [ -n "$repos" ] || repos="$proj"
+    local tree; tree="$(mktemp -d)"
+    git -C "$top" worktree add -q --detach "$tree/at" "$tag" 2>/dev/null \
+        || { rm -rf "$tree"; die "could not check out $tag beside the run"; }
+    local r script out rc owed=0 any=0
+    while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        script="$WORKSPACE/$r/.aerie/after-release"
+        [ -x "$script" ] || continue
+        any=1
+        rc=0
+        out="$(cd "$WORKSPACE/$r" && env -u BB_PROJECT AERIEOS_TAG="$tag" AERIEOS_TREE="$tree/at" \
+            "$script" "$tag" ${check:+"$check"} 2>&1)" || rc=$?
+        printf '%s\n' "$out" | sed "s/^/  $r: /"
+        [ "$rc" = 0 ] || owed=1
+    done <<< "$repos"
+    git -C "$top" worktree remove --force "$tree/at" 2>/dev/null || true
+    rm -rf "$tree"
+    [ "$any" = 1 ] || { log "no repository of this space carries .aerie/after-release: $tag owes nothing"; return 0; }
+    if [ "$owed" = 1 ]; then
+        [ -n "$check" ] && log "$tag still owes what is said above" || warn "a repository's part for $tag did not finish: its lines above say why"
+        return 1
+    fi
+    [ -n "$check" ] && log "$tag owes nothing more" || log "$tag is followed in every repository that carries .aerie/after-release"
+}
+
 cmd_version() {
     case " $* " in *" release "*"--edit "*|*" --edit "*"release "*|*" release "*"--remove "*|*" release "*"--withdraw "*)
         case " $* " in *" -h "*|*" --help "*) ;; *) cmd_version_edit "$@"; return $? ;; esac ;;
     esac
+    if [ "${1:-}" = follow ]; then
+        shift
+        local fp; fp="$(need_project BB_VERSION_PROJECT)" || return 1
+        version_follow "$fp" "$@"
+        return $?
+    fi
     local py proj
     py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
@@ -6580,7 +6662,11 @@ if on_node && [ -z "${BB_RELAYED:-}" ]; then
         # from, and `root` runs the root tier of the tree here (in a
         # container where docker answers): neither is the controller's.
         # `bisect` runs the harness here at each commit, as `run` does.
-        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests bisect"|"tests root"|"rules check"|"rules audit"|"findings sample") : ;;
+        # `version follow` runs each repository's .aerie/after-release, which
+        # a session may write, so it runs here and never on the controller,
+        # as a rule's check does (B152); the aerie verbs in those scripts
+        # relay one by one as ever.
+        "version follow"|"tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests bisect"|"tests root"|"rules check"|"rules audit"|"findings sample") : ;;
         *)  # ...and that is the whole run: without the exit the dispatch
             # below ran the verb a second time HERE, against files the bundle
             # does not carry: `aerie bug` printed the controller's answer and
