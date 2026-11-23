@@ -253,9 +253,13 @@ cmd_tests_preflight() {
     # Not cmd_dashboard test, which execs the harness and would end this
     # verb before its checks: the harness is run as a child here.
     local rc=0 here="${BB_REPO:-$PWD}/scripts/dashboard/test/run.sh"
+    # What ran before the run's log is opened, kept to be written into it in
+    # the shape aerie tests last reads (B989: a gate that failed only here
+    # read back as every suite passed).
+    local before_log=()
     if [ -n "$patch_line" ]; then
         printf '== patch: what a patch release may not change\n'
-        bash "$0" rules check --patch "${files[@]}" || rc=1
+        bash "$0" rules check --patch "${files[@]}" || { rc=1; before_log+=("[builderbot] == patch-rules ==" "FAIL  a rule a patch release keeps" "0 passed, 1 failed"); }
     fi
     # The unit tier first: seconds, and a failure there is a failure of the
     # rule itself, so it is said before any browser suite starts. A red unit
@@ -267,12 +271,19 @@ cmd_tests_preflight() {
         # one process the tier was minutes of a gate that is otherwise idle
         # while it runs.
         printf '== unit: scripts/dashboard/unit, across the cores\n'
+        local unit_out; unit_out="$(mktemp)"
         if python3 "$BB_LIB/unitpar.py" "$unit" "${BB_REPO:-$PWD}/.bb-map/unit-times.tsv" \
-                "${BB_TEST_WORKERS:-$(nproc 2>/dev/null || echo 1)}" 2>&1; then
+                "${BB_TEST_WORKERS:-$(nproc 2>/dev/null || echo 1)}" 2>&1 | tee "$unit_out"; then
             printf '  PASS  unit (exit 0)\n'
+            before_log+=("[builderbot] == unit ==" "1 passed, 0 failed")
         else
             printf '  FAIL  unit\n'; rc=1
+            local named
+            mapfile -t named < <(sed -n 's/^\(FAIL\|ERROR\): \([^ ]*\) (\(.*\))$/FAIL  \3/p' "$unit_out" | sort -u | head -40)
+            [ "${#named[@]}" -gt 0 ] || named=("FAIL  the unit tier (its output above names what)")
+            before_log+=("[builderbot] == unit ==" "${named[@]}" "0 passed, ${#named[@]} failed")
         fi
+        rm -f "$unit_out"
     fi
     [ -x "$here" ] || here=/opt/aerieos/scripts/dashboard/test/run.sh
     # A gate's verdict is on the change, never on a kept world: its server
@@ -283,6 +294,7 @@ cmd_tests_preflight() {
     # scroll was gone with the scroll (B328).
     local rl="${BB_REPO:-$PWD}/.bb-test-run.log"
     printf '[builderbot] preflight over %s, %s: %s\n' "$base" "$(date '+%d %b %H:%M')" "${suites[*]:-nothing}" > "$rl" 2>/dev/null || rl=/dev/null
+    [ "${#before_log[@]}" -eq 0 ] || printf '%s\n' "${before_log[@]}" >> "$rl" 2>/dev/null || true
     # As conditions, so set -e and pipefail read a failed suite as rc=1
     # rather than ending this verb before its checks.
     # The suites on the project's test node when its settings name one
