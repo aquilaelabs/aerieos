@@ -28,9 +28,21 @@ def outcome(auth, rid, denied, unanswered=""):
     sentence, a No with `denied` (the verb's own words), and silence with the
     quarter hour's, and `unanswered` where the verb can say what still
     happens (B127: a build the ask still starts once allowed)."""
+    # A read that nothing answered (a timeout, a restart) is asked again, a
+    # minute's worth in a row, before the verb gives up saying the ask was
+    # made and its number (B1070: one slow read ended it with a bare 'The
+    # read operation timed out').
+    missed = 0
     for _ in range(900):
         time.sleep(1)
-        o = bbapi.call("/api/phone", {"action": "outcome", "id": rid}, auth=auth)
+        st, o = bbapi.request("/api/phone", {"action": "outcome", "id": rid}, auth=auth)
+        if st is None:
+            missed += 1
+            if missed >= 60:
+                sys.exit(f"[builderbot] ERROR: ask #{rid} was made, and the controller stopped answering while it waited "
+                         f"({o.get('error') or 'no answer'}): the bell says whether it is still waiting")
+            continue
+        missed = 0
         need(o)
         if o["state"] == "denied":
             sys.exit(f"[builderbot] {denied}")

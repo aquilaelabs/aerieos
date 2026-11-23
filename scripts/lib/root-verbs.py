@@ -28,7 +28,14 @@ def status():
 
 
 def run():
-    post = lambda body: bbapi.call("/api/phone", body)  # noqa: E731
+    def post(body):
+        # The ask itself: one nothing answered may still have been made, so
+        # that is said, and where to look (B1070), rather than the bare error.
+        st, got = bbapi.request("/api/phone", body)
+        if st is None:
+            sys.exit(f"[builderbot] ERROR: the controller did not answer the ask ({got.get('error') or 'no answer'}), "
+                     "so it may or may not have been made: aerie root status says whether one is waiting")
+        return got
 
     # A file under /tmp: on a sandbox node a session's /tmp is its own view
     # (bb-session), and the root command runs outside it, so the file is not
