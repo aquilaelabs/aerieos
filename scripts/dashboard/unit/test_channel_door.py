@@ -98,6 +98,32 @@ class Door(unittest.TestCase):
                          ({"path": "/snapshots/abc", "ctype": "application/x-tar", "headers": {}}, 200))
 
 
+class IsoAnswer(unittest.TestCase):
+    """An ISO uploaded on the VMs page, fetched by its node's running job: the
+    answer is the Path, which the server asks for its size (B1035: a string
+    was handed over and the fetch was a server error)."""
+
+    def setUp(self):
+        import pathlib
+        import tempfile
+        self.dir = tempfile.mkdtemp()
+        self.iso = pathlib.Path(self.dir) / "0123456789abcdef.iso"
+        self.iso.write_bytes(b"iso")
+        self.was = (channel.nodes.job, channel.vms.upload_path)
+        channel.nodes.job = lambda jid, with_log=False: {"node": "n_1", "state": "running",
+                                                         "spec": {"iso": {"upload": "0123456789abcdef"}}}
+        channel.vms.upload_path = lambda up: self.iso if up == "0123456789abcdef" else None
+
+    def tearDown(self):
+        channel.nodes.job, channel.vms.upload_path = self.was
+
+    def test_the_answer_is_a_path_the_server_can_size(self):
+        got, status = channel.fetch("iso", NODE, Q, authed=lambda: False)
+        self.assertEqual(status, 200)
+        self.assertEqual(got["path"].stat().st_size, 3)
+        self.assertEqual(got["path"], self.iso)
+
+
 class FileAnswer(unittest.TestCase):
     def test_a_path_and_its_type_with_no_header_of_its_own(self):
         self.assertEqual(channel._file("/a/b"), ({"path": "/a/b", "ctype": "application/octet-stream", "headers": {}}, 200))

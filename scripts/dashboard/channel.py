@@ -117,7 +117,9 @@ def _iso(auth, q):
     path = vms.upload_path(up)
     if path is None:
         return {"error": "no such upload"}, 404
-    return _file(str(path))
+    # The Path itself, as every other file answer hands it: the server asks
+    # it for its size (B1035: a string here was a server error).
+    return _file(path)
 
 
 @node_only
