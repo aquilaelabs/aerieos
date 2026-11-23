@@ -424,10 +424,46 @@ def index(url=None, fresh=False, opener=None):
         miss = _cache.get("missed") or {}
         if not fresh and miss.get("base") == base and time.time() - miss.get("at", 0) < MISS_S:
             return {"index": _fallback(base), "error": miss["error"]}
+        # One kept from before, or a mirror, answers now while the catalog
+        # is asked behind it (B1000): the read waited on the network, two
+        # fetches of 20 seconds each with the host down, so the Library
+        # stalled every few minutes on a box with no way out. Only a first
+        # read, with nothing to answer, and a press asking fresh wait.
+        stale = None if fresh else _fallback(base)
+        if stale:
+            _behind(url, base, opener)
+            return {"index": _newest(stale), "error": ""}
+    return _asked(url, base, opener)
+
+
+def _asked(url, base, opener):
+    """The catalog asked now, and a miss kept for five minutes."""
     r = fetch(url, opener)
     with _lock:
         _cache["missed"] = {"base": base, "at": time.time(), "error": r["error"]} if r.get("error") else {}
     return {"index": r.get("index"), "error": r.get("error", "")}
+
+
+# The catalog asked behind a read that answered from what was kept: one at a
+# time for an address, never a second beside one still out.
+_behind_out = {}
+
+
+def _behind(url, base, opener):
+    with _lock:
+        t = _behind_out.get(base)
+        if t and t.is_alive():
+            return
+        t = threading.Thread(target=_asked, args=(url, base, opener), daemon=True, name="catalog-index")
+        _behind_out[base] = t
+    t.start()
+
+
+def settle(timeout=30):
+    """Wait for the catalog asked behind a read, for a caller (a test) that
+    reads what it brought."""
+    for t in list(_behind_out.values()):
+        t.join(timeout)
 
 
 def said(url=None):

@@ -48,6 +48,8 @@ class Mirror(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
+        # A catalog asked behind a read lands before the folder goes (B1000).
+        self.addCleanup(catalogindex.settle)
         self.priv = ed25519.Ed25519PrivateKey.generate()
         pub = self.priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         pubfile = os.path.join(self.d, "catalog.pub")
@@ -133,6 +135,12 @@ class Mirror(unittest.TestCase):
         # The catalog not answering: the mirror's index answers.
         def down(u):
             raise OSError("no route")
+        # The mirror answers at once while the catalog is asked behind it
+        # (B1000), and the read after says it did not answer.
+        first = catalogindex.index("https://catalog.example/", opener=down)
+        self.assertTrue(first["index"]["mirror"])
+        self.assertEqual(first["error"], "")
+        catalogindex.settle()
         r = catalogindex.index("https://catalog.example/", opener=down)
         self.assertIn("did not answer", r["error"])
         self.assertTrue(r["index"]["mirror"])

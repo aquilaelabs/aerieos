@@ -31,6 +31,8 @@ class Index(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
+        # A catalog asked behind a read lands before the folder goes (B1000).
+        self.addCleanup(catalogindex.settle)
         catalogindex.configure(state=self.d)
         catalogindex._cache.update(at=0.0, index=None, error="")
         self.priv = ed25519.Ed25519PrivateKey.generate()
@@ -307,6 +309,33 @@ class Index(unittest.TestCase):
         self.assertIn("remove it", rows[0]["said"])
         # Within the hour the kept copy answers without the network.
         self.assertEqual(len(catalogindex.index("https://catalog.example/", opener=down_fail)["index"]["packs"]), 2)
+
+    def test_an_index_kept_past_its_hour_answers_at_once_and_the_catalog_is_asked_behind_it(self):
+        # B1000: the read waited on the network, two fetches of 20 seconds
+        # each with the host down, and the Library stalled every few minutes.
+        url = "https://catalog.example/"
+        catalogindex.fetch(url, opener=self.served([ENTRY], "2026-10-29T00:00:00Z"))
+        kept = self.on_disk()
+        kept["fetched_at"] = 0
+        with open(os.path.join(self.d, "catalog-index.json"), "w", encoding="utf-8") as f:
+            json.dump(kept, f)
+        catalogindex._cache.update(at=0.0, index=None, missed={})
+        import threading
+        asked, gate = [], threading.Event()
+        newer = self.served([ENTRY, dict(ENTRY, name="newer")], "2026-10-29T00:00:01Z")
+
+        def slow(u):
+            asked.append(u)
+            gate.wait(5)
+            return newer(u)
+        got = catalogindex.index(url, opener=slow)
+        self.assertEqual((got["error"], len(got["index"]["packs"])), ("", 1), "the kept index, at once")
+        again = catalogindex.index(url, opener=slow)
+        self.assertEqual(len(again["index"]["packs"]), 1)
+        gate.set()
+        catalogindex.settle()
+        self.assertEqual(len([u for u in asked if u.endswith("index.json")]), 1, "asked once behind both reads")
+        self.assertEqual(len(catalogindex.index(url, opener=down_fail)["index"]["packs"]), 2, "and what it brought is read next")
 
 
 def down_fail(u):
