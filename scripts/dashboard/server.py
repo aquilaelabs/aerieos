@@ -10305,7 +10305,7 @@ class Handler(BaseHTTPRequestHandler):
     def _prefs_post(self, req):
         """POST /api/prefs: a project's settings dialog, saved by
         prefs.dialog_save behind the gates here."""
-        name = req.get("project", "")
+        name = field(req, "project")
         # Nobody may change a project they cannot see or have not taken on.
         if self._not_project(name):
             return
@@ -10992,8 +10992,10 @@ class Handler(BaseHTTPRequestHandler):
             return None
         act = field(req, "action")
         # "send" is a write to the roadmap (it marks a step sent) and starts a
-        # session's turn, so it goes with the rest.
-        if (bad := projects.locked_out(name, users.whose(self._who()))):
+        # session's turn, so it goes with the rest. The lock refuses writes
+        # alone: the history and the finished items are read through it
+        # (B1036: a member held out of a locked space could not read them).
+        if act not in ("history", "finished") and (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         # Closing a batch its session will never close (B198) is an
         # administrator's, like the other decisions about other people's work.
@@ -12077,7 +12079,9 @@ class Handler(BaseHTTPRequestHandler):
         # so an action added later is a write until somebody says otherwise.
         if field(req, "action") not in ("history", "finished") and self._readonly(name):
             return None
-        if (bad := projects.locked_out(name, users.whose(self._who()))):
+        # The lock refuses writes alone, as the roadmap's does (B1036).
+        if field(req, "action") not in ("history", "finished") \
+                and (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         return self._json(*bugs.verb(name, field(req, "action"), req, sessions=sessions_anywhere,
                                      prefix=users.tmux_prefix(self._who())))
@@ -12091,7 +12095,8 @@ class Handler(BaseHTTPRequestHandler):
         # read had no project check at all (the audit of 26 Sep).
         if not (proj := self._project_asked(req)):
             return None
-        if (bad := projects.locked_out(proj, users.whose(self._who()))):
+        # The lock refuses writes alone (B1036): the history is read through it.
+        if act != "history" and (bad := projects.locked_out(proj, users.whose(self._who()))):
             return self._json(bad, 409)
         # Seeing a project and being able to change it are different
         # questions now (users.may_work): an administrator is shown every
@@ -12662,7 +12667,7 @@ class Handler(BaseHTTPRequestHandler):
         a convention rather than a rule. The route's gate (ROUTE_GATES)
         names the verbs in its refusal.
         """
-        name = req.get("project", "")
+        name = field(req, "project")
         # A role that reads the project does not rearrange its changelog
         # either (B101): the Save was live for it, and went through.
         if self._not_project(name) or self._readonly(name):
@@ -13877,7 +13882,7 @@ class Handler(BaseHTTPRequestHandler):
     def _rename(self, req):
         """Rename a project: projects.rename. Only the registry's name
         changes, so nothing running holds it back."""
-        name = req.get("name", "")
+        name = field(req, "name")
         # Whether it is a project first, then whether this account may: a
         # name that is nothing answered "not taken on" to the owner once
         # their list was explicit (R135), where it is simply not a project.
@@ -13893,7 +13898,7 @@ class Handler(BaseHTTPRequestHandler):
     def _project_auth(self, req):
         """What credential this project's remote uses, and what else it
         could: projects.auth_answer."""
-        name = req.get("name", "")
+        name = field(req, "name")
         # The rename dialog's question, about a project this account sees
         # (B175): it says how the project's remote authenticates.
         if self._not_project(name) or self._refused("rename", name):
