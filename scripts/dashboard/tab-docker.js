@@ -3090,8 +3090,11 @@ function dmTiles(t){
       : `of ${t.all}${matchMedia("(max-width:440px)").matches ? "" : ` container${t.all === 1 ? "" : "s"}`}`,
      tone: !g && t.all && !t.running ? "warn" : ""},
     {label: !g && t.behind === 1 ? "update due" : "updates due", value: g ? GHOST : t.behind, tone: !g && t.behind ? "warn" : "", omit: !g && !t.checked && !t.behind},
-    {label: "spaces", value: g ? GHOST : t.projects, omit: !g && t.projects === undefined},
+    {label: !g && t.projects === 1 ? "space" : "spaces", value: g ? GHOST : t.projects, omit: !g && t.projects === undefined},
     {label: "not ours", value: g ? 0 : t.notOurs, omit: g || !t.notOurs, title: "on this daemon, started by nobody here"},
+    // ...and when its images were checked, on the same line (R274), where it
+    // was a head of its own with this one fact behind Details.
+    {text: !g && t.images_at ? `images checked ${ago(t.images_at)}` : "", omit: g || !t.images_at},
   ]);
 }
 // The daemon's images and volumes (R216): a section at the foot, read when
@@ -3111,8 +3114,9 @@ function dmStatus(d){
   // A head's facts (the operator, 25 Oct: no loose words at a page's top):
   // when its images were checked, and where a node only hosts containers,
   // where a shell in one opens.
-  return pageHead({cls: "dmimgbar", facts: [
-    ["Images checked", !d ? GHOST : d.images_at ? ago(d.images_at) : "not yet"],
+  // When the images were checked is on the status line (R274); a node that
+  // only hosts says where a shell opens, behind Details.
+  return pageHead({cls: "dmimgbar", line: [d && !d.images_at ? {text: "images not checked yet"} : null], facts: [
     ["Shells", host && mayShell() ? (host.config?.own ? "none on this machine: it is the controller's own" : `from a node that runs sessions: ${host.name} hosts containers only`) : ""]]});
 }
 
@@ -3275,7 +3279,7 @@ function renderDockerInto(i){
   const behind = allIns.filter(d => (d.images_behind || []).length || d.nginx_to).length;
   const notOurs = allCs.filter(c => !c.ours).length;
   const tiles = blind || !(allIns.length || allCs.length) ? "" : dmTiles({running, all: allIns.length, behind,
-    checked: !!dockerList?.images_at, projects: chips.filter(g => g.key !== "none").length, notOurs});
+    checked: !!dockerList?.images_at, images_at: dockerList?.images_at || 0, projects: chips.filter(g => g.key !== "none").length, notOurs});
   const html = `<div class="doctab dmtab${slow || dockerList?.stale ? " dmstale" : ""}">${picker}${tiles}${
     // The page's own boxes under the tiles and the chips, never between
     // them (the operator, 26 Oct): what every page has comes first.

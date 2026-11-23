@@ -216,8 +216,8 @@ function vmTiles(vms, projects){
   return statTiles([
     {label: "running", value: running, sub: `of ${vms.length}${matchMedia("(max-width:440px)").matches ? "" : ` VM${vms.length === 1 ? "" : "s"}`}`,
      tone: vms.length && !running ? "warn" : ""},
-    {label: "spaces", value: projects},
-    {label: "snapshots", value: vms.reduce((n, v) => n + (v.snapshots || []).length, 0)},
+    {label: projects === 1 ? "space" : "spaces", value: projects},
+    (n => ({label: n === 1 ? "snapshot" : "snapshots", value: n}))(vms.reduce((n, v) => n + (v.snapshots || []).length, 0)),
     {label: broke === 1 ? "needs a look" : "need a look", value: broke, tone: "bad", omit: !broke,
      title: "failed, crashed, or not on its node"},
   ]);

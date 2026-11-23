@@ -1474,7 +1474,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 :is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>*{order:5}
 :is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.field:has(>.notice){order:1}
 :is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.pghead{order:2}
-:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.field:has(>.tiles){order:3}
+:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.field:has(>.tiles),:is(.doctab,.doctab>.skel.skt,.doctab>.doclist:not(.ssplit),.doctab>.doclist:not(.ssplit)>.skel.skt)>.field:has(>.pgline){order:3}
 :is(.doctab,.doctab>.skel.skt)>.docbarrow{order:4}
 .doctab>.fnote{order:6}
 .doctab>.doclist::after,.doctab.dmtab::after,.doctab.vmtab::after{order:7}

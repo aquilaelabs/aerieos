@@ -3532,11 +3532,11 @@ await section("a registry image that moved", async () => {
   writeFileSync(`${DIR}/dockerstate/repodigests/${img.replace(/[/:]/g, '_')}`, JSON.stringify([`lscr.io/linuxserver/radarr@sha256:${'a'.repeat(64)}`]));
   writeFileSync(`${DIR}/image-digests.json`, JSON.stringify({ [img]: `sha256:${'b'.repeat(64)}` }));
   await page.waitForSelector('#bDockerCheck', { timeout: 15000 });
-  ok(await page.$eval('.dmimgbar', e => /Images checked\s*(not yet|.* ago|just now)/.test(e.textContent)),
-     'the Containers page says when its registry images were last checked, a fact of its head');
+  ok(await page.$eval('.dmtab', e => /images (checked (.* ago|just now)|not checked yet)/.test([...e.querySelectorAll('.pgline')].map(l => l.textContent).join(' '))),
+     'the Containers page says when its registry images were last checked, on its status line');
   ok(await page.$eval('.dmtab', t => { const kids = [...t.children], at = s => kids.findIndex(k => k.matches(s) || k.querySelector(`:scope > ${s}`));
        const box = at('.dmimgbar'), tiles = at('.pgline'), chips = at('.chips');
-       return box > tiles && (chips < 0 || box > chips); }),
+       return box < 0 || (box > tiles && (chips < 0 || box > chips)); }),
      '...under its status line and its chips, which every page has first (the operator, 26 Oct)');
   await page.click('#bDockerCheck');
   await page.waitForSelector('.dmtab .row[data-inst="radarr|main"] .dmimages', { timeout: 20000 });
