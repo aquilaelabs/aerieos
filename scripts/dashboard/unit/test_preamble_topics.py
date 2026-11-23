@@ -109,5 +109,34 @@ class Mentioned(unittest.TestCase):
         self.assertEqual(preamble.mentioned("p", "the one with the thing on the tab"), ("", []))
 
 
+
+class HelpNamesTheTopic(unittest.TestCase):
+    """aerie help TOPIC is the topic, where its name is a verb's too (B992):
+    map, build, tidy, capture, git and gpu printed the verb's usage, and the
+    briefing sends a session to each by that name."""
+
+    def run_help(self, *argv):
+        import subprocess
+        repo = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+        p = subprocess.run(["bash", os.path.join(repo, "scripts", "aerie"), "help", *argv], capture_output=True, text=True,
+                           timeout=60, check=False, cwd=repo, env=dict(os.environ))
+        return p.returncode, p.stdout
+
+    def test_a_topic_that_is_a_verb_too_is_the_topic_with_the_verb_named(self):
+        # A topic is the space's briefing's: run where there is one.
+        if self.run_help("topics")[0] != 0:
+            self.skipTest("not inside a space: the briefing's topics are a space's")
+        for name in ("map", "build", "tidy", "capture", "git", "gpu"):
+            rc, out = self.run_help(name)
+            self.assertEqual(rc, 0, name)
+            self.assertTrue(out.startswith("## "), f"{name}: {out[:80]}")
+            self.assertIn(f"aerie help verb {name} prints its lines", out)
+        rc, out = self.run_help("verb", "map")
+        self.assertTrue(out.startswith("aerie map "), out[:80])
+        rc, out = self.run_help("roadmap")
+        self.assertTrue(out.startswith("aerie roadmap "), out[:80])
+        rc, _ = self.run_help("nosuchthing")
+        self.assertNotEqual(rc, 0)
+
 if __name__ == "__main__":
     unittest.main()

@@ -408,7 +408,8 @@ aerie findings sample [--remove]   write a clearly-fake report, so the Analysis
                       surfaces can be worked on where no scanner runs
 aerie token keep      store BB_TOKEN where this account's sessions on this
                    machine read it; the agent runs it for an idle session
-aerie roadmap            this space's roadmap: items are R1, R2, ...; bugs are B1, B2
+aerie roadmap            this space's roadmap, an item a line with its steps still open: items
+                   are R1, R2, ...; bugs are B1, B2; --full prints each with its details
 aerie roadmap show N     one item in full: its details, its steps and theirs (N is R12 or 12)
 aerie roadmap add "..."  put something on it; `done N` finished, `rm N [why]` abandoned
 aerie roadmap restore N  put a dropped one back from the history, as it was
@@ -523,7 +524,8 @@ aerie preamble        what a session started here is handed: rules, roadmap, bug
 aerie router-key      the model router's address, this space's own key and its models, for an Any model session
 aerie help TOPIC      one topic of the session briefing in full (start, where, map, build, tidy,
                    speed, capture, asks, notebook, versions, git, android, gpu, containers);
-                   aerie help topics lists them, aerie help VERB one verb's lines
+                   aerie help topics lists them, aerie help VERB one verb's lines, and
+                   aerie help verb VERB a verb's that shares a topic's name
 aerie brief           the brief this space was started from: waiting for its first
                    session, whichever agent runs it, or kept after that session started
 aerie design          what this space looks like, from the notebook's Design view:
@@ -2655,11 +2657,23 @@ cmd_preamble() {
 # session briefing (R202), which a node relays like the rest of aerie preamble.
 cmd_help() {
     [ -n "${1:-}" ] || { usage; return 0; }
-    verb_help "$1" 2>/dev/null && return 0
+    # A topic of the briefing first, which the briefing sends a session to by
+    # this name (B992: map, build, tidy, capture, git and gpu are verbs as
+    # well, and their usage answered where the topic was asked for); then
+    # the verb's own lines, named under it, which aerie help verb NAME
+    # prints alone.
     case "$1" in
-        topics) bash "$0" preamble --topics ;;
-        *) bash "$0" preamble --topic "$1" ;;
+        topics) bash "$0" preamble --topics; return ;;
+        verb) verb_help "${2:-}" || die "no verb ${2:-} (aerie help lists them)"; return 0 ;;
     esac
+    if bash "$0" preamble --topic "$1" 2>/dev/null; then
+        if verb_help "$1" >/dev/null 2>&1; then
+            printf '\n(aerie %s itself: aerie help verb %s prints its lines.)\n' "$1" "$1"
+        fi
+        return 0
+    fi
+    verb_help "$1" 2>/dev/null && return 0
+    bash "$0" preamble --topic "$1"
 }
 
 cmd_rules() {

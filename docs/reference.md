@@ -506,7 +506,8 @@ aerie findings sample [--remove]   write a clearly-fake report, so the Analysis
                       surfaces can be worked on where no scanner runs
 aerie token keep      store BB_TOKEN where this account's sessions on this
                    machine read it; the agent runs it for an idle session
-aerie roadmap            this space's roadmap: items are R1, R2, ...; bugs are B1, B2
+aerie roadmap            this space's roadmap, an item a line with its steps still open: items
+                   are R1, R2, ...; bugs are B1, B2; --full prints each with its details
 aerie roadmap show N     one item in full: its details, its steps and theirs (N is R12 or 12)
 aerie roadmap add "..."  put something on it; `done N` finished, `rm N [why]` abandoned
 aerie roadmap restore N  put a dropped one back from the history, as it was
@@ -621,7 +622,8 @@ aerie preamble        what a session started here is handed: rules, roadmap, bug
 aerie router-key      the model router's address, this space's own key and its models, for an Any model session
 aerie help TOPIC      one topic of the session briefing in full (start, where, map, build, tidy,
                    speed, capture, asks, notebook, versions, git, android, gpu, containers);
-                   aerie help topics lists them, aerie help VERB one verb's lines
+                   aerie help topics lists them, aerie help VERB one verb's lines, and
+                   aerie help verb VERB a verb's that shares a topic's name
 aerie brief           the brief this space was started from: waiting for its first
                    session, whichever agent runs it, or kept after that session started
 aerie design          what this space looks like, from the notebook's Design view:
