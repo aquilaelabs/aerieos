@@ -791,12 +791,14 @@ function pickersFit(){
 // own way): a label over its field, never beside it, and fields that do not
 // touch. A picker in a band or an action bar sits beside what it filters and
 // is not a form's field.
-function formsHold(){
-  return page.evaluate(() => {
+// ...on a page, or in the dialog on show (R273: a dialog's form is on the
+// same grid, the operator 23 Nov).
+function formsHold(root = '.doc.on'){
+  return page.evaluate(root => {
     const out = new Set();
     const say = (e, why) => out.add(`${e.id || e.dataset?.k || e.name || e.getAttribute('aria-label') || e.tagName.toLowerCase()}: ${why}`);
     const bar = '.actbar,.docbarrow,.histbar,.phead,.pghead,.sectjump,.tbl,table,.ndmline,.bar,.fnote,.wkpick,.dsrow,.addbar,.modal[hidden],[hidden],.skel,.term,.xterm';
-    const fields = [...document.querySelectorAll('.doc.on :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]),select,textarea)')]
+    const fields = [...document.querySelectorAll(`${root} :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]),select,textarea)`)]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest(bar); });
     for (const e of fields){
       const box = e.getBoundingClientRect();
@@ -818,7 +820,7 @@ function formsHold(){
       }
     }
     return [...out];
-  });
+  }, root);
 }
 function headRoom(){
   return page.evaluate(() => {
@@ -2901,6 +2903,10 @@ for (const [name, open] of Object.entries(DIALOGS)) {
      `[dialog ${name}] its lines in .field bands, no h4, buttons in a .foot${
        d.err ? ` (${d.err})` : d.loose.length ? `: loose ${d.loose.join(', ')}` : d.h4 ? `: ${d.h4} h4` : !d.foot ? ': no foot' : ''}`);
   ok(!d.nested, `[dialog ${name}] scrolls in one place${d.nested ? `: ${d.nested}` : ''}`);
+  if (!d.err){
+    const fh = await formsHold('.modal:not([hidden]):not(.inline) > .box');
+    ok(fh.length === 0, `[dialog ${name}] a label over each field, and no field touching the one above it${fh.length ? `: ${fh.join('; ')}` : ''}`);
+  }
   ok(!d.err && d.gap <= 32, `[dialog ${name}] its verbs sit at the foot's right (${d.gap}px from its edge)`);
   // The jump bar's chips sit in a row (the operator, 11 Oct): the dialog's
   // field rule stacks a band's children, and the bar is a band.

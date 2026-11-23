@@ -819,8 +819,6 @@ body.firstrun #panes{display:none}
 #rnTestField .setrow{align-items:center;flex-wrap:nowrap}
 #rnTestField .setrow .hint{flex:1 1 auto;min-width:0}
 /* File access (R151): one row per account, its name and its access. */
-#rnFtp .logdays{flex-wrap:nowrap}
-#rnFtp .logdays input[type=number]{width:7em;flex:0 0 auto;text-align:center}
 .rnftppeople{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 /* Also reaches: an address per row, its nodes ticked beside it, and its bin. */
 #rnReachRows{display:flex;flex-direction:column;gap:6px}

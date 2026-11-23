@@ -1135,8 +1135,8 @@ function rnDrawPeople(){
   $("rnPeopleField").hidden = false;
   setHidden($("rnPeopleField").closest("details"), false);
   drawHTML($("rnPeople"), `
-    <div class="setrow ctlrow">${v.may_manage
-      ? `<label class="ndcap" for="rnOwner">Space owner</label>
+    <div class="setrow col ctlrow">${v.may_manage
+      ? `<label for="rnOwner">Space owner</label>
          <select id="rnOwner">${optionList(v.accounts, owner)}</select>`
       : `<span>Space owner: ${esc(v.owner || "AerieOS's owner")}</span>`}</div>
     ${v.may_manage && !v.bb_owner && d.owner && d.owner !== v.owner
@@ -1258,13 +1258,15 @@ function rnDrawFtp(){
     <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
     ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
     ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}
-    <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpFor">Keep it on</label>
+    <div class="fgrid"${on ? "" : " hidden"}>
+    <div class="setrow col ctlrow"><label for="rnFtpFor">Keep it on</label>
       <select id="rnFtpFor" aria-label="how long FTP stays on">${optionList([
         ...(v.on && v.until ? [["", `until ${new Date(v.until * 1000).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
         ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select></div>
-    <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
+    <div class="setrow col ctlrow"><label for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
       <input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}" aria-label="the port its FTP server listens on">
-      <span class="dim">and the ${v.span - 1} after it</span></div>
+      <div class="hint">and the ${v.span - 1} after it</div></div>
+    </div>
     ${status}
     <div class="rnftppeople"${on || editor ? "" : " hidden"}>${v.people.map(p => {
       const a = d.access?.[p.uid] ?? p.access;

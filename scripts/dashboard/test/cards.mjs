@@ -2272,10 +2272,10 @@ await section("The editor's and the apps' door is on unless a project closed it"
   const editorOn = await page.$eval('#rnFtpEditor', c => c.checked);
   ok(editorOn, '...a space is open to its people\'s editors and apps until its owner closes it (R104)');
   await page.click('#rnFtpEditor');
-  const shut = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.logdays').hidden,
+  const shut = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.fgrid').hidden,
     people: e.querySelector('.rnftppeople').hidden }));
   await page.click('#rnFtpOn');
-  const open = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.logdays').hidden,
+  const open = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.fgrid').hidden,
     people: e.querySelectorAll('.rnftprow').length, noNode: /no node to run on/.test(e.textContent),
     value: e.querySelector('#rnFtpPort').value }));
   ok(shut.port && shut.people && !open.port && open.people >= 1 && open.noNode && open.value === '2121',
@@ -2296,7 +2296,7 @@ await section("The editor's and the apps' door is on unless a project closed it"
   // port, and FTPS left off.
   await page.click('#rnFtpOn');
   await page.click('#rnFtpEditor');
-  const ed = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.logdays').hidden,
+  const ed = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.fgrid').hidden,
     people: e.querySelector('.rnftppeople').hidden, noNode: /no node to run on/.test(e.textContent) }));
   const edDraft = await page.evaluate(() => rnFtpChange());
   ok(ed.port && !ed.people && !ed.noNode && edDraft?.editor !== false && !edDraft?.on,

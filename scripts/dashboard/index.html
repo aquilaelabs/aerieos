@@ -1031,14 +1031,18 @@
            emulator shot), under the Artifacts tab's Captures fold, and goes
            by age rather than by need: nothing can tell whether another
            session is still reading one (R96). -->
-      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnCaptureDays">Captures kept for<span class="help" data-help="a session's reels and emulator shots are removed from dist/ this many days after they were taken; 0 keeps them until somebody removes them" tabindex="0">?</span></label>
-        <input id="rnCaptureDays" type="number" min="0" max="365" step="1" inputmode="numeric" aria-label="days a capture is kept"> <span class="dim">days</span></div>
-      <!-- The project's daily snapshots (R165): what a node gone wrong, or
-           compromised, through its synced copy is undone from. -->
-      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none, and the ones already kept stay. Restored from Snapshots below" tabindex="0">?</span></label>
-        <input id="rnSnapDays" type="number" min="0" max="3650" step="1" inputmode="numeric" aria-label="days a snapshot is kept"> <span class="dim">days</span></div>
-      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnDevKeep">Dev builds kept<span class="help" data-help="of each product in dist/, every file of its newest this many builds stays and older builds are removed, a signed build keeping its signed copy alone; a release and anything pinned always stay; 0 keeps everything" tabindex="0">?</span></label>
-        <input id="rnDevKeep" type="number" min="0" max="99" step="1" inputmode="numeric" aria-label="dev builds kept of each product"> <span class="dim">builds</span></div>
+      <!-- How long what a session leaves is kept: three counts side by side,
+           each labelled over its box (the forms rule, R273). -->
+      <div class="fgrid three">
+        <div class="setrow col ctlrow"><label for="rnCaptureDays">Days a capture is kept<span class="help" data-help="a session's reels and emulator shots are removed from dist/ this many days after they were taken; 0 keeps them until somebody removes them" tabindex="0">?</span></label>
+          <input id="rnCaptureDays" type="number" min="0" max="365" step="1" inputmode="numeric"></div>
+        <!-- The project's daily snapshots (R165): what a node gone wrong, or
+             compromised, through its synced copy is undone from. -->
+        <div class="setrow col ctlrow"><label for="rnSnapDays">Days a snapshot is kept<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none, and the ones already kept stay. Restored from Snapshots below" tabindex="0">?</span></label>
+          <input id="rnSnapDays" type="number" min="0" max="3650" step="1" inputmode="numeric"></div>
+        <div class="setrow col ctlrow"><label for="rnDevKeep">Dev builds kept<span class="help" data-help="of each product in dist/, every file of its newest this many builds stays and older builds are removed, a signed build keeping its signed copy alone; a release and anything pinned always stay; 0 keeps everything" tabindex="0">?</span></label>
+          <input id="rnDevKeep" type="number" min="0" max="99" step="1" inputmode="numeric"></div>
+      </div>
     </div>
     </div></details>
     <!-- Releases (R255): what a release waits for, and what each of its
