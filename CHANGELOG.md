@@ -1,24 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- aerie help TOPIC prints the briefing's topic of that name, where for map, build, tidy, capture, git and gpu it printed the verb's usage and the topic could not be read (bc5b5b7)
-- An aerie verb waits for the controller as long as the controller may take to answer, where a change that landed after about three minutes was reported as timed out and a retry could make it twice (2b18d34)
-- On a phone a Library card's Details and an Installed row's Open are a thumb's size to press, where each was a small line of text (7df06d9)
-- A toolchain check or update asked for by name through the API marks only what failed, where every installed toolchain it named read as check failed on the node (51319b9)
-- The release, nginx image and coding agent checks carry on after one fails in a way they did not expect, where every later check answered the stale result until the controller restarted (c87960f)
-- A refusal from Rename, the version check choice or the VM network box on the Nodes page is said once, where it was said twice (d8ee1cf)
-- aerie forge run dispatch takes --field NAME=VALUE as it takes -f, where it was refused (d330136)
-- aerie root run rides out a slow answer from the controller, and one it cannot ride out says whether the ask was made and its number, where it ended on a bare timeout (48f699f)
-- A root, phone or container ask that is too long names the limit, 40 arguments of 500 characters each, where it said only that it was too long (cd1b682)
-- The Library stops reading every three seconds once it is left during a long install, where it went on until the install ended (4263dc0)
-- What a role forbids on a space's Running sessions is said in the muted voice, where it was drawn in red (ef9be0a)
-- The CI runner's refusal no longer names a source file in the line a person reads (dd1a540)
-- aerie doctor warns when it cannot read the controller's key that nodes pin, where it said nothing (943508c)
-
-## 0.9.0-dev.6166: 2026-11-23
+## 0.9.0-dev.6168: 2026-11-23
 
 ### Fixed
 
@@ -50,6 +32,19 @@
 - The Library opens at once when the vetted catalog cannot be reached, where it waited up to 40 seconds every few minutes to ask it again (45436ae)
 - Keys or a message sent to a session on a node that is not answering are dropped after two minutes, where they were typed, Enter included, into whatever session had that name when the node came back (2b9a5be)
 - A member held out of a locked space can still read its roadmap's, bugs' and memories' history, where the lock refused the reads as well as the changes (341ac42)
+- aerie help TOPIC prints the briefing's topic of that name, where for map, build, tidy, capture, git and gpu it printed the verb's usage and the topic could not be read (bc5b5b7)
+- An aerie verb waits for the controller as long as the controller may take to answer, where a change that landed after about three minutes was reported as timed out and a retry could make it twice (2b18d34)
+- On a phone a Library card's Details and an Installed row's Open are a thumb's size to press, where each was a small line of text (7df06d9)
+- A toolchain check or update asked for by name through the API marks only what failed, where every installed toolchain it named read as check failed on the node (51319b9)
+- The release, nginx image and coding agent checks carry on after one fails in a way they did not expect, where every later check answered the stale result until the controller restarted (c87960f)
+- A refusal from Rename, the version check choice or the VM network box on the Nodes page is said once, where it was said twice (d8ee1cf)
+- aerie forge run dispatch takes --field NAME=VALUE as it takes -f, where it was refused (d330136)
+- aerie root run rides out a slow answer from the controller, and one it cannot ride out says whether the ask was made and its number, where it ended on a bare timeout (48f699f)
+- A root, phone or container ask that is too long names the limit, 40 arguments of 500 characters each, where it said only that it was too long (cd1b682)
+- The Library stops reading every three seconds once it is left during a long install, where it went on until the install ended (4263dc0)
+- What a role forbids on a space's Running sessions is said in the muted voice, where it was drawn in red (ef9be0a)
+- The CI runner's refusal no longer names a source file in the line a person reads (dd1a540)
+- aerie doctor warns when it cannot read the controller's key that nodes pin, where it said nothing (943508c)
 
 ### Security
 
