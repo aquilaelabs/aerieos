@@ -13,6 +13,9 @@ const { Term } = require('./lib/term');
 
 const SCHEME = 'aerieos';
 const SECRET = 'aerieos.cookie';
+// The controller's key, pinned when this editor first signed in to an
+// address under the controller's own certificate, kept beside the cookie.
+const PIN = 'aerieos.pin';
 
 let client = null;
 let fsp = null;
@@ -21,8 +24,14 @@ function base() {
   return (vscode.workspace.getConfiguration('aerieos').get('url') || '').replace(/\/+$/, '');
 }
 
-function tls() {
-  return { rejectUnauthorized: !vscode.workspace.getConfiguration('aerieos').get('allowSelfSignedCertificate') };
+// How this editor trusts the controller at `url`: by the authorities, or,
+// with the controller's own certificate allowed, by the key it pinned there
+// (pinned on the first call where none is yet, and kept).
+async function tls(context, url) {
+  const own = vscode.workspace.getConfiguration('aerieos').get('allowSelfSignedCertificate');
+  if (!own) return { rejectUnauthorized: true };
+  const pin = (await context.secrets.get(`${PIN}:${url}`)) || '';
+  return { rejectUnauthorized: false, pin, onPin: p => context.secrets.store(`${PIN}:${url}`, p) };
 }
 
 async function connect(context) {
@@ -30,7 +39,7 @@ async function connect(context) {
   const url = base();
   const cookie = url ? await context.secrets.get(`${SECRET}:${url}`) : '';
   if (!url || !cookie) throw new Refused(401, 'Not signed in to AerieOS: run AerieOS: Sign In.');
-  client = new Client(url, cookie, tls());
+  client = new Client(url, cookie, await tls(context, url));
   return client;
 }
 
@@ -234,7 +243,7 @@ async function pickAgent(project, running) {
 // to sign in without the input boxes.
 async function signInWith(context, url, name, password) {
   const clean = url.replace(/\/+$/, '');
-  const cookie = await signIn(clean, name, password, tls());
+  const cookie = await signIn(clean, name, password, await tls(context, clean));
   await vscode.workspace.getConfiguration('aerieos').update('url', clean, vscode.ConfigurationTarget.Global);
   await context.secrets.store(`${SECRET}:${clean}`, cookie);
   client = null;
@@ -260,6 +269,9 @@ async function cmdSignIn(context) {
 async function cmdSignOut(context) {
   const url = base();
   if (url) await context.secrets.delete(`${SECRET}:${url}`);
+  // ...and the key it pinned there: a controller set up anew is trusted
+  // again at the next sign-in, and at no other moment.
+  if (url) await context.secrets.delete(`${PIN}:${url}`);
   client = null;
   vscode.window.showInformationMessage('Signed out of AerieOS here.');
 }

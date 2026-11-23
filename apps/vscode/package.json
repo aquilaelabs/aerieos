@@ -29,7 +29,7 @@
         "aerieos.allowSelfSignedCertificate": {
           "type": "boolean",
           "default": false,
-          "description": "Accept a certificate no authority signed. Only for a controller you reach on your own network."
+          "description": "Accept the controller's own certificate, which no authority signed: its key is pinned at your first sign-in and any other key is refused. Only for a controller you reach on your own network."
         }
       }
     }

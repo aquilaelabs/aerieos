@@ -98,15 +98,18 @@ class Socket extends EventEmitter {
 
 // Open `url` (ws: or wss:) with these headers and subprotocols: a Socket, or
 // the server's refusal as an Error carrying its status and its words.
-function connect(url, { headers = {}, protocols = [], rejectUnauthorized = true } = {}) {
+// `createConnection` hands it a connection made and checked already (the
+// client's, held to the controller's key), with `secure` false since TLS
+// is that connection's.
+function connect(url, { headers = {}, protocols = [], rejectUnauthorized = true, createConnection = null, secure = null } = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
-    const secure = u.protocol === 'wss:' || u.protocol === 'https:';
+    const tlsHere = secure === null ? u.protocol === 'wss:' || u.protocol === 'https:' : secure;
     const key = crypto.randomBytes(16).toString('base64');
-    const req = (secure ? https : http).request({
-      host: u.hostname, port: u.port || (secure ? 443 : 80), path: u.pathname + u.search, method: 'GET',
-      agent: false,                // never a pooled connection the server has closed
-      rejectUnauthorized,
+    const req = (tlsHere ? https : http).request({
+      host: u.hostname, port: u.port || (u.protocol === 'wss:' || u.protocol === 'https:' ? 443 : 80), path: u.pathname + u.search, method: 'GET',
+      // Never a pooled connection the server has closed.
+      ...(createConnection ? { createConnection } : { agent: false, rejectUnauthorized }),
       headers: {
         ...headers, Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13',
         'Sec-WebSocket-Key': key, ...(protocols.length ? { 'Sec-WebSocket-Protocol': protocols.join(', ') } : {}),

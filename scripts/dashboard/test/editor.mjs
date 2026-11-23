@@ -323,4 +323,74 @@ await section("the session's terminal, AerieOS's own", async () => {
   ok(no.why, `...and the same server refuses a terminal the account may not open, saying why (${String(no.why).slice(0, 80)})`);
 });
 
+// Under a controller's own certificate, which no authority signed: the
+// extension took any certificate at all, and sent the person's name and
+// password to whoever answered (review of 22 Nov). Now the key is pinned at
+// the first sign-in, as a node's agent and the Windows companion pin it,
+// and nothing is sent on a connection under another key.
+await section("under the controller's own certificate the extension holds the key it pinned", async () => {
+  const https = require('node:https');
+  const crypto = require('node:crypto');
+  const { KEY_PIN } = require(`${REPO}/apps/vscode/lib/client.js`);
+  const dir = `${DIR}/vscode-tls`;
+  mkdirSync(dir, { recursive: true });
+  const pair = name => {
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes',
+      '-keyout', `${dir}/${name}.key`, '-out', `${dir}/${name}.crt`, '-days', '1', '-subj', '/CN=aerieos'], { stdio: 'ignore' });
+    return { key: readFileSync(`${dir}/${name}.key`), cert: readFileSync(`${dir}/${name}.crt`) };
+  };
+  const pinOf = ({ cert }) => KEY_PIN + crypto.createHash('sha256')
+    .update(new crypto.X509Certificate(cert).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
+  // A door that answers a sign-in, a call and a terminal's upgrade (refused,
+  // so reaching it is said by its status), and remembers what it was asked
+  // and the server name each connection named.
+  const asked = [];
+  const door = keys => new Promise(resolve => {
+    const s = https.createServer(keys, (req, res) => {
+      asked.push([req.url, req.socket.servername || '']);
+      if (req.url === '/login') { res.writeHead(303, { 'Set-Cookie': 'bb_session=tok; Path=/', Location: '/' }); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{"api":1,"projects":[]}');
+    });
+    s.on('upgrade', (req, sock) => { asked.push([req.url.split('?')[0], req.socket.servername || '']); sock.end('HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'); });
+    s.listen(0, () => resolve(s));
+  });
+  const one = pair('one'), two = pair('two');
+  const [s1, s2] = [await door(one), await door(two)];
+  const at1 = `https://localhost:${s1.address().port}`, at2 = `https://localhost:${s2.address().port}`;
+  const tried = async f => { try { return { ok: await f() }; } catch (e) { return { error: e.message, status: e.status }; } };
+  try {
+    // Held to the authorities (the setting off): refused, nothing asked.
+    const ca = await tried(() => signIn(at1, 'ed.rw', 'pw'));
+    ok(ca.error && asked.length === 0, `...with the setting off, a certificate no authority signed is refused before anything is sent (${String(ca.error).slice(0, 60)})`);
+    // The first sign-in pins the key it was answered under.
+    let pinned = '';
+    const first = await tried(() => signIn(at1, 'ed.rw', 'pw', { rejectUnauthorized: false, onPin: p => { pinned = p; } }));
+    ok(first.ok === 'tok' && pinned === pinOf(one) && asked.length === 1 && asked[0][1] === '',
+       `...the first sign-in under the controller's own certificate pins its key, naming no server (${pinned.slice(0, 16)}..., ${JSON.stringify(asked)})`);
+    // Under that pin: a call and a terminal reach it.
+    const c1 = new Client(at1, 'tok', { rejectUnauthorized: false, pin: pinned });
+    const call = await tried(() => c1.projects());
+    const term = await tried(() => c1.terminal('sh:1:alpha', 80, 24));
+    ok(call.ok && term.status === 403 && asked.map(a => a[0]).join(' ') === '/login /api/v1/files /termws',
+       `...and a call and a terminal under the key it pinned reach the controller (${JSON.stringify(asked.map(a => a[0]))})`);
+    // Another key at the address: refused, and nothing sent, the password included.
+    const n = asked.length;
+    const other = await tried(() => signIn(at2, 'ed.rw', 'pw', { rejectUnauthorized: false, pin: pinned }));
+    const c2 = new Client(at2, 'tok', { rejectUnauthorized: false, pin: pinned });
+    const otherCall = await tried(() => c2.projects());
+    const otherTerm = await tried(() => c2.terminal('sh:1:alpha', 80, 24));
+    ok([other, otherCall, otherTerm].every(r => /another key than the one this editor trusted/.test(r.error || '')) && asked.length === n,
+       `...and another key is refused for a sign-in, a call and a terminal with nothing sent (${String(other.error).slice(0, 70)})`);
+    // A client with no pin yet pins on its first call and holds it after.
+    let later = '';
+    const c3 = new Client(at1, 'tok', { rejectUnauthorized: false, onPin: p => { later = p; } });
+    await tried(() => c3.projects());
+    ok(later === pinOf(one) && c3.tls.pin === later, `...and a client with no key pinned yet pins it on its first call and holds it (${later.slice(0, 16)}...)`);
+  } finally {
+    s1.close();
+    s2.close();
+  }
+});
+
 await done();
