@@ -1425,8 +1425,9 @@ case "$1" in
         "$pn" "$pn" "$pn" "$pn"
     done
     # And one this dashboard did not start, which is the distinction the
-    # listing exists to draw.
-    printf '%s\n' '{"ID":"ccccccccccccdddd","Names":"someone-elses","Image":"redis:7","State":"exited","Status":"Exited (0) 2 hours ago","Ports":"","Labels":"com.docker.compose.project=other"}'
+    # listing exists to draw, made from an untagged build: docker names its
+    # image by the id alone, 71 characters with no place to break.
+    printf '%s\n' '{"ID":"ccccccccccccdddd","Names":"someone-elses","Image":"sha256:a0fbc67216996c701389f3e3662951bb24cebfc1510cce1a0b0b55802d2d0c11","State":"exited","Status":"Exited (0) 2 hours ago","Ports":"","Labels":"com.docker.compose.project=other"}'
     exit 0 ;;
   images)
     # The daemon's images (R216): one in use by the fixture's container and

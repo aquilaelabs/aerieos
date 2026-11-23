@@ -1984,7 +1984,10 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
   .tbl .thead{display:none}
   .tbl .tline{display:flex;flex-wrap:wrap;gap:var(--label-gap) var(--row-x);align-items:baseline}
   .tbl .td.lead{flex:1 0 100%}
-  .tbl .td{white-space:normal;overflow:visible}
+  /* ...and a token longer than the screen (an image's id, a path) breaks
+     where it must, since a cell that cannot shrink below it widened the
+     whole page. */
+  .tbl .td{white-space:normal;overflow:visible;overflow-wrap:anywhere}
   .tbl .td[data-th]::before{content:attr(data-th) " ";font:var(--f-note);color:var(--dim)}
   .tbl .td:empty{display:none}
   .tbl .td.act{flex:1 0 auto}

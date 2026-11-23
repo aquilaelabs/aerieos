@@ -3385,6 +3385,25 @@ await section("The tab at a glance", async () => {
   ok(true, '...and nothing matching says so');
   await page.fill('.dmtab #dmSearch', '');
   await page.waitForFunction(() => document.querySelectorAll('.dmtab .row[data-inst]').length > 1, null, { timeout: 10000 });
+  // On a phone a line's cells wrap under its name and none widens the page:
+  // an image named by its id alone is its first twelve with the whole read
+  // to a screen reader, and a token too long for the screen breaks (a 71-character
+  // id stretched the Containers page past a phone's edge, 23 Nov).
+  const desk = page.viewportSize();
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.waitForSelector('.dmtab details.dmline[data-ctr="someone-elses"] > summary.dmsum', { timeout: 10000 });
+  const narrow = await page.evaluate(() => {
+    const cell = document.querySelector('.dmtab details.dmline[data-ctr="someone-elses"] .td[data-th="Image"]');
+    const code = cell?.querySelector('code');
+    const tab = document.querySelector('.dmtab').getBoundingClientRect();
+    const lines = [...document.querySelectorAll('.dmtab details.dmline .td')].filter(t => t.offsetParent);
+    return { id: code?.textContent, title: code?.getAttribute('aria-description'),
+             past: Math.max(0, ...lines.map(t => Math.round(t.getBoundingClientRect().right - tab.right))),
+             over: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  await page.setViewportSize(desk);
+  ok(narrow.id === 'a0fbc6721699' && /^sha256:a0fbc6721699[0-9a-f]{52}$/.test(narrow.title || '') && narrow.past <= 1 && narrow.over <= 0,
+     `on a phone the list's lines stay inside the screen, an image named by its id shown as its first twelve (${JSON.stringify(narrow)})`);
   await page.click('.dmtab [data-dmview="cards"]');
   await page.waitForSelector('.dmtab div.row[data-inst="ep.silon|staging-two"]', { timeout: 10000 });
   ok(true, 'and Cards puts the full rows back');

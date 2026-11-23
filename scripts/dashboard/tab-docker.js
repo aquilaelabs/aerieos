@@ -2378,7 +2378,7 @@ function dmLineCells(d, st){
           who ? esc(who === "System" ? "System" : projLabel(who)) : "",
           dmPorts(d).map(p => dmPortLink(p.pub)).join(" "),
           dmRoutesOf(d).map(dmRouteLink).join(" "),
-          esc(imgs.join(", "))];
+          imgs.map(dmImage).join(", ")];
 }
 
 // The published ports of an instance: [{pub, target, proto, svc}].
@@ -2981,7 +2981,7 @@ function dmOtherRowsHtml(cs){
         <div class="dmid">
         <div class="name">${esc(c.name || c.id)}<span class="pill stat${c.state === "running" ? " ok" : " off"}">${
           esc(c.state || "unknown")}</span> <span class="pill" title="not started by AerieOS">not ours</span></div>
-        <div class="sub">${esc(c.image)} · ${esc(c.status || c.state)}${
+        <div class="sub">${dmImage(c.image)} · ${esc(c.status || c.state)}${
           c.project ? ` · ${esc(c.project)}${c.service ? "/" + esc(c.service) : ""}` : ""}${
           c.ports.length ? ` · ${c.ports.map(esc).join(", ")}` : ""}</div>
         </div>
@@ -3015,7 +3015,7 @@ function dmOtherWrap(c, inner){
   if (dmView !== "list") return `<div class="row stack2 off dmother" data-ctr="${esc(name)}">${inner}</div>`;
   return dmLineWrap(`data-ctr="${esc(name)}"`, " off dmother", [`<span class="name">${esc(name)}</span>`,
     `<span class="pill stat${c.state === "running" ? " ok" : " off"}">${esc(c.state || "unknown")}</span>`,
-    c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "", esc((c.ports || []).join(", ")), "", esc(c.image || "")], inner);
+    c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "", esc((c.ports || []).join(", ")), "", dmImage(c.image)], inner);
 }
 
 // An image as a fact (R227 step 2): its tag, and a pinned digest's first
@@ -3023,6 +3023,10 @@ function dmOtherWrap(c, inner){
 // over three lines.
 function dmImage(img){
   const s = String(img || ""), at = s.indexOf("@sha256:");
+  // ...and an image named by its id alone, as a container made from an
+  // untagged build is: its first twelve, as docker ps shows it.
+  const id = /^sha256:([0-9a-f]{12,})$/.exec(s);
+  if (id) return `<code class="dmdigest" title="${esc(s)}">${esc(id[1].slice(0, 12))}</code>`;
   if (at < 0) return esc(s);
   const dg = s.slice(at + 8);
   return `${esc(s.slice(0, at))} <code class="dmdigest" title="${esc(s.slice(at + 1))}">${esc(dg.slice(0, 12))}</code>`;
