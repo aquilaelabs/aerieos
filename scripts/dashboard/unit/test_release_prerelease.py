@@ -255,26 +255,26 @@ class Rehearsed(unittest.TestCase):
     def test_the_section_is_rolled_before_and_the_release_tags_the_commit_rehearsed(self):
         self.log("A new thing", "Added")
         n = int(self.git("rev-list", "--count", "HEAD"))
-        r = version.rehearsal_section("app")
+        r = version.rehearsal_section("app", env=GIT_ENV)
         self.assertEqual(r.get("rolled"), f"1.1.0-dev.{n + 1}", r)
         rehearsed = self.git("rev-parse", "--short=7", "HEAD")
         self.assertEqual(r["commit"], rehearsed)
         self.assertIn(f"## 1.1.0-dev.{n + 1}: ", (self.app / "CHANGELOG.md").read_text())
         # Asked again on that commit: nothing to roll.
-        self.assertEqual(version.rehearsal_section("app"), {})
+        self.assertEqual(version.rehearsal_section("app", env=GIT_ENV), {})
         rel = self.release(dev=True)
         self.assertEqual((rel.get("tag"), rel.get("sha"), rel.get("section")), (f"v1.1.0-dev.{n + 1}", rehearsed, None), rel)
         # Released: the next rehearsal with nothing new rolls nothing.
-        self.assertEqual(version.rehearsal_section("app"), {})
+        self.assertEqual(version.rehearsal_section("app", env=GIT_ENV), {})
 
     def test_a_section_no_tag_carries_is_folded_into_the_next(self):
         # A rehearsal that went red, a fix and its line after it: the next
         # rehearsal's section says both, under the commit it is cut from.
         self.log("A new thing", "Added")
-        first = version.rehearsal_section("app")["rolled"]
+        first = version.rehearsal_section("app", env=GIT_ENV)["rolled"]
         self.commit_file("fix.py", "x = 1\n", "the fix")
         self.log("The fix", "Fixed")
-        r = version.rehearsal_section("app")
+        r = version.rehearsal_section("app", env=GIT_ENV)
         n = int(self.git("rev-list", "--count", "HEAD"))
         self.assertEqual((r.get("rolled"), r.get("folded")), (f"1.1.0-dev.{n}", first), r)
         text = (self.app / "CHANGELOG.md").read_text()
@@ -284,13 +284,13 @@ class Rehearsed(unittest.TestCase):
         self.assertNotIn("## Unreleased", text)
         # ...and commits with no line after a roll move the section to the newest commit too.
         self.git("commit", "-q", "--allow-empty", "-m", "nothing to say")
-        r = version.rehearsal_section("app")
+        r = version.rehearsal_section("app", env=GIT_ENV)
         self.assertEqual(r.get("rolled"), f"1.1.0-dev.{n + 2}", r)
 
     def test_a_fixed_line_owed_is_refused_before_anything_is_rolled(self):
         self.log("A new thing", "Added")
         with mock.patch.object(version, "_gaps_check", lambda project, comp="": ("v1.0.0 carried a bug fixed since, with no Fixed line", "")):
-            r = version.rehearsal_section("app")
+            r = version.rehearsal_section("app", env=GIT_ENV)
         self.assertIn("no Fixed line", r.get("error", ""))
         self.assertIn("## Unreleased", (self.app / "CHANGELOG.md").read_text())
 
