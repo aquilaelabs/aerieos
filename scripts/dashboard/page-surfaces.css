@@ -900,10 +900,12 @@ body.firstrun #panes{display:none}
 .librarytab .lgrid.lrows>.lcard .pcacts>.state{flex:0 1 auto;text-align:right}
 @media(max-width:600px){
   /* On a phone a row is two lines: the name and its Details across the
-     card, then who made it and its pills beside the verbs, faded where
-     they run out; what it is and where it stands are its page's. Beside
-     the verbs on one line, a Software update left the name a word wide
-     and stood each pill on a line of its own (the operator, 19 Nov). */
+     card, then who made it and its pills beside the verbs; what it is and
+     where it stands are its page's. Beside the verbs on one line, a
+     Software update left the name a word wide and stood each pill on a line
+     of its own (the operator, 19 Nov). The pills wrap under one another
+     there rather than fading out, which hid a version behind its update
+     (the operator, 22 and 23 Nov: anything cut off on a phone wraps). */
   .librarytab .lgrid.lrows>.lcard{grid-template-columns:36px minmax(0,1fr) auto;column-gap:10px;row-gap:4px}
   .librarytab .lgrid.lrows>.lcard>.lchead,.librarytab .lgrid.lrows>.lcard .lctitle{display:contents}
   .librarytab .lgrid.lrows>.lcard .lcicon{grid-column:1;grid-row:1/3;align-self:center}
@@ -912,9 +914,8 @@ body.firstrun #panes{display:none}
      cut off on a phone wraps), its Details after it. */
   .librarytab .lgrid.lrows>.lcard .lcname{min-width:0;overflow-wrap:anywhere}
   .librarytab .lgrid.lrows>.lcard .lmore{flex:none}
-  .librarytab .lgrid.lrows>.lcard .lcmeta{grid-column:2;grid-row:2;flex-wrap:nowrap;overflow:hidden;
-    -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent)}
-  .librarytab .lgrid.lrows>.lcard .lcmeta>*{flex:none;white-space:nowrap}
+  .librarytab .lgrid.lrows>.lcard .lcmeta{grid-column:2;grid-row:2;flex-wrap:wrap;min-width:0;align-self:center}
+  .librarytab .lgrid.lrows>.lcard .lcmeta>*{max-width:100%;overflow-wrap:anywhere}
   .librarytab .lgrid.lrows>.lcard>.pcacts{grid-column:3;grid-row:2}
   .librarytab .lgrid.lrows>.lcard .lcabout{display:none}
   .librarytab .lgrid.lrows>.lcard .pcacts>.state{display:none}

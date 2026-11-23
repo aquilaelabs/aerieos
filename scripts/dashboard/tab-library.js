@@ -611,13 +611,19 @@ function renderLibraryInto(i){
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : ""}`;
   libHold = stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
   // Patched into what is there (R244): the search being typed in keeps its
-  // focus and its caret through the redraw its own key brings.
+  // focus and its caret through the redraw its own key brings. A narrowing
+  // whose read is out is its placeholder.
+  const waiting = !!libWaitFor && libWaitFor === libQuery();
   patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(acts)}<div class="field libgroups">${
-    libWaitFor && libWaitFor === libQuery() ? libListSkel() : libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
+    waiting ? libListSkel() : libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
   // A list a page at a time (the long-lists rule): its foot says how much
-  // of how many, and the next page comes as the foot scrolls into view.
+  // of how many, and the next page comes as the foot scrolls into view. The
+  // placeholder a narrowing draws on its press has no foot: the total is
+  // still the list's before, and "6 of 61 coding agents" stood under six
+  // placeholder cards, then inside the first card that took its place (the
+  // operator, 23 Nov).
   const one = d.list.querySelector(".libone .lgrid");
-  if (one) paginate(one, ":scope > .lcard", {key: "liblist", total: lib.total || 0, more: libMore,
+  if (one) paginate(one, ":scope > .lcard", {key: "liblist", total: waiting ? 0 : lib.total || 0, more: libMore,
     noun: libKind && !LIB_STANDS[libKind] ? (LIB_KINDS.find(([k]) => k === libKind) || ["", "entries"])[1].toLowerCase() : "entries"});
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.

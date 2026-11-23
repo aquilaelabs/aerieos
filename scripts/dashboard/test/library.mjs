@@ -558,6 +558,37 @@ await section("a service's card", async () => {
   await toLibrary();
 });
 
+// ---- a narrowing's placeholder has no foot -----------------------------------
+// A chip pressed from a long list draws its placeholder at once, while the
+// total in hand is still the list's before: "6 of 61 coding agents" stood
+// under the six placeholder cards, then inside the first real card that
+// took their place (the operator, 23 Nov). The read is held here, so the
+// placeholder is on screen while it is asked.
+await section("a narrowing's placeholder has no foot", async () => {
+  await toLibrary();
+  const bars = () => page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .pagemore')]
+    .map(b => b.textContent.trim().replace(/\s+/g, ' ') + ' in ' + b.parentElement.className));
+  // A long list with its foot first: a search most entries match.
+  await page.fill('.doc .librarytab #libFind', 'e');
+  await page.waitForFunction(() => document.querySelector('.doc .librarytab .pagemore'), null, { timeout: 15000 });
+  const was = await bars();
+  const pick = await page.$$eval('.doc .librarytab [data-libkind]', cs => cs.map(c => [c.dataset.libkind, +(c.textContent.match(/(\d+)\s*$/) || [0, 0])[1]])
+    .filter(([k, n]) => k && n > 0 && n < 25).sort((a, b) => a[1] - b[1])[0]);
+  await page.fill('.doc .librarytab #libFind', '');
+  await page.waitForFunction(() => !libWaitFor, null, { timeout: 15000 });
+  await page.route('**/api/library?*', r => setTimeout(() => r.continue().catch(() => {}), 1500));
+  await page.click(`.doc .librarytab [data-libkind="${pick[0]}"]`);
+  await page.waitForFunction(() => document.querySelector('.doc .librarytab .libone .lgrid .skel, .doc .librarytab .libone [aria-busy]') || libWaitFor, null, { timeout: 5000 }).catch(() => {});
+  const during = await bars();
+  await page.waitForFunction(() => !libWaitFor, null, { timeout: 15000 });
+  const after = await bars();
+  await page.unroute('**/api/library?*');
+  ok(was.length === 1 && !during.length && !after.length,
+     `a chip's placeholder and the rows that land after it carry no foot from the list before (${JSON.stringify({ was, pick, during, after })})`);
+  await page.click('.doc .librarytab [data-libkind=""]').catch(() => {});
+  await toLibrary();
+});
+
 // ---- no node ---------------------------------------------------------------
 // A read of the nodes in flight (the poll's) lands after the list is
 // emptied and fills it again, so it is emptied again until the page says

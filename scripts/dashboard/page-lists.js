@@ -48,8 +48,14 @@ function paginate(host, rowSel, opts = {}){
   if (!host) return;
   const key = pageKey(host, opts.key);
   const rows = [...host.querySelectorAll(rowSel)];
-  const old = host.querySelector(":scope > .pagemore");
-  if (old){ old.__io?.disconnect(); old.remove(); }
+  // Every foot this list drew, wherever it is now: one is the code's own, so
+  // a patch steps over it, and a redraw that made the list's element into
+  // another (the Library's grid into a card, its chip changed) carried the
+  // foot inside that one, out of this list's reach, saying "6 of 61" of a
+  // list of six (the operator, 23 Nov).
+  document.querySelectorAll(".pagemore").forEach(old => {
+    if (old.dataset.pagekey === key || old.parentElement === host){ old.__io?.disconnect(); old.remove(); }
+  });
   const size = opts.size || PAGE;
   // Built a page at a time (pageLimit): the rows here are all that is built,
   // `total` how many there are, and `more` builds the next page.
@@ -58,6 +64,7 @@ function paginate(host, rowSel, opts = {}){
     if (rows.length >= opts.total) return;
     const bar = document.createElement("div");
     bar.className = "pagemore";
+    bar.dataset.pagekey = key;
     bar.setAttribute("data-own", "");      // the list's code's: a patch steps over it (R244)
     drawHTML(bar, `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
       <button type="button" class="next">Show more</button>`);
@@ -87,6 +94,7 @@ function paginate(host, rowSel, opts = {}){
   if (shown >= rows.length) return;
   const bar = document.createElement("div");
   bar.className = "pagemore";
+  bar.dataset.pagekey = key;
   bar.setAttribute("data-own", "");
   drawHTML(bar, `<span>${shown} of ${rows.length}${opts.noun ? " " + esc(opts.noun) : ""}</span>
     <button type="button" class="next">Show more</button>`);
