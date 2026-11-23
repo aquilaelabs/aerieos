@@ -515,7 +515,10 @@ release that drops one. Each release commits a lived-in /config made by its
 own controller through its own API (tools/upgrade-snapshot.py), and the
 upgrade suite starts this tree on every supported one, so a change that
 loses an account or a notebook entry on upgrade fails a test, not an
-install; `bb version release` refuses a version that has none.
+install; `aerie version release` refuses a version that has none at the
+tree's state. A dev build is held to it as well (23 Nov 2026): installs
+upgrade from dev builds too, and two shipped at a state no snapshot had
+been taken at.
 
 **A migration that fails stops the start and puts /config back (13 Nov
 2026).** A migration that raised was one line in the log and the new build
