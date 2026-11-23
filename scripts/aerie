@@ -6042,10 +6042,21 @@ PY
         esac
         # The key every node pins (tls.key_state): a file that is there and
         # cannot be opened is kept, and said here, never made anew.
-        local tls_key
+        # A probe that fails with nothing said (a traceback) is said too
+        # (B1101): its stderr was thrown away, and the doctor then said
+        # nothing of the key.
+        local tls_key tls_err tls_rc=0
+        tls_err="$(mktemp)"
         tls_key=$(DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" tlskey \
-            "$BB_SCRIPTS/dashboard/tls.py" 2>/dev/null) || true
-        [ -z "$tls_key" ] || { printf '%s\n' "$tls_key"; ok=1; }
+            "$BB_SCRIPTS/dashboard/tls.py" 2>"$tls_err") || tls_rc=$?
+        if [ -n "$tls_key" ]; then
+            printf '%s\n' "$tls_key"; ok=1
+        elif [ "$tls_rc" -ne 0 ]; then
+            printf '  [warn] the doctor could not read the state of the TLS key every node pins: %s\n' \
+                "$(tail -n 1 "$tls_err" | cut -c1-200)"
+            ok=1
+        fi
+        rm -f "$tls_err"
         # What the dashboard's process does about the keys it holds (R158
         # step 6), as it said at its start.
         if [ -r /run/builderbot-hardening.json ]; then
