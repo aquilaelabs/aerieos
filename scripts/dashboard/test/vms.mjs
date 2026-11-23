@@ -110,7 +110,7 @@ const foreign = await page.evaluate(() => ({
   // Clone into a space (R163 step 12): live on the stopped one, dead with
   // why on the running one, and nothing else to press.
   clone: [...document.querySelectorAll('.vmtab .vmothers [data-vmclone]')].map(b => `${b.dataset.vmfrom}:${b.disabled ? 'dead' : 'live'}`),
-  running: document.querySelector('.vmtab .tiles')?.textContent.replace(/\s+/g, ' ') || '',
+  running: document.querySelector('.vmtab .pgline')?.textContent.replace(/\s+/g, ' ') || '',
 }));
 ok(foreign.rows.length === 2 && /win11 ?running/.test(foreign.rows[0]) && /4 vCPU · 8 GB/.test(foreign.rows[0]) && foreign.buttons === 2
    && JSON.stringify(foreign.clone) === '["win11:dead","old-box:live"]' && /shut it down to clone it/.test(foreign.rows[0]) && /1 running/.test(foreign.running),
@@ -184,9 +184,9 @@ const said = await page.evaluate(() => ({ q: vmsSearch, live: TABKINDS.vms.live(
 ok(narrowed && said.focus === 'vmSearch', `the search narrows the VMs as it is typed, keeping its focus (B368; ${JSON.stringify(said)})`);
 await page.fill('.pane .doc.on .vmtab #vmSearch', '');
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 5000 });
-const top = await page.$eval('.vmtab', t => ({ tiles: [...t.querySelectorAll('.tiles .tile .tl')].map(x => x.textContent).join(),
+const top = await page.$eval('.vmtab', t => ({ tiles: [...t.querySelectorAll('.pgline .pgl')].map(x => x.textContent.replace(/^\s*\d+\s*/, '').split(' ')[0]).join(),
   chips: [...t.querySelectorAll('[data-vmchip]')].map(c => c.textContent.replace(/\d+$/, '').trim()) }));
-ok(/^running,spaces,snapshots/.test(top.tiles), `the VMs page counts what runs, its spaces and snapshots in tiles, as Containers does (${JSON.stringify(top)})`);
+ok(/^running,spaces,snapshots/.test(top.tiles), `the VMs page's status line counts what runs, its spaces and snapshots, as Containers' does (${JSON.stringify(top)})`);
 if (top.chips.length > 2){
   const other = await page.$eval('.vmtab [data-vmchip]:not([data-vmchip=""]):not([data-vmchip="alpha"])', c => c.dataset.vmchip);
   await page.click(`.vmtab [data-vmchip="${other}"]`);

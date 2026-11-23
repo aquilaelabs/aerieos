@@ -114,7 +114,7 @@ const outline = sel => {
     // where the first card starts under the bar, the tiles and the status line
     top: card ? Math.round(card.getBoundingClientRect().top - root.getBoundingClientRect().top) : null,
     bar: !!bar && shown(bar),
-    tiles: !!first('.tiles'),
+    tiles: !!first('.pgline'),
     status: !!first('.headline'),
     split: !!split,
     detailX: detail ? box(detail).l : null,
@@ -257,7 +257,7 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
     // the loaded view never draws more tiles than its markup declares.
     const decl = await page.evaluate(() => {
       const g = [...document.querySelectorAll('.nb .nbview:not([hidden]) .nbglance')].find(e => e.checkVisibility());
-      return g ? { declared: +g.dataset.tiles || 0, drawn: g.querySelectorAll('.tile').length } : null;
+      return g ? { declared: +g.dataset.tiles || 0, drawn: g.querySelectorAll('.pgl').length } : null;
     });
     ok(!decl || decl.drawn <= decl.declared || MORE_TILES[v],
        `the notebook's ${v} view draws no more tiles than its markup declares for its waiting shape ${where} (${JSON.stringify(decl)})`);

@@ -224,8 +224,9 @@ function renderEmulatorInto(i){
     // emulator boots are kept; its free space is the tile's (R218 step 24).
     pageHead({
       pills: d.root && !d.wrong_platform ? "" : `<span class="pill warn">${d.wrong_platform ? "another platform" : "no store yet"}</span>`,
-      facts: [["System images", d.root && !d.wrong_platform ? d.root : ""],
-              ["Platform", d.wrong_platform ? `${d.platform}: the Android tools are packaged for ${d.wrong_platform}` : ""]]})}
+      // Another platform is news (R274); where the images are kept is a detail.
+      line: [d.wrong_platform ? {text: `${d.platform}: the Android tools are packaged for ${d.wrong_platform}`, tone: "warn"} : null],
+      facts: [["System images", d.root && !d.wrong_platform ? d.root : ""]]})}
     ${
     // Warnings in the notice voice, an action a button beside it rather than
     // a link in the prose (R218 step 24).

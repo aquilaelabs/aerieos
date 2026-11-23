@@ -92,7 +92,7 @@ await nbTab(page, 'roadmap');
 ok(await page.$eval('#memTitle', el => el.textContent === 'Notebook: alpha'),
    'the panel opens on the list');
 await page.waitForFunction(() => document.getElementById('roadmapSess').textContent.length > 0);
-ok(!(await page.$('#roadmapHint .tile'))
+ok(!(await page.$('#roadmapHint .pgl'))
    && await page.$eval('#roadmapEmpty', el => !el.hidden && /every Claude session/.test(el.textContent)),
    '...and says where the items end up, as its empty state, with no tiles of zeros over it (R119 step 4, R109)');
 

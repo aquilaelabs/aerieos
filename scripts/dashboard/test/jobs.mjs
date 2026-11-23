@@ -136,9 +136,9 @@ await section("The tab at a glance", async () => {
   await page.waitForSelector('.jobstab .jbrow', { timeout: 15000 });
   // The tab at a glance (R216): tiles of what runs, waits, failed and
   // finished of the jobs listed.
-  const jtiles = await page.$$eval('.jobstab .tiles .tile .tl', ls => ls.map(l => l.textContent.trim()));
-  ok(jtiles.includes('running') && jtiles.includes('succeeded'),
-     `the Jobs page opens on tiles of what runs and what finished (${jtiles.join(', ')})`);
+  const jtiles = await page.$$eval('.jobstab .pgline .pgl', ls => ls.map(l => l.textContent.replace(/^\s*\d+\s*/, '').trim()));
+  ok(jtiles.some(x => /^running/.test(x)) && jtiles.some(x => /^succeeded/.test(x)),
+     `the Jobs page opens on a status line of what runs and what finished (${jtiles.join(', ')})`);
   // By names an account without its prefix, and a job AerieOS asked for in words (B31).
   const by = await page.evaluate(() => [jobBy({ requested_by: 'user:alice' }),
     jobBy({ requested_by: 'system:auto-update' })]);
@@ -205,10 +205,10 @@ await section("The tab at a glance", async () => {
                              { timeout: 15000 });
   // Counted by the tiles (the page heads: no words on the bar), running
   // and waiting each their own.
-  await page.waitForFunction(() => [...document.querySelectorAll('.jobstab .tile')].some(t => /running/.test(t.textContent) && /[1-9]/.test(t.textContent)),
+  await page.waitForFunction(() => [...document.querySelectorAll('.jobstab .pgl')].some(t => /running/.test(t.textContent) && /[1-9]/.test(t.textContent)),
                              null, { timeout: 10000 }).catch(() => {});
-  const bar = await page.$eval('.jobstab', e => [...e.querySelectorAll('.tile')].map(t => t.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
-  ok(/\b[1-9]\d* running/.test(bar), `the tiles count what is not over (${bar})`);
+  const bar = await page.$eval('.jobstab', e => [...e.querySelectorAll('.pgl')].map(t => t.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+  ok(/\b[1-9]\d* running/.test(bar), `the status line counts what is not over (${bar})`);
   await page.click(`.jobstab .jbrow[data-job="${q.job}"] [data-jb="cancel"]`);
   await page.waitForSelector(`.jobstab .jbrow[data-job="${q.job}"][data-state="canceled"]`,
                              { timeout: 15000 });

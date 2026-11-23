@@ -103,8 +103,10 @@ await section("and to the left of that pill a card names who the tool itself is 
 });
 ok(await page.evaluate(() => {
   const head = document.querySelector('.doc .librarytab .pghead');
-  return !!head && /Installed/.test(head.textContent);
-}), 'the head says how many are installed, the way a node\'s head does');
+  // Its status line says what wants doing, or that all is up to date (R274):
+  // what is installed is the Installed chip's count, not said twice.
+  return !!head?.querySelector('.pgline') && /updates? due|installed, all up to date/.test(head.querySelector('.pgline').textContent);
+}), 'the head\'s status line says the updates due, or that what is installed is up to date');
 
 // ---- search and chips ----------------------------------------------------
 // The server narrows (R256): the search, a chip or a topic is one sorted
@@ -375,7 +377,7 @@ await section("the bar's Check for updates", async () => {
   // drawn only where the node has one; a fact with nothing to say is left out.
   // ...drawn on the paint after the read lands, so waited for rather than read at once.
   const when = await page.waitForFunction(() => {
-    const said = /Versions checked/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '');
+    const said = /versions checked/.test(document.querySelector('.doc .librarytab .pghead .pgline')?.textContent || '');
     return said === !!(lib.store?.checked) ? {checked: lib.store?.checked || 0, said} : null;
   }, null, { timeout: 10000 }).then(h => h.jsonValue());
   ok(when.said === !!when.checked, `...and the head says when versions were checked only once the node has a time (${when.checked ? 'said' : 'none yet, not drawn'})`);

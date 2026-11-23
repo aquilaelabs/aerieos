@@ -161,7 +161,7 @@ function renderUsersInto(i){
     // Its template (R218 step 16): the list beside the settings, whose
     // labels are the page's own; the accounts are on their way.
     const field = label => skField(label, 16);
-    drawHTML(d.list, skTpl(`${pageHead({facts: [["Accounts", GHOST], ["Administrators", GHOST]], actions: addUser})}<div class="rsplit"><div class="rlist">${skRows(3)}</div><div class="rdetail">${
+    drawHTML(d.list, skTpl(`${pageHead({line: [{value: GHOST, label: "accounts"}], actions: addUser})}<div class="rsplit"><div class="rlist">${skRows(3)}</div><div class="rdetail">${
       field("Account name") + field("Their name") + field("Roles and spaces")}</div></div>`));
     loadUsers();
     wireUsersBar(d.el);
@@ -180,7 +180,8 @@ function renderUsersInto(i){
   const seen = usersList.filter(x => x.seen && Date.now() / 1000 - x.seen < 86400 * 7).length;
   patch(d.list, `
     ${usersErr ? `<div class="row bad"><div class="grow">${esc(usersErr)}</div></div>` : ""}
-    ${pageHead({facts: [["Accounts", String(usersList.length)], ["Administrators", String(admins)], ["Seen this week", String(seen)]], actions: addUser})}
+    ${pageHead({line: [{value: usersList.length, label: usersList.length === 1 ? "account" : "accounts"},
+                     {value: admins, label: admins === 1 ? "administrator" : "administrators"}, {value: seen, label: "seen this week"}], actions: addUser})}
     <div class="rsplit${usersPhoneOpen ? " open" : ""}">
       <div class="rlist">${usersList.map(userRow).join("") || `<div class="empty">nobody yet</div>`}</div>
       <div class="rdetail">${u ? usersDetail(u) : `<div class="empty">nobody to show</div>`}</div>

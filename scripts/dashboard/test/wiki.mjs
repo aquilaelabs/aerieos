@@ -23,7 +23,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
 // ---- the view, empty, then a page made from it --------------------------------
 await page.evaluate(n => openNotebook(n, 'wiki'), P);
 await page.waitForFunction(() => /waits? for a page/.test(document.querySelector('.nb #wkNetState')?.textContent || '')
-  && !document.querySelector('.nb #wkHint .tile'), null, { timeout: 20000 });
+  && !document.querySelector('.nb #wkHint .pgl'), null, { timeout: 20000 });
 ok(!(await page.$(`${NB} .nbview[data-view="wiki"] .sectbar`))
    && await page.$eval(`${NB} #wkExport`, e => e.disabled),
    'the wiki opens empty, with no Save of its own (it writes through) and Export dead until there is a page');

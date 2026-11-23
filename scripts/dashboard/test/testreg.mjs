@@ -587,9 +587,9 @@ await nbTab(page, 'bugs');
 await nbTab(page, 'tests');
 await page.waitForFunction(() => /tests running/.test([...document.querySelectorAll('.nb .nbview[data-view="tests"] :is(#tstHint, .nbsaidslot)')].map(e => e.textContent).join(' ')), null, { timeout: 15000 });
 const headGoing = await page.$eval('.nb .nbview[data-view="tests"]', v => ({ said: v.querySelector('.nbsaidslot > .notice, #tstHint .nbsaid .notice')?.textContent.replace(/\s+/g, ' ').trim() || '',
-                                                           tiles: v.querySelectorAll('#tstHint .tile').length }));
+                                                           tiles: v.querySelectorAll('#tstHint .pgl').length }));
 ok(/^tests running, started just now(?: by \w+)?: npm test cards$/.test(headGoing.said) && headGoing.tiles > 0,
-   `the Tests view's status line names the run going, on its control row under its tiles: when it started, by whom, the command (${JSON.stringify(headGoing).slice(0, 120)})`);
+   `the Tests view's status line names the run going, on its control row under its glance: when it started, by whom, the command (${JSON.stringify(headGoing).slice(0, 120)})`);
 await page.waitForFunction(() => /tests running, started just now/.test(document.querySelector('.pane .bar.proj .ptesting')?.textContent || ''),
   null, { timeout: 20000 });
 ok(true, "...and the space's header says tests running, started just now");

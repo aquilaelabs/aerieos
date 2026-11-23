@@ -98,7 +98,9 @@ function renderKeysInto(i){
   }
   const k = keysData.install || {}, rows = keysData.kept || [];
   d.setBar("");
-  patch(d.list, pageHead({facts: k.where ? [
+  // One line (R274): a key not saved yet is news; the rest is Details.
+  patch(d.list, pageHead({line: [k.where ? {text: `kept in ${KEYS_WHERE[k.where]}`} : {text: "no install key"},
+                                 k.where && k.changeable && !k.saved ? {text: "not saved yet", tone: "warn"} : null], facts: k.where ? [
       ["Install key", k.fingerprint, {cls: "keyfp"}], ["Kept in", KEYS_WHERE[k.where]],
       ["Made", KEYS_WHEN(k.made)], ["Changed", k.changed && k.changed !== k.made ? KEYS_WHEN(k.changed) : ""],
       ["Saved", k.changeable ? (k.saved ? "yes" : "not yet") : ""]] : [["Install key", "none"]]})

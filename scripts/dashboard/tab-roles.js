@@ -423,7 +423,7 @@ function renderRolesInto(i){
     // are the page's own; who holds what is on its way.
     const split = detail => `<div class="rsplit"><div class="rlist">${skRows(4)}</div><div class="rdetail">${detail}</div></div>`;
     const field = skField;
-    drawHTML(d.list, skTpl(pageHead({facts: [["Roles", GHOST], ["For spaces", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas"))));
+    drawHTML(d.list, skTpl(pageHead({line: [{value: GHOST, label: "roles"}], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas"))));
     loadRoles();
     return;
   }
@@ -437,7 +437,8 @@ function renderRolesInto(i){
   const all = Object.values(rolesData.roles || {});
   patch(d.list, `
     ${rolesErr ? `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>` : ""}
-    ${pageHead({facts: [["Roles", String(all.length)], ["For spaces", String(all.filter(r => r.scope === "projects").length)]], actions: newRole})}
+    ${pageHead({line: [{value: all.length, label: all.length === 1 ? "role" : "roles"},
+                     {value: all.filter(r => r.scope === "projects").length, label: "for spaces"}], actions: newRole})}
     <div class="rsplit${rolesPhoneOpen ? " open" : ""}">
       <div class="rlist">${ro.list}</div>
       <div class="rdetail">${ro.detail}</div>

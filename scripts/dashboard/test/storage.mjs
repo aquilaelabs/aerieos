@@ -45,7 +45,7 @@ ok(await page.$eval('.pane .bar label.pick select#ndPick', s => [...s.options].s
 await page.selectOption('.pane .bar #ndPick', minted.id);
 const sect = `.storagetab [data-stnode="${minted.id}"]`;
 await page.waitForSelector(sect, { timeout: 10000 });
-const drawn = await page.$eval(sect, s => ({ status: 'measured ' + ([...s.querySelectorAll('.toolstate .fact')].find(f => f.querySelector('dt')?.textContent === 'Measured')?.querySelector('dd')?.textContent.trim() || ''),
+const drawn = await page.$eval(sect, s => ({ status: s.querySelector('.toolstate .pgline')?.textContent.trim() || '',
   // Each filesystem a card titled by its mount (R218 step 47), its meter "used".
   meters: [...s.querySelectorAll('details[data-sect^="storage:fs:"] > summary .t')].map(l => l.textContent),
   used: [...s.querySelectorAll('.ndmeter .lbl')].every(l => l.textContent === 'used'),
@@ -62,7 +62,7 @@ const drawn = await page.$eval(sect, s => ({ status: 'measured ' + ([...s.queryS
     return `${d.closest('details').querySelector('summary .t').textContent}: ${rows.join(', ')}`; }) }));
 ok(/measured 10 min ago/.test(drawn.status) && drawn.meters.join() === '/,/mnt/share' && drawn.used && /93\.8 GB \/ 125 GB/.test(drawn.vals[0])
    && drawn.stores && drawn.proj.join('|') === 'alpha|beta' && drawn.measure,
-   `...the node: each filesystem a meter, the stores and Docker's share, the spaces in rows, Measure now under the head's facts (${JSON.stringify(drawn)})`);
+   `...the node: each filesystem a meter, the stores and Docker's share, the spaces in rows, Measure now on the head's action row, when it was measured on its line (${JSON.stringify(drawn)})`);
 ok(drawn.disks.join(' | ') === '/: cache store, the accounts\' homes, Docker, artifacts store, synced copies | /mnt/share: ',
    `...and under each meter what AerieOS holds on that disk, largest first, the share with nothing on it bare (${JSON.stringify(drawn.disks)})`);
 // The meters are one stack: every track the same width, the values one column.

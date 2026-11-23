@@ -2509,9 +2509,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
 
     // The images at a glance (R216): tiles of how many, the AVDs on them.
     await page.evaluate(() => { emu = null; loadEmulator(); });
-    await page.waitForSelector('.emutab .tiles .tile', { timeout: 15000 });
-    ok((await page.$$eval('.emutab .tiles .tile .tl', ls => ls.map(l => l.textContent.trim()))).includes('images'),
-       'the Emulator page opens on tiles: images held and the AVDs built on them');
+    await page.waitForSelector('.emutab .pgline .pgl', { timeout: 15000 });
+    ok((await page.$$eval('.emutab .pgline .pgl', ls => ls.map(l => l.textContent.replace(/\s+/g, ' ').trim()))).some(x => /\bimages?\b/.test(x)),
+       'the Emulator page opens on its status line: images held and the AVDs built on them');
 
     // A census without the field (a node that has not reported it) is not a
     // node with no images: the tab would otherwise say "no image" for a node

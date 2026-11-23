@@ -549,7 +549,7 @@ function renderLibraryInto(i){
   if (lib === null){
     d.setBar("");
     const skcard = libSkCard;
-    drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
+    drawHTML(d.list, skTpl(pageHead({line: [{value: GHOST, label: "updates due"}]})
       + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name, maker or what it does" data-ph-short="search"><span class="libnarrow pickshare"><label class="pick libsort"><select disabled aria-label="order"><option>By name</option></select></label>${viewSeg("libviewsk", libViewNow(), "", "", " disabled", ["Cards", "Rows"])}</span><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
       + `<div class="field libgroups">${[["installed", "On this node"], ...LIB_KINDS].map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}<button type="button" class="link libshelfall" disabled>All ›</button></h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
     if (!readRev("library") && !readBusy("library")) loadLibrary();
@@ -595,11 +595,13 @@ function renderLibraryInto(i){
   if (LIB_STANDS[libKind] && !(lib.counts?.kind?.[libKind]) && !(lib.rows || []).length && !libQ.trim()){ libKind = ""; setTimeout(loadLibrary); }
   const inst = f.installed || 0, due = f.updates || 0, notHere = f.other_platform || 0, notBuild = f.not_this_build || 0;
   const free = lib.store?.free_mb ? `${humanBytes(lib.store.free_mb * 1048576)} free` : "";
-  const head = pageHead({facts: [
-    ["Installed", `${inst} of ${f.offered || 0}`],
-    ["Updates due", due ? String(due) : ""],
+  // One line of what is news (R274): updates due, and how fresh that is;
+  // what is installed is the Installed chip's count, said once.
+  const head = pageHead({line: [
+    due ? {value: due, label: due === 1 ? "update due" : "updates due", tone: "warn"} : {text: `${inst} of ${f.offered || 0} installed, all up to date`},
+    lib.store?.checked ? {text: `versions checked ${ago(lib.store.checked)}`} : null,
+  ], facts: [
     ["Store", lib.store?.root ? `${lib.store.root}${free ? ", " + free : ""}` : ""],
-    ["Versions checked", lib.store?.checked ? ago(lib.store.checked) : ""],
     ["Not for this node", notHere ? String(notHere) : ""],
     ["Not for this AerieOS", notBuild ? `${notBuild} in the catalog` : ""],
     ["Remove takes", clean.length ? clean.map(c => `<code>${esc(c.dir)}</code> (${esc(c.what)})`).join(", ") : "", {html: true}],

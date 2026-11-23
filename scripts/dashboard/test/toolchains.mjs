@@ -281,7 +281,7 @@ await section("One operation at a time", async () => {
   // The answers are dated, because a number with no date on it goes stale.
   const when = await page.evaluate(() => {
     const was = lib.store;
-    const read = () => /Versions checked/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '');
+    const read = () => /versions checked/.test(document.querySelector('.doc .librarytab .pghead .pgline')?.textContent || '');
     lib.store = { ...(was || {}), checked: 0 }; readMoved('library'); drawPanes();
     const none = read();
     lib.store = { ...(was || {}), checked: Math.floor(Date.now() / 1000) - 3600 }; readMoved('library'); drawPanes();

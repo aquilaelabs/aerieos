@@ -1546,15 +1546,17 @@ await section("the notebook's head row", async () => {
                    && !n.matches('button, input, select, .actbar, .sp, .gbpicker, #dkSeg, .nbsaidslot'))).map(n => n.textContent.trim()).join(' ').slice(0, 60),
                glance: (() => {
                  const bad = [];
-                 // Tiles only in the glance's .tiles, the Containers page's shape.
+                 // The glance is a status line (R274): phrases in its .pgline,
+                 // no tiles left.
                  const g = view.querySelector(':scope > .nbglance');
                  if (w !== 'settings' && !g) bad.push('no glance');
-                 if (g) for (const t of g.querySelectorAll('.tile')) if (!t.closest('.tiles') || !t.querySelector('.tv') || !t.querySelector('.tl')) bad.push('a tile out of shape');
-                 // Count-first: the row's first tile is how many of what
+                 if (g?.querySelector('.tile')) bad.push('a tile in the glance');
+                 if (g) for (const t of g.querySelectorAll('.pgl')) if (!t.closest('.pgline')) bad.push('a phrase out of its line');
+                 // Count-first: the line's first phrase is how many of what
                  // the view lists, a figure, before anything it says of them
-                 // (a tile still waiting on its read has no figure yet).
-                 const lead = g?.querySelector('.tiles .tile .tv')?.textContent.trim();
-                 if (lead && !/^\d/.test(lead)) bad.push(`its first tile reads ${lead.slice(0, 20)}, not a count`);
+                 // (one still waiting on its read has no figure yet).
+                 const lead = g?.querySelector('.pgline .pgl b')?.textContent.trim();
+                 if (lead && !/^\d/.test(lead)) bad.push(`its first phrase reads ${lead.slice(0, 20)}, not a count`);
                  // Every group of chips the view narrows by in one band.
                  const bands = [...view.querySelectorAll(':scope > .lfilter')].filter(b => b.checkVisibility());
                  if (bands.length > 1) bad.push(`${bands.length} chip bands`);
@@ -2296,6 +2298,12 @@ for (const kind of kinds){
   const cut = await page.$$eval('.doc.on .tile .tv', vs => vs.filter(v => v.offsetParent && v.scrollWidth > v.clientWidth + 1)
     .map(v => v.textContent.trim()));
   ok(cut.length === 0, `[${kind}] every tile's number is whole at phone width${cut.length ? `; cut: ${cut.join(', ')}` : ''}`);
+  // No tiles but Home's, and no facts grid open in a page's head unasked
+  // (R274, the operator 23 Nov): what a page is about now is its status line.
+  const busy = await page.$$eval('.doc.on', ds => ds.flatMap(d => [
+    ...[...d.querySelectorAll('.tiles:not(.hometiles)')].filter(e => e.checkVisibility()).map(() => 'tiles'),
+    ...[...d.querySelectorAll('.pghead > dl.facts, .pghead > .pghfacts')].filter(e => e.checkVisibility()).map(() => 'a facts grid in the head')]));
+  ok(busy.length === 0, `[${kind}] a page's top is its status line, its facts behind Details${busy.length ? `: ${busy.join(', ')}` : ''}`);
   const room = await headRoom();
   ok(room.length === 0,
      `[${kind}] every section's first line keeps room under its head at phone width${room.length ? `; touching: ${room.join(', ')}` : ''}`);

@@ -59,14 +59,15 @@ function renderAuditInto(i){
   d.setBar("");
   if (data === null){
     drawHTML(d.list, auditErr ? `<div class="field"><div class="notice bad">${esc(auditErr)}</div></div>`
-      : skTpl(pageHead({facts: [["Recorded", GHOST], ["Shown", GHOST]]})
+      : skTpl(pageHead({line: [{value: GHOST, label: "recorded"}]})
         + docSection("audit", "trail", "What was done", "", skRows(6))));
     if (!auditErr) loadAudit();
     return;
   }
   const rows = data.rows || [];
-  patch(d.list, pageHead({facts: [["Recorded", String(data.total || 0)], ["Shown", String(rows.length)],
-      ["Since", rows.length ? new Date(rows[rows.length - 1].at * 1000).toLocaleDateString() : ""]],
+  // One line (R274): what is shown of what is recorded, and since when.
+  patch(d.list, pageHead({line: [{text: `${rows.length} of ${data.total || 0} recorded${
+      rows.length ? `, since ${new Date(rows[rows.length - 1].at * 1000).toLocaleDateString()}` : ""}`}],
       actions: pick("auditPerson", "Person", (data.people || []).map(p => [p, p]), auditPerson)
         + pick("auditMachine", "Machine", (data.machines || []).map(m => [m.id, m.name]), auditMachine)})
     + (auditErr ? `<div class="notice bad">${esc(auditErr)}</div>` : "")

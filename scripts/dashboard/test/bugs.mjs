@@ -32,7 +32,7 @@ await nbShown(page);
 await nbGo(page, 'bugs');
 await page.waitForSelector('#bugList .nbempty', { timeout: 15000 });
 ok(await page.$eval('#bugList .nbempty', e => /reaches every session in this space/.test(e.textContent))
-   && !(await page.$('#bugHint .tile')) && await page.$eval('#bugNew', b => b.checkVisibility() && b.classList.contains('primary')),
+   && !(await page.$('#bugHint .pgl')) && await page.$eval('#bugNew', b => b.checkVisibility() && b.classList.contains('primary')),
    'the Bugs tab opens empty: no tiles of zeros, Report a bug on its control row, and where reports end up its empty state (R119 step 4, R109)');
 
 // ---- reporting one from the panel -----------------------------------------

@@ -3168,12 +3168,11 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
 // is here, and a container's row carries its facts as a grid with a
 // dotted state pill rather than a run-on line.
 await section("The tab at a glance", async () => {
-  const tiles = await page.$$eval('.dmtab .tiles:not(.mini) .tile', ts => ts.map(t => ({
-    v: t.querySelector('.tv')?.textContent.trim(), l: t.querySelector('.tl')?.textContent.trim(),
-    s: t.querySelector('.ts')?.textContent.trim() || '', h: t.getBoundingClientRect().height })));
-  const run = tiles.find(t => t.l === 'running');
-  ok(run && +run.v >= 1 && /^of \d+ containers?$/.test(run.s) && tiles.every(t => Math.abs(t.h - tiles[0].h) <= 1),
-     `tiles say how many run of how many are here, in one row of one height (${JSON.stringify(tiles.map(t => [t.v, t.l, t.s]))})`);
+  // ...its status line now (R274): one quiet line of phrases.
+  const tiles = await page.$$eval('.dmtab .pgline .pgl', ts => ts.map(t => t.textContent.replace(/\s+/g, ' ').trim()));
+  const run = tiles.find(t => /^\d+ running of \d+ containers?$/.test(t));
+  ok(run && +run.split(' ')[0] >= 1,
+     `the status line says how many run of how many are here (${JSON.stringify(tiles)})`);
   // What it is, on one mono line under the name (the operator's concept, 17
   // Oct), and its settings as pills.
   const head = await page.$eval('.dmtab .row[data-inst="ep.silon|staging-two"]', r => ({
@@ -3282,7 +3281,7 @@ await section("The tab at a glance", async () => {
   await page.click(`${imgSect} > summary`);
   await page.waitForFunction(sel => document.querySelector(sel + ' .dmimg'), imgSect, { timeout: 60000 });
   const imgs = await page.evaluate(sel => ({
-    tiles: [...document.querySelectorAll(sel + ' .tiles:not(.mini) .tile')].map(t => `${t.querySelector('.tv')?.textContent.trim()} ${t.querySelector('.tl')?.textContent.trim()}`),
+    tiles: [...document.querySelectorAll(sel + ' .pgline .pgl')].map(t => t.textContent.replace(/\s+/g, ' ').trim()),
     rows: [...document.querySelectorAll(sel + ' .dmimg')].map(r => `${r.querySelector('.tline')?.textContent.replace(/\s+/g, ' ').trim()}`),
     vols: [...document.querySelectorAll(sel + ' .dmvol .td.lead')].map(e => e.textContent.trim()),
     heads: [...document.querySelectorAll(sel + ' .tbl > .thead')].map(h => [...h.children].map(c => c.textContent.trim()).join(' ')),
@@ -3379,7 +3378,7 @@ await section("The tab at a glance", async () => {
   await page.fill('.dmtab #dmSearch', 'staging');
   await page.waitForFunction(() => [...document.querySelectorAll('.dmtab .row[data-inst]')].every(r => /staging/.test(r.dataset.inst)) && document.querySelectorAll('.dmtab .row[data-inst]').length >= 1, null, { timeout: 10000 });
   ok(true, 'the search narrows the rows to what matches as it is typed');
-  ok(await page.$$eval('.dmtab .tiles:not(.mini) .tile', ts => ts.length > 0), '...while the tiles still count the whole');
+  ok(await page.$$eval('.dmtab .pgline .pgl', ts => ts.length > 0), '...while the status line still counts the whole');
   await page.fill('.dmtab #dmSearch', 'no-such-container-anywhere');
   await page.waitForFunction(() => /nothing here matches/.test(document.querySelector('.dmtab .empty')?.textContent || ''), null, { timeout: 10000 });
   ok(true, '...and nothing matching says so');
@@ -3536,9 +3535,9 @@ await section("a registry image that moved", async () => {
   ok(await page.$eval('.dmimgbar', e => /Images checked\s*(not yet|.* ago|just now)/.test(e.textContent)),
      'the Containers page says when its registry images were last checked, a fact of its head');
   ok(await page.$eval('.dmtab', t => { const kids = [...t.children], at = s => kids.findIndex(k => k.matches(s) || k.querySelector(`:scope > ${s}`));
-       const box = at('.dmimgbar'), tiles = at('.tiles'), chips = at('.chips');
+       const box = at('.dmimgbar'), tiles = at('.pgline'), chips = at('.chips');
        return box > tiles && (chips < 0 || box > chips); }),
-     '...under its tiles and its chips, which every page has first (the operator, 26 Oct)');
+     '...under its status line and its chips, which every page has first (the operator, 26 Oct)');
   await page.click('#bDockerCheck');
   await page.waitForSelector('.dmtab .row[data-inst="radarr|main"] .dmimages', { timeout: 20000 });
   ok(await page.$eval('.dmtab .row[data-inst="radarr|main"]', r => /a newer lscr\.io\/linuxserver\/radarr:latest is out/.test(r.querySelector('.dmimages').textContent)
@@ -3599,13 +3598,13 @@ await section("a row on a phone", async () => {
       // The buttons share one line.
       const tops = [...b.querySelectorAll('.actbar > button')]
         .filter(e => e && e.offsetHeight).map(top);
-      const tile = [...document.querySelectorAll('.pane .doc.on .tiles .tile .ts')][0];
+      const tile = [...document.querySelectorAll('.pane .doc.on .pgline .pgl')][0];
       return { tops, right: Math.max(...[...b.querySelectorAll('button, select, input')].map(e => e.getBoundingClientRect().right)),
                tileLines: tile ? (() => { const r = document.createRange(); r.selectNodeContents(tile);
                  return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size; })() : 1 };
     });
     ok(new Set(bar.tops).size === 1 && bar.right <= w && bar.tileLines <= 1,
-       `at ${w}px the Containers bar keeps Check and New on one line inside the screen, and the tile on one line (${JSON.stringify(bar)})`);
+       `at ${w}px the Containers bar keeps Check and New on one line inside the screen, and the line's first phrase on one line (${JSON.stringify(bar)})`);
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(() => { dockerList = null; readMoved('docker'); loadDocker(); });
@@ -5015,7 +5014,7 @@ await section("the project a container belongs to", async () => {
     buttons: [...v.querySelectorAll('#dkList .row[data-inst="helper-for-eps|main"] [data-dm]')].map(b => b.dataset.dm),
     cards: [...v.querySelectorAll('#dkList > .dmcard')].map(c => c.querySelector('.dmgroup b')?.textContent),
     loose: v.querySelectorAll('#dkList > .row').length,
-    tiles: [...v.querySelectorAll('#dkHint .tile')].map(t => t.textContent.replace(/\s+/g, ' ').trim()) }));
+    tiles: [...v.querySelectorAll('#dkHint .pgl')].map(t => t.textContent.replace(/\s+/g, ' ').trim()) }));
   ok(view.rows.includes('helper-for-eps|main') && view.rows.includes('ep.silon|main')
      && view.rows.includes('someone-elses') && !view.rows.includes('ep.silon|loose'),
      `the space's Docker view lists what belongs to it, and not its own container sent to no space (${view.rows.join(' ')})`);
@@ -5026,7 +5025,7 @@ await section("the project a container belongs to", async () => {
   // As the Containers page draws them, scoped to the project (the operator,
   // 19 Oct): its own card under its tiles, no row loose on the page.
   ok(view.cards.length === 1 && view.loose === 0 && view.tiles.some(t => /running/.test(t)) && !view.tiles.some(t => /projects/.test(t)),
-     `...in the space's own card under its tiles, as the Containers page draws a group (${JSON.stringify({cards: view.cards, loose: view.loose, tiles: view.tiles})})`);
+     `...in the space's own card under its status line, as the Containers page draws a group (${JSON.stringify({cards: view.cards, loose: view.loose, tiles: view.tiles})})`);
   // Its containers may be on more than one node (a hosting node, one it also
   // works on): the view reads each as the space's, a node at a time, and one
   // band of chips narrows it to a node (the operator, 19 Nov). On one node

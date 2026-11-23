@@ -140,7 +140,7 @@ function renderScannersInto(i){
   if (scannersData === null){
     d.setBar("");
     drawHTML(d.list, scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
-      : skTpl(pageHead({facts: [["This AerieOS names", GHOST], ["Nodes scanning", GHOST]], actions: scannersActs(null)})
+      : skTpl(pageHead({line: [{value: GHOST, label: "nodes scanning"}], actions: scannersActs(null)})
         + docSection("scanners", "schedule", "Schedule", "", `<div class="field">${skRows(2)}</div>`)
         // A node's section before its name is read: a word, since a
         // section's title is words and the ghost is a fact's value.
@@ -153,8 +153,10 @@ function renderScannersInto(i){
   const lt = data.latest || {};
   d.setBar("");
   const deployed = (data.nodes || []).some(n => n.deployed);
-  patch(d.list, pageHead({facts: [["This AerieOS names", scannersVersions(lt.versions)],
-      ["Nodes scanning", String((data.nodes || []).filter(n => n.deployed).length)]], actions: scannersActs(data)})
+  // One line (R274): how many nodes scan; the versions this AerieOS names
+  // behind Details.
+  patch(d.list, pageHead({line: [{value: (data.nodes || []).filter(n => n.deployed).length, label: "nodes scanning"}],
+      facts: [["This AerieOS names", scannersVersions(lt.versions)]], actions: scannersActs(data)})
     + scannersScheduleSection(data.schedule || {}, deployed)
     + (data.nodes || []).map(scannersNodeSection).join("")
     + ((data.nodes || []).length ? "" : noNodeYet("the scanners run on a node"))

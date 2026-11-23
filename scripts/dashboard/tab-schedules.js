@@ -194,7 +194,7 @@ function renderSchedulesInto(i){
   if (!d) return;
   if (schedData === null){
     d.setBar("");
-    drawHTML(d.list, skTpl(pageHead({facts: [["Schedules", GHOST], ["Turned on", GHOST], ["Next run", GHOST]],
+    drawHTML(d.list, skTpl(pageHead({line: [{value: GHOST, label: "turned on"}],
                                        actions: `<button type="button" class="primary" disabled>New schedule</button>`})
       + docSection("schedules", "list", "Schedules", "", skRows(2))));
     loadSchedules();
@@ -209,8 +209,10 @@ function renderSchedulesInto(i){
   const on = rows.filter(s => s.on), next = on.filter(s => s.next_at).sort((a, b) => a.next_at - b.next_at)[0];
   // New schedule on the head (the operator, 29 Oct: not a row of its own).
   d.setBar("");
-  patch(d.list, pageHead({facts: [["Schedules", String(rows.length)], ["Turned on", String(on.length)],
-                                       ["Next run", next ? `${next.name}, ${schedWhen(next.next_at)}` : "none"]],
+  // One line (R274): how many run, and which is next; the count of all is
+  // the section's.
+  patch(d.list, pageHead({line: [{value: on.length, label: "turned on"},
+                                 next ? {text: `next: ${next.name}, ${schedWhen(next.next_at)}`} : null],
                                actions: may ? `<button type="button" class="primary" id="bSchedNew">New schedule</button>` : ""})
     + docSection("schedules", "list", "Schedules", `${rows.length}`,
         rows.length ? `<div class="schedrows">${rows.map(s => schedRow(s, may)).join("")}</div>`

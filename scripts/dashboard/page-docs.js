@@ -1069,40 +1069,47 @@ function segPick(ids, on){
 }
 
 
-// A page's head (the operator, 25 Oct: what a page knows is said the way a
-// node's head says it, never as loose words at its top): what the page is
-// about with its state as pills, its facts as labels and values, and the
-// buttons about it on an action bar. Each part only when the page has it.
-// `pills` is markup (pill spans); `facts` factGrid's pairs.
-function pageHead({title = "", pills = "", facts = [], actions = "", cls = ""} = {}){
+// A page's head (the operator, 25 Oct; R274, 23 Nov): what the page is
+// about with its state as pills, then one status line of what is news
+// (statusLine), then what it knows that is not news behind a quiet Details
+// fold, and the buttons about it on an action bar. Each part only when the
+// page has it. `pills` is markup (pill spans); `line` statusLine's parts;
+// `facts` factGrid's pairs, which a person opens Details for: a head that
+// listed every fact made a page read busier than it was and said a chip's
+// counts twice (the operator, 23 Nov).
+function pageHead({title = "", pills = "", line = [], facts = [], actions = "", cls = ""} = {}){
   const grid = factGrid(facts, "pghfacts");
-  if (!title && !pills && !grid && !actions) return "";
+  const said = statusLine(line, true);
+  if (!title && !pills && !said && !grid && !actions) return "";
   return `<div class="field pghead${cls ? " " + esc(cls) : ""}">${
-    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? `${title ? " " : ""}${pills}` : ""}</div>` : ""}${grid}${
+    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? `${title ? " " : ""}${pills}` : ""}</div>` : ""}${said}${
+    grid ? `<details class="pgdet chev"${sectAttr(`pgdet:${cls || title || location.hash}`)}><summary>Details</summary>${grid}</details>` : ""}${
     actions ? `<div class="actbar">${actions}</div>` : ""}</div>`;
 }
 
-// A row of tiles under a tab's bar: each a number the tab is about, with
-// its label under it and, when the number itself is news, a tone. Facts
-// to look at, never pressed; a tile for a number that is always the same
-// is not drawn, which is what the `omit` flag is for.
-// A value or a sub given as GHOST is the page's placeholder: the tile is
-// the real one, its number shimmering until the page has it.
+// A page's status line (R274, the operator 23 Nov: the tiles and the facts
+// made pages busier than they are): what the page is about now, as short
+// phrases on one line joined by a dot, quiet but for a phrase that wants
+// doing, which wears --warn or --bad. A part is {text} or {value, label,
+// sub, tone}: a number and what it counts ("5 updates due"), the number in
+// ink. `bare` draws the line without its band, for a head that holds it.
+function statusLine(parts, bare = false){
+  const ps = (parts || []).filter(p => p && !p.omit && (p.text || p.value != null || p.label));
+  if (!ps.length) return "";
+  const one = p => {
+    const v = p.value === GHOST ? skv(1.4) : p.value != null && p.value !== "" ? `<b>${esc(String(p.value))}${p.unit ? " " + esc(p.unit) : ""}</b> ` : "";
+    const words = p.text != null ? esc(p.text) : `${esc(p.label || "")}${p.sub === GHOST ? " " + skv(4) : p.sub ? " " + esc(p.sub) : ""}`;
+    return `<span class="pgl${p.tone ? " " + esc(p.tone) : ""}"${p.title ? ` title="${esc(p.title)}"` : ""}>${v}${words}</span>`;
+  };
+  const line = `<div class="pgline">${ps.map(one).join('<span class="sep" aria-hidden="true"> · </span>')}</div>`;
+  return bare ? line : `<div class="field">${line}</div>`;
+}
+// What a surface's numbers were, a row of tiles, are its status line now
+// (R274): each tile a phrase, its number first and what it counts after it.
+// Kept by its name for the pages and the notebook's glance that call it; a
+// tile flagged `omit`, a number that is always the same, is still left out.
 function statTiles(tiles){
-  // A size given whole ("11.0 TB") is its number and its unit, the unit in
-  // the small voice as a tile's unit is: at the tile's size the two parted
-  // across lines on a phone.
-  const rows = (tiles || []).filter(t => t && !t.omit).map(t => {
-    const m = !t.unit && typeof t.value === "string" && /^([\d.,]+) (B|kB|KB|MB|GB|TB)$/.exec(t.value);
-    return m ? {...t, value: m[1], unit: m[2]} : t;
-  });
-  if (!rows.length) return "";
-  return `<div class="field"><div class="tiles">${rows.map(t => `
-    <div class="tile${t.tone ? " " + esc(t.tone) : ""}"${t.title ? ` title="${esc(t.title)}"` : ""}>
-      <div class="tv">${t.value === GHOST ? skv(1.4) : esc(String(t.value ?? "–"))}${t.unit ? `<span class="tu">${esc(t.unit)}</span>` : ""}</div>
-      <div class="tl">${esc(t.label || "")}</div>
-      ${t.sub === GHOST ? `<div class="ts">${skv(5)}</div>` : t.sub ? `<div class="ts">${esc(t.sub)}</div>` : ""}
-    </div>`).join("")}</div></div>`;
+  return statusLine((tiles || []).map(t => t && !t.omit ? {...t} : null));
 }
 // What a placeholder passes where a value will go (statTiles, a page's own
 // builders): drawn as a shimmer in the real markup.
@@ -1166,7 +1173,7 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
   } else wrote = patch(el, html + viewSaid(said, actions, tone));
   // Marked once: a poll that brings nothing new writes nothing (uniform).
   if (!el.dataset.drawn) el.dataset.drawn = "1";
-  glanceSeen[el.id] = {tiles: el.querySelectorAll(".tile").length, said: !!(said || actions)};
+  glanceSeen[el.id] = {tiles: el.querySelectorAll(".pgl").length, said: !!(said || actions)};
   return wrote;
 }
 // A view's glance when its read failed: no tiles, and what was being read

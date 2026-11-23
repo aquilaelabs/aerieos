@@ -285,7 +285,7 @@ function renderInstalledInto(i){
   if (!d) return;
   if (inst === null){
     d.setBar("");    // the node is the Machines header's (R177)
-    drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Updates due", GHOST]]})
+    drawHTML(d.list, skTpl(pageHead({line: [{value: GHOST, label: "installed"}]})
       + INST_KINDS.map(([k, title]) => docSection("installed", k, title, "", skRows(2))).join("")));
     if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
@@ -309,11 +309,11 @@ function renderInstalledInto(i){
       unmet.map(([r, ps]) => `${esc(r)}: ${esc(ps.join(" "))}`).join("; ")}. ${inst.sandbox && may.install
         ? `<button type="button" data-instsysdeps title="install these on ${esc(inst.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : "";
-  const head = pageHead({facts: [
-    ["Installed", String(rows.filter(r => r.installed).length)],
-    ["Updates due", due ? String(due) : ""],
-    ["Store", inst.store?.root || ""],
-  ]});
+  // One line (R274): what is installed, and what wants updating.
+  const head = pageHead({line: [
+    {value: rows.filter(r => r.installed).length, label: "installed"},
+    due ? {value: due, label: due === 1 ? "update due" : "updates due", tone: "warn"} : null,
+  ], facts: [["Store", inst.store?.root || ""]]});
   const sects = INST_KINDS.map(([k, title]) => {
     // By its group, as the Library sorts it: a pack that brings a coding
     // agent sits with the coding agents (the operator, 12 Nov).
