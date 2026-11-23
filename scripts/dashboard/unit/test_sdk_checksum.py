@@ -41,6 +41,20 @@ class Checksum(unittest.TestCase):
         with self.answer({"https://r/rustup-init.sha256": f"{H64} *./rustup-init\n"}):
             self.assertEqual(sdkmeta.checksum(row({"from": "file", "url": "{url}.sha256"}), "https://r/rustup-init", "")[1], H64)
 
+    def test_a_one_line_file_naming_another_file_is_not_this_file_s(self):
+        # B1052: one line naming another file was taken as this file's digest.
+        import contextlib
+        import io
+        said = io.StringIO()
+        with self.answer({"https://r/tool.sha256": f"{H64}  other-tool\n"}), self.assertRaises(SystemExit), \
+                contextlib.redirect_stderr(said):
+            sdkmeta.checksum(row({"from": "file", "url": "{url}.sha256"}), "https://r/tool", "")
+        self.assertIn("names no checksum for tool", said.getvalue())
+        # ...where a bare digest, or one from a pipe, is this file's.
+        for page in (f"{H64}\n", f"{H64}  -\n"):
+            with self.answer({"https://r/tool.sha256": page}):
+                self.assertEqual(sdkmeta.checksum(row({"from": "file", "url": "{url}.sha256"}), "https://r/tool", "")[1], H64, page)
+
     def test_go_and_zig_indexes(self):
         go = [{"files": [{"filename": "go1.tar.gz", "sha256": H64}]}]
         zig = {"master": {}, "0.13.0": {"x86_64-linux": {"tarball": "https://z/zig.tar.xz", "shasum": H64}}}

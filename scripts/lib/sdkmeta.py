@@ -876,7 +876,11 @@ def checksum(tc, url, version, spec=None):
         for parts in lines:
             if len(parts) >= 2 and parts[-1].lstrip("*").removeprefix("./") == name:
                 return (*_algo(parts[0]), src)
-        if len(lines) == 1 and len(lines[0]) in (1, 2):
+        # A file of one bare digest is this file's; one line that names a
+        # file names another (B1052: it was taken as this file's digest
+        # whatever name it carried, and a pin learned from it was wrong).
+        if len(lines) == 1 and (len(lines[0]) == 1
+                                or (len(lines[0]) == 2 and lines[0][1].lstrip("*").removeprefix("./") in ("", "-"))):
             return (*_algo(lines[0][0]), src)
         die(f"{tc['name']}: {src} names no checksum for {name}")
     if how == "go-json":
