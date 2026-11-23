@@ -145,7 +145,9 @@ class Gate(unittest.TestCase):
             self.assertNotIn("secrets: inherit", text, f"{name}: a called workflow is handed the secrets it reads, by name")
         sig = load("build-image.yml")["jobs"]["signature"]
         self.assertEqual(sig["if"], TAG_ONLY)
-        self.assertTrue(GATE <= needs(sig))
+        # Asked as soon as the tag's place is checked (R190 step 6): what
+        # publishes waits for lint and the suites itself.
+        self.assertEqual(needs(sig), {"place"})
         text = runs(sig)
         self.assertIn("python3 tools/sign-agent.py --check ||", text, "a tag whose agent is not signed fails")
         self.assertIn("exit 1", text)

@@ -104,7 +104,12 @@ jobs:
   # (scripts/agent/aerieos_agent/release.py); the key is this repository's
   # secret and no controller's.
   #
-  # On a release's tag alone, once its three checks have passed. Every
+  # On a release's tag alone, once the tag's place is checked, and no longer
+  # after lint and the suites as well (R190 step 6, the operator 23 Nov):
+  # its approval was asked twenty minutes after the tag, while the person
+  # who cut it waited. Nothing it makes is published before those checks
+  # pass, since everything that publishes (build, bundle, release) waits
+  # for them itself, so signing first costs nothing and asks at once. Every
   # build used to sign: a push to main, the weekly rebuild and a run by hand
   # from any branch each read the key, in the job that also builds the
   # image, and the OS image's build read it on a branch push (the audit of
@@ -125,7 +130,7 @@ jobs:
   # is read here all the same, by any workflow of any branch: it belongs
   # in the environment alone.
   signature:
-    needs: [place, lint, suites]
+    needs: [place]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
