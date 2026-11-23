@@ -31,9 +31,14 @@ if verb in GROUPS:
 pos, flags = [], {}
 while words:
     w = words.pop(0)
-    if w == "-f":
+    # --field is -f's long name, a list as -f's is (B1062: read as one plain
+    # flag, its value was taken a character at a time).
+    if w in ("-f", "--field") or w.startswith("--field="):
+        if w.startswith("--field="):
+            flags.setdefault("field", []).append(w[len("--field="):])
+            continue
         if not words:
-            die("-f needs NAME=VALUE")
+            die(f"{w} needs NAME=VALUE")
         flags.setdefault("field", []).append(words.pop(0))
     elif w.startswith("--"):
         k, eq, v = w[2:].partition("=")

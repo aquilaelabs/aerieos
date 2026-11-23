@@ -252,6 +252,22 @@ class Dialects(Base):
         self.assertIn("a branch name", body["error"])
 
 
+
+class DispatchFields(unittest.TestCase):
+    """aerie forge run dispatch --field NAME=VALUE (B1062): read as one plain
+    flag, its value was taken a character at a time and the '=' refused."""
+
+    def test_a_field_given_alone_is_one_field(self):
+        self.assertEqual(forgeaccess._fields({"flags": {"field": "tag=v1"}}), ["tag=v1"])
+        self.assertEqual(forgeaccess._fields({"flags": {"field": ["tag=v1", "b=2"]}}), ["tag=v1", "b=2"])
+        self.assertEqual(forgeaccess._fields({}), [])
+
+    def test_the_verb_reads_field_as_f(self):
+        import re
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "lib", "forge-verbs.py"),
+                   encoding="utf-8").read()
+        self.assertTrue(re.search(r'w in \("-f", "--field"\)', src))
+
 if __name__ == "__main__":
     unittest.main()
 

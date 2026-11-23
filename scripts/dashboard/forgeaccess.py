@@ -686,12 +686,19 @@ def v_run_rerun(t, a):
     return _ok(c, b, lambda _x: {"rerun": n})
 
 
+def _fields(a):
+    """A dispatch's NAME=VALUE fields: a list, or one given as a plain
+    string, never read a character at a time (B1062)."""
+    f = (a.get("flags") or {}).get("field") or []
+    return [f] if isinstance(f, str) else list(f)
+
+
 def v_run_dispatch(t, a):
     wf = str((a.get("pos") or [""])[0])
     if not WORKFLOW.fullmatch(wf):
         raise ValueError("name the workflow by its file (build.yml) or its id")
     data = {"ref": _ref(a, "ref", True), "inputs": {}}
-    for kv in (a.get("flags") or {}).get("field") or []:
+    for kv in _fields(a):
         k, _, v = str(kv).partition("=")
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,60}", k):
             raise ValueError(f"-f {kv}: name=value")
@@ -916,7 +923,7 @@ def gl_run_rerun(t, a):
 
 def gl_run_dispatch(t, a):
     data = {"ref": _ref(a, "ref", True), "variables": []}
-    for kv in (a.get("flags") or {}).get("field") or []:
+    for kv in _fields(a):
         k, _, v = str(kv).partition("=")
         if not re.fullmatch(r"[A-Za-z0-9_]{1,60}", k):
             raise ValueError(f"-f {kv}: NAME=value")
