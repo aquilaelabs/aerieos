@@ -979,6 +979,22 @@ class Agent(unittest.TestCase):
         self.assertIn(json.dumps(KEY), ud)
 
 
+
+class Record(unittest.TestCase):
+    """A VMs' record that is JSON and not an object reads as empty, kept
+    aside, where it raised and took the VMs page with it (B1025)."""
+
+    def test_a_record_that_is_not_an_object_reads_as_empty(self):
+        import contextlib
+        import io
+        d = tempfile.mkdtemp()
+        vms.configure(state=d, write_json=lambda p, x: p.write_text(json.dumps(x)), node=lambda nid: None,
+                      node_list=list, job_add=lambda *a, **k: {}, audit=lambda *a: None, prefs_get=lambda p: {})
+        for bad in ("[]", "null", '{"vms": [], "nets": 3}'):
+            vms._file().write_text(bad)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(vms._load(), {"vms": {}, "nets": {}}, bad)
+
 if __name__ == "__main__":
     unittest.main()
 

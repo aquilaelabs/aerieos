@@ -23,6 +23,7 @@ import urllib.parse
 from pathlib import Path
 
 import nodeset
+import statefile
 
 HERE = Path(__file__).resolve().parent
 CATALOG_FILE = HERE.parent.parent / "config" / "vm-images.json"
@@ -113,12 +114,22 @@ def _file():
 
 
 def _load():
+    """The VMs' record. One that is there and not an object of objects is
+    kept aside and read as empty, as every store is (B1025: [] or null raised
+    here, and the VMs page with it; B1082's copy before a save)."""
     try:
         d = json.loads(_file().read_text())
-    except (OSError, ValueError):
+    except OSError:
         d = {}
-    d.setdefault("vms", {})
-    d.setdefault("nets", {})
+    except ValueError as e:
+        statefile.keep_unreadable(_file(), str(e)[:160])
+        d = {}
+    if not isinstance(d, dict):
+        statefile.keep_unreadable(_file(), "not the VMs' record")
+        d = {}
+    for k in ("vms", "nets"):
+        if not isinstance(d.get(k), dict):
+            d[k] = {}
     return d
 
 
