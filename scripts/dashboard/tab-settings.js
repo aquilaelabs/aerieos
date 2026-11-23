@@ -166,10 +166,10 @@ function renderSettingsInto(i){
   // says what a machine is (the operator, 25 Oct: no loose words at the top).
   d.setBar("");
   const img = state?.image || {};
-  const head = pageHead({title: "This controller", facts: [
-    ["Version", img.version || "unstamped"],
-    ["Commit", (img.rev || "").slice(0, 7)],
-    ["Up", shortUptime(state?.uptime || 0)]]});
+  // Which build, and how long it has been up, on its line (R274).
+  const head = pageHead({title: "This controller", line: [
+    {text: `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`},
+    {text: `up ${shortUptime(state?.uptime || 0)}`}]});
   // Sections, like every other tab's (the operator, 11 Oct): one fold per
   // group, its status on the heading, a jump bar over them, and each with
   // its own Apply and Revert. The groups' own markup is kept inside (the

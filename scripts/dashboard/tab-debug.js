@@ -46,7 +46,7 @@ function renderDebugInto(i){
           nodes.map(n => lrow(n.id, n.name, "machine logs", g.log_from.includes(n.id))).join("")}</div></div></div>`;
   };
   const html = pageHead({title: "Debug mode", pills: `<span class="pill stat ok">on</span>`,
-                         facts: [["Turned on by", "DEBUG_MODE=1 where this controller starts"]]})
+                         line: [{text: "turned on by DEBUG_MODE=1 where this controller starts"}]})
     + docSection("debug", "dev", "Dev features", dev ? "offered" : "off",
         `<div class="field"><label class="ndcap"><input type="checkbox" id="dbgDev"${dev ? " checked" : ""}> Offer dev features${
           helpIcon("Also offer what has not been tested end to end yet, tagged dev: git hosts, node systems, hypervisors, WireGuard and Tailscale when enrolling, an account per user on a node, the VS Code extension and the Windows companion.")}</label></div>

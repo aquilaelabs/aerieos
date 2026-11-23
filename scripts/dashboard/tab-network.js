@@ -29,7 +29,7 @@ function networkReach(){
   const s = state?.settings?.settings || {};
   const host = s.tls_host?.value || s.tunnel_host?.value || "";
   const served = t.on ? (t.kind === "acme" ? "https, Let's Encrypt" : "https, the install's own certificate") : "http";
-  return pageHead({facts: [
+  return pageHead({about: true, facts: [
     ["Reached at", location.origin],
     ["Port", location.port || (location.protocol === "https:" ? "443" : "80")],
     ["Served over", served],

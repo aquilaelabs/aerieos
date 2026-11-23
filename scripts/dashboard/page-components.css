@@ -1857,17 +1857,15 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
    phrase that wants doing in the warning's or the failure's color (the
    operator, 23 Nov: tiles and facts made pages busier than they are). Home's
    tiles are the one row of tiles left. What a page knows that is not news is
-   behind Details in its head, shut until it is opened. */
+   said beside what it describes, never in its head. */
 .pgline{font:var(--f-ui);color:var(--dim);line-height:1.6;overflow-wrap:anywhere}
 .pgline .pgl b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .pgline .pgl.warn,.pgline .pgl.warn b{color:var(--warn)}
 .pgline .pgl.bad,.pgline .pgl.bad b{color:var(--bad)}
 .pgline .pgl.ok b{color:var(--pass)}
 .pgline .sep{color:var(--line)}
-.pghead>.pgline+.pgdet,.pghead>.name+.pgline{margin-top:4px}
-.pgdet>summary{font:var(--f-note);color:var(--dim);width:max-content;padding:2px 0}
-.pgdet>summary:hover{color:var(--ink)}
-.pgdet[open]>summary{margin-bottom:var(--label-gap)}
+.pghead>.name+.pgline{margin-top:4px}
+.pghead>.pgline+.pghfacts{margin-top:var(--field-gap)}
 
 /* ---- tiles, facts and chips (R216) --------------------------------------
    The 2.0 shapes, one definition each, read by every tab that draws them

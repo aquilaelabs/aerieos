@@ -2302,8 +2302,8 @@ for (const kind of kinds){
   // (R274, the operator 23 Nov): what a page is about now is its status line.
   const busy = await page.$$eval('.doc.on', ds => ds.flatMap(d => [
     ...[...d.querySelectorAll('.tiles:not(.hometiles)')].filter(e => e.checkVisibility()).map(() => 'tiles'),
-    ...[...d.querySelectorAll('.pghead > dl.facts, .pghead > .pghfacts')].filter(e => e.checkVisibility()).map(() => 'a facts grid in the head')]));
-  ok(busy.length === 0, `[${kind}] a page's top is its status line, its facts behind Details${busy.length ? `: ${busy.join(', ')}` : ''}`);
+    ...[...d.querySelectorAll('.pghead:not(.about) > dl.facts, .pghead:not(.about) > .pghfacts, .pgdet')].filter(e => e.checkVisibility()).map(() => 'a facts grid or a Details fold in the head')]));
+  ok(busy.length === 0, `[${kind}] a page's top is its status line, its other facts beside what they describe${busy.length ? `: ${busy.join(', ')}` : ''}`);
   const room = await headRoom();
   ok(room.length === 0,
      `[${kind}] every section's first line keeps room under its head at phone width${room.length ? `; touching: ${room.join(', ')}` : ''}`);

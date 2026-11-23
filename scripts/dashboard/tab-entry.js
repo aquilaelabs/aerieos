@@ -55,7 +55,7 @@ function renderEntryInto(i){
   // layout after a reload that did not land on its address): the Library.
   if (!entryKey){ d.list.innerHTML = ""; setTimeout(() => { if (!entryKey) openLibrary(); }, 0); return; }
   if (entryLib === null){
-    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["Node", GHOST]]}) + docSection("entry", "about", "What it is", "", skRows(3))));
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, line: [{value: GHOST, label: ""}]}) + docSection("entry", "about", "What it is", "", skRows(3))));
     if (!readRev("entry") && !readBusy("entry")) loadEntry();
     return;
   }
@@ -72,7 +72,7 @@ function renderEntryInto(i){
   // Where it stands, left out when it has no words: an empty one beside the
   // one verb kept that verb off the head's line, alone under its facts (B976).
   const st = libState(r), said = st.replace(/<[^>]*>/g, "").trim() ? st : "";
-  const head = pageHead({title: r.label, pills: libPills(r), facts: [["Node", el.name || ""]],
+  const head = pageHead({title: r.label, pills: libPills(r), line: [el.name ? {text: `on ${el.name}`} : null],
     actions: `${said}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);
   const bad = packJobErr(r, el.job), err = bad && `<div class="field">${bad}</div>`;
   const about = `${r.about ? `<span class="sub">${esc(r.about)}</span>` : ""}${r.machine && r.name === TC_DRIVER ? libDriverPick(r.machine) : ""}${libDetail(r)}`;

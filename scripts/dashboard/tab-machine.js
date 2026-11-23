@@ -40,7 +40,7 @@ function machineHead(n){
     ? `<label class="ndcap"><input type="checkbox" id="heldVerify"> Check parity once the array is up</label>`
     : oldParity ? `<label class="ndcap"><input type="checkbox" disabled> Check parity <span class="sub dim">waits until the array is taken over: its parity is the old system's until then</span></label>` : "";
   const actions = h.held ? `${verify}<button type="button" class="primary" data-heldstart title="${esc((h.why || []).join("; "))}">Start</button>` : "";
-  return pageHead({title: n.name, pills: `<span class="tag ndown">this machine</span> ${nodeStatePill(n)}${h.held ? ` <span class="pill bad">held</span>` : ""}`, actions, facts: [
+  return pageHead({about: true, title: n.name, pills: `<span class="tag ndown">this machine</span> ${nodeStatePill(n)}${h.held ? ` <span class="pill bad">held</span>` : ""}`, actions, facts: [
     ["System", [r.os, r.hostname && r.hostname !== n.name ? r.hostname : ""].filter(Boolean).join(" · ")],
     ["Release", `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`],
     // AerieOS (R160 step 4): the image, the slot this boot came from
@@ -61,7 +61,7 @@ function renderMachineInto(i){
     return;
   }
   if (nodesList === null){
-    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["System", GHOST], ["Release", GHOST], ["Up", GHOST]]})
+    drawHTML(d.list, skTpl(pageHead({about: true, title: GHOST, facts: [["System", GHOST], ["Release", GHOST], ["Up", GHOST]]})
       + docSection("nodes", "updates", "Updates", "", skRows(2))));
     loadNodes();
     return;

@@ -593,18 +593,12 @@ function renderLibraryInto(i){
   // The last update installed takes the Updates chip with it, the last
   // thing removed the Installed chip: back to All.
   if (LIB_STANDS[libKind] && !(lib.counts?.kind?.[libKind]) && !(lib.rows || []).length && !libQ.trim()){ libKind = ""; setTimeout(loadLibrary); }
-  const inst = f.installed || 0, due = f.updates || 0, notHere = f.other_platform || 0, notBuild = f.not_this_build || 0;
-  const free = lib.store?.free_mb ? `${humanBytes(lib.store.free_mb * 1048576)} free` : "";
+  const inst = f.installed || 0, due = f.updates || 0;
   // One line of what is news (R274): updates due, and how fresh that is;
   // what is installed is the Installed chip's count, said once.
   const head = pageHead({line: [
     due ? {value: due, label: due === 1 ? "update due" : "updates due", tone: "warn"} : {text: `${inst} of ${f.offered || 0} installed, all up to date`},
     lib.store?.checked ? {text: `versions checked ${ago(lib.store.checked)}`} : null,
-  ], facts: [
-    ["Store", lib.store?.root ? `${lib.store.root}${free ? ", " + free : ""}` : ""],
-    ["Not for this node", notHere ? String(notHere) : ""],
-    ["Not for this AerieOS", notBuild ? `${notBuild} in the catalog` : ""],
-    ["Remove takes", clean.length ? clean.map(c => `<code>${esc(c.dir)}</code> (${esc(c.what)})`).join(", ") : "", {html: true}],
   ]});
   // What the Toolchains page said over its rows (step 5): a node that has
   // not reported, a store it cannot write, and the system packages its
@@ -700,8 +694,9 @@ function wireLibrary(root){
   if (sd) sd.onclick = () => pressing(sd, async () => { busy(sd, tcBehind() ? "Queuing" : "Installing"); await tcAct("sysdeps"); await loadLibrary(); });
   const cl = root.querySelector("[data-libclean]");
   if (cl) cl.onclick = async () => {
-    const dirs = (lib?.cleanable || []).map(c => c.dir);
-    if (!dirs.length || !await askYes(`Take ${dirs.join(", ")} off the store?\n\nNo node runs from ${dirs.length === 1 ? "it" : "them"}; what is in ${dirs.length === 1 ? "it" : "them"} is gone for good.`, {verb: "Remove", danger: true})) return;
+    // What each one was, said here, where the head said it as a fact (R274).
+    const dirs = (lib?.cleanable || []).map(c => c.dir), named = (lib?.cleanable || []).map(c => c.what ? `${c.dir} (${c.what})` : c.dir);
+    if (!dirs.length || !await askYes(`Take ${named.join(", ")} off the store?\n\nNo node runs from ${dirs.length === 1 ? "it" : "them"}; what is in ${dirs.length === 1 ? "it" : "them"} is gone for good.`, {verb: "Remove", danger: true})) return;
     // While a job writes the store it waits behind it, and says so.
     const ahead = tcBehind();
     busy(cl, ahead ? "Queuing" : "Removing");

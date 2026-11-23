@@ -108,7 +108,7 @@ function renderProfileInto(i){
       ["Password", PROFILE_SAYS.password], ["Two-factor sign-in", PROFILE_SAYS.twofactor], ["Your key store", PROFILE_SAYS.mykey],
       ["Uses of your tokens", PROFILE_SAYS.uses], ["Your terminal", PROFILE_SAYS.terminal],
       ["Where the bell reaches you", PROFILE_SAYS.reach], ["Signed in as you", PROFILE_SAYS.devices]], "Who you are", PROFILE_FIELDS.map(([, label]) => fld(label)).join(""),
-      pageHead({title: GHOST, facts: [["Roles", GHOST], ["Owner of", GHOST]]}))));
+      pageHead({title: GHOST, line: [{value: GHOST, label: ""}]}))));
     return;
   }
   const p = {...(profile.profile || {}), account: profile.name}, g = profile.git || {};
@@ -122,10 +122,11 @@ function renderProfileInto(i){
   const owns = wm.roles.filter(r => /^Owner of /.test(r)).map(r => r.slice(9));
   const held = wm.roles.filter(r => !/^Owner of /.test(r));
   const by = {...(profile.claude ? {claude: profile.claude} : {}), ...(profile.agents || {})};
-  const head = pageHead({title: profile.name, facts: [
-    ["Roles", held.length ? held.join(", ") : "no role"],
-    ["Owner of", owns.join(", ")],
-    ...AGENTS.filter(a => by[a.id]).map(a => [a.name, by[a.id]])]});
+  // Who they are on the line (R274): their roles and what they own; the
+  // accounts each agent is signed in as are its own section's.
+  const head = pageHead({title: profile.name, line: [
+    {text: held.length ? held.join(", ") : "no role"},
+    owns.length ? {text: `owner of ${owns.join(", ")}`} : null]});
   // A page of settings (page-docs.js splitSects, the operator, 16 Oct):
   // each block a section, the sections a list beside the one picked; who
   // you are first, since that is what is changed here most.

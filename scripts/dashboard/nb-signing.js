@@ -237,8 +237,7 @@ function nbSigningView({$, nb, project}){
       // checked and made on the project's node, never here: what keeps that
       // node from it is said in its words (B232).
       + (why ? `<div class="field"><div class="notice warn">${esc(why)}</div></div>` : "")
-      + (why ? "" : pageHead({cls: "sghead", facts: [
-          ["Node", tool ? "" : nodeWhy, {cls: "sgnode"}]]}))
+      + (why ? "" : (tool ? "" : `<div class="field"><div class="notice warn sgnode">${esc(nodeWhy)}</div></div>`))
       + docSection("signing", "lock", "Backup password", locked ? "set" : "none", lock, {cls: locked ? "" : "warn"})
       + names.filter(key => !keyPick || !names.includes(keyPick) || key === keyPick)
           .map(key => docSection("signing", `key:${key}`, key === "default" ? "Default key" : `Key: ${key}`,

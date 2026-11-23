@@ -154,13 +154,14 @@ function renderScannersInto(i){
   d.setBar("");
   const deployed = (data.nodes || []).some(n => n.deployed);
   // One line (R274): how many nodes scan; the versions this AerieOS names
-  // behind Details.
-  patch(d.list, pageHead({line: [{value: (data.nodes || []).filter(n => n.deployed).length, label: "nodes scanning"}],
-      facts: [["This AerieOS names", scannersVersions(lt.versions)]], actions: scannersActs(data)})
+  // at the foot, under the nodes that run them.
+  const names = scannersVersions(lt.versions);
+  patch(d.list, pageHead({line: [{value: (data.nodes || []).filter(n => n.deployed).length, label: "nodes scanning"}], actions: scannersActs(data)})
     + scannersScheduleSection(data.schedule || {}, deployed)
     + (data.nodes || []).map(scannersNodeSection).join("")
     + ((data.nodes || []).length ? "" : noNodeYet("the scanners run on a node"))
-    + scannersUncovered(data.uncovered || []));
+    + scannersUncovered(data.uncovered || [])
+    + (names ? `<div class="field"><div class="hint">This AerieOS names ${esc(names)}.</div></div>` : ""));
   wireScannersTab(d.el);
 }
 

@@ -69,9 +69,11 @@ const shape = ALL.map(r => [r.kind, r.tier, typeof r.label, typeof r.about, type
 ok(shape.length > 0 && shape.every(([k, t, l, a, i, v]) => KINDS.includes(k)
    && ['official', 'verified', 'vetted', 'sideloaded'].includes(t) && l === 'string' && a === 'string' && i === 'boolean' && v === 'string'),
    `every row is one shape: kind, tier, label, about, installed, verb (${shape.length} rows)`);
-ok(await page.evaluate(() => /Not for this node/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '') || !lib.facts?.other_platform)
-   && await page.evaluate(n => (lib.facts?.other_platform || 0) === n, ALL.filter(r => r.wrong_platform && !r.too_new).length),
-   'the head counts the cards not for this node (R170 step 9)');
+// What runs only elsewhere is counted by the server and said over the list
+// (R170 step 9), never in the head since R274.
+ok(await page.evaluate(n => (lib.facts?.other_platform || 0) === n, ALL.filter(r => r.wrong_platform && !r.too_new).length)
+   && await page.evaluate(() => !/Not for this node/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '')),
+   'the cards not for this node are counted, and not in the head (R170 step 9, R274)');
 // Who stands behind a card, in the words a person reads (the operator, 12
 // Nov): Packaged by Aerie for what AerieOS ships or wrote, never the stored
 // word official.

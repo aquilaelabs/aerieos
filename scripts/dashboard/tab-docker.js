@@ -3092,9 +3092,12 @@ function dmTiles(t){
     {label: !g && t.behind === 1 ? "update due" : "updates due", value: g ? GHOST : t.behind, tone: !g && t.behind ? "warn" : "", omit: !g && !t.checked && !t.behind},
     {label: !g && t.projects === 1 ? "space" : "spaces", value: g ? GHOST : t.projects, omit: !g && t.projects === undefined},
     {label: "not ours", value: g ? 0 : t.notOurs, omit: g || !t.notOurs, title: "on this daemon, started by nobody here"},
-    // ...and when its images were checked, on the same line (R274), where it
-    // was a head of its own with this one fact behind Details.
-    {text: !g && t.images_at ? `images checked ${ago(t.images_at)}` : "", omit: g || !t.images_at},
+    // ...and when its images were checked, and where a node only hosts
+    // containers where a shell opens, on the same line (R274): one band, as
+    // the page waits.
+    {text: g || featureOff("image-updates") ? "" : t.images_at ? `images checked ${ago(t.images_at)}` : "images not checked yet", omit: g || !!featureOff("image-updates")},
+    (h => ({text: h && mayShell() ? (h.config?.own ? "no shells on this machine: it is the controller's own" : `shells open from a node that runs sessions: ${h.name} hosts containers only`) : "",
+            omit: g || !h || !mayShell()}))(dmHostOnly()),
   ]);
 }
 // The daemon's images and volumes (R216): a section at the foot, read when
@@ -3110,14 +3113,9 @@ function dmStatus(d){
   // Image updates switched off on this install (R81): its sentence where
   // the line says when they were checked.
   if (featureOff("image-updates")) return `<div class="field">${deadWhy(featureOff("image-updates"))}</div>`;
-  const host = dmHostOnly();
-  // A head's facts (the operator, 25 Oct: no loose words at a page's top):
-  // when its images were checked, and where a node only hosts containers,
-  // where a shell in one opens.
-  // When the images were checked is on the status line (R274); a node that
-  // only hosts says where a shell opens, behind Details.
-  return pageHead({cls: "dmimgbar", line: [d && !d.images_at ? {text: "images not checked yet"} : null], facts: [
-    ["Shells", host && mayShell() ? (host.config?.own ? "none on this machine: it is the controller's own" : `from a node that runs sessions: ${host.name} hosts containers only`) : ""]]});
+  // When its images were checked and where a shell opens are the page's
+  // line's (dmTiles, R274).
+  return "";
 }
 
 // The old system's containers and VMs on the controller's own machine

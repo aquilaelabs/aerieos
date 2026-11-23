@@ -297,9 +297,9 @@ function nginxUndeployed(n){
   // no button, so the page is one shape on every node).
   return `<div data-ngnode="${esc(n.node)}">
     ${pageHead({cls: "toolstate", pills: `<span class="pill stat">not deployed</span>`,
-      actions: `<button type="button" class="primary" data-ngdeploy>Deploy</button>`, facts: [
-      ["Deploy brings", count || certs ? `${count} route${count === 1 ? "" : "s"} and ${certs} certificate${certs === 1 ? "" : "s"} kept for it`
-                                       : "nginx alone: its routes and certificates are set here once it is there"]]})}
+      actions: `<button type="button" class="primary" data-ngdeploy>Deploy</button>`, line: [
+      {text: count || certs ? `deploy brings ${count} route${count === 1 ? "" : "s"} and ${certs} certificate${certs === 1 ? "" : "s"} kept for it`
+                                       : "deploy brings nginx alone: its routes and certificates are set here once it is there"}]})}
     ${clash}
   </div>`;
 }
@@ -321,9 +321,10 @@ function nginxBody(n){
   const pill = n.state?.job?.running ? `<span class="pill stat note">deployed, rebuilding</span>`
     : n.state?.running === false ? `<span class="pill stat warn">deployed, down</span>`
     : `<span class="pill stat ok">deployed</span>`;
-  const facts = [["Container", `nginx-${esc(n.container.replace(/^nginx-/, ""))} on the ${pageLink("docker", "Containers page")}`, {html: true}],
-                 ["Routes", `${count} route${count === 1 ? "" : "s"}`],
-                 ["Node", n.host_only ? "hosting-only" : ""]];
+  // Its routes on the line (R274); which container it is, beside the link
+  // that opens it.
+  const line = [{value: count, label: count === 1 ? "route" : "routes"}, n.host_only ? {text: "on a hosting-only node"} : null];
+  const where = `<div class="field"><div class="hint">It runs as nginx-${esc(n.container.replace(/^nginx-/, ""))} on the ${pageLink("docker", "Containers page")}.</div></div>`;
   // The image it is pinned to, the one this AerieOS names, and Update when
   // behind (R192): nothing asks a registry, so there is nothing to check.
   const im = n.image || {};
@@ -409,12 +410,13 @@ function nginxBody(n){
     <div class="field ngcertlist">${nginxCertLines(n, d)}</div>`);
   // The page's head, deployed as undeployed: its state and what it runs.
   return `<div data-ngnode="${esc(n.node)}">
-    ${pageHead({cls: "toolstate", pills: pill, facts})}
+    ${pageHead({cls: "toolstate", pills: pill, line})}
     ${clash}
     ${image}
     ${hosts}
     ${routes}
     ${certs}
+    ${where}
     <div class="field"><div class="actbar ngfoot"><span class="sp"></span>
       <button type="button" class="danger" data-ngremove>Remove nginx</button></div></div>
   </div>`;
@@ -436,7 +438,7 @@ function renderNginxInto(i){
     // Its template (R218 step 16): the bar and the state row's words are
     // the page's own; the node and its routes are on their way.
     d.setBar(nginxBar(null));
-    drawHTML(d.list, skTpl(`${pageHead({cls: "toolstate", facts: [["Container", GHOST], ["Routes", GHOST]]})}${
+    drawHTML(d.list, skTpl(`${pageHead({cls: "toolstate", line: [{value: GHOST, label: "routes"}]})}${
       ["image", "hostnames", "routes", "certs"].map(k => ngSect(k, "", `<div class="field">${skRows(2)}</div>`)).join("")}`));
     loadNginx();
     return;

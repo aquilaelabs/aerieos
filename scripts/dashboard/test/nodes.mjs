@@ -2081,11 +2081,11 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   ok(tools.some(t => /6655482e/.test(t)) && tools.some(t => /29\.0\.14206865/.test(t))
      && !tools.some(t => /3\.24\.0/.test(t)),
      'a node\'s versions come from its own aerie toolchains versions, not the census summary');
-  // Its headroom is the head's Store fact to say, once (R218 step 24).
+  // Its headroom is the Installed page's to say, at the foot of what the
+  // store holds (R274): the Library says none of it.
   const room = await page.$eval('.doc .librarytab .pghead', e => e.textContent.replace(/\s+/g, ' '));
-  ok(tools.some(t => /6655482e/.test(t)) && /(40|39)(\.\d)? ?GB free/.test(room)
-     && (await page.$eval('.doc .librarytab', e => e.textContent)).match(/[GM]B free/g)?.length === 1,
-     `picking the node lists what its census says it has, and its store's headroom in the head alone (${room.slice(0, 120)} | ${tools.filter(t => /installed|21\.0/.test(t)).join(' || ').slice(0, 300)})`);
+  ok(tools.some(t => /6655482e/.test(t)) && !(await page.$eval('.doc .librarytab', e => e.textContent)).match(/[GM]B free/g),
+     `picking the node lists what its census says it has, and leaves the store's headroom to Installed (${room.slice(0, 120)} | ${tools.filter(t => /installed|21\.0/.test(t)).join(' || ').slice(0, 300)})`);
   ok(!/installed at\s*(<|$)/m.test(await page.$eval('.doc .librarytab', e => e.textContent)),
      'an installed toolchain on a node reads "installed", not "installed at" with nothing after it');
   // Check for updates is a live control on a node (R67). It used to be

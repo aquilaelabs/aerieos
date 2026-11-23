@@ -313,7 +313,10 @@ function renderInstalledInto(i){
   const head = pageHead({line: [
     {value: rows.filter(r => r.installed).length, label: "installed"},
     due ? {value: due, label: due === 1 ? "update due" : "updates due", tone: "warn"} : null,
-  ], facts: [["Store", inst.store?.root || ""]]});
+  ]});
+  // Where it is all kept, at the foot of what is kept there (R274).
+  const where = inst.store?.root ? `<div class="field"><div class="hint">Kept in <code>${esc(inst.store.root)}</code>${
+    inst.store.free_mb ? `, ${esc(humanBytes(inst.store.free_mb * 1048576))} free` : ""}.</div></div>` : "";
   const sects = INST_KINDS.map(([k, title]) => {
     // By its group, as the Library sorts it: a pack that brings a coding
     // agent sits with the coding agents (the operator, 12 Nov).
@@ -322,7 +325,7 @@ function renderInstalledInto(i){
     const body = `<div class="rows">${here.map(r => instRow(r, may)).join("")}</div>`;
     return docSection("installed", k, title, k === "agent" ? `${here.filter(r => r.installed).length} of ${here.length}` : String(here.length), body);
   }).join("") || `<div class="empty">Nothing installed on ${esc(inst.name || "this node")} yet: the Library installs toolchains, coding agents and packs there.</div>`;
-  patch(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}</div>`);
+  patch(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}${where}</div>`);
   wireInstalled(d.el);
 }
 

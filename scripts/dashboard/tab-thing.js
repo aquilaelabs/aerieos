@@ -80,7 +80,7 @@ function renderThingInto(i){
   // name: it is the Installed page then, where the row is.
   if (!thingKey){ d.list.innerHTML = ""; setTimeout(() => { if (!thingKey) openInstalledTab(); }, 0); return; }
   if (inst === null){
-    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["Installed", GHOST]]}) + docSection("thing", "about", "What it is", "", skRows(3))));
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, line: [{value: GHOST, label: ""}]}) + docSection("thing", "about", "What it is", "", skRows(3))));
     if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
   }
@@ -94,9 +94,7 @@ function renderThingInto(i){
   const may = inst.may || {};
   // Its version and an update as the row wears them, then where it stands.
   const pills = `${packVersionPill(r)}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""}`;
-  const head = pageHead({title: r.label, pills, facts: [
-    ["Node", inst.name || ""],
-  ], actions: `<span class="irow" data-irow="${esc(thingKey)}" data-style="display:contents">${instState(r)}${instActs(r, may)}</span>`})
+  const head = pageHead({title: r.label, pills, line: [inst.name ? {text: `on ${inst.name}`} : null], actions: `<span class="irow" data-irow="${esc(thingKey)}" data-style="display:contents">${instState(r)}${instActs(r, may)}</span>`})
     // Its glyph or its own icon beside its name, as a Library entry's page
     // draws it (the operator, 29 Oct: the two pressed pages one shape).
     .replace('<div class="name">', `<div class="name">${libIcon(r)}`);

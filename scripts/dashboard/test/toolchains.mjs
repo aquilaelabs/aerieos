@@ -301,8 +301,19 @@ await section("A retired node's directory on the store is offered with Remove", 
     lib.cleanable = was; readMoved('library'); drawPanes();
     return out;
   });
-  ok(/Remove takes\W*n_0ldd0ne1 \(gone's, a node since retired\)/.test(seen.head) && seen.rm,
-     `a retired node's directory on the store is in the head's Remove takes, with Remove in the bar (R196) (${seen.head.slice(-70)})`);
+  // What it takes is said in Remove's own question (R274), where the head said it.
+  ok(!/Remove takes/.test(seen.head) && seen.rm,
+     `a retired node's directory on the store is offered with Remove in the bar, the head saying nothing of it (R196) (${seen.head.slice(-70)})`);
+  // Pressed in the same turn it is drawn in, so no read lands between.
+  page.answers.push(() => false);
+  const asked = page.dialogs.length;
+  await page.evaluate(() => { const was = lib.cleanable; lib.cleanable = [{ dir: 'n_0ldd0ne1', what: "gone's, a node since retired" }];
+    readMoved('library'); drawPanes(); document.querySelector('.pane [data-libclean]')?.click(); lib.cleanable = was; });
+  await page.waitForFunction(n => window.__dialogsSeen === undefined || true, asked);
+  for (let i = 0; i < 40 && page.dialogs.length === asked; i++) await new Promise(r => setTimeout(r, 100));
+  ok(/n_0ldd0ne1 \(gone's, a node since retired\)/.test(page.dialogs.at(-1) || ''),
+     `...and Remove's question names what it takes and what it was (${(page.dialogs.at(-1) || '').slice(0, 90)})`);
+  await page.evaluate(() => { readMoved('library'); drawPanes(); });
 });
 
 // ---- install two on the controller's store, watch them land ----------------
@@ -871,8 +882,8 @@ await section("tool packs (R77)", async () => {
       .filter(r => r.too_new).map(r => r.name).sort().join();
     // (A build with no version, as the suite's is, judges no entry by its release lines: only the format counts here.)
     const want = later.rows === 'later,otherline' ? [false, false, true] : [false, true, true];
-    ok(JSON.stringify(later.cards) === JSON.stringify(want) && /^Not for this AerieOS=\d+ in the catalog$/.test(later.head),
-       `an entry this AerieOS does not take is not drawn, and the head counts what is left out (${JSON.stringify(later)})`);
+    ok(JSON.stringify(later.cards) === JSON.stringify(want) && !later.head,
+       `an entry this AerieOS does not take is not drawn, and the head says nothing of it (R274) (${JSON.stringify(later)})`);
     const past = await api('/api/toolpacks', { action: 'add', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt) });
     ok(/later needs AerieOS 9\.9\.0 or newer \(it is written in pack format 99, and this AerieOS reads up to \d+\)/.test(past.error || ''),
        `...and adding it is refused in the same words, nothing fetched (${past.error || 'it was added'})`);

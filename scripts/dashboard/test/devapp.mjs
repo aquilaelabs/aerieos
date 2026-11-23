@@ -2446,7 +2446,7 @@ await section("a shell inside a container, in the dock", async () => {
     const keepN = nodesList, keepL = dockerList, keepA = state.admin;
     nodesList = [{ id: 'n_host', name: 'hostbox', config: { host_only: true } }];
     dockerList = { ...(dockerList || {}), node: 'n_host' };
-    const host = (dmHostOnly() ? 'policy ' : '') + dmStatus(dockerList);
+    const host = (dmHostOnly() ? 'policy ' : '') + dmTiles({running: 0, all: 0, behind: 0, checked: true, images_at: 1, projects: 0, notOurs: 0});
     nodesList = keepN; dockerList = keepL;
     const p = state.projects.find(x => x.name === 'ep.silon'), keepB = p.prefs?.devbuild;
     p.prefs = { ...(p.prefs || {}), devbuild: 'deny' }; state.admin = false;

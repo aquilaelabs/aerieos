@@ -1071,19 +1071,20 @@ function segPick(ids, on){
 
 // A page's head (the operator, 25 Oct; R274, 23 Nov): what the page is
 // about with its state as pills, then one status line of what is news
-// (statusLine), then what it knows that is not news behind a quiet Details
-// fold, and the buttons about it on an action bar. Each part only when the
-// page has it. `pills` is markup (pill spans); `line` statusLine's parts;
-// `facts` factGrid's pairs, which a person opens Details for: a head that
-// listed every fact made a page read busier than it was and said a chip's
-// counts twice (the operator, 23 Nov).
-function pageHead({title = "", pills = "", line = [], facts = [], actions = "", cls = ""} = {}){
-  const grid = factGrid(facts, "pghfacts");
+// (statusLine), and the buttons about it on an action bar. Each part only
+// when the page has it. A fact that is not news is not in a page's head: it
+// is said beside what it describes, or not at all (the operator, 23 Nov: a
+// Details fold was one more kind of heading on pages that each have their
+// own). A page about one thing (a machine, the install key, how this
+// controller is reached) says `about` and its facts are its body's grid.
+// `pills` is markup (pill spans); `line` statusLine's parts; `facts`
+// factGrid's pairs, drawn only with `about`.
+function pageHead({title = "", pills = "", line = [], facts = [], about = false, actions = "", cls = ""} = {}){
+  const grid = about ? factGrid(facts, "pghfacts") : "";
   const said = statusLine(line, true);
   if (!title && !pills && !said && !grid && !actions) return "";
-  return `<div class="field pghead${cls ? " " + esc(cls) : ""}">${
-    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? `${title ? " " : ""}${pills}` : ""}</div>` : ""}${said}${
-    grid ? `<details class="pgdet chev"${sectAttr(`pgdet:${cls || title || location.hash}`)}><summary>Details</summary>${grid}</details>` : ""}${
+  return `<div class="field pghead${about ? " about" : ""}${cls ? " " + esc(cls) : ""}">${
+    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? `${title ? " " : ""}${pills}` : ""}</div>` : ""}${said}${grid}${
     actions ? `<div class="actbar">${actions}</div>` : ""}</div>`;
 }
 

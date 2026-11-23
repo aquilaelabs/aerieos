@@ -194,9 +194,7 @@ function renderEmulatorInto(i){
     surf.setBar("");
     // In the page's order: its head, its tiles, the images it holds,
     // then the ones to add.
-    const tile = (l, sub) => `<div class="tile"><span class="tv">${skv(1.4)}</span><span class="tl">${l}</span>${sub ? `<span class="ts">${sub}</span>` : ""}</div>`;
-    drawHTML(surf.list, skTpl(`${pageHead({facts: [["System images", GHOST]]})}
-      <div class="field"><div class="tiles">${tile("images")}${tile("AVDs", "built on them")}${tile("free", "on the store")}</div></div>
+    drawHTML(surf.list, skTpl(`${statusLine([{value: GHOST, label: "images"}, {value: GHOST, label: "AVDs", sub: "built on them"}, {value: GHOST, label: "free", sub: "on the store"}])}
       ${emuSections(`<div class="tcs">${skRows(2)}</div>`, "", `<div class="tcs">${skRows(2)}</div>`)}`));
     return;
   }
@@ -224,9 +222,9 @@ function renderEmulatorInto(i){
     // emulator boots are kept; its free space is the tile's (R218 step 24).
     pageHead({
       pills: d.root && !d.wrong_platform ? "" : `<span class="pill warn">${d.wrong_platform ? "another platform" : "no store yet"}</span>`,
-      // Another platform is news (R274); where the images are kept is a detail.
-      line: [d.wrong_platform ? {text: `${d.platform}: the Android tools are packaged for ${d.wrong_platform}`, tone: "warn"} : null],
-      facts: [["System images", d.root && !d.wrong_platform ? d.root : ""]]})}
+      // Another platform is its notice's to say (R274); where the images
+      // are kept is said in their own section.
+      })}
     ${
     // Warnings in the notice voice, an action a button beside it rather than
     // a link in the prose (R218 step 24).
@@ -253,11 +251,12 @@ function renderEmulatorInto(i){
     ${job.state === "failed" && job.error ? `<div class="tchead bad">${
       job.action === "remove" ? "Removing" : "Adding"} ${esc(job.image)} failed: ${esc(job.error)}.
       The Jobs page has its log.</div>` : ""}
-    ${d.wrong_platform ? "" : emuSections((d.images || []).length
+    ${d.wrong_platform ? "" : emuSections(((d.images || []).length
       ? `<div class="tcs">${d.images.map(im => emuRow(im, held)).join("")}</div>`
       : `<div class="tchead">${d.known === false
           ? `${esc(d.name)} has not reported its system images yet.`
-          : `No image yet: ${esc(d.name)}'s emulator has nothing to boot.`}</div>`,
+          : `No image yet: ${esc(d.name)}'s emulator has nothing to boot.`}</div>`)
+      + (d.root ? `<div class="hint emroot">Kept in <code>${esc(d.root)}</code>.</div>` : ""),
       (d.images || []).length ? `${d.images.length}` : "none",
       emuAddRows(d, held) + `<div class="hint tcterms">Adding an image accepts
       <a href="https://developer.android.com/studio/terms" target="_blank" rel="noreferrer">Google's

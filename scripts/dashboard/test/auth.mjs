@@ -1285,7 +1285,9 @@ await section("the Profile tab", async () => {
   const wm = await page.$eval('.profiletab', el => ({ bar: el.closest('.doc')?.querySelector('.docbarrow')?.textContent || '',
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])) }));
   // Its roles a fact of the page's head now (the operator, 25 Oct).
-  ok(/AerieOS's owner/.test(wm.facts.Roles || '') && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Spaces === 'Write',
+  // ...its roles on the head's status line since R274 (the operator, 23 Nov).
+  wm.roles = await page.$eval('.profiletab .pghead .pgline', l => l.textContent).catch(() => '');
+  ok(/AerieOS's owner/.test(wm.roles) && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Spaces === 'Write',
      `...and what it may do: its roles by name, and each area with its level (${JSON.stringify(wm).slice(0, 160)})`);
   ok(await page.evaluate(() => !!document.querySelector('#rail [data-rail="people"]') && railAllows('settings') && railAllows('users')),
      'an administrator is offered People and the controller\'s settings on the rail');

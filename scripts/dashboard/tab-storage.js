@@ -904,7 +904,6 @@ function storageBody(n, where){
   // Where its stores are set, a fact of the head's (the operator, 25 Oct:
   // no loose words at a page's top).
   // A fact's value is short, as a node's head's are, never a sentence.
-  const setOn = [["Stores set on", pageLink("nodes", "the Nodes page"), {html: true}]];
   const byProject = (count, body) => docSection("storage", "projects", "By space", count,
     `<div class="field"><div class="hint">What each space's folders hold${n ? ` on ${esc(n.name)}` : ""}.${helpIcon("Its synced copy, build cache, artifacts, dev instance data, emulators and the accounts' build caches.")}</div></div>
       ${body}`);
@@ -920,11 +919,11 @@ function storageBody(n, where){
   // Not fenced is a warning, said as one over the head, not as a fact.
   const unfenced = "fence" in n && !n.fence
     ? `<div class="field"><div class="notice warn">AerieOS's work on ${esc(n.name || "this node")} is not fenced from the system's memory: run its setup again.</div></div>` : "";
-  // When it was measured on the line (R274); how the walk goes, the work's
-  // memory and where stores are set behind Details.
-  const head = pageHead({pills: pill, cls: "toolstate", line: [n.measured ? {text: age} : {text: age, tone: "warn"}], facts: [
-    ["Walk", n.measured ? `${n.took_s ? `took ${n.took_s}s, ` : ""}every hour` : "every hour, the first an hour after start"],
-    ["Its work's memory", fence], ...setOn], actions: storageMeasureBtn(n)});
+  // When it was measured, and how often, on the line (R274); the memory
+  // AerieOS's work is held to and where stores are set at the page's foot.
+  const head = pageHead({pills: pill, cls: "toolstate", line: [n.measured ? {text: age} : {text: age, tone: "warn"},
+    {text: n.measured ? "walked every hour" : "walked every hour, the first an hour after start"}], actions: storageMeasureBtn(n)});
+  const foot = `<div class="field"><div class="hint">${fence ? `AerieOS's work here is held to ${esc(fence)}. ` : ""}Stores are set on ${pageLink("nodes", "the Nodes page")}.</div></div>`;
   return `<div data-stnode="${esc(n.node)}">
     ${unfenced}${head}
     ${storageMachineDisks(n)}
@@ -939,6 +938,7 @@ function storageBody(n, where){
     ${byProject(`${(n.projects || []).length} space${(n.projects || []).length === 1 ? "" : "s"}`, storageProjects(n, where))}
     ${(n.phones || []).length ? docSection("storage", "phones", "Phones", `${n.phones.length}, ${sgb(n.phones.reduce((a, p) => a + (p.mb || 0), 0))}`, storagePhones(n)) : ""}
     ${n.slow?.length ? `<div class="field"><div class="hint warn">Not measured in time: ${esc(n.slow.join(", "))}. A slow share; the next walk tries again.</div></div>` : ""}
+    ${foot}
   </div>`;
 }
 
