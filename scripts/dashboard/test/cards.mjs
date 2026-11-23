@@ -1887,8 +1887,8 @@ ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e
 await section("Sections, every one open by default at every width, with a jump bar", async () => {
   // Sections, every one open by default at every width, with a jump bar
   // over them (the operator, 8 Oct: too much was hidden in folds). One shut
-  // stays shut for the page's life; the chain's door shows the repository's
-  // alone, open. Read with $eval, which the harness's own fold-opening leaves be.
+  // stays shut for the page's life. Read with $eval, which the harness's
+  // own fold-opening leaves be.
   const folds = (p = page) => p.$$eval('details.rngroup', ds => ds.map(d => ({
     k: d.dataset.sect, open: d.open, shown: getComputedStyle(d).display !== 'none' })));
   const shut = fs => fs.filter(f => f.shown && !f.open).map(f => f.k).join();
@@ -1902,10 +1902,6 @@ await section("Sections, every one open by default at every width, with a jump b
   await page.waitForFunction(() => !document.querySelector('details[data-sect="rn:claude"]').open, null, { timeout: 5000 }).catch(() => {});
   await quiet(300);   // alone: time for another section to have shut with it
   ok(shut(await folds()) === 'rn:claude', `...a heading pressed shuts its own section alone (${shut(await folds())})`);
-  await page.evaluate(() => { closeRename(); renameProject('alpha', 'git'); });
-  const chain = await folds();
-  ok(chain.filter(f => f.shown).map(f => f.k).join() === 'rn:repo' && chain.find(f => f.k === 'rn:repo')?.open,
-     `...and the chain's door shows the repository's section alone, open (${JSON.stringify(chain.filter(f => f.shown))})`);
   await page.evaluate(() => { closeRename(); renameProject('alpha'); });
   ok(shut(await folds()) === 'rn:claude', `...and the gear opens again with the one this person shut, shut (${shut(await folds())})`);
   await page.$eval('#rnmodal .sectjump a:last-child', a => a.click()).catch(() => {});
@@ -1923,9 +1919,8 @@ await section("Sections, every one open by default at every width, with a jump b
 });
 ok(await page.evaluate(() => document.activeElement?.tagName) !== 'INPUT',
    '...with the keyboard down, like every other dialog here');
-ok(await page.$eval('#rnTokenField', el => el.hidden)
-   && await page.$eval('#rnAuthField', el => el.hidden),
-   '...and holds no credential: the gear is the project, the chain is its remote');
+ok(await page.$eval('#rnTokenField', el => !el.hidden && el.closest('details')?.dataset.sect === 'rn:repo'),
+   '...and its credential is in its Repository section, where the chain opens too (the operator, 23 Nov)');
 // Its people (membership.py): the owner, who may hand it on and make it
 // invite only, staged until Save, and an Invite that acts on the press;
 // the space's, so on its own dialog (R223).
@@ -2109,11 +2104,18 @@ await page.evaluate(() => { state.invites = []; drawBell(); toggleBell(false); }
 // is offered a token, and told what setting one does and does not do.
 await pjMenu('alpha');
 await page.click('.doc .projtab [data-l="alpha"]');
+// Its notebook's Settings at Repository, where the credentials are drawn
+// (the operator, 23 Nov: the section was one line and a button to a dialog).
+await page.waitForFunction(() => /\/settings/.test(location.hash)
+  && document.querySelector('.nbsettings #rnAuthField:not([hidden])'), null, { timeout: 15000 }).catch(() => {});
+const chainAt = await page.evaluate(() => ({ at: location.hash, dialog: !document.getElementById('rnmodal').hidden,
+  shown: [...document.querySelectorAll('.nbsettings details.rngroup')].filter(d => d.checkVisibility()).map(d => d.dataset.sect).join(),
+  fields: ['rnTokenField', 'rnAuthField', 'rnTestField', 'rnAddrField', 'rnUnlinkF'].filter(id => document.querySelector(`.nbsettings #${id}:not([hidden])`)).length }));
+ok(/alpha\/settings/.test(chainAt.at) && !chainAt.dialog && chainAt.shown === 'rn:repo' && chainAt.fields === 5,
+   `the chain opens its notebook's Settings at Repository, with the token, the switch, Test, the address and Unlink there, not a dialog of its own (${JSON.stringify(chainAt)})`);
+// The rest is read in the same form, as a dialog over the Spaces page.
+await page.evaluate(() => { openProjectsTab(); renameProject('alpha'); });
 await page.waitForSelector('#rnmodal:not([hidden])');
-ok(/GitHub/.test(await page.$eval('#rnTitle', e => e.textContent))
-   && await page.$eval('#rnNameField', el => el.hidden)
-   && await page.$eval('#rnMineField', el => el.hidden),
-   'the chain opens the same dialog on the remote alone, with the rest put away');
 ok(!await page.$eval('#rnTokenField', el => el.hidden),
    'a space pushing with a deploy key is offered a token');
 const kh = await page.$eval('#rnTokenHint', e => e.textContent);
@@ -2147,8 +2149,10 @@ await page.click('#rnCancel');
 // Closing over a typed token asks first, in the page's modal, so the dialog
 // shuts once that is answered: reopened before then, the late close shut it.
 await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 8000 });
-await page.evaluate(() => renameProject('alpha', 'git'));
-ok(await page.$eval('#rnDelete', e => e.hidden), 'the chain\'s door has no Delete: it is about the remote, not the space');
+await page.evaluate(() => renameProject('alpha'));
+ok(await page.$eval('#rnUnlinkF', e => !e.hidden && e.closest('details')?.dataset.sect === 'rn:repo'
+     && e.previousElementSibling?.classList.contains('rnbarf')),
+   'Unlink is at the Repository section\'s foot, under its Save and apart from it');
 await page.waitForSelector('#rnAuthField:not([hidden])', { timeout: 8000 });
 ok(await page.$eval('#rnTokenClear', b => b.hidden),
    'a space with no token stored is offered nothing to clear');
@@ -2157,7 +2161,7 @@ ok(await page.$eval('#rnTokenClear', b => b.hidden),
 // refusal said in the dialog with the remote left where it was.
 const addrWas = await page.$eval('#rnAddr', e => e.value);
 ok(!await page.$eval('#rnAddrField', e => e.hidden) && /alpha/.test(addrWas),
-   `the chain's door shows where the remote points, to change after a rename on the host (${addrWas})`);
+   `the Repository section shows where the remote points, to change after a rename on the host (${addrWas})`);
 await page.fill('#rnAddr', 'https://elsewhere.example/someone/alpha.git');
 const addrErr = await sectSave(page, 'repo');
 ok(/another host/.test(addrErr) && !await page.$eval('#rnmodal', e => e.hidden),
@@ -2172,7 +2176,7 @@ await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
 // when it is more than one thing; the server's half is unit/test_auth_test.py,
 // so its answer is set here and the draw is what is read.
 await section("Test (the operator, 7 Oct)", async () => {
-  ok(!await page.$eval('#rnTestField', e => e.hidden), 'the chain\'s door offers Test for a space with a remote');
+  ok(!await page.$eval('#rnTestField', e => e.hidden), 'the Repository section offers Test for a space with a remote');
   let asked = null;
   const answer = { using: 'its deploy key', mode: 'ssh', read: true, push: false,
                    missing: ['write access for the deploy key: ERROR: The key you are authenticating with has been marked as read only.',
@@ -2617,16 +2621,16 @@ await refreshUntil(page, () => !(state?.projects || []).some(p => p.name === 'ga
 // to have an answer for: not a form to fill in, and not an empty box either.
 await pjMenu('ep.silon');
 await page.click('.doc .projtab [data-l="ep.silon"]');
-await page.waitForSelector('#rnmodal:not([hidden])');
+await page.waitForFunction(() => /ep\.silon\/settings/.test(location.hash)
+  && document.querySelector('.nbsettings details[data-sect="rn:repo"]')?.checkVisibility(), null, { timeout: 15000 }).catch(() => {});
 ok(await page.$eval('#rnTokenField', el => el.hidden)
-   && !await page.$eval('#rnGitNone', el => el.hidden),
+   && await page.$eval('#rnGitNone', el => el.checkVisibility()),
    '...and a read-only project is told there is nothing to set, not shown a blank field');
-ok(await page.$$eval('.rnbar', bs => bs.every(b => !b.checkVisibility())),
+ok(await page.$$eval('.rnbar[data-rnbar="repo"]', bs => bs.every(b => !b.checkVisibility())),
    '...with no Save to press, since nothing there can be saved');
 // Back to alpha's dialog: everything below is about the name field, and a
 // collision check run against the wrong project's name proves nothing.
-await page.click('#rnCancel');
-await page.evaluate(() => renameProject('alpha'));
+await page.evaluate(() => { openProjectsTab(); renameProject('alpha'); });
 await page.waitForSelector('#rnmodal:not([hidden])');
 await page.fill('#rnName', 'gamma');
 ok(await page.$eval('#rnName', el => el.classList.contains('bad')),

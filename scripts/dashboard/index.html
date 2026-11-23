@@ -881,12 +881,9 @@
     </div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body">
-    <!-- What this project pushes with. Reached by the chain on its row, which
-         is where the remote lives for a project that has one and for a
-         project that has not: the gear is the project's own settings, and a
-         credential is the remote's. -->
-    <!-- In the Settings view, where the credential fields are not: what its
-         remote is and how it pushes, and the door to the rest (B813). -->
+    <!-- What this repository pushes with, and where its remote is. The chain
+         on its card opens this section. -->
+    <!-- What its remote is, and Link to a git host where it has none (B813). -->
     <div class="field" id="rnRepoSum" hidden><div class="setrow ctlrow"><span class="hint grow" id="rnRepoSay"></span>
       <button type="button" id="rnRepoGo"></button></div></div>
     <div class="field" id="rnGitNone" hidden><div class="hint"></div></div>
@@ -958,6 +955,10 @@
       <input id="rnAddr" type="text" autocomplete="off" spellcheck="false" inputmode="url">
       <div class="hint" id="rnAddrHint">Change it after renaming your account or organization on the host. Saving checks it is this repository: another one is refused.</div>
     </div>
+    <!-- Unlink, under the section's Save and apart from it (rnBars puts it
+         there): the remote and its stored token go, the commits stay. -->
+    <div class="field rnunlinkf" id="rnUnlinkF" hidden><div class="actbar"><span class="sp"></span>
+      <button type="button" id="rnUnlink" class="danger">Unlink</button></div></div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:runs"><summary><span class="t">Nodes</span></summary><div class="body">
     <!-- The project's node: where everything it does on a node goes:
@@ -1147,7 +1148,6 @@
            /api/trash: every file kept under /workspace/.trash. -->
       <button id="rnDelete" class="danger" hidden
         title="move it to .trash; everything is kept">Delete space…</button>
-      <button id="rnUnlink" class="danger" hidden>Unlink</button>
     </div>
     <!-- Why Delete project is dead for this account (B86), under it. -->
   </div>

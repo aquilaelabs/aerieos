@@ -15,7 +15,7 @@ pu = rec.get("push") or {}
 if "rights" in pu:
     print("push at all:    ", "no: this space was given no push rights; the operator grants them with Link to a git host on its Spaces page"
           if not pu["rights"]
-          else "no: its remote is https and the controller holds no credential for it; the operator links one on its Spaces page"
+          else "no: its Authentication is Disabled (an https remote with no credential); a person picks Access token under Repository in its notebook's Settings, and nothing needs linking again"
           if pu.get("auth") == "none"
           else "no: it has no origin remote" if not pu.get("auth")
           else f"yes ({'the key its ssh address carries' if pu['auth'] == 'ssh' else 'the token the controller holds'})")

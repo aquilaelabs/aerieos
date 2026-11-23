@@ -2116,7 +2116,9 @@ def _givers_said(project, me):
     out = []
     for uid, fid in gitcreds.givers(project):
         fg = accountkeys.forge_of(uid, fid) or {}
-        out.append({"uid": uid, "name": names.get(uid) or "an account that is gone", "login": fg.get("login", ""),
+        # ...and its entry's id, so the page does not offer the token this
+        # space already uses as another to use instead.
+        out.append({"uid": uid, "id": fid, "name": names.get(uid) or "an account that is gone", "login": fg.get("login", ""),
                     "host": fg.get("host", ""), "mine": uid == me, "live": logins.live(uid)})
     return out
 

@@ -222,8 +222,7 @@ function rnFillNode(){
       loadNodes().then(() => { if (opened !== null && rnFor === opened){ rnFillNode(); rnBars(); } });
     }
     // Hidden with the rest of the project's own settings when this dialog was
-    // opened by the chain, which asks about the remote and nothing else.
-    wrap.hidden = rnMode === "git" || !pick.length;
+    wrap.hidden = !pick.length;
     // Shown to everybody on the project and changed by grant (R137 step 4):
     // a node is shared, so the picker is read-only without `node`.
     sel.disabled = state?.can?.node === false;
@@ -249,7 +248,7 @@ function rnFillNode(){
     // The closed picker is italic while the removed node is the one shown.
     sel.classList.toggle("removed", !!gone && sel.value === rnPrefWas.node);
     // ...and the field shows for it even when no other node is enrolled.
-    if (gone) wrap.hidden = $("rnSeesField").hidden = $("rnReachField").hidden = rnMode === "git";
+    if (gone) wrap.hidden = $("rnSeesField").hidden = $("rnReachField").hidden = false;
     rnFillNodesMore();
 }
 
@@ -287,7 +286,6 @@ function rnReachNodes(){
 const REACH_COLS = [{label: "Address"}, {label: "On", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
 let rnReachEdit = null;           // {i, form: {addr, nodes}}: the row open, i -1 for a new one
 function rnDrawReach(focus){
-  if (rnMode === "git") return;
   const box = $("rnReachRows");
   // Nodes Write, as the server asks (R255 step 3), not the administrator
   // role: a role of anybody's may give it. A repository's view draws the
@@ -396,7 +394,7 @@ function rnFillNodesMore(){
   const others = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired" && n.state !== "disabled" && n.id !== primary
                                             && (primary || n.config?.host_only));
   const ids = rnMoreIds();
-  box.hidden = hint.hidden = label.hidden = rnMode === "git" || !(others.length || ids.length);
+  box.hidden = hint.hidden = label.hidden = !(others.length || ids.length);
   // Without the `node` grant the list is read alone (R137 step 4); a
   // repository's view draws it dead (rnSpaceRelock, at the end).
   const ro = state?.can?.node === false;
@@ -516,9 +514,7 @@ let rnToolsList = null;
 function rnLoadTools(p){
   return reading("rn.tools", async () => {
     rnToolsList = null;
-    // Not on the repository's own door (rnMode "git"), like Reads beside it.
-    $("rnToolsField").hidden = rnMode === "git";
-    if (rnMode === "git") return;
+    $("rnToolsField").hidden = false;
     drawHTML($("rnTools"), `<div class="hint">reading the toolchains on its node…</div>`);
     const node = p?.prefs?.node || "";
     const j = await getJSON("/api/toolchains" + (node ? `?node=${encodeURIComponent(node)}` : ""));
@@ -588,7 +584,7 @@ function rnFillReads(){
   const was = new Set(rnPrefWas.reads.split(",").filter(Boolean).map(r => reposOf(r) || r));
   const own = reposOf(rnFor);
   const others = projectList().filter(c => c.key !== own).sort((a, b) => a.name.localeCompare(b.name));
-  wrap.hidden = rnMode === "git" || !others.length;
+  wrap.hidden = !others.length;
   drawHTML(box, others.map(c => lrow(c.key, c.name,
     c.rows.length === 1 ? (c.rows[0].git ? `git: ${c.rows[0].git}` : "no git") : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
     was.has(c.key))).join(""));
@@ -803,7 +799,7 @@ async function unlinkProject(name){
 // rather than hides: the alternative is a project whose roadmap silently
 // stayed behind under a name nothing points at any more.
 let rnFor = null;                        // the project the dialog is open on
-let rnMode = "all";                      // "all" from the gear, "git" from the chain, "project" from a card (R208)
+let rnMode = "all";                      // "all" in a notebook's Settings view, "project" from a card (R208)
 let rnOpens = 0;                         // which opening of the dialog this is
 
 // The form shown in a notebook's Settings view instead of the dialog (R119
@@ -904,10 +900,6 @@ function renameProject(name, mode = "all"){
   rnMode = mode;
   rnOpens++;
   const p = (state?.projects || []).find(x => x.name === name);
-  // One dialog, two doors. The gear is the project's own settings; the chain
-  // is the remote's half of them, and opening it there hides everything that
-  // is not about the remote rather than scrolling past it.
-  const git = mode === "git";
   // A card's door (R208): what is the project's as a whole, in a dialog.
   // The repository's own sections (Repository, Build and test, File access,
   // Snapshots) are each notebook's Settings view's and are not drawn; on a
@@ -916,18 +908,10 @@ function renameProject(name, mode = "all"){
   const box = $("rnmodal").querySelector(":scope > .box");
   box.classList.toggle("rnproject", proj);
   box.classList.toggle("rnwork", proj && !!p?.work);
-  // Named rather than assumed: a project on somebody's own Gitea should not
-  // read "GitHub settings", and the host is the one fact this door is about.
-  const where = p?.forge_name || "its remote";
-  $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}`
-    : proj ? `${projectName(name)} settings` : projLabel(name);
-  for (const id of ["rnNameField", "rnMineField",
-                    "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField",
-                    "rnRelGateF", "rnRelTableF", "rnRelFilesF"])
-    $(id).hidden = git;
+  $("rnTitle").textContent = proj ? `${projectName(name)} settings` : projLabel(name);
   // The project's name is renamed on its card's back; the field here
   // renames a repository, which the project's door is not about.
-  $("rnNameField").hidden = git || proj;
+  $("rnNameField").hidden = proj;
   const ph = $("rnProjectHead");
   ph.hidden = !proj;
   ph.firstElementChild.textContent = `${projectName(name)}${p?.pid ? ` is space P${p.pid}` : ""}${
@@ -938,8 +922,6 @@ function renameProject(name, mode = "all"){
     ? "A space with no repository: its sessions build containers and VMs in its own folder, and have no git and no notebook. Add repository on its card makes it a coding space."
     : `Git, build and test, file access and snapshots are each repository's: open its notebook's Settings. ${
         (state?.repos?.[reposOf(name)]?.members || []).length > 1 ? "These settings are the space's as a whole." : ""}`.trim();
-  // The node picker and the two credential blocks have hidden rules of their
-  // own further down, and each of those consults the mode too.
   $("rnName").value = projLabel(name);
   $("rnToken").value = "";
   $("rnErrWrap").hidden = true;
@@ -954,9 +936,12 @@ function renameProject(name, mode = "all"){
   //
   // Still hidden for a read-only clone and for a local repo: a credential
   // there has nothing to authenticate against, and offering one would imply
-  // it grants something. Push rights are granted once, at clone.
+  // it grants something. Push rights are granted once, at clone. Drawn in
+  // the Repository section itself (the operator, 23 Nov: it was one line and
+  // a button to a dialog, over an empty page).
   const how = p?.push_how || "";
-  $("rnTokenField").hidden = git ? !(p?.has_token || p?.push) : true;
+  const linked = !proj && !!p?.linked;
+  $("rnTokenField").hidden = !linked || !(p?.has_token || p?.push);
   // The deploy-key case is tested FIRST and stays true after a token is set:
   // storing one does not change what git uses (git never asks a credential
   // helper about an ssh remote), and a hint that stopped saying so the moment
@@ -973,34 +958,31 @@ function renameProject(name, mode = "all"){
       : "Kept for this repository alone; a shell here can read it.";
   // Nothing to set is an answer, not an empty box: a linked project with no
   // token and no push rights has a remote it can only read.
-  $("rnGitNone").hidden = !(git && $("rnTokenField").hidden);
+  $("rnGitNone").hidden = !(linked && $("rnTokenField").hidden);
   if (!$("rnGitNone").hidden)
     $("rnGitNone").firstElementChild.textContent =
       `${projLabel(name)} has a remote it can only read, so there is no credential to set here.`;
-  // The Settings view keeps the credential fields behind the remote's door,
-  // which left its Repository section listed and empty (B813): it says what
-  // the remote is and how it pushes here, and opens the door.
+  // What the remote is heads the section, and one not linked yet has Link
+  // to a git host there, the section's one thing to do (B813).
   const sum = $("rnRepoSum");
-  sum.hidden = git || !p?.git_ok;
+  sum.hidden = proj || !p?.git_ok;
   if (!sum.hidden){
-    const host = p.linked ? `${p.forge_name || "its host"}${p.forge_host ? ` (${p.forge_host})` : ""}` : "";
-    const with_ = how === "key" ? "a deploy key" : p.has_token ? "a token" : "its stored credential";
     $("rnRepoSay").textContent = !p.linked ? `${projLabel(name)} is linked to no git host yet.`
-      : `Linked to ${host}; it ${p.push ? `pushes with ${with_}` : "can only read the remote"}.`;
+      : `Linked to ${p.forge_name || "its host"}${p.forge_host ? ` (${p.forge_host})` : ""}.`;
     const go = $("rnRepoGo");
-    go.textContent = p.linked ? `${p.forge_name || "Remote"} settings` : "Link to a git host";
+    go.hidden = !!p.linked;
+    go.textContent = "Link to a git host";
     go.disabled = state?.can?.["git-auth"] === false;
-    go.onclick = () => { if (p.linked) renameProject(name, "git"); else openLinkProject(name); };
+    go.onclick = () => openLinkProject(name);
   }
-  // Unlink is the chain's, never the gear's: it is about the remote, and it
-  // is the way a project moves from one host to another, since linking
-  // refuses a repo that already has one.
-  $("rnUnlink").hidden = !(git && p?.linked);
-  rnGitDoor = !!git;
+  // Unlink is at the Repository section's foot, apart from its Save: it is
+  // about the remote, and it is the way a project moves from one host to
+  // another, since linking refuses a repo that already has one.
+  $("rnUnlinkF").hidden = !linked || state?.can?.["git-auth"] === false;
   unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`);
-  // The bin, on the gear's door only: the chain's is about the remote.
+  // The bin, on the repository's settings and not the space's door.
   // Not drawn for a role that does not give it (the operator, 21 Oct).
-  $("rnDelete").hidden = git || proj || !p || !!p?.trash_why;
+  $("rnDelete").hidden = proj || !p || !!p?.trash_why;
   $("rnKeyOut").hidden = true; $("rnKeyPaste").hidden = true; $("rnKeyPaste").value = "";
   rnLoadAuth(name);
   // A project with no repository (R208) has no snapshots and no files over
@@ -1009,13 +991,13 @@ function renameProject(name, mode = "all"){
   rnLoadPeople(name);
   if (!p?.work) rnLoadFtp(name);
   rnFillPrefs(p);
-  rnSpaceMarks(name, proj || git);
+  rnSpaceMarks(name, proj);
   rnFillHostsOwn(p);
-  // The sessions at the foot: the gear's door, and an administrator's.
+  // The sessions at the foot, an administrator's.
   $("rnSessField").hidden = true;
   // Asked of the server, which answers by the account's areas on this
   // project (R255 steps 3 and 4), and its refusal said under the section.
-  if (!git) rnSessionsLoad(name);
+  rnSessionsLoad(name);
   $("rnmodal").hidden = false;
   rnFolds();
   // Each section's Save and Revert, drawn dead until something changes.
@@ -1117,7 +1099,6 @@ function rnLoadPeople(name, keep = false){
     $("rnPeopleField").hidden = true;
     setHidden($("rnPeopleField").closest("details"), true);
   }
-  if (rnMode === "git") return;
   postJSON("/api/members", {action: "view", project: name})
     .then(j => { if (rnFor !== name || j.error) return;
                  if (keep && Object.keys(rnPeopleDraft).length) return;
@@ -1128,7 +1109,7 @@ function rnLoadPeople(name, keep = false){
 function rnDrawPeople(){
   // The chain's door is the remote's alone, and a load the gear's door
   // started can land after it opens (B539).
-  if (!rnPeople || rnMode === "git") return;
+  if (!rnPeople) return;
   const v = rnPeople, d = rnPeopleDraft;
   const owner = d.owner ?? v.owner, only = d.invite_only ?? v.invite_only;
   const invitable = v.accounts.filter(n => !v.members.includes(n) && !v.invites.some(i => i.name === n));
@@ -1214,7 +1195,6 @@ let rnFtp = null, rnFtpDraft = {};
 function rnLoadFtp(name){
   rnFtp = null; rnFtpDraft = {};
   $("rnFtpField").hidden = true;
-  if (rnMode === "git") return;
   postJSON("/api/project-ftp", {project: name})
     .then(j => { if (rnFor !== name || j.error) return; rnFtp = j; rnDrawFtp(); })
     .catch(() => {});
@@ -1226,7 +1206,7 @@ function rnFtpWhere(v){
 }
 
 function rnDrawFtp(){
-  if (!rnFtp || rnMode === "git") return;
+  if (!rnFtp) return;
   const v = rnFtp, d = rnFtpDraft;
   const on = d.on ?? v.on, editor = d.editor ?? v.editor, st = v.status || {}, where = rnFtpWhere(v);
   const box = $("rnFtp");
@@ -1330,7 +1310,6 @@ let rnSnap = null;
 // `keep`: read again in place, the section left as it is until the answer.
 function rnLoadSnapshots(name, keep = false){
   if (!keep){ rnSnap = null; $("rnSnapField").hidden = true; }
-  if (rnMode === "git") return;
   // Not asked for where the row already says it would be refused (B89), and
   // not drawn: what a role does not give is not shown (the operator, 21 Oct).
   if (rnSettingsWhy(name)) return;
@@ -1450,7 +1429,8 @@ function rnLoadAuth(name){
   $("rnAddr").value = "";
   $("rnTestField").hidden = true;
   $("rnTestOut").hidden = true;
-  if (rnMode !== "git") return;
+  const p = (state?.projects || []).find(x => x.name === name);
+  if (rnMode === "project" || !p?.linked) return;
   postJSON("/api/project-auth", {name})
     .then(j => {
       if (rnFor !== name || j.error) return;   // closed, or reopened elsewhere
@@ -1486,16 +1466,25 @@ function rnDrawStore(name){
   // used for their own work while they are signed in; yours removable.
   const givers = o.givers || [], me = givers.find(g => g.mine);
   const who = givers.map(g => `<div class="setrow ctlrow"><span class="grow">${g.mine ? "Your" : esc(g.name) + "'s"} ${
-    esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
+    esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}, the one this space uses${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
     g.mine ? `<button type="button" data-rnunlink="1">Take it back</button>` : ""}</div>`).join("");
+  // Pushes are off while Authentication is Disabled, whatever is stored: said
+  // first, where the stored token and a passing Test read as all well (the
+  // operator, 23 Nov: a space set to Disabled could not push, and nothing
+  // near the token said why).
+  const off = rnAuthNow === "none" && (givers.length || rnAuthOpts?.token)
+    ? `<div class="notice warn rnauthoff">Pushes are off: Authentication below is Disabled, so no token is used. Pick Access token there and Save to push with it.</div>` : "";
   const said = givers.length
     ? `<div class="hint">${givers.length === 1 ? "One person has" : givers.length + " people have"} given this space a token; each is used for their own pushes and pulls while they are signed in${
         me ? "" : ", and yours is not among them"}.</div>`
     : `<div class="hint">Nobody has given this space a token: pushes and pulls wait until somebody does.</div>`;
-  const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="setrow ctlrow"><span class="grow">Your ${
-    esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}</span>
+  // Your other tokens for this host, each told apart by when it was saved;
+  // never the one this space already uses (B1122: it was offered again, the two
+  // rows reading the same).
+  const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="setrow ctlrow"><span class="grow">Your ${me ? "other " : ""}${
+    esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}${f.at ? `, saved ${esc(new Date(f.at * 1000).toLocaleDateString([], {day: "numeric", month: "short"}))}` : ""}</span>
     <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this space"}</button></div>`).join("");
-  drawHTML(box, said + who + rows);
+  drawHTML(box, off + said + who + rows);
   box.hidden = !(said || who || rows);
   box.querySelectorAll("[data-rnstore]").forEach(b => b.onclick = async () => {
     busy(b, "Linking");
@@ -1870,19 +1859,14 @@ const rnDirty = () => RN_SECTS.filter(s => rnSectChanges(s).said.length);
 // The bars, put in once and then kept in step with what is typed: dead
 // rather than gone while there is nothing to save, so nothing moves under a
 // thumb (sectBar's rule).
-// Opened from the git host's door (the chain) the dialog is the Repository
-// section alone, and its Save and Revert sit in the foot beside Unlink (the
-// operator, 30 Oct), not on a line of their own above it.
-let rnGitDoor = false;
 function rnBars(){
   if (rnFor === null) return;
   const enc = rnEnc(), running = !!myLiveSession(rnFor);
   for (const sect of RN_SECTS){
     const body = document.querySelector(`details.rngroup[data-sect="rn:${sect}"] > .body`);
     if (!body) continue;
-    // By its name, wherever it sits: the foot holds the repository's on
-    // the git door; and the box moves out of the dialog into the Settings
-    // view, so it is looked for in the page, not the dialog.
+    // By its name, wherever it sits: the box moves out of the dialog into
+    // the Settings view, so it is looked for in the page, not the dialog.
     let bar = document.querySelector(`.rnbar[data-rnbar="${sect}"]`);
     if (!bar){
       body.insertAdjacentHTML("beforeend", `<div class="field rnbarf"><div class="actbar sectbar rnbar" data-rnbar="${sect}">
@@ -1894,12 +1878,13 @@ function rnBars(){
       bar = body.querySelector(":scope > .rnbarf > .rnbar");
     }
     // A remote it can only read has nothing here to save (rnGitNone), nor
-    // has the Settings view, which says what the remote is and opens its
-    // door (rnRepoSum, B813).
-    bar.parentElement.hidden = sect === "repo" && (!$("rnGitNone").hidden || !$("rnRepoSum").hidden);
-    const foot = $("rnUnlink")?.parentElement, wrap = bar.parentElement;
-    if (sect === "repo" && rnGitDoor && foot && wrap.parentElement !== foot) foot.insertBefore(wrap, $("rnDelete"));
-    else if (!(sect === "repo" && rnGitDoor) && wrap.parentElement !== body) body.appendChild(wrap);
+    // has one not linked yet, whose one press is Link (rnRepoSum, B813).
+    bar.parentElement.hidden = sect === "repo" && (!$("rnGitNone").hidden
+      || ["rnTokenField", "rnAuthField", "rnAddrField"].every(id => $(id).hidden));
+    const wrap = bar.parentElement;
+    if (wrap.parentElement !== body) body.appendChild(wrap);
+    // Unlink under the section's Save, apart from it.
+    if (sect === "repo" && $("rnUnlinkF") && wrap.nextElementSibling !== $("rnUnlinkF")) wrap.after($("rnUnlinkF"));
     if (bar.dataset.busy) continue;
     const {said, start} = rnSectChanges(sect, enc);
     const ask = running && start.length > 0;

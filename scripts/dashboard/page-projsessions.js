@@ -21,7 +21,7 @@ function rnSessionsLoad(name){
     try{
       j = await getJSON("/api/project-sessions?project=" + encodeURIComponent(name));
     }catch(e){ return; }
-    if (rnFor !== name || rnMode === "git") return;
+    if (rnFor !== name) return;
     if (j.error){ rnWhyOff($("rnSessField"), $("rnSessList"), j.error); return; }
     rnSessionsDraw(name, j.sessions || []);
   });
@@ -34,7 +34,6 @@ const rnSessWho = r => r.who === state?.me ? "you" : r.who;
 const rnSessWhat = r => r.kind === "shell" ? "shell" : (r.agent || r.kind);
 
 function rnSessionsDraw(name, rows){
-  if (rnMode === "git") return;                    // the remote's door alone (B539)
   const list = $("rnSessList");
   patch(list, rows.length ? rows.map((r, i) => `<div class="row rnsess">
       <div class="grow"><div class="name">${esc(rnSessWho(r))}</div>

@@ -24,7 +24,7 @@ class GitPolicy(unittest.TestCase):
 
     def test_https_with_no_credential_says_so(self):
         out = policy({"push": {"rights": True, "auth": "none"}})
-        self.assertIn("no: its remote is https and the controller holds no credential", out.splitlines()[0])
+        self.assertIn("no: its Authentication is Disabled", out.splitlines()[0])
 
     def test_a_key_or_a_token_is_a_yes(self):
         self.assertIn("yes (the key its ssh address carries)", policy({"push": {"rights": True, "auth": "ssh"}}).splitlines()[0])

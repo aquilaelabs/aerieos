@@ -45,11 +45,12 @@ function wireProjectRows(root){
   // Install opens the Library on the node at that agent's card, where it is installed (R95, R170).
   root.querySelectorAll("[data-tcinst]").forEach(b => b.onclick = () => openLibraryOn(b.dataset.tcinst, b.dataset.agent || "claude"));
   // The chain is the remote, whichever state the project is in: linking one
-  // that has no remote, and the credential half (and the way off it) for
-  // one that has.
+  // that has no remote, and for one that has, its Settings view's Repository
+  // section, where its credentials and the way off it are (the operator,
+  // 23 Nov: a dialog of its own, opened from a section that was one line).
   root.querySelectorAll("[data-l]").forEach(b => b.onclick = () => {
     const p = (state?.projects || []).find(x => x.name === b.dataset.l);
-    if (p?.linked) renameProject(b.dataset.l, "git");
+    if (p?.linked) openProjectSettings(b.dataset.l, "repo");
     else openLinkProject(b.dataset.l);
   });
   root.querySelectorAll("[data-m]").forEach(b => b.onclick = () => openNotebook(b.dataset.m));

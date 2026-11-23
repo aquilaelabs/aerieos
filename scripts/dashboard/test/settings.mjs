@@ -528,8 +528,9 @@ await section("a project's settings live in its notebook", async () => {
     .map(b => ({ k: b.dataset.spick, on: b.classList.contains('on'), said: b.querySelector('.rtags .dim')?.textContent || '' })));
   ok(list.length >= 8 && list[0].k === 'project' && list[0].on && list.every(r => r.said) && list.some(r => r.k === 'people'),
      `...its sections a list beside the one picked, each saying what is in it, General first, People among them (${list.map(r => r.k).join(', ')})`);
-  // Every section listed opens on something: Repository's fields are the
-  // remote's door's, and it was listed and opened on an empty pane (B813).
+  // Every section listed opens on something: Repository was listed and
+  // opened on an empty pane (B813), then on one line and a door to a dialog
+  // (the operator, 23 Nov); its credentials are drawn there now.
   {
     const blank = [];
     for (const { k } of list){
@@ -538,10 +539,12 @@ await section("a project's settings live in its notebook", async () => {
       if (h < 40) blank.push(`${k} ${Math.round(h)}px`);
     }
     await rnSect(page, 'repo');
-    const repo = await page.evaluate(() => ({ say: $('rnRepoSay').textContent, go: $('rnRepoGo').textContent,
+    await page.waitForSelector('.nbsettings #rnAuthField:not([hidden])', { timeout: 10000 }).catch(() => {});
+    const repo = await page.evaluate(() => ({ say: $('rnRepoSay').textContent, go: $('rnRepoGo').checkVisibility(),
+      fields: ['rnAuthField', 'rnTestField', 'rnAddrField', 'rnUnlinkF'].filter(id => $(id).checkVisibility()).join(),
       bar: [...document.querySelectorAll('.nbsettings details[data-sect="rn:repo"] .rnbarf')].some(b => b.checkVisibility()) }));
-    ok(!blank.length && /Linked to GitHub/.test(repo.say) && /GitHub settings/.test(repo.go) && !repo.bar,
-       `...every section listed opens on something, Repository saying what its remote is with the door to it and no Save of its own (${blank.join(', ') || 'none blank'}; ${repo.say} ${repo.go})`);
+    ok(!blank.length && /Linked to GitHub/.test(repo.say) && !repo.go && repo.fields === 'rnAuthField,rnTestField,rnAddrField,rnUnlinkF' && repo.bar,
+       `...every section listed opens on something, Repository saying what its remote is over its credentials, its Save and Unlink (${blank.join(', ') || 'none blank'}; ${JSON.stringify(repo)})`);
   }
   await rnSect(page, 'yours');
   const one = await page.evaluate(() => [...document.querySelectorAll('.nbsettings details.rngroup')]

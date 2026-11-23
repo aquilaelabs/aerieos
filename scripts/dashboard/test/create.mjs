@@ -1146,11 +1146,13 @@ ok(await page.$('.pgrid .pcard[data-row="beta"] [data-l]') !== null
    "the chain is in every repo's menu, linked or not");
 await unfold(page, 'alpha');
 await page.click('.pgrid .pcard[data-row="alpha"] [data-l]');
-await page.waitForSelector('#rnmodal:not([hidden])');
-ok(/GitHub/.test(await page.$eval('#rnTitle', el => el.textContent))
-   && await page.$eval('#rnNameField', el => el.hidden),
-   '...and on a linked one it opens that space\'s GitHub settings, not the link form');
-await page.click('#rnCancel');
+await page.waitForFunction(() => /alpha\/settings/.test(location.hash)
+  && document.querySelector('.nbsettings details[data-sect="rn:repo"]')?.checkVisibility(), null, { timeout: 15000 }).catch(() => {});
+ok(await page.evaluate(() => /alpha\/settings/.test(location.hash) && document.getElementById('pmodal').hidden
+     && /Linked to GitHub/.test(document.getElementById('rnRepoSay').textContent)),
+   '...and on a linked one it opens that space\'s Settings at Repository, not the link form');
+await page.evaluate(() => openProjectsTab());
+await page.waitForSelector('.pgrid .pcard[data-row="beta"]', { timeout: 15000 });
 await unfold(page, 'beta');
 await page.click('.pgrid .pcard[data-row="beta"] [data-l]');
 // The dialog draws before its catalog lands (the keys and the git hosts are
