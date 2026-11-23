@@ -126,9 +126,14 @@ ok(/suites:.*\bphone\b/.test(pre('scripts/dashboard/page-bell.js')),
 // by that unit file, since the unit tier is the first thing a preflight
 // runs: before this a change there could never come out clean.
 await section("A file no browser suite reaches but a unit file runs", async () => {
-  const prov = pre('nodes/provision-linux.sh');
-  ok(/unit:\s+nodes\/provision-linux\.sh is run by .*test_sandbox_gpu\.py/.test(prov) && !/no suite reaches/.test(prov),
+  const prov = pre('nodes/provision-macos.sh');
+  ok(/unit:\s+nodes\/provision-macos\.sh is run by .*test_provision_rerun\.py/.test(prov) && !/no suite reaches/.test(prov),
      `a change only the unit tier runs is placed by the unit file that names it (${prov.match(/unit:.*/)?.[0].slice(0, 80)})`);
+  // ...and one a unit file and a suite both name is the suite's too (B1104:
+  // config/toolchains.json, which a unit test names, planned no suite).
+  const both = pre('config/toolchains.json');
+  ok(/suites:.*\btoolchains\b/.test(both) && /suites:.*\bplugins\b/.test(both),
+     `a file a unit test names is planned with the suites that name it too (${both.match(/suites:.*/)?.[0]})`);
 });
 
 // The other C-shaped languages: the companion app's Kotlin. `fun` opens a

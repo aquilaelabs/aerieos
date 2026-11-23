@@ -151,7 +151,9 @@ cmd_tests_preflight() {
             while IFS= read -r named; do
                 [ -n "$named" ] || continue
                 named="$(basename "$named" .mjs)"
-                case "$named" in lab-*|_*) continue ;; esac
+                # codemap.mjs names files only as what it hands this planner,
+                # never reading them: it is planned by the planner's own files.
+                case "$named" in lab-*|_*|codemap) continue ;; esac
                 case " ${suites[*]:-} " in *" $named "*) ;; *) suites+=("$named") ;; esac
             done < <(grep -lF -- "$(basename "$f")" "${BB_REPO:-$PWD}"/scripts/dashboard/test/*.mjs 2>/dev/null || true)
         done
