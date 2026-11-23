@@ -2848,6 +2848,9 @@ async function dialogShape(pg = page){
       // Its title the first line, and one that shows: a notebook's rule hid
       // the sheet's while the element stood first (the dialog walk, 17 Nov).
       title: box.firstElementChild?.tagName === 'H3' && box.firstElementChild.offsetHeight > 0, ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
+      // ...and in Perch's voice (the operator, 23 Nov): the section voice,
+      // sentence case, a band a pop-out's height, never small capitals.
+      voice: (h => h ? `${getComputedStyle(h).textTransform} ${parseFloat(getComputedStyle(h).fontSize)} ${getComputedStyle(h).fontWeight} ${Math.round(h.getBoundingClientRect().height)}` : '')(box.querySelector(':scope > h3')),
       mid: r.height < innerHeight - 40 ? Math.round(r.top + r.height / 2 - innerHeight / 2) : 'tall', order };
     return { nested, loose: loose.slice(0, 3), h4: box.classList.contains('prose') ? 0 : box.querySelectorAll('h4').length,
              foot: !!fb && fb.offsetHeight > 0, gap, census };
@@ -2891,6 +2894,9 @@ for (const [name, open] of Object.entries(DIALOGS)) {
     && (!verbs.includes('P') || verbs[0] === 'P') && verbs.every((t, i) => t !== 'D' || verbs.slice(i).every(x => x === 'D'));
   ok(!d.err && c.title && c.ownFoot && (c.mid === 'tall' || Math.abs(c.mid) <= 2) && ordered,
      `[dialog ${name}] titled first, its foot its box's own in the rule's order, centered (${JSON.stringify(c)})`);
+  const [tt, tsize, tweight, th] = String(c.voice || '').split(' ');
+  ok(!d.err && tt === 'none' && +tsize >= 14 && +tweight >= 600 && +th >= 40,
+     `[dialog ${name}] its title in the section voice, sentence case, a band as tall as a pop-out's (${c.voice})`);
   ok(!d.err && d.loose.length === 0 && d.h4 === 0 && d.foot,
      `[dialog ${name}] its lines in .field bands, no h4, buttons in a .foot${
        d.err ? ` (${d.err})` : d.loose.length ? `: loose ${d.loose.join(', ')}` : d.h4 ? `: ${d.h4} h4` : !d.foot ? ': no foot' : ''}`);

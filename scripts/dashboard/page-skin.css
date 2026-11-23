@@ -30,7 +30,7 @@
   --note:#8cc8ff;
   /* Good, warning and error are one set in every scheme: they mean the same
      whatever the theme, a shade for the dark half here and one for the
-     light half below, never a scheme's own: green, a true yellow, and red.
+     light half below, never a scheme's own: green, a warm gold, and red.
      A surface tinted with one of them is mixed over --ground, a neutral no
      scheme and no space's color moves, its words in --ground-ink: mixed
      over a space's panel, the warning's band read as a dirty olive. A
@@ -42,6 +42,11 @@
      dirty); in the light half a pale wash. */
   --pass:#3fb950;
   --ground:#141922; --ground-ink:#eef1f6;
+  /* What a dialog lays over the page (Perch, the operator 23 Nov): the
+     theme's own page, most of the way, so what is behind stays its
+     color and reads as set back; in the light half the ink at about a
+     third, since a pale veil over a pale page set nothing back. */
+  --veil:color-mix(in srgb, var(--bg) 72%, transparent);
   --warn-wash:color-mix(in srgb, #fbbf24 12%, var(--ground)); --warn-wash-ink:#fbbf24; --warn-edge:#fbbf24;
   /* Derived, not chosen. Buttons and the active/primary family were hardcoded
      hex: #232b34 eleven times, #1f6f36 and #2ea043 across every tab, pane and
@@ -331,6 +336,7 @@ html[data-mode="light"]{
   color-scheme:light;
   --pass:#1a7f37;
   --ground:#fbfbf8; --ground-ink:#1d2633;
+  --veil:color-mix(in srgb, var(--ink) 34%, transparent);
   --warn-wash:#fdf1bf; --warn-wash-ink:#1d2633; --warn-edge:#d8b62a;
   /* A lit control in the light half is a soft tint of the second color with
      its edge in the color itself and the ink on it (the operator, 16 Oct:

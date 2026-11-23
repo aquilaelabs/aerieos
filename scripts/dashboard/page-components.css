@@ -270,10 +270,6 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
    what is left and is the only thing that scrolls. */
 /* A question (page-ask.js): its words a note's measure, paragraphs apart. */
 .askdlg .asksaid{margin:0;font:var(--f-ui);color:var(--ink);overflow-wrap:anywhere}
-/* A question's title is the question, a sentence in its own case at reading
-   size: a dialog's label title is small capitals, and a question in it read
-   as shouting (the operator, 23 Oct). */
-.modal.askdlg h3{font:var(--f-sect);letter-spacing:0;text-transform:none}
 /* What one yes covers (R265): a short heading over its lines, each a point. */
 .askdlg .askpart ul{padding:0 0 0 1.1em;list-style:disc}
 .askdlg .askpart li+li{margin-top:4px}
@@ -284,7 +280,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .about>.abpage{flex:0 1 auto;min-height:0}
 .abpage{overflow:auto;padding-right:4px}
 /* A guide's heading is the text's, not the dialog's: .modal h3 (the title
-   band's inset, rule and capitals) reached into it and set every heading
+   band's inset, rule and voice) reached into it and set every heading
    in from the paragraph under it (B110). */
 .about .abpage :is(h2,h3,h4){margin:12px 0 4px;padding:0;border:0;font:var(--f-ui);font-weight:600;
   text-transform:none;letter-spacing:normal;position:static;background:none;--sheen:none}
@@ -507,7 +503,10 @@ div.tc{cursor:default}
 /* The dialogs: the command editor and the new-project form. Dialogs rather
    than cards of their own: each is a detour, and should hand the page back
    when it is done. */
-.modal{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.68);
+/* The page behind a dialog is veiled in the theme's own ground and softened
+   (--veil, Perch: the operator 23 Nov), where 68% black made it a hole. */
+.modal{position:fixed;inset:0;z-index:70;background:var(--veil);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
   display:flex;align-items:safe center;justify-content:center;padding:16px;
   overflow:auto;   /* a soft keyboard can leave less height than the box */
   /* The DYNAMIC viewport, not the large one. A fixed overlay is laid out
@@ -549,7 +548,7 @@ dialog.modal:not([open]){display:none}
 dialog.modal::backdrop{background:transparent;--sheen:none}
 .modal .box{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   width:min(520px,100%);max-height:90vh;overflow:auto;
-  box-shadow:0 18px 50px rgba(0,0,0,.6)}
+  box-shadow:0 12px 36px rgba(0,0,0,.42)}
 /* A box that scrolls says so (scrollHints in page-motion.js), with a thin
    scrollbar where the platform draws one. A page and a sheet fade what they
    hold into the ground under them at the edge with more past it, a mask and
@@ -618,7 +617,7 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
      there Cancel. One long enough to fill the screen scrolls inside itself
      and leaves a strip of the page showing. One that asks for a line of text
      sits at the top instead, where the keyboard does not cover it. */
-  .modal.askdlg:not(.inline){align-items:flex-end;padding:0;background:rgba(0,0,0,.68)}
+  .modal.askdlg:not(.inline){align-items:flex-end;padding:0;background:var(--veil)}
   .modal.askdlg.typed:not(.inline){align-items:flex-start}
   .modal.askdlg:not(.inline)>.box{height:auto;max-height:calc(100dvh - 56px);overflow:auto;overscroll-behavior:contain;
     border-top:var(--hair) solid var(--line);border-radius:var(--r-surface) var(--r-surface) 0 0;
@@ -626,8 +625,14 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
   .modal.askdlg.typed:not(.inline)>.box{border-top:0;border-bottom:var(--hair) solid var(--line);
     border-radius:0 0 var(--r-surface) var(--r-surface);padding:env(safe-area-inset-top) 0 0}
 }
-.modal h3{margin:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line);
-  font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.3px;text-transform:uppercase}
+/* A dialog's title is a band as a pop-out's is (Perch, the operator 23 Nov):
+   what the dialog is in the section voice, sentence case, as tall as the
+   bell's and the doctor's title bands. Capitals in the tag voice were the
+   look before Perch, and they rewrote what a title quotes (a file's name
+   read ENROLL-...SH). Padding gives the height rather than flex, so a title
+   with a name in code keeps the spaces round it. */
+.modal h3{margin:0;padding:12px var(--row-x);border-bottom:var(--hair) solid var(--line);
+  font:var(--f-sect);color:var(--ink);overflow-wrap:anywhere}
 /* The band inset, once, for every .field. It was scoped to .modal and .nb, so
    the Analysis tab's filter bar carried the class, matched nothing and sat
    flush against the tab's edge: the same allowlist failure as the field skin
