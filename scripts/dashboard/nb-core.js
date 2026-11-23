@@ -1501,7 +1501,7 @@ function nbCorePoll(nb, p){
   // on screen may be carrying staged changes that are not on the server,
   // and a refetch here would quietly throw them away.
   const now = myLiveSession(project);
-  if (now !== nb.roadmapSession){ nb.roadmapSession = now; nb.redrawRoadmap(); }
+  if (now !== nb.roadmapSession){ nb.roadmapSession = now; nb.redrawRoadmap(false); }
   // The Docker view follows a job on the devapp token above, never here.
   // What this notebook re-reads and when is declared once, up where the
   // watches are taken; nothing here decides it. All six halves are on

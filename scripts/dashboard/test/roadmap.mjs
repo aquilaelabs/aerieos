@@ -1261,6 +1261,21 @@ await section("and a box open in the list is not taken apart by somebody else's 
   await tick(); await tick();
   ok(await page.$eval(`${rw} textarea`, t => t.value) === 'half a thought, still typing',
      'a redraw from elsewhere leaves a half-typed rewording alone, box and words');
+  // ...and so does a session starting or ending on the space, and a chip
+  // pressed on the band (B1004), as the paging does as a person scrolls to
+  // the foot: each drew the whole list past the box's guard.
+  const kept = await page.evaluate(() => {
+    const nb = getNotebook('alpha'), said = [];
+    const box = () => document.querySelector('#roadmapList .editbox textarea')?.value;
+    nb.roadmapSession = nb.roadmapSession ? '' : 'claude-alpha';
+    nb.poll((state.projects || []).find(x => x.name === 'alpha') || {});
+    said.push(box());
+    document.querySelector('#roadmapChips [data-rmchip="open"]')?.click();
+    said.push(box());
+    return said;
+  });
+  ok(kept.every(t => t === 'half a thought, still typing'),
+     `...as does a session starting on the space and a chip pressed (${JSON.stringify(kept)})`);
   // And the arrival is not lost: the panel has not recorded the revision it
   // skipped, so the next poll after the box shuts draws what came in.
   await page.click(`${rw} .stop`);

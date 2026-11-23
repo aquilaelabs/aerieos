@@ -99,7 +99,7 @@ function nbRoadmapView({$, nb}){
     flushPending: () => nbRmFlushPending($, nb),
     loadRoadmap: gen => nbRmLoad($, nb, gen),
     postRoadmap: (body, quiet) => nbRmPost($, nb, body, quiet),
-    redrawRoadmap: () => nbRmRedraw($, nb),
+    redrawRoadmap: force => nbRmRedraw($, nb, force),
     revertPending: () => nbRmRevertPending(nb),
     sendBoxEl: opts => nbRmSendBoxEl(nb, opts),
     shutSendBoxes: () => nbRmShutSendBoxes($),
@@ -430,7 +430,7 @@ function nbRmDraw($, nb, j, force){
                              {key: "shelved", label: "Shelved", count: parked}], nb.roadmapChip, "data-rmchip");
   const view = () => $("roadmapList")?.closest(".nbview");
   chipBand($("roadmapChips"), chips, "data-rmchip", view, "#roadmapList > details.grp",
-           k => { nb.roadmapChip = k; nbRmRedraw($, nb); });
+           k => { nb.roadmapChip = k; nbRmRedraw($, nb, false); });
   setHidden($("roadmapFind"), rows.length + finishedN < 2 && !nb.roadmapFind);
   // ...and by the release an item is meant for (the operator, 21 Oct): a
   // chip per target, oldest first, and No target; the Finished section
@@ -441,7 +441,7 @@ function nbRmDraw($, nb, j, force){
   // One band for every group (R109), drawn while any group has two.
   setHidden($("roadmapFilter"), !chips && !verChips);
   chipBand($("roadmapVers"), verChips, "data-rmver", view, "#roadmapList > details.grp, #roadmapDoneList > details.grp",
-           k => { nb.roadmapVer = k; nbRmRedraw($, nb); if (nb.roadmapDone) nb.drawFinished(); });
+           k => { nb.roadmapVer = k; nbRmRedraw($, nb, false); if (nb.roadmapDone) nb.drawFinished(); });
   const q = (nb.roadmapFind || "").trim().toLowerCase();
   const shown = r => (!nb.roadmapChip || (nb.roadmapChip === "shelved") === !!r.shelved) && rmVer(r, nb.roadmapVer) && rmMatch(r, q);
   setHidden($("roadmapDoneSect"), !finishedN);
@@ -602,7 +602,7 @@ function nbRmDraw($, nb, j, force){
   // Groups, not steps: a plan cut in half by a page boundary is a plan
   // nobody can read.
   paginate($("roadmapList"), ":scope > .grp", {key: "roadmapList", noun: "items", total: vis.length,
-                                               more: () => nbRmRedraw($, nb)});
+                                               more: () => nbRmRedraw($, nb, false)});
 }
 
 // The box itself, built once and used by both lists.
@@ -1145,8 +1145,13 @@ function nbRmRevertPending(nb){
   nb.roadmapPending = []; nb.roadmapWas = null;
 }
 
-const nbRmRedraw = ($, nb) =>
-  nbRmDraw($, nb, {items: nb.roadmapItems, session: nb.roadmapSession, unsaved: nb.roadmapUnsaved}, true);
+// A press on the list draws it whatever is open, since it is that press's
+// own change; what moves under a person (the poll, the paging as they
+// scroll, a chip pressed elsewhere on the band) passes force false and
+// leaves an open Reword, Drop or Add step as it is (B1004), the list drawn
+// once it closes.
+const nbRmRedraw = ($, nb, force = true) =>
+  nbRmDraw($, nb, {items: nb.roadmapItems, session: nb.roadmapSession, unsaved: nb.roadmapUnsaved}, force !== false);
 
 // ---- staging -------------------------------------------------------------
 // Nothing the panel does touches the list until Save. Reordering worked this
