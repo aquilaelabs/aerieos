@@ -2743,6 +2743,26 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(heldNote && heldNote.note === "Refused this controller's bundle: scripts/aerie is changed: its bytes are not the ones the release signed. Its terminals and jobs run the one it had."
      && !heldNote.plain,
      `the node's Sessions section says it refused the bundle, what was wrong, and that it runs the one it had, and says nothing without the refusal (${heldNote?.note})`);
+  // A node that would refuse this build (it checks signatures, this build is
+  // unsigned) is not told to press Update agent (B1108): the row says what
+  // keeps it, once, and the button is dead; the Updates fact says only what
+  // the node takes.
+  const heldBar = await page.evaluate(id => { const n = nodesList.find(x => x.id === id); if (!n) return null;
+    const d = document.createElement('div');
+    d.innerHTML = ndRowHtml({ ...n, update_held: 'the build is unsigned', reported: { ...(n.reported || {}), release_also: ['c'.repeat(16)] } });
+    const lead = d.querySelector('.ndagent .lead')?.textContent || '', btn = [...d.querySelectorAll('.ndagent button')].find(b => b.textContent === 'Update agent');
+    d.innerHTML = ndRowHtml(n);
+    const live = [...d.querySelectorAll('.ndagent button')].find(b => b.textContent === 'Update agent');
+    return { lead, dead: !!btn?.disabled && !btn.dataset.nd, live: !!live && !live.disabled && live.dataset.nd === 'update-agent',
+             again: (lead.match(/unsigned/g) || []).length, plain: d.querySelector('.ndagent .lead')?.textContent || '' }; }, minted.id);
+  ok(heldBar && /runs agent 3 and refuses this controller's \S+: the build is unsigned$/.test(heldBar.lead) && !/Update agent/.test(heldBar.lead)
+     && heldBar.dead && heldBar.again === 1 && heldBar.live && /press Update agent first$/.test(heldBar.plain),
+     `a node that would refuse this build says what keeps it, with Update agent dead, and one it would take keeps the press (${JSON.stringify(heldBar)})`);
+  const heldFact = await page.evaluate(() => { const was = nodesAgent;
+    try { nodesAgent = { ...(was || {}), signed: false, version: '9.9.9' };
+      return ndUpdatesFact({ kind: 'agent', reported: { release_also: ['c'.repeat(16)] }, agent: { version: '3' } }); } finally { nodesAgent = was; } });
+  ok(/^signed builds only \(1 key added at its console\)/.test(heldFact) && !/refused|unsigned/.test(heldFact),
+     `...and the Updates fact says only what it takes, the refusal being the agent bar's (${heldFact})`);
   // Its link goes to THIS node, whichever the tab was on, with Update agent
   // brought into view (the operator, 4 Oct).
   const other = await page.evaluate(id => nodesList.find(n => n.id !== id && n.kind === 'agent' && n.state !== 'retired')?.id, minted.id);

@@ -3568,6 +3568,13 @@ def agent_stale(n):
     mine = (n.get("agent") or {}).get("version") or "?"
     if newer == "window":
         return f"{n['name']} runs agent {mine}, newer than this controller works with"
+    # One that will not take this build is told what keeps it (B1108): a
+    # press of Update agent, or a wait for the controller's own, could only
+    # be refused there.
+    held = build_refused(n)
+    if held:
+        return (f"{n['name']} runs agent {mine} and refuses this controller's "
+                f"{'build of ' if mine == ours['version'] else ''}{ours['version']}: {held}")
     if agent_gap(n):
         return (f"{n['name']} runs agent {mine}, too old for this controller to work with: "
                 "update it from the Nodes page")
@@ -3949,6 +3956,11 @@ def node_update_agent(principal, node_id):
         return {"error": "this controller ships no agent"}
     if (n.get("agent") or {}).get("digest") == ours["digest"]:
         return {"ok": True, "current": True, "version": ours["version"]}
+    # Not sent where the node would refuse it (B1108): the job could only
+    # fail there, and its failure said less than this.
+    held = build_refused(n)
+    if held:
+        return {"error": f"{n['name']} refuses this controller's agent: {held}"}
     # One already on its way is the one: a second press, or a press beside
     # the controller's own, queued the same update twice, and the second
     # reached the node after the first had replaced its agent.
@@ -4085,6 +4097,19 @@ def build_taken(n):
     if rep.get("unsigned_ok") is True:
         return True, "takes this controller's builds unchecked: its console allows unsigned builds"
     return False, "will not take this controller's builds: " + ("they are signed by a key it does not trust" if by else "they are unsigned")
+
+
+def build_refused(n):
+    """What keeps this node from taking the build this controller ships, in
+    a few words, or "" where nothing is known to: what the lines that say a
+    node is behind say in place of Update agent, which that node could only
+    refuse (B1108). Only an unsigned build is known before it is sent (a
+    node that checks signatures and does not allow unsigned builds at its
+    console); a signature is the node's to judge, and one it did not accept
+    is held after its answer (unsigned_refused)."""
+    if agent_sig() or build_taken(n)[0]:
+        return ""
+    return "the build is unsigned"
 
 
 def agent_sig(digest=None):
@@ -6684,7 +6709,8 @@ def job_add(principal, placement, type, spec, project="", source=None):
             if why:
                 # Marked, so bb can wait for the update (auto_update queues it
                 # inside a window) rather than give up on the job (R253).
-                return {"error": why, "agent_behind": not agent_gap(n), "node": n["id"]}
+                # One that refuses this build waits for nothing (B1108).
+                return {"error": why, "agent_behind": not agent_gap(n) and not build_refused(n), "node": n["id"]}
     elif pick(probe, node_list()) is None:
         want = ", ".join(f"{k}={v}" for k, v in pl["select"].items())
         return {"error": f"no node fits {want}"}
@@ -9016,6 +9042,13 @@ def tab_view(rows, admin):
                 if held:
                     n["bundle_held"] = held
             n["turns"] = turns_of(n)
+            # What keeps it from taking this build, where it is behind and
+            # would refuse it (B1108): Update agent is dead, and its row
+            # says why.
+            if admin and agent_stale(n):
+                held = build_refused(n)
+                if held:
+                    n["update_held"] = held
             # Its channel in a phrase, where it is plain http (R267 step 15).
             if channel_said(n):
                 n["channel_said"] = channel_said(n)

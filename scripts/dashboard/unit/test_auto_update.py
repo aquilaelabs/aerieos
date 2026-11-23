@@ -73,8 +73,33 @@ class AutoUpdate(World):
             if row:
                 self.assertFalse(row["auto"])
                 self.assertIn("signed", row["held"])
-            # A person's press still sends it: the node says why itself.
-            self.assertTrue(nodes.node_update_agent("user:test", self.nid).get("job"))
+            # Nor on a person's press (B1108): the job could only fail
+            # there, and what keeps it is said where the press was, and in
+            # every line that says the node is behind.
+            said = nodes.node_update_agent("user:test", self.nid)
+            self.assertFalse(said.get("job"))
+            self.assertEqual(said.get("error"), "box refuses this controller's agent: the build is unsigned")
+            self.assertEqual(nodes.agent_stale(nodes.node(self.nid)),
+                             f"box runs agent {self.ours['version']} and refuses this controller's build of "
+                             f"{self.ours['version']}: the build is unsigned")
+            self.assertNotIn("Update agent", nodes.agent_stale(nodes.node(self.nid)))
+            with mock.patch.object(nodes, "turns_of", lambda n: []):
+                row = nodes.tab_view([nodes.node(self.nid)], True)["nodes"][0]
+            self.assertEqual(row.get("update_held"), "the build is unsigned")
+            self.assertEqual(self.queued(), [])
+
+    def test_a_session_s_job_on_a_node_that_refuses_the_build_does_not_wait_for_it(self):
+        # bb waits up to 150 s for an update the controller sends by itself
+        # where agent_behind is true (bbapi._agent_wait): none comes here.
+        self.runs(self.ours["version"])
+        self.pins()
+        with mock.patch.object(nodes, "agent_sig", lambda digest=None: ""):
+            got = nodes.job_add("user:test", {"node": self.nid}, "exec", {"cmd": ["true"]})
+        self.assertFalse(got.get("agent_behind"), got)
+        self.assertIn("refuses this controller's build", got.get("error", ""))
+        with mock.patch.object(nodes, "agent_sig", lambda digest=None: "ab" * 64):
+            got = nodes.job_add("user:test", {"node": self.nid}, "exec", {"cmd": ["true"]})
+        self.assertTrue(got.get("agent_behind"), "a build it takes is worth the wait")
 
     def test_with_a_signature_or_unsigned_builds_allowed_it_is_sent(self):
         self.runs(self.ours["version"])

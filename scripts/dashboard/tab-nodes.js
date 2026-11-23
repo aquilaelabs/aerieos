@@ -1375,6 +1375,10 @@ function staleWhy(n){
   const [a, b] = [win(mine), win(ship)];
   if (windowGap(n) && a.length && b.length && (a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])))
     return `${n.name} runs agent ${mine}, newer than this controller works with`;
+  // It would refuse this build (B1108): what keeps it, where Update agent
+  // could only fail there.
+  if (n.update_held)
+    return `${n.name} runs agent ${mine} and refuses this controller's ${mine === ship ? "build of " : ""}${ship}: ${n.update_held}`;
   return windowGap(n)
     ? `${n.name} runs agent ${mine} and this controller needs ${ship}: press Update agent before using this node`
     : mine === ship
@@ -1987,13 +1991,10 @@ function ndUpdatesFact(n){
   const key = n.reported.release_key || "";
   const also = (n.reported.release_also || []).length;
   const added = `${also} ${also === 1 ? "key" : "keys"} added at its console`;
-  // A node that checks signatures meeting an unsigned build here will refuse its update.
-  const refused = !n.reported.unsigned_ok && nodesAgent && nodesAgent.signed === false && nodeStale(n);
   if (!key){
     // Keys added there and no release key: signed builds only, all the same.
-    if (also) return refused
-      ? `signed builds only (${added}): this controller's build is unsigned, so its update is refused there`
-      : (n.reported.unsigned_ok ? `signed builds (${added}), and unsigned builds, allowed at its console` : `signed builds only (${added})`)
+    // A refusal of this build is the agent bar's to say, once (B1108).
+    if (also) return (n.reported.unsigned_ok ? `signed builds (${added}), and unsigned builds, allowed at its console` : `signed builds only (${added})`)
         + (n.reported.release_unpinned ? "; no release key, by its console's choice"
           : nodesAgent?.release_key ? "; no release key pinned (Enroll script pins it)" : "") + older;
     // A person there dropped the release key: said whatever this build names.
@@ -2001,8 +2002,6 @@ function ndUpdatesFact(n){
     // Before AerieOS names a release key, no node can pin one: nothing to say.
     return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (its first signed update pins it, or the Enroll script)" : "";
   }
-  if (refused)
-    return "signed releases only: this controller's build is unsigned, so its update is refused there";
   // The spare (R232): pinned with the key, or named by this build and not
   // pinned there yet. The node pins it by itself where this build carries
   // the release key's word for it (spare_said); else the Enroll script does.
@@ -2110,7 +2109,8 @@ function ndRowHtml(n, lead = ""){
               : `Updating to agent ${esc(nodesAgent?.version || "")}. This row refreshes when the node reports back.`)
             : stale ? `${windowGap(n) ? "out of window" : "behind"}: ${esc(staleWhy(n))}`
             : ""}</span>
-          ${stale ? `<button type="button" data-nd="update-agent"${runAttr(updating, "Updating the agent")}
+          ${stale && n.update_held && !updating ? `<button type="button" disabled>Update agent</button>`
+            : stale ? `<button type="button" data-nd="update-agent"${runAttr(updating, "Updating the agent")}
             title="${updating ? "Update queued: this row refreshes when the node reports back"
               : `Update the agent to ${esc(nodesAgent.version)} once its running jobs finish`}">Update agent</button>` : ""}
           ${ndAgentButtons(false)}
