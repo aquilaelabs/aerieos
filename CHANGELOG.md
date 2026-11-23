@@ -16,6 +16,7 @@
 - The Library's Android app, VS Code extension and Windows companion are each the file named for the release they come from, where another file with the same start could be taken (af3417c)
 - An imported catalog mirror is used only where it is newer than the catalog's own index, where after an update it could be used though older (a99a594)
 - A node takes an OS update named by any pre-release tag, -rc.1 included, where only -dev builds were taken (3cac664)
+- Dismiss on the bell and on Home's Attention card moves once: the row folds away and the line counting what was put away unrolls in after it, where the line popped in a moment later and the panel jumped (b49eac6, f0ab019)
 
 ### Security
 
