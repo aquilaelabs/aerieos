@@ -2950,7 +2950,8 @@ function wireNodesTab(root){
         const was = nodeNameOf(id, "");
         if (!name || name === was) return notify("type the new name first", true);
         const j = await nodeAct({action: "update", id, fields: {name}});
-        if (j.error) return notify(j.error, true);
+        // A refusal is nodeAct's to say, once (B1028).
+        if (j.error) return;
         const c = nodesConf[id]; if (c && c.draft) c.draft.nameText = undefined;
         notify(`${was} is now ${name}. A runner already installed there keeps the label ${was} until it is reinstalled.`);
         return;
