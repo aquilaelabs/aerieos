@@ -2784,6 +2784,17 @@ except Exception:
     [ -n "$want" ] || return 0
     BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$proj" BB_TEST_NODE_WANT="$want" python3 "$BB_LIB/tests-away.py"
 }
+# Whether the suites go to PROJ's test node (true) or run here (false). One
+# its settings name that this session cannot use (gone, offline, not this
+# session's) ends the verb with why, tests-away.py's words (B994): its
+# refusal was thrown away, and the suites ran here with this machine's
+# workers, saying nothing.
+tests_go_away() {
+    local out rc=0
+    out="$(tests_away_node "$1")" || rc=$?
+    [ "$rc" -eq 0 ] || exit "$rc"
+    [ -n "$(printf '%s' "$out" | head -1)" ]
+}
 # The harness on the test node: PROJ, then the harness's own arguments. The
 # worker count is the node's; with BB_COVERAGE the merged counters come back
 # as the job's output and land in .bb-map/coverage.json here.
@@ -3116,7 +3127,7 @@ cmd_tests() {
         BB_TESTS_PROJECT="$proj" "$0" tests projection "$@" 2>/dev/null || true
         want="$(BB_TESTS_PROJECT="$proj" "$0" tests projection --secs "$@" 2>/dev/null || echo 0)"
         t0=$(date +%s)
-        if [ -n "$(tests_away_node "$proj" 2>/dev/null | head -1)" ]; then
+        if tests_go_away "$proj"; then
             # Its test node (R151): the harness there, the lines streamed here.
             if tests_away_run "$proj" "$@" 2>&1 | tee "$log"
             then rc=0
@@ -5112,7 +5123,7 @@ cmd_dashboard() {
             # a kept fixture is this machine's, so a run attaching to one
             # stays here.
             local tproj; tproj="$(project_here 2>/dev/null || true)"
-            if [ -n "$tproj" ] && [ ! -f "${TMPDIR:-/tmp}/bb-suite.keep" ] && [ -n "$(tests_away_node "$tproj" 2>/dev/null | head -1)" ]; then
+            if [ -n "$tproj" ] && [ ! -f "${TMPDIR:-/tmp}/bb-suite.keep" ] && tests_go_away "$tproj"; then
                 tests_away_run "$tproj" "$@"; return
             fi
             exec bash "$here" "$@"

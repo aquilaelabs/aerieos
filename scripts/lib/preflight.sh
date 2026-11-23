@@ -289,7 +289,7 @@ cmd_tests_preflight() {
     # (R151): the plan is this tree's (git here), the run is there.
     local tproj away=""
     tproj="$(project_here 2>/dev/null || true)"
-    [ -z "$tproj" ] || away="$(tests_away_node "$tproj" 2>/dev/null | head -1)"
+    if [ -n "$tproj" ] && tests_go_away "$tproj"; then away=1; fi
     if [ "${suites[*]:-}" = ALL ]; then
         # A whole run is run with the counters in and merged after, so the
         # covered run the next preflight measures by is never older than
