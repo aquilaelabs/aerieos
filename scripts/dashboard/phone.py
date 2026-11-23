@@ -816,8 +816,8 @@ def ask(why, argv, nid, node_name, project, by="claude", asker="", asker_uid="")
             isinstance(a, str) and a for a in argv):
         return {"error": "nothing to run" if not argv else "an empty argument: the command "
                          "shown must be the command run"}
-    if len(argv) > 40 or any(len(a) > 500 for a in argv):
-        return {"error": "that command is too long to put in front of somebody"}
+    if why_long := _too_long(argv):
+        return {"error": why_long}
     if not nid:
         return {"error": f"{project or 'this space'} has no node, so there is no phone "
                          "to reach: a phone is driven from the space's node"}
@@ -972,6 +972,24 @@ def _trim():
     _reqs[:] = [r for r in _reqs if id(r) in keep]
 
 
+# What a person is shown as one command: at most this many arguments, each at
+# most this long.
+ARGS_MAX, ARG_MAX = 40, 500
+
+
+def _too_long(argv):
+    """Why `argv` is too long to put in front of somebody, naming the limit it
+    passed (B1071: the refusal named none, so a session shortened its command
+    by guessing), or ""."""
+    if len(argv) > ARGS_MAX:
+        return f"that command is too long to put in front of somebody: {len(argv)} arguments, where {ARGS_MAX} is the most"
+    longest = max((len(a) for a in argv), default=0)
+    if longest > ARG_MAX:
+        return (f"that command is too long to put in front of somebody: an argument of {longest} characters, "
+                f"where {ARG_MAX} is the most")
+    return ""
+
+
 def _reason(why):
     """A reason as it is kept and shown: on one line, 300 characters at most."""
     return " ".join(str(why or "").split())[:300]
@@ -1036,8 +1054,8 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
         # reads must be exactly what the node runs.
         return {"error": "nothing to run" if not argv else "an empty argument: the command "
                          "shown must be the command run"}
-    if len(argv) > 40 or any(len(a) > 500 for a in argv):
-        return {"error": "that command is too long to put in front of somebody"}
+    if why_long := _too_long(argv):
+        return {"error": why_long}
     if not nid:
         return {"error": f"{project or 'this space'} has no node, so there is no machine "
                          "to run anything on as root: root is asked for on the space's node"}

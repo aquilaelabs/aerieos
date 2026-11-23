@@ -40,5 +40,16 @@ class RootTmpRefused(unittest.TestCase):
         self.assertNotIn("asked ", r.stderr.replace("nobody was asked", ""))
 
 
+
+class TooLong(unittest.TestCase):
+    """A command too long to put in front of somebody says which limit it
+    passed (B1071), so a session shortens it knowing by how much."""
+
+    def test_the_refusal_names_the_limit(self):
+        import phone
+        self.assertEqual(phone._too_long(["true"] * 40), "")
+        self.assertIn("41 arguments, where 40 is the most", phone._too_long(["true"] * 41))
+        self.assertIn("an argument of 501 characters, where 500 is the most", phone._too_long(["echo", "x" * 501]))
+
 if __name__ == "__main__":
     unittest.main()
