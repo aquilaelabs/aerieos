@@ -486,7 +486,10 @@ jobs:
             echo "| aerie lint and the unit tier | $LINT |"
             echo "| The browser suites | $SUITES |"
             echo "| The seal, dry: the pinned library, the list signed with a key made here and verified | ${SEAL:-not run} |"
-            echo "| A dev build from this commit | may be cut here |"
+            # Said by the place check's own result (B1106): the dev build's
+            # line read 'may be cut here' whatever that check found.
+            if [ "$PLACE" = success ]; then dev="may be cut here"; else dev="refused here ($PLACE): the place check above says why"; fi
+            echo "| A dev build from this commit | $dev |"
             echo "| A stable release or a candidate from this commit | ${STABLE:-not said ($PLACE)} |"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
