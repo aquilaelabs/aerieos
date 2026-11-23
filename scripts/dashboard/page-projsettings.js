@@ -826,6 +826,10 @@ function settingsInto(name, host){
     rnLoadSnapshots(name, true);
     rnLoadPeople(name, true);
     rnSessionsLoad(name);
+    // ...and a section asked for (the chain, on this view already) shown.
+    const here = host.querySelector(":scope > .box");
+    if (rnOpenAsked === name && here) rnSplit(here, name);
+    rnOpenAsked = "";
     return;
   }
   // Lent to another view still: taken back first, so the form is the
@@ -845,8 +849,13 @@ function settingsInto(name, host){
   // In place there is nothing to close: each section's Revert puts its
   // fields back.
   $("rnCancel").hidden = true;
-  // On a phone it opens on the list.
-  if (box){ (SPLIT["rn:" + name] || (SPLIT["rn:" + name] = {pick: "", open: false})).open = false; rnSplit(box, name); }
+  // On a phone it opens on the list, or on the section asked for.
+  if (box){
+    const s = SPLIT["rn:" + name] || (SPLIT["rn:" + name] = {pick: "", open: false});
+    if (rnOpenAsked !== name) s.open = false;
+    rnSplit(box, name);
+  }
+  rnOpenAsked = "";
 }
 
 // ---- the Settings view: the sections as a list beside the one picked ----
@@ -875,8 +884,10 @@ function rnSplit(box, name){
 }
 // A project's settings: its notebook's Settings view, at one of its sections
 // when `sect` names it (a node's Projects section opens Where it runs).
+// On a phone too: the view opens on the list unless a section was asked for.
+let rnOpenAsked = "";
 function openProjectSettings(name, sect = ""){
-  if (sect) SPLIT["rn:" + name] = {pick: sect, open: true};
+  if (sect){ SPLIT["rn:" + name] = {pick: sect, open: true}; rnOpenAsked = name; }
   openNotebook(name, "settings");
 }
 
@@ -1465,7 +1476,7 @@ function rnDrawStore(name){
   // Who has given the project a token (R159): each a person, their token
   // used for their own work while they are signed in; yours removable.
   const givers = o.givers || [], me = givers.find(g => g.mine);
-  const who = givers.map(g => `<div class="setrow ctlrow"><span class="grow">${g.mine ? "Your" : esc(g.name) + "'s"} ${
+  const who = givers.map(g => `<div class="logdays setrow ctlrow"><span class="grow">${g.mine ? "Your" : esc(g.name) + "'s"} ${
     esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}, the one this space uses${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
     g.mine ? `<button type="button" data-rnunlink="1">Take it back</button>` : ""}</div>`).join("");
   // Pushes are off while Authentication is Disabled, whatever is stored: said
@@ -1481,7 +1492,7 @@ function rnDrawStore(name){
   // Your other tokens for this host, each told apart by when it was saved;
   // never the one this space already uses (B1122: it was offered again, the two
   // rows reading the same).
-  const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="setrow ctlrow"><span class="grow">Your ${me ? "other " : ""}${
+  const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="logdays setrow ctlrow"><span class="grow">Your ${me ? "other " : ""}${
     esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}${f.at ? `, saved ${esc(new Date(f.at * 1000).toLocaleDateString([], {day: "numeric", month: "short"}))}` : ""}</span>
     <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this space"}</button></div>`).join("");
   drawHTML(box, off + said + who + rows);

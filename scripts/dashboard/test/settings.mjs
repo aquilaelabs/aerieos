@@ -866,6 +866,20 @@ await section("a split page's head on a phone", async () => {
     }).then(x => x && `${name} ${x}`));
   }
   ok(seen.every(x => !x), `on a phone a settings page's head is above its sections (${seen.filter(Boolean).join(', ') || 'both'})`);
+  // The chain opens a space's Settings at Repository on a phone too, not on
+  // the list of sections, whether the view was elsewhere or already there.
+  const at = [];
+  for (const how of ['elsewhere', 'already there']){
+    if (how === 'elsewhere') await phone.evaluate(() => openProjectsTab());
+    await phone.evaluate(() => openProjectSettings('alpha', 'repo'));
+    await phone.waitForFunction(() => document.querySelector('.nbsettings details[data-sect="rn:repo"]')?.checkVisibility(), null, { timeout: 15000 }).catch(() => {});
+    at.push(await phone.evaluate(how => {
+      const repo = document.querySelector('.nbsettings details[data-sect="rn:repo"]'), list = document.querySelector('.nbsettings .snav');
+      return repo?.checkVisibility() && !list?.checkVisibility() ? '' : `${how}: ${repo?.checkVisibility() ? 'list shown too' : 'on the list'}`;
+    }, how));
+    if (how === 'elsewhere') await phone.evaluate(() => { SPLIT['rn:alpha'] = { pick: 'yours', open: true }; rnSplit(rnHost.querySelector(':scope > .box'), 'alpha'); });
+  }
+  ok(at.every(x => !x), `on a phone the chain opens Repository, not the list (${at.filter(Boolean).join(', ') || 'both ways'})`);
   await phone.close();
 });
 
