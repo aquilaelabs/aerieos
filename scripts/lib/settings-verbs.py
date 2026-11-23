@@ -58,9 +58,14 @@ def push_state(state, proj):
                                 capture_output=True, text=True, timeout=10, check=False).stdout
     except (OSError, subprocess.SubprocessError):
         pass
+    # A token is the controller's credential helper on the space's token
+    # file: git-credential-bb now, git's own store in the form older installs
+    # wrote. Counting the old form alone told every space linked since that
+    # its remote had no credential, and its session that it could not push
+    # (B1118).
     auth = ("" if not url
             else "ssh" if url.startswith(("git@", "ssh://")) or (":" in url and "://" not in url)
-            else "token" if "store --file=" in helper
+            else "token" if "git-credential-bb" in helper or "store --file=" in helper
             else "none")
     return {"rights": rights, "auth": auth}
 

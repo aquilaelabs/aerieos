@@ -40,6 +40,48 @@ class GitPolicy(unittest.TestCase):
                       policy({"gitpol": {"scan": "off"}}))
 
 
+class PushState(unittest.TestCase):
+    """Whether an https remote has a credential, read off the repository's
+    credential.helper (B1118): git-credential-bb on the space's token file
+    is one, as git's store in the form older installs wrote is."""
+    def _state(self, helper):
+        # push_state alone, read out of the verbs' file: loading the file runs
+        # the verb its command line names.
+        import ast
+        src = open(os.path.join(os.path.dirname(__file__), "..", "..", "lib", "settings-verbs.py")).read()
+        fn = next(n for n in ast.parse(src).body if isinstance(n, ast.FunctionDef) and n.name == "push_state")
+        ns = {"json": json, "os": os}
+        exec(compile(ast.Module(body=[fn], type_ignores=[]), "settings-verbs.py", "exec"), ns)
+        ws, state = tempfile.mkdtemp(), tempfile.mkdtemp()
+        tree = os.path.join(ws, "alpha")
+        env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+        subprocess.run(["git", "init", "-q", tree], check=True, env=env)
+        subprocess.run(["git", "-C", tree, "remote", "add", "origin", "https://forge.example/o/alpha.git"], check=True, env=env)
+        if helper:
+            subprocess.run(["git", "-C", tree, "config", "--local", "--add", "credential.helper", helper], check=True, env=env)
+        with open(os.path.join(state, "push-rights.json"), "w") as f:
+            json.dump({"alpha": {"how": "token"}}, f)
+        old = os.environ.get("WORKSPACE")
+        os.environ["WORKSPACE"] = ws
+        try:
+            return ns["push_state"](state, "alpha")
+        finally:
+            if old is None:
+                os.environ.pop("WORKSPACE", None)
+            else:
+                os.environ["WORKSPACE"] = old
+
+    def test_the_credential_helper_is_a_token(self):
+        st = self._state("!/opt/aerieos/scripts/dashboard/git-credential-bb /config/gitcreds/alpha")
+        self.assertEqual(st, {"rights": True, "auth": "token"})
+
+    def test_the_older_store_is_a_token_too(self):
+        self.assertEqual(self._state("store --file=/config/gitcreds/alpha")["auth"], "token")
+
+    def test_none_is_none(self):
+        self.assertEqual(self._state("")["auth"], "none")
+
+
 class Prefs(unittest.TestCase):
     """The hold is a third key of the git policy with its own two values
     (the operator, 15 Oct): hold by default, off to let a push go unread."""
