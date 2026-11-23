@@ -142,10 +142,12 @@ cmd_tests_preflight() {
     if [ "${suites[*]:-}" != ALL ]; then
         local named
         for f in "${files[@]}"; do
-            # Prose is named everywhere and checked by lint and voice; a file
-            # a unit test names is the unit tier's, which runs first anyway.
+            # Prose is named everywhere and checked by lint and voice. A file a
+            # unit test names as well is a suite's too where a suite names it:
+            # skipping it for the unit tier's sake planned no suite for a change
+            # to config/toolchains.json alone, which toolchains.mjs and
+            # plugins.mjs check, and the gate said clean (B1104).
             case "$f" in scripts/dashboard/test/*|scripts/dashboard/unit/*|*.md|*.txt) continue ;; esac
-            ! grep -qlF -- "$(basename "$f")" "${BB_REPO:-$PWD}"/scripts/dashboard/unit/test_*.py 2>/dev/null || continue
             while IFS= read -r named; do
                 [ -n "$named" ] || continue
                 named="$(basename "$named" .mjs)"
