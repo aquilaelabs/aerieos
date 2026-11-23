@@ -27,15 +27,18 @@ function rnSessionsLoad(name){
   });
 }
 
-// Whose, what and where on each row; "you" for the reader's own.
+// Whose, what and where on each row; "you" for the reader's own. What it is
+// is the agent's own name, or shell (B1023: every agent's but Claude's was
+// called a shell, and End asked about one).
 const rnSessWho = r => r.who === state?.me ? "you" : r.who;
+const rnSessWhat = r => r.kind === "shell" ? "shell" : (r.agent || r.kind);
 
 function rnSessionsDraw(name, rows){
   if (rnMode === "git") return;                    // the remote's door alone (B539)
   const list = $("rnSessList");
   patch(list, rows.length ? rows.map((r, i) => `<div class="row rnsess">
       <div class="grow"><div class="name">${esc(rnSessWho(r))}</div>
-        <div class="sub">${[r.kind === "claude" ? "Claude" : "shell",
+        <div class="sub">${[esc(rnSessWhat(r)),
           r.node ? "on " + esc(r.node) : "", esc(r.state || "")].filter(Boolean).join(" · ")}</div></div>
       <button type="button" class="caution" data-rnsessend="${i}">End</button>
     </div>`).join("") : `<div class="hint">No sessions on this space.</div>`);
@@ -51,14 +54,14 @@ function rnSessionsDraw(name, rows){
 // is read again once the server has it. `rows` is the list it was drawn in.
 async function rnSessionEnd(name, r, rows){
   const whose = r.who === state?.me ? "your" : `${r.who}'s`;
-  if (!await askYes(r.kind === "claude"
-      ? `End ${whose} Claude session on ${projLabel(name)}?\n\nThe work in flight stops; the conversation resumes from the Claude button.`
+  if (!await askYes(r.kind !== "shell"
+      ? `End ${whose} ${rnSessWhat(r)} session on ${projLabel(name)}?\n\nThe work in flight stops; the conversation resumes from Start agent.`
       : `End ${whose} shell on ${projLabel(name)}?\n\nWhatever is running in it stops.`)) return;
   const j = await drawNow(() => {
     rnSessionsDraw(name, rows.filter(x => x !== r));
     return () => rnSessionsDraw(name, rows);
   }, () => postJSON("/api/project-sessions", {project: name, action: "end", session: r.name, node: r.node_id || ""}));
   if (j.error) return;
-  notify(`ended ${whose} ${r.kind === "claude" ? "Claude session" : "shell"} on ${projLabel(name)}`);
+  notify(`ended ${whose} ${r.kind === "shell" ? "shell" : rnSessWhat(r) + " session"} on ${projLabel(name)}`);
   rnSessionsLoad(name);
 }

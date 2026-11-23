@@ -112,6 +112,16 @@ await page.waitForFunction(() => !document.getElementById('rnSessField').hidden
 const drawn = await page.$$eval('#rnSessList .rnsess', rs => rs.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
 ok(drawn.some(t => /w\.sess/.test(t) && /Claude/.test(t)) && drawn.some(t => /w\.sess/.test(t) && /shell/.test(t)),
    `the space's settings list its sessions, whose and what (${drawn.join(' | ')})`);
+// Another agent's session is called by its agent's name, not a shell (B1023).
+const other = await page.evaluate(() => {
+  rnSessionsDraw('alpha', [{ name: 'x', who: 'w.sess', kind: 'codex', agent: 'Codex CLI', node: 'box', state: 'working' }]);
+  const said = document.querySelector('#rnSessList .rnsess .sub')?.textContent || '';
+  rnSessionsLoad('alpha');
+  return said;
+});
+ok(/^Codex CLI · on box · working$/.test(other.trim()), `...each agent's session by its agent's name, never shell (${other})`);
+await page.waitForFunction(() => [...document.querySelectorAll('#rnSessList .rnsess')]
+  .some(r => /w\.sess/.test(r.textContent) && /Claude/.test(r.textContent)), null, { timeout: 15000 });
 // The last field showing, in the dialog's sections since they came (1 Oct).
 const last = await page.$eval('#rnmodal .box', b => [...b.querySelectorAll('.field:not([hidden]):not(.rnhead)')]
   .filter(f => f.offsetParent).pop()?.id);
