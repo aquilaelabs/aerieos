@@ -70,14 +70,23 @@ def guarded(lock, record, fetch, keep=None, flag=None):
         if on["checking"]:
             return dict(record())
         on["checking"] = True
-    found, error = fetch()
+    # Whatever the fetch raises is its answer's error, and the flag comes
+    # down however the record's keeping goes (B1026: a TypeError from a
+    # null body left it up, and every later ask answered the stale record
+    # until the controller restarted).
+    try:
+        found, error = fetch()
+    except Exception as e:                                             # noqa: BLE001 (any of a fetch's reasons)
+        found, error = {}, f"the check failed: {str(e)[:200] or type(e).__name__}"
     with lock:
         rec = record()
-        rec.update(at=int(time.time()), error=error)
-        rec.update(found)
-        if keep:
-            keep(rec)
-        (rec if flag is None else flag)["checking"] = False
+        try:
+            rec.update(at=int(time.time()), error=error)
+            rec.update(found)
+            if keep:
+                keep(rec)
+        finally:
+            (rec if flag is None else flag)["checking"] = False
         return dict(rec)
 
 

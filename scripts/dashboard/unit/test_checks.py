@@ -66,5 +66,34 @@ class Checks(unittest.TestCase):
         self.assertIsNone(toolchains.node_check_every({"config": {"check_versions": "off"}}))
 
 
+
+class Guarded(unittest.TestCase):
+    """A fetch that raises what its own except does not name leaves no check
+    in flight for good (B1026): the next ask fetches again."""
+
+    def test_a_raising_fetch_is_its_error_and_the_next_ask_fetches(self):
+        import threading
+        lock, rec, asked = threading.Lock(), {"checking": False}, []
+
+        def bad():
+            asked.append(1)
+            raise TypeError("'NoneType' object is not subscriptable")
+        got = checks.guarded(lock, lambda: rec, bad)
+        self.assertIn("the check failed: 'NoneType'", got["error"])
+        self.assertFalse(rec["checking"])
+        checks.guarded(lock, lambda: rec, lambda: (asked.append(2) or ({"latest": "1.0"}, "")))
+        self.assertEqual(asked, [1, 2])
+        self.assertEqual((rec["latest"], rec["error"]), ("1.0", ""))
+
+    def test_a_keep_that_fails_still_brings_the_flag_down(self):
+        import threading
+        lock, flag = threading.Lock(), {"checking": False}
+
+        def keep(_r):
+            raise OSError("disk full")
+        with self.assertRaises(OSError):
+            checks.guarded(lock, dict, lambda: ({}, ""), keep=keep, flag=flag)
+        self.assertFalse(flag["checking"])
+
 if __name__ == "__main__":
     unittest.main()
