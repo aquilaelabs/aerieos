@@ -402,9 +402,11 @@ function bootNotebooks(){
   // presence exists to avoid (roadmap #26, B144).
   addEventListener("pagehide", () => notebooks.forEach(n => n.leave()));
   // A write still unanswered asks before the page goes (writeOut): the
-  // browser's own question, in its own words.
+  // browser's own question, in its own words. So does work typed and not
+  // saved (B1003), unless the page is the one leaving and has asked itself.
+  typedWatch();
   addEventListener("beforeunload", e => {
-    if (writesOut > 0){ e.preventDefault(); e.returnValue = ""; }
+    if (writesOut > 0 || (!leavingOnPurpose && unsavedHere())){ e.preventDefault(); e.returnValue = ""; }
   });
 }
 
@@ -480,7 +482,7 @@ function bootContainerDialogs(){
   $("rnReachAdd").onclick = () => { rnReachEdit = {i: -1, form: {addr: "", nodes: []}}; rnDrawReach(true); };
   $("cGo").onclick = cSubmit;
   // The controller restarted under unsaved work: the band's one press (page-poll.js).
-  $("newBuildGo").onclick = () => location.reload();
+  $("newBuildGo").onclick = () => { leaveOnPurpose(); location.reload(); };
   $("cCancel").onclick = () => { $("cmodal").hidden = true; };
   $("cmodal").onclick = e => { if (e.target === $("cmodal")) $("cmodal").hidden = true; };
   $("dnName").oninput = dnShow;

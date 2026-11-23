@@ -1461,7 +1461,7 @@ async function openEditContainer(name){
   $("cmodal").hidden = false;
   cHold();
   try{
-    const j = await postJSON("/api/container", {action:"read", name});
+    const j = await postJSON("/api/container", {action:"read", name}, {read: true});
     if (cEditing !== name) return;          // reopened on another one meanwhile
     $("cYml").value = j.compose || "";
     $("cEnv").value = j.env || "";

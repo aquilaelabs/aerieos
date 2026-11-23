@@ -532,7 +532,7 @@ function wireMove(root){
     if (j.error){ notify(j.error, true); unbusy(b, "Land it here"); return; }
     notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had${
       (j.said || []).length ? `. ${j.said.join(". ")}` : ""}`, (j.said || []).length > 0);
-    setTimeout(() => location.assign("/"), 6000);
+    setTimeout(() => { leaveOnPurpose(); location.assign("/"); }, 6000);
   }));
   root.querySelectorAll("[data-moveprep]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Preparing");
@@ -1154,7 +1154,7 @@ function resetFollow(body, ids, send){
 function resetGone(body, moved){
   drawHTML(body, `<div class="field"><div class="hint">Reset: the dashboard is starting over${
     moved ? `; the old state is in ${esc(moved)}` : ""}. The setup page follows.</div></div>`);
-  setTimeout(() => { location.href = "/login"; }, 2500);
+  setTimeout(() => { leaveOnPurpose(); location.href = "/login"; }, 2500);
 }
 
 function settingsSections(){

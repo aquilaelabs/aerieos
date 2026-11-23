@@ -67,8 +67,20 @@ const lbl = (id, text, help) => `<label class="lbl"${id ? ` for="${esc(id)}"` : 
 // {blob, name} where it landed.
 function postJSON(path, body, opts = {}){
   return pressTie(writeOut(answerOf(fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
-                                                 body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {})}), opts), opts));
+                                                 body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {}),
+                                                 ...timeLimit(opts.read ? READ_WAIT_MS : WRITE_WAIT_MS)}), opts), opts));
 }
+// How long a read may take before it is given up on and said as not
+// answered (B1002): one /api/status that never answered (git on a stalled
+// share) held the poll for good, and every press that awaited a refresh
+// spun with it. A write may take as long as the longest the server allows
+// one (a release, 17 minutes), and is held to that: one that never
+// answers was counted unsaid for as long as the page stayed, and every
+// leave asked about it. The head's early reads carry the read's limit too
+// (index.html).
+const READ_WAIT_MS = 90000, REVS_WAIT_MS = 30000, WRITE_WAIT_MS = 1200000;
+const timeLimit = ms => typeof AbortSignal?.timeout === "function" ? {signal: AbortSignal.timeout(ms)} : {};
+const readFetch = (url, ms = READ_WAIT_MS) => fetch(url, timeLimit(ms));
 // ...a file's bytes as the body, for an upload the server spools (an archive,
 // an ISO), answered the same way...
 function postFile(path, file, type = ""){
@@ -83,7 +95,9 @@ function postFile(path, file, type = ""){
 // outlive it.
 let writesOut = 0;
 function writeOut(p, opts){
-  if (opts.background || opts.keepalive) return p;
+  // ...and a read sent as a POST ({read: true}: the chat's messages, a
+  // container's definition) is no write a leave should ask about.
+  if (opts.background || opts.keepalive || opts.read) return p;
   writesOut += 1;
   const done = () => { writesOut -= 1; };
   p.then(done, done);

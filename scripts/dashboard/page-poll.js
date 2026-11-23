@@ -24,7 +24,7 @@ let preStatusUsed = false;                // the head's early fetch: once only
 let bootDrawn = false;
 function bootFetch(url){
   const p = preGets[url];
-  if (!p) return fetch(url);
+  if (!p) return readFetch(url);
   if (bootDrawn) p.finally(() => { if (preGets[url] === p) delete preGets[url]; });
   return p.then(r => r.clone());
 }
@@ -133,6 +133,17 @@ function readKept(key, url, {land, keep, err, after}){
   });
 }
 
+// A page whose read failed: what went wrong in one line, with Try again
+// beside it, which makes the read again (B1005). The page was one red line
+// until its revision token moved, which on nginx and Storage is rare, and a
+// proxy's 502 for a moment was enough to leave it there.
+function readFailed(said){
+  return `<div class="field"><div class="notice bad readfail">${esc(said)} <button type="button" class="link" data-readagain>Try again</button></div></div>`;
+}
+function wireReadAgain(root, again){
+  root.querySelectorAll("[data-readagain]").forEach(b => b.onclick = () => again());
+}
+
 // Terminal tabs whose session we have actually watched running.
 //
 // The transition is what closes a tab, not the absence: "no session" is also
@@ -201,7 +212,7 @@ async function refresh(){
   let fetched = false;     // the container answered; what failed is this page
   let answered = false;    // the controller itself answered, if only with an error
   try{
-    const r = preStatusUsed ? await fetch("/api/status")
+    const r = preStatusUsed ? await readFetch("/api/status")
                             : (preStatusUsed = true, await preStatus);
     // A proxy in front answers for a controller that is not there.
     answered = ![502, 503, 504].includes(r.status);
@@ -460,6 +471,54 @@ let revsBusy = false, revsAgain = false;
 let restartHeld = false;
 
 // What this page holds that is not saved, in words, or "".
+// What a person typed into a field of any page or dialog that nothing has
+// taken yet (B1003): a controller update reloaded the page over a compose
+// file half typed into New container, a node's settings or a schedule, since
+// only the notebooks, the space settings dialog and the messages were
+// counted. Asked of the fields themselves, so a new form is counted without
+// a line of its own: a field a person typed into that is on show, still holds
+// what they typed (one the page has filled again since is the page's, not
+// theirs), and holds neither what was there before they typed nor what the
+// page last drew into it (a save the page drew back is no longer unsaved). A
+// search or a filter is not work; the messages are said as messages.
+const typedFields = new Map();
+const TYPED_KINDS = new Set(["", "text", "email", "password", "number", "url", "tel"]);
+function typedField(el){
+  if (!(el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && TYPED_KINDS.has(el.type)))) return false;
+  return !el.readOnly && !el.disabled && !/^(search|find|jump)\b/i.test(el.placeholder || "")
+    && !el.closest(".xterm, .consbar, .chatbar, [data-nowork]") && el.id !== "reportText";
+}
+function typedWatch(){
+  // The value before the first keystroke, taken again where the page has
+  // put another value there since the last one.
+  document.addEventListener("beforeinput", e => {
+    const el = e.target;
+    if (!typedField(el)) return;
+    const was = typedFields.get(el);
+    if (!was || was.typed !== el.value) typedFields.set(el, {base: el.value, typed: el.value});
+  }, true);
+  document.addEventListener("input", e => {
+    const was = typedFields.get(e.target);
+    if (was) was.typed = e.target.value;
+  }, true);
+}
+function formTyped(){
+  for (const [el, t] of typedFields){
+    if (!el.isConnected){ typedFields.delete(el); continue; }
+    // On show: a dialog on its way out (closed, its fold still running) is not.
+    if (el.value === t.typed && el.value !== t.base && el.value !== el.defaultValue
+        && el.getClientRects().length && !el.closest(".leaving")) return true;
+  }
+  return false;
+}
+// The page itself going somewhere (a reload it asked for, signing out): the
+// browser's own question is not asked as well (the band asked already).
+let leavingOnPurpose = false;
+function leaveOnPurpose(){
+  leavingOnPurpose = true;
+  setTimeout(() => { leavingOnPurpose = false; }, 3000);
+}
+
 function unsavedHere(){
   const said = [];
   notebooks.forEach((nb, name) => {
@@ -475,13 +534,14 @@ function unsavedHere(){
   const typed = [...Object.values(consDraft), ...Object.values(chatDraft), $("reportText")?.value]
     .some(v => String(v || "").trim());
   if (typed) said.push("a message being typed");
+  if (formTyped()) said.push("a form being filled in");
   return said.join(", ");
 }
 
 function restartSeen(){
   awayEnd();
   const what = unsavedHere();
-  if (!what){ restartKeep(); location.reload(); return; }
+  if (!what){ restartKeep(); leaveOnPurpose(); location.reload(); return; }
   restartHeld = true;
   const band = $("newBuild");
   if (!band){ return; }
@@ -621,7 +681,7 @@ async function pollRevsOnce(){
                                           && (t.id === front?.id || notebooks.get(t.arg)?.held?.()
                                               || notebooks.get(t.arg)?.unsaved?.()))
                                .map(t => t.arg))];
-    const r = await fetch("/api/revs?p=" + encodeURIComponent(ps.join(",")));
+    const r = await readFetch("/api/revs?p=" + encodeURIComponent(ps.join(",")), REVS_WAIT_MS);
     if (!r.ok) return;
     now = await r.json();
   }catch(e){ return; }

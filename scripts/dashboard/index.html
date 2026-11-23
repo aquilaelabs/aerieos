@@ -19,7 +19,9 @@
   // this page re-fetches /api/status every fifteen seconds: one poll
   // eventually inherited the page-load-era snapshot of the shared layout and
   // saved it over the real one. Found by the suite, kept as a warning.
-  const preStatus = fetch("/api/status");
+  // ...with the limit every read of the page has (READ_WAIT_MS, 90 s): one
+  // that hangs fails and is asked again, rather than holding the page (B1002).
+  const preStatus = fetch("/api/status", {signal: AbortSignal.timeout?.(90000)});
   // ...and the page the address names asks for its own data beside it (the
   // operator, 18 Oct: a reload showed the boot's placeholder, then the
   // page's own while it only then asked for what it draws). Shared by its
@@ -50,7 +52,7 @@
     const reads = proj ? ["roadmap", "memory", ...(!view || view === "overview" ? ["rules", "codebase", "preamble", "brief"] : [])]
         .map(k => `/api/${k}?project=${encodeURIComponent(proj)}`)
       : BOOT_READS[`${g}/${t || FIRST[g] || ""}`] || [];
-    for (const u of reads) preGets[u] = fetch(u);
+    for (const u of reads) preGets[u] = fetch(u, {signal: AbortSignal.timeout?.(90000)});
   }
 
   // The color scheme, before anything is painted. It has to be here rather

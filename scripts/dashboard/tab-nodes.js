@@ -2202,7 +2202,8 @@ function renderNodesInto(i){
     return;
   }
   if (nodesErr){
-    drawHTML(d.list, `<div class="hint bad">${esc(nodesErr)}</div>`);
+    drawHTML(d.list, readFailed(nodesErr));
+    wireReadAgain(d.list, () => loadNodes());
     return;
   }
   // One node at a time, picked at the top. Every node's whole configuration

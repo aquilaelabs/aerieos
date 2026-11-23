@@ -966,7 +966,8 @@ function renderStorageInto(i){
   const missing = (storageList || []).filter(n => !known.has(n.node) && !storageAskedNodes.has(n.node));
   if (missing.length){ missing.forEach(n => storageAskedNodes.add(n.node)); loadNodes(); }
   if (storageErr){
-    drawHTML(d.list, `<div class="hint bad">${esc(storageErr)}</div>`);
+    drawHTML(d.list, readFailed(storageErr));
+    wireReadAgain(d.list, () => loadStorage());
     return;
   }
   const where = ["workspace", "cache", "artifacts", "appdata", "emulator", "builds"];

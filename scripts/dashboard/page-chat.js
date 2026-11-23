@@ -19,7 +19,7 @@ function loadChat(){
   return reading("chat", async () => {
     if (!chatWith){ drawChat(); return; }
     try{
-      const r = await postJSON("/api/chat", { action: "read", ...chatWith });
+      const r = await postJSON("/api/chat", { action: "read", ...chatWith }, {read: true});
       if (r.error){ notify(r.error, true); chatWith = null; }
       else { chatMsgs = r.messages || []; chatSeenRev = r.rev; }
     }catch(e){ /* the poll will come back to it */ }

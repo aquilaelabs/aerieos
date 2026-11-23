@@ -442,7 +442,8 @@ function renderNginxInto(i){
     return;
   }
   if (nginxErr){
-    drawHTML(d.list, `<div class="hint bad">${esc(nginxErr)}</div>`);
+    drawHTML(d.list, readFailed(nginxErr));
+    wireReadAgain(d.list, () => loadNginx());
     return;
   }
   const n = nginxPick();

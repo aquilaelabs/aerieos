@@ -56,6 +56,19 @@ ok(kept.ok && row.routes.length === 1 && row.routes[0].host === 'www.example.com
 await page.evaluate(() => loadNginx());
 await page.waitForFunction(id => /1 route and 0 certificates/.test(document.querySelector(`.nginxtab [data-ngnode="${id}"] .toolstate`)?.textContent || ''), sandbox.node, { timeout: 10000 });
 ok(true, '...and the undeployed node says Deploy will bring that route up');
+// A read that fails says so in one line with Try again (B1005), which reads
+// again; the page was one red line until its token moved, which is rare.
+await section("a failed read says so with Try again, which reads again", async () => {
+  await page.route('**/api/nginx', r => r.request().method() === 'GET' ? r.fulfill({ status: 502, body: '' }) : r.continue());
+  await page.evaluate(() => loadNginx());
+  await page.waitForSelector('.nginxtab .readfail [data-readagain]', { timeout: 10000 });
+  const said = await page.$eval('.nginxtab .readfail', e => e.textContent.replace(/\s+/g, ' ').trim());
+  await page.unroute('**/api/nginx');
+  await page.click('.nginxtab .readfail [data-readagain]');
+  await page.waitForSelector(sect, { timeout: 10000 });
+  ok(/^the controller answered 502.*Try again$/.test(said) && !await page.$('.nginxtab .readfail'),
+     `the failure is one line with Try again, and the press brings the page back (${said})`);
+});
 // Written from elsewhere (a Docker row's Add route, bb, another browser),
 // the open tab re-reads by the revisions token, not by its Refresh (B714).
 await section("Written from elsewhere", async () => {

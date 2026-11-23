@@ -577,7 +577,8 @@ function renderLibraryInto(i){
         may.packs ? `<button type="button" class="primary" data-libadd>${barSaid("Add your own", "Add")}</button>` : ""}${
         clean.length ? `<button type="button" class="danger" data-libclean>Remove</button>` : ""}` : "";
   if (lib.error){
-    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
+    patch(d.list, readFailed("could not read the library: " + lib.error));
+    wireReadAgain(d.list, () => loadLibrary());
     return;
   }
   // What the head says is about the whole Library on the node, whatever is

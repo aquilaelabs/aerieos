@@ -299,7 +299,8 @@ function renderInstalledInto(i){
   const may = inst.may || {};
   d.setBar("");    // the node is picked in the Machines group's header (R177)
   if (inst.error){
-    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read what is installed: " + inst.error)}</div></div>`);
+    patch(d.list, readFailed("could not read what is installed: " + inst.error));
+    wireReadAgain(d.list, () => loadInstalled());
     return;
   }
   const rows = (inst.rows || []).filter(instHere);

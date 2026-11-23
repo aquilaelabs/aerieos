@@ -245,6 +245,30 @@ await section("no ring where it has no room", async () => {
   await settled(page, { cap: 5000 });
 });
 
+// ---- a read that never answers (B1002) --------------------------------------
+// One /api/status that never answered (git on a stalled share) held the poll
+// for good: refreshBusy stayed set, no poll was scheduled again, and every
+// press that awaited a refresh spun. Every read has a limit now; the suite
+// shortens it to under a second rather than waiting out the page's 90.
+await section("a read that never answers is given up on, and the page goes on", async () => {
+  await page.evaluate(() => { window.__timeout = AbortSignal.timeout;
+    AbortSignal.timeout = ms => window.__timeout.call(AbortSignal, Math.min(ms, 800)); });
+  let held = 0;
+  await page.route('**/api/status*', () => { held++; });
+  const poll = await page.evaluate(() => Promise.race([refresh().then(() => 'returned'),
+    new Promise(r => setTimeout(() => r('hung'), 6000))]));
+  const busy = await page.evaluate(() => refreshBusy);
+  const read = await page.evaluate(() => Promise.race([getJSON('/api/status').then(j => j.error || 'answered'),
+    new Promise(r => setTimeout(() => r('hung'), 6000))]));
+  await page.unroute('**/api/status*');
+  await page.evaluate(() => { AbortSignal.timeout = window.__timeout; });
+  ok(held >= 2 && poll === 'returned' && !busy,
+     `a status read that never answers ends at its limit and the poll is free to go again (${held}, ${poll}, ${busy})`);
+  ok(read === 'the controller did not answer', `...and a page's read says it was not answered, in words (${read})`);
+  ok(await page.evaluate(() => refresh().then(() => !!state?.me)), '...and the next read lands as ever');
+  await settled(page, { cap: 5000 });
+});
+
 // ---- the controller restarts under the page (R246) -------------------------
 // With nothing unsaved the page starts again at once, as it always did. With
 // work on it that is not saved it waits (the operator, 13 Nov): a band under
@@ -267,6 +291,33 @@ await section("the controller restarts under the page", async () => {
   await ready(page);
   ok(await page.evaluate(() => window.__sameLoad !== true && document.getElementById('newBuild').hidden),
      '...and Reload starts the page again, the band gone');
+  // A form half filled in on any page or dialog holds it too (B1003): New
+  // space's name typed and not made, where only the notebooks, the space
+  // settings dialog and the messages were counted. A field the page fills
+  // itself, or one typed into and put back, is no work; and the browser asks
+  // before the page goes while it is there.
+  await page.evaluate(() => { window.__sameLoad = true; openNewProject(); });
+  await page.waitForSelector('#pName', { state: 'visible', timeout: 10000 });
+  await page.click('#pName');
+  await page.keyboard.type('half a name');
+  await page.evaluate(() => { bootSeen = 'the run before this one'; refresh(); });
+  await page.waitForFunction(() => !document.getElementById('newBuild').hidden, null, { timeout: 10000 }).catch(() => {});
+  const form = await page.evaluate(() => ({ same: window.__sameLoad === true, said: document.getElementById('newBuildSay').textContent,
+    name: document.getElementById('pName').value }));
+  ok(form.same && /Reload to use it: a form being filled in is not saved yet\./.test(form.said) && form.name === 'half a name',
+     `a restart under a form half filled in is held too, and the band says so (${form.said})`);
+  const asks = await page.evaluate(() => { const e = new Event('beforeunload', { cancelable: true }); dispatchEvent(e); return e.defaultPrevented; });
+  ok(asks, '...and the browser asks before the page goes while it is there');
+  const quiet = await page.evaluate(() => {
+    const f = document.getElementById('pName'), was = f.value;
+    f.value = 'filled in by the page';
+    const filled = !formTyped();
+    f.value = was;
+    closeNewProject();
+    return { filled, closed: !formTyped() };
+  });
+  ok(quiet.filled && quiet.closed, `...where one the page filled itself, or a dialog closed, is no work (${JSON.stringify(quiet)})`);
+  await page.evaluate(() => { document.getElementById('newBuild').hidden = true; restartHeld = false; });
   // Nothing unsaved: the page starts again by itself, and stays drawn as it
   // was until the new run's first read lands (Perch): the reload paints the
   // page's kept copy, inert, where the placeholder's shapes went, and the
