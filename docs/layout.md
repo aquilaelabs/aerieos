@@ -462,6 +462,8 @@ tools/companion-requirements.txt PyInstaller and what it needs for the companion
 tools/root-tier.sh               the root tier as root in a throwaway container of the controller's image: the image's own copy, or a checkout's with --tree (the lint workflow's root job, the image workflow's upgrade job)
 tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what a tag's last job makes the release with, what the seal attaches the signed list with and publishes a dev build by once it is whole, and what a job run again by hand attaches with
 tools/release-missing.sh         the files .release-files names that a set of names lacks: one reading of the list for the seal's publication and the rehearsal
+tools/release-pack.sh            a release's controller bundle: the tree at a commit with its hash and the agent's signature this run made, packed the one way a tag and the rehearsal both pack it
+tools/release-notes.sh           a release's notes, written the one way a tag and the rehearsal both write them: which download is for what, then the tree's own notes for the version or the changelog's
 tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step aerieos-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
@@ -537,6 +539,6 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
   dashboard.yml                  the dashboard's browser suites, on a pull request that changes what they test and before a release's tag publishes, on this runner
   android-app.yml                the companion app's build: on a push to main that touches it, as a job of a tag's run (the unsigned APK handed to the controller to sign), or by hand
   companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files attested and handed to that run's last job, or by hand for a release that exists, attached to it
-  release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing; and the seal's steps dry, with a key made in the job, the Android app among the files, signed with a key of the job's and held to it by the runner's apksigner
+  release-rehearsal.yml          every step a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing, with the tag's own tools: the agent signed with a key made in the job, the container image built with it, pushed nowhere, started on each release's /config and its root tier run, the bundle packed and the notes written; and the seal's steps dry, with a key made in the job, the Android app among the files, signed with a key of the job's and held to it by the runner's apksigner
   runner-smoke-test.yml          proves this runner picks up jobs, carries its toolchain and cannot see the shielded PAT (manual)
 ```

@@ -540,12 +540,23 @@ from, a session's release is the dev build's (`--dev`, a pre-release on
 the dev channel) unless `--stable` says otherwise, and its first line
 names the channel it lands on (R190).
 
-**Rehearsing one.** `aerie version rehearse` runs every build a release's tag
-runs (the controller bundle packed, the OS image built and booted, the
-Android app, the companion and the VS Code extension built) on the pushed
-branch, publishing nothing, with the checks a tag is held to; its last job
-gathers what was built as a tag's does, and its summary says which of the
-files the release must carry were built. That job also seals what was
+**Rehearsing one.** `aerie version rehearse` first commits the changelog's
+section for the dev build and pushes it, so what is rehearsed is the commit
+the release will tag. It then runs every step a release's tag runs on the
+pushed branch, publishing nothing, with the checks a tag is held to and
+the same tools: the agent signed by `tools/sign-agent.py` with a key made
+in the job; the container image built with that agent by the tag's own
+build step, pushed nowhere, started on each release's `/config`
+(`tools/upgrade-image.sh`) and its root tier run in it
+(`tools/root-tier.sh`); the controller bundle packed by
+`tools/release-pack.sh` and the notes written by `tools/release-notes.sh`;
+the OS image built with the signed agent and booted; the Android app, the
+companion and the VS Code extension built. Its last job gathers what was
+built as a tag's does, and its summary says which of the files the release
+must carry were built. What only a tag proves is said at the top of the
+workflow: the release environment's approval and key, the attestations,
+the image's push, the Windows code signing, the controller's signing of
+the Android app, and the release published. That job also seals what was
 built, dry: the Android app signed with a key made in the job, as the
 controller signs a release's, and the seal's own check of it run on the
 runner's apksigner, so a change in what apksigner prints is met here and

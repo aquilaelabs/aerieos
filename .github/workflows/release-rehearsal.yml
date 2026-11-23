@@ -1,33 +1,47 @@
-# A release rehearsed (R190 step 2): every build a release's tag runs, on a
+# A release rehearsed (R190 step 2): every step a release's tag runs, on a
 # branch, publishing nothing. The 0.9.0 dev release spent about ten tags on
 # an OS image that would not boot, since only a tag built the whole set (the
-# operator, 30 Oct); this runs the same builds from `aerie version rehearse` or
-# the Actions page, so a release is tagged once it is green here.
+# operator, 30 Oct), and v0.9.0-dev.6049 died twice on steps only a tag ran;
+# this runs them from `aerie version rehearse` or the Actions page, so a
+# release is tagged once it is green here. `aerie version rehearse` first
+# commits the changelog's section for the dev build and pushes it, so this
+# runs on the commit the release will tag.
 #
-# What it runs: the controller bundle packed as the release packs it, the
-# OS image built and booted (os-image.yml), the Android APK built
-# (android-app.yml), and the companion's .pyz, .exe and the VS Code
-# extension built (companion-app.yml), each with no tag, so nothing is
-# attached, signed or handed over. The last job gathers what they built as
-# a tag's last job does, and says which of the files a release must carry
-# (.release-files) a release from this commit would have and lack.
+# What it runs, as a tag's run does and with the same tools:
+# - the agent signed (tools/sign-agent.py) with a key made in the job and
+#   thrown away with it, and its spare, then checked against that key's
+#   public half and refused by the committed one;
+# - the container image built from this commit with that agent in it, by
+#   the tag's own build step but pushed nowhere, then started on each
+#   release's /config (tools/upgrade-image.sh) and its root tier run in the
+#   image itself (tools/root-tier.sh), as a tag's run does after its push;
+# - the controller bundle packed (tools/release-pack.sh) with the signature
+#   and the commit's hash in it, and the notes a tag on this commit would be
+#   made with (tools/release-notes.sh, at a tag made in this checkout alone);
+# - the OS image built with the signed agent and booted (os-image.yml), the
+#   Android APK built on the hosted runner a tag builds it on
+#   (android-app.yml), and the companion's .pyz, .exe and the VS Code
+#   extension built (companion-app.yml);
+# - the three checks a tag is held to before anything is built to publish
+#   (R206): where a release of each kind may be cut from, said for this
+#   commit and never refused here; aerie lint with the unit tier; and every
+#   browser suite;
+# - the seal, dry (R199): the library the release key is used with,
+#   installed from its hash-pinned list, and the list of the files this run
+#   built made and signed by tools/release-sign.py seal with a key made in
+#   the job, the Android app signed with one too and held to it by
+#   apksigner, then verified by ssh-keygen and refused against the committed
+#   file. The last job gathers what was built as a tag's last job does and
+#   says which of the files a release must carry (.release-files) a release
+#   from this commit would have and lack.
 #
-# ...and the three checks a tag is held to before anything is built to
-# publish (R206): where a release of each kind may be cut from, said for
-# this commit and never refused here; aerie lint with the unit tier; and
-# every browser suite. Green here is what a tag on this commit would meet.
-#
-# ...and the seal's own steps, dry (R199): the library the release key is
-# used with, installed from its hash-pinned list, and the list of the
-# files this run built made and signed by tools/release-sign.py seal, with
-# a key made in the job and thrown away with it, then verified by
-# ssh-keygen against the signers file written for that key and refused
-# against the committed one. So the tool, ssh-keygen and the pinned library
-# are proved on a runner before any tag needs them. It reads no secret,
-# attaches nothing, and what it signs no install takes. The APK is built
-# on the hosted runner a tag's run builds it on. What only a tag can prove
-# stays unproved here: the build attestations, the Android app's
-# signature, the Windows code signing and the release environment's key.
+# What only a tag can prove stays unproved here: the release environment's
+# approval and the key it holds; the build attestations and the transparency
+# log they go to; the image's push, the line naming it by its digest, and
+# the cache a push leaves; the Windows code signing; the controller signing
+# the Android app and attaching it; the release made, sealed with the real
+# key and published. It reads no secret and attaches nothing, and nothing it
+# signs is taken by any install.
 name: release rehearsal
 
 on:
@@ -40,34 +54,207 @@ concurrency:
   group: release-rehearsal-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
-  bundle:
+  # The agent signed as a tag's signature job signs it, with the same tool,
+  # under a key made here: the key the builds sign with and its spare, in
+  # the committed file's form, so the spare's statement is made as a
+  # release's build makes it. The private half is on disk only while the
+  # tool reads it; the public half goes to the jobs that check it.
+  signature:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    outputs:
-      version: ${{ steps.pack.outputs.version }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
           fetch-depth: 0
+      - name: The pinned library the key is used with
+        run: bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+      - name: Sign the agent with a key made for this run
+        shell: bash
+        env:
+          PYTHONPATH: ${{ runner.temp }}/release-lib
+        run: |
+          set -euo pipefail
+          keys="$RUNNER_TEMP/rehearsal-key"
+          mkdir -p "$keys"
+          python3 - "$keys/aerieos-release.pub" "$keys/seed" <<'PY'
+          import os, sys
+          from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+          key, spare = Ed25519PrivateKey.generate(), Ed25519PrivateKey.generate()
+          with open(sys.argv[1], "w", encoding="utf-8") as f:
+              f.write("# a rehearsal's own keys, thrown away with its runner\n")
+              for k in (key, spare):
+                  f.write(f"aerieos-release-ed25519 {k.public_key().public_bytes_raw().hex()}\n")
+          fd = os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+          os.write(fd, key.private_bytes_raw().hex().encode())
+          os.close(fd)
+          PY
+          AERIEOS_RELEASE_KEY="$(cat "$keys/seed")" AERIEOS_RELEASE_PUB="$keys/aerieos-release.pub" python3 tools/sign-agent.py
+          rm -f "$keys/seed"
+          AERIEOS_RELEASE_PUB="$keys/aerieos-release.pub" python3 tools/sign-agent.py --check
+          # ...and no install takes it: the committed key does not.
+          if python3 tools/sign-agent.py --check > /dev/null; then
+            echo "::error::a key made in this job signed an agent the committed release key takes"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent/agent.sig
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: rehearsal-release-key
+          path: ${{ runner.temp }}/rehearsal-key/aerieos-release.pub
+          if-no-files-found: error
+          retention-days: 1
+
+  # The container image a tag pushes, built from this commit with the agent
+  # signed above in it, by the tag's own build step but loaded here and
+  # pushed nowhere (test_release_gate.py holds the two steps to each
+  # other), then put through what a tag's run puts it through after its
+  # push: started on each release's /config, and the root tier in the image
+  # itself.
+  image:
+    needs: signature
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
+      - name: Reclaim runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af >/dev/null
+          df -h /
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1, pinned by commit (R206)
+      # For the cache a tag's build seeds from (:main): the package is
+      # private, so even the read needs the run's own token, which may read
+      # packages here and write none. No secret is read.
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550   # v4.8.0, pinned by commit (R206)
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Derive cache ref
+        id: cache
+        run: |
+          echo "ref=$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]'):main" >> "$GITHUB_OUTPUT"
+      - name: Stamp the build
+        id: stamp
+        run: echo "at=$(date -u +%Y-%m-%dT%H:%MZ)" >> "$GITHUB_OUTPUT"
+      - name: Derive the version
+        id: ver
+        run: |
+          v="$(BB_RELAYED=1 bash scripts/aerie version --semver)" \
+            || { echo "::error::aerie version did not say what this checkout is"; exit 1; }
+          echo "built $v"
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+      - name: Take the agent's signature
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent
+      - name: Take this run's key
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: rehearsal-release-key
+          path: ${{ runner.temp }}/rehearsal-key
+      - name: The agent's signature, checked against this run's key
+        shell: bash
+        run: |
+          bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+          AERIEOS_RELEASE_PUB="$RUNNER_TEMP/rehearsal-key/aerieos-release.pub" PYTHONPATH="$RUNNER_TEMP/release-lib" \
+            python3 tools/sign-agent.py --check
+      - name: Build, pushed nowhere
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0, pinned by commit (R206)
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: |
+            IMAGE_REV=${{ github.sha }}
+            IMAGE_BUILT=${{ steps.stamp.outputs.at }}
+            IMAGE_VERSION=${{ steps.ver.outputs.v }}
+          push: false
+          load: true
+          tags: aerieos-rehearsal:${{ github.sha }}
+          provenance: false
+          cache-from: type=registry,ref=${{ steps.cache.outputs.ref }}
+      - name: Start the image on each release's /config
+        run: tools/upgrade-image.sh "aerieos-rehearsal:$GITHUB_SHA"
+      - name: The root tier in the image itself
+        run: tools/root-tier.sh "aerieos-rehearsal:$GITHUB_SHA"
+
+  # The bundle packed and the notes written as a tag's bundle job packs and
+  # writes them, with the agent signed above in it.
+  bundle:
+    needs: signature
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.pack.outputs.version }}
+      tag: ${{ steps.notes.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
+      - name: Take the agent's signature
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent
+      - name: Take this run's key
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: rehearsal-release-key
+          path: ${{ runner.temp }}/rehearsal-key
+      - name: The agent's signature, checked against this run's key
+        shell: bash
+        run: |
+          bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+          AERIEOS_RELEASE_PUB="$RUNNER_TEMP/rehearsal-key/aerieos-release.pub" PYTHONPATH="$RUNNER_TEMP/release-lib" \
+            python3 tools/sign-agent.py --check
       - name: Pack the tree as the release packs it
         id: pack
         shell: bash
         run: |
-          set -eo pipefail
+          set -euo pipefail
           ver="$(BB_RELAYED=1 bash scripts/aerie version --file)"
-          name="aerieos-controller-${ver}.tar.gz"
-          git archive --format=tar --prefix="builderbot-${ver}/" HEAD | gzip -n -9 > "$name"
-          # Listed to a file and read from it: grep stopping at its first match
-          # ended tar mid-list, and with pipefail that read as no match (the
-          # rehearsal of 14 Nov failed here on a bundle that was whole).
-          tar -tzf "$name" > bundle.names
-          grep -qx "builderbot-${ver}/scripts/dashboard/server.py" bundle.names \
-            || { echo "::error::the bundle has no scripts/dashboard/server.py"; exit 1; }
-          sha256sum "$name" > "$name.sha256"
+          name="$(bash tools/release-pack.sh HEAD "$ver")"
+          tar -tzf "$name" | grep -qx "builderbot-${ver}/scripts/agent/agent.sig" \
+            || { echo "::error::the bundle carries no agent signature"; exit 1; }
           ls -l "$name"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
+      # The notes are read at the release's tag: one made in this checkout
+      # alone, on this commit, by the name a dev build's release would give
+      # it, and pushed nowhere.
+      - name: Write the notes a tag on this commit would be made with
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="$(BB_RELAYED=1 bash scripts/aerie version --semver)"
+          tag="v${v%%+*}"
+          git tag -f "$tag" HEAD
+          bash tools/release-notes.sh "$tag" "$GITHUB_REPOSITORY" > notes.md
+          grep -q '[^[:space:]]' notes.md || { echo "::error::the notes for $tag are empty"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          { echo "## The notes $tag would be made with"; echo; cat notes.md; } >> "$GITHUB_STEP_SUMMARY"
       # Handed to the last job as a tag's bundle is (build-image.yml).
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
         with:
@@ -75,6 +262,7 @@ jobs:
           path: |
             ${{ steps.pack.outputs.name }}
             ${{ steps.pack.outputs.name }}.sha256
+            notes.md
           if-no-files-found: error
           retention-days: 1
 
@@ -103,8 +291,13 @@ jobs:
     permissions:
       contents: read
 
+  # With the agent signed above, as a tag's OS image carries the run's.
   appliance:
+    needs: signature
     uses: ./.github/workflows/os-image.yml
+    with:
+      agent-signature: true
+      rehearsal-key: true
     permissions:
       contents: read
 
@@ -152,7 +345,7 @@ jobs:
     uses: ./.github/workflows/dashboard.yml
 
   manifest:
-    needs: [bundle, apps, android, appliance, place, lint, suites]
+    needs: [signature, image, bundle, apps, android, appliance, place, lint, suites]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -196,7 +389,8 @@ jobs:
           dry="$RUNNER_TEMP/dry"
           mkdir -p "$dry/files" out rel
           # The files where they are, by links: the OS image is not copied.
-          find out rel -maxdepth 1 -type f -exec ln -s -t "$dry/files" "$PWD"/{} \;
+          # The notes are the release's words, never one of its files.
+          find out rel -maxdepth 1 -type f ! -name notes.md -exec ln -s -t "$dry/files" "$PWD"/{} \;
           # A key of this run's own, never the release's: 64 hex characters
           # as the secret is, in this step's environment and nowhere else.
           AERIEOS_RELEASE_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
@@ -262,6 +456,9 @@ jobs:
         env:
           SEAL: ${{ steps.seal.outcome }}
           VER: ${{ needs.bundle.outputs.version }}
+          TAG: ${{ needs.bundle.outputs.tag }}
+          SIGNATURE: ${{ needs.signature.result }}
+          IMAGE: ${{ needs.image.result }}
           BUNDLE: ${{ needs.bundle.result }}
           APPS: ${{ needs.apps.result }}
           ANDROID: ${{ needs.android.result }}
@@ -273,11 +470,13 @@ jobs:
         run: |
           set -eo pipefail
           {
-            echo "## A release from this commit"
+            echo "## A release from this commit${TAG:+, $TAG}"
             echo
             echo "| Build | Result |"
             echo "| --- | --- |"
-            echo "| Controller bundle | $BUNDLE |"
+            echo "| The agent signed with a key made here, checked, and refused by the committed key | $SIGNATURE |"
+            echo "| The container image built with it, started on each release's /config, its root tier run in it | $IMAGE |"
+            echo "| Controller bundle, with the signature, and the release's notes | $BUNDLE |"
             echo "| Companion (.pyz, .exe) and VS Code extension | $APPS |"
             echo "| Android APK (signed by the controller after a release) | $ANDROID |"
             echo "| AerieOS (built and booted) | $APPLIANCE |"
@@ -302,7 +501,7 @@ jobs:
           # it of itself, X.Y.Z-dev.N+commit, where every other file is named
           # with a hyphen there; on a tag the two are one. Read as one here.
           mkdir -p out rel
-          mapfile -t have < <(find out rel -maxdepth 1 -type f -printf '%f\n' | tr '+' '-' | sort)
+          mapfile -t have < <(find out rel -maxdepth 1 -type f ! -name notes.md -printf '%f\n' | tr '+' '-' | sort)
           mapfile -t lacks < <(bash tools/release-missing.sh .release-files "${VER:-VERSION}" "${have[@]}")
           later=() missing=()
           for f in "${lacks[@]}"; do
@@ -325,7 +524,7 @@ jobs:
             echo "::error::a release from here would lack ${missing[*]}"
             exit 1
           fi
-          for r in "$BUNDLE" "$APPS" "$ANDROID" "$APPLIANCE"; do
+          for r in "$SIGNATURE" "$IMAGE" "$BUNDLE" "$APPS" "$ANDROID" "$APPLIANCE"; do
             [ "$r" = success ] || { echo "::error::not every build passed: a release from here would be missing files"; exit 1; }
           done
           for r in "$LINT" "$SUITES" "$PLACE"; do

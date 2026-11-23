@@ -20,6 +20,12 @@ on:
       agent-signature:
         type: boolean
         default: false
+      # A rehearsal's signature (release-rehearsal.yml), made with a key of
+      # its run's own: checked against that key's public half, which the
+      # run hands over as an artifact of its own, never the committed one.
+      rehearsal-key:
+        type: boolean
+        default: false
     # What the build made, by its bytes, for the caller's job that attests
     # the two files a release carries: it takes them as the run's artifact
     # and holds each to these before it attests anything.
@@ -145,13 +151,21 @@ jobs:
         with:
           name: agent-signature
           path: scripts/agent
+      - name: The rehearsal's key, where this is a rehearsal's
+        if: inputs.agent-signature && inputs.rehearsal-key
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: rehearsal-release-key
+          path: ${{ runner.temp }}/rehearsal-key
       - name: The agent's signature, checked on a release
         shell: bash
         env:
           SIGNED: ${{ inputs.agent-signature }}
+          REHEARSAL: ${{ inputs.rehearsal-key }}
         run: |
           if [ "$SIGNED" = true ]; then
             bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+            if [ "$REHEARSAL" = true ]; then export AERIEOS_RELEASE_PUB="$RUNNER_TEMP/rehearsal-key/aerieos-release.pub"; fi
             PYTHONPATH="$RUNNER_TEMP/release-lib" python3 tools/sign-agent.py --check
           else
             echo "not a release's build: the agent ships unsigned, as a branch's does (the release key is read on a v* tag alone)"

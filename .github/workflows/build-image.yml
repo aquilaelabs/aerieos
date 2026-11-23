@@ -618,26 +618,16 @@ jobs:
         run: |
           bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
           PYTHONPATH="$RUNNER_TEMP/release-lib" python3 tools/sign-agent.py --check
+      # The tree as the release carries it, with its commit's hash and the
+      # agent's signature: the one packing the rehearsal runs too
+      # (tools/release-pack.sh).
       - name: Pack the tag's tree
         id: pack
         shell: bash
         run: |
+          set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          ver="${tag#v}"
-          name="aerieos-controller-${ver}.tar.gz"
-          # The tree as the release carries it, with the commit's hash where
-          # the installer reads it (tree_stamp's .release-rev).
-          git archive --format=tar --prefix="builderbot-${ver}/" "$tag" > tree.tar
-          mkdir -p stamp/"builderbot-${ver}" && git rev-parse "$tag^{commit}" > stamp/"builderbot-${ver}"/.release-rev
-          tar -rf tree.tar -C stamp "builderbot-${ver}/.release-rev"
-          # ...and the agent's signature, which is made by this build and is
-          # in no commit: beside the agent's sources, where the controller reads it.
-          if [ -s scripts/agent/agent.sig ]; then
-            mkdir -p stamp/"builderbot-${ver}"/scripts/agent && cp scripts/agent/agent.sig stamp/"builderbot-${ver}"/scripts/agent/
-            tar -rf tree.tar -C stamp "builderbot-${ver}/scripts/agent/agent.sig"
-          fi
-          gzip -n -9 < tree.tar > "$name"
-          sha256sum "$name" > "$name.sha256"
+          name="$(bash tools/release-pack.sh "$tag" "${tag#v}")"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Attest the bundle
@@ -662,30 +652,9 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.pack.outputs.tag }}
-        run: |
-          # The notes are the tree's when it has them for this version
-          # (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
-          # @TAG@, @VER@ and @REPO@ filled in, so the release is made with
-          # them rather than edited after. Otherwise they are the changelog's
-          # own: the version's section for a release, and for a dev build only
-          # what Unreleased gained since the tag before (tools/release-notes.py).
-          ver="${TAG#v}"; base="${ver%%-*}"
-          notes="docs/release-notes/$base.md"; case "$TAG" in v*-*) notes="docs/release-notes/$base-dev.md";; esac
-          head="## $base:"
-          if [ -f "$notes" ]; then
-            sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" "$notes" > notes.md
-          elif [ "$ver" != "$base" ]; then
-            python3 tools/release-notes.py "$TAG" > notes.md
-          else
-            awk -v h="$head" 'index($0, h) == 1 {on = 1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
-            grep -q '[^[:space:]]' notes.md || echo "AerieOS $ver: see CHANGELOG.md." > notes.md
-          fi
-          # Which download is for what, at the top of every release (the
-          # operator, 6 Nov: the files alone did not say).
-          if [ -f docs/release-notes/downloads.md ]; then
-            { sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" docs/release-notes/downloads.md; cat notes.md; } > notes.all
-            mv notes.all notes.md
-          fi
+        # The tree's own notes for the version, or the changelog's: the one
+        # way the rehearsal writes them too (tools/release-notes.sh).
+        run: bash tools/release-notes.sh "$TAG" "$GITHUB_REPOSITORY" > notes.md
       # A day, the shortest there is: this is how the bundle and the notes
       # reach the last job of the same run, and nothing reads them afterwards.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)

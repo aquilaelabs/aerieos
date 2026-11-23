@@ -9,6 +9,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -585,6 +586,96 @@ esac
         # ...and publishes nothing: no job of it may write a release.
         for name, job in jobs.items():
             self.assertNotIn("release-attach.sh", runs(job), name)
+
+    def test_the_rehearsal_runs_what_a_tag_runs_with_the_same_tools(self):
+        # R190 step 2 (the review of 22 Nov): the rehearsal built no
+        # container image, so the image's start on each release's /config,
+        # its root tier and the agent's signature ran first on a tag.
+        tag, reh = load("build-image.yml")["jobs"], load("release-rehearsal.yml")["jobs"]
+        # The image: the tag's own build step, loaded here and pushed nowhere.
+        built = next(s for s in tag["build"]["steps"] if s.get("id") == "push")
+        here = next(s for s in reh["image"]["steps"] if s.get("id") == "build")
+        same = ("context", "platforms", "build-args", "provenance", "cache-from")
+        self.assertEqual(here["uses"], built["uses"])
+        self.assertEqual({k: here["with"][k] for k in same}, {k: built["with"][k] for k in same})
+        self.assertEqual((here["with"]["push"], here["with"]["load"]), (False, True))
+        self.assertEqual(set(here["with"]) - set(same), {"push", "load", "tags"})
+        for sid in ("cache", "stamp"):
+            self.assertEqual(next(s for s in reh["image"]["steps"] if s.get("id") == sid)["run"],
+                             next(s for s in tag["build"]["steps"] if s.get("id") == sid)["run"], sid)
+        self.assertEqual(reh["image"]["permissions"], {"contents": "read", "packages": "read"})
+        # ...then put through what the tag's run puts it through after its push.
+        for tool in ("tools/upgrade-image.sh", "tools/root-tier.sh"):
+            self.assertIn(tool, runs(tag["upgrade"]))
+            self.assertIn(f'{tool} "aerieos-rehearsal:$GITHUB_SHA"', runs(reh["image"]))
+        # The bundle and the notes: one script each, run by both.
+        self.assertIn('bash tools/release-pack.sh "$tag" "${tag#v}"', runs(tag["bundle"]))
+        self.assertIn('bash tools/release-pack.sh HEAD "$ver"', runs(reh["bundle"]))
+        self.assertIn('bash tools/release-notes.sh "$TAG" "$GITHUB_REPOSITORY" > notes.md', runs(tag["bundle"]))
+        self.assertIn('bash tools/release-notes.sh "$tag" "$GITHUB_REPOSITORY" > notes.md', runs(reh["bundle"]))
+        self.assertIn('git tag -f "$tag" HEAD', runs(reh["bundle"]))
+        self.assertNotIn("git push", runs(reh["bundle"]))
+        # The agent: signed by the tag's own tool with a key made in the job,
+        # checked against it and refused by the committed one, and handed to
+        # every job that packs it, the OS image's among them.
+        sig = runs(reh["signature"])
+        for part in ('AERIEOS_RELEASE_PUB="$keys/aerieos-release.pub" python3 tools/sign-agent.py\n', 'rm -f "$keys/seed"',
+                     'AERIEOS_RELEASE_PUB="$keys/aerieos-release.pub" python3 tools/sign-agent.py --check',
+                     'if python3 tools/sign-agent.py --check > /dev/null; then'):
+            self.assertIn(part, sig)
+        self.assertLess(sig.index('rm -f "$keys/seed"'), sig.index("--check"), "the private half is gone before anything else runs")
+        for name in ("image", "bundle", "appliance"):
+            self.assertEqual(needs(reh[name]), {"signature"}, name)
+        for name in ("image", "bundle"):
+            self.assertIn('AERIEOS_RELEASE_PUB="$RUNNER_TEMP/rehearsal-key/aerieos-release.pub"', runs(reh[name]), name)
+        self.assertEqual(reh["appliance"]["with"], {"agent-signature": True, "rehearsal-key": True})
+        osi = load("os-image.yml")
+        self.assertEqual(osi["on"]["workflow_call"]["inputs"]["rehearsal-key"], {"type": "boolean", "default": False})
+        self.assertIn('if [ "$REHEARSAL" = true ]; then export AERIEOS_RELEASE_PUB=', runs(osi["jobs"]["appliance"]))
+        self.assertNotIn("rehearsal-key", str(tag), "a tag's own run never names a rehearsal's key")
+        # Each result is a row of the summary and fails the run, and the
+        # header says what only a tag proves.
+        say = reh["manifest"]["steps"][-1]
+        for k in ("SIGNATURE", "IMAGE"):
+            self.assertIn(f'"${k}"', say["run"], k)
+        self.assertTrue({"signature", "image"} <= needs(reh["manifest"]))
+        with open(os.path.join(WF, "release-rehearsal.yml"), encoding="utf-8") as f:
+            self.assertIn("What only a tag can prove stays unproved here", f.read())
+
+    def test_the_bundle_is_packed_with_its_commit_and_the_agent_s_signature(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@x"}
+
+        def sh(*a):
+            return subprocess.run(a, cwd=d, env=env, capture_output=True, text=True, check=False)
+        os.makedirs(os.path.join(d, "scripts", "dashboard"))
+        os.makedirs(os.path.join(d, "scripts", "agent"))
+        with open(os.path.join(d, "scripts", "dashboard", "server.py"), "w") as f:
+            f.write("# the dashboard\n")
+        sh("git", "init", "-q")
+        sh("git", "add", "-A")
+        sh("git", "commit", "-q", "-m", "one")
+        pack = os.path.join(WF, "..", "..", "tools", "release-pack.sh")
+        with open(os.path.join(d, "scripts", "agent", "agent.sig"), "w") as f:
+            f.write('{"sig": "made by this run"}\n')
+        r = sh("bash", pack, "HEAD", "1.2.3-dev.4")
+        self.assertEqual((r.returncode, r.stdout), (0, "aerieos-controller-1.2.3-dev.4.tar.gz\n"), r.stderr)
+        with tarfile.open(os.path.join(d, "aerieos-controller-1.2.3-dev.4.tar.gz")) as t:
+            names = t.getnames()
+            rev = t.extractfile("builderbot-1.2.3-dev.4/.release-rev").read().decode().strip()
+            signed = t.extractfile("builderbot-1.2.3-dev.4/scripts/agent/agent.sig").read()
+        self.assertIn("builderbot-1.2.3-dev.4/scripts/dashboard/server.py", names)
+        self.assertEqual(rev, sh("git", "rev-parse", "HEAD").stdout.strip())
+        self.assertEqual(signed, b'{"sig": "made by this run"}\n', "a signature in no commit rides in the bundle")
+        with open(os.path.join(d, "aerieos-controller-1.2.3-dev.4.tar.gz.sha256")) as f:
+            self.assertTrue(f.read().endswith("  aerieos-controller-1.2.3-dev.4.tar.gz\n"))
+        # A tree with no dashboard is no bundle.
+        sh("git", "rm", "-q", "scripts/dashboard/server.py")
+        sh("git", "commit", "-q", "-m", "gone")
+        r = sh("bash", pack, "HEAD", "1.2.3-dev.5")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("the bundle has no scripts/dashboard/server.py", r.stderr)
 
     def test_every_workflow_says_what_its_token_may_do(self):
         # With none said, a job takes the repository's own default, which
