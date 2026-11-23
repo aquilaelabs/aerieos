@@ -26,7 +26,7 @@
    `design` and measured by test/uniform.mjs. */
 :root,.sw[data-theme="default"]{
   --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
-  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#facc15; --bad:#f2707a;
+  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#fbbf24; --bad:#f2707a;
   --note:#8cc8ff;
   /* Good, warning and error are one set in every scheme: they mean the same
      whatever the theme, a shade for the dark half here and one for the
@@ -42,7 +42,7 @@
      dirty); in the light half a pale wash. */
   --pass:#3fb950;
   --ground:#141922; --ground-ink:#eef1f6;
-  --warn-wash:color-mix(in srgb, #facc15 12%, var(--ground)); --warn-wash-ink:#facc15; --warn-edge:#facc15;
+  --warn-wash:color-mix(in srgb, #fbbf24 12%, var(--ground)); --warn-wash-ink:#fbbf24; --warn-edge:#fbbf24;
   /* Derived, not chosen. Buttons and the active/primary family were hardcoded
      hex: #232b34 eleven times, #1f6f36 and #2ea043 across every tab, pane and
      primary, which meant a scheme could repaint the page and leave every
