@@ -385,6 +385,22 @@ function arriveBox(el){
   foldHeight(el, 0, el.offsetHeight, () => {});
 }
 
+// A row or a line that comes into a list already on screen unrolls into
+// its place (arriveBox), as one that goes folds away (leaveBox), so what is
+// under it rides down rather than jumping: the bell's and Home's Attention
+// rows, and the line that counts what was put away, which came in a moment
+// after the row it counts had gone (the operator, 23 Nov: Dismiss skipped).
+// The list's first drawing, and one written whole, is the list's own
+// arrival, and nothing in it unrolls on its own.
+const arrivedSeen = new WeakMap();
+function arriveNew(root, sel){
+  if (!root) return;
+  const now = [...root.querySelectorAll(sel)], was = arrivedSeen.get(root);
+  arrivedSeen.set(root, {first: root.firstElementChild, els: new WeakSet(now)});
+  if (!was?.first || was.first !== root.firstElementChild) return;
+  now.forEach(el => { if (!was.els.has(el)) arriveBox(el); });
+}
+
 // ...and a row that goes leaves the way a box arrives, backwards: it fades as
 // its height folds to nothing, the rows under it riding up rather than
 // jumping (the operator, 22 Nov: a dismissed row just disappeared). `done`

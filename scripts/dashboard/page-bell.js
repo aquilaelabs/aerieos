@@ -579,11 +579,28 @@ function attRow(a){
 // A row put away and not yet answered is left out of each drawing of them,
 // the poll's included (goNow: Dismiss takes its row away on the press, the
 // operator 22 Nov). Its keys are held as its markup has them, escaped.
+// ...and what they held is counted at once with what the server says was
+// put away (bellHidden), so the line that says so moves with the press and
+// not a moment after the row it counts had gone (the operator, 23 Nov:
+// Dismiss skipped). Counted only while the server still lists the row: its
+// next read leaves the row out and counts it itself.
+let bellGoingKeys = 0;
 function bellLeft(rows){
-  return rows.filter(h => {
+  let n = 0;
+  const kept = rows.filter(h => {
     const m = /data-bdismiss="([^"]*)"/.exec(h);
-    return !m || !m[1].split(" ").every(k => going("bell:" + k));
+    const keys = m ? m[1].split(" ") : [];
+    if (!m || !keys.every(k => going("bell:" + k))) return true;
+    n += keys.length;
+    return false;
   });
+  bellGoingKeys = n;
+  return kept;
+}
+// How many updates are put away: the server's count and the ones on their
+// way to it. needsRows() is read first, which counts the second.
+function bellHidden(){
+  return (state?.bell_hidden || 0) + bellGoingKeys;
 }
 function needsRows(){
   const att = state?.attention || [], ciRed = state?.ci_red || [], syncC = state?.sync_conflicts || [];
@@ -818,7 +835,7 @@ function drawBell(){
         <div class="bfoot"><span>${when(n.at)}</span></div></div>`);
   // Three groups, each headed with its count, so what waits on an answer is
   // never under what the page merely said; Clear heads the one it clears.
-  const hidden = state?.bell_hidden || 0;
+  const hidden = bellHidden();
   const group = (title, list, extra = "", total = list.length) => list.length
     ? `<div class="bgroup"><span>${title} · ${total}</span>${extra}</div>` + list.join("") : "";
   const putAway = hidden ? `<div class="bfootbar"><span>${hidden} update${hidden === 1 ? "" : "s"} dismissed</span>
@@ -921,6 +938,9 @@ function toggleBell(open){
 // Show again change the rows where they are; a row's link leaves for the
 // page it is about, and `after` runs as it does (the bell shuts itself).
 function wireNeeds(root, after = () => {}){
+  // A row come back (Show again) or newly due, and the line counting what was
+  // put away, unroll into a list already on screen rather than popping in.
+  arriveNew(root, ".bnote.att, .bfootbar");
   // Dismiss (bellseen.py): the update to that version, for this account, on
   // every browser it opens; a newer version notes again.
   // The row goes on the press, from the bell and from Home at once, and comes

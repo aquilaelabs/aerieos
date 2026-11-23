@@ -214,7 +214,7 @@ function homeStartHtml(){
 // Attention, Last jobs and the favorite spaces: the cards under the tiles,
 // with Last jobs' rows handed in (its own, or the shapes of them on the way).
 function homeCards(jobs){
-  const needs = needsRows(), hidden = state?.bell_hidden || 0;
+  const needs = needsRows(), hidden = bellHidden();
   return `${homeStartHtml()}<div class="field"><div class="homegrid">
         <section class="hcard hattn"><h3>Attention</h3>${!state ? skRows(2) : needs.length ? needs.join("")
           : `<div class="empty">nothing needs attention</div>`}${hidden
