@@ -5,10 +5,13 @@
 ### Changed
 
 - The warning color on every dark theme is a warmer gold (e5105b3)
+- A dialog's title is a band in the same voice as the pages' sections, no longer small capitals, and the page behind a dialog is softened in the theme's own color rather than blacked out (151147d)
+- Dialogs lay out their fields on the same grid as the pages: a new space's name beside its version, a container's name beside its space, an account beside its person's name, each label over its field (d5f6edb, c02819b)
 
 ### Fixed
 
 - On a phone the Containers page in list view stays inside the screen, and a container's image named by its id alone shows its first twelve characters, where a long image id made the page scroll sideways (03ad3f9)
+- aerie git policy says a space can push when the controller holds its token, where a space linked to its git host since the credential helper changed was told it held none (9ced03a)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
