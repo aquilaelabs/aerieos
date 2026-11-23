@@ -2852,6 +2852,10 @@ async function dialogShape(pg = page){
       title: box.firstElementChild?.tagName === 'H3' && box.firstElementChild.offsetHeight > 0, ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
       // ...and in Perch's voice (the operator, 23 Nov): the section voice,
       // sentence case, a band a pop-out's height, never small capitals.
+      // ...and its foot at the box's foot, a held box's too (R273: a box held
+      // at its tallest pane's height showed a shorter pane with its buttons
+      // under it and the rest of the height empty below them).
+      low: fb ? Math.round(r.bottom - fb.getBoundingClientRect().bottom) : null,
       voice: (h => h ? `${getComputedStyle(h).textTransform} ${parseFloat(getComputedStyle(h).fontSize)} ${getComputedStyle(h).fontWeight} ${Math.round(h.getBoundingClientRect().height)}` : '')(box.querySelector(':scope > h3')),
       mid: r.height < innerHeight - 40 ? Math.round(r.top + r.height / 2 - innerHeight / 2) : 'tall', order };
     return { nested, loose: loose.slice(0, 3), h4: box.classList.contains('prose') ? 0 : box.querySelectorAll('h4').length,
@@ -2894,8 +2898,8 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   const toks = String(c.order || '').split(' ').filter(Boolean), sp = toks.indexOf('sp'), verbs = toks.slice(sp + 1);
   const ordered = sp >= 0 && toks.slice(0, sp).every(t => t === 'state')
     && (!verbs.includes('P') || verbs[0] === 'P') && verbs.every((t, i) => t !== 'D' || verbs.slice(i).every(x => x === 'D'));
-  ok(!d.err && c.title && c.ownFoot && (c.mid === 'tall' || Math.abs(c.mid) <= 2) && ordered,
-     `[dialog ${name}] titled first, its foot its box's own in the rule's order, centered (${JSON.stringify(c)})`);
+  ok(!d.err && c.title && c.ownFoot && (c.mid === 'tall' || Math.abs(c.mid) <= 2) && ordered && (c.low === null || c.low <= 2),
+     `[dialog ${name}] titled first, its foot its box's own in the rule's order and at the box's foot, centered (${JSON.stringify(c)})`);
   const [tt, tsize, tweight, th] = String(c.voice || '').split(' ');
   ok(!d.err && tt === 'none' && +tsize >= 14 && +tweight >= 600 && +th >= 40,
      `[dialog ${name}] its title in the section voice, sentence case, a band as tall as a pop-out's (${c.voice})`);

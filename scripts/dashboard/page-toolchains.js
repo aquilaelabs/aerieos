@@ -587,7 +587,12 @@ function tpDraw(first){
     }
   }
   // Held while From is chosen; what a look brings back is a step of its own.
-  if (tpHeld && !tpForm.seen) Object.assign(m.querySelector(".box").style, {boxSizing: "border-box", height: tpHeld + "px"});
+  // ...its buttons at the held box's foot, as holdPanes puts them (R273).
+  if (tpHeld && !tpForm.seen){
+    const box = m.querySelector(".box");
+    Object.assign(box.style, {boxSizing: "border-box", height: tpHeld + "px"});
+    box.classList.add("held");
+  }
   m.onclick = e => { if (e.target === m) tpClose(); };
   const url = m.querySelector("#tpUrl");
   if (url){

@@ -1449,6 +1449,7 @@ function saveBar({save, revert, state = "", dead = false, cls = "", attrs = ""})
 function holdPanes(box, keys, show, cur){
   if (!box) return 0;
   box.style.height = "";
+  box.classList.remove("held");
   if (keys.length < 2 || isPhone()) return 0;
   let h = 0;
   for (const k of keys){ show(k); h = Math.max(h, box.getBoundingClientRect().height); }
@@ -1456,6 +1457,9 @@ function holdPanes(box, keys, show, cur){
   const held = Math.ceil(h);
   box.style.boxSizing = "border-box";
   box.style.height = held + "px";
+  // ...its buttons at the held box's foot, as on a phone, rather than under
+  // a shorter pane with the rest of the height empty below them (R273).
+  box.classList.add("held");
   return held;
 }
 // A dialog's foot in the dialog rule's one order: what it says (a .state

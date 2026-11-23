@@ -549,6 +549,11 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
 .modal .box{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   width:min(520px,100%);max-height:90vh;overflow:auto;
   box-shadow:0 12px 36px rgba(0,0,0,.42)}
+/* A box held at its tallest pane's height (holdPanes) is a column whose
+   foot sits at its bottom whichever pane is on show (R273). */
+.modal .box.held{display:flex;flex-direction:column}
+:where(.modal .box.held,.modal .box.held>.dlgbody)>*{flex:none}
+.modal .box.held>.foot,.modal .box.held>.dlgbody>.foot{margin-top:auto}
 /* A box that scrolls says so (scrollHints in page-motion.js), with a thin
    scrollbar where the platform draws one. A page and a sheet fade what they
    hold into the ground under them at the edge with more past it, a mask and
