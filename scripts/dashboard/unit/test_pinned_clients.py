@@ -104,9 +104,15 @@ class Pins(unittest.TestCase):
                 self.assertEqual(how, "reached", f"{name}: {why}")
                 self.assertTrue(by_the_cas(door.context), name)
                 door.sock.getpeercert.assert_not_called()
-                # No pin yet (the first contact): reached, to be pinned.
-                how, door, _ = self.ask(client, "")
-                self.assertEqual(how, "reached")
+                # No pin yet: the agent's first contact, reached and pinned
+                # on first use; a session and the root helper pin nothing
+                # themselves, so the system's CAs hold the certificate
+                # (review of 22 Nov: it was taken with nothing checked).
+                how, door, why = self.ask(client, "")
+                self.assertEqual(how, "reached", f"{name}: {why}")
+                self.assertEqual(by_the_cas(door.context), client is not agent, name)
+                if client is not agent:
+                    door.sock.getpeercert.assert_not_called()
 
 
 if __name__ == "__main__":

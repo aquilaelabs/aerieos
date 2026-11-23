@@ -154,18 +154,21 @@ def _conn(timeout):
         return http.client.HTTPConnection(u.hostname, port, timeout=timeout), u.path.rstrip("/")
     ctx = ssl.create_default_context()
     pin = os.environ.get("BB_CONTROLLER_PIN", "")
-    if pin == "ca":
+    if pin in ("", "ca"):
         # A node enrolled by a public hostname (--reach public): the name's
         # own certificate by the system's CAs, as the agent's client checks
         # it (controller.py's CA). Nothing is pinned: what the node sees is
         # the edge's certificate, which changes. Compared to a digest, as
         # every other pin is, this was refused, and no aerie verb in a
-        # session on such a node reached its controller (R243).
+        # session on such a node reached its controller (R243). With no pin
+        # at all the same: a session is handed the agent's pin and pins
+        # nothing on first use itself, so a certificate nobody vouches for
+        # is not taken on its word.
         return http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx), u.path.rstrip("/")  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE                 # the pin below is the check
-    # Pinned on first use, see the agent. A key's pin sends no server name
-    # (Unnamed), as the agent's connection does not.
+    # The agent's pin, which it took on first use. A key's pin sends no
+    # server name (Unnamed), as the agent's connection does not.
     c = (Unnamed if pin.startswith(KEY_PIN) else http.client.HTTPSConnection)(  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
         u.hostname, port, timeout=timeout, context=ctx)
     c.connect()
@@ -177,7 +180,7 @@ def _conn(timeout):
             raise OSError(f"controller key changed: pinned {pin[:19]}…, presented another")
         return c, u.path.rstrip("/")
     seen = "sha256:" + hashlib.sha256(der).hexdigest()
-    if pin and seen != pin:
+    if seen != pin:
         c.close()
         raise OSError(f"controller certificate changed: pinned {pin[:19]}…, "
                       f"presented {seen[:19]}…")

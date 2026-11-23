@@ -1938,16 +1938,19 @@ def _grant(c, target, tok, ro):
     port = u.port or (443 if u.scheme == "https" else 80)
     if u.scheme == "https":
         ctx = ssl.create_default_context()
-        if c.get("CONTROLLER_PIN") == "ca":
+        pin = c.get("CONTROLLER_PIN") or ""
+        if pin in ("", "ca"):
             # Enrolled by a public hostname: the name's own certificate by
             # the system's CAs, nothing pinned, as the agent's client and
             # bbapi's read this pin (R243: compared to a digest it was
-            # refused, and no terminal opened on such a node).
+            # refused, and no terminal opened on such a node). With no pin
+            # at all the same: this helper pins nothing on first use, as the
+            # agent does, so a certificate nobody vouches for is not taken
+            # on its word.
             conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
         else:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
-            pin = c.get("CONTROLLER_PIN") or ""
 
             class Unnamed(http.client.HTTPSConnection):
                 """A TLS connection that sends no server name, as the
@@ -1965,7 +1968,7 @@ def _grant(c, target, tok, ro):
             # The controller's key where that is what this node pinned (any
             # certificate over it passes), else the certificate itself.
             seen = key_pin_of(der) if pin.startswith(KEY_PIN) else "sha256:" + hashlib.sha256(der).hexdigest()
-            if pin and seen != pin:
+            if seen != pin:
                 conn.close()
                 raise Refused("bb-session: the controller's " + ("key" if pin.startswith(KEY_PIN) else "certificate")
                               + " is not the one this node pinned")
