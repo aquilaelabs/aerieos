@@ -19,7 +19,7 @@ VERBS = os.path.join(REPO, "scripts", "lib", "roadmap-verbs.py")
 ROADMAP = os.path.join(REPO, "scripts", "dashboard", "roadmap.py")
 ITEM = {"id": 7, "text": "a plan with a long story", "info": "THE DECISIONS " * 40, "by": "claude",
         "steps": [{"text": "the first, done", "done": True, "info": "how it went " * 20},
-                  {"text": "the second, still to do"}]}
+                  {"text": "the second, still to do", "target": "0.8.0"}]}
 
 
 class Listing(unittest.TestCase):
@@ -38,6 +38,12 @@ class Listing(unittest.TestCase):
         self.assertNotIn("THE DECISIONS", out)
         self.assertNotIn("the first, done", out)
         self.assertIn("aerie roadmap show N", out)
+
+    def test_listed_for_a_release_the_steps_that_carry_it_are_named(self):
+        out = self.run_verbs("--target", "0.8.0")
+        self.assertIn("R7  a plan with a long story", out)
+        self.assertIn("2. the second, still to do  [for 0.8.0]", out)
+        self.assertNotIn("the first, done", out)
 
     def test_full_prints_each_whole(self):
         out = self.run_verbs("--full")

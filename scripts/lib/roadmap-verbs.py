@@ -144,6 +144,12 @@ def show(target=None, full=False):
               + ("  [shelved]" if r.get("shelved") else "")
               + ("" if full or not steps else f"  ({left} of {len(steps)} steps open)"))
         if not full:
+            # Listed for a release, the steps that carry that release of
+            # their own (R108) are named under it: they are why it is here.
+            for i, st in enumerate(steps):
+                if want and str(st.get("target") or "").lstrip("vV") == want:
+                    print(f"          {i + 1}. {st['text']}  [for {st['target']}]"
+                          + ("  (done)" if st.get("done") else "  (sent)" if st.get("sent") else ""))
             continue
         if r.get("info"):
             print("       details: " + r["info"].replace("\n", "\n                "))
