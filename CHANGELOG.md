@@ -18,6 +18,8 @@
 - A node takes an OS update named by any pre-release tag, -rc.1 included, where only -dev builds were taken (3cac664)
 - Dismiss on the bell and on Home's Attention card moves once: the row folds away and the line counting what was put away unrolls in after it, where the line popped in a moment later and the panel jumped (b49eac6, f0ab019)
 - Pressing a chip in the Library no longer leaves a "Show more" with the last list's count inside the first card, and on a phone a row's version and other pills wrap beside its button rather than being cut off (d35603b)
+- A node that takes only signed builds, behind a controller whose build is unsigned, says it refuses that build and why, with Update agent dead on its row, where it was told to press Update agent, which could only fail (93ca44e)
+- A VM made on a node from an ISO uploaded on the VMs page gets its installer, where the node's fetch of the upload was answered with a server error (adca9f1)
 
 ### Security
 
