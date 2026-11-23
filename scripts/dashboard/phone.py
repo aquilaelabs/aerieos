@@ -951,8 +951,25 @@ def _queue(kind, why, argv, nid, node_name, project, by, to, to_name, asker="",
         # and the row already names the container it would rebuild.
         r.update(extra or {})
         _reqs.append(r)
-        del _reqs[:-MAX_REQS]
+        _trim()
     return {"ok": True, "id": r["id"], "to": to_name, "node": node_name or nid}
+
+
+# Asks still waiting on a person or still running, kept up to this many: a
+# bound for a runaway, far past what any bell holds.
+MAX_LIVE = 200
+
+
+def _trim():
+    """The list cut, under _lock: every ask still waiting or running (B997:
+    the newest twenty were kept whatever their state, and every phone use
+    is an ask, auto-allowed ones too, so twenty of them dropped another
+    session's root ask from the bell, and its verb ended 'no such
+    request'), and the newest MAX_REQS of those that are over."""
+    live = [r for r in _reqs if r["state"] in ("pending", "running")][-MAX_LIVE:]
+    over = [r for r in _reqs if r["state"] not in ("pending", "running")]
+    keep = {id(r) for r in live} | {id(r) for r in over[-MAX_REQS:]}
+    _reqs[:] = [r for r in _reqs if id(r) in keep]
 
 
 def _reason(why):
