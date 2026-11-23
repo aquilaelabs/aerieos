@@ -20,6 +20,15 @@
 - Pressing a chip in the Library no longer leaves a "Show more" with the last list's count inside the first card, and on a phone a row's version and other pills wrap beside its button rather than being cut off (d35603b)
 - A node that takes only signed builds, behind a controller whose build is unsigned, says it refuses that build and why, with Update agent dead on its row, where it was told to press Update agent, which could only fail (93ca44e)
 - A VM made on a node from an ISO uploaded on the VMs page gets its installer, where the node's fetch of the upload was answered with a server error (adca9f1)
+- A node with no Android SDK shows each installed toolchain's version in the Library, where Swift read as a cut-off line of its own output, Go as its whole banner and Rust as present (3a374aa)
+- A roadmap, bug tracker or other state file that cannot be read while AerieOS runs is copied aside before the next change is saved over it, where everything it held was lost (7d74c51)
+- An ask waiting on the bell (root, a rebuild, a push) stays there however many phone commands other sessions run meanwhile, where twenty of them dropped it and its session was told there was no such request (41c47b6)
+- An item being reworded, dropped or given a step on the Roadmap keeps its box and what was typed when a session starts or ends on the space, a chip is pressed or the list pages on, where each closed it (b5fd25e)
+- A space's Running sessions names a Codex, Copilot or other agent's session by its agent, where it called it a shell and End asked about ending a shell (3e8e115)
+- A page whose read never answers gives up after a minute and a half and reads again, where one stalled read stopped the page from updating until it was reloaded (4eb820c)
+- Text typed into any form or dialog holds a controller update's reload, and the browser asks before the page is closed, where only a space's notebook, its settings and messages were held and anything else was lost (4eb820c)
+- The Nodes, nginx, Storage, Library and Installed pages say a failed read with Try again beside it, where the page stayed one red line until something on it changed (4eb820c)
+- The audit keeps a session waiting on an ask to one row for the ask and one for the answer, where its wait wrote a row every second and pushed older history out (91d9786)
 
 ### Security
 
