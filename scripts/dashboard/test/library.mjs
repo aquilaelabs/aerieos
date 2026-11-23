@@ -589,6 +589,35 @@ await section("a narrowing's placeholder has no foot", async () => {
   await toLibrary();
 });
 
+// A row still installing is read again three seconds on, once at a time,
+// while the Library is on show, and not once it is left (B1096): left during
+// a long install it read every three seconds until the install ended.
+await section("a row still installing is followed only while the Library is on show", async () => {
+  await toLibrary();
+  await page.route('**/api/library?*', async r => {
+    const res = await r.fetch(), j = await res.json().catch(() => null);
+    // The first card it holds, in a list's rows or the front page's shelves.
+    const first = j?.rows?.length ? j.rows : j?.shelves?.find(sh => sh.rows?.length)?.rows || j?.here;
+    if (first?.[0]) first[0] = { ...first[0], running: true };
+    await r.fulfill({ response: res, json: j ?? {} });
+  });
+  let reads = 0;
+  const count = req => { if (/\/api\/library\?/.test(req.url())) reads++; };
+  page.on('request', count);
+  await page.evaluate(() => loadLibrary());
+  await page.waitForFunction(() => !!libFollow, null, { timeout: 10000 });
+  await sleep(3600);
+  const onShow = reads;
+  await page.evaluate(() => openHome());
+  reads = 0;
+  await sleep(7000);
+  const away = reads;
+  page.off('request', count);
+  await page.unroute('**/api/library?*');
+  ok(onShow >= 2 && away <= 1, `followed while on show, and at most the one already armed once left (${onShow} on show, ${away} away)`);
+  await toLibrary();
+});
+
 // ---- no node ---------------------------------------------------------------
 // A read of the nodes in flight (the poll's) lands after the list is
 // emptied and fills it again, so it is emptied again until the page says

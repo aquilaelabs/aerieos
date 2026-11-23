@@ -149,8 +149,12 @@ function loadLibrary(){
     if (!lib.error) toolchainsSeen(lib);
     // One follow-up while a job writes a row, not a poll: the toolchains
     // revision moves when the job ends, and the row's "installing" until then.
+    // ...and only while the Library or an entry's page is on show (B1096):
+    // left during a long install it read every three seconds until the
+    // install ended. Shown again, its open reads it.
     clearTimeout(libFollow); libFollow = null;
-    if (libKnown().some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
+    if (libKnown().some(r => r.running || r.queued))
+      libFollow = setTimeout(() => { libFollow = null; if (shown("library") || shown("entry")) loadLibrary(); }, 3000);
   }, {join: 500, about: libQuery()});
 }
 
