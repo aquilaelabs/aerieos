@@ -108,7 +108,7 @@ function openLibraryOn(id, agent = ""){
 function libPick(){
   // ...and where this browser kept none, the one a node's toolchains were
   // last read for (tcPick's key).
-  const live = liveAgents(), want = keptNode("library", {have: live, also: "bb.tcnode"});
+  const live = liveAgents(), want = keptNode("library", {have: live});
   libNode = want;
   if (want && want !== tcNode){ tcNode = want; toolchains = null; tcDriverPick = ""; }
   return live.find(n => n.id === want) || null;

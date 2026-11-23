@@ -32,7 +32,9 @@
     // #/group/tool, a group alone naming its first tool (RAIL's order).
     // The spaces' group is projects to the code: #/spaces is its address.
     const [g0, t] = location.hash.replace(/^#\/?/, "").split("/"), g = g0 === "spaces" ? "projects" : g0;
-    const FIRST = {home: "home", machines: "settings", jobs: "jobs", people: "users", containers: "docker"};
+    // Held to the rail's order by hand (page-shell.js PAGE_KINDS): this runs
+    // before that exists. The Machines group opens on Nodes (B1031).
+    const FIRST = {home: "home", machines: "nodes", jobs: "jobs", people: "users", containers: "docker"};
     // Containers reads a node's list, the node this browser last listed
     // (tab-docker.js keeps it): known here, so its read starts with the
     // status read instead of after it, which on a busy controller took

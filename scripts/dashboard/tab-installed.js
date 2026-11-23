@@ -290,7 +290,6 @@ function renderInstalledInto(i){
     if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
   }
-  const pnodes = (nodesList || []).filter(x => x.kind === "agent" && x.state !== "retired").map(x => ({id: x.id, name: x.name, live: x.live}));
   if (inst.nonode){
     d.setBar("");
     drawHTML(d.list, noNodeYet("toolchains and coding agents install on a node", "instnone"));

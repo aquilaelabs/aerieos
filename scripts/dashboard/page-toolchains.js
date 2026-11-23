@@ -76,9 +76,6 @@ function tcPick(){
   const live = liveAgents();
   if (tcNode === "local") return tcNode;
   let want = tcNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem("bb.tcnode") || ""; }catch(e){ want = ""; }
-  }
   if (!live.some(n => n.id === want)) want = live[0]?.id || "";
   tcNode = want;
   return tcNode;

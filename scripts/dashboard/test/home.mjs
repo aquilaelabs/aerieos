@@ -385,5 +385,21 @@ await section("the controller away for a restart", async () => {
   ok(said.every(t => /api\/status|^refresh:/.test(t)), `...with nothing in the console but the refused reads (${said.length}: ${said.filter(t => !/api\/status|^refresh:/.test(t)).join(' | ')})`);
 });
 
+// A group's bare address reads what its first page draws beside the status
+// read, as #/group/tool does (B1031: #/machines named Settings, which is the
+// Controller group's, and read nothing until the status had landed).
+await section("a group's bare address starts its first page's read with the status read", async () => {
+  const p2 = await newPage(browser, { viewport: { width: 1280, height: 900 } });
+  let statusHeld = true;
+  const asked = [];
+  p2.on('request', r => { if (statusHeld) asked.push(new globalThis.URL(r.url()).pathname); });
+  await p2.route('**/api/status*', async r => { await new Promise(res => setTimeout(res, 2500)); statusHeld = false; r.continue().catch(() => {}); });
+  await p2.goto(URL.replace(/#.*$/, '') + '#/machines');
+  await new Promise(res => setTimeout(res, 1500));
+  ok(asked.includes('/api/v1/nodes'), `#/machines asks for the nodes while the status read is out (${[...new Set(asked.filter(a => a.startsWith('/api/')))].join(', ')})`);
+  await p2.unroute('**/api/status*');
+  await p2.close();
+});
+
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);
