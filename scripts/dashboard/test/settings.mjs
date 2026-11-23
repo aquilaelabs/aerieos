@@ -692,15 +692,16 @@ await section("a project's daily snapshots", async () => {
       await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
         && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+      // Each count's label over it, naming what it counts (the forms rule,
+      // R273: the unit was a word beside the box, the label beside it too).
       apart.push(...(await page.$$eval('#rnCaptureDays, #rnSnapDays, #rnDevKeep', is => is.map(i => {
-        const a = i.getBoundingClientRect(), b = i.nextElementSibling.getBoundingClientRect();
-        // On the box's line (the row lines up at the bottom) and after it.
-        return b.top < a.bottom && b.bottom > a.top && b.left >= a.right ? ''
-          : `${i.id} ${[a.left, a.top, a.width, b.left, b.top].map(Math.round).join('/')} in ${i.closest('.modal, .nb')?.className.split(' ')[0]} ${i.checkVisibility()}`;
+        const a = i.getBoundingClientRect(), l = document.querySelector(`label[for="${i.id}"]`), b = l?.getBoundingClientRect();
+        return b && b.bottom <= a.top + 2 && Math.abs(b.left - a.left) <= 2 && /days|builds/i.test(l.textContent) ? ''
+          : `${i.id} ${[a.left, a.top, b?.left, b?.bottom].map(Math.round).join('/')} "${l?.textContent.trim()}" in ${i.closest('.modal, .nb')?.className.split(' ')[0]} ${i.checkVisibility()}`;
       }).filter(Boolean))).map(x => `${width} ${x}`));
     }
     await page.setViewportSize(was);
-    ok(apart.length === 0, `Build and test's numbers each have their unit beside them (${apart.join(', ') || 'all beside'})`);
+    ok(apart.length === 0, `Build and test's counts each have their label over them, naming the unit (${apart.join(', ') || 'all over'})`);
   }
   writeFileSync(`${DIR}/ws/alpha/snapped.txt`, 'as it was\n');
   const took = await post('/api/snapshots', { project: 'alpha', action: 'take' });
