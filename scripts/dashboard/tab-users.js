@@ -285,13 +285,19 @@ function usersAddOpen(){
     document.body.appendChild(m);
     armModal(m);
   }
+  // The account beside the person's name, and the password beside itself
+  // typed again: the forms rule's grid (R273).
   drawHTML(m, `<div class="box"><h3>Add user</h3>
-    <div class="field">${lbl("uNewName", "Account name")}<input id="uNewName" autocomplete="off"></div>
-    <div class="field">${lbl("uNewPw", "Password", "at least 8 characters. They can change it on their Profile")}
-      <input id="uNewPw" type="password" autocomplete="new-password"></div>
-    <div class="field">${lbl("uNewPw2", "The password again")}<input id="uNewPw2" type="password" autocomplete="new-password"></div>
-    <div class="field">${lbl("uNewFull", "Name", "optional: how they are addressed. Their git name and email are set on their Profile, or here once the account exists")}
-      <input id="uNewFull" autocomplete="off"></div>
+    <div class="field"><div class="fgrid">
+      <div class="field">${lbl("uNewName", "Account name")}<input id="uNewName" autocomplete="off"></div>
+      <div class="field">${lbl("uNewFull", "Name", "optional: how they are addressed. Their git name and email are set on their Profile, or here once the account exists")}
+        <input id="uNewFull" autocomplete="off"></div>
+    </div></div>
+    <div class="field"><div class="fgrid">
+      <div class="field">${lbl("uNewPw", "Password", "at least 8 characters. They can change it on their Profile")}
+        <input id="uNewPw" type="password" autocomplete="new-password"></div>
+      <div class="field">${lbl("uNewPw2", "The password again")}<input id="uNewPw2" type="password" autocomplete="new-password"></div>
+    </div></div>
     <div class="field">${lbl("uNewEmail", "Email", "optional")}<input id="uNewEmail" type="email" autocomplete="off"></div>
     <div class="field"><div class="hint">A new account holds no role: give it one beside its account once it is added.</div></div>
     <div class="field" id="uAddWhyF" hidden><div class="hint bad" id="uAddWhy"></div></div>

@@ -2356,6 +2356,15 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .fgrid>.setrow,.fgrid>label.pick{max-width:none;margin:0}
 @media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)}
 }
+/* A dialog's form is on the same grid (R273, the operator 23 Nov): the
+   fields that pair sit side by side at a desk, each a .field of its own in
+   its band's .fgrid, and the grid fills the band at every width. A pair
+   one of whose two is hidden (a mode, an install with no nodes) is one
+   field across the band rather than half of it, and a band with nothing to
+   show is no band: an empty one left its padding as a gap in the form. */
+.modal .fgrid{max-width:none}
+.modal .fgrid.pair:not(:has(>:not([hidden]) ~ :not([hidden])))>*{grid-column:1 / -1}
+.modal .field:has(>.fgrid):not(:has(>.fgrid>:not([hidden]))),.modal .field:empty{display:none}
 /* The older label.pick obeys too: over its field, as every label is. */
 .field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick,[hidden]),.fgrid>label.pick:not([hidden]){display:flex;flex-direction:column;align-items:stretch;gap:var(--label-gap)}
 .field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>.pickw,.fgrid>label.pick>.pickw{font:var(--f-ui);color:var(--dim);min-width:0;flex:none}

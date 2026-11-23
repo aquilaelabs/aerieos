@@ -379,9 +379,11 @@ function rolesNewOpen(){
     armModal(m);
   }
   drawHTML(m, `<div class="box"><h3>New role</h3>
+    <div class="field"><div class="fgrid">
     <div class="field">${lbl("rolesNewName", "Its name")}<input id="rolesNewName" autocomplete="off"></div>
     <div class="field">${lbl("rolesNewScope", "Kind", "On a space: given per space, and holds there. Everywhere: holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
       <select id="rolesNewScope"><option value="projects">On a space</option><option value="global">Everywhere</option></select></div>
+    </div></div>
     ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`);
   // Make it wakes once a name is typed that no role has (the operator, 18
   // Oct).

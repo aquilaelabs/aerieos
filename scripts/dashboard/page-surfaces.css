@@ -748,7 +748,9 @@ body.firstrun #panes{display:none}
    chooser stays hidden (docs/design-language.md, Controls). */
 .filepick{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .filepick button{flex:0 0 auto;min-height:var(--tap)}
-.filepick span{font:var(--f-note);overflow-wrap:anywhere}
+/* ...its words beside its button's middle: a line of controls lines up on
+   its foot, but these are words, which sat 7px low beside it (R273). */
+.filepick span{font:var(--f-note);overflow-wrap:anywhere;align-self:center}
 /* Not the color swatches: a circle, sized by its own rule. */
 .modal .pcpick button,.pcpick button{min-height:0}
 /* The env editor wraps where the command editor does not. The rule above is
@@ -2164,6 +2166,9 @@ body.firstrun #panes{display:none}
 /* The small text areas in the container form: a few lines each, not the
    full-height editor the compose file gets. */
 #cmodal textarea.csmall{min-height:64px}
+/* ...but Ports, which is most often one, is a line's height and grows with
+   what it holds where the browser can (R273). */
+#cmodal textarea.cone{min-height:var(--ctl);field-sizing:content;max-height:10lh}
 /* Which daemon, in the quiet voice the notebook uses for the same job: a
    statement of fact above the list, not a warning about one. */
 .dmsrc{color:var(--dim);font:var(--f-ui);border-bottom:var(--hair) solid var(--line)}

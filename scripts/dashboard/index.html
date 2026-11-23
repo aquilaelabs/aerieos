@@ -1182,6 +1182,10 @@
       <!-- ...folded to a line once the definition is edited by hand. -->
       <div class="notice note" id="cAppLeft" hidden></div>
     </div>
+    <!-- Its name, where it runs and whose it is, side by side at a desk
+         (the forms rule's grid, R273); editing hides the last two, and the
+         name then runs across. -->
+    <div class="field"><div class="fgrid pair">
     <div class="field">
       <label for="cName">Name</label>
       <input id="cName" maxlength="60" autocomplete="off" spellcheck="false"
@@ -1200,6 +1204,7 @@
       <label for="cUnder">Space<span class="help" data-help="the space it belongs to: its sessions can see it and work on it. No space keeps it from every session" tabindex="0">?</span></label>
       <select id="cUnder"></select>
     </div>
+    </div></div>
     <div class="field">
       <label id="cSegLabel">Definition</label>
       <div class="pseg" role="group" aria-labelledby="cSegLabel">
@@ -1217,7 +1222,7 @@
       <input id="cImage" autocomplete="off" spellcheck="false"
              placeholder="lscr.io/linuxserver/radarr:latest" data-ph-short="image">
       <label for="cPorts">Ports<span class="help" data-help="host:container, one per line" tabindex="0">?</span></label>
-      <textarea id="cPorts" class="csmall" spellcheck="false" placeholder="7878:7878"></textarea>
+      <textarea id="cPorts" class="csmall cone" rows="1" spellcheck="false" placeholder="7878:7878"></textarea>
       <label for="cVols">Volumes<span class="help" data-help="host:container, one per line; a relative host path is inside this container's data directory" tabindex="0">?</span></label>
       <textarea id="cVols" class="csmall" spellcheck="false" placeholder="./config:/config&#10;/mnt/user/media:/media"></textarea>
       <label for="cEnvLines">Environment<span class="help" data-help="KEY=VALUE, one per line, written into the compose file" tabindex="0">?</span></label>
@@ -1445,6 +1450,9 @@
 <div id="reportModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="reportTitle">
   <div class="box">
     <h3 id="reportTitle">Report a bug</h3>
+    <!-- Which repository beside what kind of thing, where a space has
+         several (the forms rule's grid, R273); with one, Category runs across. -->
+    <div class="field"><div class="fgrid pair">
     <div class="field" id="reportRepoField" hidden>
       <label for="reportRepo">Repository</label>
       <select id="reportRepo"></select>
@@ -1453,6 +1461,7 @@
       <label for="reportCat">Category</label>
       <select id="reportCat"></select>
     </div>
+    </div></div>
     <div class="field">
       <label for="reportText">What happened</label>
       <textarea id="reportText" maxlength="2000" placeholder="what you did, what you expected, and what happened instead"></textarea>
@@ -1520,6 +1529,9 @@
          name, prefilled from the address. Deriving it and
          nothing else made two checkouts of one repository impossible, which
          is the ordinary case for deploying an app rather than developing it. -->
+    <!-- Name and its starting version side by side at a desk (the forms
+         rule's grid, R273); each keeps its id, which a mode hides it by. -->
+    <div class="field"><div class="fgrid pair">
     <div class="field" id="pNameField">
       <label for="pName">Name</label>
       <input id="pName" maxlength="100" autocomplete="off" spellcheck="false"
@@ -1536,15 +1548,33 @@
              placeholder="0.1.0" inputmode="decimal">
       <div class="hint">Committed as the space's first version. Leave it blank to commit nothing yet.</div>
     </div>
+    </div></div>
     <!-- Where it runs. A project born with no node has no builds, no
          tests and no Claude session until its settings are opened, which
          every new project on the dev pair went through (16 Sep); when
          nodes exist the pick belongs here, defaulting to the one there is. -->
+    <!-- ...and where it runs beside what it may start from (R273). -->
+    <div class="field"><div class="fgrid pair">
     <div class="field" id="pNodeField" hidden>
       <label for="pNode">Node</label>
       <select id="pNode"></select>
       <div class="hint">Builds, tests, CI and Claude sessions run there.</div>
     </div>
+    <!-- A code base somebody already has, for a fresh local repo: unpacked
+         into the new directory before git init. Uploaded on Create rather
+         than on choosing, so a change of mind costs nothing. -->
+    <div class="field" id="pArchiveField">
+      <label for="pArchive">Start from an archive<span class="help" data-help="optional: zip or tar, unpacked into the new repository; a single top-level folder is dropped" tabindex="0">?</span></label>
+      <!-- The browser's own chooser is hidden: its button wears the browser's
+           skin, not the page's. A button of ours opens it, and the name of
+           what was picked stands beside the button. -->
+      <input id="pArchive" type="file" hidden
+             accept=".zip,.tar,.tgz,.tar.gz,.tbz2,.tar.bz2,.txz,.tar.xz,application/zip,application/gzip,application/x-tar">
+      <div class="filepick ctlline"><button type="button" id="pArchivePick">Choose an archive</button>
+        <span class="dim" id="pArchiveName">none picked</span></div>
+      <div class="hint">zip or tar; a single top-level folder is dropped.</div>
+    </div>
+    </div></div>
     <!-- What a session may enter into the notebook (roadmap #27), asked
          here as well as in the settings dialog so the choice is in front of
          whoever makes the project rather than found later. Auto by default;
@@ -1581,20 +1611,6 @@
         <label class="pick">Report AerieOS bugs <select id="pGateReport"
           aria-label="reporting problems with AerieOS itself, from a session"></select></label>
       </div>
-    </div>
-    <!-- A code base somebody already has, for a fresh local repo: unpacked
-         into the new directory before git init. Uploaded on Create rather
-         than on choosing, so a change of mind costs nothing. -->
-    <div class="field" id="pArchiveField">
-      <label for="pArchive">Start from an archive<span class="help" data-help="optional: zip or tar, unpacked into the new repository; a single top-level folder is dropped" tabindex="0">?</span></label>
-      <!-- The browser's own chooser is hidden: its button wears the browser's
-           skin, not the page's. A button of ours opens it, and the name of
-           what was picked stands beside the button. -->
-      <input id="pArchive" type="file" hidden
-             accept=".zip,.tar,.tgz,.tar.gz,.tbz2,.tar.bz2,.txz,.tar.xz,application/zip,application/gzip,application/x-tar">
-      <div class="filepick ctlline"><button type="button" id="pArchivePick">Choose an archive</button>
-        <span class="dim" id="pArchiveName">none picked</span></div>
-      <div class="hint">zip or tar; a single top-level folder is dropped.</div>
     </div>
     <div class="field" id="pUrlField" hidden>
       <label for="pUrl">Repository</label>
