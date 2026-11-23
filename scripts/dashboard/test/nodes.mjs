@@ -4157,8 +4157,19 @@ await section("Claude Code on a node", async () => {
   ok(typeof agRow.sessions === 'number' && (agRow.sessions ? ends && +ends[1] === agRow.sessions : !ends && !/ends the Claude/.test(agBell)),
      `...and its warning counts the Claude sessions running there (${agRow.sessions}: ${ends?.[0] || 'none said'})`);
   // Dismiss puts that version away for this account (bellseen.py, R144),
-  // with the drawer left open; Show again brings it back.
+  // with the drawer left open; Show again brings it back. The line counting
+  // what was put away comes with the press, unrolling in as the row folds,
+  // not a moment after the server answers (the operator, 23 Nov: Dismiss
+  // skipped): the answer is held here, so the press is all there is.
+  await page.route('**/api/bell', r => r.request().method() === 'POST'
+    ? setTimeout(() => r.continue().catch(() => {}), 1500) : r.continue());
   await page.click(`#bellPanel .bnote:has([data-bag="${en.id}"]) [data-bdismiss]`);
+  const onPress = await page.waitForFunction(() => {
+    const b = document.querySelector('#bellPanel .bfootbar');
+    return b && /1 update dismissed/.test(b.textContent) && { moving: b.getAnimations().length > 0 };
+  }, null, { timeout: 1000 }).then(h => h.jsonValue()).catch(() => null);
+  ok(onPress?.moving === true, `...the line counting it is there on the press, unrolling in, before the server answers (${JSON.stringify(onPress)})`);
+  await page.unroute('**/api/bell');
   await page.waitForFunction(id => !(state?.attention || []).some(a => a.kind === 'agents' && a.id === id)
                                    && state.bell_hidden === 1, en.id, { timeout: 15000 });
   await page.waitForSelector('#bellRestore', { timeout: 10000 });
