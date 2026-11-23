@@ -1330,6 +1330,33 @@ def no_upgrade_snapshot(project, comp, tgt):
 CATALOG_FLOOR = "config/catalog-floor"
 catalog_made = None
 
+# A tree that rehearses its releases (R190 step 2) cuts a pre-release only
+# from a commit a rehearsal passed on (step 6): the tag runs what the
+# rehearsal proves first, and a commit nobody rehearsed sent its paths to
+# the tag untried (6049's two deaths, 21 Nov). `rehearsed` is the server's
+# (forgeaccess): (project, sha) -> True, False, or why it cannot be told.
+REHEARSAL = ".github/workflows/release-rehearsal.yml"
+rehearsed = None
+
+
+def unrehearsed(project, comp, sha, section):
+    """Why a pre-release may not be tagged on `sha` for want of a passed
+    rehearsal of it, or "": nothing is said of a tree with no rehearsal."""
+    if comp or rehearsed is None or not (root(project) / REHEARSAL).is_file():
+        return ""
+    if section:
+        return ("the changelog has lines no section holds yet, so the release would tag a commit no rehearsal "
+                "ran on: aerie version rehearse writes the section, pushes it and rehearses that commit; "
+                "release once it is green")
+    full = _git(project, "rev-parse", "HEAD") or ""
+    got = rehearsed(project, full)
+    if got is True:
+        return ""
+    if got is False:
+        return (f"no release rehearsal has passed on {sha}, and a tag runs only what one has proven: "
+                "aerie version rehearse, then release once its run is green (aerie forge run list shows it)")
+    return f"whether {sha} was rehearsed could not be read ({got}): release again once that is answered"
+
 
 def floor_behind(project, comp=""):
     """Why this tree's catalog floor is older than the catalog's signed
@@ -1546,6 +1573,8 @@ def _release_in_tree(project, comp, env, may_push, push, label):
         return {"error": why}
     why, owed = _gaps_check(project, comp)
     if why:
+        return {"error": why}
+    if label and (why := unrehearsed(project, comp, sha, section)):
         return {"error": why}
     wrote = ""
     if section:

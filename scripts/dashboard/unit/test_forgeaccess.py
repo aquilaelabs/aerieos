@@ -290,6 +290,27 @@ class IssueList(Base):
         self.assertEqual(len(asked), 2)
 
 
+class Rehearsed(Base):
+    """Whether a rehearsal passed on a commit (R190 step 6): the workflow's
+    runs on that commit, asked of the host with the space's token."""
+    def test_a_passed_run_on_the_commit_is_a_yes(self):
+        sha = "a" * 40
+        h = self.host({("GET", "/repos/o/app/actions/workflows/release-rehearsal.yml/runs?head_sha="):
+                       (200, {"workflow_runs": [{"conclusion": "failure"}, {"conclusion": "success"}]}, {})})
+        self.assertIs(forgeaccess.rehearsed("app", sha), True)
+        self.assertIn(f"head_sha={sha}", h.asked[0][1])
+
+    def test_only_red_or_none_is_a_no(self):
+        self.host({("GET", "/repos/o/app/actions/workflows/"): (200, {"workflow_runs": [{"conclusion": "failure"}]}, {})})
+        self.assertIs(forgeaccess.rehearsed("app", "b" * 40), False)
+        self.host({("GET", "/repos/o/app/actions/workflows/"): (200, {"workflow_runs": []}, {})})
+        self.assertIs(forgeaccess.rehearsed("app", "b" * 40), False)
+
+    def test_an_answer_it_cannot_read_is_said(self):
+        self.host({}, default=(502, {}, {}))
+        self.assertEqual(forgeaccess.rehearsed("app", "c" * 40), "the host answered 502 to the rehearsal's runs")
+
+
 class RunLog(Base):
     def test_a_failure_past_the_first_page_is_the_log_shown(self):
         # B563: fifty jobs were asked for, and with no failure among them the

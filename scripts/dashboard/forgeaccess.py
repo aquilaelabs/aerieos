@@ -983,6 +983,24 @@ def dispatch(project, workflow, ref, inputs=None):
         return {"error": str(e)}, 400
 
 
+def rehearsed(project, sha, workflow="release-rehearsal.yml"):
+    """Whether a run of `workflow` passed on the commit `sha` (R190 step 6):
+    True, False, or a sentence why it cannot be told. The controller's own
+    question, asked with the space's token as dispatch() is, never under
+    the space's override. GitHub alone lists a workflow's runs by commit;
+    another host says so."""
+    t = target_of(project)
+    if t.get("error"):
+        return t["error"]
+    if t["forge"]["kind"] != "github":
+        return f"{t['forge']['kind']} does not list a workflow's runs by the commit they ran on"
+    q = "head_sha=" + urllib.parse.quote(sha, safe="") + "&per_page=20"
+    c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/actions/workflows/{urllib.parse.quote(workflow, safe='')}/runs?{q}")
+    if not 200 <= c < 300:
+        return f"the host answered {c} to the rehearsal's runs"
+    return any(r.get("conclusion") == "success" for r in (b or {}).get("workflow_runs") or [])
+
+
 def run(project, verb, args):
     """One aerie forge verb for this project: (payload, status)."""
     if verb == "whoami":

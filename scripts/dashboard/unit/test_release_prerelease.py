@@ -294,5 +294,34 @@ class Rehearsed(unittest.TestCase):
         self.assertIn("no Fixed line", r.get("error", ""))
         self.assertIn("## Unreleased", (self.app / "CHANGELOG.md").read_text())
 
+    def test_a_tree_that_rehearses_tags_only_a_commit_a_rehearsal_passed_on(self):
+        # R190 step 6: the release asks the forge whether a run of the
+        # rehearsal passed on the very commit it would tag.
+        (self.app / ".github" / "workflows").mkdir(parents=True)
+        self.commit_file(".github/workflows/release-rehearsal.yml", "name: release rehearsal\n", "the rehearsal")
+        self.log("A new thing", "Added")
+        asked = []
+        with mock.patch.object(version, "rehearsed", lambda project, sha: asked.append(sha) or False):
+            # Lines no section holds: the release would tag a commit of its own, which nobody rehearsed.
+            r = self.release(dev=True)
+            self.assertIn("no section holds yet", r.get("error", ""), r)
+            self.assertEqual(asked, [])
+            version.rehearsal_section("app", env=GIT_ENV)
+            here = self.git("rev-parse", "HEAD")
+            r = self.release(dev=True)
+            self.assertIn(f"no release rehearsal has passed on {here[:7]}", r.get("error", ""), r)
+            self.assertEqual(asked, [here])
+        with mock.patch.object(version, "rehearsed", lambda project, sha: "the host answered 502 to the rehearsal's runs"):
+            self.assertIn("could not be read (the host answered 502", self.release(dev=True).get("error", ""))
+        with mock.patch.object(version, "rehearsed", lambda project, sha: True):
+            r = self.release(dev=True)
+        self.assertTrue(r.get("ok") and r.get("sha") == here[:7], r)
+
+    def test_a_tree_with_no_rehearsal_is_not_asked(self):
+        self.log("A new thing", "Added")
+        with mock.patch.object(version, "rehearsed", lambda project, sha: self.fail("asked")):
+            self.assertTrue(self.release(dev=True).get("ok"))
+
+
 if __name__ == "__main__":
     unittest.main()

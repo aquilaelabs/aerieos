@@ -163,7 +163,8 @@ if argv and argv[0] == "release":
               "    before the tag. A stable release gathers every pre-release section since the last stable\n"
               "    one into its own, leaving out fixes to what only they had. Either is refused while a bug\n"
               "    fixed since the last release, which that release carried, has no Fixed line (aerie\n"
-              "    changelog missing). From any branch but the one builds ship from, a release is a dev\n"
+              "    changelog missing), and a pre-release in a tree with a release rehearsal on a commit no\n"
+              "    rehearsal passed on (aerie version rehearse). From any branch but the one builds ship from, a release is a dev\n"
               "    one unless --stable says otherwise; the first line printed names the channel.\n"
               'aerie version [--for DIR] release --edit --why "..." [--tag TAG] [--notes FILE] [--attach FILE]...\n'
               "    change the published release: its notes replaced whole (- reads stdin), a file from\n"

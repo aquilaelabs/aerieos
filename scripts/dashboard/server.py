@@ -5407,6 +5407,7 @@ version.release_gate = lambda p: prefs.get(p).get("release_gate", "refuse")
 # the catalog answers: a release carrying an older config/catalog-floor is
 # refused until the floor moves to it.
 version.catalog_made = lambda: str((catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("generated") or "")
+version.rehearsed = lambda project, sha: forgeaccess.rehearsed(project, sha)   # imported below
 # Release's forge half (R123; Gitea and GitLab, R124): the release beside a pushed tag.
 import forgerelease                                              # noqa: E402
 # What each of a release's files is for, over its notes (R255).

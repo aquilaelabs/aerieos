@@ -97,7 +97,9 @@ aerie version release --why "..." [--without-apk] [--dev|--stable]
                    committed and pushed, and is tagged on that commit; a stable
                    one gathers every pre-release section since the last stable
                    into its own. Refused while aerie changelog missing lists a
-                   bug the last release carried with no Fixed line.
+                   bug the last release carried with no Fixed line, and, in a
+                   tree with a release rehearsal, a pre-release on a commit
+                   no rehearsal passed on (aerie version rehearse first).
                    From a branch other than the one builds ship from it is a
                    dev release unless --stable says otherwise; the first line
                    printed names the channel it lands on
