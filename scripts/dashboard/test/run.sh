@@ -313,6 +313,10 @@ PY
 }
 free_port() { free_ports 1; }
 PORT="${DASHBOARD_TEST_PORT:-$(free_port)}"
+# A port a person pinned is theirs; one the run picked for a worker, or here,
+# may be picked again if it is taken before the server binds it (B1114).
+PORT_PINNED=""
+[ -n "${DASHBOARD_TEST_PORT:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && PORT_PINNED=1
 [ -n "$PORT" ] || die "could not find a free port for the test server"
 # Refuse a port we do not own, before doing anything else. An interrupted run
 # (SIGKILL, or the session that launched it dying) leaves a server holding this
@@ -1775,7 +1779,22 @@ rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
 pid="$(cat "$PIDF")"
 for _ in $(seq 40); do
     curl -fs -u test:test -o /dev/null "http://127.0.0.1:$PORT/api/status" && break
-    kill -0 "$pid" 2>/dev/null || { cat "$S/server.log"; die "server exited"; }
+    if ! kill -0 "$pid" 2>/dev/null; then
+        # A port the run picked is bound and let go (free_ports), and the
+        # worker's set-up then takes seconds, in which anything binding port 0
+        # can be handed the same number: the server dies on EADDRINUSE and the
+        # worker ended with its suites unrun, the whole run red (B1114). Such a
+        # port is picked again, twice at most; a pinned one is not.
+        if [ -z "$PORT_PINNED" ] && [ "${PORT_TRIES:-0}" -lt 2 ] && grep -q "Address already in use" "$S/server.log"; then
+            PORT_TRIES=$(( ${PORT_TRIES:-0} + 1 ))
+            mv "$S/server.log" "$S/server-port-$PORT.log"
+            PORT="$(free_port)"
+            log "the server's port was taken before it bound it: on $PORT instead"
+            start_server
+            return
+        fi
+        cat "$S/server.log"; die "server exited"
+    fi
     sleep 0.25
 done
 }
