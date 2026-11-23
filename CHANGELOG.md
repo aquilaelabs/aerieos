@@ -7,6 +7,7 @@
 - The warning color on every dark theme is a warmer gold (e5105b3)
 - A dialog's title is a band in the same voice as the pages' sections, no longer small capitals, and the page behind a dialog is softened in the theme's own color rather than blacked out (151147d)
 - Dialogs lay out their fields on the same grid as the pages: a new space's name beside its version, a container's name beside its space, an account beside its person's name, each label over its field (d5f6edb, c02819b)
+- aerie version release refuses a pre-release on a commit no release rehearsal passed on, in a repository that has one, and says to rehearse it first (f9d77fc)
 
 ### Fixed
 
