@@ -4581,7 +4581,9 @@ def node_console(principal, node_id, password, clear=False):
         if r.returncode != 0 or not re.fullmatch(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}", h):
             return {"error": "the password could not be hashed here (openssl passwd -6)"}
         cfg["hash"] = h
-    why = _reachable(n, lock=False)
+    # Under the lock as every system change is (B1022): a node locked to its
+    # own console has its console's password set there; Unlock is on its page.
+    why = _reachable(n)
     if why:
         return {"error": why}
     return _queue_system(principal, n, "console", cfg, 60, "console-password", {"cleared": bool(clear)})
