@@ -1074,6 +1074,12 @@ body.firstrun #panes{display:none}
 .installedtab .irow:not(.open) .iabout{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .installedtab .irow .imore{font:var(--f-note);min-height:0;padding:0 2px;margin-left:4px;background:none;--sheen:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;vertical-align:middle}
 .installedtab .irow .imore:hover{color:var(--ink)}
+/* Each the only way to its page, and words in a line (B1006): on a touch
+   screen the press is a thumb's size around them, the line as it is. */
+@media(pointer:coarse){
+  .librarytab .lcard .lmore,.installedtab .irow .imore{position:relative}
+  .librarytab .lcard .lmore::after,.installedtab .irow .imore::after{content:"";position:absolute;inset:-14px -10px}
+}
 .installedtab .irow .acts{flex-wrap:wrap;justify-content:flex-end}
 .installedtab .irow .acts>.state{font:var(--f-note);color:var(--dim)}
 .installedtab .irow .acts>.state.ok{color:var(--pass)}
