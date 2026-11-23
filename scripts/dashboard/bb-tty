@@ -1481,7 +1481,7 @@ start_tmux_server() {
     # cleanly still goes, and so does its tab.
     tmux set-option -g remain-on-exit failed 2>/dev/null || true
     tmux set-option -g remain-on-exit-format \
-        "AerieOS: this ended before it started (exit #{pane_dead_status}). Close the tab, or open it again to start afresh." \
+        "AerieOS: this ended (exit #{pane_dead_status}), what it said above it. Close the tab, or open it again to start afresh." \
         2>/dev/null || true
     # AerieOS's tmux settings, which the controller's server reads from
     # the copy its start writes (tmux_settings).

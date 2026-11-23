@@ -6406,7 +6406,11 @@ def _session_rows(rows):
             # When it started, so a toolchain installed since can say it is
             # not on its PATH.
             "created": _mb(row.get("created")) or 0,
-            "title": str(row.get("title") or "")[:200]})
+            "title": str(row.get("title") or "")[:200],
+            # A pane whose program ended, kept with its last words (B1120):
+            # the session is over, whatever the tmux session still holds.
+            **({"dead": True, "exit": row["exit"] if isinstance(row.get("exit"), int) and -256 < row["exit"] < 256 else None}
+               if row.get("dead") is True else {})})
     return out
 
 
@@ -7390,7 +7394,10 @@ def node_sessions():
         rows = (n.get("reported") or {}).get("sessions")
         if isinstance(rows, list):
             now = time.time()
-            out[n["id"]] = (n["name"], [r for r in rows if not still_ending(n["id"], r, now)])
+            # A session whose program has ended is not running, though its
+            # pane is kept for what it said (B1120): it read as running until
+            # somebody pressed Restart, and its start is a fresh one.
+            out[n["id"]] = (n["name"], [r for r in rows if not still_ending(n["id"], r, now) and not r.get("dead")])
     return out
 
 

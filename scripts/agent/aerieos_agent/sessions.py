@@ -637,16 +637,25 @@ class SessionsMixin:
         # When each session started, too: a toolchain installed after that
         # is not on its PATH until it is reopened, and the Installed page says
         # so on the row. Before the title, which is free text and goes last.
+        # ...and whether its program has ended: a pane whose agent fails stays
+        # with its last words (remain-on-exit), so its session lived on and
+        # read as running until somebody pressed Restart (B1120). Said with
+        # the exit status, before the title.
         out = self._tmux(["list-panes", "-a", "-F",
                           "#{session_name}\t#{pane_active}\t#{session_attached}\t"
-                          "#{pane_current_path}\t#{session_created}\t#{pane_title}"])
+                          "#{pane_current_path}\t#{session_created}\t#{pane_dead}\t#{pane_dead_status}\t#{pane_title}"])
         rows = []
         for line in (out or "").splitlines():
-            parts = line.split("\t", 5)
-            if len(parts) == 6 and parts[1] == "1":
-                rows.append({"name": parts[0], "attached": parts[2].strip() not in ("", "0"),
-                             "cwd": parts[3], "created": int(parts[4]) if parts[4].isdigit() else 0,
-                             "title": parts[5]})
+            parts = line.split("\t", 7)
+            if len(parts) == 8 and parts[1] == "1":
+                row = {"name": parts[0], "attached": parts[2].strip() not in ("", "0"),
+                       "cwd": parts[3], "created": int(parts[4]) if parts[4].isdigit() else 0,
+                       "title": parts[7]}
+                if parts[5] == "1":
+                    row["dead"] = True
+                    if parts[6].lstrip("-").isdigit():
+                        row["exit"] = int(parts[6])
+                rows.append(row)
         return rows[:64]
 
     # What each account on this machine is signed in to Claude as, refreshed
