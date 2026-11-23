@@ -6654,9 +6654,11 @@ def _snapshot(who):
 #   seconds, and a session's hooks keeping their own books on every edit,
 #   prompt and turn. They were most of the audit's rows, 5,760 a day for one
 #   open notebook, and pushed real history out of the 200,000 kept. True for
-#   the whole route, or the hook kinds by name; a hook's asked and started
-#   are kept, since each says something to people. Asked of the request's
-#   path, whole.
+#   the whole route, or the hook kinds or actions by name; a hook's asked and
+#   started are kept, since each says something to people, and so is an
+#   ask's asking and answering, where the outcome a waiting session reads
+#   every second is not (B998: an hour of waiting was 3,600 rows). Asked of
+#   the request's path, whole.
 Route = collections.namedtuple(
     "Route", "method how path handler gate session instead streamed max_body own_write needs_repo quiet",
     defaults=(None, False, "", False, None, False, False, False))
@@ -6902,7 +6904,7 @@ ROUTES = (
     Route("POST", "exact", "/api/v1/files", "_files",
           ("person", "a session has its space's tree already: this is a person's editor's"), max_body=28 * 1024 * 1024),
     Route("POST", "prefix", "/api/phone", "_phone", "handler", session=("ask", "outcome", "use"),
-          instead="a session asks; a person answers"),
+          instead="a session asks; a person answers", quiet=("outcome",)),
     Route("POST", "prefix", "/api/findings", "_findings_log", "handler", needs_repo=True),
     Route("POST", "prefix", "/api/tests", "_tests", "handler", session=True, needs_repo=True),
     Route("POST", "prefix", "/api/presence", "_presence", "handler", quiet=True),
@@ -14698,7 +14700,7 @@ def _quiet_post(path, req):
     if path not in QUIET_POSTS:
         return False
     kinds = QUIET_POSTS[path]
-    return kinds is None or (isinstance(req, dict) and req.get("kind") in kinds)
+    return kinds is None or (isinstance(req, dict) and (req.get("kind") in kinds or req.get("action") in kinds))
 
 
 class Server(tls.WrapOnItsThread, ThreadingHTTPServer):

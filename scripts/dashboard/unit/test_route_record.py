@@ -101,5 +101,27 @@ class Record(unittest.TestCase):
         self.assertEqual(sorted(NOW["STREAMED_POSTS"]), sorted(r.path for r in ROUTES if r.how == "door"))
 
 
+class Quiet(unittest.TestCase):
+    """What is left out of the audit: a route whole, or its hook kinds or
+    actions by name (R228 step 7, B998)."""
+
+    def quiet_post(self):
+        ns = {"QUIET_POSTS": NOW["QUIET_POSTS"]}
+        fn = next(n for n in ast.parse(SERVER).body if isinstance(n, ast.FunctionDef) and n.name == "_quiet_post")
+        exec(compile(ast.Module([fn], []), "server.py", "exec"), ns)  # noqa: S102 (the repository's own source)  # nosemgrep: python.lang.security.audit.exec-detected.exec-detected
+        return ns["_quiet_post"]
+
+    def test_a_waiting_session_s_reads_of_its_ask_are_left_out_and_the_ask_is_kept(self):
+        # A session waiting on an ask reads its outcome every second for up
+        # to fifteen minutes: an hour of it was 3,600 rows of the 200,000.
+        quiet = self.quiet_post()
+        self.assertTrue(quiet("/api/phone", {"action": "outcome", "id": 3}))
+        for kept in ("ask", "use", "answer", ""):
+            self.assertFalse(quiet("/api/phone", {"action": kept}), kept)
+        self.assertTrue(quiet("/api/v1/hook", {"kind": "turn"}))
+        self.assertFalse(quiet("/api/v1/hook", {"kind": "asked"}))
+        self.assertTrue(quiet("/api/presence", {}))
+
+
 if __name__ == "__main__":
     sys.exit(unittest.main())
