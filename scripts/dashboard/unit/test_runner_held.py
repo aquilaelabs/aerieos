@@ -124,8 +124,9 @@ class TheJob(unittest.TestCase):
         for pins in (None, {}, {"gitea": self.PINS["gitea"]}):
             r, sent = self.ask("github.com-acme", pins=pins)
             self.assertEqual(sent, [])
-            self.assertIn("names no pin for that runner's download", r["error"])
-            self.assertIn("it is not fetched", r["error"])
+            self.assertIn("pins no download for that git host's runner", r["error"])
+            self.assertNotIn("scripts/", r["error"], "no source path in a row a person reads")
+            self.assertIn("none is fetched", r["error"])
 
     def test_a_removal_needs_no_pin_and_carries_none(self):
         r, sent = self.ask("github.com-acme", want=False, pins=None, token=False)

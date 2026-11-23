@@ -3315,8 +3315,8 @@ def node_runner(principal, node_id, slot, want, labels=None, token=False, pins=N
                          "registers with (http is accepted for a forge on your own network)"}
     pin = (pins or {}).get(forge) if want else None
     if want and not pin:
-        return {"error": "this build names no pin for that runner's download, so there is nothing to hold "
-                         "the file to and it is not fetched: scripts/dashboard/runner-pins.json is where one is kept"}
+        # What a person reads, with no source path in it (B1100).
+        return {"error": "this build of AerieOS pins no download for that git host's runner, so none is fetched"}
     # The runner's own labels unless new ones are typed with this press.
     labs = runner_labels_for(n, labels if isinstance(labels, list) else ar.get("labels")) if want else []
     services = dict(n.get("services") or {})
