@@ -604,8 +604,14 @@ await section("a row still installing is followed only while the Library is on s
   let reads = 0;
   const count = req => { if (/\/api\/library\?/.test(req.url())) reads++; };
   page.on('request', count);
-  await page.evaluate(() => loadLibrary());
-  await page.waitForFunction(() => !!libFollow, null, { timeout: 10000 });
+  // A read asked within half a second of one out joins it (reading's join),
+  // and the one out was sent before the route: asked again once none is
+  // out, until one with the route behind it has landed.
+  await page.waitForFunction(() => {
+    if (libFollow) return true;
+    if (!readBusy('library')) loadLibrary();
+    return false;
+  }, null, { timeout: 20000, polling: 700 });
   await sleep(3600);
   const onShow = reads;
   await page.evaluate(() => openHome());
