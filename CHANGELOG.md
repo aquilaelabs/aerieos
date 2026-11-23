@@ -17,6 +17,7 @@
 - An imported catalog mirror is used only where it is newer than the catalog's own index, where after an update it could be used though older (a99a594)
 - A node takes an OS update named by any pre-release tag, -rc.1 included, where only -dev builds were taken (3cac664)
 - Dismiss on the bell and on Home's Attention card moves once: the row folds away and the line counting what was put away unrolls in after it, where the line popped in a moment later and the panel jumped (b49eac6, f0ab019)
+- Pressing a chip in the Library no longer leaves a "Show more" with the last list's count inside the first card, and on a phone a row's version and other pills wrap beside its button rather than being cut off (d35603b)
 
 ### Security
 
