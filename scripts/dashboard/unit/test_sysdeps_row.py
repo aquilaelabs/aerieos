@@ -111,5 +111,19 @@ class Reason(unittest.TestCase):
         self.assertEqual(got, "ERROR: kotlin-lsp: k.zip is not the file its entry pins: nothing is installed · install failed (exit 1)")
 
 
+
+class CheckAndUpdate(unittest.TestCase):
+    """A check and an update leave an installed toolchain installed (B1017):
+    the store's word called each one failed."""
+
+    def test_a_check_is_its_job_s_end(self):
+        self.assertEqual(toolchains.finished("check", ["jdk"], {"jdk"}, {}, "succeeded"), (["jdk"], []))
+        self.assertEqual(toolchains.finished("check", ["jdk"], {"jdk"}, {}, "failed"), ([], ["jdk"]))
+
+    def test_an_update_is_done_where_it_is_in_the_store(self):
+        self.assertEqual(toolchains.finished("update", ["jdk", "go"], {"jdk"}, {}, "failed"), (["jdk"], ["go"]))
+        self.assertEqual(toolchains.finished("install", ["jdk"], {"jdk"}, {}, "succeeded"), (["jdk"], []))
+        self.assertEqual(toolchains.finished("remove", ["jdk"], {"jdk"}, {}, "failed"), ([], ["jdk"]))
+
 if __name__ == "__main__":
     unittest.main()

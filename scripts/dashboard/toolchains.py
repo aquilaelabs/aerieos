@@ -963,7 +963,13 @@ def finished(act, names, here, rep, state):
         if state != "succeeded" and not failed:
             failed = names or ["system packages"]
         return [x for x in names if x not in failed], failed
-    done = [x for x in names if (x in here) == (act == "install")]
+    # A check changes nothing in the store, so the store says nothing of it:
+    # every name it was asked about read as failed, its card red with the
+    # check's own answer as the reason (B1017). Its job's end is its answer.
+    if act == "check":
+        return (list(names), []) if state == "succeeded" else ([], list(names))
+    # An update leaves the toolchain where an install does: in the store.
+    done = [x for x in names if (x in here) == (act in ("install", "update"))]
     return done, [x for x in names if x not in done]
 
 
