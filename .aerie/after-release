@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # AerieOS's own part of what a release owes once it is out (aerie version
 # follow, R190 step 7): the catalog floor (config/catalog-floor) moves to the
 # catalog's newest signed index once that index lists the release, since the
@@ -18,7 +18,7 @@ fi
 made="$(curl -fsS --max-time 30 "$base/index.json" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("generated") or "")')"
 floor="$(grep -v '^#' config/catalog-floor | tail -1)"
 [ -n "$made" ] || { echo "owed: the catalog's index says no moment it was made"; exit 1; }
-if [ "$made" \> "$floor" ]; then
+if [[ "$made" > "$floor" ]]; then
     if [ "$check" = --check ]; then
         echo "owed: the catalog floor ($floor) is older than the catalog's newest signed index ($made)"
         exit 1
