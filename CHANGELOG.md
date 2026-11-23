@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- aerie roadmap lists an item a line with how many of its steps are open, and --full prints each whole, where the bare listing printed every item's details and steps (4c9a739)
+
 ### Fixed
 
 - A second container's rebuild that finds new settings in its repository's .env.example rewrites its own env, where it wrote over the main container's and lost its values (573a04c)
@@ -29,6 +33,8 @@
 - Text typed into any form or dialog holds a controller update's reload, and the browser asks before the page is closed, where only a space's notebook, its settings and messages were held and anything else was lost (4eb820c)
 - The Nodes, nginx, Storage, Library and Installed pages say a failed read with Try again beside it, where the page stayed one red line until something on it changed (4eb820c)
 - The audit keeps a session waiting on an ask to one row for the ask and one for the answer, where its wait wrote a row every second and pushed older history out (91d9786)
+- The Library opens at once when the vetted catalog cannot be reached, where it waited up to 40 seconds every few minutes to ask it again (45436ae)
+- Keys or a message sent to a session on a node that is not answering are dropped after two minutes, where they were typed, Enter included, into whatever session had that name when the node came back (2b9a5be)
 
 ### Security
 
