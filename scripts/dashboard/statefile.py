@@ -40,6 +40,7 @@ import errno
 import fcntl
 import json
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -191,6 +192,35 @@ def set_aside(folder, name):
     except OSError:
         return ""
     return os.path.basename(dst)
+
+
+# ...and the same for a file that goes bad while this runs (B1082): a hand
+# edit with a syntax error, a restore cut short. Its loader reads it as
+# empty, as at start, and the next save writes that over it; a copy is kept
+# first, once for each state of the file, and the log names it. Which files
+# were kept is remembered by what they are on disk, so a loader asked a
+# thousand times keeps one copy.
+_kept_aside = set()
+_kept_lock = threading.Lock()
+
+
+def keep_unreadable(path, why=""):
+    """A file that is there and cannot be read: a copy kept beside it
+    (set_aside), the first time this state of it is met, and said on the
+    log. The copy's name, or "" where none was made now."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return ""
+    sig_ = (str(path), st.st_mtime_ns, st.st_size)
+    with _kept_lock:
+        if sig_ in _kept_aside:
+            return ""
+        _kept_aside.add(sig_)
+    kept = set_aside(os.path.dirname(str(path)), os.path.basename(str(path)))
+    print(f"dashboard: {path} cannot be read{f' ({why})' if why else ''}; what it held reads as empty until it is mended"
+          + (f", and a copy is kept as {kept}" if kept else ""), file=sys.stderr, flush=True)
+    return kept
 
 
 # ---- a state file read once while it stays the same file (R228 step 1) ----
@@ -447,11 +477,16 @@ class Store:
         path = self._path()
         if self._cached:
             d = read_json(path)
+            if d is None and os.path.isfile(path):
+                keep_unreadable(path)
         else:
             try:
                 with open(path) as f:
                     d = json.load(f)
-            except (OSError, ValueError):
+            except OSError:
+                d = None
+            except ValueError as e:
+                keep_unreadable(path, str(e)[:160])
                 d = None
         if not isinstance(d, dict):
             d = {}

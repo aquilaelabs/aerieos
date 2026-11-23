@@ -31,6 +31,7 @@ if _here not in sys.path:
     sys.path.insert(0, _here)
 import agents  # noqa: E402
 import pending  # noqa: E402
+import statefile  # noqa: E402
 
 
 def _view(b):
@@ -85,8 +86,13 @@ class Tracker:
                 for k in self.sections:
                     d.setdefault(k, {})
                 return d
-        except (OSError, ValueError):
+            # There and not what this wrote: kept, as one that is not JSON
+            # is, before the next save writes the empty one over it (B1082).
+            statefile.keep_unreadable(self.file(), f"not a {self.noun} file")
+        except OSError:
             pass
+        except ValueError as e:
+            statefile.keep_unreadable(self.file(), str(e)[:160])
         return {"projects": {}, **{k: {} for k in self.sections}}
 
     # ---- the log -----------------------------------------------------------

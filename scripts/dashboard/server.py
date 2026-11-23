@@ -14776,10 +14776,10 @@ def main():
     # State files that are there and cannot be read (B763): each is read as
     # empty by its loader and written over by the next save, so a copy of
     # each is kept beside it first and the log names them.
+    # The same keeper as a file that goes bad while this runs (B1082), so a
+    # loader reading it next keeps no second copy.
     for _name, _why in statefile.unreadable(STATE):
-        _kept = statefile.set_aside(STATE, _name)
-        print(f"dashboard: /config/{_name} cannot be read ({_why}); what it held reads as empty until it is mended"
-              + (f", and a copy is kept as {_kept}" if _kept else ""), file=sys.stderr, flush=True)
+        statefile.keep_unreadable(os.path.join(STATE, _name), _why)
     if users.unreadable():
         print(f"dashboard: {users.unreadable()}: nobody can sign in and no first account is offered "
               "until it is mended or put back from /config/backups", file=sys.stderr, flush=True)

@@ -72,6 +72,7 @@ if _here not in sys.path:
     sys.path.append(_here)
 import packformat  # noqa: E402
 import seams  # noqa: E402
+import statefile  # noqa: E402
 
 # The request's timing parts (server.py's trace), where there is a request:
 # a suite or a verb loads this file by its path, outside the dashboard's
@@ -3871,9 +3872,14 @@ def _load():
     try:
         with open(FILE) as f:
             d = json.load(f)
-    except (OSError, ValueError):
+    except OSError:
+        return {}
+    except ValueError as e:
+        # Kept before the next save writes the empty store over it (B1082).
+        statefile.keep_unreadable(FILE, str(e)[:160])
         return {}
     if not isinstance(d, dict):
+        statefile.keep_unreadable(FILE, "not the containers' store")
         return {}
     return {proj: val for proj, val in d.items()
             if isinstance(val, dict) and all(isinstance(v, dict) for v in val.values())}
