@@ -382,6 +382,9 @@ function foldOpen(el){
 function arriveBox(el){
   proselines(el);
   if (noMotion() || !el) return;
+  // An element drawn into the place of one that left still holds that
+  // leaving at nothing (leaveBox): let go first, so its height is its own.
+  el.getAnimations().forEach(a => { if (a.id === "leave") a.cancel(); });
   foldHeight(el, 0, el.offsetHeight, () => {});
 }
 
@@ -391,14 +394,17 @@ function arriveBox(el){
 // rows, and the line that counts what was put away, which came in a moment
 // after the row it counts had gone (the operator, 23 Nov: Dismiss skipped).
 // The list's first drawing, and one written whole, is the list's own
-// arrival, and nothing in it unrolls on its own.
+// arrival, and nothing in it unrolls on its own. What is new is told by
+// `id`, what an element is, never by the element: a patched draw keeps
+// elements by their place, so the row that just left is the element the
+// line counting it is drawn into.
 const arrivedSeen = new WeakMap();
-function arriveNew(root, sel){
+function arriveNew(root, sel, id){
   if (!root) return;
-  const now = [...root.querySelectorAll(sel)], was = arrivedSeen.get(root);
-  arrivedSeen.set(root, {first: root.firstElementChild, els: new WeakSet(now)});
+  const now = [...root.querySelectorAll(sel)].map(el => [id(el), el]), was = arrivedSeen.get(root);
+  arrivedSeen.set(root, {first: root.firstElementChild, ids: new Set(now.map(([k]) => k))});
   if (!was?.first || was.first !== root.firstElementChild) return;
-  now.forEach(el => { if (!was.els.has(el)) arriveBox(el); });
+  now.forEach(([k, el]) => { if (!was.ids.has(k)) arriveBox(el); });
 }
 
 // ...and a row that goes leaves the way a box arrives, backwards: it fades as
@@ -421,7 +427,8 @@ function leaveBox(el, done){
   // Held at nothing until the page has drawn without it, then let go: an
   // element a patched draw kept for another row must not stay folded.
   anim.onfinish = () => { done?.(); anim.cancel(); };
-  anim.oncancel = () => { el.style.overflow = ""; };
+  // ...its clip kept where the element unrolls as something else now.
+  anim.oncancel = () => { if (!el.getAnimations().some(a => a.id === "fold")) el.style.overflow = ""; };
 }
 
 // A box whose CONTENTS are replaced: the memory writer and the bug reporter,

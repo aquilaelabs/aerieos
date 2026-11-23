@@ -940,7 +940,8 @@ function toggleBell(open){
 function wireNeeds(root, after = () => {}){
   // A row come back (Show again) or newly due, and the line counting what was
   // put away, unroll into a list already on screen rather than popping in.
-  arriveNew(root, ".bnote.att, .bfootbar");
+  arriveNew(root, ".bnote.att, .bfootbar", el => el.classList.contains("bfootbar") ? "put away"
+    : el.querySelector("[data-bdismiss]")?.dataset.bdismiss || el.querySelector(".bt")?.textContent || "");
   // Dismiss (bellseen.py): the update to that version, for this account, on
   // every browser it opens; a newer version notes again.
   // The row goes on the press, from the bell and from Home at once, and comes
