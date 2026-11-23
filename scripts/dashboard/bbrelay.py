@@ -57,6 +57,8 @@ PROJECT_VARS = ("BB_ROADMAP_PROJECT", "BB_BUG_PROJECT", "BB_VERSION_PROJECT",
 
 # How many relayed bb verbs run at once, across every session.
 _SLOTS = threading.BoundedSemaphore(8)
+# How long a verb waits here for a slot before it is turned away.
+SLOT_WAIT_S = 120
 
 # The server's, handed over by configure(): the account store, the
 # projects' push rights and settings, git's network half, and where the
@@ -355,7 +357,7 @@ def run(me, req, project):
     # six sessions and two people writing at once was 129 of them started
     # together, each slowing the rest (68s for what took 8). The rest wait
     # their turn in this thread; a wait that long says the box is busy.
-    if not _SLOTS.acquire(timeout=120):
+    if not _SLOTS.acquire(timeout=SLOT_WAIT_S):
         return {"error": "the controller is busy with other sessions' aerie; try again",
                 "code": 75, "out": "", "err": ""}, 503
     limit = relay_limit(argv)

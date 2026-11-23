@@ -24,6 +24,14 @@ project = os.environ.get("BB_RELAY_PROJECT", "")
 # or the tree's own when it is clean, read off the controller's copy, which
 # a commit made here a moment ago had not reached.
 TREE = {"git", "version", "changelog"}
+# How long this side waits for the controller's answer: past the longest it
+# can take, a slot's wait (bbrelay.SLOT_WAIT_S) and the verb's own limit
+# (bbrelay.RELAY_S, RELAY_LONG_S for a release or a rehearsal), so its own
+# sentence comes back. This side gave up at 200 s and 960 s, before it did
+# (B995): a write that landed was reported as timed out with exit 1, and
+# asked again it was made twice.
+WAIT_S = 120 + 180 + 30
+WAIT_LONG_S = 120 + 900 + 30
 tree = bool(project) and bool(argv) and (argv[0] in TREE or argv[:2] in (["bug", "fix"], ["bug", "fixed-in"]))
 if tree:
     import syncwait
@@ -67,7 +75,7 @@ r = bbapi.call("/api/v1/bb", {"argv": argv, "project": project,
                               "agent": os.environ.get("BB_AGENT", "")},
                # Past the controller's own limit for the verb (bbrelay.relay_limit),
                # so its sentence comes back rather than this side's timeout.
-               auth=auth, timeout=960 if argv[:1] == ["version"] and any(a in ("release", "rehearse") for a in argv[1:]) else 200)
+               auth=auth, timeout=WAIT_LONG_S if argv[:1] == ["version"] and any(a in ("release", "rehearse") for a in argv[1:]) else WAIT_S)
 if r.get("error") and "code" not in r:
     # The controller's own sentence, and nothing of how it traveled (B58).
     sys.exit(f"[builderbot] ERROR: {r['error']}")
