@@ -207,6 +207,7 @@ VERSION_LINE = re.compile(r'^AGENT_VERSION = "(\d+)\.(\d+)\.(\d+)"[ \t]*$', re.M
 OLDER = "older than the agent this node runs"
 # ...and of a bundle refused for its age.
 BUNDLE_OLDER = "its files are older than the agent this node runs"
+BUNDLE_UNDATED = "its files name no build, so how old they are cannot be told"
 # The member of the bundle that says which build its files are: the agent
 # package's __init__.py of the tree the release was built from, a file its
 # list names and its signature covers like any other (scripts/lib/
@@ -532,7 +533,9 @@ def may_keep_bundle(state, text, sig, members, build=None):
     signed bundle whose BUNDLE_BUILD names a build below this agent's is
     refused unless this node's console said an older one may be put back
     (older_ok), and with it root's tools, which come out of the same
-    checked tar. A bundle that names no build has no floor under it yet.
+    checked tar. One that names no build is refused the same way: every
+    release's bundle names its build, so one that names none is from
+    before that, and how old cannot be told.
 
     Kept with nothing said by a node that trusts no key. Otherwise kept
     when the signature over the list's digest is under a key this node
@@ -560,11 +563,13 @@ def may_keep_bundle(state, text, sig, members, build=None):
         if not why:
             # Its build, from the member the signed list held to its bytes.
             at, version = version_of(build.decode("utf-8", "replace") if isinstance(build, bytes) else build)
+            back = f"At this machine's own console: sudo {names.command()} older on lets an older one be put back"
+            if at is None and not older_ok(state):
+                return False, _refusal(BUNDLE_UNDATED, f"refused: this bundle's files name no build, so how old they are "
+                                                       f"cannot be told, and this node keeps the bundle it has. {back}")
             if at is not None and at < own_build() and not older_ok(state):
                 return False, _refusal(BUNDLE_OLDER, f"refused: this bundle's files are from agent {version}, "
-                                                     f"{OLDER} ({AGENT_VERSION}), so this node keeps the bundle it has. "
-                                                     f"At this machine's own console: sudo {names.command()} older on "
-                                                     "lets an older one be put back")
+                                                     f"{OLDER} ({AGENT_VERSION}), so this node keeps the bundle it has. {back}")
             return True, f"the bundle's files are signed by {who}"
     why = why.replace("the update names no digest to check", "the bundle carries no list of its files")
     if unsigned_ok(state):

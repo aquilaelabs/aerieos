@@ -34,9 +34,13 @@ import bundleparts  # noqa: E402
 import workspace as controller  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
 
+# Every release's bundle names its build: the agent package's own
+# __init__.py, this tree's here.
+BUILD = "scripts/agent/aerieos_agent/__init__.py"
 FILES = {"scripts/aerie": b"#!/bin/bash\necho aerie\n", "scripts/lib/sdk.sh": b"sdk\n",
          "scripts/lib/login-list.py": b"print('[]')\n", "config/toolchains.json": b'{"toolchains": []}\n',
-         "config/release-keys/node.asc": b"key\n", "nodes/bb-session": b"#!/bin/sh\n"}
+         "config/release-keys/node.asc": b"key\n", "nodes/bb-session": b"#!/bin/sh\n",
+         BUILD: pathlib.Path(HERE, "..", "..", "agent", "aerieos_agent", "__init__.py").read_bytes()}
 # What a controller adds beside them, which no release's list names.
 ADDS = {"config/toolpacks.json": b'{"toolchains": []}', "config/toolpacks/hexkit.bundle": b"git bundle",
         "config/toolchains.catalog.json": b'{"toolchains": []}', "nodes/root-tools.sig": b'{"sig": ""}'}
@@ -80,7 +84,7 @@ class MayKeep(Case):
     def keep(self, state, files=FILES, sig=None, listed=None, **more):
         text, held = self.members(files, **more)
         text = listing(listed) if listed is not None else text
-        return self.release.may_keep_bundle(state, text.encode(), self.sign(text) if sig is None else sig, held)
+        return self.release.may_keep_bundle(state, text.encode(), self.sign(text) if sig is None else sig, held, files.get(BUILD))
 
     def test_the_two_sides_make_the_same_list(self):
         text, digest = bundleparts.listing(list(FILES.items()))
@@ -634,11 +638,23 @@ class Floor(FetchWorld):
         self.assertTrue(self.a.bundle(None, None))
         self.assertIsNone(self.a.bundle_refused)
 
-    def test_the_same_or_a_newer_build_and_one_from_before_the_floor_are_taken(self):
+    def test_the_same_or_a_newer_build_is_taken(self):
         for files in (self.built(0), self.built(2), FILES):
             self.serve(files)
             self.assertTrue(self.a.bundle(None, None), files.get(self.release.BUNDLE_BUILD))
             self.assertIsNone(self.a.bundle_refused)
+
+    def test_one_that_names_no_build_is_refused_unless_the_console_lets_an_older_one_back(self):
+        # Only branch builds of 20 to 21 Nov signed a list with no build in
+        # it: replayed, it had no floor under it at all (review of 22 Nov).
+        bare = {n: d for n, d in FILES.items() if n != self.release.BUNDLE_BUILD}
+        self.serve(bare)
+        self.assertEqual(self.a.bundle(None, None), "")
+        self.assertEqual(self.a.bundle_refused["cause"], self.release.BUNDLE_UNDATED)
+        self.trust["older_ok"] = True
+        self.serve(bare)
+        self.assertTrue(self.a.bundle(None, None))
+        self.assertIsNone(self.a.bundle_refused)
 
     def test_the_build_is_the_one_the_list_signed(self):
         # The member changed after the signing names its file, whatever build it says.

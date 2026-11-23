@@ -445,6 +445,10 @@ class OneRule(unittest.TestCase):
             self.assertEqual(releasecheck.tag_kind(tag), kind, tag)
             self.assertEqual(osimage.tag_namespaces(tag), want[kind], tag)
             self.assertEqual(stick.tag_namespaces(tag), want[kind], tag)
+            # ...and the OS updater names an update by the same tags: a
+            # v0.9.0-rc.1 was offered and every machine refused it.
+            if tag.startswith("v"):
+                self.assertEqual(bool(osimage.VER_RE.fullmatch(tag)), bool(kind), tag)
 
     @unittest.skipUnless(shutil.which("ssh-keygen"), "no ssh-keygen here")
     def test_the_installer_reads_a_tag_the_same_way(self):
