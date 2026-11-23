@@ -13,6 +13,7 @@
 
 - On a phone the Containers page in list view stays inside the screen, and a container's image named by its id alone shows its first twelve characters, where a long image id made the page scroll sideways (03ad3f9)
 - aerie git policy says a space can push when the controller holds its token, where a space linked to its git host since the credential helper changed was told it held none (9ced03a)
+- A session whose coding agent ends on its own is shown as ended, with Start offered again, where its space went on showing it running until Restart was pressed a second time (2bcb03e)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
