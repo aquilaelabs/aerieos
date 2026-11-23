@@ -936,7 +936,12 @@ sdk_versions() {
     local names="$*"
     [ -n "$names" ] || names="$(sdk_checkable)"
     local n
-    for n in $names; do sdk_check_one "$n" local; done
+    # Each row its own, as sdk_check's are (B549): the first versioned
+    # Android row on a machine with no SDK (find on a missing folder under
+    # pipefail) ended the list after two rows, and the node's every other
+    # version came from the census's summary, Swift's as the first 40
+    # characters of its banner (B1107).
+    for n in $names; do sdk_check_one "$n" local || true; done
 }
 
 # A version with its trailing zero components off (6.4.0 and 6.4 are one

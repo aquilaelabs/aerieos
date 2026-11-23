@@ -325,6 +325,19 @@ _sdk_root_cache = []
 BB = seams.get("BB_BIN") or str(HERE.parent / "aerie")
 
 
+def _summary_version(said):
+    """A version from the census's summary, where the node's own list has
+    none: the tool's first line as it printed it ("Swift version 6.4.2
+    (swift-6.4.2-RELEASE", "go version go1.27.4 linux/amd64"), cut to its
+    first dotted number, which is what a row has room for and what every
+    row from that list says; "present" and a bare word stay as they are."""
+    said = str(said or "")
+    if " " not in said.strip():
+        return said
+    m = re.search(r"\d+(?:\.\d+)+", said)
+    return m.group(0) if m else said
+
+
 def sdk_root_path():
     """Where bb decided the toolchain store root is: asked once, since it cannot change
     without a container restart."""
@@ -1382,8 +1395,8 @@ def payload_for_node(nid):
         # inventory: it answers for six names, says "present" where it cannot
         # parse, and hands back an unstripped "go version go1.27.0
         # linux/amd64". That difference is what the operator was looking at.
-        have = pv.get(name) or tc.get(
-            {"jdk": "java", "android:emulator": "emulator"}.get(probe, probe))
+        have = pv.get(name) or _summary_version(tc.get(
+            {"jdk": "java", "android:emulator": "emulator"}.get(probe, probe)))
         kb = _tc_remembered.get(name)
         items.append({**{k: p[k] for k in ("name", "label", "about")},
                       "terms": p.get("terms") or [],
