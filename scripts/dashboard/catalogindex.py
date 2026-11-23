@@ -338,9 +338,15 @@ def _newest(idx):
     a person imported is a floor under what the network answers: a catalog
     that answers an index from before it (an old copy served again, a cache
     behind the mirror) does not bring back what the mirror's had withdrawn.
-    What is kept and compared for the address stays the catalog's own."""
+    What is kept and compared for the address stays the catalog's own.
+    Only the two moments are compared here: the release's floor is held
+    where each index came in, and a kept index from before it must not
+    hand the read to a mirror older than that index."""
     m = mirror_index() if mirror_index and idx else None
-    return m if m and older(idx, m) else idx
+    if not m:
+        return idx
+    now, was = made(idx), made(m)
+    return m if was is not None and (now is None or now < was) else idx
 
 
 def _kept(base=None):

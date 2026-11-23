@@ -147,6 +147,27 @@ class Index(unittest.TestCase):
             got = catalogindex.fetch(url, opener=down)["index"]
             self.assertEqual(bool(got.get("mirror")), answers, mirror_made)
 
+    def test_a_kept_index_from_before_a_new_floor_never_hands_the_read_to_an_older_mirror(self):
+        # A release's floor that moved past the kept index made every mirror
+        # answer in its place, one older than the kept index too (review of
+        # 22 Nov): the choice compares the two moments alone.
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        was = catalogindex.PUB_FILE
+        catalogindex.PUB_FILE = os.path.join(d, "catalog.pub")
+        self.addCleanup(setattr, catalogindex, "PUB_FILE", was)
+        with open(os.path.join(d, "catalog-floor"), "w") as f:
+            f.write("2026-11-20T00:00:00Z\n")
+        self.addCleanup(setattr, catalogindex, "mirror_index", None)
+        kept = {"generated": "2026-11-10T00:00:00Z", "packs": []}
+        for mirror_made, answers in (("2026-11-01T00:00:00Z", False), ("2026-11-10T00:00:00Z", False),
+                                     ("2026-11-15T00:00:00Z", True), ("soon", False)):
+            catalogindex.mirror_index = lambda g=mirror_made: {"generated": g, "packs": [], "mirror": True}
+            self.assertEqual(bool(catalogindex._newest(kept).get("mirror")), answers, mirror_made)
+        # A kept index that says no moment yields to a mirror that does.
+        catalogindex.mirror_index = lambda: {"generated": "2026-11-01T00:00:00Z", "packs": [], "mirror": True}
+        self.assertTrue(catalogindex._newest({"packs": []}).get("mirror"))
+
     def test_an_imported_mirror_is_a_floor_under_what_the_catalog_answers(self):
         # Two signed indexes and no word in either on which is the newest:
         # a mirror a person imported after the catalog's own was made
