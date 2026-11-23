@@ -632,6 +632,12 @@ esac
         osi = load("os-image.yml")
         self.assertEqual(osi["on"]["workflow_call"]["inputs"]["rehearsal-key"], {"type": "boolean", "default": False})
         self.assertIn('if [ "$REHEARSAL" = true ]; then export AERIEOS_RELEASE_PUB=', runs(osi["jobs"]["appliance"]))
+        # ...and its image trusts that key in the release key's place, so the
+        # boot enrolls on the signed agent; only under both inputs, before the build.
+        steps = osi["jobs"]["appliance"]["steps"]
+        put = next(s for s in steps if "config/aerieos-release.pub" in str(s.get("run") or ""))
+        self.assertEqual(put["if"], "inputs.agent-signature && inputs.rehearsal-key")
+        self.assertLess(steps.index(put), steps.index(next(s for s in steps if s.get("name") == "Build the image")))
         self.assertNotIn("rehearsal-key", str(tag), "a tag's own run never names a rehearsal's key")
         # Each result is a row of the summary and fails the run, and the
         # header says what only a tag proves.

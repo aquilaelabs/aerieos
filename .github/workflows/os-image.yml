@@ -170,6 +170,15 @@ jobs:
           else
             echo "not a release's build: the agent ships unsigned, as a branch's does (the release key is read on a v* tag alone)"
           fi
+      # ...and a rehearsal's image trusts the key its agent was signed with,
+      # in the release key's place, as a tag's image trusts the release key:
+      # the boot below enrolls the machine as its own node, which pins the
+      # key the controller names, and an agent the rehearsal signed was
+      # refused under the committed one. Never on a tag: the input is the
+      # rehearsal's alone, and this image is published nowhere.
+      - name: The rehearsal's key in the release key's place, in this image alone
+        if: inputs.agent-signature && inputs.rehearsal-key
+        run: cp "$RUNNER_TEMP/rehearsal-key/aerieos-release.pub" config/aerieos-release.pub
       - name: Build the image
         shell: bash
         # For gh's trusted root, which build.sh bakes into the image.
