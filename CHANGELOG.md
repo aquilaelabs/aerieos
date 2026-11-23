@@ -11,6 +11,17 @@
 - House rules written when the command was called bb say aerie, so a session is no longer told to run a command that is not there, and aerie status and the companion app say aerie too (21f6fea)
 - A copy the browser refuses says so in one sentence, where a signing key's fingerprint was printed in the toast (a62ca92)
 - On a phone a field too narrow for its hint shows a short one on every page, where it showed the first words of a long one cut off (843904d, 50c3a1f)
+- AerieOS's own container image is offered as an update only by the digest its newest signed release names, and says so in one sentence when no signed release can be read, where the tag's digest was offered as it stood (c257dfd)
+- A toolchain or pack that is checked by its publisher's signature reads pinned only where it names the version it installs, where one at an address with no version read pinned (1447036)
+- The Library's Android app, VS Code extension and Windows companion are each the file named for the release they come from, where another file with the same start could be taken (af3417c)
+- An imported catalog mirror is used only where it is newer than the catalog's own index, where after an update it could be used though older (a99a594)
+- A node takes an OS update named by any pre-release tag, -rc.1 included, where only -dev builds were taken (3cac664)
+
+### Security
+
+- A session's aerie verbs and the helper that opens a node's terminals check the controller's certificate against the system's authorities where the node holds no pin, where they took any certificate (2c29486)
+- A node refuses a signed bundle of its tools that does not say which build it is from, where one from before bundles said so could be served to it again (3cac664)
+- The VS Code extension, set to accept the controller's own certificate, pins the controller's key at the first sign-in and refuses any other, where it sent your name and password to whatever answered (37b352f)
 
 ## 0.9.0-dev.6094: 2026-11-22
 
