@@ -1308,11 +1308,13 @@ async function rnSaveFtp(name, change){
 // Why this account may not read or change the project's settings, sessions
 // and snapshots, from its row, or "" (B89).
 const rnSettingsWhy = name => (state?.projects || []).find(p => p.name === name)?.settings_why || "";
-// A section this account may not use, shown with why under it in red, the
+// A section this account may not use, shown with why under it, the
 // server's own words naming the area and level that would open it (R255
-// step 4), not hidden as if there were nothing there.
+// step 4), not hidden as if there were nothing there. Muted, as everything
+// a role does not give is said (B1097): a refusal is no failure, and red is
+// for what went wrong.
 function rnWhyOff(field, body, why){
-  drawHTML(body, `<div class="sub bad">${esc(why)}</div>`);
+  drawHTML(body, `<div class="sub dim">${esc(why)}</div>`);
   field.hidden = false;
 }
 
