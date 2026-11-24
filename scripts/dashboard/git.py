@@ -1356,12 +1356,14 @@ def _no_cred_why(repo, out):
     if m:
         host = m.group(1)
     where = f"{host} " if host else ""
+    # Each person's own token (R159; the operator, 23 Nov): the one asking
+    # is told about theirs.
     if _creds(repo):
-        return (f"{where}rejected the token stored for this space: it is expired, revoked "
-                "or made for another scope. The space's settings dialog takes a new one "
-                "under Access token.")
-    return (f"this space has no access token stored, and {where}asks for one: put it in the "
-            "space's settings dialog under Access token, or point the remote at ssh. "
+        return (f"{where}rejected your token for this space: it is expired, revoked "
+                "or made for another scope. Give a new one under Your access token, in "
+                "Repository in its notebook's Settings.")
+    return (f"you have not given this space a token, and {where}asks for one: give yours "
+            "under Your access token, in Repository in its notebook's Settings. "
             "Git said it had no credential and no terminal to ask at.")
 
 

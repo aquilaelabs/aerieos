@@ -576,6 +576,9 @@ def auth_options(project, dest):
             # as the alias, which is what the field will keep.
             "url": origin_url(dest),
             "token": bool(token_helper(project)),
+            # A token kept as the project's own, from before tokens were each
+            # person's (R159): its owner may clear it.
+            "own": bool(gitcreds.own_line(project)),
             # Either it is on ssh already, or it was and we kept the URL. A
             # project that has only ever been https has no alias and no key
             # picked, and offering "deploy key" would be offering to build
@@ -794,8 +797,8 @@ def set_auth(project, dest, mode):
     if mode == now:
         return "", ""                       # already there; not worth an error
     if mode == "https" and not token_helper(project):
-        return "", ("there is no access token stored for this space; "
-                    "set one in the same dialog and it can use it")
+        return "", ("nobody has given this space a token yet: "
+                    "give yours in the same section and it can use it")
     if mode == "ssh":
         url = _remembered_ssh(project)
         if not url:
@@ -2587,7 +2590,7 @@ def forge_target(name):
     if not forge.get("kind"):
         return {"error": f"{host or 'its host'} has no API AerieOS knows: git alone reaches it"}
     if not tok:
-        return {"error": "this space has no access token: link one under its settings, Git"}
+        return {"error": "you have not given this space a token: give yours under Repository in its notebook's Settings"}
     if not repo:
         return {"error": "could not read the repository from this space's remote"}
     # The repository the project was linked to, where it has one on record,
@@ -2623,7 +2626,7 @@ def _git_said(r):
     return pick[:240] if pick else f"git said nothing (exit {r['code']})"
 
 
-def auth_test(name, typed=""):
+def auth_test(name, typed="", uid=None):
     """Can this project read and push with what it authenticates with now
     (the operator, 7 Oct)? (payload, status).
 
@@ -2635,7 +2638,8 @@ def auth_test(name, typed=""):
     asked. A token is also put to the host's API (forges.token_access) for
     what git cannot see. `typed` is a token typed in the dialog and not
     saved: it is tried in its place, over https, from a file of its own
-    that is gone when this returns.
+    that is gone when this returns. `uid`: whose token a token remote is
+    tried with, the asker's own as their pushes are (the operator, 23 Nov).
     """
     if not PROJECT_NAME.fullmatch(name or ""):
         return {"error": "unknown space"}, 400
@@ -2654,6 +2658,14 @@ def auth_test(name, typed=""):
     mode = remote_auth(d, name)
     remote, scope, tmp = "origin", [], None
     stored = token_target(name) or {}
+    # A token remote is tried with the asker's own token, as their pushes
+    # are, never with whichever giver the repository's own helper finds.
+    if mode == "https" and not typed and uid is not None:
+        u = gitcreds.usable(name, uid)
+        if u.get("why"):
+            return {"error": "you have not given this space a token: type yours above and Test tries it"
+                    if not u.get("given") and not u.get("locked") else u["why"]}, 200
+        scope = gitcreds.git_c(name, uid, why="test")
     if typed:
         typed = typed.strip()
         bad = forges.token_ok(forge, typed)
@@ -2669,8 +2681,8 @@ def auth_test(name, typed=""):
         scope = ["-c", "credential.helper=", "-c", f"credential.helper=store --file={tmp}"]
         remote = f"{scheme}://{stored.get('host') or host}/{repo}.git"
         mode = "typed"
-    what = {"ssh": "its deploy key", "https": "its access token", "typed": "the token typed here",
-            "none": "no credential (Authentication is Disabled)"}.get(mode, "what its remote says")
+    what = {"ssh": "its deploy key", "https": "your access token", "typed": "the token typed here",
+            "none": "no credential (Authentication is Off)"}.get(mode, "what its remote says")
     missing, notes = [], []
     env = _git_env()
     try:

@@ -318,9 +318,9 @@ whoever reads it, and the two things behind it were not the same thing.
    to date`. That is B184 proven on an instance: the controller names its own
    credential record on the command line, and the mirror git dir that
    deliberately drops the tree's helper no longer costs the view its reach.
-4. **With the token cleared again**, the refusal now reads: *this space has
-   no access token stored, and gitea.lan:3000 asks for one: put it in the
-   space's settings dialog under Access token, or point the remote at ssh.*
+4. **With the token cleared again**, the refusal now reads: *you have not
+   given this space a token, and gitea.lan:3000 asks for one: give yours
+   under Your access token, in Repository in its notebook's Settings.*
    A token that is present and rejected says the other thing instead. Both
    are sentences that name the control; git's line named only what happened.
 5. **The Emulator page** drew for the picked node, and its button on the Tools

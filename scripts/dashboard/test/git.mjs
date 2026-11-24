@@ -325,13 +325,13 @@ said = {"code": 128, "out": "fatal: could not read Username for 'https://gitea.e
 print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
 `], { encoding: 'utf8' }).trim();
     const none = JSON.parse(why(false)).error;
-    ok(/no access token stored/.test(none) && /Access token/.test(none)
+    ok(/not given this space a token/.test(none) && /Your access token/.test(none)
        && /gitea\.example/.test(none) && !/terminal prompts disabled/.test(none),
        `no token: the refusal names the host and where to put one (${none.slice(0, 110)})`);
     mkdirSync(`${DIR}/state/gitcreds`, { recursive: true });
     writeFileSync(`${DIR}/state/gitcreds/beta`, 'https://oauth2:tok@gitea.example\n', { mode: 0o600 });
     const stale = JSON.parse(why(true)).error;
-    ok(/rejected the token stored/.test(stale) && /Access token/.test(stale),
+    ok(/rejected your token/.test(stale) && /Your access token/.test(stale),
        `a token that is there and refused reads as the other thing it is (${stale.slice(0, 110)})`);
     rmSync(`${DIR}/state/gitcreds/beta`, { force: true });
   }
@@ -1005,7 +1005,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({ beta: { repo: 'owner/beta', how: 'key' } }));
   ok(noRights.status === 403 && /no push rights/.test(noRights.error || ''),
      `a space without push rights is refused on the relay, not left to a hook in its tree (${noRights.error})`);
-  // ...and one whose Authentication is Disabled, an https remote with no
+  // ...and one whose Authentication is Off, an https remote with no
   // credential, is refused at once with where to change it (B1119): its push
   // ran on into the host and said nothing for minutes.
   {
@@ -1017,8 +1017,8 @@ await section("step 3: the policy, and Send to Claude", async () => {
     const off = await relay(['git', 'push', 'origin', 'topic']);
     git('remote', 'set-url', 'origin', was);
     for (const h of helper.split('\n').filter(Boolean)) git('config', '--local', '--add', 'credential.helper', h);
-    ok(off.status === 403 && /Authentication is Disabled/.test(off.error || ''),
-       `a space whose Authentication is Disabled is refused on the relay at once, saying where to change it (${off.error})`);
+    ok(off.status === 403 && /Authentication is Off/.test(off.error || ''),
+       `a space whose Authentication is Off is refused on the relay at once, saying where to change it (${off.error})`);
   }
   await post('/api/prefs', { project: 'beta', gitpol: { push: 'allow', main: 'deny' } });
 

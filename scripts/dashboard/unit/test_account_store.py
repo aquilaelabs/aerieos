@@ -144,9 +144,10 @@ class Store(unittest.TestCase):
         # Locked, nothing is handed out, and what was is shredded.
         unlocks.lock(UID)
         self.assertFalse(Path(handout).exists())
-        # Somebody who gave nothing, and work that is nobody's, take a
-        # signed-in giver's, handed out the same way and logged for them.
-        self.assertEqual(len(gitcreds.helpers("web", "u_0000000b")), 1)
+        # Somebody who gave nothing is handed nobody's (the operator, 23
+        # Nov); work that is nobody's takes a signed-in giver's, handed out
+        # the same way and logged for them.
+        self.assertEqual(gitcreds.helpers("web", "u_0000000b"), [])
         self.assertEqual(len(gitcreds.helpers("web", "")), 1)
         self.assertEqual(unlocks.uses(UID)[0]["by"], "")
 

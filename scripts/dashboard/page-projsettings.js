@@ -958,15 +958,12 @@ function renameProject(name, mode = "all"){
   // helper about an ssh remote), and a hint that stopped saying so the moment
   // a token existed would be wrong exactly when it mattered. One line each,
   // per the site-text rule: the reasoning lives here and in the README.
+  // The field is the asker's own (R159; the operator, 23 Nov).
   $("rnTokenHint").textContent = how === "key"
-    ? p?.has_token
-      ? "This space pushes with a deploy key and already has a token stored; "
-        + "the switch below decides which git uses."
-      : "This space pushes with a deploy key, so a token here does nothing "
-        + "until the switch below says to use it."
-    : p?.has_token
-      ? "Replaces this space's token. Kept for it alone; a shell here can read it."
-      : "Kept for this repository alone; a shell here can read it.";
+    ? "This space pushes with a deploy key, so a token here does nothing "
+      + "until the switch below says to use each person's."
+    : "Kept in your own key store and used for your own pushes and pulls here, "
+      + "while you are signed in; nobody else's work uses it. A shell here can read it.";
   // Nothing to set is an answer, not an empty box: a linked project with no
   // token and no push rights has a remote it can only read.
   $("rnGitNone").hidden = !(linked && $("rnTokenField").hidden);
@@ -1452,6 +1449,17 @@ function rnLoadAuth(name){
       $("rnAddr").value = j.url || "";
       $("rnAddrField").hidden = !j.url;
       $("rnTestField").hidden = !j.url;
+      // The link is its owner's: anybody else reads where it points and
+      // gives their own token, under one line saying whose it is.
+      const mine = rnLinkMine();
+      $("rnAddr").disabled = !mine;
+      $("rnAddrHint").textContent = mine
+        ? "Change it after renaming your account or organization on the host. Saving checks it is this repository: another one is refused."
+        : "Where it points, set by its owner.";
+      $("rnUnlinkF").hidden = !mine || $("rnUnlinkF").hidden;
+      const say = $("rnRepoSay");
+      say.textContent = say.textContent.replace(/ Where it links.*$/, "")
+        + (mine ? "" : ` Where it links and how it pushes are ${rnLinkOwner()}'s, its owner, to change; your own token is yours.`);
       rnDrawAuth();
       rnDrawKey();
       rnDrawStore(name);
@@ -1476,19 +1484,24 @@ function rnDrawStore(name){
   // Who has given the project a token (R159): each a person, their token
   // used for their own work while they are signed in; yours removable.
   const givers = o.givers || [], me = givers.find(g => g.mine);
+  // Each person's own row: their pushes and pulls run with it, everyone's
+  // at the same time (R159; the operator, 23 Nov: one row reading as the
+  // space's one token said only one could push).
   const who = givers.map(g => `<div class="logdays setrow ctlrow"><span class="grow">${g.mine ? "Your" : esc(g.name) + "'s"} ${
-    esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}, the one this space uses${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
+    esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}: ${g.mine ? "your" : "their"} pushes and pulls here use it${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
     g.mine ? `<button type="button" data-rnunlink="1">Take it back</button>` : ""}</div>`).join("");
-  // Pushes are off while Authentication is Disabled, whatever is stored: said
-  // first, where the stored token and a passing Test read as all well (the
-  // operator, 23 Nov: a space set to Disabled could not push, and nothing
-  // near the token said why).
+  // Pushes are off while Authentication is Off, whatever is given: said
+  // first, where a token and a passing Test read as all well (the operator,
+  // 23 Nov: a space set to Disabled could not push, and nothing near the
+  // token said why).
   const off = rnAuthNow === "none" && (givers.length || rnAuthOpts?.token)
-    ? `<div class="notice warn rnauthoff">Pushes are off: Authentication below is Disabled, so no token is used. Pick Access token there and Save to push with it.</div>` : "";
+    ? `<div class="notice warn rnauthoff">${rnLinkMine()
+        ? "Pushes are off: Authentication below is Off, so nobody's token is used. Pick Each person's token there and Save."
+        : `Pushes are off: ${esc(rnLinkOwner())}, its owner, has Authentication set to Off, so nobody's token is used.`}</div>` : "";
   const said = givers.length
-    ? `<div class="hint">${givers.length === 1 ? "One person has" : givers.length + " people have"} given this space a token; each is used for their own pushes and pulls while they are signed in${
-        me ? "" : ", and yours is not among them"}.</div>`
-    : `<div class="hint">Nobody has given this space a token: pushes and pulls wait until somebody does.</div>`;
+    ? `<div class="hint">${givers.length === 1 ? "One person has" : givers.length + " people have"} given this space a token. Each person's pushes and pulls use their own, at the same time, while they are signed in${
+        me ? "" : "; yours wait until you give one"}.</div>`
+    : `<div class="hint">Nobody has given this space a token: each person's pushes and pulls wait until they give their own.</div>`;
   // Your other tokens for this host, each told apart by when it was saved;
   // never the one this space already uses (B1122: it was offered again, the two
   // rows reading the same).
@@ -1517,18 +1530,28 @@ function rnDrawStore(name){
   });
 }
 
+// Where a repository links, how it pushes and its deploy key are its
+// owner's (the operator, 23 Nov); anybody else reads them here and gives
+// or takes back their own token.
+const rnLinkMine = () => rnAuthOpts?.owner?.me !== false;
+const rnLinkOwner = () => rnAuthOpts?.owner?.name || "its owner";
+
 function rnDrawKey(){
   const f = $("rnKeyField");
   if (!rnAuthOpts || $("rnTokenField").hidden){ f.hidden = true; return; }
-  f.hidden = false;
-  const k = rnAuthOpts.deploy, pasting = !$("rnKeyPaste").hidden;
+  const k = rnAuthOpts.deploy, pasting = !$("rnKeyPaste").hidden, mine = rnLinkMine();
+  // Nothing to read and nothing to do: not drawn for somebody else.
+  f.hidden = !k && !mine;
   $("rnKeyPub").hidden = !k;
   $("rnKeyPub").textContent = k ? k.pub : "";
-  $("rnKeyMake").hidden = !!k || pasting;
-  $("rnKeyPasteBtn").hidden = !!k;
+  $("rnKeyMake").hidden = !!k || pasting || !mine;
+  $("rnKeyPasteBtn").hidden = !!k || !mine;
   $("rnKeyPasteBtn").textContent = pasting ? "Keep it" : "Paste a key";
-  $("rnKeyCopy").hidden = $("rnKeyForget").hidden = !k;
-  drawHTML($("rnKeyHint"), k
+  $("rnKeyCopy").hidden = !k;
+  $("rnKeyForget").hidden = !k || !mine;
+  drawHTML($("rnKeyHint"), !mine
+    ? `Its deploy key, made by ${esc(rnLinkOwner())}.`
+    : k
     ? `Add this on the host as a deploy key with write access${k.page ? `: <a href="${esc(k.page)}" target="_blank" rel="noopener">its deploy keys page</a>` : ""}, then pick Deploy key below and Save.`
     : pasting ? "Paste the whole private key, without a passphrase. It is kept where sessions can push with it and never read it."
     : "None made here. Make one, or paste one you have.");
@@ -1575,22 +1598,26 @@ function rnDrawAuth(){
   const canToken = stored || typed;
   const canKey = rnAuthOpts.ssh;
 
-  const closed = stored && !rnClearToken;
-  $("rnToken").disabled = closed;
-  $("rnToken").placeholder = closed ? "stored: cleared below to replace it"
-                                    : "ghp_… or github_pat_…";
-  $("rnTokenClear").hidden = !(rnAuthOpts.token && !typed);
+  // The field is the asker's own token (the operator, 23 Nov): typed, it
+  // replaces theirs; their row below takes it back. A token kept as the
+  // space's own, from before each person gave their own, is its owner's to
+  // clear.
+  const mineGiven = (rnAuthOpts.givers || []).some(g => g.mine);
+  $("rnToken").disabled = false;
+  $("rnToken").placeholder = mineGiven ? "type a new one to replace yours" : "ghp_… or github_pat_…";
+  $("rnTokenClear").hidden = !(rnAuthOpts.own && rnLinkMine() && !typed);
   $("rnTokenClear").textContent = rnClearToken
-    ? "Keep the stored token after all"
-    : "Clear the stored token, and type another";
+    ? "Keep the space's own token after all"
+    : "Clear the token kept as the space's own";
 
   $("rnAuthField").hidden = false;
   // Disabled is always takeable: it is the absence of a credential rather than
   // the presence of one, and it is the honest answer for a project you want
   // pushing nowhere for now.
-  $("rnAuthNone").disabled = false;
-  $("rnAuthKey").disabled = !canKey;
-  $("rnAuthToken").disabled = !canToken;
+  const mine = rnLinkMine();
+  $("rnAuthNone").disabled = !mine;
+  $("rnAuthKey").disabled = !canKey || !mine;
+  $("rnAuthToken").disabled = !canToken || !mine;
   segPick(["rnAuthNone", "rnAuthKey", "rnAuthToken"], {none: "rnAuthNone", ssh: "rnAuthKey", https: "rnAuthToken"}[rnAuthPick]);
   // The pick is NOT moved out from under the operator when clearing a token
   // takes its ground away. It stays where they put it and Save refuses, which
@@ -1600,25 +1627,27 @@ function rnDrawAuth(){
   const changed = rnAuthPick !== rnAuthNow;
   $("rnAuthHint").classList.toggle("bad", invalid);
   $("rnAuthHint").textContent = invalid
-    ? "Access token is picked but none will be stored: type one above, keep the "
-      + "stored one, or pick Deploy key or Disabled."
+    ? "Each person's token is picked but nobody's will be given: give yours above, "
+      + "or pick Deploy key or Off."
     : (rnAuthNow === "ssh"
         ? "Pushes use the deploy key. "
       : rnAuthNow === "https"
-        ? "Pushes use this space's access token. "
-        : "Nothing is set, so a push is refused. ")
-      + (changed
+        ? "Each person's pushes and pulls use their own token, at the same time. "
+        : "Pushes are off: no credential is used. ")
+      + (!mine
+          ? `${rnLinkOwner()}, its owner, sets this.`
+        : changed
           ? (rnAuthPick === "https"
-              ? "Saving switches pushes to the token; the key stays."
+              ? "Saving switches everyone's pushes to their own tokens; the key stays."
             : rnAuthPick === "ssh"
-              ? "Saving switches pushes back to the deploy key; the token "
-                + (rnClearToken ? "is cleared." : "stays stored.")
-              : "Saving removes the credential; pushing is refused until you pick one.")
+              ? "Saving switches pushes back to the deploy key; "
+                + (rnClearToken ? "the space's own token is cleared." : "every token stays given.")
+              : "Saving turns pushes off for everyone until you pick one; the tokens and the key stay.")
         : !canToken && !canKey
-          ? "Nothing is stored to switch to: set a token above, or clone it "
+          ? "Nothing is given to switch to: give your token above, or clone it "
             + "again with a deploy key."
         : !canToken
-          ? "No token is stored for it: set one above and this becomes a choice."
+          ? "Nobody has given it a token yet: give yours above and this becomes a choice."
         : !canKey
           ? "It has no deploy-key remote to go back to: it has only ever used https."
         : "Switching keeps every credential it has; nothing is removed either way.");

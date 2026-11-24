@@ -1003,7 +1003,7 @@ print(json.dumps(out))
 const aj = JSON.parse(authOut.trim().split('\n').pop());
 ok(aj.ssh_seen === 'ssh',
    'a deploy-key alias is read as ssh, host and all: it is the URL form that decides');
-ok(/no access token/.test(aj.no_token),
+ok(/nobody has given this space a token/.test(aj.no_token),
    'switching to a token nobody stored is refused, not written');
 ok(aj.opts_on_key.now === 'ssh' && aj.opts_on_key.token && aj.opts_on_key.ssh,
    'with both credentials present the dialog is offered a real choice');

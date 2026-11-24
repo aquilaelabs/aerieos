@@ -137,21 +137,26 @@ def acting():
 
 def read_line(project, uid=None, live_only=True, why="read"):
     """The credential line git work on this project is handed, plain, or
-    "" for none: the acting person's own (`uid`, else ACTING) when they
-    gave one and are signed in, else any giver's who is signed in now,
-    else a line kept as the project's own from before. Each opening is a
-    use the person reads on their Profile (`why` says what for)."""
+    "" for none: a person's work (`uid`, else ACTING) is handed their own
+    alone, when they gave one and are signed in; work that is nobody's
+    (uid "") any giver's who is signed in now; then a line kept as the
+    project's own from before. Each opening is a use the person reads on
+    their Profile (`why` says what for)."""
     uid = acting() if uid is None else uid
     g = givers(project)
-    if uid and any(u == uid for u, _ in g) and (not live_only or _live(uid)):
-        line = _accounts().forge_line(uid, given_by(project, uid), why=why, project=project, by=uid)
-        if line or _locked(uid):
-            return line
-    for u, fid in g:
-        if (not live_only or _live(u)) and not _locked(u):
-            line = _accounts().forge_line(u, fid, why=why, project=project, by=uid or "")
-            if line:
+    # Each person's own token, with their own rights, never another's
+    # (the operator, 23 Nov): a person who gave none is handed none.
+    if uid:
+        if any(u == uid for u, _ in g) and (not live_only or _live(uid)):
+            line = _accounts().forge_line(uid, given_by(project, uid), why=why, project=project, by=uid)
+            if line or _locked(uid):
                 return line
+    else:
+        for u, fid in g:
+            if (not live_only or _live(u)) and not _locked(u):
+                line = _accounts().forge_line(u, fid, why=why, project=project, by="")
+                if line:
+                    return line
     try:
         return open_text(path(project).read_text())
     except OSError:
@@ -211,9 +216,15 @@ def usable(project, uid):
         return {"by": uid, "mine": True, "live": False, "given": True,
                 "why": "your token for this space is used only while you are signed in, and you are "
                        "signed out everywhere: aerie git waits for you to sign in to the dashboard"}
-    other = next((u for u, _ in g if _live(u) and not _locked(u)), "")
+    # Nobody's work (no person) runs with any signed-in giver's; a person's
+    # with their own alone (the operator, 23 Nov).
+    other = "" if uid else next((u for u, _ in g if _live(u) and not _locked(u)), "")
     if other:
         return {"by": other, "mine": False, "live": True, "given": False, "why": ""}
+    if uid and not own_line(project):
+        return {"by": "", "mine": False, "live": False, "given": False,
+                "why": "you have not given this space a token: your pushes and pulls run with your own, "
+                       "given under Repository in its notebook's Settings"}
     if g and not own_line(project):
         shut = [u for u, _ in g if _live(u) and _locked(u)]
         return {"by": "", "mine": False, "live": False, "given": False,
@@ -398,17 +409,18 @@ def _settled(project):
 def helpers(project, uid=None, why="git"):
     """The credential helpers for git work on this project, in the order
     git asks them (R159): a handout of the acting person's own token, when
-    they gave this project one and are signed in with their store open;
-    else a handout of any signed-in giver's whose store is open; then the
-    project's helper for a line kept as the project's own from before. A
-    handout (unlocks.handout) is the opened line in a file of its own for
-    the window, so the helper opens nothing itself and each opening is a
-    use on the person's Profile (R158 step 5)."""
+    they gave this project one and are signed in with their store open,
+    and never another person's (the operator, 23 Nov); for work that is
+    nobody's (uid "", watching CI) a handout of any signed-in giver's whose
+    store is open; then the project's helper for a line kept as the
+    project's own from before. A handout (unlocks.handout) is the opened
+    line in a file of its own for the window, so the helper opens nothing
+    itself and each opening is a use on the person's Profile (R158 step 5)."""
     uid = acting() if uid is None else uid
     out = []
     g = givers(project)
     handed = ""
-    for u, fid in ([(uid, given_by(project, uid))] if uid and given_by(project, uid) else []) + [x for x in g if x[0] != uid]:
+    for u, fid in ([(uid, given_by(project, uid))] if given_by(project, uid) else []) if uid else g:
         if not _live(u) or _locked(u):
             continue
         e = _accounts().entry_for(u, fid)

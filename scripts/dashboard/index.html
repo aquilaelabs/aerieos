@@ -888,7 +888,7 @@
       <button type="button" id="rnRepoGo"></button></div></div>
     <div class="field" id="rnGitNone" hidden><div class="hint"></div></div>
     <div class="field" id="rnTokenField" hidden>
-      <label for="rnToken">Access token<span class="help" data-help="leave empty to keep the current one" tabindex="0">?</span></label>
+      <label for="rnToken">Your access token<span class="help" data-help="yours alone: your pushes and pulls here use it; leave it empty to keep the one you gave" tabindex="0">?</span></label>
       <input id="rnToken" type="password" autocomplete="off" spellcheck="false"
              placeholder="ghp_… or github_pat_…">
       <!-- What to give the token for what an agent should do there (R188):
@@ -931,9 +931,9 @@
     <div class="field" id="rnAuthField" hidden>
       <label id="rnAuthLabel">Authentication</label>
       <div class="pseg" role="group" aria-labelledby="rnAuthLabel">
-        <button id="rnAuthNone" type="button">Disabled</button>
+        <button id="rnAuthNone" type="button">Off</button>
         <button id="rnAuthKey" type="button">Deploy key</button>
-        <button id="rnAuthToken" type="button">Access token</button>
+        <button id="rnAuthToken" type="button">Each person's token</button>
       </div>
       <div class="hint" id="rnAuthHint"></div>
     </div>

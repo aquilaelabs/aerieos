@@ -18,7 +18,7 @@ import logins       # noqa: E402
 import signing      # noqa: E402
 
 KEY = bytes(range(32))
-ADA, BOB = "u_0000000a", "u_0000000b"
+ADA, BOB, CAT = "u_0000000a", "u_0000000b", "u_0000000c"
 ADA_LINE = "https://ada:ghp_adaadaadaadaadaada1@github.com"
 BOB_LINE = "https://bob:ghp_bobbobbobbobbobbob1@github.com"
 
@@ -87,7 +87,9 @@ class PerPerson(unittest.TestCase):
         self.assertEqual(gitcreds.read_line("web", uid=""), "", "nobody signed in: nothing, and CI watching pauses")
         logins.mint(BOB, "phone")
         self.assertEqual(gitcreds.read_line("web", uid=""), BOB_LINE)
-        self.assertEqual(gitcreds.read_line("web", uid=ADA), BOB_LINE, "Ada signed out: Bob's, as the space's helper gives it")
+        self.assertEqual(gitcreds.read_line("web", uid=ADA), "", "Ada signed out: her work waits for her, never Bob's (the operator, 23 Nov)")
+        self.assertEqual(gitcreds.read_line("web", uid=CAT), "", "Cat gave none: nobody's is lent to her")
+        self.assertEqual(gitcreds.helpers("web", CAT), [], "...nor handed to her git")
         logins.mint(ADA, "desk")
         self.assertEqual(gitcreds.read_line("web", uid=ADA), ADA_LINE, "signed in: her own first")
         # The acting account, set per request, is the default.
@@ -98,16 +100,21 @@ class PerPerson(unittest.TestCase):
             gitcreds.ACTING.reset(tok)
 
     def test_usable_says_what_a_push_runs_with_or_waits_on(self):
-        self.assertIn("no git token", gitcreds.usable("web", ADA)["why"])
+        self.assertIn("no git token", gitcreds.usable("web", "")["why"], "nobody's work, nobody's token")
+        self.assertIn("you have not given this space a token", gitcreds.usable("web", ADA)["why"])
         gitcreds.link_account("web", ADA, self.ada)
         u = gitcreds.usable("web", ADA)
         self.assertEqual((u["mine"], u["live"]), (True, False))
         self.assertIn("aerie git waits for you to sign in", u["why"])
-        self.assertIn("nobody who gave this space a token is signed in", gitcreds.usable("web", BOB)["why"])
+        self.assertIn("you have not given this space a token", gitcreds.usable("web", BOB)["why"])
+        self.assertIn("nobody who gave this space a token is signed in", gitcreds.usable("web", "")["why"])
         logins.mint(ADA)
         self.assertEqual(gitcreds.usable("web", ADA), {"by": ADA, "mine": True, "live": True, "given": True, "why": ""})
         u = gitcreds.usable("web", BOB)
-        self.assertEqual((u["by"], u["mine"], u["why"]), (ADA, False, ""), "Bob's press runs with Ada's, who is signed in")
+        self.assertEqual((u["by"], u["mine"]), ("", False), "Bob's press runs with his own token alone, never Ada's (the operator, 23 Nov)")
+        self.assertIn("you have not given this space a token", u["why"])
+        u = gitcreds.usable("web", "")
+        self.assertEqual((u["by"], u["why"]), (ADA, ""), "work that is nobody's, watching CI, takes any signed-in giver's")
 
     def test_a_sign_in_runs_out_with_its_cookie(self):
         lid = logins.mint(ADA)

@@ -396,17 +396,27 @@ is used only while its person is
 signed in, on any browser or device (the phone app counts): your sessions'
 `aerie git`, your presses in the Git view, the release you cut and the wiki
 you sync all run with yours, and signed out everywhere, a session of yours
-is told that `aerie git` waits for you. The Git view's line says whose token a
-press would use. Work that is nobody's in the moment (watching CI) takes
-the token of anyone on the space signed in now, and pauses, said on the
-space, while nobody who gave one is. A space's token from before 0.9.0
-stays its owner's for that space.
+is told that `aerie git` waits for you. Everyone's pushes run at the same
+time, each with their own token and its rights, and never with another
+person's: somebody who has not given a token is told to give theirs, and
+their push or pull waits until they do. Work that is nobody's in the moment
+(watching CI) takes the token of anyone on the space signed in now, and
+pauses, said on the space, while nobody who gave one is. A space's token
+from before 0.9.0 stays its owner's for that space.
 
-A space that already has push rights can be given a token from its host's
-settings, in its menu, including one that pushes with a **deploy key**. Setting one there
-does not switch anything by itself: git never asks a credential helper about an
-ssh remote, so a space with an `ssh://` or `git@` origin goes on using its
-key however many tokens are stored for it.
+**Where a repository links is its owner's.** It has one git host link,
+and its address, its **Authentication**, its deploy key, **Unlink** and
+**Link to a git host** are changed by the space's owner, or AerieOS's own
+owner, alone; anybody else reads them in the section under a line naming
+the owner, and gives or takes back their own token there.
+
+The section is **Repository**, in a repository's notebook Settings; the
+chain on its card and its menu's git host item open it there. A space that
+already has push rights can be given tokens there, including one that
+pushes with a **deploy key**. Giving one does not switch anything by itself:
+git never asks a credential helper about an ssh remote, so a space with an
+`ssh://` or `git@` origin goes on using its key however many tokens are
+given to it.
 
 The same section holds the space's **deploy key**, beside the token:
 **Make a key** makes one and **Paste a key** keeps one you already have. The
@@ -418,26 +428,29 @@ the host's deploy-keys page, the key becomes the ssh remote to switch to,
 and a key in use is not forgotten out from under the push. A key dropped
 into the secrets folder's `ssh/` by hand works as before.
 
-None of this is GitHub's alone. The same dialog, the same file and the same
+None of this is GitHub's alone. The same section, the same files and the same
 switch serve a Gitea, a Forgejo, a GitLab or anything else git can reach; only
 two things differ by host, and both live in `forges.py`: whether a token can
 be checked before it is stored, and whether a missing repository can be
 created. Where the host has no API for either, the first fetch is the check
-and the repository has to exist already, which the dialog says in a line.
+and the repository has to exist already, which the section says in a line.
 
-The **Authentication** segment beside that field is what changes it. Three
-answers, not two: *Disabled*, *Deploy key* and *Access token*. It shows which
-one the remote actually reaches for and lets you move between them; the change
-is applied when you press Save, which is also how a token typed in the same
-dialog gets written before the switch that needs it. Under the hood it is one
+The **Authentication** segment under the tokens is what changes it, and it is
+the owner's. Three answers, not two: *Off*, *Deploy key* and *Each person's
+token*. It shows which one the remote actually reaches for and lets the owner
+move between them; the change is applied when they press Save, which is also
+how a token typed in the same section gets written before the switch that
+needs it. Under the hood it is one
 `git remote set-url`, between `git@…:owner/repo.git` and
 `https://host/owner/repo.git`, plus the credential helper.
 
-*Disabled* is a real answer rather than the absence of one: the remote keeps
-its https form and the helper comes off it, so a push is refused instead of
-quietly falling back on whatever else git can find. It is also what makes the
-dangerous case sayable: **clearing a token while the switch still says
-*Access token* is refused at Save**, in those words. The pick is left exactly
+*Off* is a real answer rather than the absence of one: the remote keeps its
+https form and the helper comes off it, so a push is refused at once, saying
+so, instead of quietly falling back on whatever else git can find; the
+section says over the tokens that pushes are off. It is also what makes the
+dangerous case sayable: **clearing the space's own token while the switch
+still says *Each person's token* and nobody else has given one is refused at
+Save**, in those words. The pick is left exactly
 where you put it and the reason is stated, rather than sliding to another mode
 on your behalf: being corrected without being asked is how you end up on a
 credential you did not choose.
@@ -447,7 +460,8 @@ out (the operator, 7 Oct). It runs `git ls-remote` for the read and `git push
 --dry-run` of HEAD to a branch nobody has for the write, which the host refuses
 at the handshake when a deploy key is read-only or a token cannot push, and
 which sends nothing; the space's own pre-push hook is skipped, so a clone
-without push rights is still asked about its credential. For a token it also
+without push rights is still asked about its credential. A token remote is
+tried with your own token, as your pushes are. For a token it also
 asks the host's API what git cannot see: on GitHub a classic token's scopes
 (without `workflow` a push touching `.github/workflows` is refused) and the
 repository's push permission, on GitLab the role and the token's scopes, on
@@ -460,13 +474,14 @@ constant: a deploy-key remote names a `bb-<key>-<host>` alias, and the server
 it stands for is resolved out of `~/.ssh/config` with `ssh -G`, which reads
 the file and touches no network.
 
-**A stored token is closed, not shown.** Only its file has the value, so the
-field cannot be pre-filled and typing over an invisible one is how a working
-credential gets replaced by accident. It is disabled, with **Clear the stored
-token** under it: pressing that opens the field for a new one, ghosts the
-*Access token* side and puts the choice back on *Deploy key*. Like everything
-else in this dialog it is staged: the space changes when you press Save,
-and the link offers the way back until you do.
+**A token is never shown.** Only your own store has the value, so the field
+is never pre-filled: **Your access token** is empty, and a token typed there
+replaces the one you gave when you press Save. A token kept as the space's
+own, from before each person gave their own, is its owner's: **Clear the
+token kept as the space's own** under the field ghosts the *Each person's
+token* side where nobody else has given one and puts the choice back on
+*Deploy key*. Like everything else in the section it is staged: the space
+changes when Save is pressed, and the link offers the way back until then.
 
 Clear the only credential a space has and both sides go quiet, with a line
 saying it cannot push to GitHub and that everything else, commit, branch and

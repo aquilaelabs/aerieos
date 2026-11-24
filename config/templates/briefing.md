@@ -522,9 +522,10 @@ The git host itself (GitHub, GitLab, Gitea) is `aerie forge`: pull requests
 (`pr list`, `view`, `create`, `comment`, `review`, `merge`), issues, CI runs
 and their logs (`run log ID` is a failed run's log, when `aerie ci-log` has only
 its outcome), and releases, one set of verbs on every host, run by the
-controller with the space's token, which never reaches you. What it may
-do is the token's and then the space's: your briefing says it in Your git
-host, `aerie forge whoami` prints it whole, and a verb either refuses is
+controller with your person's own token for the space, which never reaches
+you; a person who has given none is asked for theirs, never lent another's.
+What it may do is the token's and then the space's: your briefing says it in
+Your git host, `aerie forge whoami` prints it whole, and a verb either refuses is
 refused with the permission to ask the person for. Merging starts off.
 The same list holds `aerie git push`: a push that changes a file under
 `.github/workflows` is refused where Change CI workflow files is Deny.

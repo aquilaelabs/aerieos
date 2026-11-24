@@ -12436,7 +12436,7 @@ class Handler(BaseHTTPRequestHandler):
         dialog is only drawn for an administrator, so nothing offered it, and
         nothing refused a request that arrived anyway.
         """
-        if self._refused("create"):
+        if self._refused("create") or self._not_link_owner(field(req, "name").strip()):
             return None
         body, code = projects.link({**req, "_uid": users.uid_of(self._who())})
         # A project linked is a project whose CI is worth a first look now,
@@ -12449,7 +12449,7 @@ class Handler(BaseHTTPRequestHandler):
         """Take the remote off a project, with the credential and the push
         grant that came with it. See projects.unlink: local, instant, and it
         touches no commit."""
-        if self._refused("create"):
+        if self._refused("create") or self._not_link_owner(field(req, "name").strip()):
             return None
         body, code = projects.unlink(req)
         return self._json(body, code)
@@ -13893,10 +13893,26 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self._refused("rename", name):
             return
+        # The remote's address, its authentication and a token kept as the
+        # space's own are its owner's; a person's own token is theirs.
+        if (field(req, "address") or field(req, "auth") or req.get("clear_token")) and self._not_link_owner(name):
+            return
         # Nothing on disk moves: the name shown is the registry's, so
         # a session, a terminal or a container holding the project is not
         # in the way of it. The account a link names is the asker (R154).
         return self._json(*projects.rename({**req, "_uid": users.uid_of(self._who())}))
+
+    def _not_link_owner(self, name):
+        """Where a repository's remote is, how it pushes, its deploy key and
+        whether it is linked at all are its owner's (the operator, 23 Nov:
+        one git host link, which only the owner changes): the space's owner
+        or AerieOS's (membership.may_manage). True, with the refusal sent,
+        for anybody else; each person's own token stays theirs to give."""
+        if membership.may_manage(self._who(), name):
+            return False
+        self._json({"error": f"where {name} links and how it pushes are its owner's to change: "
+                             f"ask {membership.owner_name(name) or 'its owner'}"}, 403)
+        return True
 
     def _project_auth(self, req):
         """What credential this project's remote uses, and what else it
@@ -13912,11 +13928,13 @@ class Handler(BaseHTTPRequestHandler):
             # ...and the stored token measured on the host again (R188).
             if not req.get("token"):
                 forgeaccess.token_changed(name)
-            return self._json(*projects.auth_test(name, str(req.get("token") or "")))
+            return self._json(*projects.auth_test(name, str(req.get("token") or ""), uid=users.uid_of(self._who())))
         # Its own deploy key, made or pasted beside the token (the operator,
         # 12 Oct): the private half goes to the root-only helper and no
         # further.
         if str(req.get("action") or "").startswith("key-"):
+            if self._not_link_owner(name):
+                return None
             return self._json(*projects.deploy_key(name, str(req["action"]), str(req.get("key") or "")))
         body, code = projects.auth_answer(name)
         if code == 200:
@@ -13927,6 +13945,10 @@ class Handler(BaseHTTPRequestHandler):
             # whether each is signed in now; what the asker's own press
             # would run with.
             body["givers"] = _givers_said(name, users.uid_of(self._who()))
+            # Whether the asker may change the link, and whose it is (the
+            # operator, 23 Nov): the page draws the owner's controls dead
+            # for anybody else, under one line naming them.
+            body["owner"] = {"me": membership.may_manage(self._who(), name), "name": membership.owner_name(name)}
             body["runs_as"] = _token_said(name, users.uid_of(self._who()))
             lk = body.get("linked") or {}
             if lk.get("uid"):

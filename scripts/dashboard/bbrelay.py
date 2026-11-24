@@ -222,11 +222,11 @@ def run(me, req, project):
         return {"error": "this space has no push rights: the operator grants them "
                          "in the clone dialog or with Link to a git host on its Spaces page; "
                          "aerie git policy says so first"}, 403
-    # ...and one whose Authentication is Disabled (an https remote with no
+    # ...and one whose Authentication is Off (an https remote with no
     # credential) pushes nowhere, said at once: such a push ran on into the
     # host and said nothing for minutes (B1119, report #131).
     if argv[:2] == ["git", "push"] and projects.remote_auth(WORKSPACE / project, project) == "none":
-        return {"error": "this space's Authentication is Disabled, so it pushes nowhere: a person picks Access token "
+        return {"error": "this space's Authentication is Off, so it pushes nowhere: its owner picks Each person's token "
                          "(or Deploy key) under Repository in its notebook's Settings and saves; nothing needs linking again"}, 403
     # The tree the session is in: the project directory, or one of its
     # worktrees. Anything else (a path outside the share, a sibling

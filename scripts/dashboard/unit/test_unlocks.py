@@ -103,7 +103,9 @@ class Unlocks(unittest.TestCase):
         self.assertEqual(accountkeys.forge_line(UID, self.fid), "")
         self.assertEqual(gitcreds.helpers("web", UID), [])
         self.assertIn("locked", gitcreds.usable("web", UID)["why"])
-        self.assertIn("locked", gitcreds.usable("web", OTHER)["why"], "the one giver signed in has it locked")
+        self.assertIn("you have not given this space a token", gitcreds.usable("web", OTHER)["why"],
+                      "somebody who gave none is lent nobody's, locked or not (the operator, 23 Nov)")
+        self.assertIn("locked", gitcreds.usable("web", "")["why"], "work that is nobody's: the one giver signed in has it locked")
         # Nobody else's secret opens it; theirs does, for the window.
         self.assertIn("error", unlocks.unlock(UID, b"x" * 32))
         got = unlocks.unlock(UID, secret, 28800)

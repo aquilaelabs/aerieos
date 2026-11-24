@@ -1674,6 +1674,28 @@ await section("the Profile tab", async () => {
            && adminSame.status === 200 && adminOff.status === 403 && can === false,
            `only AerieOS's owner changes which spaces a space's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
       }
+      // Where a space's repository links and how it pushes are its owner's
+      // (the operator, 23 Nov: one git host link, which only the owner
+      // changes): an administrator on the space is refused the address, the
+      // switch, a deploy key, Unlink and Link, each naming the owner; giving
+      // their own token stays theirs.
+      {
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
+        const tries = {
+          address: await post(adminAuth, '/api/rename', { name: 'alpha', to: 'alpha', address: 'https://github.com/owner/alpha2.git' }),
+          auth: await post(adminAuth, '/api/rename', { name: 'alpha', to: 'alpha', auth: 'none' }),
+          key: await post(adminAuth, '/api/project-auth', { name: 'alpha', action: 'key-make' }),
+          unlink: await post(adminAuth, '/api/unlink', { name: 'alpha' }),
+          link: await post(adminAuth, '/api/link', { name: 'alpha', url: 'https://github.com/owner/alpha.git' }),
+        };
+        const read = await post(adminAuth, '/api/project-auth', { name: 'alpha' });
+        const mine = await post(ownerAuth, '/api/project-auth', { name: 'alpha' });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: [] });
+        const refused = Object.entries(tries).filter(([, r]) => !(r.status === 403 && /its owner's to change/.test(r.body.error || ''))).map(([k, r]) => `${k} ${r.status}`);
+        ok(!refused.length && read.status === 200 && read.body.owner?.me === false && read.body.owner?.name
+           && mine.body.owner?.me === true,
+           `where a space links and how it pushes are its owner's: an administrator on it is refused each change, naming the owner, and told whose it is (${refused.join(', ') || 'all refused'}; ${JSON.stringify(read.body.owner)})`);
+      }
       // A key's backup goes to a person with Releases write ON the project
       // (the operator, 1 Oct; R255 step 3): adminone sees alpha and holds no
       // role on it.

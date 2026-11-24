@@ -2130,7 +2130,7 @@ ok(await page.$eval('#rnAuthKey', b => b.classList.contains('on') && !b.disabled
    'the authentication segment opens on the credential the remote actually uses');
 ok(await page.$eval('#rnAuthToken', b => b.disabled),
    '...with the token side disabled while no token is stored');
-ok(/No token is stored/.test(await page.$eval('#rnAuthHint', e => e.textContent)),
+ok(/Nobody has given it a token yet/.test(await page.$eval('#rnAuthHint', e => e.textContent)),
    '...saying so, rather than leaving a dead button to be poked at');
 await page.fill('#rnToken', 'ghp_ExampleTokenValue123');
 await page.waitForFunction(() => !document.getElementById('rnAuthToken').disabled,
@@ -2225,22 +2225,22 @@ const seen = () => page.evaluate(() => ({
   hint: document.getElementById('rnAuthHint').textContent,
 }));
 
-await authState({ now: 'ssh', token: true, ssh: true }, 'ssh');
+await authState({ now: 'ssh', token: true, ssh: true, own: true }, 'ssh');
 let v = await seen();
-ok(v.closed && v.clear && !v.key && !v.token && v.onKey,
-   'a stored token closes the field and offers a way to clear it, both sides live');
+ok(!v.closed && v.clear && !v.key && !v.token && v.onKey,
+   'a token kept as the space\'s own offers its owner a way to clear it, the field open for their own, both sides live');
 await page.click('#rnTokenClear');
 v = await seen();
 ok(!v.closed && v.token && v.onKey && !v.onToken,
-   '...and clearing opens the field, ghosts the token side and puts the pick back on the key');
-ok(await page.$eval('#rnTokenClear', b => /Keep the stored token/.test(b.textContent)),
+   '...and clearing ghosts the token side and puts the pick back on the key');
+ok(await page.$eval('#rnTokenClear', b => /Keep the space's own token/.test(b.textContent)),
    '...with the way back offered, since nothing has happened to the space yet');
 
 // Only a token, no key: the side that does not exist is the ghosted one, and
 // the pick cannot leave the side that does.
-await authState({ now: 'https', token: true, ssh: false }, 'https');
+await authState({ now: 'https', token: true, ssh: false, own: true }, 'https');
 v = await seen();
-ok(v.closed && v.key && !v.token && v.onToken,
+ok(!v.closed && v.key && !v.token && v.onToken,
    'with no deploy key the key side is ghosted and the pick stays on the token');
 // Clearing does NOT slide the pick somewhere else. It stays where it was put,
 // goes invalid, and Save refuses: being corrected without being asked is how
@@ -2249,7 +2249,7 @@ await page.click('#rnTokenClear');
 v = await seen();
 ok(v.onToken && v.token,
    'clearing the token leaves the pick where it was, and ghosts it');
-ok(v.bad && /none will be stored/.test(v.hint),
+ok(v.bad && /nobody's will be given/.test(v.hint),
    '...saying in red that there will be nothing to authenticate with');
 ok(/no access token after this save/.test(await sectSave(page, 'repo')),
    '...and Save refuses rather than writing a remote with no credential');
@@ -2261,6 +2261,24 @@ await page.click('#rnAuthNone');
 v = await seen();
 ok(v.onNone && !v.bad,
    '...and picking it settles the dialog, because nothing is missing any more');
+// Somebody who is not its owner (the operator, 23 Nov): the switch and the
+// deploy key's verbs are dead or not drawn, the switch's line naming whose
+// it is, and the tokens' rows say each person pushes with their own.
+await authState({ now: 'none', token: true, ssh: true, deploy: null, owner: { me: false, name: 'ada' },
+  givers: [{ id: 'f1', name: 'ada', host: 'github.com', login: 'ada', mine: false, live: true },
+           { id: 'f2', name: 'stencil', host: 'github.com', login: 'me', mine: true, live: true }], store: [] }, 'none');
+const other = await page.evaluate(() => { rnDrawKey(); rnDrawStore('alpha'); return {
+  sw: ['rnAuthNone', 'rnAuthKey', 'rnAuthToken'].map(id => document.getElementById(id).disabled),
+  hint: document.getElementById('rnAuthHint').textContent,
+  key: document.getElementById('rnKeyField').hidden,
+  rows: [...document.querySelectorAll('#rnStore .setrow')].map(r => r.textContent.replace(/\s+/g, ' ').trim()),
+  off: document.querySelector('#rnStore .rnauthoff')?.textContent || '',
+  clear: !document.getElementById('rnTokenClear').hidden }; });
+ok(other.sw.every(Boolean) && /ada, its owner, sets this/.test(other.hint) && other.key && !other.clear
+   && other.rows.some(r => /^ada's github\.com token, as ada: their pushes and pulls here use it/.test(r))
+   && other.rows.some(r => /^Your github\.com token, as me: your pushes and pulls here use it.*Take it back$/.test(r))
+   && /ada, its owner, has Authentication set to Off/.test(other.off),
+   `for anybody but its owner the switch is dead and says whose it is, no deploy key is offered, and each person's row says their own pushes use it (${JSON.stringify(other).slice(0, 300)})`);
 
 // File access over FTP (R151): the owner's section, staged until Save. alpha
 // has no node here, so turning it on is refused in the dialog by name; an
