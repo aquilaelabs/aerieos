@@ -21,7 +21,7 @@
 - A picked row in a list (a settings section, a user, a role, a commit) is lifted with a bar of the theme's highlight at its left, where the default scheme washed it brown (22e730c)
 - nginx, the scanners and the model router open for Configure Read on their node, and a page read without Configure Write says so and draws no control, where every control was drawn and refused on the press (91409d8)
 - On a phone a page's placeholder opens the one section the page opens on, where it stood every section open and folded the rest away as the page came, and a space's Overview opens on its first section (8c583d2)
-- The bell and the Notifications page are two sections: Active, what waits on your answer (every ask queued, at the top in gold) and what stops work, none of which can be dismissed; and Earlier, where an ask moves once answered or expired, saying how it went, beside what can be dismissed and what the page said (9c87cc5)
+- The bell and the Notifications page are two sections: Active, what waits on your answer (every ask queued, at the top in gold) and what stops work, none of which can be dismissed; and Earlier, where an ask moves once answered or expired, saying how it went, beside what can be dismissed and what the page said, with no gold, since none of it waits on you; the page's Clear history clears History and never Active (9c87cc5, 5173174)
 
 ### Fixed
 
