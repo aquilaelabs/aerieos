@@ -343,7 +343,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 .rdetail>.rfoot{display:flex;align-items:center;gap:8px;margin-top:var(--row-y);padding-top:var(--row-y);
   border-top:var(--hair) solid var(--line)}
 .rdetail>.setgrid{margin:var(--row-y) 0}
-.rprojects{display:flex;flex-direction:column}
+.rprojects{display:flex;flex-direction:column;container-type:inline-size}
 /* A project an account is on, one row (the operator, 26 Oct): its name, its
    roles there beside it, and taking it off at the row's end, never a lone
    button wrapped onto a line of its own. */
@@ -353,7 +353,20 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 .rproj .upick{margin:0;display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
 @media (max-width:600px){ .rproj{grid-template-columns:minmax(0,1fr) auto} .rproj .upick{grid-column:1 / -1;grid-row:2}
 }
+/* ...and the same wherever its column is narrow, as the account's pane beside
+   the list is at a desk: side by side, a long role ran on under the trash
+   (the operator, 24 Nov). A role's words wrap within their place. */
+@container (max-width:36rem){ .rproj{grid-template-columns:minmax(0,1fr) auto} .rproj .upick{grid-column:1 / -1;grid-row:2}
+}
+.rproj .upick label.pick{min-width:0;max-width:100%;overflow-wrap:anywhere}
 .raddon{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:8px}
+/* The account's roles run the width of its pane as the fields over them do
+   (the operator, 24 Nov: held to a control's width, its spaces' rows ran a
+   long role under the trash); its pickers keep a control's width. */
+.ueaccess.setrow.col,#ueAccess .setrow.col{max-width:none}
+/* A built-in role's line keeps the field gap from the areas over it, where
+   it sat on the table's last rule. */
+.rbuiltin{margin-top:var(--field-gap)}
 .raddon select{width:100%;min-width:0}
 @media (max-width:600px){ .raddon{grid-template-columns:minmax(0,1fr) auto} .raddon>select:first-child{grid-column:1 / -1}
 }

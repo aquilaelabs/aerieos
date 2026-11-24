@@ -68,7 +68,7 @@ let usersPick = "";              // the account on show
 let usersPhoneOpen = false;      // on a phone, the settings are over the list
 let usersMoveNext = "";          // the slide the next draw plays
 let usersEdit = null;            // what is typed into the picked account's fields
-let usersRolesAsked = false;     // /api/roles read once for the roles fields
+let usersRolesAsked = "";        // the accounts /api/roles was last read for, the roles fields' read
 const USER_KEYS = ["name", "full", "email", "git_name", "git_email", "pw"];
 
 function usersEditFrom(u){
@@ -134,7 +134,7 @@ function usersDetail(u){
       ${f("ueGitEmail", "git_email", "Git email", "email", "", "on their commits. Blank means their email")}
       ${f("uePw", "pw", "New password", "password", 'autocomplete="new-password"', "blank keeps the current one. Set without the old one, which is the way back in for somebody locked out")}
     </div>
-    <div class="setrow col ueaccess ctlrow">${lbl("", "Roles and spaces", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
+    <div class="setrow col ueaccess">${lbl("", "Roles and spaces", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
     <div class="sub bad" id="ueErr" hidden></div>
     ${ro ? "" : saveBar({save: 'id="ueSave"', revert: 'id="ueRevert"', state: usersDirty() ? "unsaved" : "", dead: !usersDirty()})}
     ${u.devices ? `<div class="uedevices"><span class="lbl">Devices${helpIcon("the apps signed in as this account on its machines; Disconnect cuts one off for them, as a lost laptop needs")}</span>${
@@ -171,7 +171,14 @@ function renderUsersInto(i){
     drawHTML(d.list, `<div class="row bad"><div class="grow">${esc(usersErr)}</div></div>`);
     return;
   }
-  if (rolesData === null && !usersRolesAsked){ usersRolesAsked = true; loadRoles().then(usersRedraw); }
+  // The roles read for the accounts listed, and read again when the list
+  // names one that read does not know (added in another browser, by aerie
+  // or the API): its roles read as not this person's to give (the
+  // operator's screen, 24 Nov). Once for each list of names, so an account
+  // the read leaves out on purpose asks for nothing more.
+  const names = usersList.map(x => x.name).sort().join("\n");
+  const unknown = rolesData && usersList.some(x => !(rolesData.people || []).some(p => p.name === x.name));
+  if ((rolesData === null || unknown) && usersRolesAsked !== names){ usersRolesAsked = names; loadRoles().then(usersRedraw); }
   if (!usersPicked()) usersPick = usersList[0]?.name || "";
   const u = usersPicked();
   // The page's head, as every page of settings has one (the operator, 29

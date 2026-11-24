@@ -27,12 +27,16 @@ function openRolesTab(){
   openTab({kind: "roles", arg: "__roles", label: "Roles"});
 }
 
+// A read of the roles on its way: an account it does not know yet waits
+// for it rather than reading as one whose roles are not the asker's.
+let rolesReading = false;
 function loadRoles(){
-  return readKept("roles", "/api/roles", {
+  rolesReading = true;
+  return Promise.resolve(readKept("roles", "/api/roles", {
     err: said => { rolesErr = said; },
     keep: () => { rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false}; },
     land: j => { rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j; },
-  });
+  })).finally(() => { rolesReading = false; });
 }
 
 // `now`, where the page knows the result before the answer, draws it on the
@@ -74,6 +78,9 @@ function rolesAccessFields(name){
   const d = rolesData;
   if (rolesWho !== name){ rolesWho = name; rolesPeopleDraft = null; }
   const p = rolesPerson();
+  // Still being read, or read before this account was made: its shape
+  // while the read lands, never a refusal it has not had.
+  if (!d || (!p && rolesReading)) return skRows(2);
   if (!p) return `<div class="sub dim">${esc(name)}'s roles are not yours to give.</div>`;
   if (p.role === "owner")
     return `<div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div>`;
@@ -108,12 +115,12 @@ function rolesAccessFields(name){
   // project with, and the place that makes one is named instead of an
   // empty picker.
   const add = ro ? "" : notOn.length && !off.length ? `<div class="sub dim raddon">No role on a space yet: one made on the ${pageLink("roles", "Roles page")} puts ${esc(p.name)} on a space.</div>`
-    : off.length ? `<div class="raddon">
+    : off.length ? `<div class="raddon ctlrow">
       <select id="rolesAddProj" aria-label="the space">${optionList(off.map(pn => [pn, projLabel(pn)]), addPn)}</select>
       <select id="rolesAddRole" aria-label="the role there">${optionList(rolesOnProject(addPn).map(r => [r.name, r.label || r.name]))}</select>
       <button type="button" id="rolesAddOn"${rolesOnProject(addPn).length ? "" : " disabled"}>Add to space</button></div>` : "";
   return `${global}
-    <div class="setrow col ctlrow">${lbl("", d.admin || ro ? "Spaces" : "Your spaces", "a role on a space puts the account on it; taken off, it is not on it")}
+    <div class="setrow col">${lbl("", d.admin || ro ? "Spaces" : "Your spaces", "a role on a space puts the account on it; taken off, it is not on it")}
       <div class="rprojects">${rows || `<div class="empty">on no space yet</div>`}</div>${add}</div>
     ${rolesCanDo(p.name, dr)}`;
 }
@@ -121,18 +128,23 @@ function rolesAccessFields(name){
 // Its controls, wired in `el`; `redraw` draws the fields again from the draft.
 function wireRolesAccess(el, redraw){
   // Off a project: every role it held there goes, which is being off it.
-  el.querySelectorAll("[data-rprojoff]").forEach(b => b.onclick = () => {
+  // ...the row leaving as a row does, faded as its height folds.
+  el.querySelectorAll("[data-rprojoff]").forEach(b => b.onclick = () => leaveBox(b.closest(".rproj"), () => {
     delete rolesPeopleDraft.project_roles[b.dataset.rprojoff];
     redraw();
-  });
+  }));
   // On a project: the one picked, with the role picked for it there.
   const ap = el.querySelector("#rolesAddProj"), ar = el.querySelector("#rolesAddRole"), ao = el.querySelector("#rolesAddOn");
   if (ap) ap.onchange = () => { rolesAddProj = ap.value; redraw(); };
+  // ...the space's row arriving as a row does, unrolled from nothing.
   if (ao) ao.onclick = () => {
     if (!ap?.value || !ar?.value) return;
-    rolesPeopleDraft.project_roles[ap.value] = [ar.value];
+    const pn = ap.value;
+    rolesPeopleDraft.project_roles[pn] = [ar.value];
     rolesAddProj = "";
     redraw();
+    const row = el.querySelector(`.rproj[data-rproject="${CSS.escape(pn)}"]`);
+    if (row) arriveBox(row);
   };
   el.querySelectorAll("[data-rglobal]").forEach(cb => cb.onchange = () => {
     const dr = rolesPeopleDraft, n = cb.dataset.rglobal;
@@ -351,7 +363,7 @@ function rolesRoleBody(){
       </select></div>
     ${ro ? "" : `<div class="setrow col ctlrow">${lbl("rolesNote", "What this role is for")}<input id="rolesNote" value="${esc(r.note)}" autocomplete="off"></div>`}
     ${areas}
-    ${r.builtin ? `<div class="sub">${esc(r.note)}. Built in, every area to write, and not changed here.</div>`
+    ${r.builtin ? `<div class="sub rbuiltin">${esc(r.note)}. Built in, every area to write, and not changed here.</div>`
       : ""}
     ${r.fresh ? "" : `<label class="ndcap rtwofactor"><input type="checkbox" id="rolesTf"${
       d.roles[r.name]?.two_factor ? " checked" : ""}${d.admin ? "" : " disabled"}> Require two-factor sign-in of everybody holding it${
