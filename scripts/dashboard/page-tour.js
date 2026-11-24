@@ -21,7 +21,7 @@ const TOUR_STEPS = {
     {say: "Welcome to AerieOS. Home is what the whole install is doing at a glance: what is running, what failed, and what wants your attention."},
     {at: "#rail, .railbar", say: "Every page is here, grouped. A group with several tools opens on the first and carries the rest along its top."},
     {at: "#jump", say: "Search jumps to a page, a space, a container or a node by name. Enter opens the first match."},
-    {at: "#bBell", say: "The bell holds what needs a person: updates due, failures, and anything a session is asking you to allow."},
+    {at: "#bBell", say: "The bell holds what needs a person. Active, at its top, is what a session asks you to allow and what stops work; Earlier is what can wait, such as an update due."},
     {at: `${TOUR_PANE} .tiles, ${TOUR_PANE} .hometiles`, say: "Each number opens the page that holds it."},
     {at: "#pane1 .bar, .dockline", say: "The dock at the foot keeps the chat and your terminals and agents' sessions, whichever page you are on. Pull it up to work in one."},
   ],
