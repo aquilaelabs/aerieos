@@ -381,7 +381,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // failed fetch or a name not defined was let through as its doing came
   // off with the other layers (R7 step 7).
   const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);
-  // WebKit's line for a load of the page's own origin it cancelled itself,
+  // WebKit's line for a load of the page's own origin it canceled itself,
   // under a gate's load ("Fetch API cannot load URL due to access control
   // checks", B1141). Nothing the server does is worded so (proven 24 Nov in
   // WebKit: a dropped or reset connection is "Connection terminated
