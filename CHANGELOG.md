@@ -27,6 +27,13 @@
 - A list narrowed by a chip no longer draws rows over each other while it changes: what leaves goes first, then what stays slides, then what arrives fades in (f440cd4)
 - On a phone in Safari a toast over a dialog sits just above its buttons, where it floated 16px above them (26f9850)
 - On Safari a read the controller does not answer is said in those words, where it said Fetch is aborted (743a9e8)
+- A node's uninstall leaves alone an account that was there before AerieOS, and the shell running it, and keeps the port 22 rule and the hosting firewall working when they stay (3434533)
+- A session on a node can no longer bring another space's CI logs into its view by naming that space's repository in its own git settings, nor have a worktree made of another space's repository (bcef718)
+- A node makes the folders a session's view lands on through no link the session left, and a space's tree mapped to its person's own account is no way to root (fab6a16)
+- A VM is refused a device the host needs: its LAN card, the disk controller it boots from, a card in their IOMMU group, or a USB device it uses (a6b040e)
+- A backup of the controller's state is refused onto a disk that keeps no file modes (exFAT, FAT, a share that gives every file one), where its secrets would be readable by anyone there; any other backup there says so (0eff3a2)
+- The array's mover copies a share's files a folder at a time through folders it holds, so a folder swapped for a link while it moves takes nothing anywhere else (0fabf35)
+- SnapRAID keeps its catalogue on each data disk in a folder only root may write, where a link planted beside it on a disk anybody could write was followed as root (a524955)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
