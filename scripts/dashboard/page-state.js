@@ -66,9 +66,9 @@ const lbl = (id, text, help) => `<label class="lbl"${id ? ` for="${esc(id)}"` : 
 // button's ring (pressTie). With {blob: true} the answer is a file:
 // {blob, name} where it landed.
 function postJSON(path, body, opts = {}){
-  return pressTie(writeOut(answerOf(fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
-                                                 body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {}),
-                                                 ...timeLimit(opts.read ? READ_WAIT_MS : WRITE_WAIT_MS)}), opts), opts));
+  return pressTie(writeOut(answerOf(limitedFetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+                                                 body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {})},
+                                                 opts.read ? READ_WAIT_MS : WRITE_WAIT_MS), opts), opts));
 }
 // How long a read may take before it is given up on and said as not
 // answered (B1002): one /api/status that never answered (git on a stalled
@@ -80,7 +80,16 @@ function postJSON(path, body, opts = {}){
 // (index.html).
 const READ_WAIT_MS = 90000, REVS_WAIT_MS = 30000, WRITE_WAIT_MS = 1200000;
 const timeLimit = ms => typeof AbortSignal?.timeout === "function" ? {signal: AbortSignal.timeout(ms)} : {};
-const readFetch = (url, ms = READ_WAIT_MS) => fetch(url, timeLimit(ms));
+// A request held to its limit, which throws the limit's own reason when the
+// limit is what ended it: a TimeoutError in every engine, where WebKit threw
+// an AbortError for it ("Fetch is aborted") and Firefox throws one for a read
+// the page cut short on its way out (B1125). So a read that was not answered
+// is said as one, and a page leaving is told apart from it.
+function limitedFetch(url, init, ms){
+  const o = timeLimit(ms);
+  return fetch(url, {...init, ...o}).catch(e => { throw o.signal?.aborted && o.signal.reason ? o.signal.reason : e; });
+}
+const readFetch = (url, ms = READ_WAIT_MS) => limitedFetch(url, {}, ms);
 // ...a file's bytes as the body, for an upload the server spools (an archive,
 // an ISO), answered the same way...
 function postFile(path, file, type = ""){

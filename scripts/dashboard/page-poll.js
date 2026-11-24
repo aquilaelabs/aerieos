@@ -332,6 +332,11 @@ async function refresh(){
     awayEnd();
     lastOkAt = Date.now();
   }catch(e){
+    // A read the page itself cut short as it goes (a reload, a new
+    // address) is no failure of the poll: Firefox runs this catch on the
+    // way out, where Chromium has stopped the old page's script (B1125).
+    // A read held past its limit comes as a TimeoutError, and counts.
+    if (e?.name === "AbortError") return;
     pollFails++;
     // Away for a restart: said calmly, and asked again soon (awayCalm).
     if (!answered && awayCalm()) return;
