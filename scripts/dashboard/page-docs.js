@@ -573,7 +573,7 @@ const sectLoud = {};
 // `fold`: a fold on purpose, shut until opened at every width (the Projects
 // page's Archived, a read made only when it is opened); every other section
 // at a page's level stands open at a desk and does not fold there.
-function docSection(kind, id, title, status, body, {cls = "", open, loud = false, prime = false, fold = false, item = false} = {}){
+function docSection(kind, id, title, status, body, {cls = "", open, loud = false, prime = false, fold = false, item = false, sectCls = ""} = {}){
   const key = `${kind}:${id}`;
   const turned = loud && !sectLoud[key];
   sectLoud[key] = loud;
@@ -583,7 +583,9 @@ function docSection(kind, id, title, status, body, {cls = "", open, loud = false
   // `prime`: the section a view is opened for (Artifacts' Files), open by
   // default beside the first on a desktop. `data-set`: its caller said open
   // or shut, which a default never overrules.
-  return `<details class="sect" data-sect="${esc(key)}"${isOpen ? " open" : ""}${turned ? " data-lead" : ""}${prime ? " data-prime" : ""}${open !== undefined ? " data-set" : ""}${fold ? " data-fold" : ""}${item ? " data-item" : ""}>
+  // `cls` is the status's tone; `sectCls` the section's own (svcro: read
+  // without the grant that changes it, R277).
+  return `<details class="sect${sectCls ? " " + sectCls : ""}" data-sect="${esc(key)}"${isOpen ? " open" : ""}${turned ? " data-lead" : ""}${prime ? " data-prime" : ""}${open !== undefined ? " data-set" : ""}${fold ? " data-fold" : ""}${item ? " data-item" : ""}>
     <summary><span class="t">${esc(title)}</span>${
       status ? `<span class="sst${cls ? " " + cls : ""}">${esc(status)}</span>` : ""}</summary>
     <div class="body">${body}</div>

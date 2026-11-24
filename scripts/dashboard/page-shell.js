@@ -668,7 +668,20 @@ const GROUP_HEADS = {
 // container, and not the controller's own machine on a page not built for
 // one (NOT_ON_OWN).
 function machinesLive(kind = ""){
-  return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && NOT_ON_OWN.has(kind)));
+  const all = (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && NOT_ON_OWN.has(kind)));
+  // A reader the Nodes listing gives no node (no Nodes Read) is offered the
+  // nodes the page itself read (Configure Read on a node's services, R277),
+  // where the header said "No node yet" over a page showing one.
+  return all.length || nodesList === null ? all : pageNodes(kind);
+}
+// The nodes a page of the group read for itself (Storage, nginx, the
+// scanners), as the header's picker takes them; [] for the rest. `page`
+// marks one known only from there: no state of its own to say.
+function pageNodes(kind){
+  const rows = kind === "storage" ? (typeof storageList !== "undefined" && storageList)
+    : kind === "nginx" ? (typeof nginxList !== "undefined" && nginxList)
+    : kind === "scanners" ? (typeof scannersData !== "undefined" && scannersData?.nodes) : null;
+  return (rows || []).map(n => ({id: n.node, name: n.name, live: n.live, page: true}));
 }
 function machinesNode(kind){
   return NODE_PICKED[kind]?.() || "";
@@ -768,8 +781,7 @@ function groupHeader(t, g){
     nodesKnown();
     // A page that has its nodes before the list lands (Storage, nginx) is
     // drawn from them, so its picker is there with its rows.
-    const have = t.kind === "storage" ? (typeof storageList !== "undefined" && storageList || []).map(n => ({id: n.node, name: n.name, live: n.live}))
-      : t.kind === "nginx" ? (typeof nginxList !== "undefined" && nginxList || []).map(n => ({id: n.node, name: n.name, live: n.live})) : [];
+    const have = pageNodes(t.kind);
     if (!have.length) return `<span class="phead mchead">${nodePick("", null)}${skv(5, "ndstatesk")}<span class="sp"></span></span>`;
     return `<span class="phead mchead">${nodePick("ndPick", have, machinesNode(t.kind) || have[0].id)}${skv(5, "ndstatesk")}<span class="sp"></span></span>`;
   }
@@ -780,7 +792,7 @@ function groupHeader(t, g){
   // page from any page of the group. When it was seen, where it dials in
   // from and its agent are on that page, not a line under the picker, which
   // took a phone's second and third lines.
-  const s = n ? nodeState(n) : null;
+  const s = n && !n.page ? nodeState(n) : null;
   const pill = !s ? "" : `<button type="button" class="pill stat ${s.cls} ndstate" data-ndgo="${esc(n.id)}"
       aria-label="${esc(n.name)} is ${esc(s.word)}: open its page" title="${esc(s.means ? `${s.means}: open its page` : "open its page")}">${esc(s.word)}</button>`;
   // The containers' pages leave the own machine out, so on a machine alone

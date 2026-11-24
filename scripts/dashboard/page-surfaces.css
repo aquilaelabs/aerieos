@@ -1125,7 +1125,14 @@ body.firstrun #panes{display:none}
    so, and what would change it is not drawn: the buttons, the bars that hold
    them, the fields that add. What it reads (the lines, the help, the links,
    a bar's own state line) stays. */
-.svcro button,.svcro .addbar,.svcro .actbar:not(:has(.state:not(:empty))){display:none}
+.svcro button,.svcro .addbar{display:none}
+.svcro .actbar:not(:has(.state:not(:empty))){display:none}
+/* ...and the field that held only such a bar, so no gap is left where it
+   was. Each its own rule: :has() never nests, and one selector a browser
+   cannot read drops every other in its list. */
+.svcro .field:has(> .addbar:only-child){display:none}
+.svcro .field:has(> .actbar:only-child):not(:has(.state)){display:none}
+.svcro .field:has(> .actbar:only-child > .state:empty){display:none}
 .ngrecords{border:var(--hair) solid var(--line);border-radius:var(--r-surface);overflow:hidden}
 .ngrecords>.row{padding:var(--label-gap) var(--row-x)}
 .tbl.ngrecords>.row.ngrec{align-items:stretch}   /* over .row:has(.setrow), which ends a row of fields at its right */

@@ -68,10 +68,9 @@ function scannersLastRun(n){
         last.job ? ` <a href="#" data-scanlog="${esc(last.job)}">its log</a>` : ""}`;
 }
 
-// A node read without Configure Write there (R277): said, and nothing that
-// changes it drawn (.svcro).
-const scannersRo = (ro, body) => ro
-  ? `<div class="svcro">${body}<div class="field"><div class="hint">${esc(SVC_RO)}</div></div></div>` : body;
+// A node read without Configure Write there (R277): said under what it reads,
+// and nothing that changes it drawn (its section is .svcro).
+const scannersRo = (ro, body, why = SVC_RO) => ro ? `${body}<div class="field"><div class="hint">${esc(why)}</div></div>` : body;
 
 function scannersNodeSection(n){
   const key = `node-${n.node}`;
@@ -82,7 +81,8 @@ function scannersNodeSection(n){
   if (!n.deployed){
     return docSection("scanners", key, n.name, "not deployed", scannersRo(ro,
       `<div class="field"><div class="hint">${projects ? `${projects} space${projects === 1 ? "" : "s"} here ${projects === 1 ? "is" : "are"} not scanned until the scanners are deployed.` : "No space is bound to this node; one bound later is scanned here once the scanners are deployed."}</div></div>
-       <div class="field"><div class="actbar"><span class="sp"></span><button type="button" class="primary" data-scandeploy="${esc(n.node)}">Deploy</button></div></div>`));
+       <div class="field"><div class="actbar"><span class="sp"></span><button type="button" class="primary" data-scandeploy="${esc(n.node)}">Deploy</button></div></div>`),
+      {sectCls: ro ? "svcro" : ""});
   }
   const behind = Object.keys(n.behind || {});
   const dep = n.deploy_state && !["succeeded", "failed", "canceled"].includes(n.deploy_state) ? "deploying" : "";
@@ -103,7 +103,7 @@ function scannersNodeSection(n){
        <button type="button" data-scanrun="${esc(n.node)}"${projects && !going ? "" : " disabled"}>Run now</button>
        ${behind.length ? `<button type="button" class="primary" data-scanupdate="${esc(n.node)}">Update</button>` : ""}
        <button type="button" class="danger" data-scanremove="${esc(n.node)}">Remove</button></div></div>`),
-    {cls: behind.length ? "warn" : ""});
+    {cls: behind.length ? "warn" : "", sectCls: ro ? "svcro" : ""});
 }
 
 // The timetable is every node's, so its controls are Configure Write's on
@@ -112,8 +112,7 @@ function scannersScheduleSection(s, deployed, ro = false){
   const custom = scannersCustom !== null || !SCAN_WHEN.some(([c]) => c === s.cron);
   const cron = scannersCustom ?? s.cron;
   const dead = ro ? " disabled" : "";
-  return docSection("scanners", "schedule", "Schedule", s.on ? s.words : "off", (ro ? body =>
-    `<div class="svcro">${body}<div class="field"><div class="hint">read only: the timetable is Configure Write's on every node</div></div></div>` : body => body)(
+  return docSection("scanners", "schedule", "Schedule", s.on ? s.words : "off", scannersRo(ro,
     `<div class="field"><div class="hint">One timetable for every node's scanners; each run is a job on its node, one at a time there, and a run missed while the controller was down runs once when it is back.</div></div>
      <div class="prefrow ctlrow">
        <div class="setrow col ctlrow">${lbl("scanWhen", "When")}
@@ -127,7 +126,8 @@ function scannersScheduleSection(s, deployed, ro = false){
        s.last?.at ? `last run ${esc(ago(s.last.at))}${s.last.by ? ` by ${esc(s.last.by)}` : ""}` : ""].filter(Boolean).join(" · ")}</span><span class="sp"></span>
        <button type="button" data-scanrunall${deployed ? "" : " disabled"}>Run now on every node</button>
        <button type="button" data-scansave${custom ? "" : " hidden"}>Save timetable</button>
-       <button type="button" class="${s.on ? "" : "primary"}" data-scanon="${s.on ? "0" : "1"}">${s.on ? "Turn off" : "Turn on"}</button></div></div>`));
+       <button type="button" class="${s.on ? "" : "primary"}" data-scanon="${s.on ? "0" : "1"}">${s.on ? "Turn off" : "Turn on"}</button></div></div>`,
+    "read only: the timetable is Configure Write's on every node"), {sectCls: ro ? "svcro" : ""});
 }
 
 function scannersUncovered(rows){
