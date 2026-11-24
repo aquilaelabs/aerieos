@@ -68,8 +68,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, bb-sandbox]
     # A run that hangs is ended, not left holding the one runner: the whole
-    # set and its second try are under an hour on this machine.
-    timeout-minutes: 120
+    # set and its second try are under an hour on this machine in each
+    # engine, and it runs in three.
+    timeout-minutes: 240
     # `bash` rather than the default `bash -e`, because that one difference is
     # pipefail, and the run below is piped into tee. Without it the tee's exit
     # status is the step's, and a failing suite would report success.
@@ -129,6 +130,12 @@ jobs:
         # harness itself runs a suite that failed once more by itself, which
         # is what tells a flake from a failure, and a second whole run only
         # made a real failure take twice as long to say.
+        #
+        # In every engine (R263): Chromium, Firefox and WebKit, each named,
+        # so a store that has lost one fails here by name rather than
+        # running the suites in fewer.
+        env:
+          BB_TEST_ENGINES: chromium firefox webkit
         run: |
           set -o pipefail
           bash scripts/dashboard/test/run.sh 2>&1 | tee -a "$CI_LOG"
