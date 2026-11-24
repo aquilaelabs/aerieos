@@ -54,6 +54,24 @@ class PushAsk(unittest.TestCase):
         self.assertEqual(self.ran, [])
         self.assertEqual(phone.outcome(r["id"], "alpha")["state"], "denied")
 
+    def test_an_ask_that_ended_is_listed_with_how_it_went(self):
+        # R280: answered or expired, an ask moves to the bell's Earlier,
+        # saying how it ended; it is the asked account's, not another's.
+        done = phone.ask_push("alpha", "/workspace/alpha", ["origin", "topic"], FOUND, asker_uid="u_00000002", asker_name="ada")
+        no = phone.ask_push("alpha", "/workspace/alpha", ["origin", "x"], FOUND, asker_uid="u_00000002", asker_name="ada")
+        old = phone.ask_push("alpha", "/workspace/alpha", ["origin", "y"], FOUND, asker_uid="u_00000002", asker_name="ada")
+        phone.decide(done["id"], True, "u_00000002", name="ada", admin=False)
+        phone.decide(no["id"], False, "u_00000002", name="ada", admin=False)
+        with phone._lock:
+            next(r for r in phone._reqs if r["id"] == old["id"])["at"] -= phone.WAIT_SECONDS + 5
+        ended = {x["id"]: x for x in phone.requests_ended("u_00000002", False)}
+        self.assertEqual((ended[done["id"]]["state"], ended[done["id"]]["code"]), ("done", 0))
+        self.assertEqual(ended[no["id"]]["state"], "denied")
+        self.assertEqual(ended[old["id"]]["state"], "expired")
+        self.assertTrue(all(ended[i].get("ended") for i in (done["id"], no["id"], old["id"])))
+        self.assertFalse([x for x in phone.requests_open("u_00000002", False) if x["id"] in ended], "none of them waits any more")
+        self.assertFalse([x for x in phone.requests_ended("u_00000009", False) if x["id"] in ended], "another user's list has none")
+
     def test_nothing_to_ask_about_is_refused(self):
         self.assertIn("nothing", phone.ask_push("alpha", "/w", [], [], asker_uid="u_1")["error"])
 

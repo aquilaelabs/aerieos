@@ -94,7 +94,7 @@ await section("every toast is on the record", async () => {
 await section("the bell: a short list, and See all", async () => {
   await page.click('#bBell');
   await page.waitForSelector('#bellPanel:not([hidden]) #bellAll', { timeout: 5000 });
-  const recent = await page.$$eval('#bellPanel .bnote:not(.ask):not(.att)', ns => ns.length);
+  const recent = await page.$$eval('#bellPanel .bnote:not(.ask):not(.att):not(.asked)', ns => ns.length);
   ok(recent <= 5, `the bell shows the latest five of what was said (${recent})`);
   await page.click('#bellAll');
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notices' && location.hash === '#/notifications', null, { timeout: 10000 });
@@ -341,6 +341,26 @@ await section("a session an outage held is offered back", async () => {
   ok(row && row.startsWith('0: '), `...first of what needs attention, above the updates (${row})`);
   ok(row && /test's session on sandbox/.test(row) && /Resume/.test(row),
      `a session an outage held is a bell row naming whose it is and where it runs, with Resume (${row})`);
+  // It blocks work, so it is Active (R280): over Earlier in the bell with
+  // no Dismiss, and on the Notifications page over History with no ×.
+  const bellPlace = await page.evaluate(() => {
+    const kids = [...document.querySelectorAll('#bellPanel .bgroup, #bellPanel .bnote')];
+    const r = kids.find(k => /stopped for the update/.test(k.textContent));
+    const head = kids.slice(0, kids.indexOf(r)).reverse().find(k => k.matches('.bgroup'));
+    return { under: head?.textContent.trim() || '', dismiss: !!r?.querySelector('[data-bdismiss]') };
+  });
+  ok(/^Active/.test(bellPlace.under) && !bellPlace.dismiss, `...under Active in the bell, with no Dismiss (${JSON.stringify(bellPlace)})`);
+  await page.evaluate(() => { toggleBell(false); openNotices(); });
+  const onPage = await until(() => page.evaluate(() => {
+    const act = document.querySelector('.noticestab details[data-sect="notices:active"]');
+    const r = act && [...act.querySelectorAll('.bnote')].find(n => /stopped for the update/.test(n.textContent));
+    const hist = document.querySelector('.noticestab details[data-sect="notices:history"]');
+    return r ? { x: !!act.querySelector('[data-ntdel]'), dismiss: !!r.querySelector('[data-bdismiss]'),
+                 above: !!(hist && (act.compareDocumentPosition(hist) & Node.DOCUMENT_POSITION_FOLLOWING)) } : null;
+  }), 15000, 500);
+  ok(onPage && !onPage.x && !onPage.dismiss && onPage.above,
+     `...and on the Notifications page it is under Active, above History, with no × and no Dismiss (${JSON.stringify(onPage)})`);
+  await page.evaluate(() => toggleBell(true));
   rmSync(`${DIR}/sandboxdata/held.json`, { force: true });
   // Pressed twice before the first send is back: one line, not two (B775).
   await page.evaluate(sel => { const a = document.querySelector(sel); a.click(); a.click(); },
@@ -422,7 +442,7 @@ await section("on a phone the stack spans the width above the dock's line", asyn
   await page.evaluate(() => { openNotices(); notify('one for the phone'); });
   await until(() => page.evaluate(() => !!document.querySelector('.noticestab .ntrow')), 10000);
   const open = await page.$$eval('.noticestab details.sect[open]', ds => ds.map(d => d.dataset.sect));
-  ok(open.length === 1 && open[0] === 'notices:history' && !(await page.$('.noticestab details[data-sect="notices:waiting"]')),
+  ok(open.length === 1 && open[0] === 'notices:history' && !(await page.$('.noticestab details[data-sect="notices:active"]')),
      `on a phone, with nothing waiting, the page is its History, open (${open.join(', ')})`);
   await page.setViewportSize({ width: 1280, height: 900 });
 });

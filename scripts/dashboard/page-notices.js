@@ -1,10 +1,12 @@
 // The Notifications page (R218 step 6, the design's the-dashboard/notifications
 // rule), at #/notifications, opened from the bell's See all. Two parts:
 //
-//   Waiting on you: every ask, invitation and held change, each a row with
-//   what it is and what it would run, its Approve and Deny ON the row, and
-//   the long part (a compose file, the lines a push flagged, a release's
-//   notes) whole in a scrolling box behind a fold.
+//   Active (R280, the operator, 24 Nov): every ask, invitation and held
+//   change, each a row with what it is and what it would run, its Approve
+//   and Deny ON the row, and the long part (a compose file, the lines a push
+//   flagged, a release's notes) whole in a scrolling box behind a fold;
+//   then what blocks work now, the bell's own rows (needsRows "active").
+//   None of it has a ×: it leaves when it is answered or stops being true.
 //
 //   History: what the page has said to this account, kept on the server
 //   (notices.py) across reloads and browsers, newest first, narrowed by
@@ -110,7 +112,7 @@ function renderNoticesInto(i){
     if (!readBusy("notices")) loadNotices();
     return;
   }
-  const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows();
+  const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows(), blocking = needsRows("active");
   // Only the rows on show are built, a page at a time (pageLimit, R228 step 13).
   const lim = pageLimit(d.list, "ntList", rows.length);
   const groups = [...Object.entries(NOTICE_KINDS).map(([k, label]) => ({key: k, label, count: all.filter(n => n.kind === k).length})),
@@ -120,11 +122,14 @@ function renderNoticesInto(i){
   d.setBar(`<span class="sp"></span>
     ${all.length ? `<span class="actbar"><button type="button" class="danger" id="ntClear">${noticesChip && noticesChip !== "bad" ? `Clear ${esc(NOTICE_KINDS[noticesChip].toLowerCase())}` : "Clear all"}</button></span>` : ""}`);
   const html = (noticesErr ? `<div class="hint bad">${esc(noticesErr)}</div>` : "")
-    // Not drawn with nothing in it (the house rule: what has nothing to act
-    // on is not shown); while something waits it opens by itself, and on a
-    // phone, one section at a time, it is the one.
-    + (waiting.length ? docSection("notices", "waiting", "Waiting on you", String(waiting.length), waiting.join(""),
-                                   {loud: true, prime: true}) : "")
+    // Active, above History: what waits on an answer, then what blocks
+    // work now, none of it with a × (R280). Not drawn with nothing in it
+    // (the house rule: what has nothing to act on is not shown); while
+    // something waits it opens by itself, and on a phone, one section at a
+    // time, it is the one.
+    + (waiting.length + blocking.length ? docSection("notices", "active", "Active", String(waiting.length + blocking.length),
+                                                     waiting.join("") + (blocking.length ? `<div class="ntneeds">${blocking.join("")}</div>` : ""),
+                                                     {loud: waiting.length > 0, prime: true}) : "")
     + docSection("notices", "history", "History", String(rows.length),
                  // Failures overlap the kinds, so All is what is kept.
                  chipBar(groups, noticesChip, "data-ntchip", all.length)
@@ -137,7 +142,7 @@ function renderNoticesInto(i){
                        <button type="button" class="ic" data-ntdel="${esc(n.id)}" aria-label="delete this notice">×</button>
                      </div>`).join("")}</div>`
                    : `<div class="hint">${all.length ? "none of this kind" : "nothing yet: what the page tells you is kept here"}</div>`),
-                 {prime: !waiting.length});
+                 {prime: !(waiting.length + blocking.length)});
   // Rows the redraw puts elsewhere (one arriving on top, one whose state
   // sorts it anew) slide there, and a new one fades in (reflow).
   if (!reflow(d.list, ".ntrow[data-nt], .ntask[data-ask]", e => e.dataset.nt ? `nt:${e.dataset.nt}` : `ask:${e.dataset.ask}`, () => patch(d.list, html))) return;
@@ -148,6 +153,8 @@ function renderNoticesInto(i){
 
 function wireNotices(root){
   wireSections(root);
+  // ...and the presses on what blocks work, as the bell and Home wire them.
+  wireNeeds(root);
   const clear = root.querySelector("#ntClear");
   if (clear) clear.onclick = async () => {
     const kind = noticesChip && noticesChip !== "bad" ? noticesChip : "";

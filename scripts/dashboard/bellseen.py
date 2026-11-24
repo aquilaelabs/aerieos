@@ -70,6 +70,25 @@ def restore(uid):
     return {"ok": True, "restored": n}, 200
 
 
+def active(r):
+    """Whether a bell row is about something that blocks work now (R280, the
+    operator, 24 Nov): it stands in the bell's Active section, under what
+    waits on an answer, with no Dismiss, and leaves when it stops being
+    true. A failing CI run, a session an outage held, a session whose hooks
+    went quiet, a disk failing or a pool or array down, a UPS low or on
+    battery, and every row nothing could put away (an agent out of window, a
+    second factor required). An update waiting, a release missing a file and
+    the rest are Earlier, each with its Dismiss."""
+    k = r.get("kind")
+    if k in ("ci", "held", "unguarded"):
+        return True
+    if k in ("disk", "power"):
+        return bool(r.get("bad"))
+    if k in ("toolchain", "agents"):
+        return False                    # updates, put away tool by tool
+    return not r.get("key")
+
+
 def filter_rows(uid, rows):
     """The bell's node rows with this account's dismissals taken out, and how
     many were. A toolchain row loses the tools put away and goes when none is
@@ -118,7 +137,10 @@ def filter_rows(uid, rows):
         # above did, goes while that key is put away, and comes back when
         # the key moves. A row its maker keyed and no line here named was
         # drawn with Dismiss and came back on the next read (B1146).
-        if r.get("key") and r["key"] in gone:
+        # ...and marked active or not (active above), an active row never
+        # hidden, whatever was put away before it was one.
+        r["active"] = active(r)
+        if r.get("key") and r["key"] in gone and not r["active"]:
             hidden += 1
             continue
         out.append(r)

@@ -81,6 +81,21 @@ class BellSeen(unittest.TestCase):
         self.assertEqual(len(bellseen.filter_rows("u1", moved)[0]), 1, "what is missing changed, so it is said again")
         self.assertEqual(len(bellseen.filter_rows("u2", keyed)[0]), 4, "another account still sees them")
 
+    def test_what_blocks_work_is_active_and_never_put_away(self):
+        # R280: Active holds what blocks work now, with no Dismiss; a key put
+        # away before it became active hides nothing.
+        rows_ = [{"kind": "ci", "id": "web", "key": "ci:web@run7", "bad": True},
+                 {"kind": "disk", "id": "n1", "what": "failing", "bad": True, "key": "disk:failing:n1"},
+                 {"kind": "disk", "id": "n1", "what": "hot", "bad": False, "key": "disk:hot:n1"},
+                 {"kind": "release-files", "id": "web|v1", "key": "rfiles:web|v1@aa", "bad": True},
+                 {"kind": "agent", "id": "n2", "window": True}]
+        bellseen.dismiss("u1", ["ci:web@run7", "disk:hot:n1"])
+        out, hidden = bellseen.filter_rows("u1", rows_)
+        said = {r["kind"] + (":" + r["what"] if r.get("what") else ""): r["active"] for r in out}
+        self.assertEqual(said, {"ci": True, "disk:failing": True, "release-files": False, "agent": True})
+        self.assertEqual(hidden, 1, "the hot disk, not active, was put away")
+        self.assertFalse(bellseen.filter_rows("u1", rows())[0][0]["active"], "an update waiting is Earlier")
+
 
 if __name__ == "__main__":
     unittest.main()

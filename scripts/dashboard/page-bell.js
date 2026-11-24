@@ -265,6 +265,10 @@ function logNote(msg, bad){
 // way there and Dismiss on the row. Out of window is red and cannot be put
 // away: work there is stopped until it is updated.
 function attRow(a){
+  // What blocks work now stands in Active with no Dismiss (R280, the
+  // operator, 24 Nov): drawn without its key, it leaves when it stops being
+  // true.
+  if (a.active && a.key) a = {...a, key: ""};
   if (a.kind === "toolchain" || a.kind === "agents"){
     const keys = a.tools.map(t => t.key).filter(Boolean).join(" ");
     // The Claude sessions running there now, which an update ends (B57), not
@@ -613,8 +617,15 @@ function bellLeft(rows){
 function bellHidden(){
   return (state?.bell_hidden || 0) + bellGoingKeys;
 }
-function needsRows(){
-  const att = state?.attention || [], ciRed = state?.ci_red || [], syncC = state?.sync_conflicts || [];
+// `which`: "active" for what blocks work now (bellseen.active: the bell's
+// Active section, no Dismiss), "earlier" for the rest (each with its
+// Dismiss), every row otherwise (Home's Attention).
+function needsRows(which = ""){
+  const pick = on => which === "" || (which === "active") === !!on;
+  const att = (state?.attention || []).filter(a => pick(a.active)),
+        ciRed = (state?.ci_red || []).filter(c => pick(c.active)),
+        syncC = pick(true) ? state?.sync_conflicts || [] : [];
+  const tf = state?.two_factor_due && pick(state.two_factor_due.required) ? [state.two_factor_due] : [];
   // What needs doing but is not a question: a node behind, a red CI run, a
   // file changed in two places. One quiet shape (attRow): a title, one line
   // of what, the action on the row, the long part folded (the operator,
@@ -628,12 +639,12 @@ function needsRows(){
     ...att.map(attRow),
     // This account's own notice to add a second factor (R127), after what
     // stopped or what a node needs, which a person is waiting on.
-    ...(state?.two_factor_due ? [attRow(state.two_factor_due)] : []),
+    ...tf.map(attRow),
     ...ciRed.map(c => `<div class="bnote att bad">
         <div class="bt">CI failing in ${esc(projLabel(c.project))}</div>
         <div class="bsum">${esc(c.text)}</div>
         <div class="bfoot"><span>until the check passes again</span>
-          <span class="acts">${c.key ? `<a href="#" data-bdismiss="${esc(c.key)}">Dismiss</a>` : ""}
+          <span class="acts">${c.key && !c.active ? `<a href="#" data-bdismiss="${esc(c.key)}">Dismiss</a>` : ""}
             ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">On GitHub</a>` : ""}
             <a href="#" data-bci="${esc(c.project)}">Git view</a></span></div></div>`),
     ...syncC.map(c => `<div class="bnote att">
@@ -646,6 +657,18 @@ function needsRows(){
 // What an ask is, in one line: the machine and that it is root there, the
 // project and the verb, a container and its node. The bell's row and the
 // Notifications page's both lead with it.
+// An ask that ended (R280): under Earlier, plain where a waiting one is
+// gold, saying how it went and when, with nothing left to press.
+function askEnded(a){
+  const how = a.state === "denied" ? "denied"
+    : a.state === "expired" ? "expired: nobody answered in time"
+    : a.state === "running" ? "approved, running"
+    : a.code ? `approved; it failed (exit ${a.code})` : "approved";
+  return `<div class="bnote asked">
+      <div class="btag">${askTag(a).replace(/: needs your answer$/, "")}</div>
+      <div class="bwhy">${esc(a.why)}</div>
+      <div class="bfoot"><span>${esc(how)}${a.ended ? ` · ${esc(ago(a.ended))}` : ""}</span></div></div>`;
+}
 function askTag(a){
   return (
           a.kind === "root" ? `root on ${esc(a.node_name)}: needs your answer`
@@ -853,7 +876,12 @@ function drawBell(){
         <div class="bfoot"><span>on the notebook</span>
           <span class="acts"><a href="#" data-bpend="${esc(p.name)}">Review</a></span></div></div>`),
   ];
-  const needs = needsRows();
+  // Two sections (R280, the operator, 24 Nov): Active, what waits on an
+  // answer pinned at its top in gold and then what blocks work now, none of
+  // it put away; Earlier, the asks that ended (plain, saying how), what can
+  // be dismissed, and the latest of what the page said.
+  const needsNow = needsRows("active"), needsLater = needsRows("earlier");
+  const ended = (ph?.ended || []).map(askEnded);
   const said = notes.map(n => `<div class="bnote${n.lv === "info" ? "" : " " + n.lv}">
         <div class="bwhy">${esc(n.msg)}</div>
         <div class="bfoot"><span>${when(n.at)}</span></div></div>`);
@@ -873,9 +901,11 @@ function drawBell(){
   // Patched, and left alone when nothing in it moved (R228 step 14): it was
   // written whole on every poll, open or not, and every press bound again.
   // What is bound below is set as a property, so a row kept keeps its own.
-  if (!patch(panel, head + (answer.length + needs.length + said.length
-    ? group("Waiting on you", answer) + group("Needs attention", needs)
-      + group("Recent", said.slice(0, 5), `<button type="button" id="bellClear">Clear</button>`, said.length)
+  const active = [...answer, ...needsNow], earlier = [...ended, ...needsLater, ...said.slice(0, 5)];
+  if (!patch(panel, head + (active.length + earlier.length
+    ? group("Active", active)
+      + group("Earlier", earlier, said.length ? `<button type="button" id="bellClear" title="what this page said">Clear</button>` : "",
+              ended.length + needsLater.length + said.length)
     // Before the first status read nothing is known yet, which is not
     // nothing to report.
     : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway, true)) return;

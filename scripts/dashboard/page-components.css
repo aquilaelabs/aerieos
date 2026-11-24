@@ -237,8 +237,12 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
   background:color-mix(in srgb, var(--bad) 13%, var(--ground))}
 .bnote.ask.bad .btag{background:var(--bad);color:var(--bg)}
 .bnote.ask.bad .bwhy{color:var(--bad)}
-/* The drawer in three groups, each headed by what it is and how many
-   (the operator, 10 Oct: one amber wall). A head is a label, not a row. */
+/* An ask that ended (R280): plain under Earlier, its tag in the tag voice
+   and the dim, where a waiting one is the gold. */
+.bnote.asked .btag{margin-bottom:3px;font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+/* The drawer in two sections, Active and Earlier (R280, the operator,
+   24 Nov), each headed by what it is and how many (the operator, 10 Oct:
+   one amber wall). A head is a label, not a row. */
 .bgroup,.uimenu h4{display:flex;align-items:center;gap:8px;padding:8px 12px 6px;
   font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);
   border-bottom:var(--hair) solid var(--line);background:var(--sunk)}

@@ -107,6 +107,49 @@ const sysjob = jobs.find(j => j.type === 'system' && j.node === sandbox.id);
 ok(sysjob && sysjob.state === 'succeeded',
    `the run is a system job on that node, finished (${sysjob?.state || 'no system job found'})`);
 
+// ---- the bell: Active over Earlier (R280) ----------------------------------------
+// What waits on an answer is pinned at the top of Active in gold, every one
+// of them; answered or expired it moves to Earlier, plain, saying how it went.
+await section("the bell: Active over Earlier", async () => {
+  const bellRows = () => page.evaluate(() => {
+    const p = document.getElementById('bellPanel');
+    const kids = [...p.querySelectorAll('.bgroup, .bnote')];
+    const at = w => kids.findIndex(k => k.matches('.bgroup') && k.textContent.trim().startsWith(w));
+    return { active: at('Active'), earlier: at('Earlier'),
+             rows: kids.map((k, i) => ({ i, cls: k.className, text: k.textContent.replace(/\s+/g, ' ').trim() })) };
+  });
+  await page.evaluate(() => phFetch());
+  await page.click('#bBell');
+  await page.waitForSelector('#bellPanel:not([hidden])', { timeout: 5000 });
+  let seen = await until(async () => { const b = await bellRows();
+    return b.rows.some(r => /\basked\b/.test(r.cls) && /root on sandbox/.test(r.text)) ? b : null; }, 15000, 500);
+  const done = seen?.rows.find(r => /\basked\b/.test(r.cls) && /root on sandbox/.test(r.text));
+  ok(done && seen.earlier >= 0 && done.i > seen.earlier && !/\bask\b/.test(done.cls) && /approved/.test(done.text) && !/needs your answer/.test(done.text),
+     `an allowed ask moves to Earlier, plain, saying it was approved (${done?.text.slice(0, 90)})`);
+  await page.keyboard.press('Escape');
+  const one = await api('/api/phone', { action: 'ask', kind: 'root', why: 'the first of two', cmd: ['true'], project: 'alpha' });
+  const two = await api('/api/phone', { action: 'ask', kind: 'root', why: 'the second of two', cmd: ['true'], project: 'alpha' });
+  await page.evaluate(() => phFetch());
+  await page.click('#bBell');
+  seen = await until(async () => { const b = await bellRows();
+    return b.rows.filter(r => /\bask\b/.test(r.cls) && /of two/.test(r.text)).length === 2 ? b : null; }, 15000, 500);
+  const asks = seen ? seen.rows.filter(r => /\bask\b/.test(r.cls)) : [];
+  ok(seen && seen.active === 0 && asks.length === 2 && asks.every(r => r.i > seen.active && (seen.earlier < 0 || r.i < seen.earlier))
+     && asks[0].i === 1,
+     `two asks queued both stand at the top of Active, in gold (${asks.map(r => r.text.slice(0, 40)).join(' | ')})`);
+  await page.click(`#bellPanel [data-bdeny="${one.body.id}"]`);
+  await page.evaluate(() => phFetch());
+  await page.click('#bBell');
+  seen = await until(async () => { const b = await bellRows();
+    return b.rows.some(r => /\basked\b/.test(r.cls) && /the first of two/.test(r.text)) ? b : null; }, 15000, 500);
+  const denied = seen?.rows.find(r => /\basked\b/.test(r.cls) && /the first of two/.test(r.text));
+  const still = seen?.rows.find(r => /\bask\b/.test(r.cls) && /the second of two/.test(r.text));
+  ok(denied && denied.i > seen.earlier && /denied/.test(denied.text) && still && still.i < seen.earlier,
+     `the one denied moves to Earlier, saying so, and the other still waits in Active (${denied?.text.slice(0, 60)})`);
+  await api('/api/phone', { action: 'deny', id: two.body.id });
+  await page.keyboard.press('Escape');
+});
+
 // ---- a node locked to its console refuses the ask itself -----------------------
 await section("a node locked to its console refuses the ask itself", async () => {
   await api('/api/v1/nodes', { action: 'lock', id: sandbox.id });

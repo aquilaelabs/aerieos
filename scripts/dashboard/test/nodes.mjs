@@ -2692,9 +2692,11 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.click('#bBell');
   await page.waitForSelector('#bellPanel .bnote.att', { timeout: 10000 });
   const bellText = await page.$eval('#bellPanel', e => e.textContent.replace(/\s+/g, ' '));
-  ok(/Needs attention/i.test(bellText) && /agent update on/i.test(bellText) && /runs agent 3 and this controller ships/.test(bellText)
+  // An agent behind, inside its window, blocks nothing: it is under Earlier,
+  // with its Dismiss (R280).
+  ok(/Earlier/i.test(bellText) && /agent update on/i.test(bellText) && /runs agent 3 and this controller ships/.test(bellText)
      && await page.$('#bellPanel [data-bnode]') !== null,
-     `the bell lists "Agent update on" the node under Needs attention, with a way to the Nodes page (${bellText.slice(0, 160)})`);
+     `the bell lists "Agent update on" the node under Earlier, with a way to the Nodes page (${bellText.slice(0, 160)})`);
   ok(await page.$eval('#bBell .dot', d => d.classList.contains('warn')),
      '...in amber: an update waiting is not work stopped');
   // A node that takes only a signed release, on a build that is not one, is

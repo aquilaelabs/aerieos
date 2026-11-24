@@ -147,16 +147,22 @@ control second: a red dot means something unread or something stopped, an
 **amber** one means a session is blocked on an answer. That second case is
 the reason it exists: a request to reach the phone, a container, a root
 command or a release shows up there with **Approve** and **Deny** on it,
-so answering does not depend on another page being open. Pinned in it, and
-not Clear's to dismiss, is what is waiting on you or stopping work: a
-notebook holding a session's changes, a node whose agent has an update, (in
-red) a node from another compatibility window, a red CI run. Those come from
-the state on every poll and leave the moment they stop being true.
+so answering does not depend on another page being open. The bell is two
+sections. **Active** is what waits on you, every ask pinned at its top in
+amber with invitations and a notebook holding a session's changes under them,
+then what stops work: a red CI run, a session an outage held, a disk failing,
+(in red) a node from another compatibility window. Nothing there can be
+dismissed: it comes from the state on every poll and leaves the moment it is
+answered or stops being true. **Earlier** is the rest: an ask answered or
+expired, no longer amber, saying how it went; what can be put away, such as a
+node whose agent has an update, each with Dismiss; and the latest of what the
+page said, which Clear empties.
 
 **The Notifications page** (See all, at `#/notifications`) has the rest.
-Waiting on you comes first, when anything is waiting: every ask, invitation and held change as a row
-with its answer on the row, and the long part (a compose file, the lines a
-push flagged, a release's notes) whole in a box that scrolls inside itself.
+Active comes first, when anything is in it: every ask, invitation and held
+change as a row with its answer on the row, and the long part (a compose
+file, the lines a push flagged, a release's notes) whole in a box that
+scrolls inside itself, then what stops work, none of it with a ×.
 History follows: what the page has said to your account, each with its
 kind, when, its own × and, for a job, a button to its row on the Jobs page;
 chips narrow it to what was said, answers to asks, jobs or failures, and

@@ -135,17 +135,20 @@ class Look(unittest.TestCase):
         self.assertFalse([f for f in rec["findings"] if f["kind"] == "run"])
         self.assertEqual(ciwatch.red(["app"]), [])
 
-    def test_a_red_row_is_put_away_until_another_run_fails(self):
+    def test_a_red_row_blocks_work_and_stays_until_a_run_passes(self):
+        # R280 (the operator, 24 Nov): a failing CI run blocks work, so it is
+        # Active, drawn with no Dismiss, and a key put away before hides
+        # nothing; it leaves when a run passes. Its key still names the run
+        # (B331: "run 11" was two keys, and neither the row's).
         import bellseen
         ciwatch.look("app")
         rows = ciwatch.red(["app"])
         self.assertEqual(rows[0]["key"], "ci:app@run11")
         bellseen.configure(state=self.tmp, write_json=lambda p, d: Path(p).write_text(json.dumps(d)))
-        # As the page sends it: a row's keys joined by spaces, split on them
-        # (B331: "run 11" was two keys, and neither the row's).
         bellseen.dismiss("u_00000001", rows[0]["key"].split(" "))
-        self.assertEqual(bellseen.filter_rows("u_00000001", rows)[0], [])
-        self.assertEqual(len(bellseen.filter_rows("u_00000002", rows)[0]), 1, "one account's, not everybody's")
+        out = bellseen.filter_rows("u_00000001", rows)[0]
+        self.assertEqual(len(out), 1)
+        self.assertTrue(out[0]["active"])
 
     def test_a_finding_carries_its_fix_and_a_press_writes_only_that_line(self):
         # R117 step 4: the label and an action a major behind are one press.

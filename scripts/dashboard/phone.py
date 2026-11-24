@@ -523,7 +523,9 @@ def payload(uid, node="", probe=False, admin=False, project="", who=None):
     rows = []
     for n in (nodes.phone_nodes() if nodes is not None else []):
         rows.append(_node_row(n, uid, probe and n["id"] == node, who))
-    return {"nodes": rows, "asks": requests_open(uid, admin, project)}
+    return {"nodes": rows, "asks": requests_open(uid, admin, project),
+            # ...and an account's own that ended (R280); a session's view has none.
+            "ended": [] if project else requests_ended(uid, admin)}
 
 
 def summary(nid, uid, node=None):
@@ -714,6 +716,12 @@ def _req_public(r):
            "node_name": r["node_name"], "project": r["project"],
            "kind": r.get("kind") or "phone", "asker": r.get("asker") or "",
            "left": max(0, WAIT_SECONDS - (int(time.time()) - r["at"]))}
+    # How an answered or expired one ended, and when (R280): the bell moves
+    # it from Active to Earlier, saying so.
+    if r["state"] != "pending":
+        out["ended"] = int(r.get("ended") or 0)
+        if r["state"] == "done":
+            out["code"] = int(r.get("code") or 0)
     # A container ask is approved by READING it, the way a root ask is
     # approved by reading its argv: the compose file is the request. The env
     # file is not shown whole, since that is where a token would be; its
@@ -796,11 +804,30 @@ def requests_open(uid=None, admin=False, project=""):
         for r in _reqs:
             if r["state"] == "pending" and time.time() - r["at"] > WAIT_SECONDS:
                 r["state"] = "expired"
+                r["ended"] = r["at"] + WAIT_SECONDS
         if project:
             return [_req_public(r) for r in _reqs
                     if r["state"] == "pending" and r.get("project") == project]
         return [_req_public(r) for r in _reqs
                 if r["state"] == "pending" and (uid is None or _for(r, uid, admin))]
+
+
+# How long an ask that ended stays in the bell's Earlier section.
+ENDED_SHOWN_S = 86400
+
+
+def requests_ended(uid, admin=False):
+    """The asks that waited on this account and ended in the last day,
+    approved, denied or expired, newest first (R280, the operator, 24 Nov):
+    the bell's Earlier section says how each went, where it used to vanish
+    the moment it was answered. Kept with the others, the latest MAX_REQS,
+    so a restart forgets them as it forgets the pending ones."""
+    now = time.time()
+    requests_open(uid, admin)            # an ask past its wait is expired before it is listed
+    with _lock:
+        ended = [r for r in _reqs if r["state"] != "pending" and _for(r, uid, admin)
+                 and now - int(r.get("ended") or r["at"]) < ENDED_SHOWN_S]
+        return [_req_public(r) for r in sorted(ended, key=lambda r: -int(r.get("ended") or r["at"]))]
 
 
 def ask(why, argv, nid, node_name, project, by="claude", asker="", asker_uid=""):
@@ -1364,6 +1391,7 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
         if r["state"] != "pending":
             return {"error": f"that one was already {r['state']}"}
         r["state"] = "running" if allow else "denied"
+        r["ended"] = int(time.time())
     # Allow for this session: this one runs, and the next ones from the same
     # account's sessions in this project to this phone do not ask.
     if allow and session and r.get("kind") in ("phone", "phone-use"):
