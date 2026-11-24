@@ -174,11 +174,18 @@ await section("The old address still opens the page, which says its own address"
     await page.fill(`${card} .askline input`, to);
     await page.press(`${card} .askline input`, 'Enter');
   };
+  // Each slide a card starts is counted as it starts: sampled once, a slide
+  // WebKit had not begun or had ended read as none (B1126).
+  await page.evaluate(() => { window.__slid = 0;
+    if (!window.__slideCounted){ const was = Element.prototype.animate;
+      Element.prototype.animate = function(k, o){ try { if (this.classList?.contains('pcard') && /translate/.test(JSON.stringify(k))) window.__slid++; } catch {} return was.call(this, k, o); };
+      window.__slideCounted = true; } });
   await renameTo('zz Shop & Co');
   await page.waitForFunction(c => document.querySelector(`${c} .pcfront .pcname .name`)?.textContent === 'zz Shop & Co', card, { timeout: 3000 }).catch(() => {});
+  await page.waitForFunction(() => window.__slid > 0, null, { timeout: 5000 }).catch(() => {});
   const moved = await page.$eval(card, c => ({ name: c.querySelector('.pcfront .pcname .name')?.textContent, flipped: c.classList.contains('flipped'),
     last: [...c.parentElement.children].pop() === c,
-    sliding: [...document.querySelectorAll('.pgrid .pcard')].some(x => x.getAnimations().some(a => a.effect?.getKeyframes?.()[0]?.transform?.startsWith('translate'))) }));
+    sliding: window.__slid > 0 }));
   // Its slide over, since while it slides it is drawn where it left, and the page come to it where it landed.
   await page.waitForFunction(c => { const el = document.querySelector(c);
     if (!el || el.getAnimations().length) return false;

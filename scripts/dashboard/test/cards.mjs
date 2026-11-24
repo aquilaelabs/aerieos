@@ -2484,14 +2484,19 @@ await section("A card that moves slides there, the rest closing up, and the page
   ok(starred.at === at0 && !starred.slid, `a star leaves its card where its name puts it, nothing sliding (${JSON.stringify({ at0, ...starred })})`);
   await page.click(`${sel} .pcfront [data-pmark]`);
   await page.waitForFunction(s => !document.querySelector(s)?.querySelector('.pcfront [data-pmark].on'), sel, { timeout: 10000 }).catch(() => {});
+  // Each slide a card starts is counted as it starts: sampled, one that had
+  // not begun or had ended read as none (B1032).
+  await page.evaluate(() => { window.__slid = 0;
+    if (!window.__slideCounted){ const was = Element.prototype.animate;
+      Element.prototype.animate = function(k, o){ try { if (this.classList?.contains('pcard') && /translate/.test(JSON.stringify(k))) window.__slid++; } catch {} return was.call(this, k, o); };
+      window.__slideCounted = true; } });
   // Its name made to sort first, as the answer to a rename pressed on it.
   await page.evaluate(k => { pjFollow = { key: k, until: Date.now() + 8000 }; const r = state.repos[k]; r.__was = r.name; r.name = '0 first'; drawProjects(state.projects); }, last);
   const r = await page.waitForFunction(s => {
     const c = document.querySelector(s); if (!c) return null;
     const first = [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')].indexOf(c) === 0;
-    const slid = [...document.querySelectorAll('.doc .projtab .pcard')].some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || []))));
-    return first ? { first, slid } : null;
-  }, sel, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => null);
+    return first && window.__slid > 0 ? { first, slid: window.__slid } : null;
+  }, sel, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => page.evaluate(() => ({ first: null, slid: window.__slid })));
   // Its slide over, since while it slides it is drawn where it left, and
   // the page come to it where it landed.
   await page.waitForFunction(s => { const c = document.querySelector(s);
