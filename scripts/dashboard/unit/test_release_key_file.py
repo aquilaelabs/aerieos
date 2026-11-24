@@ -87,6 +87,15 @@ class OneReader(unittest.TestCase):
     def test_the_signer_signs_nothing_over_a_file_that_does_not_parse(self):
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         sig = os.path.join(ROOT, "scripts", "agent", "agent.sig")
+        # The tree's own file, held as test_agent_release_sig holds it
+        # (alone_with, the same lock by name): put back here while that test
+        # stood between unlinking it and reading it, it found one (B1109).
+        import fcntl
+        import hashlib
+        lock = open(os.path.join(tempfile.gettempdir(), "aerieos-agent-sig-"
+                                 + hashlib.sha256(os.path.realpath(sig).encode()).hexdigest()[:16] + ".lock"), "w")
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        self.addCleanup(lock.close)
         had = open(sig).read() if os.path.exists(sig) else None
         self.addCleanup(lambda: open(sig, "w").write(had) if had is not None else (os.path.exists(sig) and os.unlink(sig)))
         k = Ed25519PrivateKey.generate()
