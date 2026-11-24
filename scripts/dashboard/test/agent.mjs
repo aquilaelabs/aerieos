@@ -46,6 +46,24 @@ const until = async (fn, ms = 15000, step = 200) => {
   return null;
 };
 
+// The node's shells are tmux sessions on this account's own server, as a
+// real node's are on its account's, so they outlive the suite; and every
+// world restores the same test account, so a shell an earlier world left
+// answered in this one's place (the third engine's run, 24 Nov). This
+// account's are ended before the suite starts and when it is done.
+const TEST_UID = (() => { try { return JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid; } catch { return ''; } })();
+const endShells = () => {
+  if (!/^u_[0-9a-f]+$/.test(TEST_UID)) return;
+  const env = { ...process.env };
+  delete env.TMUX; delete env.TMUX_TMPDIR;
+  let names = '';
+  try { names = execFileSync('tmux', ['ls', '-F', '#{session_name}'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { return; }
+  for (const n of names.split('\n')) if (n.startsWith(TEST_UID + '~'))
+    try { execFileSync('tmux', ['kill-session', '-t', '=' + n], { env, stdio: 'ignore' }); } catch { /* gone */ }
+};
+endShells();
+
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
@@ -4082,4 +4100,5 @@ print(json.dumps(m.sysdeps_missing(cat, "r", "apt", [m.DPKG_BIN, "-s"])[0]))`],
      `...the first of them when it carries both (${JSON.stringify(c)})`);
 });
 
+endShells();
 await done(browser);
