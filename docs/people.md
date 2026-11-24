@@ -40,9 +40,11 @@ one picked, whose settings (its name, roles and spaces, profile, git
 identity and a new password) are saved together, with **Remove** at their
 foot; **Add user**, at the right of the page's bar, adds one. There is exactly one **owner**,
 undeletable and renameable; an **admin** can do everything except act on the
-owner; a **user** gets the spaces you give them and the work inside them,
-but not deleting one, renaming one, or changing which node it builds on: a
-node is shared, and that setting reaches every space on it.
+owner's account; every other account holds what its roles give and nothing
+more: a role given on a space holds on that space, an Everywhere role on
+every space and on what belongs to no space (the nodes, their services, the
+controller). Only an administrator makes an administrator, and the owner's
+account is the owner's alone to change.
 
 **The space list means the same thing for every role; what differs is the
 remedy.** A space not on your list is read-only: no session, no
@@ -98,9 +100,11 @@ An area without Read is not offered (the status carries each area's level,
 and the rail does not draw its page), and the server holds the same line: the
 Users and Roles reads, an agent's console without Terminal Read (no terminal
 at all), the Jobs listing (a person's own spaces' jobs alone) and the
-Docker listing (the spaces whose Containers they may read). Without Nodes
-or Install Read those reads answer only for the nodes of the person's own
-spaces, which a sign-in there needs, and never for another machine.
+Docker listing (the spaces whose Containers they may read; every space's
+is Containers Read held Everywhere). Without Nodes, Install or Configure
+Read those reads answer only for the nodes of the person's own spaces, which
+a sign-in there needs, and never for another machine; a role holding one of
+them on named nodes reaches those.
 
 The **Roles** page lists the roles beside the one picked (the spaces'
 owner roles folded into one row at the list's end): its kind, what it is
@@ -110,9 +114,13 @@ What one account holds (its Everywhere roles, the spaces it is on and its
 roles there, and what that adds up to) is picked in its settings on the
 Users page. A space's owner who is not an administrator gives people roles
 on the spaces they own from a name in that space's People section, and
-nothing Everywhere. Every gate on the server reads the same roles
-(`users.may` through `roles.CAP_AREA`), which keeps the pages and the
-refusals consistent.
+nothing Everywhere. Every area's gate on the server reads the same roles
+(`users.may` through `roles.CAP_AREA`), each asked of the space or the node
+the action reaches: a role on one space opens nothing on another, and a
+node's services (nginx, the scanners, the model router) are Configure's on
+that node. Beside the areas a few things are a person's whoever their roles
+say: the owner's account, locking a space (its owner or an administrator),
+making an administrator, and joining a space only its members may join.
 
 **Every space has an owner, and an owner can close it to administrators.**
 Whoever made a space owns it; one from before there were owners belongs to
@@ -207,25 +215,24 @@ terms allow one person per Claude account, and nothing is refused for it.
 The notebook (roadmap, bugs, analysis) stays shared, because it is about the
 space; memories do not, because they are about the person.
 
-## A user's console
+## A console without a shell
 
-**A `user` has no shell and no command line at all**, and that is what makes
-the rest of the role mean something: everything else is enforced by the
-dashboard, in Python, and a terminal is the way around all of it. So a `user`
-gets no shell, and their agent's session opens as a **console** instead:
+**An account without Terminal Write on a space has no shell there**, and that
+is what makes the rest of its roles mean something: everything else is
+enforced by the dashboard, in Python, and a terminal is the way around all
+of it. A shell on no space (the workspace's) reaches every space's trees, so
+it is Terminal Write held Everywhere. Without one, an agent's session opens
+as a **console** instead:
 the real interface, rendered by a read-only terminal that takes no keys, with
 a box to type a message and a button to end the conversation. The controller
 refuses anything else they ask a terminal for, so a read-only window cannot be
 pointed at somebody else's session. They see the Containers page and the Library
 for their own spaces' nodes: the scoping is on the answer, not just the
 picker, so a node none of their spaces builds on is refused rather than
-listed, and change neither, with one exception: **Rebuild**, and Abort with
-it. Building what you committed and looking at it is the point of having the
-space, and Rebuild is also how a stopped instance comes back; the page
-already ghosts it until the code has actually moved. They cannot create or
-rename a space, change how one authenticates, or touch a stored token. What
-they can write is the notebook, a rebuild, and a session on a space
-they were given.
+listed. **Rebuild**, and Abort with it, take Spaces Write or Containers
+Write on the space: building what you committed and looking at it is the
+point of having the space, and Rebuild is also how a stopped instance comes
+back; the page already ghosts it until the code has actually moved.
 
 ## Your profile
 

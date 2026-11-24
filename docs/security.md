@@ -288,7 +288,12 @@ do act for the person a session works for (their memories and
 conversations on the space, their git token for a push, the phone lent to
 them) ask for that person by name. What a session may ask of the
 permissions at all is a list of four (read its space, work in it, write
-to it, and the relayed verbs), each still held to the account behind it.
+to it, and the relayed verbs), each still held to the account behind it,
+and what a space's Agents may dials hand a session (a release, signing, its
+container, its VMs, a pack, its git host) is held there too: the dial says
+what a session does on its own, the account's roles what it may do at all.
+A token minted for an account that has since been removed is no token, and
+a verb a person relays through the controller runs as that person.
 
 **A request from another site.** A change, and a read of `/api/`, sent with
 the browser's cookie is taken from the dashboard's own page alone
