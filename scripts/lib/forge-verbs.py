@@ -3,7 +3,7 @@ controller, which holds the project's token and runs each verb with it
 (dashboard/forgeaccess.py); the token never reaches here.
 
 Arguments: the project, then the words after `aerie forge`: a verb (whoami,
-measure, or a group and an action: pr list, run log ...), its positional
+measure, owed, or a group and an action: pr list, run log ...), its positional
 arguments, and its flags (--title "...", --draft, -f NAME=VALUE ...).
 The session's credential is bbapi's own header (BB_AUTH_HEADER, from api_py
 in aerie).
@@ -61,6 +61,13 @@ if as_json:
     print(json.dumps(r, indent=1))
 elif verb == "whoami":
     print(r.get("briefing") or json.dumps(r.get("measure"), indent=1))
+elif verb == "owed":
+    # What the git host owes this repository's workflows (R267 step 29).
+    for row in r:
+        mark = {"ok": "[ok]  ", "owed": "[owed]"}.get(row.get("state"), "[?]   ")
+        print(f"  {mark} {row.get('what')}" + (f": {row['why']}" if row.get("why") else ""))
+    if not r:
+        print("(nothing: no workflow here asks the host for an environment, a tag or a pull request)")
 elif verb == "run log":
     for j in r:
         print(f"== job {j.get('job')}")

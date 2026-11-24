@@ -5415,6 +5415,7 @@ version.release_gate = lambda p: prefs.get(p).get("release_gate", "refuse")
 # refused until the floor moves to it.
 version.catalog_made = lambda: str((catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("generated") or "")
 version.rehearsed = lambda project, sha: forgeaccess.rehearsed(project, sha)   # imported below
+version.owes = lambda project, wants: forgeaccess.owed(project, wants)
 # Release's forge half (R123; Gitea and GitLab, R124): the release beside a pushed tag.
 import forgerelease                                              # noqa: E402
 # What each of a release's files is for, over its notes (R255).
@@ -5506,6 +5507,7 @@ devapp.reads_of = prefs.reads_trees
 # token to a node.
 import forgeaccess                                               # noqa: E402
 forgeaccess.configure(state=STATE, write_json=write_json, target=projects.forge_target, prefs_get=prefs.get)
+forgeaccess.wants_of = version.host_wants
 preamble.forge_line = forgeaccess.briefing
 projects.token_changed = forgeaccess.token_changed
 devapp.hosts_of = lambda p: (prefs.get(p) or {}).get("hosts") or []

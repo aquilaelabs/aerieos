@@ -1339,6 +1339,62 @@ REHEARSAL = ".github/workflows/release-rehearsal.yml"
 rehearsed = None
 
 
+# What the person owes on the git host for this tree's workflows (R267 step
+# 29): the server's (forgeaccess.owed), (project, wants) -> rows.
+owes = None
+WORKFLOWS = ".github/workflows"
+
+
+def host_wants(project):
+    """What this tree's own workflows ask of its git host's settings:
+    {"environments": {name: [the secrets a job gated by it reads]}, "tags":
+    a workflow runs on a pushed tag, "pull_requests": one runs on a pull
+    request}. Read from the files as text, a job at a time."""
+    out = {"environments": {}, "tags": False, "pull_requests": False}
+    d = root(project) / WORKFLOWS
+    for f in sorted(d.glob("*.y*ml")) if d.is_dir() else []:
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        head, _sep, jobs = text.partition("\njobs:")
+        if re.search(r"^\s+tags\s*:", head, re.M):
+            out["tags"] = True
+        if re.search(r"^\s+pull_request(_target)?\s*:|^on:.*\bpull_request\b", head, re.M):
+            out["pull_requests"] = True
+        for job in re.split(r"\n(?=  [A-Za-z0-9_-]+:\s*(?:#.*)?\n)", jobs):
+            m = re.search(r"^    environment:[ \t]*(?:\n\s+name:[ \t]*)?(.+)$", job, re.M)
+            if not m:
+                continue
+            said = m.group(1).strip()
+            # A name, or an expression choosing one (a tag's run alone):
+            # each name it may choose.
+            names = re.findall(r"'([A-Za-z0-9_.-]+)'", said) if said.startswith("${{") else \
+                re.findall(r"^['\"]?([A-Za-z0-9_.-]+)", said)
+            for name in names:
+                out["environments"].setdefault(name, set()).update(
+                    re.findall(r"secrets\.([A-Za-z_][A-Za-z0-9_]*)", job))
+    out["environments"] = {k: sorted(v - {"GITHUB_TOKEN"}) for k, v in out["environments"].items()}
+    return out
+
+
+def host_owed(project, comp):
+    """Why a release may not be cut for what the git host owes this tree's
+    workflows, or "": the rows owed, each its own sentence. What cannot be
+    read is not held against it; aerie forge owed says it."""
+    if comp or owes is None or not (root(project) / WORKFLOWS).is_dir():
+        return ""
+    wants = host_wants(project)
+    if not (wants["environments"] or wants["tags"] or wants["pull_requests"]):
+        return ""
+    rows = [r for r in owes(project, wants) if r.get("state") == "owed"]
+    if not rows:
+        return ""
+    return ("the git host owes what this repository's releases rest on: "
+            + "; ".join(f"{r['what']}: {r['why']}" for r in rows)
+            + " (aerie forge owed lists each, and what could not be read)")
+
+
 def unrehearsed(project, comp, sha, section):
     """Why a pre-release may not be tagged on `sha` for want of a passed
     rehearsal of it, or "": nothing is said of a tree with no rehearsal."""
@@ -1575,6 +1631,8 @@ def _release_in_tree(project, comp, env, may_push, push, label):
     if why:
         return {"error": why}
     if label and (why := unrehearsed(project, comp, sha, section)):
+        return {"error": why}
+    if why := host_owed(project, comp):
         return {"error": why}
     wrote = ""
     if section:

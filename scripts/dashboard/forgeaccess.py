@@ -1001,8 +1001,91 @@ def rehearsed(project, sha, workflow="release-rehearsal.yml"):
     return any(r.get("conclusion") == "success" for r in (b or {}).get("workflow_runs") or [])
 
 
+# version.host_wants, handed over by the server: what the project's own
+# workflows ask of its host's settings (owed).
+wants_of = None
+
+
+def owed(project, wants):
+    """What the person owes on the git host for what this repository's own
+    workflows ask of it (R267 step 29): [{"what", "state", "why"}], state
+    ok, owed or unknown. Worked out from `wants` (version.host_wants), never
+    from a list of names: each environment a job is gated by has a required
+    reviewer, no repository-level secret stands in for one an environment
+    holds (a repository's secret is read by any workflow, with nobody's
+    approval), a tag is made only under a ruleset where a workflow runs on
+    one, and an outside contributor's pull request runs only once approved
+    where a workflow runs on pull requests. The controller's own question,
+    asked with the space's token as rehearsed() is; what the token may not
+    read is said as unknown, with the permission it lacks."""
+    t = target_of(project)
+    if t.get("error"):
+        return [{"what": "the git host's settings", "state": "unknown", "why": t["error"]}]
+    if t["forge"]["kind"] != "github":
+        return [{"what": "the git host's settings", "state": "unknown",
+                 "why": f"{t['forge']['kind']}'s settings are not asked here: these are GitHub's"}]
+    repo, rows = t["repo"], []
+
+    def get(path):
+        c, b, _h = _call(t, "GET", f"/repos/{repo}{path}")
+        return c, b
+
+    def unknown(what, c, perm):
+        why = (f"the token may not read it (it needs {perm}: read)" if c in (401, 403, 404) and perm
+               else f"the host answered {c}")
+        rows.append({"what": what, "state": "unknown", "why": why})
+    envs = (wants or {}).get("environments") or {}
+    for env in sorted(envs):
+        what = f"the environment {env} waits for a required reviewer"
+        c, b = get(f"/environments/{urllib.parse.quote(env, safe='')}")
+        if c == 404:
+            rows.append({"what": what, "state": "owed",
+                         "why": f"{repo} has no environment {env}: make it under Settings, Environments, with a required reviewer"})
+        elif 200 <= c < 300:
+            ok = any(r.get("type") == "required_reviewers" and r.get("reviewers")
+                     for r in (b or {}).get("protection_rules") or [])
+            rows.append({"what": what, "state": "ok" if ok else "owed",
+                         "why": "" if ok else f"add a required reviewer under Settings, Environments, {env}"})
+        else:
+            unknown(what, c, "Environments")
+    named = {s for v in envs.values() for s in v}
+    if named:
+        what = "no repository-level secret stands in for one an environment holds"
+        c, b = get("/actions/secrets?per_page=100")
+        if 200 <= c < 300:
+            have = {str(s.get("name") or "") for s in (b or {}).get("secrets") or []}
+            both = sorted(have & named)
+            rows.append({"what": what, "state": "owed" if both else "ok",
+                         "why": (f"delete the repository's own secret {', '.join(both)} under Settings, Secrets and "
+                                 "variables, Actions: its environment holds it, and a repository's secret is read by "
+                                 "any workflow with nobody's approval") if both else ""})
+        else:
+            unknown(what, c, "Secrets")
+    if (wants or {}).get("tags"):
+        what = "a tag is made only under a ruleset"
+        c, b = get("/rulesets?includes_parents=true&per_page=100")
+        if 200 <= c < 300:
+            ok = any(r.get("target") == "tag" and r.get("enforcement") == "active" for r in b or [])
+            rows.append({"what": what, "state": "ok" if ok else "owed",
+                         "why": "" if ok else "add an active tag ruleset under Settings, Rules, so only who may release makes a tag"})
+        else:
+            unknown(what, c, "Administration")
+    if (wants or {}).get("pull_requests"):
+        what = "an outside contributor's pull request runs only once approved"
+        c, b = get("/actions/permissions/fork-pr-contributor-approval")
+        if 200 <= c < 300:
+            ok = (b or {}).get("approval_policy") == "all_external_contributors"
+            rows.append({"what": what, "state": "ok" if ok else "owed",
+                         "why": "" if ok else "require approval for all outside contributors under Settings, Actions, General"})
+        else:
+            unknown(what, c, "Administration")
+    return rows
+
+
 def run(project, verb, args):
     """One aerie forge verb for this project: (payload, status)."""
+    if verb == "owed":
+        return owed(project, wants_of(project) if wants_of else {}), 200
     if verb == "whoami":
         m = fresh(project)
         return {"measure": m, "override": override(project), "briefing": briefing(project)}, 200
@@ -1010,7 +1093,7 @@ def run(project, verb, args):
         return measure(project), 200
     fn = VERBS.get(verb)
     if fn is None:
-        return {"error": f"aerie forge has no {verb}: {', '.join(['whoami', 'measure', *VERBS])}"}, 400
+        return {"error": f"aerie forge has no {verb}: {', '.join(['whoami', 'measure', 'owed', *VERBS])}"}, 400
     t = target_of(project)
     if t.get("error"):
         return {"error": t["error"]}, 400

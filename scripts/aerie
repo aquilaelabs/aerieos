@@ -693,6 +693,12 @@ aerie ci-log          what CI printed on its last run here (`--list` for the run
 aerie forge whoami    what this space's token may do on its git host (GitHub,
                    GitLab, Gitea), as measured, and what to ask for; `measure`
                    asks the host again
+aerie forge owed      what the git host's settings owe this repository's own
+                   workflows: each environment a job is gated by has a
+                   required reviewer, no repository-level secret stands in
+                   for an environment's, a tag ruleset where a workflow runs
+                   on tags, outside contributors' runs approved first; a
+                   release is refused while one is owed (GitHub)
 aerie forge pr|issue|run|release ACTION [ARGS]
                    the git host worked through the controller with the
                    space's token, which never reaches a session: pr list,

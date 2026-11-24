@@ -563,6 +563,23 @@ runner's apksigner, so a change in what apksigner prints is met here and
 not by a tag's seal. A release is then tagged once. GitHub starts it only once the
 repository's default branch carries `.github/workflows/release-rehearsal.yml`.
 
+**What the git host's settings owe a release.** Some of what keeps a
+release a release is set on the git host, not in the tree, and only its
+owner sets it. `aerie forge owed` reads each from the repository's own
+workflows and asks GitHub, and `aerie version release` refuses while one is
+owed (what the space's token may not read is said, not held against it):
+
+- each environment a job is gated by (here `release` and
+  `windows-signing`, in the catalog `sign`) waits for a required reviewer,
+  under Settings, Environments;
+- no repository-level secret has the name of one an environment holds,
+  since a repository's secret is read by any workflow with nobody's
+  approval (the catalog's `CATALOG_SIGNING_KEY` belongs to `sign` alone);
+- where a workflow runs on a pushed tag, a tag ruleset is active, so only
+  who may release makes one, under Settings, Rules;
+- where a workflow runs on pull requests, an outside contributor's runs
+  wait for approval, under Settings, Actions, General.
+
 **The files a release carries.** `.release-files` at the tree's root lists
 them, one a line with `@VER@` for the version. The controller checks each
 release it made against the list at its own tag as the runs the tag started
