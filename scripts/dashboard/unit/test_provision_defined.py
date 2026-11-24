@@ -10,7 +10,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NODES = os.path.join(HERE, "..", "..", "..", "nodes")
-CALL = re.compile(r"(?:^|[;&|]\s*|\b(?:if|then|else|do|!)\s+)([a-z]+_[a-z0-9_]+)\b(?!=)")
+CALL = re.compile(r"(?:^|[;&|]\s*|\b(?:if|then|else|do|!)\s+)([a-z]+_[a-z0-9_]+)\b(?!\+?=)")
 
 
 class Defined(unittest.TestCase):
