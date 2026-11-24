@@ -2005,10 +2005,25 @@ phase() {
     log "phase $1: $(( ($(date +%s%N) - t0) / 1000000 )) ms"
     return "$rc"
 }
+# The private tmux server outlives a world (WORLD_OUT): a session a file made
+# there ends with its world, and the standing ones (fresh) are made again
+# where a file ended them. The same file runs again in each engine, and the
+# shell it left was its next run's "duplicate session" (24 Nov).
+end_sessions() {
+    local s
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r s; do
+        case "$s" in shell-9|claude-alpha) ;; *) tmux kill-session -t "=$s" 2>/dev/null || true ;; esac
+    done
+    for s in shell-9 claude-alpha; do
+        tmux has-session -t "$s" 2>/dev/null || tmux new-session -d -s "$s" -c /tmp
+        tmux send-keys -t "$s" C-u 2>/dev/null || true
+    done
+}
 fresh_world() {
     local since
     phase stop_world
     phase restore_world
+    phase end_sessions
     since="$(date +%s)"
     phase start_server
     phase start_stub
