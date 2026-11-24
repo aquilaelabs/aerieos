@@ -44,6 +44,32 @@ def _claims(jwt):
 # works here. Read as root, as this runs on a node.
 # Under AerieOS's own name where the node has it (R204), else the one before.
 SEAL_DIR = ("/var/lib/aerieos" if os.path.isdir("/var/lib/aerieos") else "/var/lib/builderbot") + "/tokens"
+# ...and where the copy a terminal opens is kept while the account works
+# here (the agent's OPEN_DIR), which the home's file is a link to.
+OPEN_DIR = "/run/bb-tokens"
+
+
+def closed_seal(home, rel, agent):
+    """Whether the home's sign-in file `rel` is the node's link to an opened
+    copy that is not open now, with a seal behind it as far as can be told
+    from here. The node takes that link away once no seal is left (the
+    agent's link_left, B386), so where the seal cannot be looked at, as by
+    the account itself, the link is the sign-in: a check run as the account
+    read it as signed out, and the page offered a sign-in to somebody signed
+    in. Where the seals can be read, a seal that is gone is a sign-out."""
+    try:
+        to = os.readlink(os.path.join(home, rel))
+    except OSError:
+        return False
+    if not to.startswith(OPEN_DIR + "/") or os.path.exists(to):
+        return False
+    try:
+        os.stat(os.path.join(SEAL_DIR, os.path.basename(home.rstrip("/")), agent + ".seal"))
+        return True
+    except FileNotFoundError:
+        return not os.access(SEAL_DIR, os.R_OK | os.X_OK)
+    except OSError:
+        return True
 
 
 def sealed_of(home, agent):
@@ -159,15 +185,19 @@ def who_of(home, agent, a):
         with open(os.path.join(home, who.get("file") or flow["kept"]), "rb") as f:
             data = f.read(1 << 20)
     except FileNotFoundError:
-        # Sealed, its copy not open now (R126): still a sign-in.
+        # Sealed, its copy not open now (R126): still a sign-in, and one
+        # whose seal cannot be read here is unread, never signed out.
         got = sealed_of(home, agent)
-        return got if got and got["email"] else None
+        if got and got["email"]:
+            return got
+        return {"error": "sealed here, its copy not open now"} if closed_seal(home, who.get("file") or flow["kept"], agent) else None
     except OSError as e:
         return {"error": f"{type(e).__name__}: {e}"[:200]}
     # Where another file says who, the sign-in itself is what makes it one
     # rather than a leftover name: a signed-out home keeps the first and
     # loses the second.
-    if apart and not os.path.exists(os.path.join(home, flow["kept"])) and not sealed_of(home, agent):
+    if apart and not os.path.exists(os.path.join(home, flow["kept"])) and not sealed_of(home, agent) \
+            and not closed_seal(home, flow["kept"], agent):
         return None
     if not data.strip():
         return None

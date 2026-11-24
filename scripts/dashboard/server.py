@@ -6208,6 +6208,9 @@ def _revisions(who=None, projects=None):
         # Who has a session where, and whether it is working: the project
         # rows fetch /api/live when this moves.
         "live": projsessions.live_token(),
+        # The asker's own sign-ins as the nodes report them: a sign-in
+        # finishing, or one a node says is gone, re-read at once.
+        "signins": claudegrant.rev(home_for(uid)) if (uid := users.uid_of(who or {})) else 0,
     }
     # Per project, for the views that are per project.
     for n in names:
@@ -10580,6 +10583,13 @@ class Handler(BaseHTTPRequestHandler):
         if agent != "claude" and not any(a.id == agent and a.login_job for a in agents.rows()):
             return self._json({"error": f"no coding agent called '{agent[:20]}' signs in"}, 400)
         signed_in = bool(req.get("signed_in", True))
+        if not signed_in and claudegrant.sealed_on(((nodes.node(nid) or {}).get("reported") or {}).get("tokseal"), uid, agent):
+            # The node holds this account's sealed sign-in (its census says
+            # so), which its next terminal there opens again: a check that
+            # could not see it, its copy closed, is not a sign-out, and the
+            # page offered a sign-in to a person signed in (the operator,
+            # 24 Nov). Sign out takes the seal away, and writes its own.
+            return self._json({"ok": True, "sealed": True})
         if not signed_in and claudegrant.on(home_for(uid), nid, agent):
             # Said in the log, as the heartbeat's sign-out is (B236): which
             # session's check took a login away is not on the page.

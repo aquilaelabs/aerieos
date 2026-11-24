@@ -57,6 +57,29 @@ def _path(home, agent="claude"):
     return Path(home) / ".claude" / f".bb-grant-{agent}.json"
 
 
+def sealed_on(tokseal, uid, agent="claude"):
+    """Whether a node's census (its reported tokseal) holds this account's
+    sealed sign-in to `agent`. Such a seal is a sign-in there, which the
+    next terminal opens again, whatever a check that could not see it
+    said; only a sign-out takes it away."""
+    sealed = (tokseal or {}).get("sealed") if isinstance(tokseal, dict) else None
+    mine = sealed.get(str(uid or "")) if isinstance(sealed, dict) else None
+    return bool(uid) and isinstance(mine, dict) and isinstance(mine.get(agent), dict)
+
+
+def rev(home):
+    """A number that moves when a node reports this account's sign-in to any
+    coding agent, or that it is gone: the newest of the account's records.
+    The page re-reads on it (the operator, 24 Nov: a sign-in finished on
+    the node and the page said so only after a reload)."""
+    if not home:
+        return 0
+    try:
+        return max((x.stat().st_mtime_ns for x in (Path(home) / ".claude").glob(".bb-grant*.json")), default=0)
+    except OSError:
+        return 0
+
+
 def _read(home, agent="claude"):
     try:
         d = json.loads(_path(home, agent).read_text())

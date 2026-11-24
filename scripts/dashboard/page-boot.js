@@ -652,6 +652,10 @@ function bootAway(){
   // Who has a session where, and whether it is working: the light fetch, so
   // the dot beside a name follows a session within seconds.
   onRev("live", () => liveRefresh());
+  // This account's sign-ins as its nodes report them: one finishing after
+  // the flow's own last look, or one a node says is gone, shows without a
+  // reload (the operator, 24 Nov).
+  onRev("signins", () => refresh());
   // The controller's own settings, which the tab draws out of `state`: another
   // window saved, or `aerie` wrote the file. The server has published this token
   // since the store was built and nothing watched it, so the tab that owns the

@@ -80,6 +80,9 @@ def whoami():
     ll = readers()
     a = ll.signins().get("claude")
     got = ll.who_of(home, "claude", a) if a and home else None
+    # Unread is not signed out (B236): None, and nothing is said for it.
+    if got and got.get("error"):
+        return None, str(got["error"])
     email = str((got or {}).get("email") or "")
     return bool(email), email
 
@@ -144,6 +147,10 @@ others()
 if FOR != "claude":
     loud = False
 here, mine = whoami()
+if here is None:
+    if loud:
+        warn(f"could not read this machine's Claude login: {mine}")
+    sys.exit(0)
 if not here:
     if loud:
         say(f"not signed in on {NODE}: Sign in on Claude Code's row of the Installed page, with this node picked, runs the flow here")
