@@ -559,7 +559,33 @@ def releasesigners():
     sys.exit(r.returncode)
 
 
-CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
+def selectors():
+    """A selector no browser reads: :has() anywhere inside another :has()'s
+    argument. A browser drops the whole rule for it, every selector in its
+    list with it, and says nothing; the read-only Scanners page drew every
+    button it meant to hide until a picture showed it (R278, 24 Nov)."""
+    bad = []
+    for f in sorted(pathlib.Path("scripts/dashboard").glob("page-*.css")):
+        text = f.read_text(encoding="utf-8", errors="replace")
+        # Comments out, their newlines kept so a line number stays true.
+        text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+        for m in re.finditer(r":has\(", text):
+            depth, i = 1, m.end()
+            while i < len(text) and depth:
+                if text.startswith(":has(", i):
+                    line = text.count("\n", 0, m.start()) + 1
+                    bad.append(f"{f}:{line}: :has() inside :has(), which drops the whole rule")
+                    break
+                depth += {"(": 1, ")": -1}.get(text[i], 0)
+                i += 1
+    for b in dict.fromkeys(bad):
+        print(f"  [FAIL] {b}")
+    if not bad:
+        print("  [ok]   no selector nests :has(), which a browser drops whole")
+    return 1 if bad else 0
+
+
+CHECKS = {"runner": runner, "selectors": selectors, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
           "changelog": changelog, "dupes": dupes, "releasekey": releasekey, "releasesigners": releasesigners}
 
