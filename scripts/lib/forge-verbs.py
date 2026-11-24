@@ -17,6 +17,12 @@ from say import die
 GROUPS = ("pr", "issue", "run", "release")
 # Flags that take no value.
 SWITCHES = {"draft", "approve", "request-changes", "failed", "job", "json"}
+# Every flag some verb reads (dashboard/forgeaccess.py), --body-file read
+# here into --body: anything else is refused by name, where it was sent and
+# dropped, and a pull request made with no description said nothing (B1123,
+# report #132).
+FLAGS = SWITCHES | {"base", "body", "body-file", "branch", "field", "head", "label", "lines", "method",
+                    "name", "ref", "size", "state", "title"}
 
 
 proj, words = sys.argv[1], list(sys.argv[2:])
@@ -52,6 +58,19 @@ while words:
             die(f"--{k} needs a value")
     else:
         pos.append(w)
+for k in flags:
+    if k not in FLAGS:
+        die(f"aerie forge: --{k} is not an option any verb takes; "
+            f"aerie help forge lists each verb's ({', '.join('--' + f for f in sorted(FLAGS - {'json'}))})")
+# --body-file FILE is the body read from that file, - from standard input.
+if "body-file" in flags:
+    if "body" in flags:
+        die("aerie forge: --body or --body-file, not both")
+    src = flags.pop("body-file")
+    try:
+        flags["body"] = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
+    except OSError as e:
+        die(f"aerie forge: --body-file {src}: {e.strerror or e}")
 as_json = bool(flags.pop("json", False))
 r = bbapi.call("/api/forge", {"project": proj, "verb": verb, "args": {"pos": pos, "flags": flags}},
                timeout=120)

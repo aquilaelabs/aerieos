@@ -710,7 +710,9 @@ aerie forge pr|issue|run|release ACTION [ARGS]
                    [--branch B], view ID, log ID [--lines N] [--job], rerun
                    ID [--failed], dispatch WORKFLOW --ref B [-f NAME=VALUE];
                    release list, view TAG. --state open|closed|all on a list,
-                   --json for the host's answer whole. Each needs what the
+                   --json for the host's answer whole, --body-file FILE (-
+                   for standard input) for a --body read from a file; an
+                   option no verb takes is refused. Each needs what the
                    token allows and the space's Permissions, On the git
                    host, permit (docs/git-hosts.md)
 aerie logs [-f] [N]   this boot's log; on a node the controller's, read
