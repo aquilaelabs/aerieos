@@ -229,6 +229,14 @@ if argv and argv[0] == "release":
     forge = rel.get("forge") or {}
     if forge.get("url"):
         print(f"the release: {forge['url']}")
+        # What it carries, named (report #133: a debug build went out alone
+        # and nothing said which file had been attached).
+        if forge.get("made"):
+            got = forge.get("assets") or []
+            print("attached: " + (", ".join(str(a) for a in got) if got else
+                                  "nothing (no build of this commit in dist/)"))
+            for s in forge.get("skipped") or []:
+                print(f"not attached: {s}")
     elif forge.get("error"):
         print(f"no release on the forge: {forge['error']}")
     # What it owes once it is out (R190 step 7): the last line names the verb

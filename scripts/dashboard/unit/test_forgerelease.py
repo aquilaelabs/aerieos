@@ -157,6 +157,33 @@ class Release(unittest.TestCase):
         self.assertEqual(fr.assets("app", git("rev-parse", "--short=7", "HEAD")), [],
                          "a build of different files is never attached")
 
+    def test_a_signed_copy_named_by_its_version_is_taken_over_the_debug_build(self):
+        # Report #133: v0.6.8 tagged on a merge went out with the debug
+        # build of the pull request's head alone, the two copies aerie sign
+        # made (named by the version, no commit id) passed over.
+        app = self.tmp / "ws" / "app"
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@x"}
+        git = lambda *a: subprocess.run(["git", "-C", str(app), *a], check=True, capture_output=True,
+                                         text=True, env=env).stdout.strip()
+        git("init", "-q"); (app / ".gitignore").write_text("dist/\n"); git("add", "-A"); git("commit", "-qm", "tip")
+        tip = git("rev-parse", "--short=7", "HEAD")
+        git("commit", "-q", "--allow-empty", "-m", "Merge pull request #12")
+        merge = git("rev-parse", "--short=7", "HEAD")
+        dist = app / "dist"
+        (dist / f"app-0.6.8-dev.324-{tip}-app-debug.apk").write_bytes(b"debug")
+        for n in ("app-0.6.8-release-signed.apk", "Voice-0.6.8-release-signed.apk",
+                  "app-0.6.8-dev.3-release-signed.apk", "app-0.6.80-release-signed.apk"):
+            (dist / n).write_bytes(b"signed")
+        got = sorted(f.name for f in fr.assets("app", merge, "0.6.8"))
+        self.assertEqual(got, ["Voice-0.6.8-release-signed.apk", "app-0.6.8-release-signed.apk"],
+                         "the version's own signed copies, not a pre-release's nor another version's, and no debug build")
+        # ...made before the commit was, a copy is an older build's.
+        old = git("show", "-s", "--format=%ct", merge)
+        for n in ("app-0.6.8-release-signed.apk", "Voice-0.6.8-release-signed.apk"):
+            os.utime(dist / n, (int(old) - 3600, int(old) - 3600))
+        self.assertEqual([f.name for f in fr.assets("app", merge, "0.6.8")], [f"app-0.6.8-dev.324-{tip}-app-debug.apk"])
+
     def test_a_second_press_makes_nothing_twice(self):
         fr.publish("app", "v0.5.0", "0.5.0", "65298e0")
         n = len([1 for m, _, _ in SEEN if m == "POST"])

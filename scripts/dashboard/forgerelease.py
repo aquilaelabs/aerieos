@@ -224,9 +224,14 @@ def _shown(project):
     return roles.shown(project)
 
 
-def assets(project, sha):
+def assets(project, sha, version=""):
     """The builds of commit `sha` in the project's dist/, signed ones when
-    there are any: [Path], newest first."""
+    there are any: [Path], newest first. A signed build whose name carries
+    no commit id (one signed from a build named by its version alone, as
+    aerie sign names what it makes after what it was given) is the
+    release's when its name carries `version` and it was made after the
+    commit was: report #133, where the debug build of the pull request's
+    head went out alone beside two such signed copies passed over."""
     d = WORKSPACE / project / "dist"
     if not sha or not d.is_dir():
         return []
@@ -239,6 +244,11 @@ def assets(project, sha):
         same = _same_tree(project, sha, {m.group(1) for f in ships for m in [BUILD_SHA.search(f.name)] if m})
         files = [f for f in ships if (m := BUILD_SHA.search(f.name)) and m.group(1) in same]
     signed = [f for f in files if "-signed" in f.name]
+    if version and (when := _commit_time(project, sha)):
+        # The version itself, not a pre-release of it (0.6.8 is not 0.6.8-dev.3).
+        named = re.compile(rf"(?<![0-9A-Za-z.]){re.escape(version)}(?![0-9A-Za-z]|[-.+](?:dev|rc|alpha|beta|pre)\b)")
+        signed += [f for f in ships if "-signed" in f.name and f not in signed and not BUILD_SHA.search(f.name)
+                   and named.search(f.name) and f.stat().st_mtime >= when]
     if signed:
         files = signed
     else:
@@ -248,6 +258,16 @@ def assets(project, sha):
 
 
 BUILD_SHA = re.compile(r"-([0-9a-f]{7,12})(?=[-.])")
+
+
+def _commit_time(project, sha):
+    """When commit `sha` was made (its committer's time), 0 when unknown."""
+    try:
+        r = subprocess.run(["git", "-C", str(WORKSPACE / project), "show", "-s", "--format=%ct", sha],
+                           capture_output=True, text=True, timeout=10)
+        return int(r.stdout.strip() or 0) if r.returncode == 0 else 0
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return 0
 
 
 def _same_tree(project, sha, others):
@@ -389,12 +409,12 @@ def _github(repo, token, project, tag, version, sha, where, title, pre=False):
     if have:
         return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": []}
     body = _body(project, where, version, tag, repo,
-                 [f.name for f in assets(project, sha) if f.stat().st_size <= ASSET_MAX])
+                 [f.name for f in assets(project, sha, version) if f.stat().st_size <= ASSET_MAX])
     rel = _req("POST", base, token, {"tag_name": tag, "name": title,
                                      "body": body, "draft": False, "prerelease": bool(pre),
                                      **({"make_latest": "false"} if pre else {})})
     up, skipped = [], []
-    for f in assets(project, sha):
+    for f in assets(project, sha, version):
         size = f.stat().st_size
         if size > ASSET_MAX:
             skipped.append(f"{f.name} is {size // 1_000_000} MB, over GitHub's limit")
@@ -551,7 +571,7 @@ class _Gitea(_Driver):
         return self.f.ask(method, path)
 
     def publish(self, project, tag, version, sha, where, title, pre):
-        body = _body(project, where, version, tag, self.at["path"], [f.name for f in assets(project, sha)])
+        body = _body(project, where, version, tag, self.at["path"], [f.name for f in assets(project, sha, version)])
         return _gitea(self.f, self.at, project, tag, version, sha, title, body, pre)
 
     def raw(self, sha, rel):
@@ -591,7 +611,7 @@ class _GitLab(_Driver):
         return self.f.ask(method, path)
 
     def publish(self, project, tag, version, sha, where, title, pre):
-        body = _body(project, where, version, tag, self.at["path"], [f.name for f in assets(project, sha)])
+        body = _body(project, where, version, tag, self.at["path"], [f.name for f in assets(project, sha, version)])
         return _gitlab(self.f, self.at, project, tag, version, sha, title, body)
 
     def raw(self, sha, rel):
@@ -698,7 +718,7 @@ def _gitea(f, at, project, tag, version, sha, title, body, pre=False):
                 raise
             time.sleep(wait)
     up, skipped = [], []
-    for p in assets(project, sha):
+    for p in assets(project, sha, version):
         size = p.stat().st_size
         if size > ASSET_MAX:
             skipped.append(f"{p.name} is {size // 1_000_000} MB, too big to attach")
@@ -727,7 +747,7 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
     pkg = re.sub(r"[^A-Za-z0-9._-]", "-", project) or "builds"
     ver = re.sub(r"[^A-Za-z0-9._+-]", "-", version) or "0"
     up, skipped = [], []
-    for p in assets(project, sha):
+    for p in assets(project, sha, version):
         size = p.stat().st_size
         if size > ASSET_MAX:
             skipped.append(f"{p.name} is {size // 1_000_000} MB, too big to attach")

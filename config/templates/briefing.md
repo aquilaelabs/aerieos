@@ -464,7 +464,12 @@ file: `![The keyboard](asset:shot.png)`), and a file comes off one only with
 `aerie version release --remove NAME --why "..."`; each is its own ask.
 Where a space's CI makes its release a draft, the release stays unseen until
 a person publishes it from the Artifacts view's Drafts, its notes read first; a
-session does not publish it, and says the draft is waiting.
+session does not publish it, and says the draft is waiting. A release made
+here attaches the builds of its commit in dist/ (a name carrying that commit's
+id, or another commit's with the same files), and a signed copy named by the
+release's version made after that commit; signed ones when there are any, a
+debug build only where nothing signed is there, an unsigned one never, and
+its output names each file attached.
 From a branch other than main a release is a dev pre-release unless
 `--stable` is said, and its first line names the channel. `aerie version
 rehearse` runs every build a tag would on the pushed branch and publishes
