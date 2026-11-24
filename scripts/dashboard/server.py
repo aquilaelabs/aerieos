@@ -10694,7 +10694,7 @@ class Handler(BaseHTTPRequestHandler):
         an administrator any; a session its own space's; a person one on a
         node they hold Jobs Write on, or one of a space they hold Spaces
         Write on, whose builds and tests these are (R277, the audit of 24
-        Nov: Accounts Write cancelled every job and a reader of a space any
+        Nov: Accounts Write canceled every job and a reader of a space any
         of its own). "unseen" for a job this account does not read."""
         if users.is_admin(me or {}):
             return ""

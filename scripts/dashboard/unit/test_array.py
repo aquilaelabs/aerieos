@@ -525,7 +525,7 @@ class Takeover(unittest.TestCase):
         self.assertIn("linked: its folder on the data disks is a link", job.text())
         self.assertTrue(os.path.isdir(os.path.join(root, "cache", "media", "keep")), "a folder the mover did not empty is kept")
 
-    def test_snapraid_keeps_its_catalogue_in_a_folder_roots_alone_on_each_disk(self):
+    def test_snapraid_keeps_its_catalog_in_a_folder_roots_alone_on_each_disk(self):
         # B858: a disk's top is often everybody's to write, and SnapRAID
         # writes .snapraid.content.tmp beside its content file as root,
         # following a link planted at that name anywhere.
@@ -536,7 +536,7 @@ class Takeover(unittest.TestCase):
         os.chmod(os.path.join(d2, ".aerie-snapraid"), 0o777)          # somebody else's, opened to all
         os.symlink("/etc/passwd", os.path.join(d2, ".aerie-snapraid", ".snapraid.content.tmp"))
         with open(os.path.join(d1, ".snapraid.content"), "w") as f:
-            f.write("the catalogue")
+            f.write("the catalog")
         os.symlink("/etc/passwd", os.path.join(d2, ".snapraid.content"))
         rec = {"data": [{"slot": 1, "where": d1}, {"slot": 2, "where": d2}]}
         # Root here is this test's account: the folder is given to it.
@@ -551,7 +551,7 @@ class Takeover(unittest.TestCase):
             st = os.lstat(os.path.join(d, ".aerie-snapraid"))
             self.assertEqual(st.st_mode & 0o7777, 0o700, d)
         with open(os.path.join(d1, ".aerie-snapraid", ".snapraid.content")) as f:
-            self.assertEqual(f.read(), "the catalogue", "the content from before is moved in")
+            self.assertEqual(f.read(), "the catalog", "the content from before is moved in")
         self.assertFalse(os.path.lexists(os.path.join(d1, ".snapraid.content")))
         self.assertEqual(os.listdir(os.path.join(d2, ".aerie-snapraid")), [], "the planted folder went aside whole")
         self.assertTrue([x for x in os.listdir(d2) if x.startswith(".aerie-snapraid.not-roots-")])

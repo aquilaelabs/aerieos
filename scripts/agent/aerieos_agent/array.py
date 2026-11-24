@@ -181,7 +181,7 @@ def content_dirs(rec):
     SnapRAID runs: one somebody else made, or opened to others, is moved
     aside whole (nothing in it followed or read) and a new one made; and a
     content file at the disk's top from before this folder, root's own and
-    a plain file, moved into it, so the array's catalogue is kept."""
+    a plain file, moved into it, so the array's catalog is kept."""
     for d in rec.get("data") or []:
         top = slot_mount("d", d)
         if not _mounted(top):
@@ -191,7 +191,7 @@ def content_dirs(rec):
             try:
                 tfd = os.open(top, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
             except FileNotFoundError:
-                continue                            # nothing there to keep a catalogue in
+                continue                            # nothing there to keep a catalog in
             st = _lstat_at(tfd, CONTENT_DIR)
             if st and not (stat.S_ISDIR(st.st_mode) and st.st_uid == 0 and stat.S_IMODE(st.st_mode) == 0o700):
                 aside = f"{CONTENT_DIR}.not-roots-{int(time.time())}"
@@ -248,7 +248,7 @@ def render_snapraid(rec):
     """snapraid.conf from the record: the parity files on the parity disks,
     a content file on every data disk and, on a machine installed to a disk,
     one on the system too; never on a stick (the operator, 8 Nov): the
-    content file is a catalogue of every block of the array, gigabytes for
+    content file is a catalog of every block of the array, gigabytes for
     a large one and rewritten whole at every autosave, which filled the
     stick's own partition and took the controller down with it."""
     out = ["# Written by AerieOS (the Storage page): the array's SnapRAID layout. Do not edit; the page writes it whole.\n"]
