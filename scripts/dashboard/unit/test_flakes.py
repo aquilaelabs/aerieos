@@ -55,6 +55,16 @@ class Record(unittest.TestCase):
                 f.write(body)
             self.logs.append(p)
 
+    def test_a_suite_run_in_each_engine_is_read_by_its_name(self):
+        # Each engine's part under a banner of its own (R263): the check that
+        # failed is found under the suite's name, the engine named in it.
+        p = os.path.join(self.d, "engines.log")
+        with open(p, "w") as f:
+            f.write("[dashboard-test] == usb.mjs [chromium] ==\nPASS  Give to a VM queues it\n"
+                    "[dashboard-test] == usb.mjs [firefox] ==\nFAIL  [firefox] Give to a VM queues it (undefined)\n"
+                    "[builderbot] == usb.mjs [webkit] again ==\nFAIL  a rerun's own\n")
+        self.assertEqual(flakes.first_fails([p]), {"usb": "[firefox] Give to a VM queues it (undefined)"})
+
     def test_a_flake_is_a_line_with_the_first_check_that_failed_in_the_run(self):
         rows = flakes.record(self.file, ["cards.mjs", "devapp.mjs"], 8, "14.6", self.logs, now=1794700000)
         self.assertEqual(len(rows), 2)

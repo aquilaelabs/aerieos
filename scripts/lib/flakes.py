@@ -26,7 +26,7 @@ import re
 import sys
 import time
 
-BANNER = re.compile(r"\[dashboard-test\] == (\S+?)(?:\.mjs)?(?: again)? ==")
+BANNER = re.compile(r"\[(?:dashboard-test|builderbot)\] == (\S+?)(?:\.mjs)?(?: \[\w+\])?(?: again)? ==")
 # What a failure waited for: the harness's own diagnosis under a FAIL, or
 # the error a suite stopped on (a timeout, a route handled twice).
 WAITED = re.compile(r"^\[wait\] ")

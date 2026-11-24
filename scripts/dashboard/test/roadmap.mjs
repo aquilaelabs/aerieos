@@ -1095,8 +1095,11 @@ await page.waitForFunction(id => { const done = document.querySelector(`.nb #roa
 ok(true, 'searching narrows the list and the finished alike to what matches');
 await page.fill('.nb #roadmapFind', '');
 await page.click('.nb #roadmapDoneSect > summary');
-await page.waitForFunction(() => !document.querySelector('.nb #roadmapDoneSect').open, null, { timeout: 5000 });
-ok(!(await page.$('.nb #roadmapDoneList .grp')), '...and shutting the section folds them away again');
+// The toggle event comes a task after the fold shuts, by the spec: WebKit's
+// lands later than Chromium's, so what it empties is waited for too.
+ok(await page.waitForFunction(() => !document.querySelector('.nb #roadmapDoneSect').open
+     && !document.querySelector('.nb #roadmapDoneList .grp'), null, { timeout: 5000 }).then(() => true, () => false),
+   '...and shutting the section folds them away again');
 // A Save lit with nothing staged is a change the session has not been told
 // about yet, and the bar says so rather than sitting there unexplained.
 const untold = await post({ action: 'add', project: 'alpha', text: 'an untold change' });

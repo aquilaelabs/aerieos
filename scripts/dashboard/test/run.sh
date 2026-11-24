@@ -686,7 +686,7 @@ QUEUE
         WORKER_PIDS=()
         [ -n "$sampler" ] && kill "$sampler" 2>/dev/null
         [ -z "$w" ] || awk -v b="== $(basename "${LOADED_SUITE%.mjs}").mjs" \
-            'index($0, b) { on = 1; print; next } on && /^\[dashboard-test\] == / { exit } on' "${logs[w]}"
+            'index($0, b) { on = 1; print; next } on && /^\[dashboard-test\] == / && !index($0, b) { exit } on' "${logs[w]}"
         log "loaded: beside it ran $(cut -f1 "$S/queue.ran" | grep -vxF -- "$LOADED_SUITE" | paste -sd' ' -)"
         load_line
         if [ -z "$lrc" ]; then

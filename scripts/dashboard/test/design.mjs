@@ -349,7 +349,11 @@ await section("nothing takes effect until Save", async () => {
       const t = s.options[s.selectedIndex]?.text || '', cs = getComputedStyle(s);
       const c = document.createElement('canvas').getContext('2d');
       c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-      const need = c.measureText(t).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 14;
+      // The arrow: past the padding on Chromium's base select, which gives
+      // the end padding to it, and inside the padding where the select is
+      // the page's own fallback (Firefox, WebKit), which leaves room for it.
+      const pr = parseFloat(cs.paddingRight);
+      const need = c.measureText(t).width + parseFloat(cs.paddingLeft) + pr + (pr >= 14 ? 0 : 14);
       return need > s.getBoundingClientRect().width + 1 ? `${s.id || s.className}: ${t}` : '';
     }).filter(Boolean));
     const was = page.viewportSize(), seen = [];

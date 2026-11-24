@@ -4,7 +4,7 @@
 // Everything here drives the stub docker the harness provides; the argv it
 // records IS the assertion, because the module's whole safety story is that
 // the buttons run table-lookup compose commands and nothing else.
-import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled, OWNER, asSession, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, skip, ENGINE, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled, OWNER, asSession, section, REPO } from './lib.mjs';
 import { writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, chmodSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -398,6 +398,16 @@ await section("A redraw must not take an open menu with it", async () => {
                                 window.__heldTab = document.querySelector('.dmtab'); });
     await sel.click();
     const open = await page.evaluate(() => window.__heldSel.matches(':open'));
+    // Headless Firefox draws no list for a select, so nothing opens one and
+    // :open never matches: what a redraw does to an open menu is this
+    // engine's to see only where one opens.
+    if (!open && ENGINE === 'firefox'){
+      skip('a redraw that lands while a menu is open leaves the menu alone', 'headless Firefox opens no select\'s list');
+      skip('...and the revisions poll waits rather than firing a watch under it', 'the same');
+      skip('...and the redraw it was owed happens once the menu shuts', 'the same');
+      await page.keyboard.press('Escape');
+      return;
+    }
     // What was drawn before the news below: once the menu shuts, the page
     // shows the news (B816). Kept before the news and not after it: a draw
     // of its own (a read landing, the stats) may put it on screen while
@@ -2689,6 +2699,9 @@ const plantDead = force => {
   readMoved('docker'); drawPanes();
   const q = s2 => [...document.querySelectorAll(s2)];
   if (!force && !q('.dmtab .row[data-inst]').length) return null;
+  // ...nor while a row still says a job's step (a rebuild the queue had not
+  // listed yet when idle looked): that is the job's to say, not the daemon's.
+  if (!force && q('.dmtab .row[data-inst] .dmpill').some(e => !/state unknown/.test(e.textContent))) return null;
   const mk = document.getElementById('bDockerNew');
   return {
     newOff: mk?.disabled === true,
@@ -4332,7 +4345,10 @@ await section("who may rebuild it", async () => {
       await fetch('/api/phone', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ action: 'allow', id }) });
     }, rmAsk.id);
+    // The job the Allow queues may not be on the queue yet when idle first
+    // looks, so what it leaves is waited for as well.
     await idle();
+    await until(() => !insts().includes('asked'), 20000, 200);
     ok(rmAsk.status === 200 && rmAsk.id && /"remove"/.test(JSON.stringify(rmSeen?.cmd)) && !insts().includes('asked'),
        `on ask a remove waits for a person, and Allow removes it (${JSON.stringify(rmSeen?.cmd)}; left: ${insts().join(', ')})`);
     for (const inst of ['fresh', 'asked']) await page.evaluate(async (i) => {
