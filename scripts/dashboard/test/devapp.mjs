@@ -931,7 +931,9 @@ await section("Sampled rather than waited for, so a miss says what the row said 
 ok(await page.$(`${DM} .dmlog`) === null, "the row carries the job's phase and no tail of its output");
 // The row says building on the press; its Abort follows once the job it
 // stops exists, with the server's answer and the read after it.
-ok(await page.waitForSelector(`${DM} [data-dm="abort"]`, { timeout: 15000 }).then(() => true, () => false),
+// Given the suite's patience: under a whole gate's load the job it stops
+// came later than fifteen seconds (B977).
+ok(await page.waitForSelector(`${DM} [data-dm="abort"]`, { timeout: patience(15000) }).then(() => true, () => false),
    '...with an Abort beside it, which a build never had');
 // Aborted once it is really running: pressed while the job was still in the
 // queue it was canceled before it started, which keeps nothing and says so,
@@ -2406,7 +2408,10 @@ await section("a shell inside a container, in the dock", async () => {
     // Until a census both lists the container running and says no terminal:
     // under a whole run's load a census came between with the container not
     // listed, and twenty seconds ran out on that answer (B829).
-    await until(async () => (old = await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 403, 60000, 500);
+    // ...and that says no terminal: a 403 saying the container is not
+    // running (a census from between) is not that answer (B977).
+    await until(async () => (old = await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 403
+      && /has not set up its container terminal yet/.test(old.error || ''), 60000, 500);
     rmSync(extra, { force: true });
     ok(old?.status === 403 && /has not set up its container terminal yet/.test(old.error),
        `a node whose agent runs no container terminal yet says so (${(old?.error || '').slice(0, 80)})`);

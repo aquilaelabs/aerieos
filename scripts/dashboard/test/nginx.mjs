@@ -5,7 +5,7 @@
 // off; and the Enroll dialog's tick puts nginx on a node the moment it
 // enrolls. The harness's sandbox node is the node, and its stub docker reads
 // the generated compose file the way a daemon would.
-import { URL, launch, newPage, ok, done, ready, DIR, api, section, jobEnd } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, api, section, jobEnd, patience } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 // Poll fn until it answers something other than null, or give up.
@@ -278,11 +278,12 @@ await page.click(`${sect} [data-ngedit="1"]`);
 await page.waitForSelector(`${sect} .ngform [data-ngdel]`, { timeout: 5000 });
 await page.click(`${sect} .ngform [data-ngdel]`);
 // Off the list on the press (the operator, 22 Nov), before the server has
-// answered, so the server's own list is asked until it says the same.
-const offAtOnce = await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.length === 1, sandbox.node, { timeout: 15000 })
+// answered, so the server's own list is asked until it says the same; each
+// wait given the suite's patience, which a whole gate's load needs (B1054).
+const offAtOnce = await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.length === 1, sandbox.node, { timeout: patience(15000) })
   .then(() => true, () => false);
 let served = [];
-for (const end = Date.now() + 15000; Date.now() < end; await new Promise(f => setTimeout(f, 250))){
+for (const end = Date.now() + patience(15000); Date.now() < end; await new Promise(f => setTimeout(f, 250))){
   served = (await api('/api/nginx')).nodes.find(n => n.node === sandbox.node).routes;
   if (served.length === 1) break;
 }

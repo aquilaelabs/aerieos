@@ -765,6 +765,9 @@ await section("a bare-metal install's first run", async () => {
       // since the step above: the plan is set again with its shares.
       state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
                                  notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
+      // Kept for the steps after this one to plant again (B969).
+      window.__adopted = n.reported.adopted;
+      window.__fbShares = state.firstboot;
       readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       return { there: !!sect, gone: !document.querySelector('.nodestab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
@@ -780,9 +783,14 @@ await section("a bare-metal install's first run", async () => {
        `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
     // The folders at /mnt/user's top with no share settings, offered to
     // tick (R163 step 13), and the same section on the Storage page (step 9).
+    // Planted again whole: the share call just above moves the nodes
+    // revision, and the reread it starts can replace what the step before
+    // planted before this one draws (B969: offered nothing, the section
+    // gone with its plan).
     const folders = await page.evaluate(() => {
       const n = ownMachine();
-      n.reported = { ...n.reported, adopted: { ...n.reported.adopted, folders: ['media', 'TV Shows', 'appdata'] }, shares: [{ name: 'appdata', path: '/mnt/user/appdata', smb: { on: true }, nfs: { on: false } }] };
+      state.firstboot = window.__fbShares;
+      n.reported = { ...n.reported, adopted: { ...window.__adopted, folders: ['media', 'TV Shows', 'appdata'] }, shares: [{ name: 'appdata', path: '/mnt/user/appdata', smb: { on: true }, nfs: { on: false } }] };
       readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       return { offered: [...(sect?.querySelectorAll('[data-adoptfolder]') || [])].map(x => x.dataset.adoptfolder),
