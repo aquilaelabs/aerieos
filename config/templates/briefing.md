@@ -527,6 +527,9 @@ you; a person who has given none is asked for theirs, never lent another's.
 What it may do is the token's and then the space's: your briefing says it in
 Your git host, `aerie forge whoami` prints it whole, and a verb either refuses is
 refused with the permission to ask the person for. Merging starts off.
+`aerie forge owed` says what the host's settings owe this repository's own
+workflows (a reviewer on each environment, a tag ruleset and the like),
+which `aerie version release` refuses on; each is the person's to set.
 The same list holds `aerie git push`: a push that changes a file under
 `.github/workflows` is refused where Change CI workflow files is Deny.
 <!-- BUILDERBOT:END -->
