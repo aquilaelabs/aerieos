@@ -103,5 +103,66 @@ class Matrix(unittest.TestCase):
             self.assertIn(level, roles.LEVELS, action)
 
 
+class Sessions(unittest.TestCase):
+    """The session half: a session's token on alpha, minted for an account
+    holding a role there, asked about every action. A session asks only
+    what SESSION_MAY lists, never what PERSON_ONLY names, and each of its
+    own is held to what the account's roles give (users.may through
+    _session_account_why): it does no more than its account."""
+
+    def setUp(self):
+        from unittest import mock
+        import users
+        self.users = users
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        roles.configure(state=self.tmp, write_json=lambda p, d: __import__("pathlib").Path(p).write_text(json.dumps(d)))
+        self.accounts = {"users": {}}
+        patch = mock.patch.object(users, "load", lambda: self.accounts)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def account(self, level):
+        roles.set_role("hand", scope="projects", perms={"projects": level} if level else {})
+        self.accounts["users"]["dev"] = {"uid": "u_dev", "role": "user", "roles": [], "projects": ["alpha"],
+                                         "project_roles": {"alpha": ["hand"]}}
+        # Its list holds the spaces its own reads (prefs.reads), as the
+        # server builds the principal.
+        return {"name": "session:alpha", "kind": "session", "role": "session", "projects": ["alpha", "beta"],
+                "session": "alpha", "seat": "u_dev", "reads": ["beta"]}
+
+    def test_a_session_asks_its_own_short_list_held_to_its_account(self):
+        u = self.users
+        wrong = []
+        for level in ("write", "read", ""):
+            s = self.account(level)
+            acct = u.account_of(s)
+            for action in sorted(set(roles.CAP_AREA) | set(u.SESSION_MAY) | {"rules", "pending", "ftp"}):
+                got = u.may(s, action, "alpha") == ""
+                if action in u.PERSON_ONLY or action in ("rules", "pending", "ftp") or action not in u.SESSION_MAY:
+                    want = False
+                else:
+                    want = bool(roles.granted(acct, action, "alpha", u.may_work))
+                if got != want:
+                    wrong.append(f"{level or 'none'} / {action}: got {got}, want {want} ({u.may(s, action, 'alpha')})")
+        self.assertEqual(wrong, [], "\n".join(wrong[:40]))
+
+    def test_a_space_it_reads_is_read_and_never_written(self):
+        u = self.users
+        s = self.account("write")
+        self.accounts["users"]["dev"]["project_roles"]["beta"] = ["hand"]
+        self.accounts["users"]["dev"]["projects"].append("beta")
+        self.assertEqual(u.may(s, "read", "beta"), "")
+        for action in ("work", "write", "docker-write", "settings"):
+            self.assertNotEqual(u.may(s, action, "beta"), "", action)
+        # ...and only as far as its account reads it.
+        self.accounts["users"]["dev"]["project_roles"]["beta"] = []
+        self.assertNotEqual(u.may(s, "read", "beta"), "", "its account gives no Spaces Read on beta")
+
+    def test_a_space_it_neither_works_on_nor_reads_is_not_one(self):
+        s = self.account("write")
+        self.assertEqual(self.users.may(s, "read", "gamma"), "not a space")
+
+
 if __name__ == "__main__":
     unittest.main()

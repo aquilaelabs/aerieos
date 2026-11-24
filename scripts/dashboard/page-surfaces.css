@@ -1121,6 +1121,11 @@ body.firstrun #panes{display:none}
    step below the rows in place of the line it read (Cloudflare's DNS page),
    the four fields in a row at a desk and stacked on a phone, Delete at the
    bar's left and Cancel and Save at its right. */
+/* A node's service read without Configure Write there (R277): its head says
+   so, and what would change it is not drawn: the buttons, the bars that hold
+   them, the fields that add. What it reads (the lines, the help, the links,
+   a bar's own state line) stays. */
+.svcro button,.svcro .addbar,.svcro .actbar:not(:has(.state:not(:empty))){display:none}
 .ngrecords{border:var(--hair) solid var(--line);border-radius:var(--r-surface);overflow:hidden}
 .ngrecords>.row{padding:var(--label-gap) var(--row-x)}
 .tbl.ngrecords>.row.ngrec{align-items:stretch}   /* over .row:has(.setrow), which ends a row of fields at its right */

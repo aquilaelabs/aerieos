@@ -295,6 +295,10 @@ function nginxUndeployed(n){
   // The page's head (the operator, 17 and 25 Oct): not deployed and what
   // Deploy brings, and Deploy at its right (R178: the bar holds no picker and
   // no button, so the page is one shape on every node).
+  // A reader without Configure Write here is told so, and offered nothing (R277).
+  if (n.may === "read") return `<div data-ngnode="${esc(n.node)}" class="svcro">
+    ${pageHead({cls: "toolstate", pills: `<span class="pill stat">not deployed</span>`, line: [{text: SVC_RO}]})}
+  </div>`;
   return `<div data-ngnode="${esc(n.node)}">
     ${pageHead({cls: "toolstate", pills: `<span class="pill stat">not deployed</span>`,
       actions: `<button type="button" class="primary" data-ngdeploy>Deploy</button>`, line: [
@@ -323,7 +327,9 @@ function nginxBody(n){
     : `<span class="pill stat ok">deployed</span>`;
   // Its routes on the line (R274); which container it is, beside the link
   // that opens it.
-  const line = [{value: count, label: count === 1 ? "route" : "routes"}, n.host_only ? {text: "on a hosting-only node"} : null];
+  const ro = n.may === "read";
+  const line = [{value: count, label: count === 1 ? "route" : "routes"}, n.host_only ? {text: "on a hosting-only node"} : null,
+    ro ? {text: SVC_RO} : null];
   const where = `<div class="field"><div class="hint">It runs as nginx-${esc(n.container.replace(/^nginx-/, ""))} on the ${pageLink("docker", "Containers page")}.</div></div>`;
   // The image it is pinned to, the one this AerieOS names, and Update when
   // behind (R192): nothing asks a registry, so there is nothing to check.
@@ -409,7 +415,7 @@ function nginxBody(n){
     ${nginxAcmeLines(n)}
     <div class="field ngcertlist">${nginxCertLines(n, d)}</div>`);
   // The page's head, deployed as undeployed: its state and what it runs.
-  return `<div data-ngnode="${esc(n.node)}">
+  return `<div data-ngnode="${esc(n.node)}"${ro ? ` class="svcro"` : ""}>
     ${pageHead({cls: "toolstate", pills: pill, line})}
     ${clash}
     ${image}

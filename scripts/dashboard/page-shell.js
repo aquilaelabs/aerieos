@@ -160,14 +160,16 @@ const PAGE_KINDS = {
   // (openRoute: a page that moved group keeps its old address), and an
   // address with no opener lands on its group's first page (B410), so each
   // has one. Theirs is the Nodes page's area (R171).
-  nginx: {group: "machines", label: "nginx", open: () => openNginxTab(), may: a => !!a.nodes,
+  // ...or Configure's, a node's services' settings being that area's (R277).
+  nginx: {group: "machines", label: "nginx", open: () => openNginxTab(), may: a => !!a.nodes || !!a.configure,
     node: () => nginxNode, setNode: v => { nginxNode = v; }, keep: "bb.ngnode", moved: "nginx",
     back: "installed", own: false,
     off: (n, nid) => {
       const row = (typeof nginxList !== "undefined" && nginxList || []).find(x => x.node === nid);
       return row && !row.deployed ? "nginx is not deployed on this node: Deploy is on its page" : "";
     }},
-  scanners: {group: "machines", label: "Scanners", open: () => openScannersTab(), may: a => !!a.nodes, back: "installed", own: false},
+  scanners: {group: "machines", label: "Scanners", open: () => openScannersTab(), may: a => !!a.nodes || !!a.configure,
+    back: "installed", own: false},
   // A machine's files (R224): an administrator's alone.
   files: {group: "machines", label: "Files", open: () => openFilesTab(), may: () => !!state?.admin,
     node: () => flNode, setNode: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },

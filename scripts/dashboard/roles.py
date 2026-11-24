@@ -124,6 +124,9 @@ CAP_AREA = {
     # The CI runner page, read: CI runner Read (R277: the page was drawn on
     # Write alone, though the runners readable were served).
     "runner-read": ("runner", "read"),
+    # A node's services' settings, read (nginx, the scanners, the model
+    # router): Configure Read, as the area says (R277).
+    "configure-read": ("configure", "read"),
 }
 
 _ALL = {a: "write" for a in AREA_KEYS}

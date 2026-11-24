@@ -281,6 +281,9 @@ const featureOff = feature => state?.off?.[feature] || "";
 // Claude session on a project they were given. This only decides what is
 // DRAWN; every one of these is refused again on the server.
 const mayShell = () => state?.can?.terminal !== false;
+// A node's service read without Configure Write on that node (R277): its
+// page says so in its head, and its controls are not drawn (.svcro).
+const SVC_RO = "read only: changing it is Configure Write's on this node";
 const mayDocker = () => state?.can?.["docker-write"] !== false;
 // ...on that node where one is named (R260: Toolchains held node by node),
 // read off the node's row; a node not drawn yet is the server's to refuse.

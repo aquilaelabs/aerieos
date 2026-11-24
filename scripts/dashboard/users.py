@@ -1822,15 +1822,19 @@ def assign(me, name, global_roles=None, project_roles=None, may_join=None):
     space it is not on yet (membership's invite-only rule), as the Users
     page's edit asks it (R277, the audit of 24 Nov: a role given here put
     an account on an invite-only space). (payload, status)."""
-    if may_join and isinstance(project_roles, dict):
-        had = (get(name) or {}).get("project_roles") or {}
-        for p, rs in project_roles.items():
-            if isinstance(rs, list) and rs and not had.get(str(p)) and (why := may_join(str(p))):
-                return {"error": why}, 403
     can = assignable(me)
     if not can["admin"] and not can["projects"]:
         return {"error": "the Roles page's people are an administrator's, or a space owner's for "
                          "their own spaces"}, 403
+    # ...asked of the spaces this assignment changes alone: one outside what
+    # `me` may assign is kept as it was below, never refused for.
+    if may_join and isinstance(project_roles, dict):
+        had = (get(name) or {}).get("project_roles") or {}
+        for p, rs in project_roles.items():
+            if not can["admin"] and str(p) not in set(can["projects"]):
+                continue
+            if isinstance(rs, list) and rs and not had.get(str(p)) and (why := may_join(str(p))):
+                return {"error": why}, 403
     known = roles.all_roles()
     with _lock:
         d = load()

@@ -5,7 +5,7 @@
 // services, every container, another space's notebook or a space's router
 // key; Accounts Write making an administrator; an administrator taking the
 // owner's account; a session going on after its account went.
-import { URL, ok, done, launch, asUser, call, mint, section } from './lib.mjs';
+import { URL, ok, done, launch, asUser, call, mint, section, newPage, ready } from './lib.mjs';
 
 const browser = await launch();
 const api = async (path, body, h) => (await call(path, body, h)).body;
@@ -16,6 +16,7 @@ const ALPHA = 'alpha';
 await api('/api/roles', { action: 'set', name: `box ${stamp}`, scope: 'projects', perms: { containers: 'write' } });
 await api('/api/roles', { action: 'set', name: `people ${stamp}`, scope: 'global', perms: { accounts: 'write' } });
 await api('/api/roles', { action: 'set', name: `maker ${stamp}`, scope: 'global', perms: { newprojects: 'write' } });
+await api('/api/roles', { action: 'set', name: `cfgread ${stamp}`, scope: 'global', perms: { configure: 'read' } });
 const made = [];
 const account = async (name, pw, extra) => {
   await api('/api/users', { action: 'add', name, password: pw, role: extra?.role || 'user' });
@@ -26,6 +27,7 @@ const account = async (name, pw, extra) => {
 const boxer = await account(`box${stamp}`, 'box-pass-word-1', { assign: { project_roles: { [ALPHA]: [`box ${stamp}`] } } });
 const hr = await account(`hr${stamp}`, 'hr-pass-word-1', { assign: { roles: [`people ${stamp}`] } });
 const adm = await account(`adm${stamp}`, 'adm-pass-word-1', { role: 'admin' });
+const cfgReader = await account(`cr${stamp}`, 'cr-pass-word-1', { assign: { roles: [`cfgread ${stamp}`] } });
 const maker = await account(`mk${stamp}`, 'mk-pass-word-1',
   { assign: { roles: [`maker ${stamp}`], project_roles: { [ALPHA]: [`box ${stamp}`] } } });
 const node = ((await api('/api/v1/nodes')).nodes || []).find(n => n.kind === 'agent' || n.id)?.id || 'local';
@@ -45,6 +47,28 @@ await section("a role on one space reaches no node's services", async () => {
   const svc = said.filter(s => !/prune/.test(s.what)), prune = said.find(s => /prune/.test(s.what));
   ok(svc.every(s => s.status === 403) && prune.status >= 400 && !prune.ok,
      `Containers Write on alpha deploys no node's nginx, router or scanners and prunes no node (${said.map(s => `${s.what}: ${s.status}`).join('; ')})`);
+});
+
+await section("a node's services read without Configure Write are drawn without their controls", async () => {
+  const view = await call('/api/scanners', undefined, cfgReader);
+  const rows = view.body.nodes || [];
+  ok(view.status === 200 && rows.length && rows.every(n => n.may === 'read') && view.body.may_all === false,
+     `Configure Read reads every node's scanners, each read only (${view.status}, ${rows.map(n => n.may).join(',')}, may_all ${view.body.may_all})`);
+  const dep = await call('/api/scanners', { action: 'deploy', node: rows[0]?.node || node }, cfgReader);
+  ok(dep.status === 403, `...and deploys them nowhere (${dep.status})`);
+  const page = await newPage(browser, { viewport: { width: 1280, height: 1000 },
+    httpCredentials: { username: `cr${stamp}`, password: 'cr-pass-word-1' }, extraHTTPHeaders: { Authorization: cfgReader.Authorization } });
+  await page.goto(URL); await ready(page);
+  await page.evaluate(() => openScannersTab());
+  await page.waitForSelector('.scannerstab .svcro', { timeout: 20000 });
+  const seen = await page.evaluate(() => {
+    const root = document.querySelector('.pane .doc.on .scannerstab') || document.querySelector('.scannerstab');
+    const live = [...root.querySelectorAll('button')].filter(b => b.offsetParent !== null && !b.closest('.dochead, .sechead, summary, .docsect > .sh'));
+    return { live: live.map(b => b.textContent.trim()), said: /read only/.test(root.textContent) };
+  });
+  ok(seen.said && !seen.live.some(w => /Deploy|Run now|Update|Remove|Turn (on|off)|Save timetable/.test(w)),
+     `the Scanners page says it is read only and draws no Deploy, Run now, Update, Remove or timetable control (${JSON.stringify(seen)})`);
+  await page.context().close();
 });
 
 await section("a role reads only what its areas say", async () => {
@@ -86,5 +110,5 @@ await section("a session goes when its account goes", async () => {
 });
 
 for (const n of made) await api('/api/users', { action: 'remove', name: n });
-for (const n of [`box ${stamp}`, `people ${stamp}`, `maker ${stamp}`]) await api('/api/roles', { action: 'remove', name: n });
+for (const n of [`box ${stamp}`, `people ${stamp}`, `maker ${stamp}`, `cfgread ${stamp}`]) await api('/api/roles', { action: 'remove', name: n });
 await done(browser);

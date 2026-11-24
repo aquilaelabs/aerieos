@@ -7300,6 +7300,25 @@ class Handler(BaseHTTPRequestHandler):
         carries an error, 200 otherwise."""
         return self._json(r, bad if r.get("error") else 200)
 
+    def _service_may(self, me, nid):
+        """What this account may do with a node's services (nginx, the
+        scanners, the model router) on `nid`: "write" with Configure Write on
+        it, "read" with Configure Read or Nodes Read on it, "" with neither
+        (R277: the pages were drawn whole on Nodes Read, every control live,
+        and refused on the press)."""
+        if not users.may_node(me, "configure", nid):
+            return "write"
+        if not users.may_node(me, "configure-read", nid) or not users.may_node(me, "nodes-read", nid):
+            return "read"
+        return ""
+
+    def _services_read_why(self, me):
+        """Why this account reads no node's services page at all, "" when it
+        reads one: an administrator, or Nodes or Configure held anywhere."""
+        if users.is_admin(me or {}) or roles.level_of(me or {}, "nodes") or roles.level_of(me or {}, "configure"):
+            return ""
+        return "a node's services are read with Configure or Nodes Read on it: an administrator gives one on the Users page"
+
     def _refused_nodes(self, ids):
         """True, with the 403 written, unless this account may choose each of
         the nodes `ids` names for a space (Nodes Write on it; none named
@@ -7816,7 +7835,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def _node_scope(self):
+    def _node_scope(self, areas=("nodes",)):
         """Node ids this account may look at, or None for "no restriction".
 
         An account that may change a node is shown the registry, which is what
@@ -7832,15 +7851,16 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         # Read on every node is the registry too (R260), and Read on named
         # nodes those besides its projects'; an administrator's or a
-        # session's answer is as it was. Install and Configure are a node's
-        # areas as Nodes is, so a role holding either reaches the nodes it
-        # holds them on (R277, the audit of 24 Nov: an Install role on every
-        # node with no space of its own was shown none, as docs/people.md
-        # says it is not).
+        # session's answer is as it was. `areas` are the ones the read is
+        # about: the Nodes listing is the Nodes page's alone, and a node's
+        # contents (its toolchains, its Library) are Install's and
+        # Configure's as well, so a role holding either reaches the nodes it
+        # holds them on there (R277, the audit of 24 Nov: an Install role on
+        # every node with no space of its own was shown none).
         if users.is_admin(me or {}) or (me or {}).get("session"):
             return None
         lim = set()
-        for area in ("nodes", "install", "configure"):
+        for area in areas:
             if not roles.level_of(me or {}, area):
                 continue
             got = roles.nodes_for(me or {}, area)
@@ -7865,7 +7885,7 @@ class Handler(BaseHTTPRequestHandler):
         builds on, and when it named none, the first of those, because its
         picker only ever offered those anyway.
         """
-        scope = self._node_scope()
+        scope = self._node_scope(("nodes", "install", "configure"))
         if scope is None:
             return nid, None
         if not scope:
@@ -9853,7 +9873,7 @@ class Handler(BaseHTTPRequestHandler):
                             f"{self.headers.get('Host') or ''}")
         # A VM made a node is a new node: Nodes Write on every node, as
         # Enroll node asks (R277: Nodes Write on any one node passed).
-        if req.get("node_agent") is True and not sess and self._refused_on_node("node", ""):
+        if req.get("node_agent") is True and not sess and self._refused_on_node("nodes-write", ""):
             return
         if sess:
             if project != sess:
@@ -13602,9 +13622,16 @@ class Handler(BaseHTTPRequestHandler):
         """The nginx page (nginxproxy.view): every node's nginx, for an
         account that may read the Nodes page; never a session's."""
         who = self._who() or {}
-        if not users.is_admin(who) and not roles.level_of(who, "nodes"):
-            return self._json({"error": "the nginx page is the Nodes page's area: ask for Read on Nodes"}, 403)
-        return self._json(nginxproxy.view(devapp, devactions.state))
+        if (why := self._services_read_why(who)):
+            return self._json({"error": why}, 403)
+        view = nginxproxy.view(devapp, devactions.state)
+        # The nodes this account reads a service on, each saying whether its
+        # controls are this account's (R277).
+        rows = []
+        for row in view.get("nodes") or []:
+            if (lvl := self._service_may(who, row.get("node") or "")):
+                rows.append({**row, "may": lvl})
+        return self._json({**view, "nodes": rows})
 
     def _get_router(self):
         """GET /api/router?node=ID: a node's model router (router.status)
@@ -13616,10 +13643,11 @@ class Handler(BaseHTTPRequestHandler):
         nid = q.get("node", [""])[0]
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
-        if self._refused_on_node("nodes-read", nid):
-            return
         who = self._who() or {}
-        return self._json({**router.status(nid), "providers_known": {k: v["label"] for k, v in router.PROVIDERS.items()},
+        if not (lvl := self._service_may(who, nid)):
+            return self._json({"error": "your roles give no Configure or Nodes Read on this node"}, 403)
+        return self._json({**router.status(nid), "may": lvl,
+                           "providers_known": {k: v["label"] for k, v in router.PROVIDERS.items()},
                            "all_projects": sorted(p for p in prefs.all_projects(WORKSPACE) if users.may_see(who, p)),
                            "gpu": bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card"))})
 
@@ -13684,10 +13712,18 @@ class Handler(BaseHTTPRequestHandler):
     def _get_scanners(self):
         """The Scanners page (scanners.view): every node's scanners, the
         schedule, the versions and what nothing covers, for an account that
-        may read the Nodes page; never a session's."""
-        if self._refused("nodes-read"):
-            return
-        return self._json(scanners.view())
+        reads a node's services (_service_may); never a session's. Each
+        node's row says whether its controls are this account's, and
+        may_all whether the page-wide ones are (every node's: R277)."""
+        who = self._who() or {}
+        if (why := self._services_read_why(who)):
+            return self._json({"error": why}, 403)
+        view = scanners.view()
+        rows = []
+        for row in view.get("nodes") or []:
+            if (lvl := self._service_may(who, row.get("node") or "")):
+                rows.append({**row, "may": lvl})
+        return self._json({**view, "nodes": rows, "may_all": not users.may_instance(who, "configure", "")})
 
     def _scanners(self, req):
         """Deploy, update, remove, run now, the schedule and a version check
