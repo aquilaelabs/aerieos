@@ -94,6 +94,38 @@ class Plan(unittest.TestCase):
         p = plan({"data": [{"slot": "disk1", "id": "WDC_WD80EFAX_AAA111", "fs": "zfs"}]}, blk=blk)
         self.assertEqual(p["zfs"], [{"pool": "disk1", "where": "/mnt/disk1", "readonly": True, "slot": "disk1"}])
 
+    def test_a_pool_named_like_an_option_is_left_alone(self):
+        # B844: the name is the disk's to say, and "-a" imported every pool.
+        blk = {**BLK, "sda1": {"TYPE": "zfs_member", "LABEL": "-a"}}
+        p = plan({"data": [{"slot": "disk1", "id": "WDC_WD80EFAX_AAA111", "fs": "zfs"}]}, blk=blk)
+        self.assertEqual(p["zfs"], [])
+        self.assertTrue(p["refused"])
+
+    def test_only_datasets_under_the_pools_place_are_mounted(self):
+        # B844: imported with nothing mounted; a dataset whose mountpoint is
+        # elsewhere (/etc here) is said and left unmounted.
+        from unittest import mock
+        ran = []
+
+        def sub(argv, **kw):
+            ran.append(argv)
+            out = ""
+            if argv[:2] == ["zfs", "list"]:
+                out = ("disk1\t/mnt/disk1\ton\tno\ndisk1/media\t/mnt/disk1/media\ton\tno\n"
+                       "disk1/evil\t/etc\ton\tno\ndisk1/off\t/mnt/disk1/off\toff\tno\ndisk1/old\tlegacy\ton\tno\n")
+            return mock.Mock(returncode=0, stdout=out)
+        said = []
+        job = type("J", (), {"say": lambda s_, t: said.append(t)})()
+        a = object.__new__(agent.Agent)
+        with mock.patch.object(adopt.subprocess, "run", side_effect=sub), \
+                mock.patch.object(agent.Agent, "_sh", lambda self_, j, argv, timeout=0: sub(argv).returncode, create=True):
+            rc = a._zfs_import(job, {"pool": "disk1", "where": "/mnt/disk1", "readonly": True})
+            self.assertEqual(rc, 0)
+            self.assertEqual(ran[0], ["zpool", "import", "-N", "-o", "cachefile=none", "-o", "readonly=on", "disk1"])
+            self.assertEqual([x[2] for x in ran if x[:2] == ["zfs", "mount"]], ["disk1", "disk1/media"])
+            self.assertTrue(any("disk1/evil is not mounted" in t and "/etc" in t for t in said), said)
+            self.assertEqual(a._zfs_import(job, {"pool": "-a", "where": "/mnt/disk1"}), 64)
+
 
 class Fstab(unittest.TestCase):
     def test_lines_are_marked_nofail_and_the_merged_tree_waits_for_its_branches(self):

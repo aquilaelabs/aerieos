@@ -32,7 +32,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from typing import Callable
-from .base import env_or, read_json, write_atomic, write_json
+from .base import env_or, log, read_json, write_atomic, write_json
 from .names import ETC, VAR
 
 RECORD = ETC + "/adopted.json"
@@ -45,6 +45,9 @@ VM_OPS = {"start": ["start"], "shutdown": ["shutdown"], "off": ["destroy"],
           "autostart-on": ["autostart"], "autostart-off": ["autostart", "--disable"]}
 DATA_RE = re.compile(r"disk([1-9][0-9]?)")
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+# A ZFS pool's own name as a disk carries it (blkid's LABEL): a letter, then
+# what ZFS allows, and never a word zpool would read as an option (B844).
+ZPOOL_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}")
 # Names a pool may not take: the merged trees under /mnt, and AerieOS's.
 NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array", "parity", "other", "cache-mover"}
 # What a read-only mount adds so the filesystem writes nothing at all.
@@ -174,6 +177,9 @@ def plan(want, disks, blk=blkid):
         data.append(slot)
         if fs == "zfs":
             pool = row.get("LABEL") or slot
+            if not ZPOOL_RE.fullmatch(pool):
+                no(f"{what}: the ZFS pool on {d['name']} is named {pool[:40]!r}, which is not a pool's name: it is left alone")
+                continue
             out["zfs"].append({"pool": pool, "where": where, "readonly": not writable, "slot": slot})
             say(f"{slot}: {d['name']} ({d.get('model') or 'disk'}), the ZFS pool {pool} imported{' read-only' if not writable else ''} at {where}")
         else:
@@ -966,11 +972,39 @@ class AdoptMixin:
 
     def _zfs_import(self, job, z):
         """Import one pool as it is: no -f, never upgraded; read-only where
-        asked. The rc."""
-        argv = ["zpool", "import", "-o", "cachefile=none"] + (["-o", "readonly=on"] if z.get("readonly") else []) + [z["pool"]]
-        if job is None:
-            return subprocess.run(argv, capture_output=True, timeout=120, check=False).returncode
-        return self._sh(job, argv, timeout=120)
+        asked. Imported with nothing mounted, then each of its datasets
+        mounted only where its mountpoint is the plan's place for it or under
+        it: the mountpoints are the disk's to say, and one saying /etc or
+        /usr/local/sbin had root mount the disk's files there (B844). The rc."""
+        pool, where = str(z.get("pool") or ""), str(z.get("where") or "").rstrip("/")
+        say = job.say if job is not None else (lambda t: log("adopt: " + t.rstrip("\n")))
+
+        def run(argv):
+            if job is None:
+                return subprocess.run(argv, capture_output=True, timeout=120, check=False).returncode
+            return self._sh(job, argv, timeout=120)
+        if not ZPOOL_RE.fullmatch(pool) or not where.startswith("/mnt/"):
+            say(f"refused: {pool[:40] or 'no pool'} at {where or 'nowhere'} is not a pool's name and a place under /mnt\n")
+            return 64
+        rc = run(["zpool", "import", "-N", "-o", "cachefile=none"] + (["-o", "readonly=on"] if z.get("readonly") else []) + [pool])
+        if rc != 0 and pool not in subprocess.run(["zpool", "list", "-H", "-o", "name"], capture_output=True, text=True,
+                                                  timeout=60, check=False).stdout.split():
+            return rc
+        listed = subprocess.run(["zfs", "list", "-H", "-r", "-t", "filesystem", "-o", "name,mountpoint,canmount,mounted", pool],
+                                capture_output=True, text=True, timeout=60, check=False).stdout
+        worst = 0
+        for line in listed.splitlines():
+            parts = line.split("\t")
+            if len(parts) != 4:
+                continue
+            name, mp, canmount, mounted = parts
+            if canmount == "off" or mp in ("none", "legacy", "-") or mounted == "yes":
+                continue
+            if mp == where or mp.startswith(where + "/"):
+                worst = worst or run(["zfs", "mount", name])
+            else:
+                say(f"{name} is not mounted: its mountpoint {mp[:80]} is outside {where}, where this machine puts the pool\n")
+        return worst
 
     def _mount_image(self, job, img):
         """An image file opened read-only at a folder of its own, its journal
