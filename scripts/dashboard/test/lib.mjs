@@ -381,10 +381,22 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // failed fetch or a name not defined was let through as its doing came
   // off with the other layers (R7 step 7).
   const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);
+  // WebKit's line for a load of the page's own origin it cancelled itself,
+  // under a gate's load ("Fetch API cannot load URL due to access control
+  // checks", B1141). Nothing the server does is worded so (proven 24 Nov in
+  // WebKit: a dropped or reset connection is "Connection terminated
+  // unexpectedly", a refusal "the server responded with a status of N", a
+  // real cross-origin refusal "Origin ... is not allowed by
+  // Access-Control-Allow-Origin"), and each of those is still an error.
+  const cutByWebKit = text => {
+    const m = /^Fetch API cannot load (\w+:\s*\/+\S+?)\.? due to access control checks\.?$/.exec(text);
+    if (!m) return false;
+    try { return new globalThis.URL(m[1].replace(/^(\w+):\s*\/+/, '$1://')).origin === new globalThis.URL(page.url()).origin; } catch { return false; }
+  };
   page.on('console', m => {
     if (m.type() !== 'error') return;
     const url = m.location()?.url || '';
-    if (url.includes('/term') || cutByNet(m.text())) return;
+    if (url.includes('/term') || cutByNet(m.text()) || cutByWebKit(m.text())) return;
     const at = url ? ` [${url.replace(/^https?:\/\/[^/]+/, '')}]` : '';
     // Firefox and WebKit write an Error logged whole as JSHandle@object:
     // its name and message are read off it, so the failure says what it was
