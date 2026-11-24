@@ -5,6 +5,7 @@
 ### Added
 
 - An approved ask's row in History opens what it okayed: a push's flagged lines, a container's compose file or a release's new notes (e457254)
+- aerie forge owed lists what a repository's git host settings owe its own workflows (a required reviewer on each environment a job is gated by, no repository-level secret standing in for an environment's, a tag ruleset, outside contributors' runs approved first), and aerie version release refuses while one is owed (913cd44)
 
 ### Changed
 
