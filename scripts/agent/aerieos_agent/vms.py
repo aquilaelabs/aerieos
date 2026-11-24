@@ -882,10 +882,20 @@ class VmsMixin:
 
     def _vm_hw_ok(self, job, hw):
         """What the host must hold for `hw`: a passed device not the host's own
-        display's, PCI ones under an IOMMU, a LAN that is wired, virtiofsd for
-        a share. Said and False when it does not."""
+        (its display's card, its LAN, its disks, what it uses over USB), PCI
+        ones under an IOMMU, a LAN that is wired, virtiofsd for a share. Said
+        and False when it does not."""
         host = vmhw.host_hw()
         for d in hw.get("devices") or []:
+            # A USB device the host uses (the stick it boots from, a disk it
+            # has mounted): named here by vendor and product, which libvirt
+            # attaches the first of, so any alike that the host uses (B870).
+            if d["type"] == "usb":
+                used = next((u for u in host["usb"] if u["vendor"] == d["vendor"] and u["product"] == d["product"]
+                             and u["use"]), None)
+                if used:
+                    job.say(f"refused: the host uses {used['name']}: {'; '.join(used['use'])}\n")
+                    return False
             if d["type"] == "pci":
                 if not host["iommu"]:
                     job.say("refused: this machine's IOMMU is off (intel_iommu=on or amd_iommu=on on its kernel's "
@@ -894,6 +904,18 @@ class VmsMixin:
                 row = next((p for p in host["pci"] if p["addr"] == d["addr"]), None)
                 if not row:
                     job.say(f"refused: no PCI device {d['addr']} here\n")
+                    return False
+                # One the host needs (its LAN card, a disk controller with a
+                # disk mounted, the USB controller of a device it uses), or one
+                # in an IOMMU group with such a device, which goes to the VM
+                # with it (B870).
+                if row["host"]:
+                    job.say(f"refused: {d['addr']} is the host's own: {row['host']}\n")
+                    return False
+                kin = next((p for p in host["pci"] if row["group"] and p["group"] == row["group"] and p["host"]), None)
+                if kin:
+                    job.say(f"refused: {d['addr']} shares IOMMU group {row['group']} with {kin['addr']}, which the host "
+                            f"needs ({kin['host']}), and a group goes to a VM whole\n")
                     return False
                 if row["driver"] == "nvidia" and subprocess.run(["systemctl", "is-active", "--quiet", "builderbot-gpu-display"],
                                                                 check=False).returncode == 0:

@@ -865,6 +865,35 @@ class Agent(unittest.TestCase):
         self.assertIn('device="12"', moved)
         self.assertIsNone(hw.usb_refresh(dom, kept, []), "pulled out: its numbers stay, and the source is optional")
 
+    def test_a_vm_is_refused_what_the_host_needs(self):
+        # B870: its LAN card, a disk controller with a disk mounted, a card
+        # in an IOMMU group with one of those, and a USB device it uses.
+        from unittest import mock
+        hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
+        a = object.__new__(self.agent.Agent)
+        said = []
+
+        class Job:
+            def say(self, x):
+                said.append(x)
+        pci = [{"addr": "0000:03:00.0", "group": "12", "driver": "igc", "host": "the host's LAN interface"},
+               {"addr": "0000:03:00.1", "group": "12", "driver": "", "host": ""},
+               {"addr": "0000:00:17.0", "group": "5", "driver": "ahci", "host": "the host boots from it (sda1 is /)"},
+               {"addr": "0000:01:00.0", "group": "1", "driver": "vfio-pci", "host": ""}]
+        stick = {"vendor": "0x0781", "product": "0x5583", "name": "SanDisk Ultra Fit", "use": []}
+        boot = {"vendor": "0x0951", "product": "0x1666", "name": "Kingston DataTraveler", "use": ["the host boots from it (sdb1 is /)"]}
+        with mock.patch.object(hw, "host_hw", return_value={"usb": [stick, boot], "pci": pci, "cpus": [], "iommu": True}):
+            ok = lambda *devs: a._vm_hw_ok(Job(), {"devices": list(devs)})  # noqa: E731
+            self.assertFalse(ok({"type": "pci", "addr": "0000:03:00.0"}))
+            self.assertIn("host's own: the host's LAN interface", said[-1])
+            self.assertFalse(ok({"type": "pci", "addr": "0000:00:17.0"}))
+            self.assertIn("boots from it", said[-1])
+            self.assertFalse(ok({"type": "pci", "addr": "0000:03:00.1"}))
+            self.assertIn("shares IOMMU group 12 with 0000:03:00.0", said[-1])
+            self.assertFalse(ok({"type": "usb", "vendor": "0x0951", "product": "0x1666"}))
+            self.assertIn("the host uses Kingston DataTraveler", said[-1])
+            self.assertTrue(ok({"type": "pci", "addr": "0000:01:00.0"}, {"type": "usb", "vendor": "0x0781", "product": "0x5583"}))
+
     def test_a_usb_give_attaches_live_and_keeps_the_device_by_name(self):
         # R116 step 3: give runs virsh attach-device --persistent with the
         # hostdev, keeps the device by name beside the disk, and says now or
