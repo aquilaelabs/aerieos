@@ -698,8 +698,19 @@ function askActs(a, {deny, allow, session = "data-session"}){
     <button type="button" class="primary" ${allow}="${a.id}">Approve</button>`;
 }
 
+// An ask's long part, whole (the-dashboard/notifications): what it is, said
+// as what approving okays, the thing itself, and what it is called once
+// okayed, for the record. ["", "", ""] where an ask has none.
+function askLong(a){
+  return a.kind === "push" ? ["the flagged lines, which approving okays until they change", a.detail, "the flagged lines"]
+    : a.kind === "container" ? ["the compose file" + (a.env_keys?.length ? `, and an env file setting ${a.env_keys.join(", ")}` : ""), a.detail, "the compose file"]
+    : a.kind === "release-edit" ? ["the new notes", a.detail, "the new notes"] : ["", "", ""];
+}
+
 // An answer to an ask, from the bell or the Notifications page, and onto
-// the account's record (kind "ask"): which ask, and what was said to it.
+// the account's record (kind "ask"): which ask, and what was said to it;
+// approved, with what it okayed, to read again in History (the operator,
+// 23 Nov). A denied ask's lines are not kept: they went nowhere.
 function askAnswer(id, allow, session = false){
   const a = (ph?.asks || []).find(x => x.id === id);
   if (allow){ phBusy = "running it"; readMoved("phone"); drawPanes(); }
@@ -707,8 +718,10 @@ function askAnswer(id, allow, session = false){
   if (a){
     const plain = document.createElement("i");
     drawHTML(plain, askTag(a).replace(/: needs your answer$/, ""));
+    const [, body, okayed] = askLong(a);
     keepNotice({text: `${allow ? (session ? "Approved for the session" : "Approved") : "Denied"}: ${plain.textContent}${
-      (a.cmd || []).length ? ` (${a.cmd.join(" ")})` : ""}`, level: allow ? "info" : "warn", kind: "ask"});
+      (a.cmd || []).length ? ` (${a.cmd.join(" ")})` : ""}`, level: allow ? "info" : "warn", kind: "ask",
+      ...(allow && body ? {what: okayed, detail: body} : {})});
   }
 }
 

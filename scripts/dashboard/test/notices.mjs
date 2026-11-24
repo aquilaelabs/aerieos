@@ -214,7 +214,34 @@ await section("an ask: answered on the row, its long part in a scrolling box", a
      `...and Approve answers it (${JSON.stringify(answered.calls)})`);
   const rec = await until(async () => ((await api('/api/notices')).notices || []).find(n => n.kind === 'ask'));
   ok(rec && /^Approved: container web on sandbox/.test(rec.text), `...an answer kept on the record as an answer (${rec?.text})`);
-  await page.evaluate(() => { ph = { ...(ph || {}), asks: [] }; drawPanes(); });
+  // ...with what it okayed, read again in History behind the same fold (the
+  // operator, 23 Nov: an approved push's lines were nowhere to be read).
+  ok(rec?.what === 'the compose file' && /^services:\n  web:\n    image: nginx/.test(rec?.detail || ''),
+     `...the record keeping what it okayed, whole (${rec?.what}, ${(rec?.detail || '').length} characters)`);
+  await page.evaluate(() => { ph = { ...(ph || {}), asks: [] }; loadNotices(); });
+  const hist = await until(() => page.evaluate(id => {
+    const row = document.querySelector(`.noticestab .ntrow[data-nt="${id}"]`), d = row?.querySelector('details.ntlong');
+    if (!d) return null;
+    d.open = true;
+    const box = d.querySelector('.ntbox');
+    return { what: d.querySelector('summary').textContent, scrolls: box.scrollHeight > box.clientHeight, text: box.textContent.slice(0, 20),
+             acts: d.querySelectorAll('button').length };
+  }, rec.id));
+  ok(hist && hist.what === 'the compose file' && hist.scrolls && /^services:/.test(hist.text) && !hist.acts,
+     `...and its History row opens it in a box that scrolls inside itself, nothing to press in it (${JSON.stringify(hist)})`);
+  // A denial keeps none: what it refused went nowhere.
+  const denied = await page.evaluate(async () => {
+    const real = phFetch;
+    phFetch = () => Promise.resolve();
+    ph = { ...(ph || {}), asks: [{ id: 42, kind: 'push', project: 'alpha', why: 'lines that look like a secret',
+      cmd: ['git', 'push'], left: 300, asker: 'test', detail: '+ token=abc' }] };
+    askAnswer(42, false);
+    phFetch = real;
+    ph = { ...(ph || {}), asks: [] };
+  });
+  const no = await until(async () => ((await api('/api/notices')).notices || []).find(n => /^Denied: /.test(n.text)));
+  ok(no && !no.detail && !no.what, `...while a denied ask's lines are not kept (${JSON.stringify(no).slice(0, 160)})`);
+  await page.evaluate(() => drawPanes());
 });
 
 // ---- a job's toast follows the job, and its end is kept ---------------------

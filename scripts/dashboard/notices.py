@@ -10,7 +10,10 @@ that holds it large, and what is old enough to fall off the end is long
 acted on. Each entry: id, at (epoch seconds), kind ("said" for what the
 page said about a press, "ask" for an answer to an ask, "job" for how a
 followed job ended), level ("info", "warn", "bad") and the text, with an
-optional job id or link the page can open again.
+optional job id or link the page can open again, and for an ask approved
+what it okayed (the operator, 23 Nov): `what` names it and `detail` is it
+whole, read again behind a fold on the Notifications page. Both optional,
+so an entry from before reads as it did.
 """
 import json
 import re
@@ -22,6 +25,7 @@ DIR = None                   # <state>/notices, set by configure()
 write_json = None
 _lock = threading.Lock()
 CAP = 300
+DETAIL_CAP = 20000           # characters of what an ask okayed, kept with its answer
 KINDS = ("said", "ask", "job")
 LEVELS = ("info", "warn", "bad")
 
@@ -77,6 +81,13 @@ def act(uid, req):
                        "level": it.get("level") if it.get("level") in LEVELS else "info", "text": text}
                 if re.fullmatch(r"j_[0-9a-f]+", str(it.get("job") or "")):
                     row["job"] = it["job"]
+                # What an answered ask okayed: its flagged lines, its compose
+                # file, its notes, cut at DETAIL_CAP with the cut said.
+                detail = str((it or {}).get("detail") or "")
+                if row["kind"] == "ask" and detail.strip():
+                    row["what"] = str(it.get("what") or "what was approved").strip()[:160]
+                    row["detail"] = detail[:DETAIL_CAP] + (f"\n... {len(detail) - DETAIL_CAP} more characters not kept"
+                                                           if len(detail) > DETAIL_CAP else "")
                 added.append(row)
             if not added:
                 return {"error": "nothing to keep: a notice needs its text"}, 400

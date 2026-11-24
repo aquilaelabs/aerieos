@@ -60,11 +60,8 @@ const NOTICE_KINDS = {said: "Said", ask: "Answers", job: "Jobs"};
 // row, and the long part in a scrolling box behind a fold.
 function noticesAskRows(){
   const asks = ph?.asks || [];
-  const long = a => a.kind === "push" ? ["the flagged lines, which approving okays until they change", a.detail]
-    : a.kind === "container" ? ["the compose file" + (a.env_keys?.length ? `, and an env file setting ${a.env_keys.join(", ")}` : ""), a.detail]
-    : a.kind === "release-edit" ? ["the new notes", a.detail] : ["", ""];
   return asks.map(a => {
-    const [what, body] = long(a);
+    const [what, body] = askLong(a);
     return `<div class="row stack2 ntask${a.kind === "root" || a.kind === "release-remove" || a.kind === "release-withdraw" ? " bad" : ""}" data-ask="${a.id}">
       <div class="grow">
         <div class="name">${askTag(a)}</div>
@@ -128,8 +125,9 @@ function renderNoticesInto(i){
                  chipBar(groups, noticesChip, "data-ntchip", all.length)
                  + (rows.length ? `<div class="ntlist">${rows.slice(0, lim).map(n => `<div class="row ntrow ${esc(n.level)}" data-nt="${esc(n.id)}">
                        <span class="tic">${TOAST_ICONS[n.level] || TOAST_ICONS.info}</span>
-                       <span class="grow"><span class="nttext">${esc(n.text)}</span>
-                         <span class="sub dim">${esc(NOTICE_KINDS[n.kind] || n.kind)} · ${esc(ago(n.at))}</span></span>
+                       <div class="grow"><span class="nttext">${esc(n.text)}</span>
+                         <span class="sub dim">${esc(NOTICE_KINDS[n.kind] || n.kind)} · ${esc(ago(n.at))}</span>
+                         ${n.detail ? `<details class="ntlong chev"${sectAttr("notices:okayed:" + n.id)}><summary>${esc(n.what || "what was approved")}</summary><pre class="ntbox">${esc(n.detail)}</pre></details>` : ""}</div>
                        ${n.job ? `<button type="button" data-ntjob="${esc(n.job)}">Job</button>` : ""}
                        <button type="button" class="ic" data-ntdel="${esc(n.id)}" aria-label="delete this notice">×</button>
                      </div>`).join("")}</div>`
