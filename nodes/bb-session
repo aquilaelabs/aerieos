@@ -187,19 +187,30 @@ def conf():
     return c
 
 
-def _repo_name(tree):
-    """The repository's name from the project's origin remote, the last part
-    of its path without .git, or "" (no remote, no git config here)."""
+def _read_nofollow(path, limit=65536):
+    """A regular file's first `limit` bytes as text, every part of its path
+    opened through no link (_src_fd), or "": a session can write the trees
+    this reads as root, and a link there named any file on the machine."""
     try:
-        text = open(f"{tree}/.git/config", encoding="utf-8").read()
+        d = _src_fd(os.path.dirname(path))
     except OSError:
         return ""
-    m = re.search(r'\[remote "origin"\][^\[]*?\burl\s*=\s*(\S+)', text)
-    if not m:
+    try:
+        fd = os.open(os.path.basename(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=d)
+    except OSError:
         return ""
-    name = re.split(r"[/:]", m.group(1).rstrip("/"))[-1]
-    name = name[:-4] if name.endswith(".git") else name
-    return name if re.fullmatch(r"[A-Za-z0-9._-]{1,100}", name) and not name.startswith(".") else ""
+    finally:
+        os.close(d)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return ""
+        return os.read(fd, limit).decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+    finally:
+        os.close(fd)
+
+
 
 
 AGENT_DIRS = ("/var/lib/aerieos", "/var/lib/builderbot")
@@ -774,7 +785,7 @@ def plan(c, a, uid, wall=None):
         # This project's own emulator folder, not every project's (the
         # operator, 12 Oct); and its CI logs under its name and under its
         # repository's, which is the name the workflows file them by.
-        repo = _repo_name(f"{ws}/{project}")
+        repo = repo_of(project)
         rels = [f"emu/{project}", f"ci-logs/{project}"] + ([f"ci-logs/{repo}"] if repo and repo != project else [])
         for rel in rels:
             if _real_dir(f"{data}/{rel}"):
@@ -1566,7 +1577,7 @@ def worktree(c, argv):
         raise Refused("bb-session worktree: not a space, an agent, a slot and a branch")
     ws = c["WORKSPACE"].rstrip("/")
     src = f"{ws}/{project}"
-    if not os.path.isdir(f"{src}/.git") and not os.path.isfile(f"{src}/.git"):
+    if not _own_repository(src):
         raise Refused(f"bb-session worktree: {project} is not a repository here")
     wt = f"{ws}/.worktrees/{project}/{account}" + ("" if agent == "claude" else f"-{agent}") + ("" if slot == "1" else f"-{slot}")
     if not os.path.isdir(wt):
@@ -1604,6 +1615,27 @@ def worktree(c, argv):
         if os.waitstatus_to_exitcode(status) != 0 or not os.path.isdir(wt):
             raise Refused(f"bb-session worktree: git could not make {wt}")
     print(wt)
+
+
+def _own_repository(src):
+    """Whether `src` is a repository of its own: its .git a folder in it and
+    not a link, or a file naming a folder inside it. A session of the space
+    can write that file, and one naming another space's repository had this
+    make a worktree of that one, with git run as the tree's owner (B890)."""
+    try:
+        st = os.lstat(f"{src}/.git")
+    except OSError:
+        return False
+    if stat.S_ISDIR(st.st_mode):
+        return True
+    if not stat.S_ISREG(st.st_mode):
+        return False
+    line = _read_nofollow(f"{src}/.git", 4096).split("\n", 1)[0].strip()
+    if not line.startswith("gitdir: "):
+        return False
+    admin = line[len("gitdir: "):]
+    admin = os.path.realpath(admin if os.path.isabs(admin) else os.path.join(src, admin))
+    return admin.startswith(os.path.realpath(src) + "/") and os.path.isdir(admin)
 
 
 def worktree_unfilled(wt):
@@ -1662,6 +1694,46 @@ def grant_keep(account, got):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(all_, f)
     os.replace(path + ".new", path)
+
+
+# The repository each space's CI logs are filed under, as the controller
+# said it with a terminal, kept where only root writes: the view binds that
+# folder by it. It was read from the tree's own git config, which a session
+# of the space writes, so naming another space's repository there bound that
+# space's CI logs into the view to write (B886).
+REPOS = os.path.join(os.path.dirname(GRANTS.rstrip("/")), "repos.json")
+REPO_NAME = re.compile(r"(?!\.)[A-Za-z0-9._-]{1,100}")
+
+
+def repos_kept():
+    try:
+        with open(REPOS, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def repo_keep(got):
+    """The controller's word for a terminal: the space it is for and the
+    repository its CI logs are filed under, "" for none."""
+    project, repo = str(got.get("project") or ""), str(got.get("repo") or "")
+    if not PROJECT_DIR.fullmatch(project):
+        return
+    all_ = repos_kept()
+    all_[project] = repo if REPO_NAME.fullmatch(repo) else ""
+    os.makedirs(os.path.dirname(REPOS), mode=0o700, exist_ok=True)
+    fd = os.open(REPOS + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(all_, f)
+    os.replace(REPOS + ".new", REPOS)
+
+
+def repo_of(project):
+    """The repository the controller last said `project`'s CI logs are filed
+    under, or "" when it has said none since this machine started."""
+    repo = repos_kept().get(project)
+    return repo if isinstance(repo, str) and REPO_NAME.fullmatch(repo) else ""
 
 
 def grant_hold(account, a):
@@ -2039,6 +2111,7 @@ def tty(c, argv, ro=False):
     account = str(got.get("uid") or "")
     if st != 200 or not ACCOUNT.fullmatch(account):
         raise Refused(str(got.get("error") or "the controller did not grant this terminal"))
+    repo_keep(got)
     pw = account_user(account)
     home = f"{c['HOME_ROOT'].rstrip('/')}/users/{account}"
     try:

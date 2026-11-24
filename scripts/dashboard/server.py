@@ -10650,6 +10650,10 @@ class Handler(BaseHTTPRequestHandler):
                            "works": works, "tokens": tokens,
                            "reads": [r for r in prefs.reads_trees(project) if (WORKSPACE / r).is_dir() and r not in works],
                            "sees": (prefs.get(project) or {}).get("sees") or [],
+                           # The repository its CI logs are filed under, from
+                           # this side's tree, which the view binds that
+                           # folder by (B886).
+                           "repo": projects.ci_repo_name(project),
                            # Whether it may compute on its node's NVIDIA card
                            # (R102): "on", or who said no, the node or the
                            # project, which aerie gpu then says to the session.

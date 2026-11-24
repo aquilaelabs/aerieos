@@ -497,6 +497,17 @@ def origin_url(dest):
     return r["out"].strip() if r["code"] == 0 else ""
 
 
+def ci_repo_name(project):
+    """The name a space's CI logs are filed under: its origin's repository,
+    without .git, read from the controller's own tree, or "". A node's view
+    binds that folder by this name and never by the one in the node's copy,
+    which a session of the space writes (B886)."""
+    path = repo_path_of(origin_url(WORKSPACE / project)) if WORKSPACE else ""
+    name = path.rsplit("/", 1)[-1] if path else ""
+    name = name[:-4] if name.endswith(".git") else name
+    return name if re.fullmatch(r"[A-Za-z0-9._-]{1,100}", name) and not name.startswith(".") else ""
+
+
 def scoped_to_token(dest, project):
     """Is this repository actually pointed at its own stored token?
 
