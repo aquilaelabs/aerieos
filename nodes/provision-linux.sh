@@ -2799,6 +2799,25 @@ EOF
 }
 
 
+# account_goes USER [say]: whether the uninstall ends and removes an account:
+# one there, not root, not one that was here before AerieOS (somebody's own,
+# home and all: it took the session account's name on a cloud image), and
+# one this script made where it has kept that list (a node provisioned
+# before the list keeps the old reading, B516). With say, a kept one is said.
+account_goes() {
+    id -u "$1" >/dev/null 2>&1 || return 1
+    [ "$(id -u "$1")" != 0 ] || return 1
+    if grep -qx "$1" /etc/aerieos/kept-accounts 2>/dev/null; then
+        [ -z "${2:-}" ] || say "kept ${1}: it was an account here before AerieOS"
+        return 1
+    fi
+    if [ -f /etc/aerieos/made-accounts ] && ! grep -qx "$1" /etc/aerieos/made-accounts; then
+        [ -z "${2:-}" ] || say "kept ${1}: AerieOS did not make it"
+        return 1
+    fi
+    return 0
+}
+
 # uninstall: take AerieOS's software off this machine and leave the rest.
 # What goes is what provision-linux.sh put here for AerieOS alone: the
 # agent and its unit, the session-ports rule, the two accounts and their
@@ -2919,14 +2938,17 @@ cmd_uninstall() {
         done
         firewall-cmd --reload >/dev/null 2>&1 || true
     fi
+    # Only the accounts that go below have their processes ended: one that
+    # was here before AerieOS is somebody's own, and may be the very shell
+    # running this uninstall (B895).
     say "ending the accounts' processes"
     for u in "$session_user" "$DOCKER_USER"; do
-        id -u "$u" >/dev/null 2>&1 || continue
+        account_goes "$u" || continue
         pkill -TERM -u "$u" 2>/dev/null || true
     done
     sleep 2
     for u in "$session_user" "$DOCKER_USER"; do
-        id -u "$u" >/dev/null 2>&1 && pkill -KILL -u "$u" 2>/dev/null || true
+        account_goes "$u" && pkill -KILL -u "$u" 2>/dev/null || true
     done
     if [ "$configured" = 1 ]; then
         for p in $mounts; do
@@ -2961,20 +2983,7 @@ cmd_uninstall() {
     have systemctl && systemctl daemon-reload >/dev/null 2>&1 || true
     say "removing the accounts and their homes"
     for u in "$session_user" "$DOCKER_USER"; do
-        id -u "$u" >/dev/null 2>&1 || continue
-        [ "$(id -u "$u")" != 0 ] || continue
-        # One that was here before AerieOS is somebody's own: left, home
-        # and all (it took the session account's name on a cloud image).
-        if grep -qx "$u" /etc/aerieos/kept-accounts 2>/dev/null; then
-            say "kept ${u}: it was an account here before AerieOS"
-            continue
-        fi
-        # Only one this script made, where it has kept that list; a node
-        # provisioned before the list keeps the old reading (B516).
-        if [ -f /etc/aerieos/made-accounts ] && ! grep -qx "$u" /etc/aerieos/made-accounts; then
-            say "kept ${u}: AerieOS did not make it"
-            continue
-        fi
+        account_goes "$u" say || continue
         case "$(getent passwd "$u" | cut -d: -f6)" in
             /home/*) userdel -r "$u" >/dev/null 2>&1 || userdel "$u" >/dev/null 2>&1 || true ;;
             *) userdel "$u" >/dev/null 2>&1 || true ;;
@@ -3007,8 +3016,20 @@ cmd_uninstall() {
     else
         rm -rf /var/lib/aerieos/agent /var/lib/aerieos/runner
     fi
-    rm -rf "$(readlink -f /etc/aerieos 2>/dev/null || echo /etc/aerieos)"
-    rm -rf /etc/aerieos /etc/builderbot /etc/bb-sandbox.conf /etc/profile.d/builderbot-session.sh /usr/local/sbin/aerieos-agent \
+    # Without --doors the port 22 rule and the hosting firewall stay, and
+    # their units read their rules from this folder at every boot: those
+    # two files stay with them, and the rest of the folder goes (B894).
+    local keep_door=() f
+    if [ "$doors" != 1 ]; then
+        for f in door-22.nft hosting-fw.nft; do [ -f "/etc/aerieos/$f" ] && keep_door+=(! -name "$f"); done
+    fi
+    if [ "${#keep_door[@]}" -gt 0 ]; then
+        find "$(readlink -f /etc/aerieos)" -mindepth 1 -maxdepth 1 "${keep_door[@]}" -exec rm -rf {} +
+        say "kept the port 22 rule and the hosting firewall in /etc/aerieos: they stay without --doors"
+    else
+        rm -rf "$(readlink -f /etc/aerieos 2>/dev/null || echo /etc/aerieos)" /etc/aerieos
+    fi
+    rm -rf /etc/builderbot /etc/bb-sandbox.conf /etc/profile.d/builderbot-session.sh /usr/local/sbin/aerieos-agent \
         /usr/local/sbin/builderbot-agent /usr/local/sbin/aerie-sandbox
     # A ttyd binary an earlier provisioner fetched into /usr/local/bin, on a
     # node provisioned before the agent opened its own terminals; a package's
