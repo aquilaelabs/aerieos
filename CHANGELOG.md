@@ -55,7 +55,7 @@
 
 ### Security
 
-- Each role is asked of the space or node its action reaches: a role on one space no longer reaches nginx, the scanners or the model router on any node, every space's containers, other spaces' bins, notebooks and code, or a shell on another space; Accounts Write no longer makes administrators, an administrator no longer changes the owner's account, a role no longer puts somebody on a space only its members may join, and a session does no more than its account, a removed account's sessions ending with it. Upgrading: whoever ran nginx, the scanners or the model router with Containers Write on a space is given Configure on those nodes, and whoever read a space's notebook through another of its areas is given Spaces Read there (2dbd56d, 7a941b1)
+- Each role is asked of the space or node its action reaches: a role on one space no longer reaches nginx, the scanners or the model router on any node, every space's containers, other spaces' bins, notebooks and code, or a shell on another space or at /workspace, which reaches every space; Accounts Write no longer makes administrators, an administrator no longer changes the owner's account, a role no longer puts somebody on a space only its members may join, and a session does no more than its account, a removed account's sessions ending with it. Upgrading: on the Roles page an administrator gives Configure on its nodes to a role that ran nginx, the scanners or the model router through Containers Write on a space, Spaces Read on a space to one that read its notebook through another of its areas there, and Terminal Write Everywhere to one that opened shells at /workspace (2dbd56d, 7a941b1, a15c5dd)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
