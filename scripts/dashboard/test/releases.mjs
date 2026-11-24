@@ -60,7 +60,16 @@ await nbGo(page, 'bugs');
 await page.waitForSelector('#bugList .bug[data-id="1"]', { timeout: 15000 });
 const row = n => `#bugList .bug[data-id="${n}"]`;
 const open = async n => { if (!await page.$eval(row(n), d => d.open)) await page.click(`${row(n)} > summary`); await page.waitForSelector(`${row(n)}[open] .body`); };
-const more = async (n, cls) => { await page.click(`${row(n)} .macts .more > button`); await page.click(`${row(n)} .actmenu .${cls}`); };
+// The row's More menu, opened until its item shows: a redraw the step
+// before started (a tie's or an untie's write moving the list) shut the menu
+// under the press, and the item waited a minute for nothing (B1046).
+const more = async (n, cls) => {
+  for (let i = 0; i < 4; i++){
+    await page.click(`${row(n)} .macts .more > button`);
+    if (await page.waitForSelector(`${row(n)} .actmenu .${cls}`, { state: 'visible', timeout: 5000 }).then(() => true, () => false)) break;
+  }
+  await page.click(`${row(n)} .actmenu .${cls}`);
+};
 
 await section("a fixed bug's row: its commits and its lines", async () => {
   await open(1);
