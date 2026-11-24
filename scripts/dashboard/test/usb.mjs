@@ -88,7 +88,9 @@ ok(drawn.ctls.length === 2 && /0000:00:14\.0/.test(drawn.ctls[0]) && /SanDisk Ul
 
 // Give to a VM queues the node's usb-give job with the device named whole.
 await page.click(`${ROW} .ndusb[data-usb="0x0781:0x5583"] [data-usbgive]`);
-const job = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || [])
+// Looked for among the recent jobs whatever their state: one the node took
+// and ended before the first look was not on the active queue (B1127).
+const job = await until(async () => ((await call('/api/v1/jobs')).jobs || [])
   .find(x => x.type === 'vm' && x.spec?.action === 'usb-give'), 15000, 250);
 ok(job && job.spec.domain === `bbvm-alpha-${VMN}` && job.spec.usb.serial === '4C53' && job.spec.usb.port === '1-3' && job.spec.usb.name === 'SanDisk Ultra Fit',
    `Give to a VM queues the node's usb-give job, the device named by vendor, product, serial and port (${JSON.stringify(job?.spec?.usb)})`);
