@@ -2734,6 +2734,12 @@ let dmChip = "";
 const dmSpaceOf = o => !o || o === "System" ? (o || "") : reposOf(o) || o;
 const dmSpaceLabel = k => state?.repos?.[k]?.name || projLabel(k);
 const dmKeyOf = r => dmSpaceOf(r.owner || "");
+// What the groups are drawn from beside the list: each space's name, color
+// and repositories, and each repository's label and space. In the Containers
+// and VMs pages' live stamps, so a space renamed or a repository moved
+// redraws them though no container or VM changed.
+const dmSpacesKey = () => Object.entries(state?.repos || {}).map(([k, r]) => `${k}=${r.name}:${r.color}:${(r.members || []).join("+")}`).join(";")
+  + "|" + (state?.projects || []).map(p => `${p.name}:${p.label}:${p.project}`).join(";");
 // What a row says it belongs to: its space, and its repository beside it
 // where the space has more than one.
 function dmOwnerSaid(o){

@@ -302,7 +302,7 @@ const TABKINDS = {
               // pill says and which arrives on the status read, not with
               // the list (a dial changed kept the old words until the
               // containers were read again).
-              live: () => `${readRev("docker")}/${dmNodesKey()}/${readRev("phone")}/${(state?.projects || []).map(p => p.prefs?.devbuild || "").join(",")}`,
+              live: () => `${readRev("docker")}/${dmNodesKey()}/${readRev("phone")}/${(state?.projects || []).map(p => p.prefs?.devbuild || "").join(",")}/${dmSpacesKey()}`,
               open: () => { const t = dockerTab();
                             if (!dockerNode && t?.arg && t.arg !== "__docker")
                               dockerNode = t.arg;
@@ -325,7 +325,7 @@ const TABKINDS = {
   // The VMs page (R91): its records, and the census a node's hello carries.
   vms:      { multi: false, label: () => "VMs",
               icon: TOOL_ICONS.vms,
-              render: (i) => renderVmsInto(i), live: () => `${readRev("vms")}|${vmView}|${vmsNode}|${vmsChip}|${vmsSearch}`,
+              render: (i) => renderVmsInto(i), live: () => `${readRev("vms")}|${vmView}|${vmsNode}|${vmsChip}|${vmsSearch}|${dmSpacesKey()}`,
               open: () => loadVms() },
   // the nodes' revision as well as its own: a hello carries a fresh walk.
   storage:  { multi: false, label: () => "Storage",

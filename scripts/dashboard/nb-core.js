@@ -1289,7 +1289,9 @@ function nbCoreNodeChips(nb, box, counts, picked, attr, items, pick){
 }
 function nbCoreDrawVms(nb){
   const {$, project} = nb;
-  const all = (vmsData?.vms || []).filter(v => v.project === project);
+  // The space's, every repository's in it (the operator, 24 Nov: never by
+  // repository), as the VMs page groups them.
+  const all = (vmsData?.vms || []).filter(v => dmSpaceOf(v.project) === dmSpaceOf(project));
   const nodes = [...new Set(all.map(v => v.node || ""))];
   nb.nvNode = nbCoreNodeChips(nb, $("nvChips"), nodes.map(id => [id, all.find(v => (v.node || "") === id)?.node_name || id || "no node",
                                                                all.filter(v => (v.node || "") === id).length]),
@@ -1364,12 +1366,14 @@ function nbCoreLoadDocker(nb){
 function nbCoreDrawDocker(nb){
   const {$, project} = nb;
   const called = id => (nodesList || []).find(n => n.id === id)?.name || (nb.dkGot.nodes || []).find(n => n.id === id)?.name || "its node";
-  // What belongs to the project on each node read, which is the Containers
-  // page's group for it there.
+  // What belongs to the space on each node read, every repository's in it
+  // and what was given to the space itself, which is the Containers page's
+  // group for it there (the operator, 24 Nov: never by repository).
+  const space = dmSpaceOf(project);
   const parts = [nb.dkGot, ...(nb.dkMore || [])].map(got => ({
     got, node: got.node || "",
-    mine: (got.instances || []).filter(d => d.owner === project),
-    others: (got.containers || []).filter(c => c.owner === project),
+    mine: (got.instances || []).filter(d => d.owner && dmSpaceOf(d.owner) === space),
+    others: (got.containers || []).filter(c => c.owner && dmSpaceOf(c.owner) === space),
     job: got.job && (got.job.running || got.job.error) ? got.job : null,
     blind: !!(got.blind || got.error || got.on === false)}));
   const held = parts.filter(x => x.mine.length + x.others.length);
@@ -1412,7 +1416,7 @@ function nbCoreDrawDocker(nb){
   };
   // What the view is for, as its empty state (R119 step 4).
   dmNoteOpen($("dkList"));
-  patch($("dkList"), shown.map(x => dmGroupsHtml(x.mine, x.others, x.job, x.blind, project,
+  patch($("dkList"), shown.map(x => dmGroupsHtml(x.mine, x.others, x.job, x.blind, space,
                                                  {id: x.node, name: one ? "" : called(x.node) + (x.blind ? ", which did not answer" : "")})).join("")
     || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/spaces/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`);
   // Each node's card is wired with its own read: a press on a row goes to

@@ -248,7 +248,7 @@ space belongs to it until its row says otherwise, one written here belongs
 to the space picked when it was made, and one somebody else started belongs
 to none until an administrator picks a space on its row; that choice is kept
 by name on its node, so the same container recreated keeps it. The space it
-belongs to lists it in its notebook's Docker view, and that space's
+belongs to lists it in each of its notebooks' Docker view, and that space's
 sessions are the only ones that can see it: `aerie devapp ls` lists them and `aerie
 devapp log NAME` reads one, while rebuilding, changing the env, starting and
 stopping follow that space's *Agents may: Run its container*. An account

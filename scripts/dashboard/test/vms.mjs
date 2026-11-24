@@ -86,7 +86,7 @@ ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alp
   await page.evaluate(() => refresh());
   let last = null;
   const fleet = await until(async () => {
-    const r = last = await page.evaluate(k => { drawPanes(); return { heads: [...document.querySelectorAll('.vmtab .dmgroup b')].map(b => b.textContent.trim()),
+    const r = last = await page.evaluate(async k => { await refresh(); drawPanes(); return { heads: [...document.querySelectorAll('.vmtab .dmgroup b')].map(b => b.textContent.trim()),
       space: state?.repos?.[k]?.name, repo: projLabel('alpha') }; }, key);
     return r.heads.includes('Fleet') ? r : null;
   }, 15000, 300);
