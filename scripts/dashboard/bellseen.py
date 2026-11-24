@@ -70,7 +70,7 @@ def restore(uid):
     return {"ok": True, "restored": n}, 200
 
 
-def active(r):
+def blocks_work(r):
     """Whether a bell row is about something that blocks work now (R280, the
     operator, 24 Nov): it stands in the bell's Active section, under what
     waits on an answer, with no Dismiss, and leaves when it stops being
@@ -139,7 +139,7 @@ def filter_rows(uid, rows):
         # drawn with Dismiss and came back on the next read (B1146).
         # ...and marked active or not (active above), an active row never
         # hidden, whatever was put away before it was one.
-        r["active"] = active(r)
+        r["active"] = blocks_work(r)
         if r.get("key") and r["key"] in gone and not r["active"]:
             hidden += 1
             continue

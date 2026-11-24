@@ -1603,18 +1603,22 @@ await section("the CI watch", async () => {
   ok(/The Android CI check failed on main/.test(bell) && /Git view/.test(bell) && /On GitHub/.test(bell)
      && link === 'https://github.com/o/beta/actions/runs/11',
      `the bell carries a row while main is red, with the way to the Git view (${bell.slice(0, 80)})`);
-  // Its buttons each one line tall, their words whole (B332), and Dismiss
-  // puts it away (B331: the run's key had a space, and the page split it).
+  // Its buttons each one line tall, their words whole (B332). A red main
+  // blocks work, so the row stands in Active with no Dismiss: it leaves
+  // when the branch is green again (R280, the operator, 24 Nov).
   const tall = await page.$eval('#bellPanel', p => {
     const row = [...p.querySelectorAll('.bnote')].find(n => /CI failing in beta/.test(n.textContent));
-    return [...row.querySelectorAll('.acts a')].map(a => { const r = a.getBoundingClientRect(), lh = parseFloat(getComputedStyle(a).lineHeight) || 16;
+    return [...row.querySelectorAll('.acts a, .acts button')].map(a => { const r = a.getBoundingClientRect(), lh = parseFloat(getComputedStyle(a).lineHeight) || 16;
       return { text: a.textContent.trim(), lines: Math.round((r.height - 8) / lh) }; });
   });
-  ok(tall.length === 3 && tall.every(b => b.lines <= 1), `the row's buttons keep their words on one line (${JSON.stringify(tall)})`);
-  await page.evaluate(() => { const row = [...document.querySelectorAll('#bellPanel .bnote')].find(n => /CI failing in beta/.test(n.textContent));
-    row.querySelector('[data-bdismiss]').click(); });
-  const gone = await page.waitForFunction(() => !(state?.ci_red || []).some(c => c.project === 'beta'), null, { timeout: 10000 }).then(() => true, () => false);
-  ok(gone, 'Dismiss puts the CI row away');
+  ok(tall.length === 2 && tall.every(b => b.lines <= 1), `the row's buttons keep their words on one line (${JSON.stringify(tall)})`);
+  const held = await page.evaluate(() => {
+    const p = document.getElementById('bellPanel');
+    const row = [...p.querySelectorAll('.bnote')].find(n => /CI failing in beta/.test(n.textContent));
+    const head = [...p.querySelectorAll('.bgroup')].filter(h => h.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).pop();
+    return { dismiss: !!row.querySelector('[data-bdismiss]'), under: head?.textContent.replace(/\s+/g, ' ').trim() || '' };
+  });
+  ok(!held.dismiss && /^Active/.test(held.under), `a red main stands in Active with no Dismiss (${JSON.stringify(held)})`);
   await page.evaluate(() => postJSON('/api/bell', { action: 'restore' }));
   await page.evaluate(() => toggleBell(false));
   // R117 step 4: the runner row carries Fix, which writes that one line into
