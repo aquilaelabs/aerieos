@@ -533,7 +533,7 @@ function termConnect(rec){
     keyStoreUnlock("Unlock your key store so this terminal opens your sign-ins?").then(() => termConnect(rec));
     return;
   }
-  try{ rec.ws?.close(); }catch(e){ /* already gone */ }
+  wsShut(rec.ws);
   rec.ended = "";
   rec.el.querySelector(".xend").hidden = true;
   rec.term.reset();
@@ -545,6 +545,14 @@ function termConnect(rec){
     if (rec.ws !== ws) return;
     termEnded(rec, e.reason || (e.code === 1006 ? "the connection dropped" : "the terminal ended"));
   };
+}
+
+// A terminal's socket shut: one still connecting is shut as it opens, since
+// Firefox and WebKit log one closed before then as an error in the console.
+function wsShut(ws){
+  if (!ws) return;
+  if (ws.readyState === WebSocket.CONNECTING){ ws.onopen = () => ws.close(); return; }
+  try{ ws.close(); }catch(e){ /* already gone */ }
 }
 
 // Why it ended, under the screen, with Reconnect. A drop rather than an
@@ -564,7 +572,7 @@ function termDrop(key){
   // fit a resize asked for, reached the disposed terminal and xterm read a
   // renderer it no longer had (B425: "reading 'dimensions'").
   rec.gone = true;
-  try{ rec.ws?.close(); }catch(e){ /* gone */ }
+  wsShut(rec.ws);
   rec.ro?.disconnect();
   // Disposed two frames on, not now: xterm runs a frame it had already
   // asked for (a first draw still pending when a slow start's terminal is

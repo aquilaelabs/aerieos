@@ -96,6 +96,10 @@ const PANE_BG   = "#2b2b2b";           // the same color as .pane iframe
 // still needed for.
 function dressFrame(frame){
   try {
+    // Only a frame of this page's own origin: reaching into another is
+    // refused anyway, and WebKit says so in the console as an error.
+    const src = frame.getAttribute("src");
+    if (src && new URL(src, location.href).origin !== location.origin) return null;
     const d = frame.contentDocument;
     if (!d || !d.documentElement) return null;
     d.documentElement.style.background = PANE_BG;

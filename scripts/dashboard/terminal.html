@@ -60,7 +60,10 @@ function size(){
 }
 
 function connect(){
-  try{ ws?.close(); }catch(e){ /* gone */ }
+  // One still connecting is shut as it opens: Firefox and WebKit log one
+  // closed before then as an error.
+  if (ws?.readyState === WebSocket.CONNECTING){ const was = ws; was.onopen = () => was.close(); }
+  else try{ ws?.close(); }catch(e){ /* gone */ }
   ended = ""; end.hidden = true;
   term.reset();
   try{ fit.fit(); }catch(e){ /* no size yet */ }
