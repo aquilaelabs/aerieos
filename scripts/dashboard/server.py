@@ -6496,7 +6496,7 @@ def _snapshot(who):
         "emulator": {"ready": False, "why": "the node store did not open"} if NODES_OK
                     else emulator.ready(),
         "can": {name: not users.may(who, name) for name in
-                ("terminal", "docker-write", "vms-write", "toolchains-write", "curate", "configure", "git-auth", "admin",
+                ("terminal", "terminal-any", "docker-write", "vms-write", "toolchains-write", "curate", "configure", "git-auth", "admin",
                  # The CI runner tab, a job run and a project's node, by
                  # grant (R137 step 3): the Tools card hides CI runner on it.
                  "runner", "runner-read", "jobs", "node",
@@ -11272,17 +11272,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(*containers.admin_verb(act, name, nid, under))
             with devapp.on_node(nid or None):
                 owner = containers.owner_named(name)
-            if act == "logs":
-                if why := self._ctr_may(me, "docker-read", owner):
-                    return self._json({"error": why}, 403)
-            elif (self._refused_on_node("configure", nid) if owner == devapp.SYSTEM
-                    else self._refused("docker-write", owner) if owner and registry.is_project(owner)
-                    else self._refused("docker-any")):
+            # The seatbelt's own sentence first (a space not taken on, and
+            # how to take it on), then what the account's roles say.
+            if act == "logs" and (why := self._ctr_may(me, "docker-read", owner)):
+                return self._json({"error": why}, 403)
+            if why := self._not_on_list(me, owner):
+                return self._json({"error": why}, 403)
+            if act != "logs" and (self._refused_on_node("configure", nid) if owner == devapp.SYSTEM
+                                  else self._refused("docker-write", owner) if owner and registry.is_project(owner)
+                                  else self._refused("docker-any")):
                 return
             if act == "owner" and under and self._refused("docker-write", under):
                 return
-            if why := self._not_on_list(me, owner):
-                return self._json({"error": why}, 403)
             return self._json(*containers.admin_verb(act, name, nid, under))
 
     def _devapp_refused(self, me, name, act, req):
@@ -11341,7 +11342,8 @@ class Handler(BaseHTTPRequestHandler):
         act, name = field(req, "action"), field(req, "name")
         owner = field(req, "owner") if act == "create" else devapp.owner_of(name, devapp.MAIN) if name else ""
         if (self._refused_on_node("configure", "") if owner == devapp.SYSTEM
-                else self._refused("docker-write", owner) if owner else self._refused("docker-any")):
+                else self._refused("docker-write", owner) if owner and registry.is_project(owner)
+                else self._refused("docker-any")):
             return
         return self._json(*containers.tab_verb(act, name, req, seen=lambda: project_names(self._who())))
 
@@ -12693,7 +12695,7 @@ class Handler(BaseHTTPRequestHandler):
         # 24 Nov: New spaces Write, kept from the create dialog, refused a
         # space's own owner), and its owner's alone (_not_link_owner).
         name = field(req, "name").strip()
-        if self._refused("git-auth", name) or self._not_link_owner(name):
+        if (registry.is_project(name) and self._refused("git-auth", name)) or self._not_link_owner(name):
             return None
         body, code = projects.link({**req, "_uid": users.uid_of(self._who())})
         # A project linked is a project whose CI is worth a first look now,
@@ -12707,7 +12709,7 @@ class Handler(BaseHTTPRequestHandler):
         grant that came with it. See projects.unlink: local, instant, and it
         touches no commit. Git authentication Write on it, as Link asks."""
         name = field(req, "name").strip()
-        if self._refused("git-auth", name) or self._not_link_owner(name):
+        if (registry.is_project(name) and self._refused("git-auth", name)) or self._not_link_owner(name):
             return None
         body, code = projects.unlink(req)
         return self._json(body, code)

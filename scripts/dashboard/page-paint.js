@@ -422,7 +422,7 @@ function giveBack(root){
 
 // A terminal at some directory, always a new one. "" is the workspace root.
 function newShell(proj){
-  if (!mayShell()){ notify("a shell is an administrator's", true); return; }
+  if (!(proj ? mayShell() : mayShellAny())){ notify(proj ? "a shell here needs Terminal Write on this space" : "a shell on no space needs Terminal Write Everywhere", true); return; }
   const arg = nextShell(proj);
   if (!arg){ notify("Too many terminals open for that directory.", true); return; }
   // A shell on a project whose node cannot take one opens on this container

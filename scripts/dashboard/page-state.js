@@ -281,6 +281,9 @@ const featureOff = feature => state?.off?.[feature] || "";
 // Claude session on a project they were given. This only decides what is
 // DRAWN; every one of these is refused again on the server.
 const mayShell = () => state?.can?.terminal !== false;
+// ...and one on no space, at /workspace, which reaches every space's trees:
+// Terminal Write Everywhere (R277).
+const mayShellAny = () => state?.can?.["terminal-any"] !== false;
 // A node's service read without Configure Write on that node (R277): its
 // page says so in its head, and its controls are not drawn (.svcro).
 const SVC_RO = "read only: changing it is Configure Write's on this node";

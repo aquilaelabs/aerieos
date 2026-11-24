@@ -134,7 +134,7 @@ function usersDetail(u){
       ${f("ueGitEmail", "git_email", "Git email", "email", "", "on their commits. Blank means their email")}
       ${f("uePw", "pw", "New password", "password", 'autocomplete="new-password"', "blank keeps the current one. Set without the old one, which is the way back in for somebody locked out")}
     </div>
-    <div class="setrow col ueaccess">${lbl("", "Roles and spaces", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
+    <div class="setrow col ueaccess ctlrow">${lbl("", "Roles and spaces", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
     <div class="sub bad" id="ueErr" hidden></div>
     ${ro ? "" : saveBar({save: 'id="ueSave"', revert: 'id="ueRevert"', state: usersDirty() ? "unsaved" : "", dead: !usersDirty()})}
     ${u.devices ? `<div class="uedevices"><span class="lbl">Devices${helpIcon("the apps signed in as this account on its machines; Disconnect cuts one off for them, as a lost laptop needs")}</span>${

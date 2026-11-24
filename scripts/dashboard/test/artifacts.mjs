@@ -156,6 +156,8 @@ await section("a signed build", async () => {
   await page.click(`${ROW} .top b`);
   const opened = await page.$eval(ROW, e => ({ prov: e.querySelector('.artprov')?.hidden, open: e.classList.contains('open'), exp: e.getAttribute('aria-expanded') }));
   await page.click(`${ROW} .top b`);
+  // Shut as it opened, folding, so hidden once the fold has run.
+  await page.locator(`${ROW} .artprov`).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   const again = await page.$eval(ROW, e => e.querySelector('.artprov')?.hidden);
   ok(shut.prov === true && shut.top <= 34 && opened.prov === false && opened.open && opened.exp === 'true' && again === true,
      `a file row is one line shut and opens on a press to what built and signed it, a press shutting it again (${JSON.stringify({ shut, opened, again })})`);

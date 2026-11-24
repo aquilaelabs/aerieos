@@ -122,7 +122,7 @@ function dockBar(){
       <span class="dtab dchat${chatOn ? " on" : ""}${waiting ? " unread" : ""}"><button type="button" class="dlbl" data-dchat
         role="tab" aria-selected="${chatOn && dockUp}" title="${waiting ? `${waiting} unread` : "people and the spaces' channels"}">Chat${
         waiting ? ` <span class="pill">${waiting}</span>` : ""}</button></span>${tabsHtml}
-      ${mayShell() ? `<button type="button" class="ic dnew" data-dnew aria-label="a new shell" title="a new terminal at /workspace">+</button>` : ""}
+      ${mayShellAny() ? `<button type="button" class="ic dnew" data-dnew aria-label="a new shell" title="a new terminal at /workspace">+</button>` : ""}
     </div>
     <span class="sp"></span>
     ${t?.kind === "term" && dockUp && !isPhone() ? `<button type="button" class="ic" data-pop="${esc(t.id)}" title="${t.popped

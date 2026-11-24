@@ -66,7 +66,21 @@ class Verdicts(unittest.TestCase):
     def test_every_check_is_one_the_dispatcher_knows(self):
         self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "pinned", "channels", "shipped",
                                               "formats", "packs", "unraid", "changelog", "dupes", "releasekey",
-                                              "releasesigners"})
+                                              "releasesigners", "selectors"})
+
+    def test_a_has_inside_a_has_is_refused_and_one_beside_another_is_not(self):
+        # R278: a browser drops a rule whose selector nests :has(), every
+        # selector in its list with it, and says nothing.
+        os.makedirs(os.path.join(self.d, "scripts", "dashboard"))
+        self.put("scripts/dashboard/page-x.css",
+                 "/* .a:has(.b:has(.c)) in a comment is words */\n"
+                 ".ok:has(.b):not(:has(.c)){color:red}\n")
+        rc, said = self.run_check("selectors")
+        self.assertEqual(rc, 0, said)
+        self.put("scripts/dashboard/page-x.css", ".x .f:has(> .a:only-child):not(:has(.s:has(.t))){display:none}\n")
+        rc, said = self.run_check("selectors")
+        self.assertEqual(rc, 1, said)
+        self.assertIn("page-x.css", said)
 
     def test_an_action_named_by_a_tag_is_a_note_anywhere_and_a_failure_here(self):
         # R206: an action at @v4 runs whatever its publisher points v4 at,

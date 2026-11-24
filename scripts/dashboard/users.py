@@ -602,8 +602,8 @@ def key_of(name):
 #
 # There is no "delete" here because there is no delete: a project is removed
 # by moving it to the trash and purging it, and both are `trash`.
-USER_DENIES = ("rename", "trash", "node", "create", "terminal", "git-auth", "runner",
-               "docker-write", "toolchains-write", "jobs", "lock", "command-pin", "version", "debug",
+USER_DENIES = ("rename", "trash", "node", "create", "terminal", "terminal-any", "git-auth", "runner",
+               "docker-write", "docker-any", "toolchains-write", "jobs", "lock", "command-pin", "version", "debug",
                "ftp")
 
 
@@ -788,6 +788,11 @@ def may(u, action, project=None):
         return (f"{project} is read-only from a session on {u['session']}: it reads "
                 f"{project}'s code and notebook, and a session on {project} is what changes them")
     if project is not None and not may_work(u, project):
+        # Read-only, and so read: an administrator sees every space, and one
+        # not taken on still reads its notebook and code (R274's seatbelt
+        # stops changes, not reading).
+        if action in READ_ACTIONS and is_admin(u):
+            return ""
         return ("you hold no role on this space: give yourself one on it in your "
                 "settings on the Users page" if is_admin(u) else
                 "you were not given this space")
@@ -849,9 +854,11 @@ def may(u, action, project=None):
             # that may not have one gets a Claude console instead of a
             # window it could point somewhere else (roadmap #27).
             "terminal": ("a shell", "your agent's session opens as a console instead"),
+            "terminal-any": ("a shell", "one on no space reaches every space's trees"),
             "git-auth": ("how a space authenticates to its remote", "the token is what pushes, and "
                          "changing the method or clearing it reaches everybody who works on it"),
             "docker-write": ("starting and stopping containers", "you can see what is running and open it"),
+            "docker-any": ("changing a container of no space", "it is nobody's to answer for but the whole controller's"),
             "toolchains-write": ("installing on a node", "these are gigabytes on shared disk"),
             "debug": ("the debug options", ""),
             "ftp": ("setting up file access over FTP", "it hands the space's files to a server on the network"),
@@ -881,7 +888,7 @@ def _needs(action, project=None):
     gives it on the Users page"."""
     area, need = roles.CAP_AREA.get(action, ("projects", "write"))
     label = next((a[1] for a in roles.AREAS if a[0] == area), area)
-    where = f" on {project}" if project else ""
+    where = f" on {project}" if project else " Everywhere" if action in roles.EVERYWHERE_ONLY else ""
     return (f"needs {label} {'Write' if need == 'write' else 'Read'}{where}, which your roles do not give: "
             "an administrator gives it on the Users page")
 
@@ -890,7 +897,7 @@ def _roles_why(action, project=None, whose="your"):
     """The refusal for an action no role gives, naming the area and level."""
     area, need = roles.CAP_AREA.get(action, ("projects", "write"))
     label = next((a[1] for a in roles.AREAS if a[0] == area), area)
-    where = f" on {project}" if project else ""
+    where = f" on {project}" if project else " Everywhere" if action in roles.EVERYWHERE_ONLY else ""
     return f"{whose} roles give no {label} {'Write' if need == 'write' else 'Read'}{where}: an administrator gives one on the Users page"
 
 

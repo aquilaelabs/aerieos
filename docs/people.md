@@ -47,7 +47,7 @@ controller). Only an administrator makes an administrator, and the owner's
 account is the owner's alone to change.
 
 **The space list means the same thing for every role; what differs is the
-remedy.** A space not on your list is read-only: no session, no
+remedy.** A space not on your list is read-only: no session, no shell in its tree, no
 notebook edits, no rebuild. An admin is shown *every* space: hiding one
 from somebody who administers the box only sends them looking for it, with
 the ones they have not taken on marked read-only, and they can add any of them

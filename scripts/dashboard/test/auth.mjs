@@ -1327,9 +1327,14 @@ await section("the Profile tab", async () => {
     await page.evaluate(async () => (await fetch('/api/users', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add', name: 'noauthor', password: 'tabmadepw1', role: 'admin' }) })).json());
-    const sh = await bare('/termws?arg=sh:1:beta', { headers: noauthor });
+    const sh = await bare('/termws?arg=sh:1:', { headers: noauthor });
     ok(sh.status === 409 && /no name and email/.test((await sh.json()).error || ''),
        'an account with no author is refused a shell at the door, and told where to set one');
+    // ...and a shell in a space it has not taken on is refused before that:
+    // a shell in a tree is work on the space, an administrator's as anybody's.
+    const shb = await bare('/termws?arg=sh:1:beta', { headers: noauthor });
+    ok(shb.status === 403 && /no role on this space/.test((await shb.json()).error || ''),
+       '...while a shell in a space an administrator has not taken on is refused, and says how to take it on');
     // fetch writes with git and wants an author; a policy read and an
     // ls-remote do not, and answer for the same account (B128).
     const git = await bare('/api/v1/bb', { method: 'POST',
@@ -1417,8 +1422,10 @@ await section("the Profile tab", async () => {
         ['/api/lock', { name: 'alpha', locked: true }, /owner or an administrator/],
         ['/api/pin', { name: 'status', pinned: true }, /needs Controller Write/],
         ['/api/project-auth', { name: 'alpha' }, /needs .+ Write|rename/],
-        ['/api/version', { project: 'alpha', action: 'bump', part: 'patch' }, /needs .+ Write/],
-        ['/api/version', { project: 'alpha', action: 'policy', policy: 'any' }, /needs .+ Write/],
+        // Given alpha with no role on it, it reads nothing there either,
+        // which is the refusal said first.
+        ['/api/version', { project: 'alpha', action: 'bump', part: 'patch' }, /needs .+ Write|roles give no Spaces Read on alpha/],
+        ['/api/version', { project: 'alpha', action: 'policy', policy: 'any' }, /needs .+ Write|roles give no Spaces Read on alpha/],
         ['/api/signing', { project: 'alpha', action: 'put', route: 'sideload', keystore: 'eA==', password: 'p' }, /roles give no Releases and versions Write on alpha/]]) {
       const r = await act(plainAuth, path, body);
       ok(r.status === 403 && why.test(r.error), `a plain account cannot ${path} ${body.action || ''} (${r.status}: ${r.error.slice(0, 50)})`);
@@ -1954,7 +1961,11 @@ await section("maintenance mode", async () => {
       + `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nCookie: ${cookie}\r\n\r\n`);
   });
   const cookieOf = async (u, pw) => ((await form(u, pw)).headers.get('set-cookie') || '').split(';')[0];
-  // An author first: a terminal is refused to an account with none.
+  // An author first: a terminal is refused to an account with none. And
+  // alpha on the administrator's own list: a shell in a space's tree is
+  // work on it, which an administrator does on the spaces taken on.
+  await bare('/api/users', { method: 'POST', headers: owner,
+    body: JSON.stringify({ action: 'edit', name: 'maintadm', projects: [projectKey('alpha')] }) });
   await bare('/api/profile', { method: 'POST', headers: adm,
     body: JSON.stringify({ action: 'save', profile: { full_name: 'Maint Admin', email: 'maintadm@example.invalid' } }) });
   const admTerm = await openTerm(await cookieOf('maintadm', 'maintpass22'), 7);

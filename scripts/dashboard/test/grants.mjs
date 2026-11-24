@@ -17,6 +17,7 @@ await api('/api/roles', { action: 'set', name: `box ${stamp}`, scope: 'projects'
 await api('/api/roles', { action: 'set', name: `people ${stamp}`, scope: 'global', perms: { accounts: 'write' } });
 await api('/api/roles', { action: 'set', name: `maker ${stamp}`, scope: 'global', perms: { newprojects: 'write' } });
 await api('/api/roles', { action: 'set', name: `cfgread ${stamp}`, scope: 'global', perms: { configure: 'read' } });
+await api('/api/roles', { action: 'set', name: `shell ${stamp}`, scope: 'projects', perms: { projects: 'read', terminal: 'write' } });
 const made = [];
 const account = async (name, pw, extra) => {
   await api('/api/users', { action: 'add', name, password: pw, role: extra?.role || 'user' });
@@ -30,6 +31,9 @@ const adm = await account(`adm${stamp}`, 'adm-pass-word-1', { role: 'admin' });
 const cfgReader = await account(`cr${stamp}`, 'cr-pass-word-1', { assign: { roles: [`cfgread ${stamp}`] } });
 const maker = await account(`mk${stamp}`, 'mk-pass-word-1',
   { assign: { roles: [`maker ${stamp}`], project_roles: { [ALPHA]: [`box ${stamp}`] } } });
+const sheller = await account(`sh${stamp}`, 'sh-pass-word-1', { assign: { project_roles: { [ALPHA]: [`shell ${stamp}`] } } });
+// An author, without which no shell opens for anybody.
+await api('/api/users', { action: 'edit', name: `sh${stamp}`, profile: { full_name: 'Shell Holder', email: 'sh@example.invalid' } });
 const node = ((await api('/api/v1/nodes')).nodes || []).find(n => n.kind === 'agent' || n.id)?.id || 'local';
 // No node: the Containers page's own daemon, which a prune would reach.
 const dnode = '';
@@ -80,6 +84,25 @@ await section("a role reads only what its areas say", async () => {
   ok(trash.status === 403, `...nor its bin, which is Space settings Write (${trash.status})`);
 });
 
+await section("a shell on one space is no shell on every space", async () => {
+  // Terminal Write on alpha opens a shell in alpha's tree; one at
+  // /workspace, on no space, reaches every space's trees and asks it
+  // Everywhere, so the dock draws no + for it.
+  const can = (await call('/api/status', undefined, sheller)).body.can || {};
+  const bare = await call('/termws?arg=sh%3A1%3A', undefined, sheller);
+  const there = await call(`/termws?arg=sh%3A1%3A${ALPHA}`, undefined, sheller);
+  ok(can.terminal === true && can['terminal-any'] === false && bare.status === 403
+     && /a shell needs Terminal Write Everywhere/.test(bare.body.error || '') && there.status !== 403,
+     `Terminal Write on alpha is a shell there and none on no space (can ${can.terminal}/${can['terminal-any']}; ${bare.status} ${bare.body.error || ''}; alpha ${there.status})`);
+  const page = await newPage(browser, { viewport: { width: 1280, height: 900 },
+    httpCredentials: { username: `sh${stamp}`, password: 'sh-pass-word-1' }, extraHTTPHeaders: { Authorization: sheller.Authorization } });
+  await page.goto(URL); await ready(page);
+  await page.waitForSelector('.dockline .dtab', { timeout: 15000 }).catch(() => {});
+  const dock = await page.evaluate(() => ({ line: !!document.querySelector('.dockline .dtab'), plus: !!document.querySelector('[data-dnew]') }));
+  ok(dock.line && !dock.plus, `the dock draws no new shell at /workspace for it (${JSON.stringify(dock)})`);
+  await page.context().close();
+});
+
 await section("a repository is added to a space by its owner or an administrator", async () => {
   // New spaces Write, and on alpha, but not alpha's owner. A repository is
   // added into its space, named by the space's key.
@@ -110,5 +133,5 @@ await section("a session goes when its account goes", async () => {
 });
 
 for (const n of made) await api('/api/users', { action: 'remove', name: n });
-for (const n of [`box ${stamp}`, `people ${stamp}`, `maker ${stamp}`, `cfgread ${stamp}`]) await api('/api/roles', { action: 'remove', name: n });
+for (const n of [`box ${stamp}`, `people ${stamp}`, `maker ${stamp}`, `cfgread ${stamp}`, `shell ${stamp}`]) await api('/api/roles', { action: 'remove', name: n });
 await done(browser);
