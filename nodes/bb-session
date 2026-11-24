@@ -121,6 +121,7 @@ SYS_OPEN_TREE, SYS_MOVE_MOUNT, SYS_MOUNT_SETATTR = 428, 429, 442
 OPEN_TREE_CLONE, OPEN_TREE_CLOEXEC = 1, 0o2000000
 AT_FDCWD, AT_EMPTY_PATH, MOVE_MOUNT_F_EMPTY_PATH = -100, 0x1000, 0x4
 MOUNT_ATTR_IDMAP = 0x00100000
+MOUNT_ATTR_NOSUID, MOUNT_ATTR_NODEV = 0x2, 0x4
 PR_SET_NO_NEW_PRIVS = 38
 
 # The session network (R79). The folder is the agent's: its resolver file for
@@ -1023,8 +1024,11 @@ def idmap_userns(owner, account):
     account's user (uid, gid), as an fd, for an idmapped bind (R125 step 7):
     made before the session's own namespaces, while /proc is the node's, by a
     child that enters it and waits while this side writes its one-line maps.
-    None where the kernel will not."""
+    None where the kernel will not, and for root on either side: a tree
+    root owns is not one to write as the account, nor an account root (B889)."""
     (ou, og), (au, ag) = owner, account
+    if 0 in (ou, og, au, ag):
+        return None
     ready_r, ready_w = os.pipe()
     hold_r, hold_w = os.pipe()
     pid = os.fork()
@@ -1063,7 +1067,9 @@ def _bind_idmapped(src, target, userns):
     try:
         fd = _sys(SYS_OPEN_TREE, ctypes.c_int(AT_FDCWD), src.encode(),
                   ctypes.c_uint(OPEN_TREE_CLONE | OPEN_TREE_CLOEXEC))
-        attr = _MountAttr(MOUNT_ATTR_IDMAP, 0, 0, userns)
+        # ...and with no set-id program or device node honored through it,
+        # as every other mount of the view (B889).
+        attr = _MountAttr(MOUNT_ATTR_IDMAP | MOUNT_ATTR_NOSUID | MOUNT_ATTR_NODEV, 0, 0, userns)
         _sys(SYS_MOUNT_SETATTR, ctypes.c_int(fd), b"", ctypes.c_uint(AT_EMPTY_PATH),
              ctypes.byref(attr), ctypes.c_size_t(ctypes.sizeof(attr)))
         _sys(SYS_MOVE_MOUNT, ctypes.c_int(fd), b"", ctypes.c_int(AT_FDCWD), target.encode(),
@@ -1121,16 +1127,42 @@ _USERNS = None
 
 def _mkdirs(path, uid, gid):
     """Directories on a tmpfs this process mounted a moment ago, given to the
-    session account so its own folders sit in folders it can use."""
-    parts, cur = path.strip("/").split("/"), ""
-    for p in parts:
-        cur += "/" + p
-        if not os.path.isdir(cur):
-            os.mkdir(cur, 0o755)
-            # Never through a link: on a real home a racing session could
-            # swap the folder just made for one, and root's chown would go
-            # wherever it pointed (B511).
-            os.lchown(cur, uid, gid)
+    session account so its own folders sit in folders it can use.
+
+    Made a part at a time from descriptors opened through no link, and
+    never through a link anybody but root made: some targets are in a real
+    home the account writes, and ~/.claude made a link to any folder had
+    root make sessions/ there (B887). A link root made (/home onto
+    /var/home) is the machine's own, and the walk goes on from where it
+    points. Every folder made is given to the account by its name in the
+    folder just opened, never through a link (B511)."""
+    flags = os.O_PATH | os.O_NOFOLLOW | os.O_DIRECTORY | os.O_CLOEXEC
+    parts, done, hops = [x for x in path.split("/") if x], "", 0
+    fd = os.open("/", os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        i = 0
+        while i < len(parts):
+            part = parts[i]
+            if part in (".", ".."):
+                raise OSError(errno.EINVAL, f"{path} climbs with {part}")
+            try:
+                st = os.stat(part, dir_fd=fd, follow_symlinks=False)
+            except FileNotFoundError:
+                os.mkdir(part, 0o755, dir_fd=fd)
+                os.chown(part, uid, gid, dir_fd=fd, follow_symlinks=False)
+                st = os.stat(part, dir_fd=fd, follow_symlinks=False)
+            if stat.S_ISLNK(st.st_mode):
+                if st.st_uid != 0 or hops >= 8:
+                    raise OSError(errno.ELOOP, f"{path} has a link along it at {done}/{part} that root did not make")
+                parts, i, done, hops = [x for x in os.path.realpath(f"{done}/{part}").split("/") if x] + parts[i + 1:], 0, "", hops + 1
+                os.close(fd)
+                fd = os.open("/", os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC)
+                continue
+            nfd = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd, done, i = nfd, f"{done}/{part}", i + 1
+    finally:
+        os.close(fd)
 
 
 def apply(steps, uid, gid):

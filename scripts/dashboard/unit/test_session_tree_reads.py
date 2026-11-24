@@ -1,8 +1,9 @@
-"""What a node's view takes from a space's tree, which a session of that
-space can write: the CI logs it binds are the folder the controller names
-with a terminal, never the name in the tree's git config (B886), and a
-worktree is made only of a repository whose .git is its own (B890), so
-neither a config, a link nor a gitfile reaches another space."""
+"""What a node's view takes from what a session can write, its space's tree
+and its home: the CI logs it binds are the folder the controller names with
+a terminal, never the name in the tree's git config (B886); a worktree is
+made only of a repository whose .git is its own (B890); the folders a bind
+lands on are made through no link a session left (B887); and the mapped
+tree is no way to root (B889)."""
 import importlib.machinery
 import importlib.util
 import os
@@ -80,6 +81,49 @@ class CiRepository(unittest.TestCase):
         subprocess.run(["git", "-C", str(tmp / "ws" / "app"), "remote", "add", "origin",
                         "https://example.test/Owner/The-App.git"], check=True)
         self.assertEqual(projects.ci_repo_name("app"), "The-App")
+
+
+class Mkdirs(unittest.TestCase):
+    def setUp(self):
+        self.d = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.me = (os.getuid(), os.getgid())
+        self.home = os.path.join(self.d, "home")
+        self.elsewhere = os.path.join(self.d, "elsewhere")
+        os.makedirs(self.home)
+        os.makedirs(self.elsewhere)
+
+    def test_the_folders_are_made_and_given_to_the_account(self):
+        session._mkdirs(os.path.join(self.home, ".claude", "sessions"), *self.me)
+        self.assertTrue(os.path.isdir(os.path.join(self.home, ".claude", "sessions")))
+        session._mkdirs(os.path.join(self.home, ".claude", "sessions"), *self.me)   # there already: nothing to do
+
+    def test_a_link_the_account_left_is_not_walked_through(self):
+        os.symlink(self.elsewhere, os.path.join(self.home, ".claude"))
+        with self.assertRaisesRegex(OSError, "link along it"):
+            session._mkdirs(os.path.join(self.home, ".claude", "sessions"), *self.me)
+        self.assertEqual(os.listdir(self.elsewhere), [])
+
+    def test_a_file_in_the_way_is_no_folder(self):
+        with open(os.path.join(self.home, ".claude"), "w") as f:
+            f.write("x")
+        with self.assertRaises(OSError):
+            session._mkdirs(os.path.join(self.home, ".claude", "sessions"), *self.me)
+
+
+class Idmap(unittest.TestCase):
+    def test_root_is_mapped_on_neither_side(self):
+        # B889: a tree root owns is not one to write as the account, nor is
+        # an account root; asked for either, no namespace is made.
+        for owner, account in (((0, 1000), (2000, 2000)), ((1000, 0), (2000, 2000)),
+                               ((1000, 1000), (0, 2000)), ((1000, 1000), (2000, 0))):
+            with mock.patch.object(session.os, "fork", side_effect=AssertionError("forked")):
+                self.assertIsNone(session.idmap_userns(owner, account))
+
+    def test_the_mapped_tree_honors_no_set_id_program_or_device(self):
+        with open(os.path.join(ROOT, "nodes", "bb-session"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("_MountAttr(MOUNT_ATTR_IDMAP | MOUNT_ATTR_NOSUID | MOUNT_ATTR_NODEV, 0, 0, userns)", text)
 
 
 class OwnRepository(unittest.TestCase):

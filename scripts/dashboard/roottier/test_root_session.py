@@ -125,6 +125,49 @@ class Worktree(unittest.TestCase):
         self.assertTrue(os.path.exists(self.ran), "the filter is real: it runs for the session itself")
         self.assertFalse(session.worktree_unfilled(wt))
 
+    def test_a_git_file_naming_another_spaces_repository_makes_none(self):
+        # B890: a session of the space writes its tree, and a .git there
+        # naming another space's repository had root make a worktree of it.
+        other = self.w.folder("workspace/beta", WHO)
+        r = world.as_account(WHO, ["git", "init", "-q", "-b", "main", "."], cwd=other,
+                             env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": other})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        shutil.rmtree(os.path.join(self.src, ".git"))
+        with open(os.path.join(self.src, ".git"), "w") as f:
+            f.write(f"gitdir: {other}/.git\n")
+        user = collections.namedtuple("P", "pw_name")(session.ACCOUNT_USER + ME[2:])
+        real = session.pwd.getpwuid
+        with mock.patch.dict(os.environ, {"SUDO_UID": "64001"}), \
+                mock.patch.object(session.pwd, "getpwuid", lambda uid: user if uid == 64001 else real(uid)), \
+                self.assertRaisesRegex(session.Refused, "alpha is not a repository here"):
+            session.worktree({"ACCOUNT_USERS": "on", "WORKSPACE": self.ws}, ["alpha", "claude", "1", "claude/x"])
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".worktrees", "alpha", ME)))
+
+
+class ViewFolders(unittest.TestCase):
+    """The folders a bind lands on, made by root in a home the account
+    writes (B887): through a link root made, which is the machine's own
+    (/home onto /var/home), and never through one the account left."""
+
+    def setUp(self):
+        self.w = world.World(self)
+        self.real = self.w.folder("var/home")
+        self.home = self.w.folder("var/home/someone", WHO)
+        os.symlink(self.real, os.path.join(self.w.top, "home"))
+
+    def test_a_link_root_made_is_walked_and_the_folders_are_the_accounts(self):
+        session._mkdirs(os.path.join(self.w.top, "home", "someone", ".claude", "sessions"), UID, GID)
+        made = os.path.join(self.home, ".claude", "sessions")
+        self.assertTrue(os.path.isdir(made))
+        self.assertEqual((os.lstat(made).st_uid, os.lstat(os.path.dirname(made)).st_uid), (UID, UID))
+
+    def test_a_link_the_account_made_is_not(self):
+        os.symlink(self.w.vault, os.path.join(self.home, ".claude"))
+        os.lchown(os.path.join(self.home, ".claude"), UID, GID)
+        with self.assertRaisesRegex(OSError, "root did not make"):
+            session._mkdirs(os.path.join(self.home, ".claude", "sessions"), UID, GID)
+        self.assertFalse(os.path.exists(os.path.join(self.w.vault, "sessions")))
+
 
 class TerminalServer(unittest.TestCase):
     def setUp(self):
