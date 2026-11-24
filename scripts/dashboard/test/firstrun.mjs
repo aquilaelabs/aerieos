@@ -157,22 +157,34 @@ await section("a bare-metal install's first run", async () => {
     // Nobody's yet when asked (a move's destination, R90 step 12).
     if (!noOwner) execFileSync('python3', [`${LIB}/users-verbs.py`, 'claim', `${DASH}/users.py`, OWNER.username],
                                { env: { ...env, BB_USERS_PW: OWNER.password } });
-    const port = await freePort();
-    const out = openSync(`${w}/server.log`, 'a');
-    const proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', out, out], env: {
-      ...env, DASHBOARD_PORT: String(port), BUILDER_HOME: `${w}/home`,
-      BB_DOCTOR_FIXTURE: `${DIR}/doctor.txt`, TC_AUTOCHECK: '0', BB_NODE_POLL: '3',
-      BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',
-      BB_NGINX_CHECK_DELAY: '3600', BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
-      BB_IMAGE_CHECK_DELAY: '3600', BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '',
-      ...(kind === 'bare' ? { BB_INSTALL: 'bare-metal' } : {}) } });
-    ctrls.push(proc);
-    const base = `http://127.0.0.1:${port}`;
-    // Its own server, which under a whole run's load took more than 30 s to
-    // answer; when it never does, its log says why, not "fetch failed".
-    if (!await until(async () => (await fetch(`${base}/login`)).status === 200, 90000, 250)) {
-      let said = '';
-      try { said = readFileSync(`${w}/server.log`, 'utf8').trim().split('\n').slice(-6).join(' | '); } catch (e) { said = String(e); }
+    // The port is free when asked for and taken by the server only once it
+    // starts, and under a whole run's load an outgoing connection can take
+    // it in that gap: the server then ends on Address already in use (B931's
+    // gap, B1142). Started again on another port when that is what ended it,
+    // three times at most; any other end is the answer, its log saying why.
+    let proc, base;
+    for (let tries = 1; ; tries++){
+      const from = (() => { try { return readFileSync(`${w}/server.log`, 'utf8').length; } catch { return 0; } })();
+      const port = await freePort();
+      const out = openSync(`${w}/server.log`, 'a');
+      proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', out, out], env: {
+        ...env, DASHBOARD_PORT: String(port), BUILDER_HOME: `${w}/home`,
+        BB_DOCTOR_FIXTURE: `${DIR}/doctor.txt`, TC_AUTOCHECK: '0', BB_NODE_POLL: '3',
+        BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',
+        BB_NGINX_CHECK_DELAY: '3600', BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
+        BB_IMAGE_CHECK_DELAY: '3600', BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '',
+        ...(kind === 'bare' ? { BB_INSTALL: 'bare-metal' } : {}) } });
+      ctrls.push(proc);
+      let ended = false;
+      proc.on('exit', () => { ended = true; });
+      base = `http://127.0.0.1:${port}`;
+      // Its own server, which under a whole run's load took more than 30 s to
+      // answer; when it never does, its log says why, not "fetch failed".
+      const up = await until(async () => ended || (await fetch(`${base}/login`)).status === 200, 90000, 250);
+      const log = (() => { try { return readFileSync(`${w}/server.log`, 'utf8'); } catch { return ''; } })();
+      if (up && !ended) break;
+      if (ended && tries < 3 && /Address already in use/.test(log.slice(from))) continue;
+      const said = log.trim().split('\n').slice(-6).join(' | ');
       throw new Error(`the ${kind} controller did not answer in 90 s: ${said || 'its log is empty'}`);
     }
     const post = async (path, body, h = H) => (await fetch(base + path, { method: 'POST', headers: h, body: JSON.stringify(body) })).json();
