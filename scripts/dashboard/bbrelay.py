@@ -303,7 +303,11 @@ def run(me, req, project):
     env.update(dict.fromkeys(PROJECT_VARS, project))
     env.update({"BB_PROJECT": project,
                 "DASHBOARD_STATE": str(STATE), "WORKSPACE": str(WORKSPACE),
-                "BB_TOKEN": users.mint_session(project), "BB_RELAYED": "1",
+                # ...for the account the session works for: minted with
+                # none, every gate that asks whose a call is (the
+                # diagnostics' debug grant, a person's own token) found
+                # nobody behind it and refused, or took nobody's.
+                "BB_TOKEN": users.mint_session(project, uid=users.seat_of(me)), "BB_RELAYED": "1",
                 "BUILDERBOT_ROLE": "controller"})
     # Which seat the caller sits in, so a node's session is the same one
     # here: it is what says whether the roadmap has moved since that
