@@ -2739,9 +2739,10 @@ const dmKeyOf = r => dmSpaceOf(r.owner || "");
 function dmOwnerSaid(o){
   if (!o) return "none";
   if (o === "System") return "System";
-  // Given to the space itself (a move that left it there), the space alone.
-  const k = dmSpaceOf(o);
-  return k !== o && (state?.repos?.[k]?.members || []).length > 1 ? `${dmSpaceLabel(k)} · ${projLabel(o)}` : dmSpaceLabel(k);
+  // Given to the space itself (a move that left it there), or kept by the
+  // repository named as the space, the space alone: never one name twice.
+  const k = dmSpaceOf(o), space = dmSpaceLabel(k), repo = projLabel(o);
+  return k !== o && repo !== space && (state?.repos?.[k]?.members || []).length > 1 ? `${space} · ${repo}` : space;
 }
 
 // `on` is the node these are on, {id, name}, where a space's containers are
