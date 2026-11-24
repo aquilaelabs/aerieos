@@ -864,11 +864,15 @@ aerie pc [VERB] [--why "..."]
 aerie doctor          check everything that usually goes wrong
 
 # developing AerieOS itself, from inside it
-aerie dashboard test [SUITE...] [--at REF] [--loaded]  browser-test the dashboard from
-                   this checkout, isolated; --at runs a commit as it was (git archive, not the
-                   working tree); --loaded runs one suite beside a whole run's load, the gate's
-                   workers taking the longest of the rest, so a suite that fails only in a gate
-                   fails on demand
+aerie dashboard test [SUITE...] [--at REF] [--loaded] [--engine NAME]  browser-test the dashboard
+                   from this checkout, isolated, each suite in every engine the store carries
+                   (Chromium, Firefox, WebKit: aerie capture browsers), each engine a fresh world
+                   and its results named by it; --engine (again for more, or BB_TEST_ENGINES)
+                   narrows, and a suite that needs Chromium's own protocol says so at its head and
+                   is said skipped in the others; --at runs a commit as it was (git archive, not
+                   the working tree); --loaded runs one suite beside a whole run's load, the
+                   gate's workers taking the longest of the rest, so a suite that fails only in a
+                   gate fails on demand; aerie tests probe FILE takes --engine the same way
 aerie dashboard dev   serve the live dashboard from ./scripts/dashboard (--off reverts)
 aerie dashboard status  which copy of the dashboard is serving
 aerie dashboard trace [SECONDS]  what the dashboard was asked over the last SECONDS, by endpoint and who asked, with how long each took

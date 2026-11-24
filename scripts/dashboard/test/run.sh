@@ -31,6 +31,20 @@ set -euo pipefail
 # (B151; settings.mjs met it as B146).
 while IFS= read -r v; do unset "$v"; done < <(compgen -e | grep -E '^GIT_CONFIG_(COUNT|KEY_[0-9]+|VALUE_[0-9]+)$' || true)
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Which engines (R263 step 5, the operator, 23 Nov: every suite in all
+# three): --engine NAME, again for more, or BB_TEST_ENGINES; else every
+# engine the store carries (test_engines below). Taken off the arguments
+# here, so the rest sees suite names alone.
+_args=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --engine)   BB_TEST_ENGINES="${BB_TEST_ENGINES:+$BB_TEST_ENGINES }${2:-}"; shift 2 ;;
+        --engine=*) BB_TEST_ENGINES="${BB_TEST_ENGINES:+$BB_TEST_ENGINES }${1#--engine=}"; shift ;;
+        *)          _args+=("$1"); shift ;;
+    esac
+done
+set -- ${_args[@]+"${_args[@]}"}
+export BB_TEST_ENGINES
 # Its own: the harness sources nothing of bb's, and the sentence a failed copy
 # meant to say ended as "die: command not found" (B231).
 die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -65,6 +79,32 @@ if [ "$(id -u)" = 0 ] && id builder >/dev/null 2>&1 && command -v runuser >/dev/
     exec runuser -u builder -- env HOME="$(getent passwd builder | cut -d: -f6)" \
         USER=builder bash "$0" "$@"
 fi
+
+# The engines a run uses: those asked for, each of which the store must
+# carry, else every one it carries, found as aerie capture finds them and
+# never listed here. Chromium first, the engine every suite was written in.
+test_engines() {
+    local have want e
+    have="$(bash "$HERE/../../aerie" capture browsers 2>/dev/null | tr '\n' ' ')"
+    [ -n "$have" ] || have="chromium"
+    want="${BB_TEST_ENGINES:-$have}"
+    for e in $want; do
+        case " $have " in *" $e "*) ;; *) die "no $e in the Playwright store here: the engines are $have" ;; esac
+    done
+    for e in chromium $want; do printf '%s\n' "$e"; done | awk -v w=" $want " 'index(w, " " $0 " ") && !seen[$0]++'
+}
+# What a suite takes: a line at its head, `// engines: chromium` and why,
+# where its checks need one engine's own protocol (finger's real touch, a
+# virtual security key). Every engine otherwise.
+suite_takes() {
+    local only
+    only="$(head -40 "$1" | sed -n 's|^// engines: *\([a-z ]*\).*|\1|p' | head -1)"
+    [ -z "$only" ] && return 0
+    case " $only " in *" $2 "*) return 0 ;; esac
+    return 1
+}
+suite_why() { head -40 "$1" | sed -n 's|^// engines: *[a-z ]*[:,(-]* *||p' | head -1; }
+PW_BROWSERS="$(bash "$HERE/../../aerie" capture shot --print-browsers-path 2>/dev/null || true)"
 
 # ---- a kept fixture (roadmap R75 step 2) ------------------------------------
 # `aerie tests keep` runs this script with BB_TEST_HOLD=1: the whole set-up, then
@@ -126,16 +166,22 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
                 /*) f="$KEEP_HERE/_probe-$(basename "${t%.mjs}").mjs"; cp "$t" "$f" ;;
                 *)  f="$KEEP_HERE/${t%.mjs}.mjs"; cp "$HERE/${t%.mjs}.mjs" "$f" ;;
             esac
-            printf '[dashboard-test] == %s == (attached to the kept fixture at %s)\n' "$(basename "$f")" "$KEEP_URL"
-            # The kept world's own environment, the same as a fresh run sets
-            # below: its private tmux server, its git config, and none of the
-            # node's or the session's own variables (SCRUB). Without it a suite
-            # that ends or makes a tmux session refused to run attached (B230).
-            env -u TMUX "${scrub[@]}" \
-                TMUX_TMPDIR="$KEEP_S/tmux" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$KEEP_S/gitconfig" \
-                DASHBOARD_TEST_URL="$KEEP_URL" DASHBOARD_TEST_CHROME="$KEEP_CHROME" \
-                BB_TEST_ORIGIN="${KEEP_ORIGIN:-$_here_root}" \
-                DASHBOARD_TEST_DIR="$KEEP_S" timeout --kill-after=10 "${SUITE_TIMEOUT:-1500}" node "$f" || rc=1
+            for e in $(test_engines); do
+                if ! suite_takes "$f" "$e"; then
+                    printf '[dashboard-test] [%s] skip %s: %s\n' "$e" "$(basename "$f")" "$(suite_why "$f")"; continue
+                fi
+                printf '[dashboard-test] == %s [%s] == (attached to the kept fixture at %s)\n' "$(basename "$f")" "$e" "$KEEP_URL"
+                # The kept world's own environment, the same as a fresh run sets
+                # below: its private tmux server, its git config, and none of the
+                # node's or the session's own variables (SCRUB). Without it a suite
+                # that ends or makes a tmux session refused to run attached (B230).
+                env -u TMUX "${scrub[@]}" \
+                    TMUX_TMPDIR="$KEEP_S/tmux" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$KEEP_S/gitconfig" \
+                    DASHBOARD_TEST_URL="$KEEP_URL" DASHBOARD_TEST_CHROME="$KEEP_CHROME" \
+                    DASHBOARD_TEST_ENGINE="$e" PLAYWRIGHT_BROWSERS_PATH="$PW_BROWSERS" \
+                    BB_TEST_ORIGIN="${KEEP_ORIGIN:-$_here_root}" \
+                    DASHBOARD_TEST_DIR="$KEEP_S" timeout --kill-after=10 "${SUITE_TIMEOUT:-1500}" node "$f" || rc=1
+            done
             case "$f" in */_probe-*) rm -f "$f" ;; esac
         done
         exit "$rc"
@@ -283,6 +329,8 @@ node -e "require.resolve('playwright')" 2>/dev/null \
     || die "node and playwright are not on PATH here (NODE_PATH=$NODE_PATH); on a node they are the playwright recipe in the toolchain store, installed from the Library"
 CHROME="$(bash "$DASH/../aerie" capture shot --print-chromium 2>/dev/null || true)"
 [ -x "${CHROME:-}" ] || die "no Playwright chromium: install it with: aerie toolchains install playwright"
+ENGINES="$(test_engines | tr '\n' ' ')"
+export ENGINES
 command -v tmux >/dev/null || die "tmux is not installed"
 
 # The port is picked, not fixed. It was 8093 for everybody, which meant a run
@@ -2005,7 +2053,25 @@ else
     mapfile -t names < <(default_suites)
     for t in "${names[@]}"; do tests+=("$HERE/$t.mjs"); done
 fi
+# A suite in every engine the run uses, each in a world of its own (R263
+# step 5); one that takes Chromium alone is said skipped in the others,
+# never passed. Its cost, all engines together, for the next run's plan.
 run_file() {
+    local e rc=0 t0
+    t0="$(date +%s)"
+    for e in $ENGINES; do
+        if ! suite_takes "$1" "$e"; then
+            log "[$e] skip $(basename "$1"): $(suite_why "$1")"; continue
+        fi
+        run_engine "$1" "$e" "${2:-}" || rc=$?
+    done
+    [ "$rc" = 0 ] && [ -z "${2:-}" ] && [ -n "${SUITE_TIMES:-}" ] \
+        && printf '%s\t%s\n' "$(basename "${1%.mjs}")" "$(( $(date +%s) - t0 ))" >> "$SUITE_TIMES" 2>/dev/null
+    return "$rc"
+}
+run_engine() {
+    local engine="$2"
+    set -- "$1" "${3:-}"
     # The suite's name, for the server's coverage counts to carry (R76):
     # the server is started fresh for every file, so its counts are that
     # file's and the map can say which suite reached a handler.
@@ -2015,7 +2081,7 @@ run_file() {
     t0="$(date +%s)"
     fresh_world
     phase fresh
-    log "== $(basename "$1")${2:+ $2} =="
+    log "== $(basename "$1") [$engine]${2:+ $2} =="
     # A time limit per file (B514): a check that awaited a request it held
     # open itself hung cards.mjs for four hours, holding the run's lock, with
     # nothing saying so. SUITE_TIMEOUT seconds (1500: the longest file takes
@@ -2026,6 +2092,7 @@ run_file() {
     # and itself waiting on it. A wait is interrupted by the trap, and the
     # cleanup ends the suite's group.
     DASHBOARD_TEST_URL="http://127.0.0.1:$PORT/" DASHBOARD_TEST_CHROME="$CHROME" \
+    DASHBOARD_TEST_ENGINE="$engine" PLAYWRIGHT_BROWSERS_PATH="$PW_BROWSERS" \
     DASHBOARD_TEST_DIR="$S" timeout --kill-after=10 "${SUITE_TIMEOUT:-1500}" node "$1" &
     suite_pid=$!
     wait "$suite_pid" || rc=$?
@@ -2045,12 +2112,8 @@ run_file() {
         awk '/^Traceback \(most recent call last\)/{buf=""; on=1} on{buf=buf $0 "\n"} on && /^[A-Za-z_.]*(Error|Exception)[:]?/ && !/^  /{last=buf; on=0} END{printf "%s", last}' "$S/server.log" \
             | tail -40 | while IFS= read -r l; do log "server: $l"; done
     fi
-    # What the suite cost, world and all, for the next run's worker plan
-    # (the queue's order): a pass in a whole run only, since a failure can stop
-    # early or wait out a timeout, and a rerun runs on an idle box. One
-    # short line appended, so four workers at once do not tear it.
-    [ "$rc" = 0 ] && [ -z "${2:-}" ] && [ -n "${SUITE_TIMES:-}" ] \
-        && printf '%s\t%s\n' "$BB_COVERAGE_SUITE" "$(( $(date +%s) - t0 ))" >> "$SUITE_TIMES" 2>/dev/null
+    # What the suite cost is run_file's, all its engines together, for the
+    # next run's worker plan (the queue's order).
     return "$rc"
 }
 rc=0

@@ -6,7 +6,7 @@
 // session; a tab popped out opens the same terminal on a page of its own
 // (terminal.html); a closed tab's socket goes with it. Driven through the
 // page, as a person at the dock would.
-import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey, OWNER, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey, OWNER, section, ENGINE, skip } from './lib.mjs';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -107,7 +107,10 @@ await section("The look is the person's", async () => {
 // On a phone (step 11): a finger dragged down scrolls back through a
 // shell's history, by the line, in tmux's copy mode; a press held on a word
 // selects it, with grips and Copy; Copy puts it on the clipboard.
-await section("On a phone (step 11)", async () => {
+// Its drags are real touch through Chromium's gesture recognizer (finger):
+// said skipped in the other engines (R263 step 6).
+if (ENGINE !== 'chromium') skip('On a phone (step 11)', "its drags are a real touch through Chromium's gesture recognizer");
+else await section("On a phone (step 11)", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 800 }, hasTouch: true, isMobile: true });
   await phone.goto(URL);
   await ready(phone);

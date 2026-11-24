@@ -44,7 +44,11 @@ aerie tests lab                  # the lab suites, against the lab's own stack (
 
 The browser suite runs the checkout's `server.py` on a spare port with a
 scratch state directory, fake projects and a private tmux server, from a
-copy of the tree, one run at a time. A project whose settings name a
+copy of the tree, one run at a time, and runs each suite in every engine
+the Playwright store carries (Chromium, Firefox and WebKit), each in a
+fresh world with its results named by the engine; `--engine NAME` narrows
+it, and a suite that needs Chromium's own protocol says
+`// engines: chromium` at its head and is said skipped in the others. A project whose settings name a
 **test node** (picked in its Build and test section) sends `aerie tests run`, `aerie dashboard test`
 and the gate's suites there as a job, the tree snapshotted and the lines
 streamed back. Its discipline is the house rule

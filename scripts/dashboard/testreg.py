@@ -108,11 +108,13 @@ def _project(d, project):
 # wall time wherever they exist and the registry has to be able to say so; a
 # parser that only knows the two statuses one runner happens to print is a
 # parser that has to be rewritten the day a test is skipped.
-BANNER = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+) ==\s*$")
+# ...with the engine it ran in, [chromium], since every suite runs in each
+# (R263 step 5); its results outside Chromium carry the engine in their names.
+BANNER = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+)(?: \[\w+\])? ==\s*$")
 # A file run again, alone, after it failed in the whole run (B124). Its lines
 # are not recorded: the run's own timings are the ones worth keeping, and
 # the second copy of a file's roster would read as every test doubled.
-RETRY = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+) again ==\s*$")
+RETRY = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+)(?: \[\w+\])? again ==\s*$")
 RESULT = re.compile(r"^(PASS|FAIL|SKIP|TODO)\s+(?:\[\+([0-9.]+)s\]\s+)?(.+?)\s*$")
 FILETOT = re.compile(r"^(\d+) passed, (\d+) failed(?: in ([0-9.]+)s)?\s*$")
 STATUS = {"PASS": "pass", "FAIL": "fail", "SKIP": "skip", "TODO": "todo"}

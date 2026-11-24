@@ -5,13 +5,15 @@
 // markup changes on purpose (a Revert, a draft drawn, a section opened by an
 // address) still lands. Each rule is held on a scratch element of the real
 // page, with markup written here.
-import { URL, launch, newPage, ok, done, ready, section } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, section, ENGINE, skip } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
-const cdp = await page.context().newCDPSession(page);
+// An IME composition is typed through Chromium's own Input protocol; in
+// the other engines the field's focus, value and caret are held without it.
+const cdp = ENGINE === 'chromium' ? await page.context().newCDPSession(page) : null;
 
 // A scratch element on the page, drawn once with `html`; what each part then
 // does is its own.
@@ -38,7 +40,8 @@ await section("the same markup is no change, and a change keeps the elements it 
 await section("typing, its caret and a composition outlive a redraw", async () => {
   await fresh('<div class="field"><input type="text" data-k="name" value="old"></div><span>3 running</span>');
   await page.evaluate(() => { const f = document.querySelector('#r244 input'); f.focus(); f.value = 'abcd'; f.setSelectionRange(2, 2); });
-  await cdp.send('Input.imeSetComposition', { text: 'か', selectionStart: 1, selectionEnd: 1 });
+  if (cdp) await cdp.send('Input.imeSetComposition', { text: 'か', selectionStart: 1, selectionEnd: 1 });
+  else skip('a composition outlives a redraw', "an IME composition is typed through Chromium's Input protocol");
   const r = await page.evaluate(() => {
     const el = document.querySelector('#r244'), f = el.querySelector('input');
     let ended = 0; f.addEventListener('compositionend', () => ended++); f.addEventListener('blur', () => ended++);
@@ -46,7 +49,7 @@ await section("typing, its caret and a composition outlive a redraw", async () =
     return { kept: el.querySelector('input') === f, focus: document.activeElement === f, value: f.value, caret: f.selectionStart,
              ended, text: el.querySelector('span').textContent };
   });
-  await cdp.send('Input.insertText', { text: '' });
+  if (cdp) await cdp.send('Input.insertText', { text: '' });
   ok(r.kept && r.focus && /^abか?cd$/.test(r.value) && r.caret >= 2 && r.caret <= 3 && r.ended === 0 && r.text === '4 running',
      `the field is kept with its focus, its value, its caret and its composition while the rest moves (${JSON.stringify(r)})`);
   const back = await page.evaluate(() => {

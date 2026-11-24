@@ -3270,7 +3270,8 @@ await section("a project on several nodes", async () => {
       await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
       await page.waitForFunction(() => !document.getElementById('rmModal')?.hidden && !!document.querySelector('#resumemenu [data-rmclose]'), null, { timeout: 10000 }).catch(() => {});
       if (how === 'close') await page.click('#resumemenu [data-rmclose]');
-      else if (how === 'backdrop') await page.mouse.click(4, 860);
+      // Inside the page: a press below its 800px is no press in Firefox.
+      else if (how === 'backdrop') await page.mouse.click(4, desk.height - 40);
       else await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.getElementById('rmModal')?.hidden && !document.getElementById('resumemenu'), null, { timeout: 5000 }).catch(() => {});
       away[how] = await page.evaluate(() => !!document.getElementById('rmModal')?.hidden && !document.getElementById('resumemenu') && resumeFor === null);

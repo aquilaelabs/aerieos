@@ -1,5 +1,6 @@
 // Real touch through Chromium's gesture recognizer: the dock's line under a
 // finger, and pull to refresh.
+// engines: chromium: a real touch through Chromium's gesture recognizer (finger)
 import { launch, newPage, ok, done, finger, settled, URL, section } from './lib.mjs';
 
 const browser = await launch();

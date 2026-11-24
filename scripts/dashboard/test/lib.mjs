@@ -12,7 +12,13 @@ import { execFileSync } from 'child_process';
 // require, not import: ESM resolution ignores NODE_PATH, and the image's
 // Playwright is a global install (/usr/lib/node_modules), not a dependency
 // of this directory. CJS resolution honors NODE_PATH, which run.sh sets.
-const { chromium } = createRequire(import.meta.url)('playwright');
+const playwright = createRequire(import.meta.url)('playwright');
+const { chromium } = playwright;
+// Which engine this run of the suite is in (R263 step 5, the operator, 23
+// Nov: every suite in all three): run.sh runs each suite once per engine the
+// store carries and says which here. Chromium unless told.
+export const ENGINE = process.env.DASHBOARD_TEST_ENGINE || 'chromium';
+if (!playwright[ENGINE]) throw new Error(`no Playwright engine called ${ENGINE}`);
 
 // run.sh hands the URL over; the port in it is picked per run, so there is no
 // default worth having: a hardcoded one would run the suite against whatever
@@ -35,7 +41,9 @@ let lastAt = startedAt;
 export const ok = (cond, name) => {
   const gap = TIMING ? `[+${((Date.now() - lastAt) / 1000).toFixed(1)}s] ` : '';
   lastAt = Date.now();
-  console.log((cond ? 'PASS' : 'FAIL') + '  ' + gap + name);
+  // Named by its engine outside Chromium, so a result, a flake and a
+  // failure in one engine are told apart from the same check in another.
+  console.log((cond ? 'PASS' : 'FAIL') + '  ' + gap + (ENGINE === 'chromium' ? '' : `[${ENGINE}] `) + name);
   cond ? pass++ : fail++;
 };
 // What a lab suite walked, for the lab's own record (R3 step 8): one line
@@ -44,6 +52,9 @@ export const ok = (cond, name) => {
 // subject's first check). `aerie tests lab` reads these lines off the run and
 // keeps each, dated, in scripts/dashboard/lab-record.json, which the vetted
 // lines are read from.
+// A check this engine cannot make (R263 step 6): said as skipped, with why,
+// never passed. The register reads SKIP lines as their own status.
+export const skip = (name, why) => console.log(`SKIP  ${ENGINE === 'chromium' ? '' : `[${ENGINE}] `}${name}: ${why}`);
 export const failed = () => fail;
 export const record = (suite, subject, said, since = 0) => {
   if (fail > since) return false;
@@ -170,7 +181,18 @@ export async function closePage(p){
   await p.close();
 }
 
-export const launch = () => chromium.launch({ executablePath: CHROME });
+// The engine's browser; Chromium's is the store's binary run.sh found, the
+// others Playwright's own from the store (PLAYWRIGHT_BROWSERS_PATH). Firefox
+// takes no isMobile, so a context asked for one there is made without it
+// (a phone's size, touch and density still hold).
+export const launch = async () => {
+  const b = ENGINE === 'chromium' ? await chromium.launch({ executablePath: CHROME }) : await playwright[ENGINE].launch();
+  if (ENGINE === 'firefox'){
+    const made = b.newContext.bind(b);
+    b.newContext = (o = {}) => { const { isMobile, ...rest } = o; return made(rest); };
+  }
+  return b;
+};
 
 // A page with the test credentials, console errors collected on page.errors,
 // and dialogs auto-accepted (recorded on page.dialogs): the confirmations
@@ -363,7 +385,14 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     if (m.type() !== 'error') return;
     const url = m.location()?.url || '';
     if (url.includes('/term') || cutByNet(m.text())) return;
-    page.errors.push(url ? `${m.text()} [${url.replace(/^https?:\/\/[^/]+/, '')}]` : m.text());
+    const at = url ? ` [${url.replace(/^https?:\/\/[^/]+/, '')}]` : '';
+    // Firefox and WebKit write an Error logged whole as JSHandle@object:
+    // its name and message are read off it, so the failure says what it was
+    // (R263). Its place in the list is taken at once, filled when read.
+    if (!/JSHandle@/.test(m.text())){ page.errors.push(m.text() + at); return; }
+    const i = page.errors.push(m.text() + at) - 1;
+    Promise.all(m.args().map(a => a.evaluate(v => v instanceof Error ? `${v.name}: ${v.message}` : typeof v === 'object' ? JSON.stringify(v) : String(v)).catch(() => '?')))
+      .then(parts => { const said = parts.join(' '); if (!cutByNet(said)) page.errors[i] = said + at; }).catch(() => {});
   });
   // ...and a name the cut script would have defined, missed right after it.
   page.on('pageerror', e => {
@@ -768,7 +797,10 @@ export const ready = page => page.waitForFunction(() => {
 
 // A real touch gesture through Chromium's gesture recognizer (not synthetic
 // pointer events): down at (x,y), optional hold, glide to (x2,y2), lift.
+// Chromium's own protocol: a suite using it says `// engines: chromium` at
+// its head, and the runner skips it elsewhere, saying so.
 export async function finger(page, x, y, x2, y2, holdMs){
+  if (ENGINE !== 'chromium') throw new Error(`finger() is Chromium's real touch, and this is ${ENGINE}: say "// engines: chromium" at the suite's head`);
   const cdp = await page.context().newCDPSession(page);
   const touch = (type, tx, ty) =>
     cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: tx, y: ty }] });

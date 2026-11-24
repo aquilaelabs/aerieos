@@ -766,11 +766,15 @@ aerie pc [VERB] [--why "..."]
 aerie doctor          check everything that usually goes wrong
 
 # developing AerieOS itself, from inside it
-aerie dashboard test [SUITE...] [--at REF] [--loaded]  browser-test the dashboard from
-                   this checkout, isolated; --at runs a commit as it was (git archive, not the
-                   working tree); --loaded runs one suite beside a whole run's load, the gate's
-                   workers taking the longest of the rest, so a suite that fails only in a gate
-                   fails on demand
+aerie dashboard test [SUITE...] [--at REF] [--loaded] [--engine NAME]  browser-test the dashboard
+                   from this checkout, isolated, each suite in every engine the store carries
+                   (Chromium, Firefox, WebKit: aerie capture browsers), each engine a fresh world
+                   and its results named by it; --engine (again for more, or BB_TEST_ENGINES)
+                   narrows, and a suite that needs Chromium's own protocol says so at its head and
+                   is said skipped in the others; --at runs a commit as it was (git archive, not
+                   the working tree); --loaded runs one suite beside a whole run's load, the
+                   gate's workers taking the longest of the rest, so a suite that fails only in a
+                   gate fails on demand; aerie tests probe FILE takes --engine the same way
 aerie dashboard dev   serve the live dashboard from ./scripts/dashboard (--off reverts)
 aerie dashboard status  which copy of the dashboard is serving
 aerie dashboard trace [SECONDS]  what the dashboard was asked over the last SECONDS, by endpoint and who asked, with how long each took
@@ -2862,11 +2866,16 @@ cmd_tests() {
     # runs it against a kept fixture when one is up.
     if [ "${1:-}" = probe ]; then
         shift
-        [ $# -gt 0 ] || die "aerie tests probe FILE.mjs [FILE...]: a script that imports './lib.mjs' and drives the fixture; after aerie tests keep it attaches to the fixture that is up"
+        [ $# -gt 0 ] || die "aerie tests probe FILE.mjs [FILE...] [--engine NAME]: a script that imports './lib.mjs' and drives the fixture, in every engine the store carries or the ones named; after aerie tests keep it attaches to the fixture that is up"
         local f files=()
-        for f in "$@"; do
-            [ -f "$f" ] || die "no such file: $f"
-            files+=("$(readlink -f "$f")")
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                # Which engines, as the runner takes them (R263 step 5).
+                --engine)   files+=("$1" "${2:-}"); shift 2; continue ;;
+                --engine=*) files+=("$1"); shift; continue ;;
+            esac
+            [ -f "$1" ] || die "no such file: $1"
+            files+=("$(readlink -f "$1")"); shift
         done
         cmd_dashboard test "${files[@]}"
         return
@@ -5504,6 +5513,7 @@ capture_shot() {
     # should not re-implement the search to get it.
     if [ "${1:-}" = --print-chromium ]; then find_chromium; printf '\n'; return 0; fi
     if [ "${1:-}" = --print-node-path ]; then pw_node_path; printf '\n'; return 0; fi
+    if [ "${1:-}" = --print-browsers-path ]; then pw_browsers_path; printf '\n'; return 0; fi
     while [ $# -gt 0 ]; do
         case "$1" in
             --auth)   auth="$2"; trust=named; shift 2 ;;

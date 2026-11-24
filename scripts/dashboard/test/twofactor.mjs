@@ -4,7 +4,7 @@
 // its password alone opens nothing, Basic auth included; the bell asks an
 // account with none to add one; a role can require it, and an account in
 // that role meets the setup page before anything else; wrong codes are held.
-import { launch, ok, done, URL, DIR, OWNER as owner, aerie } from './lib.mjs';
+import { launch, ok, done, URL, DIR, OWNER as owner, aerie, ENGINE, skip } from './lib.mjs';
 import { createHmac } from 'node:crypto';
 
 const BASE = URL.replace(/\/$/, '');
@@ -118,38 +118,43 @@ const dev2 = await fetch(BASE + '/api/v1/device/signin', { method: 'POST', heade
 ok(dev2.ok && (await dev2.json()).token, '...and signs in with it');
 
 // ---- a passkey: added on Profile, used to sign in -----------------------
-// WebAuthn takes no IP address for its site, so this part is on localhost.
-const LOCAL = BASE.replace('127.0.0.1', 'localhost');
-({ ctx, page } = await signIn('twofa', 'twofapass11', { host: LOCAL }));
-await page.fill('#c', codes[2]);
-await Promise.all([page.waitForNavigation().catch(() => {}), page.click('button[type=submit]')]);
-await inDashboard(page);
-const cdp = await ctx.newCDPSession(page);
-await cdp.send('WebAuthn.enable');
-const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: {
-  protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
-await page.evaluate(() => openProfileTwoFactor());
-await page.waitForSelector('.doc [data-tf="passkey-add"]', { timeout: 20000 });
-await page.click('.doc [data-tf="passkey-add"]');
-await page.waitForSelector('.modal:not([hidden]) input', { timeout: 15000 });
-await page.fill('.modal:not([hidden]) input', 'suite key');
-await page.click('.modal:not([hidden]) button:has-text("Save")');
-await page.waitForFunction(() => (profile?.two_factor?.passkeys || []).some(k => k.name === 'suite key'), null, { timeout: 15000 });
-ok(true, 'a passkey is added on Profile by name');
-const { credentials } = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
-await ctx.close();
+// A virtual authenticator is Chromium's own protocol: the other engines
+// say this part skipped (R263 step 6).
+if (ENGINE !== 'chromium') skip('a passkey added on Profile signs in at the second step', "a virtual authenticator is Chromium's protocol");
+else {
+  // WebAuthn takes no IP address for its site, so this part is on localhost.
+  const LOCAL = BASE.replace('127.0.0.1', 'localhost');
+  ({ ctx, page } = await signIn('twofa', 'twofapass11', { host: LOCAL }));
+  await page.fill('#c', codes[2]);
+  await Promise.all([page.waitForNavigation().catch(() => {}), page.click('button[type=submit]')]);
+  await inDashboard(page);
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: {
+    protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
+  await page.evaluate(() => openProfileTwoFactor());
+  await page.waitForSelector('.doc [data-tf="passkey-add"]', { timeout: 20000 });
+  await page.click('.doc [data-tf="passkey-add"]');
+  await page.waitForSelector('.modal:not([hidden]) input', { timeout: 15000 });
+  await page.fill('.modal:not([hidden]) input', 'suite key');
+  await page.click('.modal:not([hidden]) button:has-text("Save")');
+  await page.waitForFunction(() => (profile?.two_factor?.passkeys || []).some(k => k.name === 'suite key'), null, { timeout: 15000 });
+  ok(true, 'a passkey is added on Profile by name');
+  const { credentials } = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
+  await ctx.close();
 
-({ ctx, page } = await signIn('twofa', 'twofapass11', { host: LOCAL }));
-const cdp2 = await ctx.newCDPSession(page);
-await cdp2.send('WebAuthn.enable');
-const a2 = (await cdp2.send('WebAuthn.addVirtualAuthenticator', { options: {
-  protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } })).authenticatorId;
-for (const c of credentials) await cdp2.send('WebAuthn.addCredential', { authenticatorId: a2, credential: c });
-await page.reload();
-await page.waitForSelector('#pk:not([hidden])', { timeout: 10000 });
-await Promise.all([page.waitForNavigation().catch(() => {}), page.click('#pk')]);
-ok(await inDashboard(page), 'the passkey signs in at the second step');
-await ctx.close();
+  ({ ctx, page } = await signIn('twofa', 'twofapass11', { host: LOCAL }));
+  const cdp2 = await ctx.newCDPSession(page);
+  await cdp2.send('WebAuthn.enable');
+  const a2 = (await cdp2.send('WebAuthn.addVirtualAuthenticator', { options: {
+    protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } })).authenticatorId;
+  for (const c of credentials) await cdp2.send('WebAuthn.addCredential', { authenticatorId: a2, credential: c });
+  await page.reload();
+  await page.waitForSelector('#pk:not([hidden])', { timeout: 10000 });
+  await Promise.all([page.waitForNavigation().catch(() => {}), page.click('#pk')]);
+  ok(await inDashboard(page), 'the passkey signs in at the second step');
+  await ctx.close();
+}
 
 // ---- a role that requires it -------------------------------------------
 await api('/api/roles', owner, { action: 'set', name: 'twofa-role', scope: 'global', perms: {}, note: 'needs a second factor' });

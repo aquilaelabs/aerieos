@@ -6,7 +6,7 @@
 // is locked), a passkey that answers PRF holds it too where this Chrome's
 // virtual authenticator does PRF, and Give the key back moves it under the
 // install key again.
-import { URL as BASE, launch, newPage, done, ok, settled, patience } from './lib.mjs';
+import { URL as BASE, launch, newPage, done, ok, settled, patience, ENGINE, skip } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser);
@@ -64,11 +64,13 @@ ok(uses.some(u => u.why === 'unlocked') && uses.some(u => u.why === 'locked'), `
 const back = await keys({ action: 'own-back' });
 ok(back.ok === true && (await keys({ action: 'mine' })).own === false, 'Give the key back moves it under the install key again');
 
-// A passkey that answers PRF, where this Chrome's virtual authenticator does.
-const cdp = await page.context().newCDPSession(page);
-await cdp.send('WebAuthn.enable');
+// A passkey that answers PRF, where this Chrome's virtual authenticator does:
+// Chromium's own protocol, so said skipped in the other engines.
 let prfOk = false;
-try {
+if (ENGINE !== 'chromium') skip('a passkey that answers PRF holds the key', "a virtual authenticator is Chromium's protocol");
+else try {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
   await cdp.send('WebAuthn.addVirtualAuthenticator', { options: {
     protocol: 'ctap2', ctap2Version: 'ctap2_1', transport: 'internal', hasResidentKey: true, hasUserVerification: true,
     isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true } });
