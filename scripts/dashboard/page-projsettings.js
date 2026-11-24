@@ -182,7 +182,9 @@ function rnLockSettings(p){
   const locked = p?.may_settings === false;
   document.querySelectorAll("details.rngroup").forEach(d => {
     const k = (d.dataset.sect || "").replace(/^rn:/, "");
-    if (["yours", "snapshots", "sessions"].includes(k)) return;
+    // Repository is each person's own token and its owner's link, each
+    // gated where it is drawn (R275), not Space settings'.
+    if (["yours", "snapshots", "sessions", "repo"].includes(k)) return;
     const body = d.querySelector(":scope > .body");
     if (!body) return;
     body.querySelector(":scope > .rnlocked")?.remove();
@@ -952,7 +954,7 @@ function renameProject(name, mode = "all"){
   // a button to a dialog, over an empty page).
   const how = p?.push_how || "";
   const linked = !proj && !!p?.linked;
-  $("rnTokenField").hidden = !linked || !(p?.has_token || p?.push);
+  $("rnTokenField").hidden = !linked || !(p?.has_token || p?.push) || state?.can?.["git-auth"] === false;
   // The deploy-key case is tested FIRST and stays true after a token is set:
   // storing one does not change what git uses (git never asks a credential
   // helper about an ssh remote), and a hint that stopped saying so the moment

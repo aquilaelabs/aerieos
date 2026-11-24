@@ -1691,6 +1691,24 @@ await section("the Profile tab", async () => {
         const read = await post(adminAuth, '/api/project-auth', { name: 'alpha' });
         const mine = await post(ownerAuth, '/api/project-auth', { name: 'alpha' });
         await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: [] });
+        // ...while somebody on the space whose role gives Git authentication
+        // and not Space settings reads the section and gives or takes back
+        // their own token there.
+        await post(ownerAuth, '/api/users', { action: 'add', name: 'gitonly.one', password: 'gitonlypw11', role: 'user' });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'gitonly.one', projects: ['alpha'] });
+        await post(ownerAuth, '/api/roles', { action: 'set', name: 'gitonly-role', scope: 'projects', perms: { projects: 'write', gitauth: 'write' } });
+        await post(ownerAuth, '/api/roles', { action: 'assign', name: 'gitonly.one', project_roles: { alpha: ['gitonly-role'] } });
+        const plainAuth = { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('gitonly.one:gitonlypw11').toString('base64') };
+        const plain = {
+          read: await post(plainAuth, '/api/project-auth', { name: 'alpha' }),
+          own: await post(plainAuth, '/api/rename', { name: 'alpha', to: 'alpha', unlink_mine: true }),
+          rename: await post(plainAuth, '/api/rename', { name: 'alpha', to: 'alpha renamed' }),
+          link: await post(plainAuth, '/api/rename', { name: 'alpha', to: 'alpha', auth: 'none' }),
+        };
+        ok(plain.read.status === 200 && plain.read.body.owner?.me === false
+           && plain.own.status === 400 && /you have not given this space a token/.test(plain.own.body.error || '')
+           && plain.rename.status === 403 && plain.link.status === 403,
+           `somebody whose role gives Git authentication and not Space settings reads Repository and manages their own token there, and is refused a rename and the link (${Object.entries(plain).map(([k, r]) => `${k} ${r.status}`).join(', ')}: ${(plain.own.body.error || '').slice(0, 80)})`);
         const refused = Object.entries(tries).filter(([, r]) => !(r.status === 403 && /its owner's to change/.test(r.body.error || ''))).map(([k, r]) => `${k} ${r.status}`);
         ok(!refused.length && read.status === 200 && read.body.owner?.me === false && read.body.owner?.name
            && mine.body.owner?.me === true,

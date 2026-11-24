@@ -13891,7 +13891,15 @@ class Handler(BaseHTTPRequestHandler):
         # their list was explicit (R135), where it is simply not a project.
         if self._not_project(name):
             return
-        if self._refused("rename", name):
+        # A person's own token, given, replaced or taken back, is theirs on
+        # any space they may hold git credentials on (git-auth): renaming
+        # is Space settings' (the operator, 23 Nov: everybody pushes with
+        # their own token, which a read-only Settings view had refused).
+        shown = registry.clean_name(field(req, "to"))
+        if shown and shown != registry.label(name):
+            if self._refused("rename", name):
+                return
+        elif self._refused("git-auth", name):
             return
         # The remote's address, its authentication and a token kept as the
         # space's own are its owner's; a person's own token is theirs.
@@ -13918,9 +13926,11 @@ class Handler(BaseHTTPRequestHandler):
         """What credential this project's remote uses, and what else it
         could: projects.auth_answer."""
         name = field(req, "name")
-        # The rename dialog's question, about a project this account sees
-        # (B175): it says how the project's remote authenticates.
-        if self._not_project(name) or self._refused("rename", name):
+        # The Repository section's question, about a project this account
+        # sees (B175): it says how the project's remote authenticates, to
+        # anybody who may hold git credentials there, since each gives their
+        # own token (R275); its owner's controls are gated where they write.
+        if self._not_project(name) or self._refused("git-auth", name):
             return None
         # Test (the operator, 7 Oct): a read and a dry-run push with what it
         # authenticates with, or with a token typed and not saved yet.
