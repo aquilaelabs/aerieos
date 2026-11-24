@@ -26,6 +26,7 @@
 - A space's git host settings no longer list the token it uses a second time as another to use instead (bf3b7c3)
 - A list narrowed by a chip no longer draws rows over each other while it changes: what leaves goes first, then what stays slides, then what arrives fades in (f440cd4)
 - On a phone in Safari a toast over a dialog sits just above its buttons, where it floated 16px above them (26f9850)
+- On Safari a read the controller does not answer is said in those words, where it said Fetch is aborted (743a9e8)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
