@@ -200,6 +200,35 @@ def give_backup_dir(top, acct):
         log(f"the backup folder on {top} could not be given to the controller's account: {e}")
 
 
+def pool_guid(zpool, name):
+    """The pool's own number (its guid, what zpool import lists as its id),
+    or "": what an import is kept by, so the minute pass imports that pool
+    and never another of the same name (B857)."""
+    got = _out([zpool, "get", "-H", "-o", "value", "guid", name], timeout=30).strip()
+    return got if re.fullmatch(r"\d{1,24}", got) else ""
+
+
+def mount_under(say, run, zfs, pool, root):
+    """Each dataset of `pool` mounted where its mountpoint is under `root`,
+    and one whose mountpoint is elsewhere said and left: a pool's
+    mountpoints are its disks' to say, and `zfs mount -a` mounted one saying
+    /etc there (B857). The first exit code that was not 0, or 0."""
+    listed = _out([zfs, "list", "-H", "-r", "-t", "filesystem", "-o", "name,mountpoint,canmount,mounted", pool], timeout=60)
+    worst = 0
+    for line in listed.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 4:
+            continue
+        name, mp, canmount, mounted = parts
+        if canmount == "off" or mp in ("none", "legacy", "-") or mounted == "yes":
+            continue
+        if mp.startswith(root.rstrip("/") + "/"):
+            worst = worst or run([zfs, "mount", name])
+        else:
+            say(f"{name} is not mounted: its mountpoint {mp[:80]} is outside {root}\n")
+    return worst
+
+
 def import_argv(zpool, name, pid, force=False):
     """A pool imported as it is: never upgraded, its mountpoints under /mnt,
     kept out of zpool.cache (the minute pass imports it again). Not by force
@@ -308,12 +337,12 @@ class PoolsMixin:
         if mp.startswith(MOUNT_ROOT + "/"):
             say(f"{name} mounts at {mp}: this machine's own pool from before, back where it was and imported at every boot\n")
             self._sh(job, [zpool, "set", "cachefile=", name], timeout=60)
-            return self._sh(job, [zfs, "mount", "-a"], timeout=600)
+            return mount_under(say, lambda argv: self._sh(job, argv, timeout=600), zfs, name, MOUNT_ROOT)
         say(f"{name} mounts at {mp or 'its own place'}: another machine's, imported again under {MOUNT_ROOT}\n")
         self._sh(job, [zpool, "export", name], timeout=600)
         rc = self._sh(job, import_argv(zpool, name, pid, force=True), timeout=600)
         if rc == 0:
-            _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid}])
+            _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid or pool_guid(zpool, name)}])
         return rc
 
     def backup_dirs_pass(self):
@@ -338,15 +367,19 @@ class PoolsMixin:
 
     def pools_pass(self):
         """Once a minute: a pool imported from another machine that is not
-        imported now (after a reboot) imported again, as it was."""
+        imported now (after a reboot) imported again, as it was: by its own
+        number, never by a name another pool plugged in could carry, and
+        never forced (B857). This machine's host id is pinned (pin_hostid),
+        and a pool it imported is its own to import again without force."""
         rows = _imported()
         zpool = shutil.which("zpool")
         if not rows or not zpool or os.geteuid() != 0:
             return
         have = {p["name"] for p in pools_now()}
         for x in rows:
-            if x["name"] not in have:
-                subprocess.run(import_argv(zpool, x["name"], str(x.get("id") or ""), force=True), capture_output=True, timeout=120, check=False)
+            pid = str(x.get("id") or "")
+            if x["name"] not in have and re.fullmatch(r"\d{1,24}", pid):
+                subprocess.run(import_argv(zpool, x["name"], pid), capture_output=True, timeout=120, check=False)
 
     def _apply_storage_snapshot(self, job, cfg):
         say = job.say
@@ -542,7 +575,7 @@ class PoolsMixin:
                 say(f"pool import {name}: as it is, never upgraded, its datasets under {MOUNT_ROOT}; a pool another machine did not export is refused, not forced\n")
                 rc = self._sh(job, import_argv(zpool, name, pid), timeout=600)
                 if rc == 0:
-                    _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid}])
+                    _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid or pool_guid(zpool, name)}])
         else:
             if name not in have:
                 say(f"refused: no pool called {name} here\n")
@@ -552,5 +585,8 @@ class PoolsMixin:
                 return "failed", 64
             say(f"pool destroy {name}: everything on it is gone\n")
             rc = self._sh(job, [zpool, "destroy", "-f", name], timeout=600)
+            # ...and no longer one to import again (B857).
+            if rc == 0 and any(x["name"] == name for x in _imported()):
+                _imported_set([x for x in _imported() if x["name"] != name])
         self.hello_again(f"the pool {name}: {action}")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)

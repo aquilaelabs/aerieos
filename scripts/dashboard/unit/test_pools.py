@@ -157,12 +157,28 @@ class TheAgent(unittest.TestCase):
                  mock.patch.object(self.pm.os, "geteuid", return_value=0), mock.patch.object(self.pm.subprocess, "run") as run:
                 self.A().pools_pass()
             self.assertEqual(run.call_args[0][0][-2:], ["1234567890", "nas"])
-            self.assertIn("-f", run.call_args[0][0], "this machine had it before, and each image has its own host id")
+            # Never forced (B857): this machine's host id is pinned, and a
+            # pool another machine has now is never taken from it.
+            self.assertNotIn("-f", run.call_args[0][0])
+            # ...and only by its number: a row with none is a name another
+            # pool plugged in could carry, and is left.
+            with open(rec, "w") as f:
+                json.dump([{"name": "nas", "id": ""}], f)
+            with mock.patch.object(self.pm, "pools_now", return_value=[]), mock.patch.object(self.pm.shutil, "which", return_value="/usr/sbin/zpool"), \
+                 mock.patch.object(self.pm.os, "geteuid", return_value=0), mock.patch.object(self.pm.subprocess, "run") as run:
+                self.A().pools_pass()
+            self.assertFalse(run.called)
             state, code, text = self.run_job({"pool": "import", "name": "tank"})
             self.assertIn("is here already", text)
             with open(rec, "w") as f:
                 json.dump([{"name": "nas", "id": "1"}, {"name": "tank", "id": "2"}], f)
             self.run_job({"pool": "export", "name": "tank"})
+            with open(rec) as f:
+                self.assertEqual([x["name"] for x in json.load(f)], ["nas"])
+            # A pool destroyed is no longer one to import again.
+            with open(rec, "w") as f:
+                json.dump([{"name": "nas", "id": "1"}, {"name": "tank", "id": "2"}], f)
+            self.run_job({"pool": "destroy", "name": "tank", "confirm": "tank"})
             with open(rec) as f:
                 self.assertEqual([x["name"] for x in json.load(f)], ["nas"])
 
@@ -181,6 +197,8 @@ class TheAgent(unittest.TestCase):
         real = self.fake_out
 
         def out(argv, timeout=60):
+            if argv[1:2] == ["list"]:
+                return "old\t/mnt/old\ton\tno\nold/x\t/etc\ton\tno\n"
             return "/mnt/old\n" if argv[1:3] == ["get", "-H"] else real(argv, timeout)
         self.fake_out = out
         with mock.patch.object(self.pm, "pools_now", return_value=[]):
@@ -189,6 +207,10 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(self.ran[0], ["/usr/sbin/zpool", "import", "-f", "-N", "-o", "cachefile=none", "42", "old"])
         self.assertIn(["/usr/sbin/zpool", "set", "cachefile=", "old"], self.ran)
         self.assertFalse([a for a in self.ran if "upgrade" in a or "altroot=/mnt" in a], "never upgraded, and back where it was")
+        # Its datasets mounted only under /mnt, never all at once (B857).
+        mounts = [a[-1] for a in self.ran if a[1:2] == ["mount"]]
+        self.assertEqual(mounts, ["old"])
+        self.assertIn("old/x is not mounted: its mountpoint /etc is outside /mnt", text)
 
     def test_a_mirror_is_made_of_disks_that_hold_nothing_by_their_links(self):
         state, code, text = self.run_job({"pool": "create", "name": "data", "layout": "mirror", "disks": ["sdb", "sdc"]})
