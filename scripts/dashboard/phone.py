@@ -1948,6 +1948,14 @@ def verb(action, req, who, fresh):
         if not proj or (not who.get("session") and not users.may_see(who, proj)):
             return {"error": "which space's phone?"}, 400
         op = field(req, "op")
+        # A person drives a lent phone only as its owner: anybody else who
+        # sees the space reads its status, and the rest is its owner's Allow
+        # on a session's ask (R277, the audit of 24 Nov: seeing the space
+        # drove the phone somebody lent it, with nobody asked).
+        if not who.get("session") and op != "status":
+            lnid, _got = leasing.leased_to(proj)
+            if not lnid or (_rec(lnid) or {}).get("owner") != uid:
+                return {"error": "a lent phone is driven by its owner, or by a session on its Allow"}, 403
         if op == "status" or not who.get("session"):
             # A touch beyond the lease's apps (anyapp) is only ever its
             # owner's Allow on a session's ask, never asked for directly.

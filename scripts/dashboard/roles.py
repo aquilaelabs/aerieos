@@ -34,7 +34,8 @@ NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
 # administrator gives. Each sentence is what the Roles tab shows.
 AREAS = (
     ("projects", "Spaces", "project", "its notebook and code", "an agent's session, edits, builds and tests"),
-    ("settings", "Space settings", "project", "the settings", "change them, lock, rename and delete"),
+    # Locking is its owner's or an administrator's (R119), never this area's.
+    ("settings", "Space settings", "project", "the settings", "change them, rename and delete"),
     ("releases", "Releases and versions", "project", "versions and releases", "move the version and release"),
     ("gitauth", "Git authentication", "project", "how it authenticates", "change the credential"),
     ("files", "File access", "project", "the files over FTP or in an editor", "save, upload, rename and delete them"),
@@ -104,6 +105,25 @@ CAP_AREA = {
     "nodes-write": ("nodes", "write"), "containers-read": ("containers", "read"),
     "vms-write": ("vms", "write"), "vms-read": ("vms", "read"),
     "settings": ("settings", "write"), "signing": ("releases", "write"),
+    # A container written on the Containers page for no space: every space's
+    # at once, so an Everywhere role's (R277, the audit of 24 Nov).
+    "docker-any": ("containers", "write"),
+    # One space's containers, their state and their logs: Containers Read
+    # on that space, as the area's sentence says.
+    "docker-read": ("containers", "read"),
+    # A repository in the bin whose space is gone: no space's, so Space
+    # settings Write held Everywhere (R277).
+    "trash-any": ("settings", "write"),
+    # A shell on no space (the workspace's, a scratch one): every space's
+    # trees at once, so Terminal Write held Everywhere (R277).
+    "terminal-any": ("terminal", "write"),
+    # The Nodes page and what is read with it (a node's router, the scanners):
+    # Nodes Read, on the node where one is named (R277: an action no table
+    # named fell to Spaces Write held anywhere).
+    "nodes-read": ("nodes", "read"),
+    # The CI runner page, read: CI runner Read (R277: the page was drawn on
+    # Write alone, though the runners readable were served).
+    "runner-read": ("runner", "read"),
 }
 
 _ALL = {a: "write" for a in AREA_KEYS}
@@ -453,7 +473,7 @@ def level_of(u, area, project=None, on_project=None, node=None, everywhere=False
 
 # Actions over every project at once (the daemon's whole container list):
 # a role held on one project is no grant of them; an Everywhere role is.
-EVERYWHERE_ONLY = frozenset({"containers-read"})
+EVERYWHERE_ONLY = frozenset({"containers-read", "docker-any", "trash-any", "terminal-any"})
 
 
 def granted(u, action, project=None, on_project=None, node=None, nodes_of=None, instance=None):

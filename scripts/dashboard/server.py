@@ -5357,6 +5357,11 @@ phone.release_signer = _release_signer
 DIALS = {"release": ("release it", "Tag and publish a release"),
          "sign": ("sign its builds", "Sign a build"),
          "keys": ("manage its signing keys", "Manage signing keys")}
+# The grant each dial stands for, which the session's account must hold as
+# well: the dial says what a session may do on its own, the roles what its
+# person may do at all (R277, the audit of 24 Nov: a session released on a
+# dial set to auto for an account with no Releases Write).
+DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing"}
 
 # The changes to a published release, by /api/version's action
 # (_release_change). `does` is the word a session on another space is refused
@@ -6494,7 +6499,7 @@ def _snapshot(who):
                 ("terminal", "docker-write", "vms-write", "toolchains-write", "curate", "configure", "git-auth", "admin",
                  # The CI runner tab, a job run and a project's node, by
                  # grant (R137 step 3): the Tools card hides CI runner on it.
-                 "runner", "jobs", "node",
+                 "runner", "runner-read", "jobs", "node",
                  # ...and what the sidebar and the dialogs offer (step 4):
                  # drawn from the same grants the server refuses on.
                  "lock", "rename", "trash", "version", "create", "command-pin",
@@ -6507,6 +6512,9 @@ def _snapshot(who):
                # ...and what other projects a session may read: the owner's
                # alone (the operator, 6 Oct), whatever the grants say.
                | {"reads": (who or {}).get("role") == "owner",
+                  # ...and a new node or VM, Nodes Write on every node, which
+                  # the Machines header's two buttons are drawn on (R277).
+                  "nodes-new": bool(who) and not users.may_instance(who, "nodes-write", ""),
                   # ...and maintenance mode, the owner's alone, a session of
                   # theirs counting as them.
                   "maintenance": users.is_owner(who)},
@@ -7246,19 +7254,23 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": f"not a space: {name}" if name else "not a space"}, 400)
         return True
 
-    def _project_asked(self, req=None, *, query=None, write=False):
+    def _project_asked(self, req=None, *, query=None, write=False, files=False):
         """The project a request names, or None with the refusal already
         written: the opening of every handler that works on one project.
         The name is the body's `project` field when a body is given, the
         query's otherwise (`query` when the handler has parsed it already).
         It is refused by _not_project when it is not a project this account
-        sees and, for a `write`, by _readonly after that, in that order,
-        which is the order a person hears the two in."""
+        sees, for a read by Spaces Read on it (its notebook and code, as the
+        area says: R277, the audit of 24 Nov, where being on the space's list
+        through any role read them) and for a `write` by _readonly, in that
+        order, which is the order a person hears them in. The files (the
+        File access area's own gate) pass `files` and ask their own."""
         if req is not None:
             name = field(req, "project")
         else:
             name = (self._q() if query is None else query).get("project", [""])[0]
-        if self._not_project(name) or (write and self._readonly(name)):
+        if self._not_project(name) or (write and self._readonly(name)) \
+                or (not write and not files and self._refused("read", name)):
             return None
         return name
 
@@ -7288,6 +7300,31 @@ class Handler(BaseHTTPRequestHandler):
         carries an error, 200 otherwise."""
         return self._json(r, bad if r.get("error") else 200)
 
+    def _refused_nodes(self, ids):
+        """True, with the 403 written, unless this account may choose each of
+        the nodes `ids` names for a space (Nodes Write on it; none named
+        reaches no node and asks nothing): R277, the audit of 24 Nov, where
+        the check named the space instead of a node and a role on one node
+        set any."""
+        ids = [str(n).strip() for n in ids or [] if str(n or "").strip()]
+        for nid in ids:
+            if self._refused_on_node("node", nid):
+                return True
+        return False
+
+    def _refused_on_node(self, action, nid):
+        """True, with the 403 written, when this account may not do `action`
+        (an area of a node's: Configure, Install, Nodes) on the node `nid`,
+        or, with no node, on every node: an action across all of them asks
+        for a role holding the area on every one (R277, the audit of 24 Nov:
+        a node's services were gated by Containers Write held on any space)."""
+        who = self._who()
+        why = users.may_node(who, action, nid) if nid else users.may_instance(who, action, "")
+        if not why:
+            return False
+        self._json({"error": why}, 403)
+        return True
+
     def _refused(self, action, project=None):
         """True, with the 403 already written, when this account may not.
 
@@ -7315,6 +7352,18 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": why}, 403)
         return True
 
+    def _session_held(self, action, project):
+        """True, with the 403 written, when the account a session works for
+        may not do `action` on `project` itself (R277, the audit of 24 Nov:
+        a session's own routes followed its space's dial and never asked its
+        account, so a session did what its person could not). A session no
+        account was minted for (the controller's own) answers to the dials
+        alone, as everywhere."""
+        if (why := users._session_account_why(self._who() or {}, action, project)):
+            self._json({"error": why}, 403)
+            return True
+        return False
+
     def _dialed(self, project, dial, instead="", person=False):
         """What a space's Agents-may dial says of a session's ask: "auto",
         where it is done now, or "ask", where it waits for the owner on the
@@ -7328,6 +7377,10 @@ class Handler(BaseHTTPRequestHandler):
         if mode == "deny":
             does, named = DIALS[dial]
             self._json({"error": f"{project}'s settings say Claude does not {does} (Agents may: {named}){instead}"}, 403)
+            return None
+        # ...and never past what the session's account may do (DIAL_ACTION).
+        if (action := DIAL_ACTION.get(dial)) and (why := users._session_account_why(self._who() or {}, action, project)):
+            self._json({"error": why}, 403)
             return None
         return mode
 
@@ -7779,12 +7832,24 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         # Read on every node is the registry too (R260), and Read on named
         # nodes those besides its projects'; an administrator's or a
-        # session's answer is as it was.
-        lim = None if users.is_admin(me or {}) or (me or {}).get("session") \
-            else roles.nodes_for(me or {}, "nodes")
-        if lim is None and (not users.may(me, "node") or roles.level_of(me or {}, "nodes")):
+        # session's answer is as it was. Install and Configure are a node's
+        # areas as Nodes is, so a role holding either reaches the nodes it
+        # holds them on (R277, the audit of 24 Nov: an Install role on every
+        # node with no space of its own was shown none, as docs/people.md
+        # says it is not).
+        if users.is_admin(me or {}) or (me or {}).get("session"):
             return None
-        want = set(lim or ())
+        lim = set()
+        for area in ("nodes", "install", "configure"):
+            if not roles.level_of(me or {}, area):
+                continue
+            got = roles.nodes_for(me or {}, area)
+            if got is None:
+                return None
+            lim |= set(got)
+        if not users.may(me, "node") and not lim:
+            return None
+        want = set(lim)
         for name in project_names(me):
             pr = prefs.get(name)
             want.update([pr["node"], *(pr.get("nodes") or [])])
@@ -7899,7 +7964,20 @@ class Handler(BaseHTTPRequestHandler):
             # Terminal Read is the shielded Claude console; without it there
             # is no terminal on the project at all (R152 (e)).
             return users.may(me, "claude", project) or self._area_read_why("terminal", project, me)
-        return users.may(me, "terminal")
+        # A shell in a space's tree asks Terminal on that space; one on no
+        # space reaches every space's trees, Terminal Everywhere (R277, the
+        # audit of 24 Nov: asked of no space, a grant on one opened shells in
+        # every other).
+        project = _arg_project(arg)
+        return users.may(me, "terminal", project) if project else users.may(me, "terminal-any")
+
+    def _term_ro(self, me, arg):
+        """Whether the terminal `arg` names opens read-only for `me`: no
+        Terminal Write on the space it is about, or Everywhere for one about
+        none (R277: it was asked of no space, so a grant on one made every
+        space's agent sessions writable)."""
+        project = _arg_project(arg)
+        return bool(users.may(me, "terminal", project) if project else users.may(me, "terminal-any"))
 
     def _vm_con_refused(self, arg, me):
         """A sentence when this account may not open the console of the VM a
@@ -7910,7 +7988,7 @@ class Handler(BaseHTTPRequestHandler):
         if not m:
             return "not a VM's console: vm:PROJECT:NAME"
         project, name = m.groups()
-        no_shell = users.may(me, "terminal")
+        no_shell = users.may(me, "terminal", project)
         if no_shell:
             return no_shell
         if not users.is_admin(me):
@@ -7953,7 +8031,19 @@ class Handler(BaseHTTPRequestHandler):
         project on the account's list), the container one of the instance's
         running ones now."""
         return self._ctr_checks(_ARG_LOGCTR.match(arg), me, "not a container's log: log:ctr:NAME:INSTANCE:CONTAINER",
-                                "docker-write", lambda name, inst: self._not_on_list(me, _ctr_owner(name, inst)))
+                                "docker-read", lambda name, inst: self._not_on_list(me, _ctr_owner(name, inst)))
+
+    def _ctr_may(self, me, action, owner):
+        """Whether `me` may do `action` (docker-read for a log, terminal for a
+        shell, docker-write) on a container of the space `owner`, asked of
+        that space (R277, the audit of 24 Nov: asked of none, a grant on any
+        space reached every container): one of AerieOS's own is a service,
+        Configure on every node; one of no space asks the area Everywhere."""
+        if owner == devapp.SYSTEM:
+            return users.may_instance(me, "configure", "")
+        if owner and registry.is_project(owner):
+            return users.may(me, action, owner)
+        return users.may(me, "containers-read" if action == "docker-read" else "docker-any")
 
     def _ctr_checks(self, m, me, said, may, owned, shell=False):
         """What a container's shell and its log are both asked, in the one
@@ -7968,11 +8058,11 @@ class Handler(BaseHTTPRequestHandler):
         if not m:
             return said
         name, inst, ctr = m.groups()
-        why = users.may(me, may)
-        if why:
-            return why
         if inst not in (devapp.instances(name) or []):
             return f"no instance {inst} of {name} on record here"
+        why = self._ctr_may(me, may, _ctr_owner(name, inst))
+        if why:
+            return why
         why = owned(name, inst)
         if why:
             return why
@@ -8280,7 +8370,7 @@ class Handler(BaseHTTPRequestHandler):
                                users.uid_of(self._who() or {}) or "")
         try:
             if node:
-                ro = bool(users.may(self._who(), "terminal")) and not (_ARG_CTR.match(_term_arg(args)) or vmm)
+                ro = self._term_ro(self._who(), _term_arg(args)) and not (_ARG_CTR.match(_term_arg(args)) or vmm)
                 kind = "ctr" if (_ARG_CTR.match(_term_arg(args)) or vmm) else "ro" if ro else "rw"
                 # A person's own terminal carries what opens their sealed
                 # sign-ins there (R126), wrapped to the agent; a container's
@@ -8294,7 +8384,7 @@ class Handler(BaseHTTPRequestHandler):
                                    **nodes.relay_of(target["id"]), **dims)
             env = {k: v for k, v in os.environ.items() if k != "DASHBOARD_AUTH"}
             return termws.local(down, words, bbtty=str(HERE / "bb-tty"), env=env,
-                                cwd=env.get("HOME") or "/", ro=bool(users.may(self._who(), "terminal")),
+                                cwd=env.get("HOME") or "/", ro=self._term_ro(self._who(), _term_arg(args)),
                                 alive=alive, **dims)
         finally:
             if here is not None:
@@ -8394,8 +8484,6 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if me.get("session"):
             return None, "a container's log tab is a person's"
-        if why := users.may(me, "docker-write"):
-            return None, why
         if not devapp._CTR_NAME.match(name):
             return None, "no such container"
         nid, why = self._node_asked(nid)
@@ -8403,7 +8491,8 @@ class Handler(BaseHTTPRequestHandler):
             return None, why
         with devapp.on_node(nid or None):
             owner = containers.owner_named(name)
-        if why := self._not_on_list(me, owner):
+        # Containers Read on the container's own space, as its area says.
+        if why := self._ctr_may(me, "docker-read", owner) or self._not_on_list(me, owner):
             return None, why
         held = {"at": 0.0, "text": ""}
 
@@ -8751,6 +8840,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/metrics":
             if NODES_OK:
                 return self._json({"error": NODES_OK}, 503)
+            # Every node's figures: the Nodes page's, Nodes Read (R277, the
+            # audit of 24 Nov: anybody signed in read them).
+            if self._refused("nodes-read"):
+                return None
             body = jobs.metrics_text().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
@@ -8987,8 +9080,9 @@ class Handler(BaseHTTPRequestHandler):
         the Audit page (R158 step 8), newest first, a page at a time
         (before=TIME), by one person (person=NAME) or one machine
         (machine=NODE_ID); with the people and the machines to pick from.
-        For an account that reads the controller's area."""
-        if self._refused("controller"):
+        For an account that reads the controller's area: Controller Read, as
+        it says and as the page is drawn (R277: it asked for Write)."""
+        if self._refused("controller-read"):
             return
         q = self._q()
         person, machine = q.get("person", [""])[0][:120], q.get("machine", [""])[0][:40]
@@ -9497,13 +9591,15 @@ class Handler(BaseHTTPRequestHandler):
                                "instances": [], "containers": []})
         # What an account that is not an administrator sees is what belongs
         # to its projects, a session's to its own one (the operator, 24 Sep).
+        # Every space's at once is Containers Read held Everywhere
+        # (containers-read); anything less sees the spaces it reads the
+        # Containers of (R152 step 3; R277, the audit of 24 Nov: Nodes Read on
+        # every node was taken for every space's containers).
         seen = None
-        if sess or self._node_scope() is not None:
-            seen = {name} if sess else set(project_names(me))
-        # ...and of those, the projects whose Containers this person may
-        # read (R152 step 3).
-        if seen is not None and not sess and not users.is_admin(me):
-            seen = {p for p in seen if roles.level_of(me, "containers", p, users.may_work)}
+        if sess:
+            seen = {name}
+        elif not users.is_admin(me) and users.may(me, "containers-read"):
+            seen = {p for p in project_names(me) if roles.level_of(me, "containers", p, users.may_work)}
         # /api/docker/stats: what the containers are using now, asked
         # beside the list once it has landed (R216), so the list never
         # waits on a sample of the daemon. A path of its own rather than a
@@ -9749,6 +9845,8 @@ class Handler(BaseHTTPRequestHandler):
         if sess:
             if project != sess:
                 return self._json({"error": f"a session works on {sess}'s VMs alone, not {project}'s"}, 403)
+            if self._session_held("vms-write", sess):
+                return
             if req.get("node_agent") is True and prefs.get(sess)["makevms"] != "deny":
                 # A node is the administrators' to add: asked of them whatever
                 # the dial says, and made by whoever allows it.
@@ -9798,10 +9896,20 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(projects.job())
 
     def _get_trash(self):
-        """GET /api/trash."""
+        """GET /api/trash: what in the bin this account may manage, each item
+        asked of the space it was in (R277, the audit of 24 Nov: Space
+        settings Write on any space listed, restored and purged every
+        space's)."""
         if self._refused("trash"):
             return None
         return self._trash_list()
+
+    def _trash_why(self, name):
+        """Why this account may not restore or purge the repository `name` in
+        the bin, or "": Space settings Write on the space it was in, or held
+        Everywhere where that space is gone."""
+        was = registry.last_project(projects.restore_dir(name))
+        return users.may(self._who(), "trash", was) if registry.is_repos(was) else users.may(self._who(), "trash-any")
 
     def _get_claude_now(self):
         """GET /api/claude-now."""
@@ -10322,14 +10430,18 @@ class Handler(BaseHTTPRequestHandler):
         # Nobody may change a project they cannot see or have not taken on.
         if self._not_project(name):
             return
-        if self._readonly(name):
+        # The Debug page's grants alone ask the debug grant, below, never
+        # Spaces Write: an administrator grants a space's sessions its
+        # diagnostics without working on it (R277, the audit of 24 Nov).
+        debug_only = set(req) <= {"project", "diag", "log_from"}
+        if not debug_only and self._readonly(name):
             return None
         # Everything else in this dialog is the project's own; the node is
         # not, because a node is shared and moving a project onto one
         # reaches every other project there. Only a CHANGE is asked about
         # (B488): the dialog sends every field on every save.
         if ("node" in req or "nodes" in req) and prefs.node_changed(name, req) \
-                and self._refused("node", name):
+                and self._refused_nodes([req.get("node") or ""] + (req.get("nodes") if isinstance(req.get("nodes"), list) else [])):
             return
         # A hosting-only node holds no project: its code and its sessions are
         # what the flag keeps off it (nodes.host_only).
@@ -10350,7 +10462,7 @@ class Handler(BaseHTTPRequestHandler):
         # node, and only a hosting-only node is one: a node that holds the
         # project is in its node set already. Only a change is asked about.
         if req.get("hosts") is not None and prefs.hosts_changed(name, req.get("hosts")):
-            if self._refused("node", name):
+            if self._refused_nodes(req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")):
                 return
             if not NODES_OK:
                 got = req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")
@@ -10371,7 +10483,7 @@ class Handler(BaseHTTPRequestHandler):
         # share on a node is every project's there, so naming one is for
         # whoever may set the node. Only a change is asked about.
         if req.get("sees") is not None and prefs.sees_changed(name, req.get("sees")) \
-                and self._refused("node", name):
+                and self._refused_nodes([(prefs.get(name) or {}).get("node") or ""] + list((prefs.get(name) or {}).get("nodes") or [])):
             return
         # ...and the addresses its sessions may still reach where the node
         # filters their network (the operator, 7 Oct): a hole in a shared
@@ -10459,6 +10571,11 @@ class Handler(BaseHTTPRequestHandler):
             why = users.may_instance(me, "runner", f"{nid}/{slot}" if slot in have else "", f"{slot} on {nname}")
         else:
             why = users.may_instance(me, "nodes-write", "" if act in ("add", "vm-xml") else nid, nname)
+        # Enrolling one again acts on the node it names, whose tokens it
+        # revokes and mints anew: asked of that node too (R277, the audit of
+        # 24 Nov: asked of `id` alone, a role on one node re-enrolled another).
+        if not why and act == "enroll" and (again := field(req, "node")):
+            why = users.may_instance(me, "nodes-write", again, ((nodes.node(again) or {}).get("name") or again) if not NODES_OK else again)
         if why:
             return self._json({"error": why}, 403)
         if NODES_OK:
@@ -10643,7 +10760,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": refused}, 403)
         # A log (R133 step 12) runs nothing anybody types into: reading it
         # wants the log's own grant, decided above, not a shell.
-        if not req.get("ro") and not arg.startswith("log:") and users.may(me, "terminal"):
+        if not req.get("ro") and not arg.startswith("log:") and self._term_ro(me, arg):
             return self._json({"error": f"{me['name']} has no shell, so this terminal is the "
                                         "read-only one"}, 403)
         # A coding agent's session on a repository of a project of several
@@ -11072,9 +11189,9 @@ class Handler(BaseHTTPRequestHandler):
             proj = field(req, "project")
             if act == "logs" and proj and proj != sess and self._reads(proj):
                 return self._json(*containers.session_verb(proj, me, act, name, req, read_only=True))
+            if self._session_held("docker-read" if act == "logs" else "docker-write", sess):
+                return None
             return self._json(*containers.session_verb(sess, me, act, name, req))
-        if self._refused("docker-write"):
-            return
         nid, why = self._node_asked(field(req, "node"))
         if why:
             return self._json({"error": why}, 400)
@@ -11091,13 +11208,55 @@ class Handler(BaseHTTPRequestHandler):
         # their own list first. System's and nobody's stay an administrator's.
         # The owner's check and the act read the daemon's list once between
         # them (devapp.one_listing): Start on boot read it twice first.
+        # Each asks what the container is (R277, the audit of 24 Nov: Containers
+        # Write on any space started, stopped and pruned every container on a
+        # node): a prune reaches the node's whole store, Nodes Write on it; a
+        # System container is a service, Configure on its node; a space's,
+        # Containers Write on that space; one of no space, Containers Write
+        # Everywhere. Moving one to a space asks the same of that space.
         with devapp.one_listing():
-            if act != "prune":
-                with devapp.on_node(nid or None):
-                    owner = containers.owner_named(name)
-                if why := self._not_on_list(me, owner):
+            if act == "prune":
+                if self._refused_on_node("nodes-write", nid):
+                    return
+                return self._json(*containers.admin_verb(act, name, nid, under))
+            with devapp.on_node(nid or None):
+                owner = containers.owner_named(name)
+            if act == "logs":
+                if why := self._ctr_may(me, "docker-read", owner):
                     return self._json({"error": why}, 403)
+            elif (self._refused_on_node("configure", nid) if owner == devapp.SYSTEM
+                    else self._refused("docker-write", owner) if owner and registry.is_project(owner)
+                    else self._refused("docker-any")):
+                return
+            if act == "owner" and under and self._refused("docker-write", under):
+                return
+            if why := self._not_on_list(me, owner):
+                return self._json({"error": why}, 403)
             return self._json(*containers.admin_verb(act, name, nid, under))
+
+    def _devapp_refused(self, me, name, act, req):
+        """True, with the 403 written, when a person may not do `act` to the
+        instance or written container `name` names, asked of the space it
+        belongs to (R277, the audit of 24 Nov: the write gate named no space,
+        so Containers Write on one space changed another's): Containers Read
+        there to read its state, Containers Write to change it, and a rebuild,
+        an abort or a test either that or Spaces Write, whose sentence is
+        builds and tests; one of AerieOS's own, Configure on every node; one
+        of no space, Containers Write Everywhere to change it."""
+        if act == "new":
+            own = field(req, "owner") or (name if registry.is_project(name) else "")
+        else:
+            own = devapp.owner_of(name, field(req, "instance") or devapp.only_instance(name))
+        reading = act in ("starter", "state", "probe")
+        if own == devapp.SYSTEM:
+            return not reading and self._refused_on_node("configure", "")
+        if own and registry.is_project(own):
+            if reading:
+                return self._refused("docker-read", own)
+            if act in ("rebuild", "abort", "test") and not users.may(me, "work", own):
+                return False
+            return self._refused("docker-write", own)
+        return not reading and self._refused("docker-any")
 
     def _not_on_list(self, me, owner):
         """Why `me` may not act on a container of project `owner`, or "":
@@ -11123,11 +11282,17 @@ class Handler(BaseHTTPRequestHandler):
         writing a compose file and building from it is root-shaped power on
         the node, so the endpoint says no itself.
         """
-        if self._refused("docker-write"):
+        # Asked of what the container is (R277, the audit of 24 Nov: Containers
+        # Write on any space read and wrote every written container, its
+        # environment's secrets among it): a space's, on that space; one of
+        # AerieOS's own, Configure on every node, as its page asks; one for no
+        # space, Containers Write held Everywhere.
+        act, name = field(req, "action"), field(req, "name")
+        owner = field(req, "owner") if act == "create" else devapp.owner_of(name, devapp.MAIN) if name else ""
+        if (self._refused_on_node("configure", "") if owner == devapp.SYSTEM
+                else self._refused("docker-write", owner) if owner else self._refused("docker-any")):
             return
-        return self._json(*containers.tab_verb(
-            field(req, "action"), field(req, "name"), req,
-            seen=lambda: project_names(self._who())))
+        return self._json(*containers.tab_verb(act, name, req, seen=lambda: project_names(self._who())))
 
     def _logs(self, req):
         """The log policy, and the two things that can be done to the pile:
@@ -11228,8 +11393,14 @@ class Handler(BaseHTTPRequestHandler):
         # decides rather than this gate, since a session never passes this one.
         session = bool(sess)
         dialed = ("env-get", "env-set", "new", "remove", "override", "gpu") if session else ()
-        if act not in ("starter", "state", "probe", "rebuild", "abort", "test") + dialed \
-                and self._refused("docker-write"):
+        if session:
+            if act not in ("starter", "state", "probe", "rebuild", "abort", "test") + dialed \
+                    and self._refused("docker-write"):
+                return None
+            # ...and what the dial hands a session, never past its account.
+            if act in dialed and self._session_held("docker-write", sess):
+                return None
+        elif self._devapp_refused(me, name, act, req):
             return None
         # A compose file edited from the Docker tab is a file in the project's
         # tree: a write to the project as well as to its container.
@@ -12135,10 +12306,11 @@ class Handler(BaseHTTPRequestHandler):
     def _custom(self, req):
         """Save or delete one of the operator's own command lists:
         macros.custom_edit."""
-        # They run in terminals, so they are edited by accounts that may have
-        # one: a command list a shell-less account could write and an
-        # administrator would run is a shell by proxy.
-        if self._refused("terminal"):
+        # They run in everybody's terminals, one set for the controller, so
+        # they are the pinned commands' to change: Controller Write (R277,
+        # the audit of 24 Nov: Terminal Write on any one space rewrote the
+        # lists every account's terminals run).
+        if self._refused("command-pin"):
             return None
         return self._json(*macros.custom_edit(req.get("action"), req))
 
@@ -12367,6 +12539,8 @@ class Handler(BaseHTTPRequestHandler):
         if me.get("session"):
             if name != me["session"]:
                 return self._json({"error": "a session works its own space's git host and no other"}, 403)
+            if self._session_held("work", name):
+                return None
         elif self._not_project(name) or self._readonly(name):
             return None
         verb = " ".join(str(req.get("verb") or "").split())[:40]
@@ -12457,7 +12631,11 @@ class Handler(BaseHTTPRequestHandler):
         dialog is only drawn for an administrator, so nothing offered it, and
         nothing refused a request that arrived anyway.
         """
-        if self._refused("create") or self._not_link_owner(field(req, "name").strip()):
+        # Git authentication Write on the space it links (R277, the audit of
+        # 24 Nov: New spaces Write, kept from the create dialog, refused a
+        # space's own owner), and its owner's alone (_not_link_owner).
+        name = field(req, "name").strip()
+        if self._refused("git-auth", name) or self._not_link_owner(name):
             return None
         body, code = projects.link({**req, "_uid": users.uid_of(self._who())})
         # A project linked is a project whose CI is worth a first look now,
@@ -12469,8 +12647,9 @@ class Handler(BaseHTTPRequestHandler):
     def _unlink(self, req):
         """Take the remote off a project, with the credential and the push
         grant that came with it. See projects.unlink: local, instant, and it
-        touches no commit."""
-        if self._refused("create") or self._not_link_owner(field(req, "name").strip()):
+        touches no commit. Git authentication Write on it, as Link asks."""
+        name = field(req, "name").strip()
+        if self._refused("git-auth", name) or self._not_link_owner(name):
             return None
         body, code = projects.unlink(req)
         return self._json(body, code)
@@ -12517,7 +12696,7 @@ class Handler(BaseHTTPRequestHandler):
                                                by=me.get("name", "")))
         return self._result(users.verb(act, req, lambda: set(project_names(me)),
                                        may_change=lambda p: membership.member_refusal(
-                                           me, p, joining=field(req, "name") == me.get("name"))))
+                                           me, p, joining=field(req, "name") == me.get("name")), me=me))
 
     def _roles(self, req):
         """POST /api/roles: assign (an account's Everywhere roles and its
@@ -12527,9 +12706,12 @@ class Handler(BaseHTTPRequestHandler):
         are an administrator's."""
         act = field(req, "action")
         if act == "assign":
-            return self._json(*users.assign(self._who(), field(req, "name"),
-                                             req.get("roles") if isinstance(req.get("roles"), list) else None,
-                                             req.get("project_roles") if isinstance(req.get("project_roles"), dict) else None))
+            me = self._who() or {}
+            return self._json(*users.assign(me, field(req, "name"),
+                                            req.get("roles") if isinstance(req.get("roles"), list) else None,
+                                            req.get("project_roles") if isinstance(req.get("project_roles"), dict) else None,
+                                            may_join=lambda p: membership.member_refusal(
+                                                me, p, joining=field(req, "name") == me.get("name"))))
         if self._refused("admin"):
             return None
         if act == "set":
@@ -12602,6 +12784,8 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if me.get("session"):
             sess = me["session"]             # install alone reaches here (SESSION_ACTIONS)
+            if self._session_held("toolchains-write", sess):
+                return None
             # Whose session, and which nodes its space works on, are read
             # here from the token: the project it proves and the account it
             # was minted for. The node the request names counts only among
@@ -12806,7 +12990,7 @@ class Handler(BaseHTTPRequestHandler):
                 if a:
                     mine.append({"name": name, "access": a, **projects.app_flags(name, users.uid_of(me))})
             return self._json({"api": files.API, "api_min": files.API_MIN, "projects": mine})
-        if not (project := self._project_asked(req)):
+        if not (project := self._project_asked(req, files=True)):
             return None
         access, why = ftp.access_for(me, project, "editor")
         if not access:
@@ -13076,7 +13260,10 @@ class Handler(BaseHTTPRequestHandler):
                            "apps_note": library.apps_note(napps, cat.get("index")) if may_apps else "",
                            # Whether this node runs Docker, for an app's card (R170 step 7).
                            "docker": bool(((n or {}).get("reported") or {}).get("docker")),
-                           "may": {"install": may_install, "apps": may_apps, "packs": not users.may(who, "curate"),
+                           # Install on the node shown (R277, the audit of 24 Nov: asked
+                           # anywhere, it was drawn on a node the install was refused on).
+                           "may": {"install": not users.may_node(who, "toolchains-write", nid), "apps": may_apps,
+                                   "packs": not users.may(who, "curate"),
                                    "configure": bool(n) and not users.may_node(who, "configure", nid), "yours": yours_ok},
                            "store": {"root": tc.get("root", ""), "free_mb": tc.get("free_mb"), "checked": tc.get("checked") or 0},
                            "sysdeps": tc.get("sysdeps") or {}, "cleanable": tc.get("cleanable") or [], "locked": bool(tc.get("locked")),
@@ -13112,8 +13299,9 @@ class Handler(BaseHTTPRequestHandler):
         kind = services.of_pack(pack)
         if kind and services.paged(kind):
             # nginx's and the Scanners' Install and Remove (R264): what
-            # their pages' Deploy and Remove do, a written container's.
-            if self._refused("docker-write"):
+            # their pages' Deploy and Remove do, a service's, so Configure
+            # on the node, as the router's branch below asks.
+            if self._refused_on_node("configure", nid):
                 return None
             if act not in ("install", "remove"):
                 return self._json({"error": f"{pack} is installed and removed here; the rest is on its own page"}, 400)
@@ -13350,13 +13538,12 @@ class Handler(BaseHTTPRequestHandler):
         controller's own machine's CPU, memory, network, disk I/O and
         temperatures over the span, at the resolution kept for it (five
         minutes for a day, an hour for a month). Read on the Nodes area;
-        never a session's."""
-        who = self._who() or {}
-        why = users.may(who, "node")
-        if why:
-            return self._json({"error": why}, 403)
+        never a session's. A read of the Nodes page's, Nodes Read on that
+        node (R277: it asked to choose a space's node, Nodes Write)."""
         q = self._q()
         nid, span = (q.get("node") or [""])[0], (q.get("span") or ["day"])[0]
+        if nid and self._refused_on_node("nodes-read", nid):
+            return
         n = nodes.node(nid) if nid else None
         if not n or not nodes.own_machine(n):
             return self._json({"error": "the reporting is the controller's own machine's: name its node"}, 400)
@@ -13384,15 +13571,18 @@ class Handler(BaseHTTPRequestHandler):
     def _get_router(self):
         """GET /api/router?node=ID: a node's model router (router.status)
         and the projects it may be offered to, for an account that reads the
-        Nodes page; never a session's."""
-        if self._refused("nodes"):
-            return
+        Nodes page, on that node; never a session's. The spaces it may be
+        offered to are the ones the asker sees (R277, the audit of 24 Nov:
+        an unnamed action let any space's owner read every space's name)."""
         q = self._q()
         nid = q.get("node", [""])[0]
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
+        if self._refused_on_node("nodes-read", nid):
+            return
+        who = self._who() or {}
         return self._json({**router.status(nid), "providers_known": {k: v["label"] for k, v in router.PROVIDERS.items()},
-                           "all_projects": sorted(prefs.all_projects(WORKSPACE)),
+                           "all_projects": sorted(p for p in prefs.all_projects(WORKSPACE) if users.may_see(who, p)),
                            "gpu": bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card"))})
 
     def _get_router_key(self):
@@ -13405,6 +13595,10 @@ class Handler(BaseHTTPRequestHandler):
         who = self._who() or {}
         if who.get("session") and who.get("session") != name and users.key_of(who.get("session") or "") != users.key_of(name):
             return self._json({"error": "a session is handed its own space's key"}, 403)
+        # ...and only to one who may work on it, as said (R277, the audit of 24
+        # Nov: seeing the space was enough), a session's account included.
+        if self._refused("work", name):
+            return
         got = router.for_project(name)
         if got:
             got["models"] = router.models_for(name)
@@ -13414,13 +13608,13 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/router: a node's model router (router.py): its keys and
         endpoints saved, Deploy, Save and Remove as a written container's
         compose jobs, Ollama's models pulled and removed, a project allowed
-        or not, the models and the spend read; docker-write like the
-        nginx page, and never a session's."""
-        if self._refused("docker-write"):
-            return
+        or not, the models and the spend read; Configure on its node, as
+        a service is (the areas' sentence), and never a session's."""
         act, nid = field(req, "action"), field(req, "node")
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
+        if self._refused_on_node("configure", nid):
+            return
         by = (self._who() or {}).get("name") or ""
         gpu = bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card"))
         if act == "set":
@@ -13453,17 +13647,18 @@ class Handler(BaseHTTPRequestHandler):
         """The Scanners page (scanners.view): every node's scanners, the
         schedule, the versions and what nothing covers, for an account that
         may read the Nodes page; never a session's."""
-        if self._refused("nodes"):
+        if self._refused("nodes-read"):
             return
         return self._json(scanners.view())
 
     def _scanners(self, req):
         """Deploy, update, remove, run now, the schedule and a version check
-        (scanners.py): compose and scan jobs on a node, so docker-write like
-        a written container, and never a session's."""
-        if self._refused("docker-write"):
-            return
+        (scanners.py): compose and scan jobs on a node, a service's, so
+        Configure on that node, or on every node for what reaches them all
+        (deploy-all, a run with no node, the schedule); never a session's."""
         act, nid = field(req, "action"), field(req, "node")
+        if self._refused_on_node("configure", nid if act not in ("deploy-all", "schedule") else ""):
+            return
         by = (self._who() or {}).get("name") or ""
         if act == "deploy-all":
             r = scanners.deploy_all(by)
@@ -13489,12 +13684,13 @@ class Handler(BaseHTTPRequestHandler):
     def _nginx(self, req):
         """Deploy, save, certificate, remove, check and update on one node's
         nginx (nginxproxy.py): writing a compose file and building it on a
-        node, so docker-write like a written container, and never a
+        node, a service's, so Configure on that node, and on every node
+        for the hostname list every node's routes pick from; never a
         session's. Check reads the registry now; update pins the newest
         line on the node and rebuilds (R192)."""
-        if self._refused("docker-write"):
-            return
         act, nid = field(req, "action"), field(req, "node")
+        if self._refused_on_node("configure", "" if act in ("host-add", "host-remove") else nid):
+            return
         # The hostname list is every node's (one pull-down on every route).
         if act == "host-add":
             return self._result(nginxproxy.add_hostname(field(req, "name")))
@@ -13867,7 +14063,9 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(body, code)
 
     def _trash_list(self):
-        return self._json(projects.trash_list())
+        got = projects.trash_list()
+        got["items"] = [x for x in got.get("items") or [] if not self._trash_why(x["name"])]
+        return self._json(got)
 
     def _trash_restore(self, req):
         """A repository out of the bin, back into the project it was in, or
@@ -13876,9 +14074,13 @@ class Handler(BaseHTTPRequestHandler):
         It is never put back into none."""
         if self._refused("trash"):
             return
+        if why := self._trash_why(field(req, "name")):
+            return self._json({"error": why}, 403)
         into = field(req, "project")
         if into and (not registry.is_repos(into) or not users.may_see(self._who(), into)):
             return self._json({"error": f"not a space: {into}"}, 400)
+        if into and self._refused("trash", into):
+            return
         was = registry.last_project(projects.restore_dir(field(req, "name")))
         into = into or (was if registry.is_repos(was) else "")
         # Its project deleted since: which one is asked. One deleted before
@@ -13901,9 +14103,12 @@ class Handler(BaseHTTPRequestHandler):
     def _trash_purge(self, req):
         """Delete a trashed project for good. The guards are in projects.py
         (the path is resolved against the bin and the name has to be typed
-        back), and this is only the route to them."""
+        back), and this is only the route to them; asked of the space the
+        repository was in (_trash_why)."""
         if self._refused("trash"):
             return
+        if why := self._trash_why(field(req, "name")):
+            return self._json({"error": why}, 403)
         return self._json(*projects.trash_purge(req))
 
     def _rename(self, req):
@@ -13998,7 +14203,7 @@ class Handler(BaseHTTPRequestHandler):
         """A project's file access over FTP (ftp.py, R151): what it is, for
         whoever sees the project, and a change, for an account with File
         access Write on it (users.may's ftp)."""
-        if not (name := self._project_asked(req)):
+        if not (name := self._project_asked(req, files=True)):
             return None
         me = self._who() or {}
         may_set = not users.may(me, "ftp", name)

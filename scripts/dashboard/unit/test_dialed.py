@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 from fields import field  # noqa: E402
 
 SERVER = open(os.path.join(HERE, "..", "server.py"), encoding="utf-8").read()
-TABLES = ("DIALS", "ReleaseChange", "RELEASE_CHANGES")
+TABLES = ("DIALS", "DIAL_ACTION", "ReleaseChange", "RELEASE_CHANGES")
 LIFTED = ("_dialed", "_release_change", "_result", "_refused")
 SESSION = {"name": "session:alpha", "session": "alpha"}
 PERSON = {"name": "olga", "uid": "u_1"}
@@ -54,6 +54,8 @@ CODE = compile(source(), "server.py", "exec")
 def lifted(answers):
     """(stand-in handler class, the log its modules write, the tables)."""
     log = []
+    # The session's account holds the grant unless a test says it does not.
+    answers = {"users._session_account_why": "", **answers}
     ns = {"collections": collections, "field": field}
     for name in ("prefs", "forgerelease", "phone", "version", "users", "membership",
                  "_release_remover", "_release_withdrawer", "_release_editor"):
@@ -115,6 +117,16 @@ class Dial(unittest.TestCase):
             h = stand(SESSION)
             self.assertEqual(h._dialed("alpha", "release"), dial)
             self.assertEqual(h.said, [])
+
+    def test_a_session_does_no_more_than_its_account_whatever_the_dial(self):
+        # R277 (the audit of 24 Nov): the dial on auto released for an
+        # account with no Releases Write.
+        h, log, _ = lifted({"prefs.get": {"release": "auto"},
+                            "users._session_account_why": "dana's roles give no Releases Write on alpha"})
+        s = h(SESSION)
+        self.assertIsNone(s._dialed("alpha", "release"))
+        self.assertEqual(s.said, [(403, {"error": "dana's roles give no Releases Write on alpha"})])
+        self.assertIn(("users._session_account_why", (SESSION, "version", "alpha"), {}), log)
 
     def test_a_dial_never_set_asks(self):
         for kept in (None, {}, {"release": ""}, {"release": None}):

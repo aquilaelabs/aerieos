@@ -47,8 +47,8 @@ import seams
 # is the one every list of them keeps.
 TABLE = {
     "router": {"module": "router", "grant": "configure", "page": False},
-    "nginx": {"module": "nginxproxy", "grant": "docker-write", "page": True},
-    "scanners": {"module": "scanners", "grant": "docker-write", "page": True},
+    "nginx": {"module": "nginxproxy", "grant": "configure", "page": True},
+    "scanners": {"module": "scanners", "grant": "configure", "page": True},
 }
 KINDS = tuple(TABLE)
 

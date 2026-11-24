@@ -701,6 +701,12 @@ def may_node(u, action, node_id=""):
         return ""
     if not u:
         return "not signed in"
+    # No node named, for a node's area, is every node (the controller's own
+    # where a verb takes none): a role held on named nodes alone is on none
+    # of them (R277, the audit of 24 Nov: it was answered as "anywhere", so a
+    # role on one node installed on the controller), as may_instance says.
+    if not node_id and roles.CAP_AREA.get(action, ("", ""))[0] in roles.NODE_AREAS:
+        return may_instance(u, action, "")
     if roles.granted(u, action, node=str(node_id or "") or None, nodes_of=nodes_of):
         return ""
     # A node area's answer is the node's (R152): asking again with no node
@@ -1020,6 +1026,12 @@ def session_principal(tok):
     signed = f"{project}|{exp}|{uid}"
     want = hmac.new(_session_key(), signed.encode(), hashlib.sha256).hexdigest()[:32]
     if not hmac.compare_digest(sig, want):
+        return None
+    # A token minted for an account that is gone is no token (R277, the audit
+    # of 24 Nov: a removed account's session went on working, and renewing,
+    # held to nothing but its space's dials). One minted for nobody is the
+    # controller's own (aerie users token on it, the harness), and stays so.
+    if uid and not any(isinstance(rec, dict) and rec.get("uid") == uid for rec in load()["users"].values()):
         return None
     # A caller of its own kind (R227 step 4): no role's rights and no
     # account's id. `seat` names the person it works for, which the routes a
@@ -1664,13 +1676,37 @@ def _members_refused(name, want, may_change):
     return ""
 
 
-def verb(act, req, seen, may_change=None):
+def _verb_refused(act, req, me):
+    """Why `me` may not do `act` to the account `req` names, or "": the
+    owner's account is the owner's alone, and an administrator's account
+    and the admin role an administrator's (R152 (a), B66), held here as
+    assign holds them (R277, the audit of 24 Nov: Accounts Write alone set a
+    role to admin, its own among them, and an administrator reset the
+    owner's password)."""
+    if me is None or me is ALL:
+        return ""
+    target = get(field(req, "name")) or {}
+    if target.get("role") == "owner" and me.get("role") != "owner" and act in ("edit", "remove"):
+        return "the owner's account is the owner's alone to change"
+    raising = field(req, "role") in ("admin", "owner") or "admin" in [str(r) for r in (req.get("roles") or [])
+                                                                     if isinstance(req.get("roles"), list)]
+    if not is_admin(me) and (raising or (target.get("role") == "admin" and act in ("edit", "remove"))):
+        return "the admin role and an administrator's account are an administrator's to change"
+    if field(req, "role") == "owner":
+        return "there is one owner, made at the first run"
+    return ""
+
+
+def verb(act, req, seen, may_change=None, me=None):
     """One of the Users page's verbs on an account, an administrator's (the
     server holds that gate): add, the account dialog's one Save (edit), and
-    remove. The store's own functions above hold the owner's protections.
-    `seen()` is the projects this administrator sees. {ok} or {error}."""
+    remove. The store's own functions above hold the owner's protections,
+    and _verb_refused the ones that depend on who asks (`me`). `seen()` is
+    the projects this administrator sees. {ok} or {error}."""
     name = field(req, "name")
     pw = req.get("password") or ""
+    if (why := _verb_refused(act, req, me)):
+        return {"error": why}
     if act == "add":
         for p in req.get("projects") or []:
             why = may_change(p) if may_change else ""
@@ -1778,11 +1814,19 @@ def assignable(me):
     return {"admin": False, "projects": owned}
 
 
-def assign(me, name, global_roles=None, project_roles=None):
+def assign(me, name, global_roles=None, project_roles=None, may_join=None):
     """Set an account's Everywhere roles and the roles it holds on each
     project, as far as `me` may (assignable): what is outside that is kept
     as it was, never refused silently. The projects it is on follow the
-    roles (R155). (payload, status)."""
+    roles (R155). `may_join(project)` says why the account may not join a
+    space it is not on yet (membership's invite-only rule), as the Users
+    page's edit asks it (R277, the audit of 24 Nov: a role given here put
+    an account on an invite-only space). (payload, status)."""
+    if may_join and isinstance(project_roles, dict):
+        had = (get(name) or {}).get("project_roles") or {}
+        for p, rs in project_roles.items():
+            if isinstance(rs, list) and rs and not had.get(str(p)) and (why := may_join(str(p))):
+                return {"error": why}, 403
     can = assignable(me)
     if not can["admin"] and not can["projects"]:
         return {"error": "the Roles page's people are an administrator's, or a space owner's for "

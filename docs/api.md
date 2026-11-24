@@ -12,7 +12,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 |---|---|---|---|---|---|
 | GET | `/api/revs` | prefix | `_get_revs` | GET /api/revs. |  |
 | GET | `/api/live` | exact | `_get_live` | GET /api/live: who has a Claude session on each project this account sees, which of them are working and which asking, the maps the status payload also carries (projsessions.maps), alone and cheap. |  |
-| GET | `/api/audit` | exact | `_get_audit` | GET /api/audit: who did what to this install (db.audit_page) for the Audit page (R158 step 8), newest first, a page at a time (before=TIME), by one person (person=NAME) or one machine (machine=NODE_ID); with the people a | refused: controller |
+| GET | `/api/audit` | exact | `_get_audit` | GET /api/audit: who did what to this install (db.audit_page) for the Audit page (R158 step 8), newest first, a page at a time (before=TIME), by one person (person=NAME) or one machine (machine=NODE_ID); with the people a | refused: controller-read |
 | GET | `/api/trace` | prefix | `_get_trace` | GET /api/trace?since=T: what this server was asked since T, grouped by endpoint (R75 step 4). |  |
 | GET | `/api/status` | prefix | `_get_status` | GET /api/status. |  |
 | GET | `/api/reset` | exact | `_get_reset` | GET /api/reset: how a Reset that un-enrolls its nodes first is getting on: each node, done or why not, and the error that stopped it. | refused: controller-read |
@@ -48,9 +48,9 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/roles` | prefix | `_get_roles` | GET /api/roles: the Roles page (R152): the areas, every role, and each account with its Global roles, the roles it holds on each project and the projects it is on. |  |
 | GET | `/api/users` | prefix | `_get_users` | GET /api/users. |  |
 | GET | `/api/nginx` | prefix | `_get_nginx` | The nginx page (nginxproxy.view): every node's nginx, for an account that may read the Nodes page; never a session's. |  |
-| GET | `/api/scanners` | exact | `_get_scanners` | The Scanners page (scanners.view): every node's scanners, the schedule, the versions and what nothing covers, for an account that may read the Nodes page; never a session's. | refused: nodes |
-| GET | `/api/router` | exact | `_get_router` | GET /api/router?node=ID: a node's model router (router.status) and the projects it may be offered to, for an account that reads the Nodes page; never a session's. | refused: nodes |
-| GET | `/api/router-key` | exact | `_get_router_key` | GET /api/router-key?project=NAME: the router address and the project's own key, for a session of that project at its start (bb-tty's launcher) or a person who may work on it; {} where no router allows the project. |  |
+| GET | `/api/scanners` | exact | `_get_scanners` | The Scanners page (scanners.view): every node's scanners, the schedule, the versions and what nothing covers, for an account that may read the Nodes page; never a session's. | refused: nodes-read |
+| GET | `/api/router` | exact | `_get_router` | GET /api/router?node=ID: a node's model router (router.status) and the projects it may be offered to, for an account that reads the Nodes page, on that node; never a session's. |  |
+| GET | `/api/router-key` | exact | `_get_router_key` | GET /api/router-key?project=NAME: the router address and the project's own key, for a session of that project at its start (bb-tty's launcher) or a person who may work on it; {} where no router allows the project. | refused: work |
 | GET | `/api/storage` | prefix | `_get_storage` | The Storage page (storage.view, R169): every node this account holds the Storage area on, what its disks hold, by project where the account sees the project and as one line otherwise. |  |
 | GET | `/api/history` | prefix | `_get_history` | GET /api/history?node=ID&span=6h\\|day\\|week\\|month (R164 step 4): the controller's own machine's CPU, memory, network, disk I/O and temperatures over the span, at the resolution kept for it (five minutes for a day, an hour  |  |
 | GET | `/api/schedules` | exact | `_get_schedules` | GET /api/schedules (R117): every schedule, its words, its next run and its last run's state, and the nodes it may run on. |  |
@@ -73,7 +73,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/node-files` | exact | `_get_node_files` | GET /api/node-files?node=&root=&path= (R224): the node's roots, and with a root the folder's listing; an administrator's. |  |
 | GET | `/api/node-files/read` | exact | `_get_node_files_read` | GET /api/node-files/read?node=&root=&path=[&dl=1] (R224): a file's bytes streamed from its node, a download or shown in the page; nothing it holds runs here (a page or a script is sent as text). |  |
 | GET | `/api/project-job` | prefix | `_get_project_job` | GET /api/project-job. | refused: create |
-| GET | `/api/trash` | prefix | `_get_trash` | GET /api/trash. | refused: trash |
+| GET | `/api/trash` | prefix | `_get_trash` | GET /api/trash: what in the bin this account may manage, each item asked of the space it was in (R277, the audit of 24 Nov: Space settings Write on any space listed, restored and purged every space's). | refused: trash |
 | GET | `/api/claude-now` | prefix | `_get_claude_now` | GET /api/claude-now. |  |
 | GET | `/api/roadmap` | prefix | `_get_todo` | GET /api/roadmap. |  |
 | GET | `/api/rules` | prefix | `_get_rules` | GET /api/rules. |  |
@@ -107,9 +107,9 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/project-color` | prefix | `_project_color` | Give a project one of the colors for this account alone, or none (projects.set_mark): worn by its card, its tabs and its bar. |  |
 | POST | `/api/project-auth` | prefix | `_project_auth` | What credential this project's remote uses, and what else it could: projects.auth_answer. | refused: git-auth |
 | POST | `/api/project-ftp` | exact | `_project_ftp` | A project's file access over FTP (ftp.py, R151): what it is, for whoever sees the project, and a change, for an account with File access Write on it (users.may's ftp). | refused: ftp |
-| POST | `/api/container` | prefix | `_container` | A container from a compose file written here, with no project: containers.tab_verb. | refused: docker-write |
+| POST | `/api/container` | prefix | `_container` | A container from a compose file written here, with no project: containers.tab_verb. | refused: docker-write, refused: docker-any |
 | POST | `/api/vms` | exact | `_vms` | POST /api/vms (R91): new, start, stop, restart, remove, snapshot, revert, snapshot-rm. | refused: vms-write, refused: node |
-| POST | `/api/dockerctl` | prefix | `_docker_ctl` | Start, stop, restart or read the log of ONE container on a node. | refused: docker-write |
+| POST | `/api/dockerctl` | prefix | `_docker_ctl` | Start, stop, restart or read the log of ONE container on a node. | refused: docker-write, refused: docker-any |
 | POST | `/api/rename` | prefix | `_rename` | Rename a project: projects.rename. | refused: rename, refused: git-auth |
 | POST | `/api/trash-restore` | prefix | `_trash_restore` | A repository out of the bin, back into the project it was in, or into the one named (`project`) where that one is gone or another is wanted (R138); one from before projects into a project of its own. | refused: trash |
 | POST | `/api/trash-purge` | prefix | `_trash_purge` | Delete a trashed project for good. | refused: trash |
@@ -121,10 +121,10 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/layout` | prefix | `_layout` | Store this account's open tabs: layout.save_tabs. |  |
 | POST | `/api/bell` | exact | `_bell` | Put a bell note away for this account, bring every one back (bellseen.py), or resume a session an outage held (R251). |  |
 | POST | `/api/notices` | exact | `_notices` | Keep, delete or clear what the page said to this account: notices.act. |  |
-| POST | `/api/nginx` | exact | `_nginx` | Deploy, save, certificate, remove, check and update on one node's nginx (nginxproxy.py): writing a compose file and building it on a node, so docker-write like a written container, and never a session's. | refused: docker-write |
-| POST | `/api/scanners` | exact | `_scanners` | Deploy, update, remove, run now, the schedule and a version check (scanners.py): compose and scan jobs on a node, so docker-write like a written container, and never a session's. | refused: docker-write |
-| POST | `/api/router` | exact | `_router` | POST /api/router: a node's model router (router.py): its keys and endpoints saved, Deploy, Save and Remove as a written container's compose jobs, Ollama's models pulled and removed, a project allowed or not, the models a | refused: docker-write |
-| POST | `/api/library` | exact | `_library` | POST /api/library (R172): a card's Configure, Install and Remove for a service (the model router, router.py's own verbs, docker-write as the nginx page), the router's models, spend and Ollama's pulls, and Configure for a | refused: docker-write |
+| POST | `/api/nginx` | exact | `_nginx` | Deploy, save, certificate, remove, check and update on one node's nginx (nginxproxy.py): writing a compose file and building it on a node, a service's, so Configure on that node, and on every node for the hostname list e |  |
+| POST | `/api/scanners` | exact | `_scanners` | Deploy, update, remove, run now, the schedule and a version check (scanners.py): compose and scan jobs on a node, a service's, so Configure on that node, or on every node for what reaches them all (deploy-all, a run with |  |
+| POST | `/api/router` | exact | `_router` | POST /api/router: a node's model router (router.py): its keys and endpoints saved, Deploy, Save and Remove as a written container's compose jobs, Ollama's models pulled and removed, a project allowed or not, the models a |  |
+| POST | `/api/library` | exact | `_library` | POST /api/library (R172): a card's Configure, Install and Remove for a service (the model router, router.py's own verbs, docker-write as the nginx page), the router's models, spend and Ollama's pulls, and Configure for a |  |
 | POST | `/api/images` | exact | `_images` | Check for updates on the Containers page (imagecheck.py, R195): every container's registry images on one node, or all, asked now. | refused: docker-write |
 | POST | `/api/storage` | exact | `_storage` | Measure now on the Storage page: a node's disks walked at once (nodes.node_storage_measure). |  |
 | POST | `/api/schedules` | exact | `_schedules` | POST /api/schedules (R117): save (add or change, turning one on or off among them), remove, or run now. |  |
@@ -142,8 +142,8 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/forge-access` | exact | `_forge_access_post` | POST /api/forge-access {project, action: measure}: the token measured again, for the Permissions section's Measure; an account's on a project it may change. |  |
 | POST | `/api/forge` | exact | `_forge` | POST /api/forge {project, verb, args}: one aerie forge verb (R188), run here with the project's own token under what the token allows and the project's override, for a session on its own project or an account that may ch |  |
 | POST | `/api/project-sessions` | prefix | `_project_sessions` | POST /api/project-sessions {project, action: "end", session, node}: an administrator ending one of them (projsessions.py). | refused: settings |
-| POST | `/api/unlink` | prefix | `_unlink` | Take the remote off a project, with the credential and the push grant that came with it. | refused: create |
-| POST | `/api/link` | prefix | `_link` | Link an existing local repo to an empty repo on a host. | refused: create |
+| POST | `/api/unlink` | prefix | `_unlink` | Take the remote off a project, with the credential and the push grant that came with it. | refused: git-auth |
+| POST | `/api/link` | prefix | `_link` | Link an existing local repo to an empty repo on a host. | refused: git-auth |
 | POST | `/api/project-job` | prefix | `_project_job` | Stop the running project job, or clear the last one's outcome. | refused: create |
 | POST | `/api/roadmap` | prefix | `_roadmap` | Add, send, edit or drop one item on a project's list: roadmap.verb says what each action means. | refused: settings |
 | POST | `/api/roles` | prefix | `_roles` | POST /api/roles: assign (an account's Everywhere roles and its roles on each project, as far as the asker may, R152 and R155), set (make or change a role: its scope, its areas and note) or remove one; owner and admin are | refused: admin |
@@ -164,7 +164,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/global-rules` | prefix | `_global_rules` | The rules that apply to EVERY project (R63): rules.global_verb. | refused: controller |
 | POST | `/api/pending` | prefix | `_pending` | Approve or deny what a session has waiting (roadmap #27): pending.verb. | refused: pending |
 | POST | `/api/memory` | prefix | `_memory` | Edit, create or delete one of this project's memories, rewrite their index, or read the history: memory.verb, behind the gates here. |  |
-| POST | `/api/prefs` | prefix | `_prefs_post` | POST /api/prefs: a project's settings dialog, saved by prefs.dialog_save behind the gates here. | refused: node, refused: nodes-write, refused: debug, refused: docker-write, refused: curate, refused: vms-write, refused: settings |
+| POST | `/api/prefs` | prefix | `_prefs_post` | POST /api/prefs: a project's settings dialog, saved by prefs.dialog_save behind the gates here. | refused: nodes-write, refused: debug, refused: docker-write, refused: curate, refused: vms-write, refused: settings |
 | POST | `/api/brief` | prefix | `_brief` | POST /api/brief: the first Claude press's Build it and Start without it, and a session's take as it starts: brief.verb, behind the gates here. |  |
 | POST | `/api/design` | prefix | `_design` | POST /api/design: a Design section's Save of the language and the pages, and the file written into the tree: design.verb, for an account that works on the project. |  |
 | POST | `/api/wiki` | exact | `_wiki` | POST /api/wiki: a page saved, removed or renamed, and the wiki pushed to or pulled from the forge's (wiki.verb), for an account that works on the project. |  |
@@ -187,7 +187,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/tests` | prefix | `_tests` | The hand-written half of the registry: testreg.verb. |  |
 | POST | `/api/presence` | prefix | `_presence` | This browser is in a project's notebook, and who else is (roadmap #26): presence.heartbeat, for a signed-in account on a project it sees. |  |
 | POST | `/api/bugs` | prefix | `_bugs` | Report, edit, or close one bug: bugs.verb, behind the gates here. |  |
-| POST | `/api/custom` | prefix | `_custom` | Save or delete one of the operator's own command lists: macros.custom_edit. | refused: terminal |
+| POST | `/api/custom` | prefix | `_custom` | Save or delete one of the operator's own command lists: macros.custom_edit. | refused: command-pin |
 | POST | `/api/doctor` | prefix | `_doctor` | Re-run aerie doctor now and answer with the fresh verdict. | refused: controller |
 | POST | `/api/signout` | prefix | `_signout` | Sign this account out of a coding agent on one node (signin.sign_out): the login is that machine's, so that machine lets go of it. |  |
 | POST | `/api/login-code` | prefix | `_login_code` | Hand the code from the browser to the sign-in flow: signin.take_code, for the person whose flow it is. |  |
