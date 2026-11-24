@@ -40,7 +40,13 @@ def write_json(path, d, mode=0o644):
 class Table(unittest.TestCase):
     def test_every_list_reads_the_table_in_its_order(self):
         self.assertEqual(services.KINDS, ("router", "nginx", "scanners"))
-        self.assertIs(toolpacks.SERVICES, services.KINDS)
+        # Read from the one table, said in toolpacks' own source: the same
+        # object only while no other test of the tier has reloaded services
+        # (test_seams, test_features_off and test_auto_update do), which
+        # made an identity check fail in a whole run (B1110).
+        self.assertEqual(toolpacks.SERVICES, services.KINDS)
+        with open(toolpacks.__file__, encoding="utf-8") as f:
+            self.assertIn("\nSERVICES = services.KINDS\n", f.read())
         self.assertEqual(checks.KINDS, ("release", "images", "catalog"), "no service asks what is newest: each runs the images its entry names")
         self.assertEqual([k for k in settings.KEYS if k.startswith("check_")], [f"check_{k}" for k in checks.KINDS])
 
