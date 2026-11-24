@@ -973,7 +973,14 @@ def _source_urls(tc):
         die(f"{tc['name']}: unknown download resolver {kind!r}")
     if not spec.get("run") or not spec.get("match"):
         die(f"{tc['name']}: a command-urls download needs both run and match")
-    env = dict(os.environ, **{k: str(v) for k, v in (spec.get("env") or {}).items()})
+    env = dict(os.environ)
+    # The tool is the store's (playwright from its pack, dotnet's script under
+    # bash), found on the PATH a recipe's step is handed: aerie toolchains
+    # runs with the system's own folders and keeps the caller's as
+    # SDK_STEP_PATH (sdk.sh's sdk_entry).
+    if env.get("SDK_STEP_PATH"):
+        env["PATH"] = env["SDK_STEP_PATH"]
+    env.update({k: str(v) for k, v in (spec.get("env") or {}).items()})
     # Cached like a fetched document, and for the same reason: the .NET dry run
     # downloads and executes a vendor script, and it was being run twice per
     # check: once to learn the version, once to learn the size.

@@ -169,6 +169,31 @@ class Installed(unittest.TestCase):
             self.assertEqual(said, str(tree), p.stderr)
             self.assertEqual(where.startswith(self.bin), tree, where)
 
+    def test_a_store_tool_is_found_where_a_step_finds_it(self):
+        # aerie toolchains runs on the system's own folders (sdk_entry), and
+        # the caller's PATH, which a pack's bin folder is on, is kept for a
+        # recipe's step. What the recipe needs (npm, from the node pack) is
+        # looked for there, as is the tool the catalog's dry run asks for
+        # its downloads (playwright): on the system's folders neither is.
+        tool = os.path.join(self.bin, "storetool")
+        with open(tool, "w") as f:
+            f.write("#!/bin/sh\necho 'Download url: https://dl.example/thing.zip'\n")
+        os.chmod(tool, 0o755)
+        rc, out, err = self.sh(self.lib, 'sdk_entry command -v storetool || echo "not on the system\'s"; '
+                                         'sdk_entry sdk_store command -v storetool; sdk_entry printenv SDK_STEP_PATH')
+        self.assertEqual(rc, 0, err)
+        said = out.splitlines()
+        self.assertEqual(said[0], "not on the system's")
+        self.assertEqual(said[1], tool)
+        self.assertTrue(said[2].startswith(self.bin + ":"), said[2])
+        tc = {"name": "thing", "source": {"kind": "command", "download": {
+            "resolver": "command-urls", "run": ["storetool"], "match": r"Download url:\s+(\S+)"}}}
+        p = subprocess.run([sys.executable, "-c", "import json, sys, sdkmeta; print(sdkmeta._source_urls(json.loads(sys.argv[1])))",
+                            json.dumps(tc)], capture_output=True, text=True, check=False, cwd=self.lib,
+                           env={"PATH": "/usr/bin:/bin", "PYTHONPATH": self.lib, "SDK_STEP_PATH": f"{self.bin}:/usr/bin:/bin",
+                                "BB_SDK_CACHE_TTL": "0", "HOME": self.d})
+        self.assertEqual(p.stdout.strip(), "['https://dl.example/thing.zip']", p.stderr)
+
 
 class Seams(Installed):
     ENV = {"BUILDERBOT_NET_DEV": "/tmp/planted-net-dev", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut", "BUILDERBOT_RUN_DIR": "/tmp/planted-run",

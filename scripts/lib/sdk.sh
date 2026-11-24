@@ -1273,9 +1273,11 @@ sdk_step_env() {
 # recipe's step is handed (sdk_step_env) and the store's own tools are found
 # on (sdk_store), so a step sees what it saw before: the official recipes
 # run npm from the node pack. aerie sources this file for every verb, so the
-# PATH is narrowed here, for these verbs alone, and not at its top.
+# PATH is narrowed here, for these verbs alone, and not at its top. It is
+# exported, so the catalog's own dry run of a store tool (sdkmeta's
+# command-urls: playwright install --dry-run) finds the tool there too.
 sdk_entry() {
-    local SDK_STEP_PATH="${SDK_STEP_PATH:-$PATH}"
+    local -x SDK_STEP_PATH="${SDK_STEP_PATH:-$PATH}"
     local PATH="$SDK_SYS_PATH"
     "$@"
 }
@@ -2141,7 +2143,9 @@ sdk_install_command() {
     d="$(sdk_dir "$what")"
     sdk_mark_partial "$d"
     need="$(sdk_meta field "$what" source.requires)"
-    [ -z "$need" ] || command -v "$need" >/dev/null 2>&1 \
+    # What the command needs is looked for where its step will look: npm
+    # comes from the node pack, on the PATH the step is handed (sdk_store).
+    [ -z "$need" ] || sdk_store command -v "$need" >/dev/null 2>&1 \
         || die "${need} is not in this image"
     mkdir -p "$d"
     local -a cmd ROW_ENV

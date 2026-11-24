@@ -2692,7 +2692,8 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
        `...and refused on the node with the names, without reinstalling the recipe (${dfin?.state} ${dfin?.exit_code}: ${(dfin?.log || '').slice(-160).replace(/\n/g, ' / ')})`);
     ok(sfin && sfin.state === 'failed' && /npm: stub/.test(sfin.log)
        && !existsSync(`${PK}/playwright/node_modules`),
-       '...and the recipe then ran as the job account, where the stub npm stopped it before a download');
+       `...and the recipe then ran as the job account, where the stub npm stopped it before a download (${sfin?.state}: ${
+         (sfin?.log || '').slice(-300).replace(/\n/g, ' / ')})`);
   }
 
   // ---- test workers: the node's setting, in every job's environment (R81) --
