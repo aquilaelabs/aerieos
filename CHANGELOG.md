@@ -18,6 +18,7 @@
 - A page says what is news on one line in its head, a card at a desk, the same on every page and a node's, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4, 6f2809d)
 - Each person's pushes, pulls and git host work on a space run with their own token alone, at the same time as everyone else's, and the Repository section says so: Your access token, each person's row saying their own work uses it, and Authentication as Off, Deploy key or Each person's token. Upgrading: somebody who had not given a space a token of their own, whose pushes ran with another person's, gives theirs under Repository in its notebook's Settings (87f5103)
 - Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
+- A picked row in a list (a settings section, a user, a role, a commit) is lifted with a bar of the theme's highlight at its left, where the default scheme washed it brown (22e730c)
 
 ### Fixed
 
@@ -46,6 +47,12 @@
 - A sign-in finishing on a node shows on the page at once, where it waited for a reload (2144681)
 - The arrows at the ends of a row of chips, the dock's line and a row of sub-tabs are drawn whole, where the row's fade dimmed their ring (6fb56c9)
 - Switching between Full and Compact, or Cards and List, resizes each card smoothly into its new shape, where the boxes jumped to their new size half way through the fade (5b1789e)
+- Everything that opens, shuts or sorts anew on the page moves: a list slides its rows to their new places (the Library's On this node after an update, Jobs, Containers, Sessions), every fold and every field a choice reveals slides over its height, and a detail beside a list no longer pops to its new size half way through its fade (cccd303)
+- The Users page's roles use the account's whole pane and a long role no longer runs under the trash; an account added in another browser has its roles read, where the owner was told they were not theirs to give (07b38ad)
+
+### Security
+
+- Each role is asked of the space or node its action reaches: a role on one space no longer reaches nginx, the scanners or the model router on any node, every space's containers, other spaces' bins, notebooks and code, or a shell on another space; Accounts Write no longer makes administrators, an administrator no longer changes the owner's account, a role no longer puts somebody on a space only its members may join, and a session does no more than its account, a removed account's sessions ending with it. Upgrading: whoever ran nginx, the scanners or the model router with Containers Write on a space is given Configure on those nodes, and whoever read a space's notebook through another of its areas is given Spaces Read there (2dbd56d, 7a941b1)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
