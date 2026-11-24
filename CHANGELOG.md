@@ -34,6 +34,7 @@
 - A backup of the controller's state is refused onto a disk that keeps no file modes (exFAT, FAT, a share that gives every file one), where its secrets would be readable by anyone there; any other backup there says so (0eff3a2)
 - The array's mover copies a share's files a folder at a time through folders it holds, so a folder swapped for a link while it moves takes nothing anywhere else (0fabf35)
 - SnapRAID keeps its catalogue on each data disk in a folder only root may write, where a link planted beside it on a disk anybody could write was followed as root (a524955)
+- A CI runner's registration and removal tokens are no longer on its command line, where any account on the node could read them while it registered (1836c4c)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
