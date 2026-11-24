@@ -294,6 +294,17 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
   const now = await page.$eval('.dockline', l => ({ left: l.scrollLeft, chl: l.classList.contains('chl') }));
   ok(was.chr && was.left === 0 && now.left > 0 && now.chl,
      `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })}${hit ? '; under the press: ' + hit : ''})`);
+  // The arrow is never under the fade (the operator, 24 Nov): the circle the
+  // row's mask keeps open is the whole disc, and its ring is drawn inside it
+  // with room to spare, where a ring on the circle's soft edge read faded.
+  const disc = await page.$eval('.dockline', l => {
+    const cs = getComputedStyle(l), px = v => parseFloat(cs.getPropertyValue(v));
+    const ring = getComputedStyle(l, '::before').boxShadow.match(/inset 0px 0px 0px ([\d.]+)px/g) || [];
+    const deepest = Math.max(0, ...ring.map(s => parseFloat(s.match(/([\d.]+)px$/)[1])));
+    return { open: px('--arr'), radius: px('--arw') / 2, ringAt: px('--arw') / 2 - deepest };
+  });
+  ok(disc.open >= disc.radius && disc.ringAt <= disc.open - 1,
+     `an end's arrow is never under the row's fade: the circle kept open is its whole disc and its ring sits inside it (${JSON.stringify(disc)})`);
   // Drawn again (something on the line moved, as a session's dot does), the
   // line stays where the press put it rather than going back to the tab in
   // front (B322). Chat's unread count, since a terminal's label is its
