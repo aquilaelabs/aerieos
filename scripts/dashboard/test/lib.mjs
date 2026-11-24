@@ -381,23 +381,10 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // failed fetch or a name not defined was let through as its doing came
   // off with the other layers (R7 step 7).
   const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);
-  // WebKit says a fetch the page's own navigation cut short (a reload with
-  // a poll on its way) "cannot load ... due to access control checks", the
-  // words it has for a refused cross-origin load. Only that, for this
-  // page's own origin, in the three seconds about a navigation of its own
-  // (B1141): a load refused any other time is still an error.
-  let navAt = 0;
-  page.on('request', r => { if (r.isNavigationRequest() && r.frame() === page.mainFrame()) navAt = Date.now(); });
-  page.on('framenavigated', f => { if (f === page.mainFrame()) navAt = Date.now(); });
-  const cutByNav = text => {
-    const m = /^Fetch API cannot load (\w+:\s*\/+\S+?)\.? due to access control checks/.exec(text);
-    if (!m || Date.now() - navAt > 3000) return false;
-    try { return new globalThis.URL(m[1].replace(/^(\w+):\s*\/+/, '$1://')).origin === new globalThis.URL(page.url()).origin; } catch { return false; }
-  };
   page.on('console', m => {
     if (m.type() !== 'error') return;
     const url = m.location()?.url || '';
-    if (url.includes('/term') || cutByNet(m.text()) || cutByNav(m.text())) return;
+    if (url.includes('/term') || cutByNet(m.text())) return;
     const at = url ? ` [${url.replace(/^https?:\/\/[^/]+/, '')}]` : '';
     // Firefox and WebKit write an Error logged whole as JSHandle@object:
     // its name and message are read off it, so the failure says what it was
