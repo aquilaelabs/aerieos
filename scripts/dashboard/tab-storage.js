@@ -232,7 +232,7 @@ function moveRead(share, land, mover){
 // Samba and NFS to read again. The SMB password an account sets is R164's.
 function storageShares(n){
   if (!n.own) return "";
-  const admin = !!state?.can?.admin && n.may_measure;
+  const admin = !!state?.admin && n.may_measure;
   const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const shares = n.shares || [];
@@ -370,7 +370,7 @@ function wireStorageShares(root, n){
 // a system job the root agent runs from its table.
 function storagePools(n){
   if (!n.own) return "";
-  const admin = !!state?.can?.admin && n.may_measure;
+  const admin = !!state?.admin && n.may_measure;
   const why = !n.zfs ? `No zpool on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [];
@@ -486,7 +486,7 @@ function wireStoragePools(root, n){
 const SNAP_KINDS = [["hourly", "Hourly", "0 * * * *"], ["daily", "Daily, at 4:00", "0 4 * * *"], ["weekly", "Weekly, Sundays at 4:00", "0 4 * * 0"]];
 function storageSnapshots(n){
   if (!n.own) return "";
-  const admin = !!state?.can?.admin && n.may_measure;
+  const admin = !!state?.admin && n.may_measure;
   const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [], snaps = n.snapshots || {}, scheds = storageScheds(n);
@@ -573,7 +573,7 @@ function arrayVerifyWord(v){
 }
 function storageArray(n){
   if (!n.own) return "";
-  const admin = !!state?.can?.admin && n.may_measure;
+  const admin = !!state?.admin && n.may_measure;
   const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const a = n.array || {}, has = (a.data || []).length > 0, scheds = storageScheds(n).filter(x => x.array);
@@ -696,7 +696,7 @@ function wireStorageArray(root, n){
 // and Eject turns a row off so the disk is unmounted before it is pulled.
 function storageOther(n){
   if (!n.own) return "";
-  const admin = !!state?.can?.admin && n.may_measure;
+  const admin = !!state?.admin && n.may_measure;
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const recs = (n.extmounts || []).filter(r => !going(`storage:mount:${r.id}`)), live = n.ext_mounts || [];
   const kindWord = {disk: "a disk here", smb: "an SMB share", nfs: "an NFS export"};
@@ -768,7 +768,7 @@ function wireStorageOther(root, n){
 // page's row), the last run from the census, and a form for a new one.
 function storageBackups(n){
   if (!n.own) return "";
-  const admin = !!state?.can?.admin && n.may_measure;
+  const admin = !!state?.admin && n.may_measure;
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const recs = (n.backups || []).filter(r => !going(`storage:backup:${r.id}`)), live = n.store_backups || [], scheds = storageScheds(n).filter(x => x.backup);
   const places = [...(n.pools || []).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]).filter(x => x[0]),

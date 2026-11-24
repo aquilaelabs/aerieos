@@ -167,7 +167,7 @@ let homeStartHidden = (() => { try{ return localStorage.getItem("bb.gsHidden") =
 // a list from before the nodes dialed in again after a restart said there
 // was no node and no Claude Code until a reload (19 Oct).
 function homeStartReadsNodes(){
-  return !homeStartHidden && !setupNeeded() && !!state?.can?.admin && railAllows("nodes")
+  return !homeStartHidden && !setupNeeded() && !!state?.admin && railAllows("nodes")
     && !(nodesList && homeStartSteps().claude);
 }
 // The card's reading of the node steps: the setup page's, with one more
@@ -188,7 +188,7 @@ function homeStartSteps(){
 function homeStartHtml(){
   // First run's continuation, so the owner's and an administrator's: a
   // person without the role may have no New project to press.
-  if (homeStartHidden || setupNeeded() || !state?.can?.admin) return "";
+  if (homeStartHidden || setupNeeded() || !state?.admin) return "";
   const s = homeStartSteps(), canNodes = railAllows("nodes");
   // What the card cannot read yet it does not claim: the nodes list comes
   // once, with the Claude step's state.

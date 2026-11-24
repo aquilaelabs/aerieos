@@ -108,7 +108,8 @@ const PAGE_KINDS = {
   // CI runner is offered by grant too (R137 step 3). Its page is drawn from
   // the nodes' read.
   runner: {group: "build", label: "CI runner", open: () => openRunnerTab(),
-    may: a => state?.can?.runner !== false && a.runner !== "",
+    // ...drawn for CI runner Read, which reads the runners it may (R277).
+    may: a => state?.can?.["runner-read"] !== false && a.runner !== "",
     node: () => runnerNode, setNode: v => { runnerNode = v; }, moved: "nodes",
     off: n => {
       const has = (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
@@ -168,7 +169,7 @@ const PAGE_KINDS = {
     }},
   scanners: {group: "machines", label: "Scanners", open: () => openScannersTab(), may: a => !!a.nodes, back: "installed", own: false},
   // A machine's files (R224): an administrator's alone.
-  files: {group: "machines", label: "Files", open: () => openFilesTab(), may: () => !!state?.can?.admin,
+  files: {group: "machines", label: "Files", open: () => openFilesTab(), may: () => !!state?.admin,
     node: () => flNode, setNode: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },
     keep: "bb.filenode", load: () => loadFiles()},
 
@@ -799,6 +800,9 @@ function openNodePage(nid){
 // the strip's arrow, one + whose menu holds them, so the tabs are whole and
 // the row keeps its one height (the operator, 22 Nov; the group-header rule).
 function machinesActions(){
+  // Not drawn for an account whose roles do not give a new node (Nodes Write
+  // on every node, R277): what a role does not give is not advertised.
+  if (state?.can?.["nodes-new"] === false) return "";
   const dead = nodesList === null || featureOff("enroll") ? " disabled" : "";
   const fold = actMore([`<button type="button" data-ndvm${dead}>New VM</button>`, `<button type="button" data-ndenroll${dead}>Enroll node</button>`],
     true, {glyph: "+", said: "New VM or Enroll node", title: "a new VM, or a machine to enroll", dead: !!dead});
