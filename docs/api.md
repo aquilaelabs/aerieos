@@ -48,7 +48,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/roles` | prefix | `_get_roles` | GET /api/roles: the Roles page (R152): the areas, every role, and each account with its Global roles, the roles it holds on each project and the projects it is on. |  |
 | GET | `/api/users` | prefix | `_get_users` | GET /api/users. |  |
 | GET | `/api/nginx` | prefix | `_get_nginx` | The nginx page (nginxproxy.view): every node's nginx, for an account that may read the Nodes page; never a session's. |  |
-| GET | `/api/scanners` | exact | `_get_scanners` | The Scanners page (scanners.view): every node's scanners, the schedule, the versions and what nothing covers, for an account that may read the Nodes page; never a session's. | refused: nodes-read |
+| GET | `/api/scanners` | exact | `_get_scanners` | The Scanners page (scanners.view): every node's scanners, the schedule, the versions and what nothing covers, for an account that reads a node's services (_service_may); never a session's. |  |
 | GET | `/api/router` | exact | `_get_router` | GET /api/router?node=ID: a node's model router (router.status) and the projects it may be offered to, for an account that reads the Nodes page, on that node; never a session's. |  |
 | GET | `/api/router-key` | exact | `_get_router_key` | GET /api/router-key?project=NAME: the router address and the project's own key, for a session of that project at its start (bb-tty's launcher) or a person who may work on it; {} where no router allows the project. | refused: work |
 | GET | `/api/storage` | prefix | `_get_storage` | The Storage page (storage.view, R169): every node this account holds the Storage area on, what its disks hold, by project where the account sees the project and as one line otherwise. |  |
@@ -108,7 +108,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/project-auth` | prefix | `_project_auth` | What credential this project's remote uses, and what else it could: projects.auth_answer. | refused: git-auth |
 | POST | `/api/project-ftp` | exact | `_project_ftp` | A project's file access over FTP (ftp.py, R151): what it is, for whoever sees the project, and a change, for an account with File access Write on it (users.may's ftp). | refused: ftp |
 | POST | `/api/container` | prefix | `_container` | A container from a compose file written here, with no project: containers.tab_verb. | refused: docker-write, refused: docker-any |
-| POST | `/api/vms` | exact | `_vms` | POST /api/vms (R91): new, start, stop, restart, remove, snapshot, revert, snapshot-rm. | refused: vms-write, refused: node |
+| POST | `/api/vms` | exact | `_vms` | POST /api/vms (R91): new, start, stop, restart, remove, snapshot, revert, snapshot-rm. | refused: vms-write |
 | POST | `/api/dockerctl` | prefix | `_docker_ctl` | Start, stop, restart or read the log of ONE container on a node. | refused: docker-write, refused: docker-any |
 | POST | `/api/rename` | prefix | `_rename` | Rename a project: projects.rename. | refused: rename, refused: git-auth |
 | POST | `/api/trash-restore` | prefix | `_trash_restore` | A repository out of the bin, back into the project it was in, or into the one named (`project`) where that one is gone or another is wanted (R138); one from before projects into a project of its own. | refused: trash |
