@@ -86,6 +86,15 @@ function toastPlace(){
   stack.style.bottom = ask?.offsetHeight ? `${ask.offsetHeight + 8}px`
     : r?.height ? `${Math.round(innerHeight - r.top + 8)}px`
     : sheet ? "calc(8px + env(safe-area-inset-bottom))" : "";
+  // A dialog still coming in is drawn short of where it rests (its box
+  // scales up into place), so its foot is read again once it has: WebKit
+  // placed the stack mid-entry, 8px above where the buttons came to rest.
+  const coming = r ? sheet.getAnimations({subtree: true}).filter(a => a.playState === "running"
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)) : [];
+  if (coming.length && !toastPlace.again){
+    toastPlace.again = true;
+    Promise.allSettled(coming.map(a => a.finished)).then(() => { toastPlace.again = false; toastPlace(); });
+  }
 }
 
 function toastAdd(text, lv){
