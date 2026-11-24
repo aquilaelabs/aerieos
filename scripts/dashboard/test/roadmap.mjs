@@ -2188,7 +2188,10 @@ await section("a target release, and the chips by it", async () => {
   await page.waitForFunction(s => { const b = document.querySelector(s); return b.getAttribute('aria-busy') !== 'true' && b.disabled; }, save, { timeout: 15000 });
   const bbEps = (...a) => execFileSync(BB, ['roadmap', ...a],
     { env: { ...process.env, BB_ROADMAP_PROJECT: 'ep.silon', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).toString();
-  const shown = bbEps('show', 'R' + added[2].item.id);
+  // The press answers at once and the server writes after it (the
+  // operator, 22 Nov), so the file is asked until it says so.
+  let shown = '';
+  await until(() => /ship the third\s+\[for 0\.6\.0\]/.test(shown = bbEps('show', 'R' + added[2].item.id)), 10000, 200);
   ok(/ship the third\s+\[for 0\.6\.0\]/.test(shown), `the Reword box sets the target, v dropped, and Save writes it (${shown.trim().split('\n')[0]})`);
   await page.click('.pane .doc.on #roadmapVers [data-rmver=""]');
   let refused = '';
