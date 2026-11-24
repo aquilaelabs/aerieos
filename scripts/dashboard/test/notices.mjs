@@ -229,6 +229,26 @@ await section("an ask: answered on the row, its long part in a scrolling box", a
   }, rec.id));
   ok(hist && hist.what === 'the compose file' && hist.scrolls && /^services:/.test(hist.text) && !hist.acts,
      `...and its History row opens it in a box that scrolls inside itself, nothing to press in it (${JSON.stringify(hist)})`);
+  // Shut again each time the page is come back to, never remembered past it
+  // (the operator, 24 Nov), while one opened stays open through a redraw.
+  const histSel = `.noticestab .ntrow[data-nt="${rec.id}"] details.ntlong`;
+  await page.evaluate(s => { const d = document.querySelector(s); d.open = false; }, histSel);
+  await page.evaluate(s => { const d = document.querySelector(s); window.__ntSlid = false;
+    const real = Element.prototype.animate;
+    Element.prototype.animate = function(k, o){ if (this === d && Array.isArray(k) && k[0] && 'height' in k[0]) window.__ntSlid = true; return real.call(this, k, o); };
+    window.__ntUnslide = () => { Element.prototype.animate = real; }; }, histSel);
+  await page.click(`${histSel} > summary`);
+  const slid = await page.evaluate(() => { window.__ntUnslide(); return window.__ntSlid; });
+  await page.waitForFunction(s => document.querySelector(s)?.open, histSel, { timeout: 5000 }).catch(() => {});
+  await page.evaluate(() => loadNotices());
+  await sleep(600);
+  const keptOpen = await page.evaluate(s => !!document.querySelector(s)?.open, histSel);
+  await page.evaluate(() => openJobsTab());
+  await page.waitForFunction(() => tabOf(panes[0])?.kind === 'jobs', null, { timeout: 10000 }).catch(() => {});
+  await page.evaluate(() => openNotices());
+  const back = await until(() => page.evaluate(s => { const d = document.querySelector(s); return d && tabOf(panes[0])?.kind === 'notices' ? { open: d.open } : null; }, histSel));
+  ok(slid && keptOpen && back && back.open === false,
+     `...sliding open over its height as every fold does, open while the page is read, through its redraw, and shut again when it is come back to (${JSON.stringify({ slid, keptOpen, back })})`);
   // A denial keeps none: what it refused went nowhere.
   const denied = await page.evaluate(async () => {
     const real = phFetch;

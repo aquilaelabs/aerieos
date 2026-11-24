@@ -21,6 +21,11 @@ let noticesErr = "";
 let noticesChip = "";            // the chip in force: "", a kind, or "bad" for failures
 
 function openNotices(){
+  // Every long part shut each time the page is come back to (the operator,
+  // 24 Nov): one opened stays open while the page is read, through the
+  // redraws the poll makes, and not past it.
+  for (const k of Object.keys(sectOpen)) if (/^notices:(ask|okayed):/.test(k)) delete sectOpen[k];
+  document.querySelectorAll('details:is([data-sect^="notices:ask:"], [data-sect^="notices:okayed:"])').forEach(d => { d.open = false; });
   openTab({kind: "notices", arg: "__notices", label: "Notifications"});
 }
 
@@ -152,6 +157,13 @@ function wireNotices(root){
   root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () =>
     noticesAct({action: "delete", id: b.dataset.ntdel}, n => String(n.id) === b.dataset.ntdel));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
+  // A long part's fold, a Waiting row's or a History row's, slides over its
+  // height as every fold does (the operator, 24 Nov: it snapped open and
+  // shut where every other fold moves).
+  root.querySelectorAll("details.ntlong > summary").forEach(s => s.onclick = e => {
+    e.preventDefault();
+    slideDetails(s.parentElement, !foldOpen(s.parentElement));
+  });
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));
   root.querySelectorAll("[data-ntdeny]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntdeny), false));
   root.querySelectorAll("[data-ntinvite]").forEach(b => b.onclick = async () => {
