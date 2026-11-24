@@ -6,7 +6,7 @@
 // identity landing in the repo's own config through /api/prefs and coming out
 // of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
-import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER, section, pageCall } from './lib.mjs';
+import { launch, newPage, ok, skip, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -560,6 +560,22 @@ await section("a project's settings live in its notebook", async () => {
   const still = await page.evaluate(() => ({ people: !document.querySelector('details[data-sect="rn:people"]').hidden,
     pick: document.querySelector('.nbsettings .snav .rrow.on')?.dataset.spick }));
   ok(still.people && still.pick === 'yours', `...and asked for again it keeps People and the section picked (${JSON.stringify(still)})`);
+  // The picked row is a lift with the lit color as a bar at its left edge,
+  // never a wash of the lit color (the operator, 24 Nov: copper over navy
+  // read brown on the default scheme).
+  const picked = await page.evaluate(() => {
+    const r = document.querySelector('.nbsettings .snav .rrow.on');
+    if (!r || !r.checkVisibility()) return null;
+    const cs = getComputedStyle(r);
+    const probe = document.createElement('i'); probe.style.color = 'var(--lit)'; r.appendChild(probe);
+    const lit = getComputedStyle(probe).color; probe.remove();
+    return { bar: cs.boxShadow, lit, bg: cs.backgroundColor };
+  });
+  if (picked){
+    const rgb = s => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number).join(',');
+    ok(/inset/.test(picked.bar) && /3px 0px 0px/.test(picked.bar) && picked.bar.includes(rgb(picked.lit).split(',')[0]) && !picked.bg.includes(rgb(picked.lit)),
+       `...the picked row lifted with the lit color as a bar at its left, not washed in it (${JSON.stringify(picked)})`);
+  } else skip('...the picked row lifted with the lit color as a bar at its left', 'the list is folded away at this width');
   // The box borrowed from the dialog brings no dialog shadow into the view
   // (B702): the scroll-hint class it wore in the dialog is dropped on the way
   // in, and an inline box gets no shadow from that class however it arrives.

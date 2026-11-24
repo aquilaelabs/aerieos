@@ -375,7 +375,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
   .rsplit.open>.rlist,.rsplit:not(.open)>.rdetail{display:none}
   /* As a page of settings does: no row stays lit on the list, and the
      detail slides in from the right and the list back from the left. */
-  .rsplit:not(.open)>.rlist .rrow.on{background:none;--sheen:none}
+  .rsplit:not(.open)>.rlist .rrow.on{background:none;box-shadow:none;--sheen:none}
   .rsplit.open[data-move="in"]>.rdetail{animation:splitIn .26s cubic-bezier(.33,1,.68,1)}
   .rsplit:not(.open)[data-move="back"]>.rlist{animation:splitBack .26s cubic-bezier(.33,1,.68,1)}
 }

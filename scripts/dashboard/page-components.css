@@ -96,14 +96,17 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .rrow .rtags{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font:var(--f-note)}
 @media(hover:hover){ :is(.rolestab,.userstab) .rrow:hover:not(.on),.snav .rrow:hover:not(.on){background:color-mix(in srgb,var(--ink) 6%,transparent)}
 }
-/* The picked row is lit, so it wears the second color (--lit) as every lit
-   control does. */
+/* The picked row is a step lighter than the panel, with the second color
+   (--lit) as a bar inside its left edge, the way the rail marks the group
+   on show (the operator, 24 Nov: the lit color washed over the panel read
+   brown on the default scheme, copper over navy). */
 :is(.rolestab,.userstab) .rrow.on,:is(.rolestab,.userstab) .rrow.on:hover,.snav .rrow.on,.snav .rrow.on:hover{
-  background:color-mix(in srgb,var(--lit) 14%,transparent);border-bottom-color:var(--line)}
-/* ...and every row picked to show what is beside or under it is lit the
+  background:color-mix(in srgb,var(--ink) 9%,transparent);box-shadow:inset 3px 0 0 var(--lit);border-bottom-color:var(--line)}
+/* ...and every row picked to show what is beside or under it is marked the
    same way: a commit picked in the history, a file in Files, a node's
    runner on the CI runner page. */
-.grow[data-sha].on,.grow[data-sha].on:hover,.fxtbl .tline.on,.fxtbl .tline.on:hover,.runnersall .row.on,.runnersall .row.on:hover{background:color-mix(in srgb,var(--lit) 14%,transparent)}
+.grow[data-sha].on,.grow[data-sha].on:hover,.fxtbl .tline.on,.fxtbl .tline.on:hover,.runnersall .row.on,.runnersall .row.on:hover{
+  background:color-mix(in srgb,var(--ink) 9%,transparent);box-shadow:inset 3px 0 0 var(--lit)}
 /* A row that asks a person something (the bell's asks, a phone to pair, a
    node's root command, a container to make): one mark, an edge of the
    ask's tone inside its left side so nothing moves, a root command or an
@@ -150,7 +153,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
   /* The open section's head is the way back: a chevron before its name,
      the whole head the press (splitSects). */
   .ssplit.sopen>.scur>summary,.rsplit.open>.rdetail>.rhead{pointer-events:auto;cursor:pointer}
-  .ssplit:not(.sopen)>.snav .rrow.on{background:none;--sheen:none}
+  .ssplit:not(.sopen)>.snav .rrow.on{background:none;box-shadow:none;--sheen:none}
   .ssplit.sopen[data-move="in"]>:not(.snav){animation:splitIn .26s cubic-bezier(.33,1,.68,1)}
   .ssplit:not(.sopen)[data-move="back"]>.snav{animation:splitBack .26s cubic-bezier(.33,1,.68,1)}
 }
