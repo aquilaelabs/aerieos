@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- An approved ask's row in History opens what it okayed: a push's flagged lines, a container's compose file or a release's new notes (e457254)
+
 ### Changed
 
 - The warning color on every dark theme is a warmer gold (e5105b3)
@@ -10,6 +14,8 @@
 - aerie version release refuses a pre-release on a commit no release rehearsal passed on, in a repository that has one, and says to rehearse it first (f9d77fc)
 - A repository's git host settings are drawn in its Settings under Repository, where the chain on its card and its menu now lead, and a space whose Authentication is Disabled says over its tokens that pushes are off (bf3b7c3)
 - A page says what is news on one line under its name, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4)
+- Each person's pushes, pulls and git host work on a space run with their own token alone, at the same time as everyone else's, and the Repository section says so: Your access token, each person's row saying their own work uses it, and Authentication as Off, Deploy key or Each person's token. Upgrading: somebody who had not given a space a token of their own, whose pushes ran with another person's, gives theirs under Repository in its notebook's Settings (87f5103)
+- Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
 
 ### Fixed
 
@@ -18,6 +24,8 @@
 - A session whose coding agent ends on its own is shown as ended, with Start offered again, where its space went on showing it running until Restart was pressed a second time (2bcb03e)
 - A session's push from a space whose Authentication is Disabled is refused at once, saying where to turn it back on, where it ran for minutes saying nothing and aerie git policy said to link the space again (bf3b7c3)
 - A space's git host settings no longer list the token it uses a second time as another to use instead (bf3b7c3)
+- A list narrowed by a chip no longer draws rows over each other while it changes: what leaves goes first, then what stays slides, then what arrives fades in (f440cd4)
+- On a phone in Safari a toast over a dialog sits just above its buttons, where it floated 16px above them (26f9850)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
