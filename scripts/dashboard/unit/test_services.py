@@ -87,7 +87,7 @@ class Table(unittest.TestCase):
 
     def test_the_grants_differ_and_only_the_router_is_set_on_its_card(self):
         self.assertEqual({k: services.grant(k) for k in services.KINDS},
-                         {"router": "configure", "nginx": "docker-write", "scanners": "docker-write"})
+                         {"router": "configure", "nginx": "configure", "scanners": "configure"})
         self.assertEqual([k for k in services.KINDS if services.paged(k)], ["nginx", "scanners"])
 
 
@@ -140,9 +140,11 @@ class OnANode(unittest.TestCase):
             for k in ("manifest", "status", "ready", "all_projects"):
                 self.assertEqual(json.dumps(got[0][k]), json.dumps(the_router[0][k]), f"{step}: {k}")
             self.assertEqual(got[1:], the_paged, step)
-            # Each comes to whoever holds its own grant on the node.
-            self.assertEqual(self.drawn(services.rows("n1", lambda g: g == "configure")), self.drawn(the_router), step)
-            self.assertEqual(services.rows("n1", lambda g: g == "docker-write"), the_paged, step)
+            # Each comes to whoever holds Configure on the node, a node's
+            # services all being its (R277), and none to Containers Write.
+            self.assertEqual(self.drawn(services.rows("n1", lambda g: g == "configure")),
+                             self.drawn(the_router + the_paged), step)
+            self.assertEqual(services.rows("n1", lambda g: g == "docker-write"), [], step)
             self.assertEqual(services.rows("n1", lambda g: False), [], step)
         self.assertEqual((got[1]["status"], got[2]["status"]), ({"deployed": True}, {"deployed": True}))
         self.assertEqual(got[0]["ready"], "")

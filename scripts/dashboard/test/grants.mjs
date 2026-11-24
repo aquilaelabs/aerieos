@@ -15,6 +15,7 @@ const ALPHA = 'alpha';
 // The roles: Containers Write on a space, and Accounts Write everywhere.
 await api('/api/roles', { action: 'set', name: `box ${stamp}`, scope: 'projects', perms: { containers: 'write' } });
 await api('/api/roles', { action: 'set', name: `people ${stamp}`, scope: 'global', perms: { accounts: 'write' } });
+await api('/api/roles', { action: 'set', name: `maker ${stamp}`, scope: 'global', perms: { newprojects: 'write' } });
 const made = [];
 const account = async (name, pw, extra) => {
   await api('/api/users', { action: 'add', name, password: pw, role: extra?.role || 'user' });
@@ -25,6 +26,8 @@ const account = async (name, pw, extra) => {
 const boxer = await account(`box${stamp}`, 'box-pass-word-1', { assign: { project_roles: { [ALPHA]: [`box ${stamp}`] } } });
 const hr = await account(`hr${stamp}`, 'hr-pass-word-1', { assign: { roles: [`people ${stamp}`] } });
 const adm = await account(`adm${stamp}`, 'adm-pass-word-1', { role: 'admin' });
+const maker = await account(`mk${stamp}`, 'mk-pass-word-1',
+  { assign: { roles: [`maker ${stamp}`], project_roles: { [ALPHA]: [`box ${stamp}`] } } });
 const node = ((await api('/api/v1/nodes')).nodes || []).find(n => n.kind === 'agent' || n.id)?.id || 'local';
 // No node: the Containers page's own daemon, which a prune would reach.
 const dnode = '';
@@ -53,6 +56,16 @@ await section("a role reads only what its areas say", async () => {
   ok(trash.status === 403, `...nor its bin, which is Space settings Write (${trash.status})`);
 });
 
+await section("a repository is added to a space by its owner or an administrator", async () => {
+  // New spaces Write, and on alpha, but not alpha's owner. A repository is
+  // added into its space, named by the space's key.
+  const repos = (await api('/api/status')).repos || {};
+  const space = Object.keys(repos).find(k => (repos[k].members || []).includes(ALPHA)) || ALPHA;
+  const r = await call('/api/create', { project: space, name: `rep${stamp}` }, maker);
+  ok(r.status === 403 && /owner or an administrator/.test(r.body.error || ''),
+     `New spaces Write and a place on alpha add no repository to it (${r.status} ${r.body.error})`);
+});
+
 await section("Accounts Write gives no administrator and an administrator no owner's account", async () => {
   const self = await call('/api/users', { action: 'edit', name: `hr${stamp}`, role: 'admin' }, hr);
   const made = await call('/api/users', { action: 'add', name: `x${stamp}`, password: 'x-pass-word-1', role: 'admin' }, hr);
@@ -73,5 +86,5 @@ await section("a session goes when its account goes", async () => {
 });
 
 for (const n of made) await api('/api/users', { action: 'remove', name: n });
-for (const n of [`box ${stamp}`, `people ${stamp}`]) await api('/api/roles', { action: 'remove', name: n });
+for (const n of [`box ${stamp}`, `people ${stamp}`, `maker ${stamp}`]) await api('/api/roles', { action: 'remove', name: n });
 await done(browser);

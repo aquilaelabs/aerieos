@@ -9507,7 +9507,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._nodes_down()
         q = self._q()
         mine, system = self._jobs_scope()
-        return self._json(*nodes.jobs_view(q.get("id", [""])[0], q, mine, system, self._jobs_hidden()))
+        body, code = nodes.jobs_view(q.get("id", [""])[0], q, mine, system, self._jobs_hidden())
+        # Whether each live job's Cancel is this reader's, so the page draws
+        # it only where the press would be taken (R277).
+        me = self._who()
+        for j in body.get("jobs") or []:
+            if j.get("state") not in ("succeeded", "failed", "canceled"):
+                j["may_cancel"] = not self._job_cancel_why(me, j, mine)
+        return self._json(body, code)
 
     def _jobs_scope(self):
         """(the projects whose jobs this account reads, None for all; the
@@ -9515,7 +9522,11 @@ class Handler(BaseHTTPRequestHandler):
         what the Jobs page and a job's log in the dock (R133 step 12) both
         read by."""
         me = self._who()
-        mine = None if users.may(me, "admin") == "" \
+        # Every job for an administrator or for Jobs Read held on every node
+        # (R277: it was Accounts Write's, which is not about jobs).
+        mine = None if users.is_admin(me or {}) or (not (me or {}).get("session")
+                                                     and roles.level_of(me or {}, "jobs")
+                                                     and roles.nodes_for(me or {}, "jobs") is None) \
             else set(project_names(me))
         # Without Jobs Read a person sees their projects' jobs alone, those
         # they may read (R152 step 3); the Jobs tab is hidden for them.
@@ -9840,7 +9851,9 @@ class Handler(BaseHTTPRequestHandler):
         # dials (R91 step 14): the asker's own, as Enroll node's script uses.
         req = dict(req, ctl=f"{'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'}://"
                             f"{self.headers.get('Host') or ''}")
-        if req.get("node_agent") is True and not sess and self._refused("node"):
+        # A VM made a node is a new node: Nodes Write on every node, as
+        # Enroll node asks (R277: Nodes Write on any one node passed).
+        if req.get("node_agent") is True and not sess and self._refused_on_node("node", ""):
             return
         if sess:
             if project != sess:
@@ -10649,16 +10662,34 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*nodes.run_job(name, req, self._principal()))
         if act != "cancel":
             return self._json({"error": "unknown action"}, 400)
-        # Whose it is, the way the read is scoped: an account cancels the
-        # jobs of its projects and a session its own project's; a stranger's
-        # job and a missing one answer alike.
-        me = self._who()
-        mine = None if users.may(me, "admin") == "" else set(project_names(me))
-        if mine is not None:
-            j = nodes.job(field(req, "id"), with_log=False)
-            if not j or j.get("project") not in mine:
-                return self._json({"error": "no such job of yours"}, 403)
+        # Whose it is (_job_cancel_why); a stranger's job and a missing one
+        # answer alike.
+        j = nodes.job(field(req, "id"), with_log=False)
+        if not j or (why := self._job_cancel_why(self._who(), j)):
+            return self._json({"error": why if j and why != "unseen" else "no such job of yours"}, 403)
         return self._result(jobs.cancel(self._principal(), field(req, "id")))
+
+    def _job_cancel_why(self, me, j, mine=False):
+        """Why this account may not cancel the job `j`, "" when it may:
+        an administrator any; a session its own space's; a person one on a
+        node they hold Jobs Write on, or one of a space they hold Spaces
+        Write on, whose builds and tests these are (R277, the audit of 24
+        Nov: Accounts Write cancelled every job and a reader of a space any
+        of its own). "unseen" for a job this account does not read."""
+        if users.is_admin(me or {}):
+            return ""
+        proj = j.get("project") or ""
+        if (me or {}).get("session"):
+            return "" if proj and users.may_work(me, proj) else "unseen"
+        if mine is False:
+            mine, _system = self._jobs_scope()
+        if mine is not None and proj not in mine and not (j.get("node") and not users.may_node(me, "jobs", j["node"])):
+            return "unseen"
+        if j.get("node") and not users.may_node(me, "jobs", j["node"]):
+            return ""
+        if proj and not users.may(me, "work", proj):
+            return ""
+        return "your roles give no Jobs Write on its node and no Spaces Write on its space"
 
     def _claude_login(self, req):
         """A node saying what this account is signed in to Claude, or another
@@ -12334,6 +12365,13 @@ class Handler(BaseHTTPRequestHandler):
             if not users.may_work(me, into):
                 return self._json({"error": f"{registry.label(into)} is not on your list of spaces: "
                                             "add it to your own list on the Users page first"}, 403)
+            # What repositories a space holds is its owner's or an
+            # administrator's, as the card draws Add repository (R277, the
+            # audit of 24 Nov: New spaces Write and a place on the space
+            # added one to somebody else's space).
+            if not users.is_admin(me) and not membership.may_manage(me, into):
+                return self._json({"error": f"a repository is added to {registry.label(into)} by its owner "
+                                            "or an administrator"}, 403)
             if (bad := projects.locked_out(into, users.whose(me))):
                 return self._json(bad, 403)
             return self._json(*projects.create_from_dialog(
@@ -13943,8 +13981,9 @@ class Handler(BaseHTTPRequestHandler):
             plan = self._move_plan(me, name, to, was)
             offered = {n["id"]: n["as"] for n in plan["nodes"] if not n["have"]}
             add = [str(x) for x in (req.get("add_nodes") or []) if str(x) in offered]
-            if add and users.may(me, "node"):
-                return self._json({"error": users.may(me, "node")}, 403)
+            # ...each one asked of (R277: Nodes Write on any node passed).
+            if self._refused_nodes(add):
+                return
             got = repos.move(name, to)
             if got.get("error"):
                 return self._json(got, 400)
@@ -14006,7 +14045,8 @@ class Handler(BaseHTTPRequestHandler):
         return {"name": name, "label": registry.label(name), "from": registry.label(was) if was else "",
                 "to": registry.label(to), "nodes": out, "lose": sorted(x for x in lose if x),
                 "things": self._move_things(name, was, have),
-                "busy": busy, "node_why": users.may(me, "node") if any(not n["have"] for n in out) else ""}
+                "busy": busy, "node_why": next((w for n in out if not n["have"]
+                                                if (w := users.may_node(me, "node", n["id"]))), "")}
 
     @staticmethod
     def _move_things(name, was, have):

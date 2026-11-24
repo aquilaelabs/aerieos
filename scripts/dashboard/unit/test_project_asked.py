@@ -1,6 +1,7 @@
 """The opening of a handler that works on one project (server.py's
 _project_asked): where the name is read from, which refusal comes first,
-and that a write is asked of an account that works on the project. Held
+that a read is asked Spaces Read on it and a write of an account that works
+on the project. Held
 here without a server: the helper and the three gates it stands on are
 lifted out of server.py's source and run against a stand-in for the
 accounts and the locks."""
@@ -51,6 +52,15 @@ def handler():
         def _who(self):
             return self.who
 
+        # Spaces Read, the area's gate (_refused is the server's whole
+        # dispatcher; what it answers for "read" is the account's reads).
+        def _refused(self, action, name=None):
+            assert action == "read", action
+            if name in self.who.get("reads", self.who["sees"]):
+                return False
+            self.said.append((403, {"error": "your roles give no Spaces Read on it"}))
+            return True
+
         def _json(self, obj, code=200):
             self.said.append((code, obj))
 
@@ -60,6 +70,8 @@ def handler():
 Stand = handler()
 USER = {"uid": "u_user", "sees": ["alpha", "beta", "locked"], "works": ["alpha", "locked"]}
 OWNER = {"uid": "u_owner", "sees": ["alpha", "locked"], "works": ["alpha", "locked"]}
+# On beta by a role that gives it Containers alone (R277, the audit of 24 Nov).
+BOXER = {"uid": "u_box", "sees": ["beta"], "works": [], "reads": []}
 
 
 class Asked(unittest.TestCase):
@@ -95,6 +107,14 @@ class Asked(unittest.TestCase):
     def test_a_read_is_not_asked_whether_the_account_works_on_it(self):
         h = Stand(USER)
         self.assertEqual(h._project_asked({"project": "beta"}), "beta")
+        self.assertEqual(h.said, [])
+
+    def test_a_read_asks_spaces_read_and_the_files_ask_their_own(self):
+        h = Stand(BOXER)
+        self.assertIsNone(h._project_asked({"project": "beta"}))
+        self.assertEqual(h.said, [(403, {"error": "your roles give no Spaces Read on it"})])
+        h = Stand(BOXER)
+        self.assertEqual(h._project_asked({"project": "beta"}, files=True), "beta")
         self.assertEqual(h.said, [])
 
     def test_a_write_is_refused_where_the_account_only_sees_it(self):
