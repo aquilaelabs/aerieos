@@ -954,7 +954,10 @@ function renameProject(name, mode = "all"){
   // a button to a dialog, over an empty page).
   const how = p?.push_how || "";
   const linked = !proj && !!p?.linked;
-  $("rnTokenField").hidden = !linked || !(p?.has_token || p?.push) || state?.can?.["git-auth"] === false;
+  // Whether this space's git host access is this account's at all, by its
+  // grants on this space; where not, none of it is drawn (a reader).
+  const gitMay = (p?.may_gitauth ?? state?.can?.["git-auth"]) !== false;
+  $("rnTokenField").hidden = !linked || !(p?.has_token || p?.push) || !gitMay;
   // The deploy-key case is tested FIRST and stays true after a token is set:
   // storing one does not change what git uses (git never asks a credential
   // helper about an ssh remote), and a hint that stopped saying so the moment
@@ -968,7 +971,7 @@ function renameProject(name, mode = "all"){
       + "while you are signed in; nobody else's work uses it. A shell here can read it.";
   // Nothing to set is an answer, not an empty box: a linked project with no
   // token and no push rights has a remote it can only read.
-  $("rnGitNone").hidden = !(linked && $("rnTokenField").hidden);
+  $("rnGitNone").hidden = !(linked && gitMay && $("rnTokenField").hidden);
   if (!$("rnGitNone").hidden)
     $("rnGitNone").firstElementChild.textContent =
       `${projLabel(name)} has a remote it can only read, so there is no credential to set here.`;
@@ -982,13 +985,13 @@ function renameProject(name, mode = "all"){
     const go = $("rnRepoGo");
     go.hidden = !!p.linked;
     go.textContent = "Link to a git host";
-    go.disabled = state?.can?.["git-auth"] === false;
+    go.disabled = !gitMay;
     go.onclick = () => openLinkProject(name);
   }
   // Unlink is at the Repository section's foot, apart from its Save: it is
   // about the remote, and it is the way a project moves from one host to
   // another, since linking refuses a repo that already has one.
-  $("rnUnlinkF").hidden = !linked || state?.can?.["git-auth"] === false;
+  $("rnUnlinkF").hidden = !linked || !gitMay;
   unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`);
   // The bin, on the repository's settings and not the space's door.
   // Not drawn for a role that does not give it (the operator, 21 Oct).
@@ -1440,7 +1443,7 @@ function rnLoadAuth(name){
   $("rnTestField").hidden = true;
   $("rnTestOut").hidden = true;
   const p = (state?.projects || []).find(x => x.name === name);
-  if (rnMode === "project" || !p?.linked) return;
+  if (rnMode === "project" || !p?.linked || p.may_gitauth === false) return;
   postJSON("/api/project-auth", {name})
     .then(j => {
       if (rnFor !== name || j.error) return;   // closed, or reopened elsewhere

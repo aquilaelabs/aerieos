@@ -1533,6 +1533,11 @@ def _project_columns(who, facts):
                     # Running sessions sections say without asking for what
                     # they would only be refused (B89).
                     "settings_why": _tpart("projects:may", users.may, who, "settings", d.name) if who else "",
+                    # ...and whether its git host access is this account's to
+                    # read and give its own token to (R275): the Repository
+                    # section asks for none of it where not, rather than being
+                    # refused for every open.
+                    "may_gitauth": not _tpart("projects:may", users.may, who, "git-auth", d.name) if who else True,
                     # ...and why its notebook, its tree and the project itself
                     # are not this account's to change, or "" (B86): a role
                     # that gives Projects Read alone sees the page with every
