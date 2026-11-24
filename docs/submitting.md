@@ -342,8 +342,8 @@ AerieOS's own validators as every supported release carries them.
    release is listed yet, name AerieOS's branch for it to fetch instead:
    `tools/aerieos-checkouts.sh main`.
 
-Do not sign anything: `index.sig` is the maintainers', and a pull request
-that changes it is not merged.
+Do not sign anything: never change `index.sig`, which the maintainers' sign
+workflow commits to the change's branch before it is merged.
 
 ## Open the pull request
 
@@ -387,8 +387,9 @@ The check runs on the pull request. A red check says why in its log.
   ([Declared downloads](tool-packs.md#declared-downloads)): each file's
   address and sha256 in the manifest, so AerieOS fetches and checks it and
   your steps run with no network.
-- **Sign and merge.** The index is signed with the maintainers' key and the
-  pull request merged. From then on every install lists the entry at its
+- **Sign and merge.** A maintainer runs the catalog's `sign` workflow for
+  the change's branch, whose key only a maintainer's approval releases;
+  it commits the signed index there, and the pull request is merged. From then on every install lists the entry at its
   next look at the catalog.
 
 Vetting says the pack does what its manifest says and fetches what it says

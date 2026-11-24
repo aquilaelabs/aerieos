@@ -567,13 +567,17 @@ The keys a signature must verify against are the install's own copy of
 with, never the release's: a file is taken only when it is in a list a key
 this install already held signed. Four things check it, each with OpenSSH's
 `ssh-keygen -Y verify`, and each hashes the file it took and holds those
-bytes to the list: the OS updater, the installer's `--update`, the stick
-maker (`write`, which carries the same lines in itself) and the Library's
-downloads of the apps.
+bytes to the list: the OS updater, the installer's `--update` from a
+release (`--from DIR` takes a tree you vouch for yourself, unchecked), the
+stick maker (`write`, which carries the same lines in itself) and the
+Library's downloads of the apps.
 
 What the list is made over is every file of the release, and each is
-vouched for before it is listed. Every file CI builds carries a build
-attestation made by the job that built it: the controller bundle, the ISO,
+vouched for before it is listed. Every file CI builds is named in a build
+attestation from the workflow the seal names for it (files one step
+attests together share one attestation; the ISO and the stick's image are
+attested by the release job, held first to the sha256 the OS image's
+build put out): the controller bundle, the ISO,
 the stick's image and the line naming the container image by the release
 workflow (`build-image.yml`), the two `.exe`, the `.pyz` and the `.vsix` by
 the companion's workflow it calls (`companion-app.yml`), each run on the

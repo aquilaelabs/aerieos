@@ -23,8 +23,8 @@ named for is the channel, a pre-release takes a list signed in either, and a
 stable release takes aerieos-release alone, so the key the release build
 holds can never sign one. A release whose list is unsigned, signed by
 nobody this install names or by somebody its tag may not have, is refused
-and said; only an install that names no signer at all goes on without, and
-says so. The rule the OS updater (osimage.py), the installer and the stick
+and said, and so is every release on an install that names no signer at
+all: no app is taken from it. The rule the OS updater (osimage.py), the installer and the stick
 maker follow; test_release_signing.py holds the four to one table of cases.
 
     configure(state=, version=, setting=, write_json=, audit=)

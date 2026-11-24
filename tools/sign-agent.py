@@ -230,9 +230,8 @@ def _builder_key(path, Ed25519PrivateKey):
 
 
 def _builder_sign(args, Ed25519PrivateKey):
-    """--builder FILE [--out SIG]: this tree's agent, root's tools and the
-    bundle's files signed with a builder's own key, whatever the committed
-    file names."""
+    """--builder FILE [--out SIG]: this tree's agent and the bundle's files
+    signed with a builder's own key, whatever the committed file names."""
     out = SIG
     if "--out" in args:
         i = args.index("--out")

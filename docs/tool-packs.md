@@ -324,7 +324,7 @@ it asks for.
 or its signature; one that answers another file stops the install, naming
 what it expected and what it got, and leaves nothing installed. The files
 are then where `to` says, inside the pack, and the install steps and the
-verify command run with no network: a step that tries to fetch anything
+verify command run with no network where the node can cut it (below): a step that tries to fetch anything
 else fails, and the job says it ran with no network. So a pinned commit
 pins everything the install brings, and a newer version of the tool is a
 new commit of the pack with a new address and a new sha256, which a
@@ -589,6 +589,8 @@ Everything AerieOS ships is a pack in this same format too (R169): under
 recipe `config/toolchains.json` has for it under `shipped` (where it is
 fetched from, how it is verified, the system packages it needs), and under
 `packs/agents/` one per coding agent, carrying the adapter under `agent`
+(and under `packs/services/` one per service AerieOS deploys: the model
+router, nginx, the scanners)
 (the program sessions run, how it installs and updates, how a person signs
 in, how it takes the briefing and AerieOS's guards, where its
 conversations are). Both carry `"tier": "official"`, which is what lets

@@ -335,8 +335,8 @@ wait for the move.
 that network reads the node's token and everything the channel carries
 (the jobs and their logs, a session's token on its way to a terminal),
 and whoever can change traffic there can answer as the controller. Two
-things hold even then: an agent update, root's tools and the bundle's
-files are taken only under the release key the node pinned (below), and a
+things hold even then: an agent update and the bundle's files (root's tools
+among them) are taken only under the release key the node pinned (below), and a
 terminal, a file request or a VM's screen on the node's relay is signed
 and crosses in TLS of the node's own. A browser at `http://` is what the
 Connection section says, and is not changed by any of this.
@@ -619,8 +619,8 @@ holds, never one that arrives with the thing itself:
 
 | What is checked | The public half an install holds | Where the private half is |
 |---|---|---|
-| The catalog's index | `config/catalog.pub`, shipped in the release | the catalog repository's secret `CATALOG_SIGNING_KEY`, used by its `sign` workflow |
-| A node's agent update, root's tools and the files of the bundle it fetches | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY`, read by two jobs on a `v*` tag alone ([versions.md](versions.md#the-release-key-on-github)) |
+| The catalog's index | `config/catalog.pub`, shipped in the release | the secret `CATALOG_SIGNING_KEY` of the catalog repository's environment `sign`, used by its `sign` workflow |
+| A node's agent update and the files of the bundle it fetches (root's tools among them) | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY`, read by two jobs on a `v*` tag alone ([versions.md](versions.md#the-release-key-on-github)) |
 | A release's list of its files (`SHA256SUMS`), for a dev build | `config/release-signers`, its `aerieos-dev` lines: the release key and its spare again, as OpenSSH keys | the release build's secret `AERIEOS_RELEASE_KEY` |
 | A release's list of its files, for a stable release | `config/release-signers`, its `aerieos-release` line | offline, on the stable key holder's own machine |
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The official packs (R169 step 1): every shipped toolchain
-(config/toolchains.json) and every coding agent (agents.py's table) written
+(config/toolchains.json), every coding agent (agents.py's table) and every
+service AerieOS deploys (the model router, nginx, the scanners) written
 as a pack in bbtool.json's format under packs/, tagged official, and
 carried by the vetted catalog (--catalog), whose mirror is how an install
 with no network takes them. One manifest
@@ -8,7 +9,7 @@ for everything: the installer and the agents' adapters still read their
 own tables; the packs are those tables in the one format, and this
 script's --check holds the two to each other in aerie lint.
 
-    tools/packs-export.py --write     write packs/official/*/bbtool.json and packs/agents/*/bbtool.json
+    tools/packs-export.py --write     write packs/official/*, packs/agents/* and packs/services/* bbtool.json
     tools/packs-export.py --check     fail when what is written is not what the tables say
     tools/packs-export.py --catalog DIR          write the same folders under DIR/packs/ (the catalog's checkout)
     tools/packs-export.py --catalog DIR --index  rewrite DIR/index.json's official entries from DIR's HEAD commit
