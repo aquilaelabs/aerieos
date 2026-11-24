@@ -6,6 +6,7 @@
 
 - An approved ask's row in History opens what it okayed: a push's flagged lines, a container's compose file or a release's new notes (e457254)
 - aerie forge owed lists what a repository's git host settings owe its own workflows (a required reviewer on each environment a job is gated by, no repository-level secret standing in for an environment's, a tag ruleset, outside contributors' runs approved first), and aerie version release refuses while one is owed (913cd44)
+- aerie diag log reads the controller's own log whole: the dashboard's output, the boot log or Docker's, this start's or an earlier one, the last lines or those holding some words, redacted as the rest of the diagnostics; on a node, aerie logs reads it the same way (92cc568)
 
 ### Changed
 
@@ -41,6 +42,8 @@
 - Adopting an old system reads its images and folders through no link and copies its VMs' TPM state with none, where an absolute link in them led to this machine's own files (bbd2cc0)
 - An OS update from a folder takes the version the image's own release file names, and an older version than the machine runs is refused with the boot menu named as the way back (31d94b3)
 - A verb a session on a node runs through the controller acts as the account the session works for, where the controller could not tell whose it was (faa0eb7)
+- A node holding your sealed sign-in is no longer taken for signed out, which after an update made Restart ask you to sign in again (2144681)
+- A sign-in finishing on a node shows on the page at once, where it waited for a reload (2144681)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
