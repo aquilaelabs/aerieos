@@ -228,8 +228,9 @@ function renderEmulatorInto(i){
       // (the operator, 24 Nov): how many, the AVDs built on them, the
       // levels its projects need and have none of, the room left.
       line: !d.wrong_platform && d.known !== false ? [
-        {label: "images", value: (d.images || []).length},
-        {label: "AVDs", value: (d.images || []).reduce((n, im) => n + (im.avds || []).length, 0), sub: "built on them"},
+        {label: (d.images || []).length === 1 ? "image" : "images", value: (d.images || []).length},
+        (n => ({label: n === 1 ? "AVD" : "AVDs", value: n, sub: (d.images || []).length === 1 ? "built on it" : "built on them"}))(
+          (d.images || []).reduce((n, im) => n + (im.avds || []).length, 0)),
         {label: "levels needed", value: (d.needed || []).length, tone: (d.needed || []).length ? "warn" : "", omit: !(d.needed || []).length},
         // Storage's reading of a size (sgb), TB past ten of them (B842).
         {label: "free", value: typeof d.free_mb === "number" ? sgb(d.free_mb) : "",

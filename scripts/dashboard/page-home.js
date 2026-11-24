@@ -75,20 +75,21 @@ function homeTiles(){
   const jobs = h.jobs || {};
   const c = h.containers;
   return [
-    h.nodes ? {key: "nodes", label: "nodes online", value: h.nodes.online, sub: `of ${h.nodes.enrolled} enrolled`,
+    h.nodes ? {key: "nodes", label: h.nodes.online === 1 ? "node online" : "nodes online", value: h.nodes.online, sub: `of ${h.nodes.enrolled} enrolled`,
                tone: h.nodes.online < h.nodes.enrolled ? "warn" : ""} : null,
-    c ? {key: "containers", label: "containers running", value: c.unknown === c.nodes && c.nodes ? "–" : c.running,
+    c ? {key: "containers", label: c.running === 1 && !(c.unknown === c.nodes && c.nodes) ? "container running" : "containers running",
+         value: c.unknown === c.nodes && c.nodes ? "–" : c.running,
          sub: `of ${c.all}${c.stale || c.unknown ? ", as last seen" : ""}`}
       // Asked of every docker node, after the rest has drawn.
       : h.nodes ? {key: "containers", label: "containers running", value: "–", sub: "asking the nodes…"} : null,
     // The news here is a failure, not the count running, so the bad tone is
     // on the line that says it rather than on a red zero.
-    {key: "jobs", label: "jobs running", value: jobs.running ?? "–",
+    {key: "jobs", label: jobs.running === 1 ? "job running" : "jobs running", value: jobs.running ?? "–",
      sub: jobs.failed_today ? `${jobs.failed_today} failed today` : jobs.waiting ? `${jobs.waiting} waiting` : "none failed today",
      subTone: jobs.failed_today ? "bad" : ""},
     // These three are the status read's: before its first answer they wait
     // rather than say 0 (a reload read 0 sessions open beside 24 a moment on).
-    {key: "sessions", label: "sessions open", value: sessions, wait: !state, sub: claudes ? `${claudes} of them ${agentsWord(agentSs.map(s => s.name))}` : ""},
+    {key: "sessions", label: sessions === 1 ? "session open" : "sessions open", value: sessions, wait: !state, sub: claudes ? `${claudes} of them ${agentsWord(agentSs.map(s => s.name))}` : ""},
     {key: "updates", label: updates === 1 ? "update due" : "updates due", value: updates, wait: !state, tone: updates ? "warn" : ""},
     {key: "ci", label: "CI red", value: red, wait: !state, tone: red ? "bad" : "", sub: red === 1 ? projLabel(state.ci_red[0].project) : ""},
     // The own machine's backups (R162 step 5): the last good run, or what

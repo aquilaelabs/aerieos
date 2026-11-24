@@ -2463,9 +2463,9 @@ async function dockerImagesRead(key){
   if (!st){ st = document.createElement("span"); st.className = "sst"; st.setAttribute("data-own", ""); det.querySelector(":scope > summary")?.appendChild(st); }
   st.textContent = `${(j.images || []).length} image${(j.images || []).length === 1 ? "" : "s"}, ${(j.volumes || []).length} volume${(j.volumes || []).length === 1 ? "" : "s"}`;
   drawHTML(box, statTiles([
-    {label: "images", value: (j.images || []).length, sub: humanBytes(df("Images").size || (j.images || []).reduce((n, i) => n + i.size, 0))},
+    {label: (j.images || []).length === 1 ? "image" : "images", value: (j.images || []).length, sub: humanBytes(df("Images").size || (j.images || []).reduce((n, i) => n + i.size, 0))},
     {label: "not in use", value: unused, sub: `${dang} dangling`, tone: dang ? "warn" : ""},
-    {label: "volumes", value: (j.volumes || []).length, sub: df("Local Volumes").size ? humanBytes(df("Local Volumes").size) : ""},
+    {label: (j.volumes || []).length === 1 ? "volume" : "volumes", value: (j.volumes || []).length, sub: df("Local Volumes").size ? humanBytes(df("Local Volumes").size) : ""},
     // Docker's reclaimable is what no container uses: unused images and
     // volumes, which only the two red prunes take (the operator, 23 Oct: 18
     // GB said reclaimable did not move after the two safe ones). Said by

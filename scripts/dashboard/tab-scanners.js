@@ -167,7 +167,7 @@ function renderScannersInto(i){
   // One line (R274): how many nodes scan; the versions this AerieOS names
   // at the foot, under the nodes that run them.
   const names = scannersVersions(lt.versions);
-  patch(d.list, pageHead({line: [{value: (data.nodes || []).filter(n => n.deployed).length, label: "nodes scanning"}], actions: scannersActs(data)})
+  patch(d.list, pageHead({line: [(n => ({value: n, label: n === 1 ? "node scanning" : "nodes scanning"}))((data.nodes || []).filter(x => x.deployed).length)], actions: scannersActs(data)})
     + scannersScheduleSection(data.schedule || {}, deployed, data.may_all === false)
     + (data.nodes || []).map(scannersNodeSection).join("")
     + ((data.nodes || []).length ? "" : noNodeYet("the scanners run on a node"))
