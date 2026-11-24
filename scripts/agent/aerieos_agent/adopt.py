@@ -21,12 +21,14 @@ file lands on a pool. Release unmounts all of it and forgets it, every disk
 as it was.
 """
 import contextlib
+import errno
 import glob
 import ipaddress
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -371,23 +373,71 @@ CIDR_RE = re.compile(r"\d{1,3}(\.\d{1,3}){3}/\d{1,2}")
 IP_RE = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
 
 
+def _walk_in(root, rel):
+    """(a descriptor on the folder holding `rel`'s last part, that part),
+    each folder from `root` down opened through no link (B846): the old
+    system's image or folder is its, and an absolute link in it names this
+    machine's own files (an autostart file leading to /etc/shadow)."""
+    parts = [x for x in rel.split("/") if x]
+    if not parts or any(x in (".", "..") for x in parts):
+        raise OSError(errno.EINVAL, f"{rel} is not a path inside")
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        for part in parts[:-1]:
+            nfd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
+            os.close(fd)
+            fd = nfd
+    except OSError:
+        os.close(fd)
+        raise
+    return fd, parts[-1]
+
+
+def read_in(root, rel, limit=8 << 20):
+    """The text of the plain file `rel` under `root`, read through no link
+    and only so far; OSError otherwise."""
+    d, last = _walk_in(root, rel)
+    try:
+        fd = os.open(last, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=d)
+    finally:
+        os.close(d)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(errno.EINVAL, f"{rel} is not a plain file")
+        return os.read(fd, limit).decode("utf-8", errors="replace")
+    finally:
+        os.close(fd)
+
+
+def kind_in(root, rel):
+    """What `rel` under `root` is, its last part not followed: "file", "dir",
+    "link" or "" for nothing there or a link along the way."""
+    try:
+        d, last = _walk_in(root, rel)
+    except OSError:
+        return ""
+    try:
+        st = os.stat(last, dir_fd=d, follow_symlinks=False)
+    except OSError:
+        return ""
+    finally:
+        os.close(d)
+    return "file" if stat.S_ISREG(st.st_mode) else "dir" if stat.S_ISDIR(st.st_mode) else "link" if stat.S_ISLNK(st.st_mode) else ""
+
+
 def read_docker_root(root, autostart_name=""):
     """What a Docker data directory says ran: {"autostart": [names],
     "containers": {name: {"image", "digest"}}}. The digest is the image's
     repo@sha256 the daemon pulled, so the same image runs again."""
     out = {"autostart": [], "containers": {}}
     if autostart_name and "/" not in autostart_name:
-        try:
-            with open(os.path.join(root, autostart_name), encoding="utf-8") as f:
-                out["autostart"] = [ln.split()[0] for ln in f if ln.strip()][:256]
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            out["autostart"] = [ln.split()[0] for ln in read_in(root, autostart_name).splitlines() if ln.strip()][:256]
     digests = {}
     for drv in sorted(os.listdir(os.path.join(root, "image"))) if os.path.isdir(os.path.join(root, "image")) else []:
         try:
-            with open(os.path.join(root, "image", drv, "repositories.json"), encoding="utf-8") as f:
-                repos = json.load(f).get("Repositories") or {}
-        except (OSError, ValueError):
+            repos = json.loads(read_in(root, f"image/{drv}/repositories.json")).get("Repositories") or {}
+        except (OSError, ValueError, AttributeError):
             continue
         for refs in repos.values():
             for ref, iid in (refs or {}).items():
@@ -397,8 +447,7 @@ def read_docker_root(root, autostart_name=""):
     found = []
     for cid in sorted(os.listdir(cdir)) if os.path.isdir(cdir) else []:
         try:
-            with open(os.path.join(cdir, cid, "config.v2.json"), encoding="utf-8") as f:
-                c = json.load(f)
+            c = json.loads(read_in(root, f"containers/{cid}/config.v2.json"))
         except (OSError, ValueError):
             continue
         name = str(c.get("Name") or "").lstrip("/")
@@ -413,8 +462,7 @@ def read_docker_root(root, autostart_name=""):
     out["specs"] = {}
     for cid, name, c in found[:256]:
         try:
-            with open(os.path.join(cdir, cid, "hostconfig.json"), encoding="utf-8") as f:
-                h = json.load(f)
+            h = json.loads(read_in(root, f"containers/{cid}/hostconfig.json"))
         except (OSError, ValueError):
             h = {}
         out["specs"][name] = container_spec(cid, c, h if isinstance(h, dict) else {},
@@ -448,8 +496,7 @@ def image_config(root, image_id):
         return {}
     for f in glob.glob(os.path.join(root, "image", "*", "imagedb", "content", "sha256", hexid)):
         try:
-            with open(f, encoding="utf-8") as fh:
-                got = json.load(fh).get("config") or {}
+            got = json.loads(read_in(root, os.path.relpath(f, root))).get("config") or {}
             return got if isinstance(got, dict) else {}
         except (OSError, ValueError, AttributeError):
             continue
@@ -581,19 +628,18 @@ def read_libvirt_root(root):
         if not fn.endswith(".xml"):
             continue
         try:
-            with open(os.path.join(q, fn), encoding="utf-8") as f:
-                xml = f.read()
+            xml = read_in(root, f"qemu/{fn}")
             dom = ET.fromstring(xml)
         except (OSError, ET.ParseError):
             continue
         name = (dom.findtext("name") or "").strip()
         if not VM_NAME_RE.fullmatch(name):
             continue
-        nv = (dom.findtext("os/nvram") or "").strip()
-        kept = os.path.join(q, "nvram", os.path.basename(nv)) if nv else ""
+        nv = os.path.basename((dom.findtext("os/nvram") or "").strip())
+        kept = os.path.join(q, "nvram", nv) if nv and kind_in(root, f"qemu/nvram/{nv}") == "file" else ""
         uuid = (dom.findtext("uuid") or "").strip().lower()
-        out.append({"name": name, "xml": xml, "autostart": os.path.exists(os.path.join(q, "autostart", fn)),
-                    "nvram": kept if kept and os.path.isfile(kept) else "",
+        out.append({"name": name, "xml": xml, "autostart": kind_in(root, f"qemu/autostart/{fn}") != "",
+                    "nvram": kept,
                     "tpm": tpm_state(root, uuid) if dom.find("devices/tpm") is not None else ""})
     return out[:64]
 
@@ -613,7 +659,7 @@ def tpm_state(root, uuid, depth=4):
         if here.count("/") - base >= depth:
             dirs[:] = []
             continue
-        if os.path.basename(here).lower() == uuid and os.path.isdir(os.path.join(here, "tpm2")):
+        if os.path.basename(here).lower() == uuid and kind_in(here, "tpm2") == "dir":
             return here
     return ""
 
@@ -628,8 +674,7 @@ def read_libvirt_networks(root):
         if not fn.endswith(".xml"):
             continue
         try:
-            with open(os.path.join(q, fn), encoding="utf-8") as f:
-                xml = f.read()
+            xml = read_in(root, f"qemu/networks/{fn}")
             net = ET.fromstring(xml)
         except (OSError, ET.ParseError):
             continue
@@ -638,7 +683,7 @@ def read_libvirt_networks(root):
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", name):
             continue
         out.append({"name": name, "bridge": br.get("name", "") if br is not None else "", "xml": xml,
-                    "autostart": os.path.exists(os.path.join(q, "autostart", fn))})
+                    "autostart": kind_in(root, f"qemu/networks/autostart/{fn}") != ""})
     return out[:16]
 
 
@@ -917,7 +962,12 @@ def carry_tpm(x, here, swtpm_dir=None):
         dest = os.path.join(swtpm_dir or env_or("BB_SWTPM_DIR", SWTPM_DIR), uuid)
         if not os.path.exists(dest):
             os.makedirs(os.path.dirname(dest), exist_ok=True)
-            shutil.copytree(state, dest, symlinks=True)
+            # Its folders and plain files, and never a link: one kept as a
+            # link led swtpm, which writes its state as root, wherever it
+            # pointed (B846).
+            shutil.copytree(state, dest, symlinks=True,
+                            ignore=lambda d, names: [n for n in names if not os.path.isdir(os.path.join(d, n)) and not os.path.isfile(os.path.join(d, n))
+                                                     or os.path.islink(os.path.join(d, n))])
         return ["its TPM's state kept (a Windows guest may still ask for its BitLocker recovery key once, since the firmware is this machine's)"]
     return ["its TPM starts empty (the old system's state was not found): BitLocker asks for its recovery key once"]
 

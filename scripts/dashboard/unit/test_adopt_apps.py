@@ -193,6 +193,51 @@ class Read(unittest.TestCase):
         self.assertEqual([(x["name"], x["autostart"], bool(x["nvram"])) for x in got], [("Windows 11", True, True)])
 
 
+class Links(unittest.TestCase):
+    """B846: the old system's image or folder is its own, and an absolute
+    link in it names this machine's files; nothing is read or copied through
+    one."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.secret = os.path.join(self.d, "shadow")
+        open(self.secret, "w").write("root:$6$hash:19000:0:99999:7:::\n")
+
+    def test_an_autostart_file_that_is_a_link_is_read_as_none(self):
+        root = os.path.join(self.d, "docker")
+        os.makedirs(f"{root}/containers")
+        os.symlink(self.secret, f"{root}/autostart-list")
+        self.assertEqual(adopt.read_docker_root(root, "autostart-list")["autostart"], [])
+
+    def test_a_containers_folder_that_is_a_link_is_read_as_none(self):
+        root = os.path.join(self.d, "docker")
+        os.makedirs(f"{self.d}/elsewhere/abc")
+        json.dump({"Name": "/planted", "Config": {"Image": "x"}}, open(f"{self.d}/elsewhere/abc/config.v2.json", "w"))
+        os.makedirs(root)
+        os.symlink(f"{self.d}/elsewhere", f"{root}/containers")
+        self.assertEqual(adopt.read_docker_root(root)["containers"], {})
+
+    def test_a_domain_and_its_variables_that_are_links_are_not_taken(self):
+        root = os.path.join(self.d, "libvirt")
+        os.makedirs(f"{root}/qemu/nvram")
+        open(f"{root}/qemu/vm.xml", "w").write("<domain><name>vm</name><os><nvram>/x/vm_VARS.fd</nvram></os><devices/></domain>")
+        os.symlink(self.secret, f"{root}/qemu/nvram/vm_VARS.fd")
+        os.symlink(self.secret, f"{root}/qemu/planted.xml")
+        got = adopt.read_libvirt_root(root)
+        self.assertEqual([(x["name"], x["nvram"]) for x in got], [("vm", "")])
+
+    def test_a_tpms_state_is_copied_with_no_link_in_it(self):
+        state = os.path.join(self.d, "swtpm", "0" * 8 + "-0000-4000-8000-" + "0" * 12)
+        os.makedirs(f"{state}/tpm2")
+        open(f"{state}/tpm2/tpm2-00.permall", "wb").write(b"state")
+        os.symlink(self.secret, f"{state}/tpm2/planted")
+        uuid = os.path.basename(state)
+        x = {"xml": f"<domain><uuid>{uuid}</uuid><devices><tpm/></devices></domain>", "tpm": state}
+        out = os.path.join(self.d, "here")
+        adopt.carry_tpm(x, True, swtpm_dir=out)
+        self.assertEqual(sorted(os.listdir(os.path.join(out, uuid, "tpm2"))), ["tpm2-00.permall"])
+
+
 class Rewrite(unittest.TestCase):
     def test_a_vm_runs_on_this_machines_qemu_firmware_and_lan(self):
         xml = ("<domain type='kvm'><name>vm</name><os><loader readonly='yes' type='pflash'>/usr/share/qemu/ovmf-x64/OVMF_CODE-pure-efi.fd</loader>"
