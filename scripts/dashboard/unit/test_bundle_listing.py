@@ -151,7 +151,7 @@ class TheControllersBundle(unittest.TestCase):
         self.assertIs(b["files_signed"], True)
         self.assertEqual(b["files"], listed)
         self.assertNotIn("not the ones this build signed", self.said.getvalue())
-        self.assertNotIn(workspace.TOOLS_SIG, got, "the tools' part is another")
+        self.assertNotIn("nodes/root-tools.sig", got, "no second signature over root's tools alone")
         # A part that is not a signature rides nowhere.
         with open(os.path.join(self.root, "scripts", "agent", "agent.sig"), "w") as f:
             json.dump({"bundle": {"digest": listed, "sig": "not one"}}, f)

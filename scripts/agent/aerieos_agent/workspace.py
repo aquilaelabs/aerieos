@@ -13,7 +13,7 @@ import tarfile
 import threading
 import time
 from . import release
-from .base import (BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, REFUSED, REFUSED_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG,
+from .base import (BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, REFUSED, REFUSED_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR,
                    dir_at, fs_holds, give_fd, hello_again, log, open_dir, rm_at)
 from .stores import dir_bytes, load_state, tc_root
 
@@ -387,7 +387,7 @@ class WorkspaceMixin:
                 # Said as the bundle arrives, not by every job that fetches it.
                 say(said + "\n")
             if root:
-                self._keep_root_tools(tar_path, hexd[:16] or "bundle", say, trust)
+                self._keep_root_tools(tar_path, hexd[:16] or "bundle", say)
                 self._keep_root_bundle(tar_path, hexd[:16] or "bundle", say)
             # In the store by a process of the account it belongs to, never
             # by root: the store is that account's to write, and a link left
@@ -501,14 +501,15 @@ class WorkspaceMixin:
         return release.may_keep_bundle(trust, text, sig, members, build)
 
     @staticmethod
-    def _keep_root_tools(tar_path, name, say, trust=None):
+    def _keep_root_tools(tar_path, name, say):
         """Root's own copy of the tools it installs, lifted straight out of
         the checked tar into TOOLS_DIR/<name>/, and TOOLS_DIR/current pointed
-        at it; the copies of other bundles go. On a node that pinned
-        AerieOS's release key, only when the release signed those files
-        (release.may_keep_tools, R227 step 1): the bundle's digest is the
-        controller's word, and these are what root runs. Refused, root
-        keeps the copy it has, and the job says why. Whether it was kept."""
+        at it; the copies of other bundles go. Only ever from a tar the
+        bundle's signed list passed (_bundle_checked, release.may_keep_bundle):
+        that list names these files with the rest a release ships, so on a
+        node that pinned AerieOS's release key they are the release's (R267
+        step 28: a second signature over them alone said nothing more).
+        Whether it was kept."""
         into = os.path.join(TOOLS_DIR, name)
         # This bundle's already, checked when it was kept: nothing to do,
         # and nothing said again on every job that fetches the bundle.
@@ -516,13 +517,9 @@ class WorkspaceMixin:
             return True
         try:
             with tarfile.open(tar_path) as tar:
-                files, sig = {}, ""
+                files = {}
                 for m in tar.getmembers():
                     rel = m.name.lstrip("./")
-                    if rel == TOOLS_SIG and m.isfile() and m.size <= 4096:
-                        with contextlib.suppress(ValueError, AttributeError):
-                            sig = str(json.loads(tar.extractfile(m).read().decode("utf-8", "replace")).get("sig") or "")
-                        continue
                     # ...and the provisioner's family files (R204), which it
                     # sources from beside itself.
                     if (rel not in ROOT_TOOLS and not rel.startswith("nodes/families/")) or not m.isfile():
@@ -530,11 +527,6 @@ class WorkspaceMixin:
                     src = tar.extractfile(m)
                     if src is not None:
                         files[rel] = src.read()
-                ok, said = release.may_keep_tools(trust or {}, release.tools_digest(files), sig)
-                if said:
-                    say(said + "\n")
-                if not ok:
-                    return False
                 for rel, data in files.items():
                     dest = os.path.join(into, rel)
                     os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)

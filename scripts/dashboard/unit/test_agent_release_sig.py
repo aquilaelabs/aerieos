@@ -274,9 +274,9 @@ class Signer(unittest.TestCase):
 class FromTheBuildToTheNode(unittest.TestCase):
     """What the build signs is what the controller's bundle carries and what
     a pinned node then keeps: the three work the list out apart (the tool
-    from the tree, the node from the bundle it was sent), and a file the
-    bundle holds that the signature does not cover would leave every pinned
-    node on its old tools."""
+    from the tree, the controller and the node from the bundle), and root's
+    tools are kept from a bundle that list passed, under the one signature
+    over it (R267 step 28)."""
 
     def test_the_tree_signed_is_the_bundle_kept(self):
         import tarfile
@@ -296,13 +296,14 @@ class FromTheBuildToTheNode(unittest.TestCase):
         env = dict(os.environ, AERIEOS_RELEASE_PUB=mine, AERIEOS_RELEASE_KEY=k.private_bytes_raw().hex())
         r = subprocess.run([sys.executable, tool], env=env, capture_output=True, text=True, timeout=60, check=False)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("root's tools", r.stdout)
+        self.assertIn("the bundle's files", r.stdout)
         with open(sig) as f:
             got = json.load(f)
-        self.assertEqual(release.verify(pub, got["tools"]["digest"], got["tools"]["sig"], release.TOOLS_MESSAGE), "")
+        self.assertNotIn("tools", got, "no second signature over root's tools alone")
+        self.assertEqual(release.verify(pub, got["bundle"]["digest"], got["bundle"]["sig"], release.BUNDLE_MESSAGE), "")
         r = subprocess.run([sys.executable, tool, "--check"], env=env, capture_output=True, text=True, timeout=60, check=False)
         self.assertEqual(r.returncode, 0, r.stdout)
-        self.assertIn("root's tools: signed by", r.stdout)
+        self.assertIn("the bundle's files: signed by", r.stdout)
         # The controller's bundle, as a node is sent it...
         with mock.patch.object(controller_bundle, "_bundle", {}), mock.patch.object(controller_bundle, "REPO", __import__("pathlib").Path(root)):
             body = controller_bundle.bundle()["body"]
@@ -310,12 +311,16 @@ class FromTheBuildToTheNode(unittest.TestCase):
         with open(tar, "wb") as f:
             f.write(body)
         with tarfile.open(tar) as t:
-            self.assertIn(agent_base.TOOLS_SIG, t.getnames())
-        # ...and the node, pinned to that key.
+            self.assertIn(agent_base.BUNDLE_SIG, t.getnames())
+            self.assertNotIn("nodes/root-tools.sig", t.getnames())
+        # ...and the node, pinned to that key: the bundle passes its list,
+        # and root's tools are kept from it.
         tools, said = os.path.join(d, "tools"), []
         os.makedirs(tools)
+        ok, why = agent_workspace.WorkspaceMixin._bundle_checked(tar, {"release_key": pub})
+        self.assertTrue(ok, why)
         with mock.patch.object(agent_workspace, "TOOLS_DIR", tools):
-            kept = agent_workspace.WorkspaceMixin._keep_root_tools(tar, "abcd", said.append, {"release_key": pub})
+            kept = agent_workspace.WorkspaceMixin._keep_root_tools(tar, "abcd", said.append)
         self.assertTrue(kept, said)
         self.assertTrue(os.path.isfile(os.path.join(tools, "abcd", "nodes", "provision-linux.sh")))
         self.assertTrue(os.path.isdir(os.path.join(tools, "abcd", "nodes", "families")))
@@ -326,10 +331,10 @@ class FromTheBuildToTheNode(unittest.TestCase):
         with open(tar, "wb") as f:
             f.write(body)
         with tarfile.open(tar) as t:
-            self.assertNotIn(agent_base.TOOLS_SIG, t.getnames())
-        with mock.patch.object(agent_workspace, "TOOLS_DIR", tools):
-            self.assertFalse(agent_workspace.WorkspaceMixin._keep_root_tools(tar, "ef01", said.append, {"release_key": pub}))
-            self.assertEqual(os.readlink(os.path.join(tools, "current")), "abcd")
+            self.assertNotIn(agent_base.BUNDLE_SIG, t.getnames())
+        ok, why = agent_workspace.WorkspaceMixin._bundle_checked(tar, {"release_key": pub})
+        self.assertFalse(ok, "a pinned node takes nothing of it, root's tools included")
+        self.assertEqual(os.readlink(os.path.join(tools, "current")), "abcd")
 
 
 if __name__ == "__main__":

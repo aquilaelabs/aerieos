@@ -450,13 +450,10 @@ and writes nothing.
 provisioner with the machine's own helper in it, the helper that builds a
 session's view and the one that cuts a pack's install off the network reach
 a node in the bundle of `aerie` the controller serves, whose digest moves
-with a person's tool packs and is the controller's word. A release's build
-signs the list of those files, each with its digest, and a pinned node
-keeps a copy of them for root only under that signature: otherwise root
-goes on with the copy it has, the job saying why, and a machine whose
-console allows unsigned builds takes them from a branch's build as it takes
-that build's agent. A key added at the console counts here as it does for
-the agent: root's tools signed by it are kept.
+with a person's tool packs and is the controller's word. They are files a
+release ships in that bundle, held as the others below are: root keeps its
+copy of them only from a bundle whose signed list they passed, and
+otherwise goes on with the copy it has.
 
 **Nor the other files a release ships in that bundle.** `aerie` itself and
 its library (the toolchain installer and its checksum logic are in it, and a
@@ -467,7 +464,7 @@ in the same bundle. The bundle carries the list of them, a line a file with
 its sha256 (`nodes/bundle.list`, made one way by
 `scripts/lib/bundleparts.py` for the build's signer and the controller
 alike), and the release's signature over that list (`nodes/bundle.sig`, the
-third part of `scripts/agent/agent.sig`). A pinned node unpacks a bundle
+second part of `scripts/agent/agent.sig`). A pinned node unpacks a bundle
 only when that signature is under a key it trusts and every file in the
 bundle is the one the list names: none changed, none missing, no link, and
 none beside them except what a controller adds of its own. A bundle that

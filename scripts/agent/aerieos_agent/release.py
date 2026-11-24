@@ -33,14 +33,11 @@ Ed25519, by the `cryptography` library the nodes are provisioned with
 (tokenseal.py's): nothing here is hand-built, and a node that pinned a key
 and lacks the library refuses the update rather than taking it unchecked.
 
-The tools root installs from the bundle are held the same way (the rest of
-step 1): the provisioner with the machine's own helper in it, the helper
-that builds a session's view, the one that cuts a pack's install off the
-network, and the provisioner's family files. The bundle's own digest moves
-with a person's tool packs, so no release can sign it; what a release signs
-is the list of those files, each with its digest (tools_digest), under a
-line of its own, and a pinned node keeps a copy of them for root only when
-that signature covers the files it was sent.
+The tools root installs from the bundle are held by the bundle's list below
+(R267 step 28): the provisioner with the machine's own helper in it, the
+helper that builds a session's view, the one that cuts a pack's install off
+the network and the provisioner's family files are files a release ships
+in it, and root keeps its copy of them only from a tar that list passed.
 
 So is everything else a release ships in the bundle (R267 step 6): aerie,
 its library, the shipped catalog, the publishers' keys a download is checked
@@ -62,9 +59,9 @@ A controller somebody builds on their own machine is not a release, and its
 builder signs it with a key of their own. A node trusts such a key beside
 the release key and its spare once a person adds it at the node's console
 (`aerieos-agent release-key add HEX`, up to ALSO_MAX of them, kept in
-node.json as release_also): an update or a list of root's tools signed by an
-added key, or a bundle whose list one signed, is taken as one the release
-signed, and said as what it is. Nothing a controller sends adds, changes or
+node.json as release_also): an update signed by an added key, or a bundle
+whose list one signed (root's tools among its files), is taken as one the
+release signed, and said as what it is. Nothing a controller sends adds, changes or
 drops one.
 
 A signature says who made an agent, not when: every agent the release key
@@ -110,32 +107,25 @@ from .bundle import PACKAGE
 # ("sha256:" and 64 hex characters). The line keeps a signature made for
 # anything else under the same key from passing here.
 MESSAGE = b"aerieos agent v1\n"
-# ...and for the tools root installs from the bundle: this line, then
-# tools_digest() of them. Another line, so neither signature passes as the
-# other.
-TOOLS_MESSAGE = b"aerieos root tools v1\n"
 # ...and for the list of every file a release ships in the bundle: this
-# line, then the digest of that list as the bundle carries it. A third line,
-# so no signature passes as another.
+# line, then the digest of that list as the bundle carries it. Another
+# line, so neither signature passes as the other.
 BUNDLE_MESSAGE = b"aerieos bundle v1\n"
-# ...and for the release key's word that another key is its spare without
-# the build that said it, which names nothing (spare_said): this line, then
-# the spare as 64 hex characters. A fourth line, so a signature over an
-# agent, root's tools or a bundle's list never names a spare.
-SPARE_MESSAGE = b"aerieos release spare v1\n"
-# ...and for the same word with the build that said it, the one a statement
-# is taken on: this line, the spare, a line break and the build
-# (spare_built). A fifth line, so neither passes as the other.
+# ...and for the release key's word that another key is its spare, with the
+# build that said it: this line, the spare, a line break and the build
+# (spare_built). A third line, so a signature over an agent or a bundle's
+# list never names a spare. (The first form of that word named no build
+# and was taken nowhere; its line is not used again.)
 SPARE_BUILT_MESSAGE = b"aerieos release spare v2\n"
 # What a controller adds to the bundle beside the files a release ships, so
 # what a release's list never names and a pinned node lets ride: a person's
 # tool packs and the packs made on that install, which are theirs and differ
 # on every install; the vetted catalog's newer rows, which are the catalog's
-# and newer than any release; and the three members that carry the
-# signatures and the list themselves. Under any other name, a file the list
-# does not name is refused.
+# and newer than any release; and the two members that carry the list and
+# its signature themselves. Under any other name, a file the list does not
+# name is refused.
 BUNDLE_ADDS = re.compile(r"config/toolpacks\.json|config/toolpacks/[A-Za-z0-9][A-Za-z0-9._-]{0,79}\.bundle"
-                         r"|config/toolchains\.catalog\.json|nodes/root-tools\.sig|nodes/bundle\.list|nodes/bundle\.sig")
+                         r"|config/toolchains\.catalog\.json|nodes/bundle\.list|nodes/bundle\.sig")
 # One line of the list: a file's sha256, two spaces, its name in the bundle.
 LIST_LINE = re.compile(r"([0-9a-f]{64})  ([^\n]+)")
 KEY_RE = re.compile(r"[0-9a-f]{64}")
@@ -289,14 +279,6 @@ def _console_can():
             f"sudo {names.command()} unsigned on allows unsigned builds")
 
 
-def tools_digest(files):
-    """What a release signs for the tools root installs: {name in the bundle:
-    bytes}, each said as its own digest and its name, in the names' order,
-    and the digest of that list."""
-    h = hashlib.sha256()
-    for name in sorted(files):
-        h.update(f"{hashlib.sha256(files[name]).hexdigest()}  {name}\n".encode())
-    return "sha256:" + h.hexdigest()
 
 
 def bundle_list(text):
@@ -502,22 +484,6 @@ def may_install(state, digest, sig, named=None, body=None):
     return False, _refusal(why, f"refused: {why}. This node takes only updates signed by {_named(state)}. {_console_can()}")
 
 
-def may_keep_tools(state, digest, sig):
-    """(ok, words) for root's copy of the bundle's tools, whose list is
-    `digest` and came with `sig`: as may_install decides an update. Kept
-    with no key trusted here, kept when the signature is under a key this
-    node trusts, kept unsigned only where this node's console said so, and
-    otherwise not: root goes on with the copy it has."""
-    if not trusted(state):
-        return True, ""
-    who, why = _signer(state, digest, sig, TOOLS_MESSAGE)
-    if who:
-        return True, f"root's tools are signed by {who}"
-    why = why.replace("the update names no digest to check", "the bundle holds none of root's tools")
-    if unsigned_ok(state):
-        return True, f"root's tools not checked ({why}): this node's console allows unsigned builds"
-    return False, (f"refused: the tools root installs from this bundle are not signed by a key this node trusts ({why}), so "
-                   f"root keeps the copy it has. This node takes only what is signed by {_named(state)}. {_console_can()}")
 
 
 def may_keep_bundle(state, text, sig, members, build=None):

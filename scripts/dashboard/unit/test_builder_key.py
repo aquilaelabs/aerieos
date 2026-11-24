@@ -58,13 +58,13 @@ class BuilderKey(unittest.TestCase):
         from aerieos_agent import release
         self.assertEqual(sig["key"], pub)
         self.assertEqual(release.verify(pub, sig["digest"], sig["sig"]), "")
-        self.assertEqual(release.verify(pub, sig["tools"]["digest"], sig["tools"]["sig"], release.TOOLS_MESSAGE), "")
+        self.assertNotIn("tools", sig, "no second signature over root's tools alone (R267 step 28)")
+        self.assertEqual(release.verify(pub, sig["bundle"]["digest"], sig["bundle"]["sig"], release.BUNDLE_MESSAGE), "")
         pinned = {"release_key": "ab" * 32}
         self.assertFalse(release.may_install(pinned, sig["digest"], sig["sig"])[0], "a node that has not added the key refuses it")
         ok, said = release.may_install({**pinned, "release_also": [pub]}, sig["digest"], sig["sig"])
         self.assertTrue(ok)
         self.assertIn("added at this node's console", said)
-        self.assertTrue(release.may_keep_tools({**pinned, "release_also": [pub]}, sig["tools"]["digest"], sig["tools"]["sig"])[0])
 
     def test_a_file_that_holds_no_key_signs_nothing(self):
         os.makedirs(os.path.dirname(self.key))

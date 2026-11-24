@@ -379,9 +379,9 @@ def _release_also(state, verb, args):
     state["release_also"] = added + [key]
     save_state(state, console=True)
     print(f"added {key[:16]}…: this node takes "
-          + ("agent updates, root's tools and the bundle's files signed by it, beside what the release key signs"
+          + ("agent updates and the bundle's files (root's tools among them) signed by it, beside what the release key signs"
              if release.keys(state)
-             else "only agent updates, root's tools and the bundle's files signed by a key added here"))
+             else "only agent updates and the bundle's files (root's tools among them) signed by a key added here"))
 
 
 def cmd_unsigned(args):

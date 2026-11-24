@@ -44,6 +44,12 @@ def pair():
     return k, k.public_key().public_bytes_raw().hex()
 
 
+# Lines no build signs with any more, kept here to show they pass as nothing:
+# the spare's word without its build (never taken), and the second signature
+# over root's tools alone (R267 step 28).
+SPARE_V1 = b"aerieos release spare v1\n"
+TOOLS_V1 = b"aerieos root tools v1\n"
+
 class Case(unittest.TestCase):
     def setUp(self):
         self.agent = agentpkg.load("aerieos_agent_spare_statement")
@@ -67,7 +73,7 @@ class Case(unittest.TestCase):
     def unbuilt(self, by=None, names=None):
         """The words without the build, as builds before it wrote them."""
         names = names or self.spare
-        return {"key": names, "sig": (by or self.k).sign(self.release.SPARE_MESSAGE + names.encode()).hex()}
+        return {"key": names, "sig": (by or self.k).sign(SPARE_V1 + names.encode()).hex()}
 
     def write(self, state):
         with open(self.nj, "w") as f:
@@ -153,11 +159,11 @@ class Decided(Case):
         # bundle's list or the words without the build, whose "digest" were
         # the spare's hex, is no statement.
         own = self.release.own_build()
-        for line in (self.release.MESSAGE, self.release.TOOLS_MESSAGE, self.release.BUNDLE_MESSAGE, self.release.SPARE_MESSAGE):
+        for line in (self.release.MESSAGE, TOOLS_V1, self.release.BUNDLE_MESSAGE, SPARE_V1):
             said = {"key": self.spare, "build": own, "build_sig": self.k.sign(line + self.spare.encode()).hex()}
             self.assertEqual(self.release.spare_pin({"release_key": self.pub}, said), "", line)
         # ...and the statement passes as none of them.
-        for line in (self.release.MESSAGE, self.release.TOOLS_MESSAGE, self.release.BUNDLE_MESSAGE):
+        for line in (self.release.MESSAGE, TOOLS_V1, self.release.BUNDLE_MESSAGE):
             self.assertTrue(self.release.verify(self.pub, "sha256:" + self.spare, self.statement()["build_sig"], line))
 
 
@@ -443,7 +449,7 @@ class Signer(unittest.TestCase):
         r = self.signer("--check")
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertIn(f"the spare: named by {self.pub[:16]}… as {self.spare[:16]}…", r.stdout)
-        for wrong in ({"build": said["build"] - 1}, {"sig": self.k.sign(self.release.SPARE_MESSAGE + self.spare.encode()).hex()}):
+        for wrong in ({"build": said["build"] - 1}, {"sig": self.k.sign(SPARE_V1 + self.spare.encode()).hex()}):
             self.put_sig({**self.read_sig(), "spare": {**said, **wrong}})
             self.assertEqual(self.signer("--check").returncode, 1, wrong)
         self.assertIn("the spare: its statement of the spare carries the word without the build", self.signer("--check").stdout)
@@ -459,7 +465,7 @@ class Signer(unittest.TestCase):
                             "its statement of the spare is not signed by the release key"),
                            ({"key": theirs, "build": b, "build_sig": self.k.sign(self.release.spare_built(theirs, b)).hex()},
                             "it names another spare than"),
-                           ({"key": self.spare, "sig": self.k.sign(self.release.SPARE_MESSAGE + self.spare.encode()).hex()},
+                           ({"key": self.spare, "sig": self.k.sign(SPARE_V1 + self.spare.encode()).hex()},
                             "its statement of the spare is not signed by the release key"),
                            ("nope", "its statement of the spare is not signed by the release key")):
             got = dict(whole)
@@ -492,7 +498,7 @@ class Signer(unittest.TestCase):
         self.assertNotIn("spare", self.read_sig())
         self.assertEqual(self.signer("--check").returncode, 0)
         # ...and a statement left in a file whose key file names none fails the check.
-        self.put_sig(dict(self.read_sig(), spare={"key": self.spare, "sig": self.k.sign(self.release.SPARE_MESSAGE + self.spare.encode()).hex()}))
+        self.put_sig(dict(self.read_sig(), spare={"key": self.spare, "sig": self.k.sign(SPARE_V1 + self.spare.encode()).hex()}))
         r = self.signer("--check")
         self.assertEqual(r.returncode, 1, r.stdout)
         self.assertIn("the spare: it names a spare and", r.stdout)

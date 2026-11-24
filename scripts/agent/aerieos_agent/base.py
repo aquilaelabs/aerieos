@@ -136,9 +136,6 @@ ROOT_BUNDLE_DIR = os.environ.get("BUILDERBOT_ROOT_BUNDLE", "/usr/local/lib/build
 # read while the job ran. Root's, 0711, each job's folder its account's, 0700.
 SIGN_WORK = os.environ.get("BUILDERBOT_SIGN_WORK", "/run/builderbot/sign")
 ROOT_TOOLS = ("nodes/provision-linux.sh", "nodes/bb-session", "nodes/bb-netcut")
-# The release's signature over those and the provisioner's family files, as
-# the bundle carries it where its build made one (release.tools_digest).
-TOOLS_SIG = "nodes/root-tools.sig"
 # The list of every file a release ships in the bundle, a line each with its
 # sha256, and the release's signature over that list's digest, as the bundle
 # carries them (release.may_keep_bundle, R267 step 6). The list is a few

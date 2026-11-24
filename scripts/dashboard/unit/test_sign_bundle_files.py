@@ -1,7 +1,7 @@
 """A release signs the list of every file its bundle ships (R267 step 6):
-tools/sign-agent.py writes a third part to agent.sig beside the agent's and
-the tools', over the digest of the list scripts/lib/bundleparts.py makes of
-the tree, under a line of its own. --check holds that part too, so a shipped
+tools/sign-agent.py writes a second part to agent.sig beside the agent's,
+over the digest of the list scripts/lib/bundleparts.py makes of the tree
+(root's tools among its files), under a line of its own. --check holds that part too, so a shipped
 file changed after the signing fails a release's tag; a builder's key signs
 it as a release's does; and --digests says what a tree would be signed as.
 
@@ -72,8 +72,9 @@ class Signed(unittest.TestCase):
         part = self.read_sig()["bundle"]
         self.assertEqual(part["digest"], bundleparts.listing(self.t)[1], "the list of this tree's files")
         self.assertEqual(release.verify(self.pub, part["digest"], part["sig"], release.BUNDLE_MESSAGE), "")
-        for other in (release.MESSAGE, release.TOOLS_MESSAGE):
+        for other in (release.MESSAGE, b"aerieos root tools v1\n"):
             self.assertIn("not the pinned", release.verify(self.pub, part["digest"], part["sig"], other), "it passes as no other")
+        self.assertNotIn("tools", self.read_sig(), "no second signature over root's tools alone (R267 step 28)")
         # The controller built from this tree lists the same files and passes the signature on.
         with mock.patch.object(workspace, "REPO", pathlib.Path(self.t)), mock.patch.object(workspace, "_bundle", {}), \
                 mock.patch.object(workspace, "_bundle_missing", set()), mock.patch.object(workspace, "packs_json", None), \
@@ -99,7 +100,7 @@ class Signed(unittest.TestCase):
             f.write("# changed after the signing\n")
         r = self.signer("--check")
         self.assertEqual(r.returncode, 1, r.stdout)
-        self.assertIn("root's tools: signed by", r.stdout, "the other two parts still stand")
+        self.assertIn("signed by", r.stdout.splitlines()[0], "the agent's part still stands")
         self.assertIn("the bundle's files: it is for other files than this tree's bundle ships", r.stdout)
 
     def test_a_signature_without_the_part_is_not_whole(self):
@@ -111,8 +112,8 @@ class Signed(unittest.TestCase):
         r = self.signer("--check")
         self.assertEqual(r.returncode, 1, r.stdout)
         self.assertIn("the bundle's files: it carries no signature for the files the bundle ships", r.stdout)
-        # ...and one made for the tools does not stand in for it.
-        got["bundle"] = got["tools"]
+        # ...and one made for the agent does not stand in for it.
+        got["bundle"] = {"digest": got["digest"], "sig": got["sig"]}
         with open(self.sig, "w") as f:
             json.dump(got, f)
         self.assertEqual(self.signer("--check").returncode, 1)
@@ -130,18 +131,18 @@ class Signed(unittest.TestCase):
         self.assertEqual(part["digest"], bundleparts.listing(self.t)[1])
         self.assertEqual(release.verify(pub, part["digest"], part["sig"], release.BUNDLE_MESSAGE), "")
 
-    def test_digests_says_the_three_and_writes_nothing(self):
+    def test_digests_says_the_two_and_writes_nothing(self):
         r = self.signer("--digests")
         self.assertEqual(r.returncode, 0, r.stderr)
         got = dict(ln.split() for ln in r.stdout.splitlines())
-        self.assertEqual(sorted(got), ["agent", "bundle", "tools"])
+        self.assertEqual(sorted(got), ["agent", "bundle"])
         self.assertTrue(all(v.startswith("sha256:") and len(v) == 71 for v in got.values()), got)
         self.assertEqual(got["bundle"], bundleparts.listing(self.t)[1])
         self.assertFalse(os.path.exists(self.sig), "nothing is written")
         self.assertEqual(self.signer(key=self.k).returncode, 0)
         signed = self.read_sig()
-        self.assertEqual((signed["digest"], signed["tools"]["digest"], signed["bundle"]["digest"]),
-                         (got["agent"], got["tools"], got["bundle"]), "they are what a signing signs")
+        self.assertEqual((signed["digest"], signed["bundle"]["digest"]),
+                         (got["agent"], got["bundle"]), "they are what a signing signs")
 
 
 if __name__ == "__main__":

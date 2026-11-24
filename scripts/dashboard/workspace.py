@@ -322,9 +322,6 @@ BUNDLE_PARTS = bundleparts.PARTS
 _bundle_missing = set()
 
 
-# The member a node reads the release's signature over root's tools from
-# (the agent's base.TOOLS_SIG).
-TOOLS_SIG = "nodes/root-tools.sig"
 # The list of the files a release ships in this bundle, each with its
 # sha256, made from the very bytes the tar carries (bundleparts.listing), and
 # the release's signature over that list's digest, where the build made one
@@ -340,10 +337,10 @@ CATALOG_ROWS = "config/toolchains.catalog.json"
 
 
 def _signed(part):
-    """One part of scripts/agent/agent.sig as (digest, sig): the tools root
-    installs ("tools") or the list of the bundle's files ("bundle"), which
-    a release's build writes and a build from a branch does not. ("", "")
-    where there is none, or its signature is not one."""
+    """One part of scripts/agent/agent.sig as (digest, sig): the list of the
+    bundle's files ("bundle"), which a release's build writes and a build
+    from a branch does not. ("", "") where there is none, or its signature
+    is not one."""
     try:
         d = json.loads((REPO / "scripts" / "agent" / "agent.sig").read_text())
         t = d.get(part) if isinstance(d, dict) else None
@@ -352,14 +349,6 @@ def _signed(part):
     except (OSError, ValueError):
         pass
     return "", ""
-
-
-def _tools_sig():
-    """The bundle's root-tools.sig as text, or "": {"digest", "sig"} from
-    the tools half of scripts/agent/agent.sig, which a release's build
-    writes and a build from a branch does not."""
-    digest, sig = _signed("tools")
-    return json.dumps({"digest": digest, "sig": sig}) if sig else ""
 
 
 def _bundle_sig():
@@ -389,8 +378,8 @@ def bundle():
     # (R227 step 1) and over the list of every file it ships (R267 step 6),
     # where the build made them: beside the agent's, in the file
     # tools/sign-agent.py writes, and each carried as a member of its own.
-    tools_sig, bundle_sig = _tools_sig(), _bundle_sig()
-    key = hash((tuple(stamp), packs, newer, tools_sig, bundle_sig))
+    bundle_sig = _bundle_sig()
+    key = hash((tuple(stamp), packs, newer, bundle_sig))
     if _bundle.get("key") != key:
         import io
         for part in bundleparts.missing(REPO, BUNDLE_PARTS):
@@ -420,7 +409,7 @@ def bundle():
             # the newest of those files' times, not this moment's: the same
             # files make the same tar at every start, so a controller that
             # restarts sends no node a new bundle for it.
-            for name, data in ((BUNDLE_LIST, text), (BUNDLE_SIG, bundle_sig), (TOOLS_SIG, tools_sig),
+            for name, data in ((BUNDLE_LIST, text), (BUNDLE_SIG, bundle_sig),
                                # The catalog's newer rows, beside the shipped
                                # file and never in its place.
                                (CATALOG_ROWS, newer), ("config/toolpacks.json", packs)):

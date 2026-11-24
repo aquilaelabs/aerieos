@@ -10,7 +10,6 @@ import io
 import json
 import os
 import sys
-import tarfile
 import tempfile
 import unittest
 from unittest import mock
@@ -122,41 +121,6 @@ class Trusted(Case):
         self.assertNotIn("built from a branch", said)
         self.assertRegex(said, r"release-key add HEX")
         self.assertIn(f"only updates signed by the release key it pinned ({self.pub[:16]}…). ", said)
-
-
-class RootTools(Case):
-    def bundle(self, sig):
-        tar = os.path.join(self.d, "bundle.tar")
-        held = dict(FILES)
-        if sig is not None:
-            held[self.agent.TOOLS_SIG] = json.dumps({"sig": sig}).encode()
-        with tarfile.open(tar, "w") as t:
-            for name, data in held.items():
-                ti = tarfile.TarInfo(name)
-                ti.size = len(data)
-                t.addfile(ti, io.BytesIO(data))
-        return tar
-
-    def test_roots_tools_signed_by_an_added_key_are_kept_and_said_as_such(self):
-        workspace = self.agent.module("workspace")
-        tools, said = os.path.join(self.d, "tools"), []
-        os.makedirs(tools)
-        sig = self.sign(self.m, self.release.tools_digest(FILES), self.release.TOOLS_MESSAGE)
-        with mock.patch.object(workspace, "TOOLS_DIR", tools):
-            keep = workspace.WorkspaceMixin._keep_root_tools
-            # A node that pinned the release key alone keeps the copy it has...
-            self.assertFalse(keep(self.bundle(sig), "aaaa", said.append, {"release_key": self.pub}))
-            self.assertIn("root keeps the copy it has", said[0])
-            self.assertRegex(said[0], r"release-key add HEX")
-            self.assertNotIn("built from a branch", said[0])
-            del said[:]
-            # ...and one whose console added the builder's key keeps these.
-            self.assertTrue(keep(self.bundle(sig), "aaaa", said.append, {"release_key": self.pub, "release_also": [self.mine]}))
-            self.assertEqual(said, [f"root's tools are signed by a key added at this node's console ({self.mine[:16]}…)\n"])
-            self.assertEqual(os.readlink(os.path.join(tools, "current")), "aaaa")
-            # The agent's signature under the same key is not the tools'.
-            self.assertFalse(keep(self.bundle(self.sign(self.m, self.release.tools_digest(FILES))), "bbbb", said.append,
-                                  {"release_also": [self.mine]}))
 
 
 class Console(Case):

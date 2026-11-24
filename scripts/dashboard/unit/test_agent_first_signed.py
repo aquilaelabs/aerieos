@@ -85,7 +85,7 @@ class Decided(Case):
         for sig, why in (("", "the controller sent no signature with it"),
                          (self.sign(other), "its signature is not under a release key the controller named"),
                          (self.sign(self.k, "sha256:" + "cd" * 32), "its signature is not under a release key the controller named"),
-                         (self.k.sign(self.release.TOOLS_MESSAGE + DIGEST.encode()).hex(), "its signature is not under a release key")):
+                         (self.k.sign(b"aerieos bundle v1\n" + DIGEST.encode()).hex(), "its signature is not under a release key")):
             ok, said = self.release.may_install({}, DIGEST, sig, named)
             self.assertTrue(ok)
             self.assertIn("not checked: no release key is pinned here", said)

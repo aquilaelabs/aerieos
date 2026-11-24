@@ -43,7 +43,7 @@ FILES = {"scripts/aerie": b"#!/bin/bash\necho aerie\n", "scripts/lib/sdk.sh": b"
          BUILD: pathlib.Path(HERE, "..", "..", "agent", "aerieos_agent", "__init__.py").read_bytes()}
 # What a controller adds beside them, which no release's list names.
 ADDS = {"config/toolpacks.json": b'{"toolchains": []}', "config/toolpacks/hexkit.bundle": b"git bundle",
-        "config/toolchains.catalog.json": b'{"toolchains": []}', "nodes/root-tools.sig": b'{"sig": ""}'}
+        "config/toolchains.catalog.json": b'{"toolchains": []}'}
 
 
 def pair():
@@ -132,7 +132,9 @@ class MayKeep(Case):
         self.assertTrue(ok, said)
         for name in ("config/toolpacks/../x", "config/toolpacks/../../scripts/aerie.bundle", "config/toolpacks/a/b.bundle",
                      "config/toolpacks/.bundle", "config/toolpacks/..bundle", "config/toolpacks.json.bak",
-                     "./config/toolpacks.json", "config/toolchains.catalog.json/x", "nodes/bundle.sig2", "nodes/root-tools.sh"):
+                     "./config/toolpacks.json", "config/toolchains.catalog.json/x", "nodes/bundle.sig2", "nodes/root-tools.sh",
+                     # ...and the second signature over root's tools, which rides no more (R267 step 28).
+                     "nodes/root-tools.sig"):
             ok, said = self.keep(self.pinned, **{name: sha(b"x")})
             self.assertFalse(ok, name)
             self.assertIn(f"{name} is not one a release ships", said)
@@ -144,8 +146,9 @@ class MayKeep(Case):
         ok, said = self.keep(self.pinned, files=other, sig=self.sign(listing(FILES)))
         self.assertFalse(ok)
         self.assertIn("not the pinned release key's", said)
-        # The tools' signature, or the agent's, does not pass as the bundle's.
-        for message in (self.release.TOOLS_MESSAGE, self.release.MESSAGE):
+        # The agent's signature, or one made under the old line for root's
+        # tools alone, does not pass as the bundle's.
+        for message in (b"aerieos root tools v1\n", self.release.MESSAGE):
             self.assertFalse(self.keep(self.pinned, sig=self.sign(listing(FILES), message=message))[0])
         # No list at all.
         ok, said = self.release.may_keep_bundle(self.pinned, b"", "", {n: sha(d) for n, d in FILES.items()})

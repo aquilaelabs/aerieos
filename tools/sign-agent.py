@@ -7,13 +7,13 @@ signature under it covers the update's digest, and the bundle it fetches
 from its controller only when one covers the list of the files a release
 ships in it (scripts/agent/aerieos_agent/release.py). This makes those
 signatures at build time, from the key a release build is handed and no
-controller holds. scripts/agent/agent.sig carries three, each under a line
-of its own so none passes as another: over the agent's zip, over the tools
-root installs from the bundle, and over the list of every file the bundle
-ships (scripts/lib/bundleparts.py: aerie, its library, the shipped catalog,
-the publishers' keys, root's tools, the hooks).
+controller holds. scripts/agent/agent.sig carries two, each under a line
+of its own so neither passes as the other: over the agent's zip, and over
+the list of every file the bundle ships (scripts/lib/bundleparts.py: aerie,
+its library, the shipped catalog, the publishers' keys, the tools root
+installs, the hooks).
 
-A build the release key itself signs carries a fourth thing, where
+A build the release key itself signs carries a third thing, where
 config/aerieos-release.pub names a spare: the release key's own statement
 that the second key is its spare as of this tree's agent build, under a
 line of its own (release.spare_built). A node that pinned the release key
@@ -27,18 +27,18 @@ first key says what its spare is.
         secret (AERIEOS_RELEASE_KEY), the public half for
         config/aerieos-release.pub, which is committed.
     AERIEOS_RELEASE_KEY=... tools/sign-agent.py
-        writes scripts/agent/agent.sig for the agent, root's tools and the
-        bundle's files as this tree holds them, and the release key's
+        writes scripts/agent/agent.sig for the agent and the bundle's
+        files as this tree holds them, and the release key's
         statement of its spare when the key is the file's first and the
         file names a spare. With no key in the environment it writes
         nothing and says so: a build from a branch ships unsigned.
     tools/sign-agent.py --check
         whether scripts/agent/agent.sig is the committed public key's
-        signature over this tree's agent, root's tools and the bundle's
-        files, all three, and whether a build the release key signed names
+        signature over this tree's agent and the bundle's files, both,
+        and whether a build the release key signed names
         the file's spare under that key: exit 0 when it is, 1 when not.
     tools/sign-agent.py --digests
-        the three digests this tree would be signed as, one a line with its
+        the two digests this tree would be signed as, one a line with its
         name, and nothing written: for comparing a build with a checkout
         (the Nodes page's status names the bundle's as `files`).
     tools/sign-agent.py --builder-keygen FILE
@@ -47,7 +47,7 @@ first key says what its spare is.
         public half printed with the command that adds it at a node's
         console. Not a release key: it goes in no repository.
     tools/sign-agent.py --builder FILE [--out SIG]
-        signs this tree's agent, root's tools and the bundle's files with
+        signs this tree's agent and the bundle's files with
         the key in FILE, whatever config/aerieos-release.pub names: a node
         takes the build
         once a person has added the key at its console (aerieos-agent
@@ -92,21 +92,6 @@ def agent_build():
     return _load("release").own_build()
 
 
-def tools_digest():
-    """The digest of the tools root installs from the bundle, as this tree
-    holds them and as a node works it out from the bundle it was sent
-    (release.tools_digest): the files base.ROOT_TOOLS names and the
-    provisioner's family files, each by its name in the bundle."""
-    root = os.path.join(HERE, "..")
-    names = list(_load("base").ROOT_TOOLS)
-    fam = os.path.join(root, "nodes", "families")
-    for d, _dirs, files in os.walk(fam):
-        names += [os.path.relpath(os.path.join(d, f), root).replace(os.sep, "/") for f in files]
-    held = {}
-    for name in names:
-        with open(os.path.join(root, name), "rb") as f:
-            held[name] = f.read()
-    return _load("release").tools_digest(held)
 
 
 def _lib(name):
@@ -143,18 +128,16 @@ def public_key():
 
 
 def _write(key, path, spare=""):
-    """The signature file for this tree's agent, root's tools and the
+    """The signature file for this tree's agent and the
     bundle's files under `key`, written to `path`: what was signed, in
     words (each digest shortened). `spare` is the key `key` states to be
     its spare, where it is the release key and the file names one."""
     release = _load("release")
-    d, t, b = digest(), tools_digest(), bundle_digest()
+    d, b = digest(), bundle_digest()
     out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": key.public_key().public_bytes_raw().hex(),
-           # The tools root installs from the bundle, under a line of their
-           # own: the controller puts this in the bundle it serves.
-           "tools": {"digest": t, "sig": key.sign(release.TOOLS_MESSAGE + t.encode()).hex()},
-           # ...and the list of every file a release ships in that bundle,
-           # under a third line: the controller passes it on beside the list.
+           # The list of every file a release ships in the bundle, the tools
+           # root installs among them, under a line of its own: the
+           # controller passes it on beside the list.
            "bundle": {"digest": b, "sig": key.sign(release.BUNDLE_MESSAGE + b.encode()).hex()}}
     if spare:
         # The release key's word for its spare, with this tree's agent build
@@ -168,7 +151,7 @@ def _write(key, path, spare=""):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
-    return f"the agent {d[:19]}…, root's tools {t[:19]}… and the bundle's files {b[:19]}…"
+    return f"the agent {d[:19]}… and the bundle's files {b[:19]}…"
 
 
 def _spare_why(got, by):
@@ -273,7 +256,7 @@ def main(argv):
     if argv[:1] == ["--digests"]:
         # Read-only, and with no key or signature in it: what this tree
         # would be signed as, for a person holding a build against it.
-        print(f"agent   {digest()}\ntools   {tools_digest()}\nbundle  {bundle_digest()}")
+        print(f"agent   {digest()}\nbundle  {bundle_digest()}")
         return 0
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -315,13 +298,7 @@ def main(argv):
                     by = k
                     break
         print(f"{os.path.relpath(SIG)}: " + (why or f"signed by {by[:16]}… for {digest()[:19]}…"))
-        # ...and root's tools, signed beside it under their own line.
-        tools = got.get("tools") if isinstance(got.get("tools"), dict) else {}
-        twhy = "it carries no signature for the tools root installs" if not tools else \
-            "it is for other tools than this tree holds" if tools.get("digest") != tools_digest() else \
-            next((w for w in [release.verify(by or public_key(), tools.get("digest"), tools.get("sig"), release.TOOLS_MESSAGE)] if w), "")
-        print(f"{os.path.relpath(SIG)}: root's tools: " + (twhy or f"signed by {(by or public_key())[:16]}… for {tools_digest()[:19]}…"))
-        # ...and the list of the bundle's files, under the third line: a
+        # ...and the list of the bundle's files, under its own line: a
         # file of them changed after the signing is a signature that is not
         # whole, which is what fails a release's tag.
         part = got.get("bundle") if isinstance(got.get("bundle"), dict) else {}
@@ -334,7 +311,7 @@ def main(argv):
         swhy = _spare_why(got, by)
         if swhy or got.get("spare") is not None:
             print(f"{os.path.relpath(SIG)}: the spare: " + (swhy or f"named by {public_key()[:16]}… as {public_keys()[1][:16]}…"))
-        return 1 if why or twhy or bwhy or swhy else 0
+        return 1 if why or bwhy or swhy else 0
     if argv[:1] == ["--builder-keygen"]:
         return _builder_keygen(argv[1:], Ed25519PrivateKey)
     if argv[:1] == ["--builder"]:
