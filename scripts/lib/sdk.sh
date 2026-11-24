@@ -163,7 +163,7 @@ sdkmgr() {
     # tools (removed, or never installed) the trash bin on an Android row
     # could not remove it (the operator, 12 Oct). Its directory is the
     # package; deleted directly.
-    if [ "${1:-}" = --uninstall ] && ! command -v sdkmanager >/dev/null 2>&1; then
+    if [ "${1:-}" = --uninstall ] && ! sdk_store command -v sdkmanager >/dev/null 2>&1; then
         local root d
         root="${ANDROID_HOME:-$(sdk_dir android)}"
         d="$root/${2//;//}"
@@ -438,7 +438,7 @@ sdk_status_local() {
             # it (B105), while "no cmdline-tools" beside a store that has them
             # sends somebody to install what is already there.
             printf '  %-11s %s\n' android "$(
-                if command -v sdkmanager >/dev/null 2>&1; then
+                if sdk_store command -v sdkmanager >/dev/null 2>&1; then
                     printf 'sdkmanager ready; packages in %s' "$d"
                 elif [ -x "$d/cmdline-tools/latest/bin/sdkmanager" ]; then
                     printf 'cmdline-tools are in the store but not on PATH; packages in %s' "$d"
@@ -481,7 +481,7 @@ for t in sdkmeta.catalog_at(sys.argv[1]):
 PY
     fi
     printf '\n== android packages ==\n'
-    if command -v sdkmanager >/dev/null 2>&1; then
+    if sdk_store command -v sdkmanager >/dev/null 2>&1; then
         sdkmgr --list_installed 2>/dev/null | sed -n '/^  /p' | head -20 \
             || printf '  (sdkmanager could not list them)\n'
     else
@@ -780,7 +780,7 @@ sdk_check_one() {
             local want missing=0 rev="" base
             [ -z "$d" ] || inst="$(basename "$(find "$d" -maxdepth 1 -name 'chromium-*' | head -1)" 2>/dev/null)"
             if [ -z "$local_only" ]; then
-                for want in $(PLAYWRIGHT_BROWSERS_PATH="${d:-$(sdk_dir playwright)}" timeout 60 \
+                for want in $(PATH="${SDK_STEP_PATH:-$PATH}" PLAYWRIGHT_BROWSERS_PATH="${d:-$(sdk_dir playwright)}" timeout 60 \
                               playwright install --dry-run chromium firefox webkit 2>/dev/null \
                               | sed -n 's/.*Install location: *//p'); do
                     base="$(basename "$want")"
@@ -1006,7 +1006,7 @@ sdk_update() {
             sdk_install "$what"
             ;;
         android:*)
-            command -v sdkmanager >/dev/null 2>&1 || die "no sdkmanager here: every android:*
+            sdk_store command -v sdkmanager >/dev/null 2>&1 || die "no sdkmanager here: every android:*
    toolchain installs through it, and it comes from android-tools. On a node, install
    Android command-line tools from the Library with that node picked; an android:*
    toolchain should bring it along, and if it did not then this store has a
@@ -1253,15 +1253,35 @@ SDK_CATALOG=""
 # steer every other row's install that runs after it. What stands in front
 # of the step (the cut) is no name a pack's bin folder answers to.
 # SDK_STEP_KEEP are those names; sdk_step_env makes STEP_ENV the words.
-SDK_STEP_KEEP="PATH BB_LIB $SDK_SYS_KEEP"
+# The PATH is the one the entry verb was handed (SDK_STEP_PATH, sdk_entry),
+# where the shell running sdk.sh has the system's own.
+SDK_STEP_KEEP="BB_LIB $SDK_SYS_KEEP"
 sdk_step_env() {
     local en
     en="$(sdk_sys_path env)" || { printf 'there is no env among this system'\''s own tools\n' >&2; return 127; }
     local -a KEEP
     # shellcheck disable=SC2086  # a list of names, split on purpose
     sdk_keep $SDK_STEP_KEEP
-    STEP_ENV=("$en" -i "${KEEP[@]}")
+    STEP_ENV=("$en" -i "PATH=${SDK_STEP_PATH:-$PATH}" "${KEEP[@]}")
 }
+# sdk_entry FUNCTION [ARG...]: a verb of aerie toolchains or aerie emu run
+# with the system's own folders for its PATH (SDK_SYS_PATH), so each tool
+# sdk.sh calls by name itself (mkdir, rm, mv, cp, find, sed, timeout and the
+# rest, beside the ones sdk_sys already runs) is the system's: on the
+# caller's PATH a pack's bin folder stands ahead of /usr/bin for every job
+# (R267 step 27). The caller's PATH is kept as SDK_STEP_PATH, which a
+# recipe's step is handed (sdk_step_env) and the store's own tools are found
+# on (sdk_store), so a step sees what it saw before: the official recipes
+# run npm from the node pack. aerie sources this file for every verb, so the
+# PATH is narrowed here, for these verbs alone, and not at its top.
+sdk_entry() {
+    local SDK_STEP_PATH="${SDK_STEP_PATH:-$PATH}"
+    local PATH="$SDK_SYS_PATH"
+    "$@"
+}
+# sdk_store CMD [ARG...]: a tool the store holds rather than the system
+# (sdkmanager, playwright), found on the PATH a step is handed.
+sdk_store() { PATH="${SDK_STEP_PATH:-$PATH}" "$@"; }
 sdk_step() {
     local -a STEP_ENV
     sdk_step_env || return 127
@@ -1383,7 +1403,7 @@ sdk_android_id() {
 
 sdk_install_android() {
     local what="$1" pkg
-    command -v sdkmanager >/dev/null 2>&1 || die "no sdkmanager here: every android:*
+    sdk_store command -v sdkmanager >/dev/null 2>&1 || die "no sdkmanager here: every android:*
    toolchain installs through it, and it comes from android-tools. On a node, install
    Android command-line tools from the Library with that node picked; an android:*
    toolchain should bring it along, and if it did not then this store has a
@@ -2468,7 +2488,8 @@ sdk_images() {
     done < <(find -L "$base" -mindepth 3 -maxdepth 3 -type d 2>/dev/null | sort -V)
 }
 
-cmd_toolchains() {
+cmd_toolchains() { sdk_entry sdk_cmd_toolchains "$@"; }
+sdk_cmd_toolchains() {
     local sub="${1:-status}"; shift || true
     case "$sub" in
         status|"")  sdk_status "$@" ;;
@@ -2518,7 +2539,8 @@ sdk_not_image() {
 # toolchain store, which is where they live even though they are not
 # toolchains. The operator's, like aerie toolchains install: sdk_install and
 # sdk_remove refuse inside a Claude session on their own.
-cmd_emu_images() {
+cmd_emu_images() { sdk_entry sdk_cmd_emu_images "$@"; }
+sdk_cmd_emu_images() {
     local sub="$1"; shift || true
     case "$sub" in
         images)
