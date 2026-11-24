@@ -20,6 +20,7 @@
 - Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
 - A picked row in a list (a settings section, a user, a role, a commit) is lifted with a bar of the theme's highlight at its left, where the default scheme washed it brown (22e730c)
 - nginx, the scanners and the model router open for Configure Read on their node, and a page read without Configure Write says so and draws no control, where every control was drawn and refused on the press (91409d8)
+- On a phone a page's placeholder opens the one section the page opens on, where it stood every section open and folded the rest away as the page came, and a space's Overview opens on its first section (8c583d2)
 
 ### Fixed
 
