@@ -383,6 +383,29 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(state, "failed")
         self.assertIn("is not a folder", text)
 
+    def test_an_image_whose_name_is_not_its_release_writes_nothing(self):
+        # B847: the folder's file name named the version, never read
+        # against the image's own release file. (A renamed file is refused
+        # by the release's signed list first; this is what an image whose
+        # inside says another version than its name meets after it.)
+        w = World(slot="b")
+        d, _files = w.publish("0.9.3")
+        with mock.patch.object(self.av, "release_version", return_value="0.9.2"):
+            state, code, text = self.run_update(w, {"from": d})
+        self.assertEqual((state, code), ("failed", 69), text)
+        self.assertIn("the image's own release says 0.9.2, and its name says 0.9.3", text)
+
+    def test_an_older_version_is_not_taken(self):
+        # B847: an update only goes forward; the version before is on the
+        # boot menu.
+        w = World(slot="b", version="0.9.5")
+        d, _files = w.publish("0.9.2")
+        state, code, text = self.run_update(w, {"from": d})
+        self.assertEqual((state, code), ("failed", 69), text)
+        self.assertIn("0.9.2 is older than 0.9.5", text)
+        self.assertLess(self.av.version_key("0.9.1-dev.12"), self.av.version_key("0.9.1"))
+        self.assertLess(self.av.version_key("0.9.1"), self.av.version_key("0.9.2-dev.3"))
+
     def test_a_dev_build_is_taken_by_its_tag(self):
         # B589: the dev channel's update names a dev build, v0.9.1-dev.12.
         w = World(slot="a")

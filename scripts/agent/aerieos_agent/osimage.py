@@ -176,6 +176,28 @@ def os_work():
     return env_or("BB_OS_WORK", "/var/lib/aerieos-os")
 
 
+def version_key(v):
+    """A version to order by: X.Y.Z, then a pre-release (-dev.N) before the
+    release it leads to. None for one that is not a version."""
+    m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:-[a-z][a-z0-9]*\.(\d+))?", v or "")
+    if not m:
+        return None
+    return (int(m[1]), int(m[2]), int(m[3]), 0 if m[4] else 1, int(m[4] or 0))
+
+
+def release_version(path):
+    """The BUILDERBOT_OS_VERSION an image's release file names, or ""."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                k, _, v = line.strip().partition("=")
+                if k == "BUILDERBOT_OS_VERSION":
+                    return v[:40]
+    except OSError:
+        pass
+    return ""
+
+
 def os_release():
     """{version, snapshot, built, slot, next} on an AerieOS disk, {}
     anywhere else: the release file the image carries, and the slot tool's
@@ -872,6 +894,19 @@ class OsImageMixin:
         if not files:
             return "failed", 66
         os.unlink(iso)
+        # The version is the image's own release file's, never only its
+        # file's name, and an older one than this machine runs is not taken
+        # (B847): going back is the boot menu's, which keeps the version
+        # before.
+        said = release_version(files["release"])
+        if said != ver:
+            say(f"refused: the image's own release says {said or 'no version'}, and its name says {ver}: nothing written\n")
+            return "failed", 69
+        now = rel.get("version") or ""
+        if version_key(ver) is None or (version_key(now) is not None and version_key(ver) < version_key(now)):
+            say(f"refused: {ver} is older than {now}, which this machine runs: an update only goes forward, and the "
+                "version before is on the boot menu to go back to\n")
+            return "failed", 69
         size = os.path.getsize(files["root.squashfs"])
         if size > SLOT_MIB * 1048576:
             say(f"the root image is {size >> 20} MB and a slot holds {SLOT_MIB}: nothing written\n")
