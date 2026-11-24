@@ -19,6 +19,7 @@
 - Each person's pushes, pulls and git host work on a space run with their own token alone, at the same time as everyone else's, and the Repository section says so: Your access token, each person's row saying their own work uses it, and Authentication as Off, Deploy key or Each person's token. Upgrading: somebody who had not given a space a token of their own, whose pushes ran with another person's, gives theirs under Repository in its notebook's Settings (87f5103)
 - Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
 - A picked row in a list (a settings section, a user, a role, a commit) is lifted with a bar of the theme's highlight at its left, where the default scheme washed it brown (22e730c)
+- nginx, the scanners and the model router open for Configure Read on their node, and a page read without Configure Write says so and draws no control, where every control was drawn and refused on the press (91409d8)
 
 ### Fixed
 
@@ -49,6 +50,8 @@
 - Switching between Full and Compact, or Cards and List, resizes each card smoothly into its new shape, where the boxes jumped to their new size half way through the fade (5b1789e)
 - Everything that opens, shuts or sorts anew on the page moves: a list slides its rows to their new places (the Library's On this node after an update, Jobs, Containers, Sessions), every fold and every field a choice reveals slides over its height, and a detail beside a list no longer pops to its new size half way through its fade (cccd303)
 - The Users page's roles use the account's whole pane and a long role no longer runs under the trash; an account added in another browser has its roles read, where the owner was told they were not theirs to give (07b38ad)
+- aerie forge reads --body-file FILE into a pull request's or an issue's body, and refuses an option it does not take, where it made the pull request with no description and said nothing (ba0a41a)
+- A release attaches the signed copies aerie sign made of its version, where it passed over them and attached a debug build of the same files alone, which does not update an installed release; its output names each file it attached (5811a5f)
 
 ### Security
 
