@@ -15,7 +15,7 @@
 - Dialogs lay out their fields on the same grid as the pages: a new space's name beside its version, a container's name beside its space, an account beside its person's name, each label over its field (d5f6edb, c02819b)
 - aerie version release refuses a pre-release on a commit no release rehearsal passed on, in a repository that has one, and says to rehearse it first (f9d77fc)
 - A repository's git host settings are drawn in its Settings under Repository, where the chain on its card and its menu now lead, and a space whose Authentication is Disabled says over its tokens that pushes are off (bf3b7c3)
-- A page says what is news on one line under its name, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4)
+- A page says what is news on one line in its head, a card at a desk, the same on every page and a node's, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4, 6f2809d)
 - Each person's pushes, pulls and git host work on a space run with their own token alone, at the same time as everyone else's, and the Repository section says so: Your access token, each person's row saying their own work uses it, and Authentication as Off, Deploy key or Each person's token. Upgrading: somebody who had not given a space a token of their own, whose pushes ran with another person's, gives theirs under Repository in its notebook's Settings (87f5103)
 - Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
 
@@ -44,6 +44,8 @@
 - A verb a session on a node runs through the controller acts as the account the session works for, where the controller could not tell whose it was (faa0eb7)
 - A node holding your sealed sign-in is no longer taken for signed out, which after an update made Restart ask you to sign in again (2144681)
 - A sign-in finishing on a node shows on the page at once, where it waited for a reload (2144681)
+- The arrows at the ends of a row of chips, the dock's line and a row of sub-tabs are drawn whole, where the row's fade dimmed their ring (6fb56c9)
+- Switching between Full and Compact, or Cards and List, resizes each card smoothly into its new shape, where the boxes jumped to their new size half way through the fade (5b1789e)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
