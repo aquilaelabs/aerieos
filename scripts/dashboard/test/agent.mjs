@@ -242,7 +242,8 @@ exit 1
 // token minter with a fake token, since the real one needs the root-only stash.
 mkdirSync(`${DIR}/runner-src/bin`, { recursive: true });
 writeFileSync(`${DIR}/runner-src/config.sh`, `#!/bin/sh
-echo "config $*" >> "$(dirname "$0")/calls.log"
+# ...and the token it reads from its environment, never its arguments (B849).
+echo "config $* token=\${ACTIONS_RUNNER_INPUT_TOKEN:-}" >> "$(dirname "$0")/calls.log"
 if [ "$1" = remove ]; then rm -f "$(dirname "$0")/.runner"; exit 0; fi
 # What the real one says on a RHEL node with no libicu, and then exits: the
 # reason first and GitHub's advice under it.
@@ -283,7 +284,7 @@ execFileSync('tar', ['-czf', `${DIR}/runner.tar.gz`, '-C', `${DIR}/runner-src`, 
 // (name, address, labels, id) and records its arguments; daemon stays up as
 // a child so the census's pgrep sees `<dir>/act_runner daemon`.
 writeFileSync(`${DIR}/bin/act_runner`, `#!/bin/sh
-echo "act $*" >> "$(pwd)/act-calls.log"
+echo "act $* token=\${GITEA_RUNNER_REGISTRATION_TOKEN:-}" >> "$(pwd)/act-calls.log"
 case "$1" in
   register) name=; inst=; labels=
     while [ $# -gt 0 ]; do case "$1" in --name) name="$2"; shift;; --instance) inst="$2"; shift;; --labels) labels="$2"; shift;; esac; shift; done
@@ -2781,9 +2782,9 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const calls = existsSync(`${DIR}/runner/${GH}/calls.log`) ? readFileSync(`${DIR}/runner/${GH}/calls.log`, 'utf8') : '';
     ok(ifin && ifin.state === 'succeeded' && /registering agentbox with https:\/\/github.com\/example-org/.test(ifin.log),
        `the agent unpacks the runner into the runner's own directory and registers it (${ifin?.state}: ${(ifin?.log || '').slice(-200).replace(/\n/g, ' / ')})`);
-    ok(/config --unattended --replace --url https:\/\/github.com\/example-org --token AAAREGTOKEN --name agentbox --labels builderbot,self-hosted,linux,x64,agentbox,gpu,badlabel --work _work/.test(calls)
-       && !/svc /.test(calls),
-       'config.sh gets the minted token, the node\'s name, the default labels plus its own name, and the runner\'s own svc.sh is never run');
+    ok(/config --unattended --replace --url https:\/\/github.com\/example-org --name agentbox --labels builderbot,self-hosted,linux,x64,agentbox,gpu,badlabel --work _work token=AAAREGTOKEN/.test(calls)
+       && !/--token/.test(calls) && !/svc /.test(calls),
+       'config.sh gets the minted token in its environment and never on its command line, the node\'s name, the default labels plus its own name, and the runner\'s own svc.sh is never run');
     // The unit is the agent's, from GitHub's template: the runner's folder is
     // the jobs account's, and root ran svc.sh from it (R247 step 5).
     const unitName = existsSync(`${DIR}/runner/${GH}/.service`) ? readFileSync(`${DIR}/runner/${GH}/.service`, 'utf8').trim() : '';
@@ -2846,7 +2847,8 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const gfin = await ended(gi.job);
     const acts = existsSync(`${DIR}/runner/${GT}/act-calls.log`) ? readFileSync(`${DIR}/runner/${GT}/act-calls.log`, 'utf8') : '';
     ok(gfin?.state === 'succeeded' && /registering agentbox with https:\/\/git\.example\.test:3000\/example-org/.test(gfin.log)
-       && /act register --no-interactive --instance https:\/\/git\.example\.test:3000 --token AAAREGTOKEN --name agentbox --labels builderbot:host,self-hosted:host,linux:host,x64:host,agentbox:host,gpu:host/.test(acts)
+       && /act register --no-interactive --instance https:\/\/git\.example\.test:3000 --name agentbox --labels builderbot:host,self-hosted:host,linux:host,x64:host,agentbox:host,gpu:host token=AAAREGTOKEN/.test(acts)
+       && !/--token/.test(acts)
        && /act daemon/.test(acts) && !/AAAREGTOKEN/.test(gfin.log),
        `act_runner registers with the host from its own directory, every label as :host, and runs as a daemon under the agent (${gfin?.state}: ${(gfin?.log || '').slice(-160).replace(/\n/g, ' / ')})`);
     const gn = await until(async () => { const n = await nodeById(minted.id);

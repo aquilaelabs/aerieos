@@ -29,6 +29,14 @@ from .base import (
 )
 from .toolchains import ci_log_dir, runner_env_text
 
+# Where each runner reads the token it registers or removes with (B849):
+# its environment, which only its own account and root read, never its
+# command line, which every account on the machine does in /proc. Both
+# named by the runners' own sources (GitHub's CommandSettings, Gitea's
+# register).
+GH_TOKEN_ENV = "ACTIONS_RUNNER_INPUT_TOKEN"
+GITEA_TOKEN_ENV = "GITEA_RUNNER_REGISTRATION_TOKEN"
+
 
 def runner_slot(url):
     """The slot a runner's address maps to: its host and path, lowercase,
@@ -517,7 +525,7 @@ class RunnersMixin:
             self.runner_stop(d)
             if has_systemd():
                 self._runner_unservice(job, d)
-            code = self._run_as(job, who, d, [os.path.join(d, "config.sh"), "remove", "--token", r["token"]])
+            code = self._run_as(job, who, d, [os.path.join(d, "config.sh"), "remove"], {GH_TOKEN_ENV: r["token"]})
             if code != 0:
                 job.say("deregistration did not complete; remove the runner in GitHub's settings if it lingers\n")
             shutil.rmtree(d, ignore_errors=True)
@@ -584,8 +592,8 @@ class RunnersMixin:
             st, rr = self.ctl.call("runner-token", {"kind": "remove", "slot": slot}, timeout=60)
             gone = False
             if st == 200 and rr.get("token"):
-                gone = self._run_as(job, who, d, [os.path.join(d, "config.sh"), "remove",
-                                                  "--token", rr["token"]]) == 0
+                gone = self._run_as(job, who, d, [os.path.join(d, "config.sh"), "remove"],
+                                    {GH_TOKEN_ENV: rr["token"]}) == 0
             if not gone:
                 job.say("deregistration did not complete; taking the local config out of the "
                         "way so the reinstall can proceed. The old runner is replaced by name.\n")
@@ -595,8 +603,8 @@ class RunnersMixin:
                             os.remove(os.path.join(d, junk))
         job.say(f"registering {name} with {url} [{','.join(labels)}]\n")
         code = self._run_as(job, who, d, [os.path.join(d, "config.sh"), "--unattended", "--replace",
-                                          "--url", url, "--token", r["token"], "--name", name,
-                                          "--labels", ",".join(labels), "--work", "_work"])
+                                          "--url", url, "--name", name,
+                                          "--labels", ",".join(labels), "--work", "_work"], {GH_TOKEN_ENV: r["token"]})
         if code != 0:
             return "failed", code
         self._runner_write(who, d, ".builderbot-labels", ",".join(labels))
@@ -748,8 +756,8 @@ class RunnersMixin:
         job.say(f"registering {name} with {url} (instance {instance}) [{','.join(labels)}]\n")
         job.flush()          # a register can hang; the log says where it is (B129)
         code = self._run_as(job, who, d, [exe, "register", "--no-interactive", "--instance", instance,
-                                          "--token", r["token"], "--name", name,
-                                          "--labels", ",".join(f"{x}:host" for x in labels)])
+                                          "--name", name,
+                                          "--labels", ",".join(f"{x}:host" for x in labels)], {GITEA_TOKEN_ENV: r["token"]})
         if code != 0:
             return "failed", code
         self._runner_write(who, d, ".builderbot-labels", ",".join(labels))

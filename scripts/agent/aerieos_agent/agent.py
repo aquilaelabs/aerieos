@@ -1540,12 +1540,14 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         job.say(f"installed {got[:19]}…; restarting once nothing else runs\n")
         return "succeeded", 0
 
-    def _run_as(self, job, who, cwd, argv):
+    def _run_as(self, job, who, cwd, argv, secret_env=None):
         """One command as the enrolled account, in the runner's directory,
-        its output into the log. config.sh refuses to run as root."""
-        job.say("$ " + " ".join(a if "--token" not in argv[max(0, i - 1)] else "…" for i, a in enumerate(argv)) + "\n")
+        its output into the log. config.sh refuses to run as root. A token
+        goes in `secret_env`, never in `argv`, which any account on the
+        machine reads in /proc for as long as the command runs (B849)."""
+        job.say("$ " + " ".join(argv) + "".join(f" ({k} set)" for k in secret_env or {}) + "\n")
         env = {"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"), "LANG": "C.UTF-8",
-               "HOME": cwd}
+               "HOME": cwd, **(secret_env or {})}
         who2 = dict(who)
         if who:
             import pwd
