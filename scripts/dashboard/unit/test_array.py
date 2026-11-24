@@ -464,11 +464,15 @@ class Takeover(unittest.TestCase):
         seen = []
 
         class M(self.am.ArrayMixin):
-            def _sh(inner, job, argv, timeout=0, **kw):
+            def _sh(inner, job, argv, timeout=0, pass_fds=(), **kw):
                 lst = next(a for a in argv if a.startswith("--files-from="))[13:]
-                seen.append((argv[:3], open(lst).read(), argv[-2:]))
+                # Folders handed by descriptors (B859): kept as where each reaches.
+                for x in argv[-2:]:
+                    assert int(x.split("/")[4]) in pass_fds, (x, pass_fds)
+                seen.append((argv[:3], open(lst).read(), [os.path.realpath(x) + "/" for x in argv[-2:]]))
                 return 0
         job = Job()
+        os.makedirs(os.path.join(root, "fast"))          # the pool's mount: there, as _mounted says
         os.makedirs(os.path.join(root, "user0", "isos"))
         os.utime(os.path.join(root, "user0", "isos"))
         open(os.path.join(root, "user0", "isos", "old.iso"), "w").close()
@@ -477,8 +481,8 @@ class Takeover(unittest.TestCase):
             rc = M()._mover(job, [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "none", "land": "cache", "from": "cache", "to": "array"},
                                   {"share": "isos", "land": "fast", "from": "array", "to": "fast"}, {"share": "appdata", "land": "cache", "from": "", "to": ""}], root=root)
         self.assertEqual(rc, 0)
-        self.assertEqual(seen, [(["rsync", "-aHAXS", "--ignore-existing"], "s1/e1.mkv\0",
-                                 [os.path.join(root, "cache", "TV Shows") + "/", os.path.join(root, "user0", "TV Shows") + "/"]),
+        self.assertEqual(seen, [(["rsync", "-aHAXS", "--ignore-existing"], "e1.mkv\0",
+                                 [os.path.join(root, "cache", "TV Shows", "s1") + "/", os.path.join(root, "user0", "TV Shows", "s1") + "/"]),
                                 (["rsync", "-aHAXS", "--ignore-existing"], "old.iso\0",
                                  [os.path.join(root, "user0", "isos") + "/", os.path.join(root, "fast", "isos") + "/"])])
         self.assertIn("isos: 1 file from the data disks to fast", job.text())
@@ -515,11 +519,47 @@ class Takeover(unittest.TestCase):
         with mock.patch.object(self.am, "_mounted", return_value=True), \
              mock.patch.object(self.am, "_open_paths", return_value={os.path.join(root, "user", "media", "a", "open.db")}):
             rc = M()._mover(job, mv, root=root)
-        self.assertEqual(seen, [["a/move.mkv"]], "the newer copy, the open file and the linked folder are left")
+        self.assertEqual(seen, [["move.mkv"]], "the newer copy, the open file and the linked folder are left")
         self.assertIn("1 file left on cache: the same path is on the data disks already", job.text())
         self.assertIn("1 file held open by a program", job.text())
         self.assertIn("linked: its folder on the data disks is a link", job.text())
         self.assertTrue(os.path.isdir(os.path.join(root, "cache", "media", "keep")), "a folder the mover did not empty is kept")
+
+    def test_a_folder_swapped_for_a_link_while_it_moves_takes_nothing_elsewhere(self):
+        # B859: a share's users write its tree, and a folder swapped for a
+        # link between the list and the copy took root's copy, and its
+        # removal of the source, wherever the link pointed.
+        root = tempfile.mkdtemp()
+        for d in ("cache/media/a", "cache/media/b", "user0", "etc"):
+            os.makedirs(os.path.join(root, d), exist_ok=True)
+        os.chmod(os.path.join(root, "cache", "media", "b"), 0o2770)
+        for f in ("cache/media/a/x.mkv", "cache/media/b/y.mkv", "etc/shadow"):
+            with open(os.path.join(root, f), "w") as fh:
+                fh.write("x")
+            os.utime(os.path.join(root, f), (1000, 1000))
+        seen = []
+
+        class M(self.am.ArrayMixin):
+            def _sh(inner, job, argv, timeout=0, **kw):
+                seen.append([os.path.realpath(x) for x in argv[-2:]])
+                return 0
+
+        class Swap(Job):
+            def say(self, s):
+                super().say(s)
+                if "files from" in s:            # the list is made: a share user swaps a folder
+                    os.rename(os.path.join(root, "cache", "media", "a"), os.path.join(root, "cache", "media", "a.was"))
+                    os.symlink(os.path.join(root, "etc"), os.path.join(root, "cache", "media", "a"))
+        job = Swap()
+        with mock.patch.object(self.am, "_mounted", return_value=True), mock.patch.object(self.am, "_open_paths", return_value=set()):
+            rc = M()._mover(job, [{"share": "media", "land": "cache", "from": "cache", "to": "array"}], root=root)
+        self.assertEqual(rc, 1)
+        self.assertEqual(seen, [[os.path.join(root, "cache", "media", "b"), os.path.join(root, "user0", "media", "b")]],
+                         "only the folder that is still a folder is copied")
+        self.assertIn("media: a on cache has a link along it or moved", job.text())
+        self.assertTrue(os.path.exists(os.path.join(root, "etc", "shadow")))
+        self.assertEqual(os.stat(os.path.join(root, "user0", "media", "b")).st_mode & 0o7777, 0o2770,
+                         "a folder made on the other side takes its source's mode")
 
     def test_a_share_lands_where_its_folder_is_and_nothing_with_files_is_touched(self):
         root = tempfile.mkdtemp()

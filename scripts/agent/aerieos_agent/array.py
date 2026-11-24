@@ -363,6 +363,61 @@ def run_watched(argv, say, progress, timeout=172800):
     return proc.wait(), "\n".join(said)
 
 
+def _close(fds):
+    for fd in fds:
+        with contextlib.suppress(OSError):
+            os.close(fd)
+
+
+def _held_dir(path, fds, like=None):
+    """A descriptor on the folder at `path` (added to `fds`), its last part
+    opened through no link; made where it is not, with the mode and owner of
+    the folder `like` is a descriptor on."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        if like is None:
+            raise
+        st = os.fstat(like)
+        os.mkdir(path, 0o700)
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        os.fchown(fd, st.st_uid, st.st_gid)
+        os.fchmod(fd, st.st_mode & 0o7777)
+    fds.append(fd)
+    return fd
+
+
+def _walk_held(top, rel, fds, like_top=None):
+    """A descriptor on the folder `rel` under the folder `top` is a
+    descriptor on (added to `fds`), each part opened through no link: OSError
+    at a link, at anything not a folder, at a part that is not there. With
+    `like_top`, a part not there is made with the mode and owner of the same
+    part under it."""
+    fd, like_fd = top, like_top
+    for part in [x for x in rel.split("/") if x]:
+        if part in (".", ".."):
+            raise OSError(f"{rel} climbs with {part}")
+        if like_top is not None:
+            like_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=like_fd)
+            fds.append(like_fd)
+        try:
+            nfd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+        except FileNotFoundError:
+            if like_top is None:
+                raise
+            st = os.fstat(like_fd)
+            os.mkdir(part, 0o700, dir_fd=fd)
+            nfd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            fds.append(nfd)
+            os.fchown(nfd, st.st_uid, st.st_gid)
+            os.fchmod(nfd, st.st_mode & 0o7777)
+            fd = nfd
+            continue
+        fds.append(nfd)
+        fd = nfd
+    return fd
+
+
 class ArrayMixin:
     """Agent's array jobs: one of the parts class Agent (agent.py) is made of."""
 
@@ -445,27 +500,67 @@ class ArrayMixin:
                 say(f"{mv['share']}: {busy} file{'' if busy == 1 else 's'} held open by a program, left for next time\n")
             if not files:
                 continue
-            with tempfile.NamedTemporaryFile("w", delete=False, suffix=".list") as fl:
-                fl.write("".join(x + "\0" for x in files))
-            try:
-                say(f"{mv['share']}: {len(files)} file{'' if len(files) == 1 else 's'} from {said.get(mv['from'], mv['from'])} to {said.get(mv['to'], mv['to'])}\n")
-                # rsync itself leaves a source in place whose size or time
-                # changed while it was copied; --ignore-existing keeps a file
-                # that appeared on the other side since the list was made.
-                rc = self._sh(job, ["rsync", "-aHAXS", "--ignore-existing", "--remove-source-files", "--from0",
-                                    f"--files-from={fl.name}", src + "/", dst + "/"], timeout=86400)
-            finally:
-                os.unlink(fl.name)
-            worst = worst or rc
+            say(f"{mv['share']}: {len(files)} file{'' if len(files) == 1 else 's'} from {said.get(mv['from'], mv['from'])} to {said.get(mv['to'], mv['to'])}\n")
+            worst = worst or self._move_held(job, mv["share"], said.get(mv["from"], mv["from"]), src, dst, files)
+        return worst
+
+    def _move_held(self, job, share, where, src, dst, files):
+        """The listed files moved a folder at a time, rsync handed each
+        folder by a descriptor opened a part at a time through no link: a
+        share's users write its tree, and a folder swapped for a link
+        between the list and the copy took root's copy, and its removal of
+        the source, wherever the link pointed (B859). A folder made on the
+        other side takes its source's mode and owner, as rsync's own did.
+        The folders it empties are removed through descriptors as well."""
+        say, worst = job.say, 0
+        by_dir = {}
+        for rel in files:
+            by_dir.setdefault(os.path.dirname(rel), []).append(os.path.basename(rel))
+        held = []
+        try:
+            s_top = _held_dir(src, held)
+            d_top = _held_dir(dst, held, like=s_top)
+        except OSError:
+            say(f"{share}: its folder moved while the mover began, and it never follows a link: left\n")
+            _close(held)
+            return 1
+        try:
+            for d, names in sorted(by_dir.items()):
+                fds = []
+                try:
+                    s_fd = _walk_held(s_top, d, fds)
+                    d_fd = _walk_held(d_top, d, fds, like_top=s_top)
+                except OSError:
+                    say(f"{share}: {d} on {where} has a link along it or moved, and the mover never follows one: left\n")
+                    worst = worst or 1
+                    _close(fds)
+                    continue
+                with tempfile.NamedTemporaryFile("w", delete=False, suffix=".list") as fl:
+                    fl.write("".join(x + "\0" for x in names))
+                try:
+                    # rsync itself leaves a source in place whose size or time
+                    # changed while it was copied; --ignore-existing keeps a
+                    # file that appeared on the other side since the list was
+                    # made.
+                    rc = self._sh(job, ["rsync", "-aHAXS", "--ignore-existing", "--remove-source-files", "--from0",
+                                        f"--files-from={fl.name}", f"/proc/self/fd/{s_fd}/", f"/proc/self/fd/{d_fd}/"],
+                                  timeout=86400, pass_fds=(s_fd, d_fd))
+                finally:
+                    os.unlink(fl.name)
+                    _close(fds)
+                worst = worst or rc
             emptied = set()
-            for rel in files:
-                d = os.path.dirname(rel)
+            for d in by_dir:
                 while d:
                     emptied.add(d)
                     d = os.path.dirname(d)
             for d in sorted(emptied, key=lambda x: -x.count("/")):
+                fds = []
                 with contextlib.suppress(OSError):
-                    os.rmdir(os.path.join(src, d))
+                    os.rmdir(os.path.basename(d), dir_fd=_walk_held(s_top, os.path.dirname(d), fds))
+                _close(fds)
+        finally:
+            _close(held)
         return worst
 
     def _landing(self, say, moves, pools, root=None):
