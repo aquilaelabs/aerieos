@@ -35,6 +35,10 @@
 - The array's mover copies a share's files a folder at a time through folders it holds, so a folder swapped for a link while it moves takes nothing anywhere else (0fabf35)
 - SnapRAID keeps its catalogue on each data disk in a folder only root may write, where a link planted beside it on a disk anybody could write was followed as root (a524955)
 - A CI runner's registration and removal tokens are no longer on its command line, where any account on the node could read them while it registered (1836c4c)
+- Adopting an old system's ZFS disk refuses a pool whose name reads as an option, and mounts only the pool's datasets under its own place, where one whose disk named /etc was mounted there (830692f)
+- A pool imported from another machine comes back after a restart by its own number and without force, a destroyed pool is no longer imported again, and this machine's own pool from before mounts only its datasets under /mnt (202a7de)
+- Adopting an old system reads its images and folders through no link and copies its VMs' TPM state with none, where an absolute link in them led to this machine's own files (bbd2cc0)
+- An OS update from a folder takes the version the image's own release file names, and an older version than the machine runs is refused with the boot menu named as the way back (31d94b3)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
