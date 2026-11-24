@@ -888,8 +888,10 @@ function drawBell(){
   // Three groups, each headed with its count, so what waits on an answer is
   // never under what the page merely said; Clear heads the one it clears.
   const hidden = bellHidden();
-  const group = (title, list, extra = "", total = list.length) => list.length
-    ? `<div class="bgroup"><span>${title} · ${total}</span>${extra}</div>` + list.join("") : "";
+  // Earlier's head wears .later, which takes the gold off the rows under
+  // it: gold says something waits on you, and nothing there does.
+  const group = (title, list, extra = "", total = list.length, cls = "") => list.length
+    ? `<div class="bgroup${cls}"><span>${title} · ${total}</span>${extra}</div>` + list.join("") : "";
   const putAway = hidden ? `<div class="bfootbar"><span>${hidden} update${hidden === 1 ? "" : "s"} dismissed</span>
       <button type="button" id="bellRestore">Show again</button></div>` : "";
   // A short list (R218 step 6): what waits on an answer, what needs doing,
@@ -905,7 +907,7 @@ function drawBell(){
   if (!patch(panel, head + (active.length + earlier.length
     ? group("Active", active)
       + group("Earlier", earlier, said.length ? `<button type="button" id="bellClear" title="what this page said">Clear</button>` : "",
-              ended.length + needsLater.length + said.length)
+              ended.length + needsLater.length + said.length, " later")
     // Before the first status read nothing is known yet, which is not
     // nothing to report.
     : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway, true)) return;

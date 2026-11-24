@@ -209,9 +209,12 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .bnote.ask{border-left:3px solid var(--warn);background:var(--ground);
   border-bottom:var(--hair) solid var(--warn)}
 .bnote.ask .bwhy{color:var(--warn)}
+/* A long ask's tag wraps with room between its lines (line-height), where
+   the tag voice's own set them touching on the gold; after the font,
+   whose shorthand would set it back. */
 .bnote.ask .btag{display:inline-block;margin-bottom:5px;padding:1px 6px;
   border-radius:var(--r-small);font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;
-  background:var(--warn);color:var(--bg);font-weight:700}
+  background:var(--warn);color:var(--bg);font-weight:700;line-height:1.45}
 /* The two answers read as controls, not as links in a sentence. */
 .bnote.ask .acts a{padding:3px 10px;border-radius:var(--r-control);border:var(--hair) solid var(--line);
   text-decoration:none}
@@ -247,6 +250,9 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
   font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);
   border-bottom:var(--hair) solid var(--line);background:var(--sunk)}
 .bgroup button{margin-left:auto}
+/* Under Earlier a row that needs doing keeps its bar and loses the gold:
+   gold says something waits on you, and nothing under Earlier does. */
+.bgroup.later ~ .bnote.att{border-left-color:var(--line)}
 /* What needs doing but is not a question: the bar down its side says how
    much it matters, the words stay in ink, and the long part is folded. */
 .bnote.att{border-left:3px solid var(--warn)}

@@ -119,8 +119,10 @@ function renderNoticesInto(i){
                   {key: "bad", label: "Failures", count: all.filter(n => n.level === "bad").length}];
   // In an action bar as every page's bar action is, which keeps it at the
   // right on a phone too, where it sat at the left once the spacer folded.
+  // It clears History alone, and says so: Active above it is never cleared
+  // (R280), and Clear all read as both.
   d.setBar(`<span class="sp"></span>
-    ${all.length ? `<span class="actbar"><button type="button" class="danger" id="ntClear">${noticesChip && noticesChip !== "bad" ? `Clear ${esc(NOTICE_KINDS[noticesChip].toLowerCase())}` : "Clear all"}</button></span>` : ""}`);
+    ${all.length ? `<span class="actbar"><button type="button" class="danger" id="ntClear">${noticesChip && noticesChip !== "bad" ? `Clear ${esc(NOTICE_KINDS[noticesChip].toLowerCase())}` : "Clear history"}</button></span>` : ""}`);
   const html = (noticesErr ? `<div class="hint bad">${esc(noticesErr)}</div>` : "")
     // Active, above History: what waits on an answer, then what blocks
     // work now, none of it with a × (R280). Not drawn with nothing in it
@@ -158,7 +160,7 @@ function wireNotices(root){
   const clear = root.querySelector("#ntClear");
   if (clear) clear.onclick = async () => {
     const kind = noticesChip && noticesChip !== "bad" ? noticesChip : "";
-    if (!await askYes(kind ? `Clear every ${NOTICE_KINDS[kind].toLowerCase()} notice?` : "Clear every notice kept for your account?")) return;
+    if (!await askYes(kind ? `Clear every ${NOTICE_KINDS[kind].toLowerCase()} notice?` : "Clear every notice in your history? What is active stays.")) return;
     return noticesAct({action: "clear", kind}, n => !kind || n.kind === kind);
   };
   root.querySelectorAll("[data-ntchip]").forEach(b => b.onclick = () =>

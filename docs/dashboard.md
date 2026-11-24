@@ -155,8 +155,8 @@ then what stops work: a red CI run, a session an outage held, a disk failing,
 dismissed: it comes from the state on every poll and leaves the moment it is
 answered or stops being true. **Earlier** is the rest: an ask answered or
 expired, no longer amber, saying how it went; what can be put away, such as a
-node whose agent has an update, each with Dismiss; and the latest of what the
-page said, which Clear empties.
+node whose agent has an update, each with Dismiss and no amber, since none of
+it waits on you; and the latest of what the page said, which Clear empties.
 
 **The Notifications page** (See all, at `#/notifications`) has the rest.
 Active comes first, when anything is in it: every ask, invitation and held
@@ -166,7 +166,8 @@ scrolls inside itself, then what stops work, none of it with a ×.
 History follows: what the page has said to your account, each with its
 kind, when, its own × and, for a job, a button to its row on the Jobs page;
 chips narrow it to what was said, answers to asks, jobs or failures, and
-Clear empties it or the chip in force, asked first. An answer to an ask is
+Clear history empties it, or Clear with a chip on that chip's rows, asked
+first; nothing in Active is cleared. An answer to an ask is
 kept there as an answer, from the bell or from the page.
 
 **`aerie doctor`'s verdict** is the dot right after the bell, green, amber or

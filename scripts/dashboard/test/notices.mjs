@@ -142,9 +142,11 @@ await section("the page's history", async () => {
   await page.click(`.noticestab [data-ntdel="${first}"]`);
   await page.waitForFunction(id => !document.querySelector(`.noticestab [data-nt="${id}"]`), first, { timeout: 10000 });
   ok(!(await api('/api/notices')).notices.some(n => n.id === first), 'a row\'s × deletes it, on the record too');
+  const says = await page.$eval('#ntClear', b => b.textContent.trim());
   await page.click('#ntClear');
   await page.waitForFunction(() => !document.querySelector('.noticestab .ntrow'), null, { timeout: 10000 });
-  ok((await api('/api/notices')).notices.length === 0, 'Clear all empties the record, asked first');
+  ok(says === 'Clear history' && (await api('/api/notices')).notices.length === 0,
+     `Clear history empties the record, asked first, and says what it clears: Active is never cleared (${says})`);
 });
 
 // ---- an ask: answered on the row, its long part in a scrolling box -----------
