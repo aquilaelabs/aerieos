@@ -69,10 +69,10 @@ class TheAgent(unittest.TestCase):
         with mock.patch.dict(os.environ, {"BB_CMDLINE": cmd}):
             stick = self.am.render_snapraid(REC)
         self.assertNotIn(f"content {self.am.CONTENT}", stick)
-        self.assertIn("content /mnt/disks/d1/.snapraid.content\n", stick)
+        self.assertIn("content /mnt/disks/d1/.aerie-snapraid/.snapraid.content\n", stick)
         self.assertNotIn("2-parity", conf)
         self.assertIn(f"content {self.am.CONTENT}\n", conf)
-        self.assertIn("content /mnt/disks/d1/.snapraid.content\n", conf)
+        self.assertIn("content /mnt/disks/d1/.aerie-snapraid/.snapraid.content\n", conf)
         self.assertIn("data d2 /mnt/disks/d2/\n", conf)
         two = self.am.render_snapraid({**REC, "parity": REC["parity"] + [{"slot": 2, "id": "x", "uuid": "4", "fs": "xfs"}]})
         self.assertIn("2-parity /mnt/parity/p2/snapraid.2-parity\n", two)
@@ -371,7 +371,7 @@ class Takeover(unittest.TestCase):
         self.assertEqual(arec["plan"]["merged"]["/mnt/user"], ["/mnt/cache=RW", "/mnt/disk1=RW", "/mnt/disk2=RW"])
         conf = self.am.render_snapraid(rec)
         on_data = [ln for ln in conf.splitlines() if "/mnt/disk" in ln and not ln.startswith("data ")]
-        self.assertEqual(on_data, ["content /mnt/disk1/.snapraid.content", "content /mnt/disk2/.snapraid.content"],
+        self.assertEqual(on_data, ["content /mnt/disk1/.aerie-snapraid/.snapraid.content", "content /mnt/disk2/.aerie-snapraid/.snapraid.content"],
                          "SnapRAID's content files are the only new thing on a data disk")
         self.assertIn("parity /mnt/parity/p1/snapraid.parity", conf)
         lines = [ln for ln in self.am.render_fstab(rec).splitlines()]
@@ -524,6 +524,38 @@ class Takeover(unittest.TestCase):
         self.assertIn("1 file held open by a program", job.text())
         self.assertIn("linked: its folder on the data disks is a link", job.text())
         self.assertTrue(os.path.isdir(os.path.join(root, "cache", "media", "keep")), "a folder the mover did not empty is kept")
+
+    def test_snapraid_keeps_its_catalogue_in_a_folder_roots_alone_on_each_disk(self):
+        # B858: a disk's top is often everybody's to write, and SnapRAID
+        # writes .snapraid.content.tmp beside its content file as root,
+        # following a link planted at that name anywhere.
+        root = tempfile.mkdtemp()
+        d1, d2 = os.path.join(root, "disk1"), os.path.join(root, "disk2")
+        os.makedirs(d1)
+        os.makedirs(os.path.join(d2, ".aerie-snapraid"))
+        os.chmod(os.path.join(d2, ".aerie-snapraid"), 0o777)          # somebody else's, opened to all
+        os.symlink("/etc/passwd", os.path.join(d2, ".aerie-snapraid", ".snapraid.content.tmp"))
+        with open(os.path.join(d1, ".snapraid.content"), "w") as f:
+            f.write("the catalogue")
+        os.symlink("/etc/passwd", os.path.join(d2, ".snapraid.content"))
+        rec = {"data": [{"slot": 1, "where": d1}, {"slot": 2, "where": d2}]}
+        # Root here is this test's account: the folder is given to it.
+        with mock.patch.object(self.am, "_mounted", return_value=True), \
+                mock.patch.object(self.am.os, "fchown", side_effect=lambda fd, u, g: os.chown(f"/proc/self/fd/{fd}", os.getuid(), os.getgid())), \
+                mock.patch.object(self.am, "_lstat_at", side_effect=lambda fd, n: (lambda st: st and os.stat_result(
+                    (st.st_mode, st.st_ino, st.st_dev, st.st_nlink, 0 if st.st_uid == os.getuid() else st.st_uid) + tuple(st)[5:]))(
+                    self.am.os.stat(n, dir_fd=fd, follow_symlinks=False) if os.path.lexists(f"/proc/self/fd/{fd}/{n}") else None)), \
+                mock.patch.object(self.am, "log"):
+            self.am.content_dirs(rec)
+        for d in (d1, d2):
+            st = os.lstat(os.path.join(d, ".aerie-snapraid"))
+            self.assertEqual(st.st_mode & 0o7777, 0o700, d)
+        with open(os.path.join(d1, ".aerie-snapraid", ".snapraid.content")) as f:
+            self.assertEqual(f.read(), "the catalogue", "the content from before is moved in")
+        self.assertFalse(os.path.lexists(os.path.join(d1, ".snapraid.content")))
+        self.assertEqual(os.listdir(os.path.join(d2, ".aerie-snapraid")), [], "the planted folder went aside whole")
+        self.assertTrue([x for x in os.listdir(d2) if x.startswith(".aerie-snapraid.not-roots-")])
+        self.assertTrue(os.path.islink(os.path.join(d2, ".snapraid.content")), "a link at the old name is left, never followed")
 
     def test_a_folder_swapped_for_a_link_while_it_moves_takes_nothing_elsewhere(self):
         # B859: a share's users write its tree, and a folder swapped for a

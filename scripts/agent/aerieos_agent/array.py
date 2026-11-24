@@ -17,6 +17,7 @@ import contextlib
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import threading
@@ -43,6 +44,12 @@ MAX_MOVES = 128
 DISKS = "/mnt/disks"
 PARITY = "/mnt/parity"
 CONTENT = VAR + "/snapraid.content"
+# Where SnapRAID keeps its content file on each data disk: a folder root's
+# alone. A disk's own top is often everybody's to write (one taken over
+# from another system is 0777), and SnapRAID writes its content beside it
+# as .snapraid.content.tmp first, as root, following a link planted at that
+# name to /etc/passwd or anywhere (B858).
+CONTENT_DIR = ".aerie-snapraid"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
 POLICIES = {"mfs": "most free space", "lfs": "fill up (least free space)", "epmfs": "existing path, then most free space", "ff": "first disk with room"}
@@ -162,6 +169,51 @@ def unmounted_slots(rec):
             for x in rec.get(key) or [] if not _mounted(slot_mount(kind, x))]
 
 
+def _lstat_at(fd, name):
+    try:
+        return os.stat(name, dir_fd=fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+
+
+def content_dirs(rec):
+    """Each mounted data disk's content folder made root's alone before
+    SnapRAID runs: one somebody else made, or opened to others, is moved
+    aside whole (nothing in it followed or read) and a new one made; and a
+    content file at the disk's top from before this folder, root's own and
+    a plain file, moved into it, so the array's catalogue is kept."""
+    for d in rec.get("data") or []:
+        top = slot_mount("d", d)
+        if not _mounted(top):
+            continue
+        tfd = cfd = -1
+        try:
+            try:
+                tfd = os.open(top, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            except FileNotFoundError:
+                continue                            # nothing there to keep a catalogue in
+            st = _lstat_at(tfd, CONTENT_DIR)
+            if st and not (stat.S_ISDIR(st.st_mode) and st.st_uid == 0 and stat.S_IMODE(st.st_mode) == 0o700):
+                aside = f"{CONTENT_DIR}.not-roots-{int(time.time())}"
+                os.rename(CONTENT_DIR, aside, src_dir_fd=tfd, dst_dir_fd=tfd)
+                log(f"array: {top}/{CONTENT_DIR} was not root's alone; moved aside to {aside}")
+                st = None
+            if not st:
+                os.mkdir(CONTENT_DIR, 0o700, dir_fd=tfd)
+            cfd = os.open(CONTENT_DIR, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=tfd)
+            os.fchown(cfd, 0, 0)
+            os.fchmod(cfd, 0o700)
+            old = _lstat_at(tfd, ".snapraid.content")
+            if old and stat.S_ISREG(old.st_mode) and old.st_uid == 0 and not _lstat_at(cfd, ".snapraid.content"):
+                os.rename(".snapraid.content", ".snapraid.content", src_dir_fd=tfd, dst_dir_fd=cfd)
+        except OSError as e:
+            log(f"array: {top}/{CONTENT_DIR} could not be made root's alone: {e}")
+        finally:
+            for fd in (cfd, tfd):
+                if fd >= 0:
+                    os.close(fd)
+
+
 def adopted_pools():
     """The pools in front of the data disks in the old system's merged
     tree, by name, in its order."""
@@ -206,10 +258,10 @@ def render_snapraid(rec):
     if not on_stick():
         out.append(f"content {CONTENT}\n")
     for d in rec.get("data") or []:
-        out.append(f"content {slot_mount('d', d)}/.snapraid.content\n")
+        out.append(f"content {slot_mount('d', d)}/{CONTENT_DIR}/.snapraid.content\n")
     for d in rec.get("data") or []:
         out.append(f"data d{int(d['slot'])} {slot_mount('d', d)}/\n")
-    out.append("exclude *.unrecoverable\nexclude /lost+found/\nexclude .snapraid.content\nexclude /.Trash*/\nexclude .DS_Store\n"
+    out.append(f"exclude *.unrecoverable\nexclude /lost+found/\nexclude .snapraid.content\nexclude /{CONTENT_DIR}/\nexclude /.Trash*/\nexclude .DS_Store\n"
                "blocksize 256\nhashsize 16\nautosave 500\n")
     return "".join(out)
 
@@ -774,6 +826,7 @@ class ArrayMixin:
         if missing:
             return (f"{', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not mounted, and SnapRAID run without "
                     f"{'it' if len(missing) == 1 else 'them'} would write its parity into memory or read a missing disk as emptied")
+        content_dirs(rec)
         _state_set(running=what, progress="", bg=True, status="")
         last = [0.0]
 
@@ -880,6 +933,7 @@ class ArrayMixin:
             write_fstab(rec)
             write_atomic(env_or("BB_SNAPRAID_CONF", SNAPRAID_CONF), render_snapraid(rec))
             os.makedirs(os.path.dirname(CONTENT), exist_ok=True)
+            content_dirs(rec)
             write_record(rec)
 
         def run_snapraid(what, *extra, key=None, timeout=86400):
@@ -889,6 +943,7 @@ class ArrayMixin:
                     f"{'it' if len(missing) == 1 else 'them'} would write its parity into memory or read a missing disk as emptied: "
                     "nothing run\n")
                 return 65
+            content_dirs(rec)
             _state_set(running=what)
             try:
                 rc = self._sh(job, [snapraid, what, *extra], timeout=timeout)
@@ -1079,6 +1134,7 @@ class ArrayMixin:
                 say(f"refused: {', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not mounted: nothing is read or corrected "
                     "until every disk of the array is\n")
                 return "failed", 65
+            content_dirs(rec)
             _state_set(running="verify", progress="")
             last = [0.0]
 
@@ -1153,7 +1209,8 @@ class ArrayMixin:
             # data disk, or the next array's first sync reads them as this
             # one's and refuses its disks as changed (B704); on a disk taken
             # over from another system they are what this machine added.
-            for path in [env_or("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), ".snapraid.content") for d in rec.get("data") or []]:
+            for path in [env_or("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), sub, ".snapraid.content")
+                                                                     for d in rec.get("data") or [] for sub in (CONTENT_DIR, "")]:
                 for p_ in (path, path + ".tmp", path + ".lock"):
                     with contextlib.suppress(OSError):
                         os.unlink(p_)
