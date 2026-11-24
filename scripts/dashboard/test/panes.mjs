@@ -299,8 +299,10 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
   // with room to spare, where a ring on the circle's soft edge read faded.
   const disc = await page.$eval('.dockline', l => {
     const cs = getComputedStyle(l), px = v => parseFloat(cs.getPropertyValue(v));
-    const ring = getComputedStyle(l, '::before').boxShadow.match(/inset 0px 0px 0px ([\d.]+)px/g) || [];
-    const deepest = Math.max(0, ...ring.map(s => parseFloat(s.match(/([\d.]+)px$/)[1])));
+    // Each shadow's spread, its fourth length, wherever the engine writes
+    // its color and its inset.
+    const ring = [...getComputedStyle(l, '::before').boxShadow.matchAll(/(-?[\d.]+)px (-?[\d.]+)px (-?[\d.]+)px (-?[\d.]+)px/g)];
+    const deepest = Math.max(0, ...ring.map(m => parseFloat(m[4])));
     return { open: px('--arr'), radius: px('--arw') / 2, ringAt: px('--arw') / 2 - deepest };
   });
   ok(disc.open >= disc.radius && disc.ringAt <= disc.open - 1,
