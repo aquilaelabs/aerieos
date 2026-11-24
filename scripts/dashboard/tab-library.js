@@ -615,8 +615,12 @@ function renderLibraryInto(i){
   // focus and its caret through the redraw its own key brings. A narrowing
   // whose read is out is its placeholder.
   const waiting = !!libWaitFor && libWaitFor === libQuery();
-  patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(acts)}<div class="field libgroups">${
-    waiting ? libListSkel() : libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
+  // ...each card that the redraw puts elsewhere (an update done sorts it
+  // anew, one installed joins On this node) sliding there (reflow), named
+  // by its shelf and its entry, since one entry stands on two shelves.
+  reflow(d.list, ".lcard[data-lrow]", e => `${e.closest("[data-libgroup]")?.dataset.libgroup || ""}:${e.dataset.lrow}`,
+    () => patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(acts)}<div class="field libgroups">${
+      waiting ? libListSkel() : libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`));
   // A list a page at a time (the long-lists rule): its foot says how much
   // of how many, and the next page comes as the foot scrolls into view. The
   // placeholder a narrowing draws on its press has no foot: the total is

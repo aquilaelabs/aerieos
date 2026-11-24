@@ -252,8 +252,10 @@ function renderHomeInto(i){
   }
   // Painted only when it changed: Home redraws on every poll (its rows are
   // the poll's), and an unchanged draw keeps a pointer's hover and a fold.
-  if (!patch(d.list, (homeData.error ? `<div class="hint bad">${esc(homeData.error)}</div>` : "")
-    + homeTilesHtml(homeTiles()) + homeCards(homeJobsHtml()))) return;
+  // A job finishing or one arriving moves the rows of Last jobs: each slides
+  // to its new place and a new one fades in (reflow).
+  if (!reflow(d.list, ".hjob[data-hjob]", e => e.dataset.hjob, () => patch(d.list, (homeData.error ? `<div class="hint bad">${esc(homeData.error)}</div>` : "")
+    + homeTilesHtml(homeTiles()) + homeCards(homeJobsHtml())))) return;
   const root = d.list;
   root.querySelectorAll('[data-htile="sessions"]').forEach(a => a.onclick = e => { e.preventDefault(); railGo("sessions"); });
   root.querySelectorAll('[data-htile="updates"]').forEach(a => a.onclick = e => { e.preventDefault(); homeAttention(root); });
@@ -273,7 +275,10 @@ function renderHomeInto(i){
     else if (k === "project") openNewProject();
     else if (k === "machine") openMachineTab();
     else if (k === "ownnode") openDockerOn(ownMachine()?.id || "");
-    else if (k === "hide"){ homeStartHidden = true; try{ localStorage.setItem("bb.gsHidden", "1"); }catch(e){ /* private */ } drawPanes(); }
+    // Put away, it leaves as a row does: faded as its height folds, what is
+    // under it riding up (the operator, 24 Nov: nothing goes with a cut).
+    else if (k === "hide"){ homeStartHidden = true; try{ localStorage.setItem("bb.gsHidden", "1"); }catch(e){ /* private */ }
+      leaveBox(b.closest(".hstart")?.closest(".field"), () => drawPanes()); }
   });
   // The Claude step's state is the nodes list's, read on open and again
   // when the nodes move (index.html's watch).

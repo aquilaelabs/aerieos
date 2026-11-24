@@ -62,7 +62,9 @@ function renderSessionsInto(i){
   const ss = sessShown();
   if (!ss){
     d.setBar("");
-    patch(d.list, skTpl(skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
+    // In the page's shape, its head's line among it, so nothing moves down
+    // when the sessions land.
+    patch(d.list, skTpl(pageHead({line: [{value: GHOST, label: "sessions"}]}) + skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
     return;
   }
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name))), claudes = agentSs.length;
@@ -101,7 +103,9 @@ function renderSessionsInto(i){
   }).join("");
   const html = ss.length ? glance + tblWrap(SESS_COLS, rows, "sesstbl")
     : `<div class="empty">nothing is running: a terminal or an agent's session you open is listed here</div>`;
-  if (!patch(d.list, html)) return;
+  // Rows the redraw puts elsewhere (one arriving on top, one whose state
+  // sorts it anew) slide there, and a new one fades in (reflow).
+  if (!reflow(d.list, ".sessrow[data-sess]", e => e.dataset.sess, () => patch(d.list, html))) return;
   // Kept from the pane under the page: its click makes the page's pane the
   // active one, and the terminal just opened in the dock would lose the
   // keys and the commands to a page that cannot take them.

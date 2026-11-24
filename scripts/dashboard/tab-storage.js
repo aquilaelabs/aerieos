@@ -307,12 +307,13 @@ function storageShares(n){
 function wireStorageShares(root, n){
   const over = root.querySelector("#stShareOver"), ex = root.querySelector("#stShareExport"), sec = root.querySelector("#stShareSecurity"), who = root.querySelector("#stShareWho");
   const secRow = root.querySelector("#stShareSecRow"), nfs = root.querySelector("#stShareNfs"), nfsRow = root.querySelector("#stShareNfsRow");
+  // What each choice asks for slides in under it (the motion rule).
   const fit = () => {
     const on = ex?.value === "smb";
-    if (over) over.hidden = !on;
-    if (secRow) secRow.hidden = !on;
-    if (who && sec) who.hidden = sec.value === "public";
-    if (nfsRow && nfs) nfsRow.hidden = !nfs.checked;
+    showBlock(over, on);
+    showBlock(secRow, on);
+    if (sec) showBlock(who, sec.value !== "public");
+    if (nfs) showBlock(nfsRow, nfs.checked);
   };
   if (ex) ex.onchange = fit;
   if (sec) sec.onchange = fit;
@@ -425,7 +426,7 @@ function storagePools(n){
 }
 function wireStoragePools(root, n){
   const enc = $("stPoolEncrypt"), keyF = $("stPoolKeyF");
-  if (enc && keyF) enc.onchange = () => { keyF.hidden = !enc.checked; };
+  if (enc && keyF) enc.onchange = () => slideShow(keyF, enc.checked);
   root.querySelectorAll("[data-stkey]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.stkey, body = {action: "storage-key", id: n.node, key: act, pool: b.dataset.name};
     if (act === "unlock"){
@@ -731,8 +732,8 @@ function storageOther(n){
 }
 function wireStorageOther(root, n){
   const kind = $("stOtherKind");
-  const showKind = () => root.querySelectorAll("[data-stotherk]").forEach(f => { f.hidden = !f.dataset.stotherk.split(" ").includes(kind.value); });
-  if (kind){ kind.onchange = () => { showKind(); const pw = root.querySelector("[data-stotherpath]"); if (pw) pw.textContent = kind.value === "nfs" ? "Path" : "Share"; const p = $("stOtherPath"); if (p) p.placeholder = kind.value === "nfs" ? "/export/media" : "media"; }; showKind(); }
+  const showKind = (slide = true) => root.querySelectorAll("[data-stotherk]").forEach(f => showBlock(f, f.dataset.stotherk.split(" ").includes(kind.value), slide));
+  if (kind){ kind.onchange = () => { showKind(); const pw = root.querySelector("[data-stotherpath]"); if (pw) pw.textContent = kind.value === "nfs" ? "Path" : "Share"; const p = $("stOtherPath"); if (p) p.placeholder = kind.value === "nfs" ? "/export/media" : "media"; }; showKind(false); }
   root.querySelectorAll("[data-stother]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.stother;
     let body;

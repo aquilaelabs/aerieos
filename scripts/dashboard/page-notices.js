@@ -138,7 +138,9 @@ function renderNoticesInto(i){
                      </div>`).join("")}</div>`
                    : `<div class="hint">${all.length ? "none of this kind" : "nothing yet: what the page tells you is kept here"}</div>`),
                  {prime: !waiting.length});
-  if (!patch(d.list, html)) return;
+  // Rows the redraw puts elsewhere (one arriving on top, one whose state
+  // sorts it anew) slide there, and a new one fades in (reflow).
+  if (!reflow(d.list, ".ntrow[data-nt], .ntask[data-ask]", e => e.dataset.nt ? `nt:${e.dataset.nt}` : `ask:${e.dataset.ask}`, () => patch(d.list, html))) return;
   const list = d.list.querySelector(".ntlist");
   if (list) paginate(list, ":scope > .ntrow", {key: "ntList", noun: "notices", total: rows.length, more: () => renderNoticesInto(i)});
   wireNotices(d.el);
@@ -157,13 +159,6 @@ function wireNotices(root){
   root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () =>
     noticesAct({action: "delete", id: b.dataset.ntdel}, n => String(n.id) === b.dataset.ntdel));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
-  // A long part's fold, a Waiting row's or a History row's, slides over its
-  // height as every fold does (the operator, 24 Nov: it snapped open and
-  // shut where every other fold moves).
-  root.querySelectorAll("details.ntlong > summary").forEach(s => s.onclick = e => {
-    e.preventDefault();
-    slideDetails(s.parentElement, !foldOpen(s.parentElement));
-  });
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));
   root.querySelectorAll("[data-ntdeny]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntdeny), false));
   root.querySelectorAll("[data-ntinvite]").forEach(b => b.onclick = async () => {

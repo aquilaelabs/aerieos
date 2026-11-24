@@ -2491,37 +2491,38 @@ function ndDialogs(){
     // switch is ticked and held, and the address field asks for the name.
     // A system marked dev says so under the pulldown, with why it is not
     // walked where it cannot be here (R97, R102).
-    const sysWhy = () => {
+    const sysWhy = (slide = true) => {
       const s = nodesSystems.find(x => x.id === $b("#ndEnSystem")?.value);
       const dev = s && !s.vetted;
       drawHTML($b("#ndEnSysWhy"), dev ? `${devMark().trim()} ${esc(s.why || "not walked on a real machine yet: it may need a hand")}` : "");
-      $b("#ndEnSysWhy").hidden = !dev;
+      showBlock($b("#ndEnSysWhy"), dev, slide);
     };
-    if ($b("#ndEnSystem")){ $b("#ndEnSystem").addEventListener("change", sysWhy); sysWhy(); }
+    if ($b("#ndEnSystem")){ $b("#ndEnSystem").addEventListener("change", () => sysWhy()); sysWhy(false); }
     const host = $b("#ndEnHost"), sess = $b("#ndEnSess");
-    const showHost = () => {
+    const showHost = (slide = true) => {
       const cf = reach.value === "public";
       if (cf) host.checked = true;
       host.disabled = cf;
-      $b("#ndEnHostHint").hidden = $b("#ndEnFwRow").hidden = !host.checked;
-      $b("#ndEnFwHint").hidden = !host.checked || !$b("#ndEnFw").checked;
-      $b("#ndEnCfHint").hidden = !cf;
+      showBlock($b("#ndEnHostHint"), host.checked, slide);
+      showBlock($b("#ndEnFwRow"), host.checked, slide);
+      showBlock($b("#ndEnFwHint"), host.checked && $b("#ndEnFw").checked, slide);
+      showBlock($b("#ndEnCfHint"), cf, slide);
       sess.disabled = host.checked;
       if (host.checked) sess.checked = false;
     };
-    $b("#ndEnFw").onchange = showHost;
-    $b("#ndEnVm").onchange = () => { $b("#ndEnVmHint").hidden = !$b("#ndEnVm").checked; };
+    $b("#ndEnFw").onchange = () => showHost();
+    $b("#ndEnVm").onchange = () => slideShow($b("#ndEnVmHint"), $b("#ndEnVm").checked);
     const ngx = $b("#ndEnNginx");
-    ngx.onchange = () => { $b("#ndEnNginxHint").hidden = !ngx.checked; };
+    ngx.onchange = () => slideShow($b("#ndEnNginxHint"), ngx.checked);
     const door = $b("#ndEnDoor");
-    const showDoor = () => {
-      $b("#ndEnDoorHostRow").hidden = door.value !== "cloudflared";
-      $b("#ndEnDoorSecretRow").hidden = $b("#ndEnDoorCloseRow").hidden = $b("#ndEnDoorHint").hidden = !door.value;
+    const showDoor = (slide = true) => {
+      showBlock($b("#ndEnDoorHostRow"), door.value === "cloudflared", slide);
+      for (const id of ["#ndEnDoorSecretRow", "#ndEnDoorCloseRow", "#ndEnDoorHint"]) showBlock($b(id), !!door.value, slide);
     };
-    door.onchange = showDoor;
-    showDoor();
-    const showWg = () => {
-      $b("#ndEnWgRow").hidden = reach.value !== "wireguard";
+    door.onchange = () => showDoor();
+    showDoor(false);
+    const showWg = (slide = true) => {
+      showBlock($b("#ndEnWgRow"), reach.value === "wireguard", slide);
       const ctl = $b("#ndEnCtl");
       if (reach.value === "public" && /^https?:\/\/(\d+\.|localhost|\[)/.test(ctl.value)) ctl.value = "https://";
       else if (reach.value !== "public" && ctl.value === "https://") ctl.value = location.origin;
@@ -2529,16 +2530,16 @@ function ndDialogs(){
       // in where the settings have one and nothing has been typed yet.
       const own = state?.settings?.settings?.tunnel_host?.value;
       if (reach.value === "public" && own && ctl.value === "https://") ctl.value = `https://${own}`;
-      showHost();
+      showHost(slide);
     };
     // Make the script wakes once a WireGuard way in has its config (the
     // operator, 18 Oct): chosen or pasted.
     const goReady = () => { const g = $b("#ndEnGo");
       if (g && !g.dataset.busy) g.disabled = reach.value === "wireguard" && !$b("#ndEnWgText").value.trim() && !enrolled; };
     reach.onchange = () => { showWg(); goReady(); };
-    host.onchange = showHost;
+    host.onchange = () => showHost();
     $b("#ndEnWgText").addEventListener("input", goReady);
-    showWg();
+    showWg(false);
     goReady();
     // A file chosen lands in the box, which is what is sent: one place to
     // read it, change it, or paste it instead.

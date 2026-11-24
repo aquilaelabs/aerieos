@@ -252,7 +252,7 @@ function wireStick(root){
   if (!b || !sel) return;
   const s = (ownMachine()?.reported?.os_stick) || {};
   const note = root.querySelector("#stickPoolOther");
-  sel.onchange = () => { if (note) note.hidden = !stickPoolOther(s, sel.value); };
+  sel.onchange = () => slideShow(note, stickPoolOther(s, sel.value));
   b.onclick = () => pressing(b, async () => {
     const path = sel.value, aside = stickPoolOther(s, path);
     if (!path) return notify("pick a pool first", true);

@@ -770,6 +770,23 @@ function bootDocs(){
     // fold can move.
     sectOpen[d.dataset.sect] = !foldOpen(d);
   }, true);
+  // Every fold slides over its height (the motion rule): a press on a
+  // summary that nothing of its own answered (a section's, a row's, a
+  // memory's do) slides its <details> here rather than letting it snap,
+  // so a fold drawn anywhere, now or later, moves as every other does (the
+  // operator, 24 Nov: the bell's details, a finding's rule, a diff's file,
+  // a pending change whole and the rest opened with a cut). A press on a
+  // control inside the summary is that control's.
+  document.addEventListener("click", e => {
+    if (e.defaultPrevented) return;
+    const sum = e.target.closest?.("summary");
+    const d = sum?.parentElement;
+    if (!d || d.tagName !== "DETAILS" || d.querySelector(":scope > summary") !== sum) return;
+    const own = e.target.closest("a, button, input, select, textarea, label");
+    if (own && sum.contains(own) && own !== sum) return;
+    e.preventDefault();
+    slideDetails(d, !foldOpen(d));
+  });
   document.addEventListener("toggle", e => {
     fxRemember(e);                        // a finding's rule, open or shut (tab-findings.js)
     const d = e.target;

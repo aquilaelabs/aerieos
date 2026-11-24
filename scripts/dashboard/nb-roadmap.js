@@ -1131,8 +1131,9 @@ async function nbRmAdd($, nb){
 // half typed keeps the box open. The button stays where it is, a press
 // while the box is open taking the caret back to it.
 function nbRmForm($, on){
-  $("roadmapForm").hidden = !on;
-  $("roadmapAddBar").hidden = !on;
+  // Unrolled and rolled back over its height, as it says (the motion rule).
+  slideShow($("roadmapForm"), !!on);
+  slideShow($("roadmapAddBar"), !!on);
   $("roadmapShow").setAttribute("aria-expanded", String(!!on));
   if (on) $("roadmapText").focus();
 }

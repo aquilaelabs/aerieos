@@ -435,7 +435,8 @@ function nbWikiView({$, nb, project}){
     const nn = box.querySelector("#wkNewName"), nt = box.querySelector("#wkNewText");
     if (nn) nn.oninput = () => { nb.wkAdding.name = nn.value; };
     if (nt) nt.oninput = () => { nb.wkAdding.text = nt.value; };
-    on("wkNewCancel", () => { nb.wkAdding = null; drawWiki(); });
+    on("wkNewCancel", () => { const f = box.querySelector(".wkadd"), done = () => { nb.wkAdding = null; drawWiki(); };
+      if (f && !noMotion()) slideHidden(f, false, done); else done(); });
     on("wkNewSave", async ev => {
       const n = (nb.wkAdding?.name || "").trim();
       if (!n){ failed("a page needs a name"); return; }
@@ -455,12 +456,23 @@ function nbWikiView({$, nb, project}){
   // New page waits on the control row where it lands, for a role that
   // writes the space, which is known before the wiki is read.
   $("wkNew").hidden = !!projWriteWhy(project);
+  // New page unrolls its form under the row, History its log, each over
+  // its height, and each rolls back the same way (the motion rule).
+  const viewOf = () => $("wkNew")?.closest(".nbview");
+  const unroll = sel => { const f = viewOf()?.querySelector(sel); if (f && !noMotion()){ f.hidden = true; slideHidden(f, true); } };
+  const rollBack = (sel, then) => { const f = viewOf()?.querySelector(sel); if (f && !noMotion()) slideHidden(f, false, then); else then(); };
   $("wkNew").onclick = () => {
+    const was = !!nb.wkAdding;
     if (!nb.wkAdding) nb.wkAdding = {name: articles().length ? "" : "Home", text: ""};
-    drawWiki(); $("wkNewName")?.focus();
+    drawWiki();
+    if (!was) unroll(".wkadd");
+    $("wkNewName")?.focus();
   };
   $("wkExport").onclick = () => { location.href = "/api/wiki-export" + q; };
-  $("wkLogBtn").onclick = () => { nb.wkLog = !nb.wkLog; drawWiki(); };
+  $("wkLogBtn").onclick = () => {
+    if (nb.wkLog) return rollBack(".wklog", () => { nb.wkLog = false; drawWiki(); });
+    nb.wkLog = true; drawWiki(); unroll(".wklog");
+  };
   $("wkPull").onclick = async ev => {
     busy(ev.target, "Pulling");
     const j = await post({action: "pull"});

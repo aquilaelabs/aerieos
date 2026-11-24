@@ -273,7 +273,9 @@ function renderVmsInto(i){
   const others = off ? [] : (vmsData.others || []).filter(v => !vmsNode || v.node === vmsNode)
     .filter(v => !q || [v.name, v.node_name].some(x => String(x || "").toLowerCase().includes(q)));
   const html = `<div class="doctab vmtab">${vmBar(false)}${head}${empty || vmGroupsHtml(rows)}${others.length ? vmOthersHtml(others) : ""}</div>`;
-  if (!patch(el, html) && el.querySelector(":scope > .vmtab")) return;
+  // Rows the redraw puts elsewhere (one arriving on top, one whose state
+  // sorts it anew) slide there, and a new one fades in (reflow).
+  if (!reflow(el, "[data-vm-key]", e => e.dataset.vmKey, () => patch(el, html)) && el.querySelector(":scope > .vmtab")) return;
   wireVms(el);
 }
 
@@ -461,7 +463,7 @@ function openNewVm(forProject = ""){
   $m("#vmNode").onchange = () => { drawHTML($m("#vmOs"), fromOptions($m("#vmNode").value)); from(); hwBox(); };
   $m("#vmOs").onchange = from;
   $m("#vmCancel").onclick = () => { m.hidden = true; };
-  $m("#vmAgent").onchange = () => { $m("#vmAgentHint").hidden = !$m("#vmAgent").checked; };
+  $m("#vmAgent").onchange = () => slideShow($m("#vmAgentHint"), $m("#vmAgent").checked);
   $m("#vmIsoGo").onclick = () => pressing($m("#vmIsoGo"), async () => {
     busy($m("#vmIsoGo"), "Asking");
     const j = await postJSON("/api/vms", {action: "iso-add", project: $m("#vmProject").value, node: $m("#vmNode").value,

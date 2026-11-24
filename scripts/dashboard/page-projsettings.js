@@ -729,13 +729,15 @@ function rnFillPrefsRest(p){
   fieldDial("installpacks", GATE_MODES).closest("label").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
   // What its VMs may hold, only where it may make VMs at all (R223).
-  const vmsCaps = () => {
+  // ...sliding in and out as the dial moves, and put where it belongs as
+  // the settings are drawn.
+  const vmsCaps = (slide = true) => {
     const g = $("rnGateVms"), v = g.value === "inherit" ? g.dataset.inherit : g.value;
-    $("rnVmCapsRow").hidden = state?.can?.["vms-write"] === false || v === "deny";
+    showBlock($("rnVmCapsRow"), !(state?.can?.["vms-write"] === false || v === "deny"), slide);
   };
   if (!$("rnGateVms").dataset.capsWired){ $("rnGateVms").dataset.capsWired = "1"; $("rnGateVms").addEventListener("change", () => rnVmCapsShown()); }
   rnVmCapsShown = vmsCaps;
-  vmsCaps();
+  vmsCaps(false);
   rnDrawPrefs();
 }
 

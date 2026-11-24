@@ -134,11 +134,20 @@ await section("The tab at a glance", async () => {
     if (c?.classList.contains('closed')) c.querySelector('h2').click(); });
   await page.evaluate(() => openJobsTab());
   await page.waitForSelector('.jobstab .jbrow', { timeout: 15000 });
-  // The tab at a glance (R216): tiles of what runs, waits, failed and
-  // finished of the jobs listed.
-  const jtiles = await page.$$eval('.jobstab .pgline .pgl', ls => ls.map(l => l.textContent.replace(/^\s*\d+\s*/, '').trim()));
-  ok(jtiles.some(x => /^running/.test(x)) && jtiles.some(x => /^succeeded/.test(x)),
-     `the Jobs page opens on a status line of what runs and what finished (${jtiles.join(', ')})`);
+  // The tab at a glance (R216, R274): its status line in its head says what
+  // its chips do not, how many run and wait and the failures of today, each
+  // only where there are any, and only the failures in a tone.
+  const glance = await page.evaluate(() => {
+    const ls = [...document.querySelectorAll('.jobstab .pgline .pgl')];
+    const want = { running: jobsList.filter(j => j.state === 'running').length,
+                   waiting: jobsList.filter(j => ['queued', 'assigned'].includes(j.state)).length,
+                   'failed today': jobsList.filter(JOB_TODAY.is).length };
+    return { said: ls.map(l => l.textContent.trim()), inHead: ls.every(l => !!l.closest('.pghead')),
+             toned: ls.filter(l => /\b(warn|bad|ok)\b/.test(l.className)).map(l => l.textContent.trim()), want };
+  });
+  const expect = Object.entries(glance.want).filter(([, n]) => n).map(([w, n]) => `${n} ${w}`);
+  ok(glance.said.join('|') === expect.join('|') && glance.inHead && glance.toned.every(x => /failed today/.test(x)),
+     `the Jobs page's head says what runs, waits and failed today, never a chip's count again (${JSON.stringify(glance)})`);
   // By names an account without its prefix, and a job AerieOS asked for in words (B31).
   const by = await page.evaluate(() => [jobBy({ requested_by: 'user:alice' }),
     jobBy({ requested_by: 'system:auto-update' })]);

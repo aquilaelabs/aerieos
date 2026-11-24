@@ -291,7 +291,8 @@ function nbTestsView({$, nb, project}){
             title="discard what was typed">Cancel</button>
           <button type="button" class="primary tstSave">Save</button></div>`);
       const acc = body.querySelector(".tstAccept");
-      if (acc) acc.onchange = () => { body.querySelector(".tstWhy").hidden = !acc.checked; };
+      // The reason it asks for slides in under the tick, and away with it.
+      if (acc) acc.onchange = () => slideShow(body.querySelector(".tstWhy"), acc.checked);
       body.querySelector(".tstCancel").onclick = () => {
         tstEditing.delete(t.key);
         // The fields go before the redraw reads them for a draft.

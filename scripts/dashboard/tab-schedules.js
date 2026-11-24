@@ -172,7 +172,7 @@ function wireSchedForm(m, s){
   when.onchange = () => {
     schedDraft.custom = !when.value;
     if (when.value){ schedDraft.cron = when.value; m.querySelector("#schCron").value = when.value; }
-    cronF.hidden = !!when.value;
+    slideShow(cronF, !when.value);
     if (!when.value) m.querySelector("#schCron").focus();
   };
   m.querySelector("[data-schedsave]").onclick = async e => {

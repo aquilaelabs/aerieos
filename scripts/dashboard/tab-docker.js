@@ -3316,7 +3316,9 @@ function renderDockerInto(i){
   // ...and one that does is patched into what is there (R244): a person's
   // typing in the search or a row's settings, an open fold and what was read
   // into it, and an open dialog all stay where they were.
-  if (!patch(el, html) && el.querySelector(":scope > .dmtab")){ dmSyncDialogs(el); return; }
+  // Rows the redraw puts elsewhere (one arriving on top, one whose state
+  // sorts it anew) slide there, and a new one fades in (reflow).
+  if (!reflow(el, ".row[data-inst]", e => e.dataset.inst, () => patch(el, html)) && el.querySelector(":scope > .dmtab")){ dmSyncDialogs(el); return; }
   dmNoteOpen(el);
   gateDocker(el, off);
   wireAdoptApps(el);

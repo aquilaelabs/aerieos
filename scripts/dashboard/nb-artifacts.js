@@ -455,7 +455,10 @@ function nbArtWireList(av, list, rows, cf, cfFiles){
     r.classList.toggle("open", open);
     r.setAttribute("aria-expanded", String(open));
     setText(r.querySelector(".artcaret"), open ? "\u25BE" : "\u25B8");
-    setHidden(r.querySelector(".artprov"), !open);
+    // Its provenance slides open and shut over its height, as every fold's
+    // body does (the motion rule).
+    const prov = r.querySelector(".artprov");
+    if (prov && prov.hidden === open) slideHidden(prov, open);
   });
   wireMore(list);
   list.querySelectorAll("[data-devsend]").forEach(b => b.onclick = () => {

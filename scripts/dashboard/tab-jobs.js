@@ -282,10 +282,13 @@ function renderJobsInto(i){
       ${j.error ? `<div class="sub jberr warn">${esc(j.error)}</div>` : ""}
       ${jobOutputs(j)}
       ${open ? `<pre class="dmlog jblog" data-tail="1">${
+          // Its log on its way, the first time it is opened: a line of its
+          // shape, never "wrote nothing" before anybody read it.
+          !(j.id in jobsLogs) ? skv(18)
           // "yet" only while there could be more. A job that has ENDED
           // with an empty log is not waiting for anything, and saying it
           // is sends somebody back to look again at nothing.
-          esc((jobsLogs[j.id] || "").slice(-4000)
+          : esc((jobsLogs[j.id] || "").slice(-4000)
               || (over ? "(this job wrote nothing)" : "(no output yet)"))}</pre>
         <div class="actbar jbfollow"><button type="button" data-jbfollow="${esc(j.id)}" data-label="${esc(`${j.type || "job"} ${j.id}`)}"
           title="its whole log in a tab of the dock, following it as it is written">Follow in the dock</button></div>` : ""}
@@ -309,12 +312,14 @@ function renderJobsInto(i){
   const chips = chipBar(JOB_VIEWS.map(g => ({key: g.key, label: g.label, count: count(g.is)})), jobsShow, "data-jbshow",
                         jobsList.length);
   const said = JOB_VIEWS.find(g => g.key === jobsShow);
-  patch(d.list, tiles + chips + jobsSection(shown.length ? tblWrap(JOB_COLS, rows, "jbtbl")
+  // Rows the redraw puts elsewhere (one arriving on top, one whose state
+  // sorts it anew) slide there, and a new one fades in (reflow).
+  reflow(d.list, ".jbrow[data-job]", e => e.dataset.job, () => patch(d.list, tiles + chips + jobsSection(shown.length ? tblWrap(JOB_COLS, rows, "jbtbl")
     : `<div class="empty">${said ? (said.key === "live" ? "nothing is running or waiting"
                                      : `nothing ${said.key === JOB_TODAY.key ? "failed today" : said.key} among the last ${jobsList.length} jobs`)
                                    + ` <button type="button" data-jbshow="">Show every job</button>`
                                  : "no jobs yet: a compose action, an exec on a node, or an agent update will appear here"}</div>`,
-    shown.length ? `${shown.length}` : "none"));
+    shown.length ? `${shown.length}` : "none")));
   d.list.querySelectorAll("[data-jbfollow]").forEach(b => b.onclick = e => {
     e.stopPropagation();
     openLogTab(`log:job:${b.dataset.jbfollow}`, `Log: ${b.dataset.label}`);
@@ -342,9 +347,40 @@ function wireJobsTab(root){
   root.querySelectorAll('.jblog[data-tail="1"]').forEach(t => { t.scrollTop = t.scrollHeight; });
   root.querySelectorAll(".jbrow").forEach(row => {
     const id = row.dataset.job;
+    // Opened and shut over its height, as every row that opens is (the
+    // operator, 24 Nov: the log appeared and went with a cut): open, it is
+    // drawn at once with what is known and slides open, and slides on to
+    // the log's own height when the log lands; shut, it slides closed over
+    // its log before it is drawn without it.
+    const at = () => document.querySelector(`.pane .doc.on .jobstab .jbrow[data-job="${CSS.escape(id)}"]`);
     const toggle = async () => {
-      if (jobsOpen.has(id)) jobsOpen.delete(id); else jobsOpen.add(id);
+      const el = at();
+      if (jobsOpen.has(id)){
+        // Shut at the press: a redraw while it slides (its log's read
+        // landing, the poll) draws it shut, and the slide is how it looks.
+        jobsOpen.delete(id);
+        const extra = el ? [...el.querySelectorAll(":scope > .jblog, :scope > .jbfollow")] : [];
+        // Marked moved first: drawPanes draws again only what moved.
+        if (!el || !extra.length || noMotion()){ readMoved("jobs"); drawPanes(); return; }
+        const from = el.offsetHeight;
+        extra.forEach(x => { x.hidden = true; });
+        const to = el.offsetHeight;
+        extra.forEach(x => { x.hidden = false; });
+        let drawn = false;
+        const shut = () => { if (!drawn){ drawn = true; readMoved("jobs"); drawPanes(); } };
+        foldHeight(el, from, to, shut);
+        // ...and drawn so however the slide ends, a newer fold on the row
+        // having taken its place.
+        setTimeout(shut, 400);
+        return;
+      }
+      jobsOpen.add(id);
+      const draw = () => { readMoved("jobs"); drawPanes(); };
+      if (el) swapBox(el, draw); else draw();
       await loadJobs();
+      // On to its log's height, unless it was shut meanwhile.
+      const now = at();
+      if (now && jobsOpen.has(id)) swapBox(now, () => {});
     };
     const line = row.querySelector(".jbopen");
     // Not a press on its own controls: Cancel, a link, an output.

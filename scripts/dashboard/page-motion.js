@@ -447,7 +447,9 @@ function swapBox(el, paint){
   // all: the second click in a row was the one that looked broken.
   const from = el.offsetHeight;
   el.getAnimations().forEach(a => { if (a.id === "fold") a.cancel(); });
-  paint();
+  // Its own motion: what the paint moves under it rides on its fold.
+  pressMoving++;
+  try{ paint(); }finally{ pressMoving--; }
   const to = el.offsetHeight;
   if (from === to) return;
   foldHeight(el, from, to, () => {});
@@ -520,7 +522,8 @@ function morphThrough(pick, swap, key = e => e.dataset.key || ""){
     if (k && !was.has(k)) was.set(k, {r: e.getBoundingClientRect(), g: ghostOf(e)});
     else loose.push(ghostOf(e));
   }
-  swap();
+  pressMoving++;
+  try{ swap(); }finally{ pressMoving--; }
   const kept = [], fresh = [];
   for (const e of parts()){
     const w = was.get(key(e));
@@ -565,6 +568,26 @@ function morphThrough(pick, swap, key = e => e.dataset.key || ""){
   fadeIn(fresh);
 }
 
+// A press's own motion drawing (chipMove, morphThrough, fadeThrough): a
+// list's redraw inside it leaves the moving to the press (reflow).
+let pressMoving = 0;
+// A list drawn again with its things in a new order, or some of them gone
+// or come, as the Spaces page's cards always have (the operator, 24 Nov:
+// the Library's cards jumped to their new places when an update sorted them
+// anew): `draw` redraws `root`, each thing (`sel`, named by `key`) that
+// moved slides there from where it was, and each new one fades in. Inside a
+// press's own motion it only draws.
+function reflow(root, sel, key, draw, ms = 360){
+  if (!root || pressMoving || noMotion()) return draw();
+  const all = () => [...root.querySelectorAll(sel)].filter(e => !e.classList.contains("fghost") && e.offsetParent);
+  const had = new Set(all().map(key));
+  const play = flip(all, key, ms);
+  const out = draw();
+  play();
+  if (had.size) fadeIn(all().filter(e => !had.has(key(e))));
+  return out;
+}
+
 // A press's redraw as a fade through: `pick` names the parts that change
 // (a selector, or a function giving them), `swap` redraws them.
 function fadeThrough(pick, swap){
@@ -572,8 +595,20 @@ function fadeThrough(pick, swap){
     .filter(e => !e.classList.contains("fghost") && e.offsetParent);
   if (noMotion()) return swap();
   const was = parts().map(ghostOf);
-  swap();
+  pressMoving++;
+  try{ swap(); }finally{ pressMoving--; }
   const now = parts();
+  // Each part drawn again in its place tweens from the height it had to its
+  // new one, on the fold's tween, as its drawing fades through (the
+  // operator, 24 Nov: a detail beside a list, a settings section, popped to
+  // its new size half way through the fade). All read before any moves.
+  if (was.length === now.length){
+    const ends = now.map(el => el.offsetHeight);
+    now.forEach((el, i) => {
+      const h = was[i]?.r.height;
+      if (h && ends[i] && Math.abs(h - ends[i]) > 1) foldHeight(el, h, ends[i], () => {});
+    });
+  }
   was.forEach((w, i) => ghostOut(w, (now[i] || now[0])?.parentNode));
   fadeIn(now);
 }
@@ -607,7 +642,9 @@ function chipMove(scope, items, swap){
     const k = moveKey(el), r = el.getBoundingClientRect();
     if (k && !before.has(k)) before.set(k, {el, r});
   }
-  const out = swap();
+  pressMoving++;
+  let out;
+  try{ out = swap(); }finally{ pressMoving--; }
   const host = scope();
   // The list is not a page arriving: paint's fade on what it redrew went
   // under the move, the whole list blinking while its cards slid.
@@ -723,6 +760,19 @@ function slideMark(box, key, vertical = false){
               {duration: 260, easing: "cubic-bezier(.33,1,.68,1)"});
 }
 
+// A block a choice shows or hides (a hint under a tick, a field a switch
+// asks for), slid in or out over its height rather than cut (the operator,
+// 24 Nov: every reveal moves); nothing when it is already so.
+function slideShow(el, show){
+  if (el && el.hidden === !!show) slideHidden(el, !!show);
+}
+// ...or put so at once, where `slide` is false: a dialog setting its fields
+// as it opens draws them where they belong; a change while it is open slides.
+function showBlock(el, show, slide = true){
+  if (!el) return;
+  if (slide) slideShow(el, show);
+  else el.hidden = !show;
+}
 function slideHidden(el, willShow, after){
   const done = () => { el.hidden = !willShow; after?.(); };
   if (noMotion()){ done(); return; }
