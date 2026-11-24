@@ -56,6 +56,7 @@
 - A release attaches the signed copies aerie sign made of its version, where it passed over them and attached a debug build of the same files alone, which does not update an installed release; its output names each file it attached (5811a5f)
 - A space linked to its git host before AerieOS moved to /opt/aerieos no longer reads as Authentication Off, and its pushes are no longer refused for it (df45793)
 - Dismiss on the bell holds for a release missing its files, a space left beside its repository and a space whose git access went, where those came back on the next read (7038df4)
+- The Containers and VMs pages group by space: a space of several repositories is one group and one chip, each row naming its repository beside the space, where each repository stood apart and was called a space (538b294)
 
 ### Security
 
