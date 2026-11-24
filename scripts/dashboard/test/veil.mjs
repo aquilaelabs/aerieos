@@ -94,6 +94,15 @@ ok(page.errors.length === 0, 'a pane replaced while covered raises nothing');
 // screen that is not there; the frame still loads, which is all a veil waits for.
 const refused = [];
 page.on('console', m => { if (/Content Security Policy|Refused to execute inline/i.test(m.text())) refused.push(m.text()); });
+// A console tab onto a VM the list does not have is dropped once the list
+// lands (vmReapConsoles, B172), which on an idle machine is before the
+// checks below look: so the list read here has the VM the tab is onto.
+await page.route(u => u.pathname === '/api/vms', async r => {
+  const real = await r.fetch();
+  const j = await real.json().catch(() => null);
+  if (!j || !Array.isArray(j.vms)) return r.fulfill({ response: real });
+  await r.fulfill({ response: real, json: { ...j, vms: [...j.vms, { project: 'alpha', name: 'nobody', state: 'running' }] } });
+});
 await page.evaluate(() => openTab({ kind: 'term', arg: 'screen:alpha:nobody', label: 'screen nobody' }));
 await page.waitForSelector('.pane .slot.on iframe', { timeout: 10000 });
 ok(await page.$eval('.pane .slot.on iframe', f => !f.hasAttribute('onload')),
