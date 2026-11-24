@@ -551,8 +551,13 @@ function chipMove(scope, items, swap){
     host.classList.remove("justpainted");
     host.querySelectorAll(".justpainted").forEach(e => e.classList.remove("justpainted"));
   }
-  const kept = new Set();
-  let late = 0;
+  // One after another, so nothing moves through anything on show (the
+  // operator, 23 Nov: a filter's rows slid across the ones fading in and
+  // out, their words drawn over each other): what leaves fades first, then
+  // what stays slides to its place, then what arrives fades up there. What
+  // stays keeps its order, so the sliding rows never cross each other.
+  const LEAVE = 110, MOVE = 260;
+  const kept = new Set(), moves = [], arrivals = [];
   // Every place read before anything is started or added, so the page is
   // laid out once (a read after each write laid out a big page per card,
   // and the screen stood still while it did).
@@ -562,13 +567,8 @@ function chipMove(scope, items, swap){
     if (was && !kept.has(k)){
       kept.add(k);
       const dx = was.r.left - r.left, dy = was.r.top - r.top;
-      if ((dx || dy) && (onScreen(was.r) || onScreen(r)))
-        el.animate([{transform: `translate(${dx}px,${dy}px)`}, {transform: "none"}], {duration: 320, easing: MOVE_EASE});
-    } else if (onScreen(r)){
-      // Arriving one after another, a beat apart, as a store's shelf fills.
-      el.animate([{opacity: 0, transform: "scale(.96)"}, {opacity: 1, transform: "none"}],
-                 {duration: 240, delay: 110 + Math.min(late++, 8) * 18, fill: "backwards", easing: MOVE_EASE});
-    }
+      if ((dx || dy) && (onScreen(was.r) || onScreen(r))) moves.push([el, dx, dy]);
+    } else if (onScreen(r)) arrivals.push(el);
   }
   const ghosts = [];
   if (host) for (const [k, was] of before){
@@ -584,6 +584,15 @@ function chipMove(scope, items, swap){
                             width: `${was.r.width}px`, height: `${was.r.height}px`, pointerEvents: "none", zIndex: "1"});
     ghosts.push([g, was]);
   }
+  const moveAt = ghosts.length ? LEAVE : 0, arriveAt = moveAt + (moves.length ? MOVE : 0);
+  // Held where it was until what leaves has gone, then slid.
+  for (const [el, dx, dy] of moves)
+    el.animate([{transform: `translate(${dx}px,${dy}px)`}, {transform: "none"}],
+               {duration: MOVE, delay: moveAt, fill: "backwards", easing: MOVE_EASE});
+  // Arriving one after another, a beat apart, as a store's shelf fills,
+  // once nothing is sliding past where they land.
+  arrivals.forEach((el, n) => el.animate([{opacity: 0, transform: "scale(.96)"}, {opacity: 1, transform: "none"}],
+    {duration: 220, delay: arriveAt + Math.min(n, 8) * 18, fill: "backwards", easing: MOVE_EASE}));
   // All laid in, then all measured, then all put in place: one layout.
   ghosts.forEach(([g]) => host.appendChild(g));
   const at = ghosts.map(([g]) => g.getBoundingClientRect());
@@ -592,7 +601,7 @@ function chipMove(scope, items, swap){
     g.style.top = `${(was.r.top - at[n].top).toFixed(1)}px`;
     const gone = () => g.remove();
     g.animate([{opacity: 1, transform: "none"}, {opacity: 0, transform: "scale(.96)"}],
-              {duration: 180, easing: "ease-in", fill: "forwards"}).finished.then(gone, gone);
+              {duration: LEAVE, easing: "ease-in", fill: "forwards"}).finished.then(gone, gone);
     setTimeout(gone, 600);
   });
   return out;

@@ -148,6 +148,42 @@ await section("the page's history", async () => {
 });
 
 // ---- an ask: answered on the row, its long part in a scrolling box -----------
+await section("a chip's change never draws one row over another", async () => {
+  // The operator, 23 Nov: rows of different heights slid across the ones
+  // fading in and out, their words over each other. Sampled every frame
+  // through each change, on a phone's width where rows are tallest.
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.evaluate(async () => {
+    const long = 'Approved: root on a node (sh -c journalctl --list-boots --no-pager | tail -3; journalctl -b -1 -o short-iso | grep -i -E oom|out of memory|killed process|memory pressure|hung)';
+    const items = [];
+    for (let i = 0; i < 9; i++) items.push(i % 3 === 0 ? { text: `${long} ${i}`, kind: 'ask' } : { text: `A short thing said ${i}`, kind: 'said' });
+    await postJSON('/api/notices', { action: 'add', items });
+    loadNotices();
+  });
+  await page.waitForFunction(() => document.querySelectorAll('.noticestab .ntrow').length >= 9, null, { timeout: 15000 });
+  const hits = [];
+  for (const chip of ['ask', 'said', '', 'ask', '']){
+    const seen = await page.evaluate(async chip => {
+      document.querySelector(`.noticestab [data-ntchip="${chip}"]`).click();
+      const out = [];
+      for (const end = performance.now() + 900; performance.now() < end;){
+        await new Promise(r => requestAnimationFrame(r));
+        const boxes = [...document.querySelectorAll('.noticestab .ntrow, .noticestab .fghost')]
+          .filter(e => e.checkVisibility() && parseFloat(getComputedStyle(e).opacity) > 0.05)
+          .map(e => e.getBoundingClientRect()).filter(r => r.bottom > 0 && r.top < innerHeight).sort((a, b) => a.top - b.top);
+        for (let i = 1; i < boxes.length; i++)
+          if (boxes[i - 1].bottom - boxes[i].top > 3){ out.push(`${Math.round(boxes[i - 1].bottom - boxes[i].top)}px`); break; }
+      }
+      return out;
+    }, chip);
+    if (seen.length) hits.push(`${chip || 'all'}: ${seen.length} frames, up to ${seen.sort((a, b) => parseFloat(b) - parseFloat(a))[0]}`);
+  }
+  ok(!hits.length, `a chip's change draws no row over another in any frame: what leaves goes first, then what stays slides, then what arrives fades in (${hits.join('; ') || 'none'})`);
+  // Cleared whole: the next part finds its answer as the newest ask kept.
+  await page.evaluate(async () => { await postJSON('/api/notices', { action: 'clear' }); noticesChip = ''; loadNotices(); });
+  await page.setViewportSize({ width: 1280, height: 900 });
+});
+
 await section("an ask: answered on the row, its long part in a scrolling box", async () => {
   const answered = await page.evaluate(async () => {
     const calls = [];
