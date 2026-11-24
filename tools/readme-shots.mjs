@@ -42,7 +42,11 @@ const scrub = page => page.evaluate(() => {
   const ip = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g, seen = new Map();
   const fake = a => a.startsWith('192.0.2.') || a === '127.0.0.1' ? a
     : (seen.has(a) || seen.set(a, `192.0.2.${10 + seen.size}`), seen.get(a));
-  const clean = s => s.replace(mail, 'you@example.com').replace(ip, fake).replace(/bb-dev-sandbox/g, 'workshop-1');
+  // A dev instance built from its space's synced copy is stamped .dirty by
+  // what the copy holds beside the commit, which is the instance's and not
+  // the build's: the version is the commit's.
+  const clean = s => s.replace(mail, 'you@example.com').replace(ip, fake).replace(/bb-dev-sandbox/g, 'workshop-1')
+    .replace(/(\d+\.\d+\.\d+-dev\.\d+\+[0-9a-f]{7,40})\.dirty\b/g, '$1');
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()){ const c = clean(n.nodeValue); if (c !== n.nodeValue) n.nodeValue = c; }
   document.querySelectorAll('[title]').forEach(e => { e.title = clean(e.title); });
@@ -80,6 +84,10 @@ const open = async ({ tour = false, ...opts }, view) => {
       }
       // The tour's picture is of a first visit, whatever the account has seen.
       if (tour) j.tour = { seen: [], off: false };
+      // ...and the build as one the account has seen, so no picture carries
+      // the Updated to band a rebuilt instance shows until it is pressed
+      // away, which would be a post this tool never makes.
+      if (j.welcome && j.image?.rev) j.welcome = { ...j.welcome, image_seen: j.image.rev };
       // A lived-in instance's bell is long: two rows say what it is for.
       if (Array.isArray(j.attention)) j.attention = j.attention.slice(0, 2);
       const sh = (j.layout?.tabs || []).find(t => t.kind === 'term' && /^sh:\d+:$/.test(t.arg));
