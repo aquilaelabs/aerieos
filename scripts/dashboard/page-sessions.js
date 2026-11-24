@@ -66,11 +66,12 @@ function renderSessionsInto(i){
     return;
   }
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name))), claudes = agentSs.length;
-  // Its counts as tiles (the operator, 25 Oct: no loose words at a page's
-  // top), not a line in its bar.
+  // Its counts on its status line, in the page's head as every page's is
+  // (R274; the operator, 24 Nov: a line drawn bare on some pages and in a
+  // card on others was all over the place).
   d.setBar("");
-  const glance = statTiles([{label: ss.length === 1 ? "session" : "sessions", value: ss.length},
-                            {label: agentsWord(agentSs.map(s => s.name)), value: claudes, omit: !claudes}]);
+  const glance = pageHead({line: [{label: ss.length === 1 ? "session" : "sessions", value: ss.length},
+                                  {label: agentsWord(agentSs.map(s => s.name)), value: claudes, omit: !claudes}]});
   // Named exactly as its tab is: the tmux name and the full path are in the
   // name's description, where the detail belongs.
   const names = sessionLabels();

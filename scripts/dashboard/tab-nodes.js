@@ -2013,6 +2013,18 @@ function ndUpdatesFact(n){
     ? `signed releases (${keys}), and unsigned builds, allowed at its console`
     : `signed releases only (${keys})`) + owed + older;
 }
+// A node's status line: the sessions open on it and the jobs running there,
+// or that nothing runs on one that answers; one that does not answers is
+// the header's state to say, and its facts say when it was seen.
+function ndStatusLine(n){
+  if (n.kind !== "agent" || n.state === "pending") return "";
+  const sessions = n.config?.host_only ? 0 : (n.reported?.sessions || []).length;
+  const jobs = (n.jobs || []).filter(j => j.state === "running").length;
+  const line = [{value: sessions, label: sessions === 1 ? "session open" : "sessions open", omit: !sessions},
+                {value: jobs, label: jobs === 1 ? "job running" : "jobs running", omit: !jobs}];
+  if (!sessions && !jobs && n.live) line.push({text: "nothing running"});
+  return statusLine(line, true);
+}
 function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");
 }
@@ -2150,6 +2162,11 @@ function ndRowHtml(n, lead = ""){
           // the wall, and an agent behind this controller's.
           n.config?.own || stalePill ? `<div class="name">${n.config?.own ? `<span class="tag ndown">this machine</span> ` : ""}${stalePill}</div>` : ""}
         ${
+        // What it is doing now, on the status line every page's head opens
+        // with (R274; the operator, 24 Nov: a line on some pages, none on
+        // others, was all over the place), its facts under it.
+        ndStatusLine(n)}
+        ${
         // Its facts in the facts voice, its id among them (R218 step 26):
         // the id is the one in its enroll script's name.
         ndFacts([where, census, seen, agentVer, ndUpdatesFact(n), n.kind === "agent" ? n.config?.user || "" : "",
@@ -2190,7 +2207,7 @@ function renderNodesInto(i){
     // puts over them, as the page does.
     d.setBar(ndBar(null));
     drawHTML(d.list, skTpl(`<div class="row stack2 ndrow"><div class="grow">
-        <div class="name">${skv(7)}</div>${ndFacts(null)}
+        <div class="name">${skv(7)}</div>${statusLine([{value: GHOST, label: "sessions open"}], true)}${ndFacts(null)}
         <div class="actbar ndagent"><span class="lead dim"></span>${ndAgentButtons(true)}</div></div>
       <div class="ndsections">${ND_SECTS.filter(([k]) => !["gpu", "usb", "machine", "power", "report"].includes(k)).map(([k, t], j) =>
         // Storage's mounts and the Repositories are tables of records, as

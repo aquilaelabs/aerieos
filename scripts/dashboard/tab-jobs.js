@@ -291,18 +291,17 @@ function renderJobsInto(i){
           title="its whole log in a tab of the dock, following it as it is written">Follow in the dock</button></div>` : ""}
     </div>`;
   }).join("");
-  // The tab at a glance (R216, the tiles rule): of the jobs listed, how
-  // many run, wait, failed and finished; a tile for a number that is zero
-  // and not news (nothing failed) is left out.
+  // Its status line in its head, as every page's (R274, the tiles rule):
+  // what is news, the split of what runs from what waits and the failures
+  // of today; the groups' counts are the chips' own, said once there.
   const count = f => jobsList.filter(f).length;
-  const tiles = !jobsList.length ? "" : statTiles([
-    {label: "running", value: count(j => j.state === "running"), tone: count(j => j.state === "running") ? "ok" : ""},
-    {label: "waiting", value: count(j => ["queued", "assigned"].includes(j.state)),
-     omit: !count(j => ["queued", "assigned"].includes(j.state))},
-    {label: "failed", value: count(j => j.state === "failed"), tone: count(j => j.state === "failed") ? "bad" : "",
-     omit: !count(j => j.state === "failed")},
-    {label: "succeeded", value: count(j => j.state === "succeeded"), sub: `of ${jobsList.length} listed`},
-  ]);
+  const running = count(j => j.state === "running"), waiting = count(j => ["queued", "assigned"].includes(j.state));
+  const failedToday = count(JOB_TODAY.is);
+  const tiles = !jobsList.length ? "" : pageHead({line: [
+    {label: "running", value: running, omit: !running},
+    {label: "waiting", value: waiting, omit: !waiting},
+    {label: "failed today", value: failedToday, tone: "bad", omit: !failedToday},
+  ]});
   // Narrowed by how a job stands (B74): a chip per state group with jobs
   // in it, under the tiles; the one a link named stays on even when its
   // group is empty, so the list says so rather than showing everything.

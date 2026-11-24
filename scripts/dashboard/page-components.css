@@ -1866,6 +1866,10 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .pgline .sep{color:var(--line)}
 .pghead>.name+.pgline{margin-top:4px}
 .pghead>.pgline+.pghfacts{margin-top:var(--field-gap)}
+/* ...and a node's head, the card the page head was drawn after: its line
+   over its facts as a head's is (R274). */
+.ndrow>.grow>.name+.pgline{margin-top:4px}
+.ndrow>.grow>.pgline+.ndfacts{margin-top:var(--field-gap)}
 
 /* ---- tiles, facts and chips (R216) --------------------------------------
    The 2.0 shapes, one definition each, read by every tab that draws them

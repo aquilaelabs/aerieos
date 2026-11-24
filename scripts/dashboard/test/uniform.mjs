@@ -2304,6 +2304,18 @@ for (const kind of kinds){
     ...[...d.querySelectorAll('.tiles:not(.hometiles)')].filter(e => e.checkVisibility()).map(() => 'tiles'),
     ...[...d.querySelectorAll('.pghead:not(.about) > dl.facts, .pghead:not(.about) > .pghfacts, .pgdet')].filter(e => e.checkVisibility()).map(() => 'a facts grid or a Details fold in the head')]));
   ok(busy.length === 0, `[${kind}] a page's top is its status line, its other facts beside what they describe${busy.length ? `: ${busy.join(', ')}` : ''}`);
+  // ...and that line is in the page's head, a card at a desk, on every page
+  // alike (the operator, 24 Nov: a bare line on some pages, a card on
+  // others, was all over the place): pageHead's, or a node's head card,
+  // which the page head was drawn after. A notebook view keeps its glance
+  // on its own row (a-notebook/views), and a section's own summary line is
+  // the section's.
+  if (!kind.startsWith('notebook:')){
+    const bare = await page.$$eval('.doc.on .pgline', ls => ls.filter(l => l.checkVisibility()
+      && !l.closest('.pghead, .ndrow > .grow, details.sect > :not(summary), .nbview'))
+      .map(l => l.textContent.replace(/\s+/g, ' ').trim().slice(0, 50)));
+    ok(bare.length === 0, `[${kind}] a page's status line is in its head, never a band of its own${bare.length ? `: ${bare.join(' | ')}` : ''}`);
+  }
   const room = await headRoom();
   ok(room.length === 0,
      `[${kind}] every section's first line keeps room under its head at phone width${room.length ? `; touching: ${room.join(', ')}` : ''}`);

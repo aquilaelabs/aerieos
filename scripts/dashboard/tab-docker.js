@@ -3079,12 +3079,20 @@ async function dmCheck(btn, node, after){
   }catch(e){ notify("could not check: " + failWords(e), true); }
   after();
 }
-// The tiles: what runs of how many, the updates due once images were
+// The status line: what runs of how many, the updates due once images were
 // checked, the projects, and what on this daemon nobody here started; a
 // project's own Docker view counts its containers alone, with no projects.
+// Its phrases: the page draws them in its head (dmHead), a notebook's
+// Docker view in its glance (dmTiles).
 function dmTiles(t){
+  return statTiles(dmLine(t));
+}
+function dmHead(t){
+  return pageHead({line: dmLine(t)});
+}
+function dmLine(t){
   const g = !t;
-  return statTiles([
+  return ([
     // "of 6" alone on a small phone, where the word wrapped the tile.
     {label: "running", value: g ? GHOST : t.running, sub: g ? GHOST
       : `of ${t.all}${matchMedia("(max-width:440px)").matches ? "" : ` container${t.all === 1 ? "" : "s"}`}`,
@@ -3153,7 +3161,7 @@ function renderDockerInto(i){
     // The old system's containers and VMs need nothing of the daemon's
     // answer, so they are drawn while it is on its way.
     const old = dmOldApps();
-    drawHTML(el, `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}`)}${old}${skTpl(`
+    drawHTML(el, `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmHead(null)}${dmStatus(null)}`)}${old}${skTpl(`
       ${dmView === "list" ? skTable(DM_COLS, 4)
         // ...the rows in a project group's card, as they land (R262).
         : `<section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(3)}</section>`}
@@ -3276,7 +3284,7 @@ function renderDockerInto(i){
   const running = allIns.filter(d => d.running).length;
   const behind = allIns.filter(d => (d.images_behind || []).length || d.nginx_to).length;
   const notOurs = allCs.filter(c => !c.ours).length;
-  const tiles = blind || !(allIns.length || allCs.length) ? "" : dmTiles({running, all: allIns.length, behind,
+  const tiles = blind || !(allIns.length || allCs.length) ? "" : dmHead({running, all: allIns.length, behind,
     checked: !!dockerList?.images_at, images_at: dockerList?.images_at || 0, projects: chips.filter(g => g.key !== "none").length, notOurs});
   const html = `<div class="doctab dmtab${slow || dockerList?.stale ? " dmstale" : ""}">${picker}${tiles}${
     // The page's own boxes under the tiles and the chips, never between

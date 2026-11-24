@@ -208,19 +208,20 @@ function vmBar(ghost){
         dead || !(vmsData?.hosts || []).length ? " disabled" : ""}>${barSaid("New VM", "New")}</button></span>` : ""}</div>`;
 }
 
-// The tiles, as Containers has them: how many run of how many, the projects
-// they are under, and any that failed or are not on their node, in their tone.
+// The status line in the page's head, as Containers has it: how many run of
+// how many, the projects they are under, and any that failed or are not on
+// their node, in their tone.
 function vmTiles(vms, projects){
   const running = vms.filter(v => v.state === "running").length;
   const broke = vms.filter(v => ["failed", "crashed", "missing"].includes(v.state)).length;
-  return statTiles([
+  return pageHead({line: [
     {label: "running", value: running, sub: `of ${vms.length}${matchMedia("(max-width:440px)").matches ? "" : ` VM${vms.length === 1 ? "" : "s"}`}`,
      tone: vms.length && !running ? "warn" : ""},
     {label: projects === 1 ? "space" : "spaces", value: projects},
     (n => ({label: n === 1 ? "snapshot" : "snapshots", value: n}))(vms.reduce((n, v) => n + (v.snapshots || []).length, 0)),
     {label: broke === 1 ? "needs a look" : "need a look", value: broke, tone: "bad", omit: !broke,
      title: "failed, crashed, or not on its node"},
-  ]);
+  ]});
 }
 // A chip per project with a VM here (the chips rule), by name.
 function vmChipGroups(vms){
@@ -234,8 +235,8 @@ function renderVmsInto(i){
   if (!el) return;
   el.classList.add("flush");
   if (!vmsData){
-    drawHTML(el, `<div class="doctab vmtab">${skTpl(`${vmBar(true)}${statTiles([{label: "running", value: GHOST, sub: GHOST},
-        {label: "spaces", value: GHOST}, {label: "snapshots", value: GHOST}])}
+    drawHTML(el, `<div class="doctab vmtab">${skTpl(`${vmBar(true)}${pageHead({line: [{label: "running", value: GHOST, sub: GHOST},
+        {label: "spaces", value: GHOST}, {label: "snapshots", value: GHOST}]})}
       <section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(2)}</section>`)}</div>`);
     loadVms();
     return;

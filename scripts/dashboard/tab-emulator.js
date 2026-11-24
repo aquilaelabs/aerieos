@@ -194,7 +194,7 @@ function renderEmulatorInto(i){
     surf.setBar("");
     // In the page's order: its head, its tiles, the images it holds,
     // then the ones to add.
-    drawHTML(surf.list, skTpl(`${statusLine([{value: GHOST, label: "images"}, {value: GHOST, label: "AVDs", sub: "built on them"}, {value: GHOST, label: "free", sub: "on the store"}])}
+    drawHTML(surf.list, skTpl(`${pageHead({line: [{value: GHOST, label: "images"}, {value: GHOST, label: "AVDs", sub: "built on them"}, {value: GHOST, label: "free", sub: "on the store"}]})}
       ${emuSections(`<div class="tcs">${skRows(2)}</div>`, "", `<div class="tcs">${skRows(2)}</div>`)}`));
     return;
   }
@@ -223,8 +223,18 @@ function renderEmulatorInto(i){
     pageHead({
       pills: d.root && !d.wrong_platform ? "" : `<span class="pill warn">${d.wrong_platform ? "another platform" : "no store yet"}</span>`,
       // Another platform is its notice's to say (R274); where the images
-      // are kept is said in their own section.
-      })}
+      // are kept is said in their own section. The node's images at a
+      // glance (R216) on its status line, in this head as every page's is
+      // (the operator, 24 Nov): how many, the AVDs built on them, the
+      // levels its projects need and have none of, the room left.
+      line: !d.wrong_platform && d.known !== false ? [
+        {label: "images", value: (d.images || []).length},
+        {label: "AVDs", value: (d.images || []).reduce((n, im) => n + (im.avds || []).length, 0), sub: "built on them"},
+        {label: "levels needed", value: (d.needed || []).length, tone: (d.needed || []).length ? "warn" : "", omit: !(d.needed || []).length},
+        // Storage's reading of a size (sgb), TB past ten of them (B842).
+        {label: "free", value: typeof d.free_mb === "number" ? sgb(d.free_mb) : "",
+         sub: "on the store", omit: typeof d.free_mb !== "number"},
+      ] : []})}
     ${
     // Warnings in the notice voice, an action a button beside it rather than
     // a link in the prose (R218 step 24).
@@ -234,17 +244,6 @@ function renderEmulatorInto(i){
       esc(d.wrong_platform)}: no system image can run there.</div></div>`
       : (d.missing || []).length ? `<div class="field"><div class="notice warn emneed">${esc(d.name)} has no ${
       esc(d.missing.join(" or "))} yet. <button type="button" id="emuToTc">Install from the Library</button></div></div>` : ""}
-    ${
-    // The node's images at a glance (R216): how many, the AVDs built on
-    // them, the levels its projects need and have none of, the room left.
-    !d.wrong_platform && d.known !== false ? statTiles([
-      {label: "images", value: (d.images || []).length},
-      {label: "AVDs", value: (d.images || []).reduce((n, im) => n + (im.avds || []).length, 0), sub: "built on them"},
-      {label: "levels needed", value: (d.needed || []).length, tone: (d.needed || []).length ? "warn" : "", omit: !(d.needed || []).length},
-      // Storage's reading of a size (sgb), TB past ten of them (B842).
-      {label: "free", value: typeof d.free_mb === "number" ? sgb(d.free_mb) : "",
-       sub: "on the store", omit: typeof d.free_mb !== "number"},
-    ]) : ""}
     ${(d.needed || []).map(nd => `<div class="field"><div class="notice warn emlevel">${esc(nd.projects.join(", "))} compile${
       nd.projects.length === 1 ? "s" : ""} against ${esc(nd.level)} and no image of that level is here${
       nd.pick ? `: ${esc(nd.pick)} below is the plain one` : ""}.</div></div>`).join("")}
