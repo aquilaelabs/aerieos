@@ -85,7 +85,7 @@ class ControllerSide(unittest.TestCase):
         def fake(cmd, **kw):
             seen.update(kw)
             return subprocess.CompletedProcess(cmd, 0, "ok\n", "")
-        users = mock.Mock(mint_session=lambda p: "t", seat_of=lambda me: "")
+        users = mock.Mock(mint_session=lambda p, uid="": "t", seat_of=lambda me: "")
         with tempfile.TemporaryDirectory() as ws, mock.patch.object(bbrelay, "WORKSPACE", Path(ws)), \
                 mock.patch.object(bbrelay, "users", users), mock.patch.object(bbrelay.subprocess, "run", fake):
             (Path(ws) / "alpha").mkdir()

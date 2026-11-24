@@ -40,7 +40,7 @@
 - A pool imported from another machine comes back after a restart by its own number and without force, a destroyed pool is no longer imported again, and this machine's own pool from before mounts only its datasets under /mnt (202a7de)
 - Adopting an old system reads its images and folders through no link and copies its VMs' TPM state with none, where an absolute link in them led to this machine's own files (bbd2cc0)
 - An OS update from a folder takes the version the image's own release file names, and an older version than the machine runs is refused with the boot menu named as the way back (31d94b3)
-- aerie diag reports and the other verbs a session on a node runs through the controller run as that session's account, where the diagnostics refused them as an account without the debug grant (faa0eb7)
+- A verb a session on a node runs through the controller acts as the account the session works for, where the controller could not tell whose it was (faa0eb7)
 
 ## 0.9.0-dev.6168: 2026-11-23
 
