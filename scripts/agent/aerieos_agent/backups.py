@@ -21,7 +21,10 @@ from .names import VAR
 
 STATE_FILE = VAR + "/backups-state.json"
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
-ROOTS = ("/mnt/", "/var/lib/aerieos-controller", "/srv/")
+# The controller's state: its secrets among it, so never copied where they
+# would be readable by others (B861).
+STATE_ROOT = "/var/lib/aerieos-controller"
+ROOTS = ("/mnt/", STATE_ROOT, "/srv/")
 RUN_RE = re.compile(r"\d{8}-\d{6}")
 # Whose the runs' folder must be: root's, the account rsync copies as.
 OWNER = 0
@@ -98,6 +101,28 @@ def _acl(fd):
     except (OSError, AttributeError):
         return False
     return True
+
+
+def _keeps_modes(fd, part):
+    """Whether the folder `part` in the folder `fd` is a descriptor on kept
+    the 0700 it was made with, and a file made in it the 0600 it was made
+    with: a filesystem with no modes of its own (exFAT, FAT, an SMB mount's
+    one mode for everything) shows every file as the mount says."""
+    try:
+        if stat.S_IMODE(os.stat(part, dir_fd=fd, follow_symlinks=False).st_mode) != 0o700:
+            return False
+        pfd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+        try:
+            f = os.open(".aerie-modes", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=pfd)
+            try:
+                return stat.S_IMODE(os.fstat(f).st_mode) == 0o600
+            finally:
+                os.close(f)
+                os.unlink(".aerie-modes", dir_fd=pfd)
+        finally:
+            os.close(pfd)
+    except OSError:
+        return False
 
 
 def _there(fd, name):
@@ -231,6 +256,18 @@ class BackupsMixin:
             say(f"refused: something is already at {name}/{part} in {dest}\n")
             _state_set(name, ok=False, error="something is already at the run's name", last_at=int(time.time()))
             return "failed", 64
+        # A destination that keeps no modes shows what root copies to whoever
+        # can reach it there: refused for the controller's state, whose files
+        # are its secrets, and said for anything else (B861).
+        if not _keeps_modes(runs_fd, part):
+            if real_src == STATE_ROOT or real_src.startswith(STATE_ROOT + "/"):
+                shutil.rmtree(_held(runs_fd, part), ignore_errors=True)
+                say(f"refused: {dest} keeps no file modes (exFAT, FAT or a share that gives every file one), so the "
+                    "controller's secrets would be readable there by anyone who can reach it: back its state up to "
+                    "a disk formatted ext4, XFS, Btrfs or ZFS\n")
+                _state_set(name, ok=False, error="the destination keeps no file modes", last_at=int(time.time()))
+                return "failed", 64
+            say(f"note: {dest} keeps no file modes, so what is copied there is readable by whoever can reach it\n")
         argv = [rsync, "-aHAX", "--numeric-ids", "--delete", "--delete-excluded", "--exclude", ".snapraid.content",
                 "--exclude", "lost+found", "--exclude", ".zfs", "--info=stats1,progress0"]
         # The run before, only where it is one of these runs.

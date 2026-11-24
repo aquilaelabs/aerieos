@@ -114,6 +114,32 @@ class TheAgent(unittest.TestCase):
             rows = self.bm.backups_now(a.state)
         self.assertEqual((rows[0]["name"], rows[0]["ok"], rows[0]["runs"]), ("media", True, 2))
 
+    def test_a_destination_that_keeps_no_modes_takes_no_secrets(self):
+        # B861: exFAT, FAT or a share with one mode for every file shows
+        # root's copy to whoever can reach it: the controller's state is
+        # refused there, and anything else goes with that said.
+        a = self.A()
+        with mock.patch.object(self.bm, "_keeps_modes", return_value=False), \
+                mock.patch.object(self.bm, "STATE_ROOT", os.path.realpath(self.src)):
+            self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), self.job.text())
+        self.assertIn("keeps no file modes", self.job.text())
+        self.assertIn("controller's secrets", self.job.text())
+        self.assertEqual(self.ran, [], "rsync is not run")
+        self.assertEqual(os.listdir(os.path.join(self.dest, "media")), [], "the partial run is gone")
+        self.job.log.clear()
+        with mock.patch.object(self.bm, "_keeps_modes", return_value=False):
+            self.assertEqual(self.run_job(a, {"name": "media"}, "20261029-040000"), ("succeeded", 0), self.job.text())
+        self.assertIn("note:", self.job.text())
+
+    def test_a_folder_that_kept_its_modes_is_told_from_one_that_did_not(self):
+        fd = os.open(self.dest, os.O_RDONLY | os.O_DIRECTORY)
+        self.addCleanup(os.close, fd)
+        os.mkdir("run", 0o700, dir_fd=fd)
+        self.assertTrue(self.bm._keeps_modes(fd, "run"))
+        self.assertEqual(os.listdir(os.path.join(self.dest, "run")), [], "the probe file is gone")
+        os.chmod(os.path.join(self.dest, "run"), 0o777)
+        self.assertFalse(self.bm._keeps_modes(fd, "run"))
+
     def test_a_link_at_the_backups_name_is_refused(self):
         # A share user may write the destination: a link left at the
         # backup's name would take root's copy, and its deletions, anywhere.
