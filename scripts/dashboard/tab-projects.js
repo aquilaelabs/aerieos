@@ -609,9 +609,10 @@ function renderProjectsInto(i){
       try{ localStorage.setItem("bb.pjview", pjView); }catch(e){ /* private mode */ }
       el.querySelectorAll("[data-pjview]").forEach(x => {
         x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
-      // ...the cards faded through the change, as the Containers page's
-      // Full and Compact are (the operator, 18 Nov).
-      fadeThrough(".pane .doc.on .projtab #pjGrid .pcard[data-pkey]", () => renderProjectsInto(i));
+      // ...each card tweening to its new size as its drawing fades through,
+      // as the Containers page's Full and Compact do (the operator, 18 and
+      // 24 Nov: the boxes popped to their size half way through the fade).
+      morphThrough(".pane .doc.on .projtab #pjGrid .pcard[data-pkey]", () => renderProjectsInto(i), e => e.dataset.pkey);
     });
   }
   const grid = el.querySelector("#pjGrid");

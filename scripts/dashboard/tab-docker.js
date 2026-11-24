@@ -193,6 +193,9 @@ function dockerWarm(){
 const DM_SLOW_MS = 600;
 // What a chip or Cards and List redraws: the groups' cards, or the list.
 const DM_PARTS = ".pane .doc.on .dmtab .dmcard, .pane .doc.on .dmtab > .tbl";
+// ...and each container's own row, a card or a line, the same one in either
+// view: what Full and Compact move between (morphThrough).
+const DM_ROWS = ".pane .doc.on .dmtab .row[data-inst]";
 let dmSlowTimer = null, dmSlow = false;
 function loadDocker(){
   return reading("docker", async overtaken => {
@@ -3335,7 +3338,7 @@ function renderDockerInto(i){
     // ...the groups it leaves fading through, as a page does (fadeThrough).
     chipMove(() => document.querySelector(".pane .doc.on .dmtab"), ".dmcard, .tbl > .row, .tbl .rows > .row",
              () => { dmChip = c.dataset.dmchip; readMoved("docker"); drawPanes(); }));
-  dmViewWire(el, () => fadeThrough(DM_PARTS, () => { readMoved("docker"); drawPanes(); }));
+  dmViewWire(el, () => morphThrough(DM_ROWS, () => { readMoved("docker"); drawPanes(); }, e => e.dataset.inst));
   // The search redraws as it is typed; the patch keeps the box, its focus
   // and its caret.
   const sb = el.querySelector("#dmSearch");

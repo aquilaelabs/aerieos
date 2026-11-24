@@ -680,7 +680,9 @@ function wireLibrary(root){
   root.querySelectorAll("[data-libview]").forEach(b => b.onclick = () => {
     libView = b.dataset.libview;
     try{ localStorage.setItem("bb.libview", libView); }catch(e){ /* private */ }
-    readMoved("library"); drawPanes();
+    // Each entry's box moving and tweening to its new size as its drawing
+    // fades through (the operator, 24 Nov: the boxes popped to their size).
+    morphThrough(".pane .doc.on .librarytab .lcard[data-lrow]", () => { readMoved("library"); drawPanes(); }, e => e.dataset.lrow);
   });
   root.querySelectorAll("[data-libmore]").forEach(b => b.onclick = () => openEntry(libNode, b.dataset.libmore));
   const chk = root.querySelector("[data-libcheck]");

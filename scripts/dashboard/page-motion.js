@@ -501,6 +501,70 @@ function ghostOut(w, home){
   g.animate([{opacity: 1}, {opacity: 0}], {duration: 90, easing: "ease-in", fill: "forwards"}).finished.then(gone, gone);
   setTimeout(gone, 400);
 }
+// A view switched over the same things (Full and Compact, Cards and Rows) as
+// one motion (the operator, 24 Nov: half way through the fade the boxes
+// popped to their new size, everywhere a view switches). Each thing drawn
+// in both views keeps its box: it tweens from the size and place it had to
+// the ones it has, on the fold's tween, the old drawing fading out inside it
+// as the new one fades in, so what is under it rides along rather than
+// jumping. What is drawn in only one of the two fades through as
+// fadeThrough does. `pick` names the parts, `swap` redraws them, and `key`
+// says which part is which across the redraw.
+function morphThrough(pick, swap, key = e => e.dataset.key || ""){
+  const parts = () => [...(typeof pick === "function" ? pick() : document.querySelectorAll(pick))]
+    .filter(e => !e.classList.contains("fghost") && e.offsetParent);
+  if (noMotion()) return swap();
+  const was = new Map(), loose = [];
+  for (const e of parts()){
+    const k = key(e);
+    if (k && !was.has(k)) was.set(k, {r: e.getBoundingClientRect(), g: ghostOf(e)});
+    else loose.push(ghostOf(e));
+  }
+  swap();
+  const kept = [], fresh = [];
+  for (const e of parts()){
+    const w = was.get(key(e));
+    if (w){ was.delete(key(e)); kept.push([e, w]); } else fresh.push(e);
+  }
+  // Every box set back to the size it had first, all at once, so the
+  // layout under them is the one before the press; then each one's place
+  // is read in that layout and the difference slid away. On the fold's
+  // curve, which starts soft: the menus' ease-out moved a box a third of
+  // the way in its first frame, which still read as a pop.
+  const ease = "ease", ms = 260;
+  // Every box's new size read first, all in the new layout: read as each
+  // one's tween began, a box beside ones already set back read its row
+  // shrunk around them, tweened to that and snapped at the end.
+  kept.forEach(k => k[0].getAnimations().forEach(a => { if (a.id === "morph" || a.id === "fold") a.cancel(); }));
+  const ends = kept.map(([e]) => e.getBoundingClientRect());
+  for (const [i, [e, w]] of kept.entries()){
+    const to = ends[i];
+    if (getComputedStyle(e).position === "static"){ e.style.position = "relative"; e.dataset.morphPos = "1"; }
+    e.style.overflow = "hidden";
+    const size = [{height: `${w.r.height}px`, width: `${w.r.width}px`}, {height: `${to.height}px`, width: `${to.width}px`}];
+    const a = e.animate(size, {duration: ms, easing: ease});
+    a.id = "morph";
+  }
+  for (const [e, w] of kept){
+    const at = e.getBoundingClientRect();
+    const dx = w.r.left - at.left, dy = w.r.top - at.top;
+    if (Math.abs(dx) > .5 || Math.abs(dy) > .5)
+      e.animate([{translate: `${dx.toFixed(1)}px ${dy.toFixed(1)}px`}, {translate: "0 0"}], {duration: ms, easing: ease, composite: "add"}).id = "morph";
+    fadeIn([...e.children]);
+    // Inside the box, which clips it as it shrinks; beside a <details>,
+    // which shows nothing in it but its summary and its content.
+    ghostOut(w.g, e.tagName === "DETAILS" ? e.parentNode : e);
+    const settle = () => {
+      if (e.getAnimations().some(a => a.id === "morph" && a.playState === "running")) return;
+      e.style.overflow = "";
+      if (e.dataset.morphPos){ e.style.position = ""; delete e.dataset.morphPos; }
+    };
+    e.getAnimations().filter(a => a.id === "morph").forEach(a => { a.onfinish = settle; a.oncancel = settle; });
+  }
+  [...loose, ...[...was.values()].map(w => w.g)].forEach((w, i) => ghostOut(w, (fresh[i] || fresh[0] || kept[0]?.[0])?.parentNode));
+  fadeIn(fresh);
+}
+
 // A press's redraw as a fade through: `pick` names the parts that change
 // (a selector, or a function giving them), `swap` redraws them.
 function fadeThrough(pick, swap){

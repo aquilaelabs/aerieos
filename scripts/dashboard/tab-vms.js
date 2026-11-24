@@ -292,7 +292,9 @@ function wireVms(el){
   el.querySelectorAll("[data-vmview]").forEach(b => b.onclick = () => {
     vmView = b.dataset.vmview === "list" ? "list" : "cards";
     try{ localStorage.setItem("bb.vmview", vmView); }catch(e){ /* private mode */ }
-    drawPanes();
+    // Each VM's box tweening to its new size as its drawing fades through
+    // (the operator, 24 Nov), as the Containers page's switch does.
+    morphThrough(".pane .doc.on .vmtab [data-vm-key]", () => drawPanes(), e => e.dataset.vmKey);
   });
   const nb = el.querySelector("#bVmNew");
   if (nb) nb.onclick = () => openNewVm();

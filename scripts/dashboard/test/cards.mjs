@@ -1679,9 +1679,9 @@ await section("Full and Compact on the Spaces page", async () => {
       if (this.dataset?.pkey && Array.isArray(k) && k[0] && 'height' in k[0]) window.__pjMoves.push(`${this.dataset.pkey}:${k[0].height}>${k[k.length - 1].height}`);
       return animate.call(this, k, o);
     };
-    const fade = fadeThrough;
+    const fade = morphThrough;
     window.__pjFadeWas = fade;
-    fadeThrough = (pick, swap) => { if (/projtab/.test(String(pick))) window.__pjFades++; return fade(pick, swap); };
+    morphThrough = (pick, swap, key) => { if (/projtab/.test(String(pick))) window.__pjFades++; return fade(pick, swap, key); };
   });
   await page.click('.doc .projtab [data-pjview="list"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')].every(c => c.classList.contains('compact')),
@@ -1703,13 +1703,19 @@ await section("Full and Compact on the Spaces page", async () => {
   const moved = await page.evaluate(() => {
     const out = { moves: window.__pjMoves, fades: window.__pjFades };
     Element.prototype.animate = Element.prototype.__pjWas; delete Element.prototype.__pjWas;
-    fadeThrough = window.__pjFadeWas;
+    morphThrough = window.__pjFadeWas;
     return out;
   });
   const grew = (k, up) => moved.moves.some(m => { const [key, h] = m.split(':'); const [a, b] = h.split('>').map(parseFloat);
     return key === k && (up ? b > a : b < a); });
-  ok(moved.fades === 2 && grew(k1, true) && grew(k2, true) && grew(k1, false),
-     `...each animated as the Containers page's are: the switch fades the cards through, a card opened grows from its name and the one it folds shrinks (${JSON.stringify(moved)})`);
+  // The switch tweens every card from its size to its new one as its
+  // drawing fades through (the operator, 24 Nov: the boxes popped to their
+  // size half way through the fade): Compact shrinks each card, Full grows
+  // each back.
+  const all = await page.$$eval('.doc.on .projtab #pjGrid .pcard[data-pkey]', cs => cs.map(c => c.dataset.pkey));
+  const shrankAll = all.every(k => grew(k, false)), grewAll = all.every(k => grew(k, true));
+  ok(moved.fades === 2 && grew(k1, true) && grew(k2, true) && grew(k1, false) && shrankAll && grewAll,
+     `...each animated as the Containers page's are: the switch tweens every card to its new size as its drawing fades through, a card opened grows from its name and the one it folds shrinks (${JSON.stringify({ ...moved, shrankAll, grewAll })})`);
   ok(seg.join() === 'Full,Compact' && folded.n > 1 && folded.folded === folded.n,
      `Compact beside Full folds every space's card to its name line (${JSON.stringify({ seg, folded })})`);
   ok(one.open.join() === k1 && two.open.join() === k2 && full.open.length === full.n,
