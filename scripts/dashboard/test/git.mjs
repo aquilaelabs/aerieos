@@ -734,8 +734,13 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   await page.click('.nb .nbview[data-view="git"] [data-gbchip=""]');
   await page.fill('.nb .nbview[data-view="git"] #gitBranchFind', 'old-w');
   // ...the rows on show, not the copies of the ones a chip took away while
-  // they fade (.fghost, which every reader of the parts skips).
-  const narrowed = await page.$$eval('.nb .nbview[data-view="git"] .gbranch:not([hidden]):not(.fghost)', rs => rs.map(r => r.dataset.branch).join());
+  // they fade (.fghost, which every reader of the parts skips). The search
+  // narrows as typing settles, so what it shows is waited for, not sampled
+  // at once (B814).
+  const shown = '.nb .nbview[data-view="git"] .gbranch:not([hidden]):not(.fghost)';
+  await page.waitForFunction(s => [...document.querySelectorAll(s)].map(r => r.dataset.branch).join() === 'old-work', shown,
+    { timeout: 10000 }).catch(() => {});
+  const narrowed = await page.$$eval(shown, rs => rs.map(r => r.dataset.branch).join());
   const ghosts = await page.$$eval('.nb .nbview[data-view="git"] .gbranch.fghost', rs => rs.length);
   ok(narrowed === 'old-work',
      `a chip narrows the table to its kind, and the search to the names holding what is typed (${JSON.stringify({ narrowed, ghosts })})`);
