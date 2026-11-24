@@ -64,6 +64,23 @@ class BellSeen(unittest.TestCase):
         self.assertEqual(bellseen.dismiss("", ["x"])[1], 400)
         self.assertEqual(bellseen.dismiss("u1", [])[1], 400)
 
+    def test_a_row_its_maker_keyed_goes_while_its_key_is_put_away(self):
+        # B1146: a release short of its files, a space's leftover and a
+        # node that turned the controller away were drawn with Dismiss and
+        # came back on the next read; the release's key is what is missing,
+        # so it comes back when that changes. A row with no key stays.
+        keyed = [{"kind": "release-files", "id": "web|v1", "key": "rfiles:web|v1@aaaa", "bad": True},
+                 {"kind": "project-leftover", "id": "old", "key": "leftover:old"},
+                 {"kind": "node-refused", "id": "n1", "since": 5},
+                 {"kind": "ci", "id": "web", "bad": True}]
+        bellseen.dismiss("u1", ["rfiles:web|v1@aaaa", "leftover:old", "noderefused:n1@5"])
+        out, hidden = bellseen.filter_rows("u1", keyed)
+        self.assertEqual([r["kind"] for r in out], ["ci"])
+        self.assertEqual(hidden, 3)
+        moved = [dict(keyed[0], key="rfiles:web|v1@bbbb")]
+        self.assertEqual(len(bellseen.filter_rows("u1", moved)[0]), 1, "what is missing changed, so it is said again")
+        self.assertEqual(len(bellseen.filter_rows("u2", keyed)[0]), 4, "another account still sees them")
+
 
 if __name__ == "__main__":
     unittest.main()

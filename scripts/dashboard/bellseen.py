@@ -93,65 +93,33 @@ def filter_rows(uid, rows):
         elif r.get("kind") == "relocate":
             # To when it failed: put away until another one fails.
             r["key"] = f"relocate:{r['id']}@{r.get('at') or 0}"
-            if r["key"] in gone:
-                hidden += 1
-                continue
         elif r.get("kind") == "image":
             # To the digests it would move to (R195): put away until one moves.
             r["key"] = f"image:{r['id']}@{r.get('digest') or ''}"
-            if r["key"] in gone:
-                hidden += 1
-                continue
-        elif r.get("kind") == "release-sign":
-            # Keyed on what it says (R106): put away until it says another
-            # thing, or another signing fails.
-            if r.get("key") in gone:
-                hidden += 1
-                continue
         elif r.get("kind") == "token-read":
             # To the newest read (R125 step 6): put away until another one.
             r["key"] = f"tokenread:{r['id']}@{r.get('at') or 0}"
-            if r["key"] in gone:
-                hidden += 1
-                continue
-        elif r.get("kind") == "ci":
-            # To the failed run: put away until another run fails.
-            if r.get("key") in gone:
-                hidden += 1
-                continue
-        elif r.get("kind") == "bundle-refused":
-            # To the bundle it refused (R267 step 6): put away until the
-            # controller serves another and the node refuses that one.
-            if r.get("key") in gone:
-                hidden += 1
-                continue
         elif r.get("kind") == "node-refused":
             # To when it began: put away until a new refusal begins.
             r["key"] = f"noderefused:{r['id']}@{r.get('since') or 0}"
-            if r["key"] in gone:
-                hidden += 1
         elif r.get("kind") == "token-reuse":
             # To when it was found: put away until it happens again.
             r["key"] = f"tokenreuse:{r['id']}@{r.get('at') or 0}"
-            if r["key"] in gone:
-                hidden += 1
-                continue
-        elif r.get("kind") == "held":
-            # To the hold (R251): put away until the session is held again.
-            if r.get("key") in gone:
-                hidden += 1
-                continue
         elif r.get("kind") == "nginx":
             # To the digest it would move to (R192): put away until the
             # registry moves the line again.
             r["key"] = f"nginx:{r['id']}@{r.get('digest') or ''}"
-            if r["key"] in gone:
-                hidden += 1
-                continue
         elif not r.get("window") and r.get("id") and r.get("to"):
             r["key"] = f"agent:{r['id']}@{r['to']}"
-            if r["key"] in gone:
-                hidden += 1
-                continue
+        # Every row that carries a key, whether its maker gave it one (a
+        # signing that failed, keyed on what it says; a failed CI run; a
+        # bundle a node refused; a held session; a release short of a file,
+        # keyed on what is missing; a space's git access gone) or the lines
+        # above did, goes while that key is put away, and comes back when
+        # the key moves. A row its maker keyed and no line here named was
+        # drawn with Dismiss and came back on the next read (B1146).
+        if r.get("key") and r["key"] in gone:
+            hidden += 1
+            continue
         out.append(r)
     return out, hidden
