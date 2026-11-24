@@ -950,6 +950,13 @@ function nbCoreSetView(nb, v){
     if (show && wasHidden){ x.classList.remove("justpainted"); fadeIn(x); }
   });
   ghostOut(away);
+  // Its sections open as they will once it is drawn, its placeholder's
+  // among them (the operator, 24 Nov): at a desk every one, on a phone the
+  // one this visit opened or the first. A view's placeholder is several
+  // pieces of markup, each with its section, and only the view sees them
+  // side by side.
+  const shown = root.querySelector(`.nbview[data-view="${v}"]`);
+  if (shown) oneOpen(shown);
   // The settings form comes into this view while it is on screen, and goes
   // back to the dialog when another view is picked (page-projsettings.js).
   // ...and its Agents may section into Permissions, which hands it back

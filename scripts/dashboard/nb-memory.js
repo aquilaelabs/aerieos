@@ -84,9 +84,12 @@ function nbMemoryView({$, nb}){
     // B594). The fold's state is the page's one toggle listener's, keyed like
     // every section.
     $("memSect").open = "briefing:memories" in sectOpen ? sectOpen["briefing:memories"] : true;
-    // ...one section open at a time in a notebook (page-docs.js): open here
-    // only because the person opened it, so it is the one that stays.
-    if ($("memSect").open) keepOpen($("memSect"));
+    // ...one section open at a time in a notebook (page-docs.js): the one
+    // that stays where the person opened it. Open by the default alone it is
+    // one of the view's sections like the rest, and a phone opens the view
+    // on its first, Code base (the operator, 24 Nov: it opened on Memories,
+    // which no press had asked for, under a placeholder that had the top).
+    if ($("memSect").open && sectOpen["briefing:memories"] === true) keepOpen($("memSect"));
     // Which were open before this redraw. Saving reloads the book, and folding
     // away the memory that was just edited is the wrong answer to "did that
     // work?": the whole point is to look at it again.

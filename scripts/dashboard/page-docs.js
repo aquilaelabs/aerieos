@@ -151,7 +151,30 @@ function skRows(n = 4){
 // be, but never found by a selector, a wiring or a suite asking for those.
 function skTpl(html, {said = "loading…", live = false} = {}){
   return `<div class="loading skel skt"${live ? "" : " inert"}><span class="sk-said">${esc(said)}</span>${
-    html.replace(/ data-sect="[^"]*"/g, "")}</div>`;
+    skOpen(html).replace(/ data-sect="[^"]*"/g, "")}</div>`;
+}
+// A placeholder's sections open as the page will open them once it is drawn
+// (oneOpen): at a desk every section of the page stands open, a fold on
+// purpose shut as given; on a phone one does, the one this visit of the page
+// last opened, else the first that is not a fold on purpose (the operator,
+// 24 Nov: a phone's placeholder stood every section open, and all but one
+// folded away as the page came).
+function skOpen(html){
+  if (!html.includes("<details")) return html;
+  const t = document.createElement("template");
+  t.innerHTML = html;
+  const top = [...t.content.querySelectorAll("details.sect")]
+    .filter(d => !d.parentElement?.closest("details.sect") && !d.closest(".row:not(.ndrow), .modal"));
+  if (!top.length) return html;
+  if (!isPhone()) top.forEach(d => { if (!d.hasAttribute("data-fold")) d.setAttribute("open", ""); });
+  else if (top.length > 1){
+    const name = (top[0].dataset.sect || "").split(":")[0];
+    const had = name ? sectLastByName.get(name) : undefined;
+    const last = had && had[0] === sectVisit ? had[1] : "";
+    const keep = top.find(d => last && d.dataset.sect === last) || top.find(d => !d.hasAttribute("data-fold")) || top[0];
+    top.forEach(d => d.toggleAttribute("open", d === keep));
+  }
+  return t.innerHTML;
 }
 
 // A bar button's words at both widths (the operator, 18 Oct: the node
@@ -246,7 +269,7 @@ function bootView(view){
   [c, ...c.querySelectorAll("[id]")].forEach(e => e.removeAttribute("id"));
   c.querySelectorAll("label[for]").forEach(e => e.removeAttribute("for"));
   c.querySelectorAll("input, select, textarea, button").forEach(e => { e.disabled = true; });
-  return c.outerHTML;
+  return skOpen(c.outerHTML);
 }
 
 // ...and in it, the page's own placeholder where it has one: the page drawn

@@ -135,6 +135,11 @@ const outline = sel => {
       : e.matches('.nbsaidslot') ? 'words' : null).filter(Boolean).join(', ') : '',
     jump: !!first('.sectjump'),
     titles: [...root.querySelectorAll('details.sect > summary .t')].filter(shown).map(e => e.textContent.trim()).filter(Boolean),
+    // ...and which of the page's own sections stand open: at a desk every
+    // one, on a phone one (the operator, 24 Nov: a phone's template stood
+    // them all open, and all but one folded away as the page came).
+    opened: [...root.querySelectorAll('details.sect[open]')].filter(d => shown(d) && !d.parentElement.closest('details.sect'))
+      .map(d => d.querySelector(':scope > summary .t')?.textContent.trim()).filter(Boolean),
   };
 };
 
@@ -153,6 +158,11 @@ const differ = (got, tpl, skip = []) => {
   const extra = got.titles.filter(t => !tpl.titles.includes(t) && !spare.includes(t));
   if (lost.length) out.push(`the template has sections the page does not: ${lost.join(', ')}`);
   if (extra.length) out.push(`the page has sections the template does not: ${extra.join(', ')}`);
+  // A section both draw stands open in both or shut in both.
+  const both = got.titles.filter(t => tpl.titles.includes(t));
+  const flip = both.filter(t => got.opened.includes(t) !== tpl.opened.includes(t));
+  if (!skip.includes('open') && flip.length)
+    out.push(`open on the page and not in the template, or the other way: ${flip.map(t => `${t} (${got.opened.includes(t) ? 'open' : 'shut'} on the page)`).join(', ')}`);
   // An empty page has only its frame to compare: what fills it differs.
   for (const k of got.empty ? ['bar', 'tiles', 'status'] : ['bar', 'tiles', 'status', 'split', 'table'])
     if (!skip.includes(k) && got[k] !== tpl[k]) out.push(`${k}: page ${got[k] ? 'has' : 'has none'}, template ${tpl[k] ? 'has' : 'has none'}`);
