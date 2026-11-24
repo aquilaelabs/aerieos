@@ -4,7 +4,10 @@ A space's virtual machines, made, started, stopped, snapshotted and removed
 on the nodes whose VM host feature is installed, by a person on the VMs page
 or by a space's session with `aerie vm`, under the space's own
 setting. The VMs page sits in the Containers group beside Containers, and
-is built from the Containers page's pieces.
+is built from the Containers page's pieces: a VM is kept by the repository
+it was made for and stands under that repository's space, a space of
+several repositories being one group and one chip, never one per
+repository.
 
 **The machine's own VMs** (R165): a VM may belong to the machine rather
 than a space: Belongs to on New VM offers "This machine's own" to an

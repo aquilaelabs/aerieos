@@ -240,7 +240,10 @@ name and read its log.
 
 **Every row belongs to a space or to none**, and the page is grouped that way:
 each space's containers together under its name, the spaces in
-alphabetical order, and what belongs to none last. A container built from a
+alphabetical order, and what belongs to none last. A container is kept by
+the repository it came from or was given to, and a space of several
+repositories holds all of theirs in its one group, each row naming its
+repository beside the space. A container built from a
 space belongs to it until its row says otherwise, one written here belongs
 to the space picked when it was made, and one somebody else started belongs
 to none until an administrator picks a space on its row; that choice is kept

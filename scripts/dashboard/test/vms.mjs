@@ -76,6 +76,25 @@ ok(job?.spec?.action === 'create' && job.spec.domain === 'bbvm-alpha-db' && job.
 await page.waitForFunction(() => /being made/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 15000 });
 ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alpha/.test(e.querySelector('.dmgroup').textContent)),
    '...and the row stands in its space\'s card, being made');
+// ...the space's, never the repository's (the operator, 24 Nov): alpha's
+// space renamed (a session there holds it from a move) heads alpha's VMs
+// by the space's new name, and its own again when renamed back.
+{
+  const key = (((await call('/api/status')).projects || []).find(p => p.name === 'alpha') || {}).project;
+  const was = ((await call('/api/status')).repos || {})[key]?.name;
+  const rn = await call('/api/repos', { action: 'rename', key, to: 'Fleet' });
+  await page.evaluate(() => refresh());
+  let last = null;
+  const fleet = await until(async () => {
+    const r = last = await page.evaluate(k => { drawPanes(); return { heads: [...document.querySelectorAll('.vmtab .dmgroup b')].map(b => b.textContent.trim()),
+      space: state?.repos?.[k]?.name, repo: projLabel('alpha') }; }, key);
+    return r.heads.includes('Fleet') ? r : null;
+  }, 15000, 300);
+  ok(rn.status === 200 && fleet && fleet.space === 'Fleet',
+     `a VM stands under its repository's space, named as the space (${JSON.stringify(fleet || last)} ${rn.error || ''})`);
+  await call('/api/repos', { action: 'rename', key, to: was });
+  await page.evaluate(() => refresh());
+}
 // What it cannot take while it is made is drawn dead, never left out, and
 // the row says why (the operator, 22 Nov).
 const making = await page.$eval('.vmtab [data-vm-key="alpha/db"]', e => ({

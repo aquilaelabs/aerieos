@@ -3322,11 +3322,13 @@ await section("The tab at a glance", async () => {
   await page.click(`${imgSect} > summary`);
   // Chips narrow the list to one project, when there is more than one.
   const chips = await page.$$eval('.dmtab .chips .chip', cs => cs.map(c => c.dataset.dmchip));
+  // A chip is a space's (B1153), by its key: ep.silon's space, not the repository.
+  const epKey = await page.evaluate(() => (state.projects || []).find(p => p.name === 'ep.silon')?.project || 'ep.silon');
   if (chips.length){
-    const mine = await page.$$eval('.dmtab .chips .chip', cs => cs.find(c => c.dataset.dmchip === 'ep.silon')?.textContent || '');
+    const mine = await page.$$eval('.dmtab .chips .chip', (cs, k) => cs.find(c => c.dataset.dmchip === k)?.textContent || '', epKey);
     ok(chips[0] === '' && /ep\.silon/.test(mine), `the chips start with All and count each space (${chips.join('|')})`);
-    await page.click('.dmtab .chips .chip[data-dmchip="ep.silon"]');
-    await page.waitForFunction(() => document.querySelector('.dmtab .chip.on')?.dataset.dmchip === 'ep.silon', null, { timeout: 5000 });
+    await page.click(`.dmtab .chips .chip[data-dmchip="${epKey}"]`);
+    await page.waitForFunction(k => document.querySelector('.dmtab .chip.on')?.dataset.dmchip === k, epKey, { timeout: 5000 });
     await faded(page);
     const shown = await page.$$eval('.dmtab .dmgroup b', bs => bs.map(b => b.textContent.trim()));
     ok(shown.length === 1 && /ep\.silon|epsilon/i.test(shown[0]),
@@ -5823,6 +5825,41 @@ await section("a route through the node's nginx, from the row", async () => {
   const hosts = (await page.evaluate(async () => (await (await fetch('/api/nginx')).json()).hostnames)).map(h => h.name);
   ok(named.route?.host === 'app.example.com' && hosts.includes('app.example.com'),
      `a hostname typed on the row is the route's, and is on the Hostnames list after (${named.error || named.route?.host}; ${hosts.join(',')})`);
+});
+
+// ---- a space of several repositories is one group (B1153) ------------------
+// A container belongs to a repository, and the Containers page groups by the
+// space that repository is in: ep.silon and gamma moved into one space are
+// one group and one chip, named and colored as the space, ep.silon's rows
+// naming their repository beside the space, since it holds two.
+await section("a space of several repositories is one group on the Containers page", async () => {
+  const api = (path, body) => page.evaluate(async ([p, b]) => {
+    const r = await fetch(p, b ? { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                   body: JSON.stringify(b) } : {});
+    return { status: r.status, ...(await r.json()) };
+  }, [path, body]);
+  const spaceOf = async n => (((await api('/api/status')).projects || []).find(p => p.name === n) || {}).project;
+  const was = { gamma: await spaceOf('gamma'), 'ep.silon': await spaceOf('ep.silon') };
+  const made = await api('/api/repos', { action: 'create', name: 'Both Repos' });
+  const moved = [await api('/api/repos', { action: 'move', name: 'gamma', to: made.key }),
+                 await api('/api/repos', { action: 'move', name: 'ep.silon', to: made.key })];
+  ok(made.ok && moved.every(m => m.status === 200),
+     `two repositories go into one space (${JSON.stringify([made.error, ...moved.map(m => m.error)])})`);
+  await page.evaluate(() => { dmChip = ""; refresh(); openDocker(); });
+  const seen = await until(async () => {
+    const r = await page.evaluate(() => { drawPanes(); return {
+      heads: [...document.querySelectorAll('.dmtab .dmgroup b')].map(b => b.textContent.trim()),
+      chips: [...document.querySelectorAll('.dmtab .chips .chip')].map(c => c.textContent.replace(/\s+/g, ' ').trim()),
+      pill: document.querySelector('.dmtab [data-inst^="ep.silon|"]')?.textContent.replace(/\s+/g, ' ') || '' }; });
+    return r.heads.includes('Both Repos') ? r : null;
+  }, 20000, 400);
+  ok(seen && seen.heads.filter(h => h === 'Both Repos').length === 1 && !seen.heads.some(h => /^(gamma|ep\.silon)$/.test(h))
+     && seen.chips.some(c => /^Both Repos/.test(c)) && !seen.chips.some(c => /^ep\.silon/.test(c))
+     && /Space Both Repos · ep\.silon/.test(seen.pill),
+     `...and the Containers page draws its containers as the space's one group and chip, a row naming its repository beside the space (${JSON.stringify(seen && { heads: seen.heads, chips: seen.chips })})`);
+  for (const [n, k] of Object.entries(was)) await api('/api/repos', { action: 'move', name: n, to: k });
+  await api('/api/repos', { action: 'delete', key: made.key });
+  await page.evaluate(() => refresh());
 });
 
 await done(browser);

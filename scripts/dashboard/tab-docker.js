@@ -994,7 +994,7 @@ function dmOwnerLine(r, key){
   const pick = dmOwnDraft[key] ?? saved;
   // A project since deleted is still what the row says until it is changed.
   const names = myProjectNames(saved);
-  const shown = n => n === saved && r.owner_gone ? `${r.owner_label || n} (deleted)` : projLabel(n);
+  const shown = n => n === saved && r.owner_gone ? `${r.owner_label || n} (deleted)` : dmOwnerSaid(n);
   const id = "dmo-" + key;
   return `<div class="setcell dmowner">${lbl(id, "Space",
       "Its space's sessions can see it and, as that space's Run its container setting allows, "
@@ -1067,7 +1067,7 @@ function dmInstPills(d, managed){
   const url = r?.url ? `<a href="${esc(r.url)}" target="_blank" rel="noreferrer"${r.ready ? "" : ' class="dim"'}>${esc(r.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>` : "";
   const refs = dockerList?.refs?.[d.project] || [];
   return [
-    ["Space", d.owner ? esc(d.owner === "System" ? "System" : projLabel(d.owner)) : "none"],
+    ["Space", esc(dmOwnerSaid(d.owner))],
     d.source !== "file" && d.owner && d.project !== d.owner ? ["Built from", esc(projLabel(d.project))] : null,
     d.source !== "file" && refs.length ? ["Branch", d.ref ? esc(d.ref) : "follows space"] : null,
     d.override ? ["Override", esc(d.override)] : null,
@@ -2378,7 +2378,7 @@ function dmLineCells(d, st){
   const imgs = [...new Set((d.services || []).map(c => (c.image || "").replace(/@sha256:.*$/, "")).filter(Boolean))];
   return [`<span class="name">${esc(d.name)}</span>`,
           `<span class="pill stat dmpill${st[1] ? " " + st[1] : ""}">${esc(st[0])}</span>`,
-          who ? esc(who === "System" ? "System" : projLabel(who)) : "",
+          who ? esc(dmOwnerSaid(who)) : "",
           dmPorts(d).map(p => dmPortLink(p.pub)).join(" "),
           dmRoutesOf(d).map(dmRouteLink).join(" "),
           imgs.map(dmImage).join(", ")];
@@ -2703,9 +2703,9 @@ function dmWireRows(el, list = dockerList){
   wireMore(el);
 }
 
-// Grouped by the PROJECT each row belongs to (the operator, 24 Sep): a
-// project's containers together under its name, the groups in alphabetical
-// order, and what belongs to no project last. In each, AerieOS's own
+// Grouped by the SPACE each row belongs to (the operator, 24 Sep; B1153: by
+// the space its repository is in): a space's containers together under its
+// name, the groups in alphabetical order, and what belongs to none last. In each, AerieOS's own
 // containers first and then the others, by name. Where a row came from
 // (built from a project, written here, or started by somebody else) is said
 // on the row itself, since that is what decides what can be done to it.
@@ -2717,73 +2717,93 @@ function dmMatch(r){
   const q = dmSearch.trim().toLowerCase();
   if (!q) return true;
   const hay = [r.name, r.id, r.image, r.project, r.instance, r.owner, r.owner_label,
-               r.owner ? projLabel(r.owner) : "", ...(r.ports || []),
+               r.owner ? projLabel(r.owner) : "", r.owner ? dmSpaceLabel(dmSpaceOf(r.owner)) : "", ...(r.ports || []),
                ...((r.services || []).flatMap(c => [c.name, c.image, c.service, ...(c.ports || [])]))]
     .filter(Boolean).join(" ").toLowerCase();
   return q.split(/\s+/).every(w => hay.includes(w));
 }
 
-// Which project's group the chips narrow the list to, for the page's life
-// ("" is All, "none" the containers of no project): a view, never saved.
+// Which space's group the chips narrow the list to, for the page's life
+// ("" is All, "none" the containers of no space): a view, never saved.
 let dmChip = "";
+
+// The space a row's owner is in (B1153): a container belongs to a
+// repository, and a space of several (R208) holds all their containers in
+// one group, named and colored as the space. System, an owner since deleted
+// and no owner are each their own.
+const dmSpaceOf = o => !o || o === "System" ? (o || "") : reposOf(o) || o;
+const dmSpaceLabel = k => state?.repos?.[k]?.name || projLabel(k);
+const dmKeyOf = r => dmSpaceOf(r.owner || "");
+// What a row says it belongs to: its space, and its repository beside it
+// where the space has more than one.
+function dmOwnerSaid(o){
+  if (!o) return "none";
+  if (o === "System") return "System";
+  // Given to the space itself (a move that left it there), the space alone.
+  const k = dmSpaceOf(o);
+  return k !== o && (state?.repos?.[k]?.members || []).length > 1 ? `${dmSpaceLabel(k)} · ${projLabel(o)}` : dmSpaceLabel(k);
+}
 
 // `on` is the node these are on, {id, name}, where a space's containers are
 // drawn a node at a time (the notebook's Docker view): its card is marked
-// with the node, and its heading says which when a name is given.
+// with the node, and its heading says which when a name is given. `only`
+// narrows to one group: a chip's space, "none", or a repository's own
+// containers by its name (the notebook's).
 function dmGroupsHtml(ins, cs, job, blind, only = "", on = null){
-  // A project's heading wears its own color when it has one; `null` is
-  // the No project heading, which wears none.
+  // A space's heading wears its own color when it has one; `null` is
+  // the No space heading, which wears none.
   const head = (t, sub, tone) => `<div class="field dmgroup${tone === null ? " none" : ""}"${
     tone ? ` data-style="--gc:${tone}"` : ""}><b>${esc(t)}</b>${
     sub ? `<span class="dim">${esc(sub)}</span>` : ""}</div>`;
   const byName = (a, b) => a.localeCompare(b, undefined, {sensitivity: "base"});
-  // A deleted project's containers keep its name until it is restored from
-  // the trash, or they are moved or given to another project (8 Oct).
-  const gone = o => [...ins, ...cs].some(r => r.owner === o && r.owner_gone);
-  const gonesName = o => [...ins, ...cs].find(r => r.owner === o)?.owner_label || o;
-  // An administrator sees every project's containers and works on the ones
+  const kept = r => !only || (only === "none" ? !r.owner : dmKeyOf(r) === only || r.owner === only);
+  ins = ins.filter(kept); cs = cs.filter(kept);
+  // A deleted repository's containers keep its name until it is restored
+  // from the trash, or they are moved or given to another space (8 Oct).
+  const gone = k => [...ins, ...cs].some(r => dmKeyOf(r) === k && r.owner_gone);
+  const gonesName = k => [...ins, ...cs].find(r => dmKeyOf(r) === k)?.owner_label || k;
+  // An administrator sees every space's containers and works on the ones
   // on their own list, as anybody does (R274, the operator 19 Oct): those
-  // first, by name; another project's after them, dimmed, its controls dead
+  // first, by name; another space's after them, dimmed, its controls dead
   // and the way onto it said under its heading.
-  const notMine = o => !!state?.admin && o !== "System" && !gone(o)
-    && (state?.projects || []).some(p => p.name === o && !p.mine);
+  const notMine = k => !!state?.admin && k !== "System" && !gone(k)
+    && (state?.projects || []).some(p => (p.name === k || p.project === k) && !p.mine);
   // ...AerieOS's own (System) pinned above them all (R181, the operator,
-  // 29 Oct), then this account's, then another project's.
-  const rank = o => o === "System" ? -1 : notMine(o) ? 2 : 0;
-  const owners = [...new Set([...ins, ...cs].map(r => r.owner || ""))]
-    .filter(Boolean).filter(o => !only || only === o)
-    .sort((a, b) => rank(a) - rank(b) || byName(projLabel(a), projLabel(b)));
-  const rowsOf = o =>
-    dmRowsHtml(ins.filter(d => (d.owner || "") === o).sort((a, b) => byName(a.name, b.name)), job, blind)
-    + dmOtherRowsHtml(cs.filter(c => (c.owner || "") === o)
+  // 29 Oct), then this account's, then another space's.
+  const rank = k => k === "System" ? -1 : notMine(k) ? 2 : 0;
+  const keys = [...new Set([...ins, ...cs].map(dmKeyOf))].filter(Boolean)
+    .sort((a, b) => rank(a) - rank(b) || byName(dmSpaceLabel(a), dmSpaceLabel(b)));
+  const rowsOf = k =>
+    dmRowsHtml(ins.filter(d => dmKeyOf(d) === k).sort((a, b) => byName(a.name, b.name)), job, blind)
+    + dmOtherRowsHtml(cs.filter(c => dmKeyOf(c) === k)
         .sort((a, b) => byName(a.name || a.id, b.name || b.id)));
-  const group = o => dmView === "list" ? tblWrap(DM_COLS, rowsOf(o), "dmtbl") : rowsOf(o);
-  const loose = [...ins, ...cs].some(r => !r.owner) && (!only || only === "none");
+  const group = k => dmView === "list" ? tblWrap(DM_COLS, rowsOf(k), "dmtbl") : rowsOf(k);
+  const loose = [...ins, ...cs].some(r => !r.owner);
   // System is AerieOS's own (R180): what it deploys itself, the nginx
   // container today, set by that deployment and by no picker.
   // Each group a card at a desk (R262): its heading and its rows together.
   const card = (html, cls = "") => `<section class="dmcard${cls}"${on ? ` data-node="${esc(on.id)}"` : ""}>${html}</section>`;
-  return owners.map(o => gone(o)
-      ? card(head(`${gonesName(o)} (deleted)`, "restore it from the trash, or Move these to another space", null) + group(o))
-      : o === "System"
-        ? card(head("System", "AerieOS's own · no session sees these", null) + group(o))
-        : notMine(o)
-          ? card(head(projLabel(o), "", colorTone(projectColor(o)))
-              + `<div class="sub bad dmwhy">${esc(projLabel(o))} is not on your list of spaces: add it to your own list on ${
-                  pageLink("users", "the Users page")} to work on these</div>` + group(o), " notmine")
-          : card(head(projLabel(o), on?.name ? `on ${on.name}` : "", colorTone(projectColor(o))) + group(o))).join("")
+  return keys.map(k => gone(k)
+      ? card(head(`${gonesName(k)} (deleted)`, "restore it from the trash, or Move these to another space", null) + group(k))
+      : k === "System"
+        ? card(head("System", "AerieOS's own · no session sees these", null) + group(k))
+        : notMine(k)
+          ? card(head(dmSpaceLabel(k), "", colorTone(projectColor(k)))
+              + `<div class="sub bad dmwhy">${esc(dmSpaceLabel(k))} is not on your list of spaces: add it to your own list on ${
+                  pageLink("users", "the Users page")} to work on these</div>` + group(k), " notmine")
+          : card(head(dmSpaceLabel(k), on?.name ? `on ${on.name}` : "", colorTone(projectColor(k))) + group(k))).join("")
     + (loose ? card(head("No space", "no session sees these", null) + group("")) : "");
 }
 
-// The groups the chips offer: each project with containers here, by its
-// label, with how many, and "No project" for the loose ones.
+// The groups the chips offer: each space with containers here, by its
+// name, with how many, and "No space" for the loose ones.
 function dmChipGroups(ins, cs){
   const all = [...ins, ...cs];
   const byName = (a, b) => a.localeCompare(b, undefined, {sensitivity: "base"});
-  const owners = [...new Set(all.map(r => r.owner || ""))].filter(Boolean);
-  const label = o => o === "System" ? "System"
-    : all.some(r => r.owner === o && r.owner_gone) ? `${all.find(r => r.owner === o)?.owner_label || o} (deleted)` : projLabel(o);
-  const groups = owners.map(o => ({key: o, label: label(o), count: all.filter(r => (r.owner || "") === o).length}))
+  const keys = [...new Set(all.map(dmKeyOf))].filter(Boolean);
+  const label = k => k === "System" ? "System"
+    : all.some(r => dmKeyOf(r) === k && r.owner_gone) ? `${all.find(r => dmKeyOf(r) === k)?.owner_label || k} (deleted)` : dmSpaceLabel(k);
+  const groups = keys.map(k => ({key: k, label: label(k), count: all.filter(r => dmKeyOf(r) === k).length}))
     .sort((a, b) => byName(a.label, b.label));
   const loose = all.filter(r => !r.owner).length;
   return loose ? [...groups, {key: "none", label: "No space", count: loose}] : groups;
@@ -3002,7 +3022,7 @@ function dmOtherRowsHtml(cs){
             title="what it prints, in a tab of the dock, read again as it goes on">Log</button>` : ""])}
         </div>
         </div>
-        ${dmSetPills([["Space", c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "none"],
+        ${dmSetPills([["Space", esc(dmOwnerSaid(c.owner))],
                         ["", c.boot ? "✓ Starts on boot" : "not on boot", c.boot ? "ok" : ""],
                         ["Agent", dmClaudeSaid(c, true)]])}
         ${dmEditing.has("ctr:" + (c.name || c.id)) || dmRowDirty("ctr:" + (c.name || c.id))
@@ -3018,7 +3038,7 @@ function dmOtherWrap(c, inner){
   if (dmView !== "list") return `<div class="row stack2 off dmother" data-ctr="${esc(name)}">${inner}</div>`;
   return dmLineWrap(`data-ctr="${esc(name)}"`, " off dmother", [`<span class="name">${esc(name)}</span>`,
     `<span class="pill stat${c.state === "running" ? " ok" : " off"}">${esc(c.state || "unknown")}</span>`,
-    c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "", esc((c.ports || []).join(", ")), "", dmImage(c.image)], inner);
+    c.owner ? esc(dmOwnerSaid(c.owner)) : "", esc((c.ports || []).join(", ")), "", dmImage(c.image)], inner);
 }
 
 // An image as a fact (R227 step 2): its tag, and a pinned digest's first

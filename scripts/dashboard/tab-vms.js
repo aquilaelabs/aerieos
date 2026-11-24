@@ -182,16 +182,20 @@ async function vmCloneAsk(nodeId, from){
 // grouped and chipped as No project.
 // ...and the machine's own (R165 step 3): the NAS's apps and desktops, no
 // project's, grouped and chipped as such.
-const vmOwner = p => p === "machine" ? "This machine's own" : (vmsData?.unowned || []).includes(p) ? "No space" : projLabel(p);
+// A VM is kept by its repository and stands in the group of the space that
+// repository is in, never a repository's own (the operator, 24 Nov), as a
+// container does (dmSpaceOf); every one in no space is one group.
+const vmKey = v => v.project === "machine" ? "machine" : (vmsData?.unowned || []).includes(v.project) ? "none" : dmSpaceOf(v.project);
+const vmOwner = k => k === "machine" ? "This machine's own" : k === "none" ? "No space" : dmSpaceLabel(k);
 function vmGroupsHtml(rows){
   const byName = (a, b) => a.localeCompare(b, undefined, {sensitivity: "base"});
-  const owners = [...new Set(rows.map(v => v.project))].sort((a, b) => byName(vmOwner(a), vmOwner(b)));
-  const group = o => {
-    const html = rows.filter(v => v.project === o).sort((a, b) => byName(a.name, b.name)).map(vmRow).join("");
+  const keys = [...new Set(rows.map(vmKey))].sort((a, b) => byName(vmOwner(a), vmOwner(b)));
+  const group = k => {
+    const html = rows.filter(v => vmKey(v) === k).sort((a, b) => byName(a.name, b.name)).map(vmRow).join("");
     return vmView === "list" ? tblWrap(VM_COLS, html, "dmtbl") : html;
   };
-  return owners.map(o => `<section class="dmcard"><div class="field dmgroup" data-style="--gc:${colorTone(projectColor(o)) || "var(--accent)"}"><b>${
-      esc(vmOwner(o))}</b></div>${group(o)}</section>`).join("");
+  return keys.map(k => `<section class="dmcard"><div class="field dmgroup" data-style="--gc:${colorTone(projectColor(k)) || "var(--accent)"}"><b>${
+      esc(vmOwner(k))}</b></div>${group(k)}</section>`).join("");
 }
 
 // The bar, as Containers' is (the operator, 26 Oct): the node switcher, every
@@ -223,10 +227,10 @@ function vmTiles(vms, projects){
      title: "failed, crashed, or not on its node"},
   ]});
 }
-// A chip per project with a VM here (the chips rule), by name.
+// A chip per space with a VM here (the chips rule), by name.
 function vmChipGroups(vms){
-  const owners = [...new Set(vms.map(v => v.project))];
-  return owners.map(o => ({key: o, label: vmOwner(o), count: vms.filter(v => v.project === o).length}))
+  const keys = [...new Set(vms.map(vmKey))];
+  return keys.map(k => ({key: k, label: vmOwner(k), count: vms.filter(v => vmKey(v) === k).length}))
     .sort((a, b) => a.label.localeCompare(b.label, undefined, {sensitivity: "base"}));
 }
 
@@ -248,7 +252,7 @@ function renderVmsInto(i){
   const onNode = (vmsData.vms || []).filter(v => !vmsNode || v.node === vmsNode);
   const chips = vmChipGroups(onNode);
   if (vmsChip && !chips.some(c => c.key === vmsChip)) vmsChip = "";
-  const rows = onNode.filter(v => !vmsChip || v.project === vmsChip).filter(v => !q || [v.name, v.os, v.os_name, v.node_name, projLabel(v.project), v.ip]
+  const rows = onNode.filter(v => !vmsChip || vmKey(v) === vmsChip).filter(v => !q || [v.name, v.os, v.os_name, v.node_name, projLabel(v.project), vmOwner(vmKey(v)), v.ip]
     .some(s => String(s || "").toLowerCase().includes(q)));
   const hosts = vmsData.hosts || [];
   // Switched off on this install (FEATURES_OFF=vms): said where the list
@@ -392,7 +396,7 @@ function openNewVm(forProject = ""){
   drawHTML(m, `<div class="box"><h3>New VM</h3>
     <div class="field"><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmName", "Name")}<input id="vmName" maxlength="31" autocomplete="off" spellcheck="false" placeholder="db"></div>
-      <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a space, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, vmOwner(p)]), forProject)}</select></div>
+      <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a space, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, p === "machine" ? vmOwner(p) : dmOwnerSaid(p)]), forProject)}</select></div>
     </div></div>
     <div class="field"><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmNode", "Node", "a node with VM host installed")}<select id="vmNode">${optionList(hosts.map(h => [h.id, h.name]))}</select></div>
