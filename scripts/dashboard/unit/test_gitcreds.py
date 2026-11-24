@@ -97,6 +97,16 @@ class Sealed(unittest.TestCase):
         self.assertTrue(gitcreds.names_helper(gitcreds.helper("web"), "web"))
         self.assertFalse(gitcreds.names_helper(gitcreds.helper("web"), "shop"))
         self.assertFalse(gitcreds.names_helper(f"store --file={gitcreds.path('web')}", "web"))
+        # ...known by its name, wherever it was written from: one linked
+        # before the install moved to /opt/aerieos names /opt/builderbot,
+        # a link to the same file (B1144), and the old helper line beside
+        # another is found among them.
+        old = f"!/opt/builderbot/scripts/dashboard/git-credential-bb {gitcreds.path('web')}"
+        self.assertTrue(gitcreds.names_helper(old, "web"))
+        self.assertTrue(gitcreds.names_helper("\n" + old + "\n", "web"))
+        self.assertFalse(gitcreds.names_helper(old, "shop"))
+        self.assertFalse(gitcreds.names_helper(f"!/opt/builderbot/scripts/dashboard/other-helper {gitcreds.path('web')}", "web"))
+        self.assertFalse(gitcreds.names_helper("!'unbalanced", "web"))
 
 
 if __name__ == "__main__":

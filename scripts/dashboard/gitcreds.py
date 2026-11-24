@@ -472,9 +472,20 @@ def helper(project):
 
 def names_helper(value, project):
     """Whether a repository's credential.helper value is this project's:
-    git-credential-bb on its token file (projects.scoped_to_token)."""
+    git-credential-bb on its token file (projects.scoped_to_token). The
+    helper is known by its name, not by the directory it was written from:
+    a repository linked before the install moved to /opt/aerieos names it
+    at /opt/builderbot, a link to the same file, and asked for the resolved
+    path it read as no credential at all, its pushes refused (B1144)."""
     f = str(path(project))
-    return str(HELPER) in value and f in value
+    for line in value.splitlines():
+        try:
+            words = shlex.split(line.strip().lstrip("!"))
+        except ValueError:
+            continue
+        if words and Path(words[0]).name == HELPER.name and f in words[1:]:
+            return True
+    return False
 
 
 def forget(project):
