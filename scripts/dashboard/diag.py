@@ -45,6 +45,9 @@ IMAGE_LOG = Path(os.environ.get("BB_IMAGE_LOG") or f"{os.environ.get('DASHBOARD_
 
 SECTIONS = ("controller", "images", "settings", "tunnel", "doctor", "nodes", "plugins", "jobs", "errors",
             "audit", "reports")
+# Asked for by name and never part of the whole report, which every read
+# without sections is: the controller's own log is long.
+BY_NAME = ("log",)
 
 
 def configure(**deps):
@@ -234,6 +237,42 @@ def errors(n=40, scan=4000):
     return out[-n:]
 
 
+# The controller's own log, read whole (the operator, 24 Nov: a session
+# granted the diagnostics read every fault but not what the controller said
+# around it, so a sign-in a node reported gone could only be guessed at).
+# One stream of one start: the dashboard's own output in full, the boot log
+# with every warning after it, or the Docker manager's compose calls.
+LOG_STREAMS = ("dashboard", "builderbot", "docker")
+LOG_MAX = 5000
+LOG_LINE_MAX = 2000
+
+
+def log(lines=300, grep="", stream="dashboard", boot=0):
+    """The last `lines` of one stream's log for the start `boot` back (0 this
+    one), or the last of its lines that hold `grep`, a phrase in any case,
+    never a pattern. Each line redacted as every section is."""
+    stream = str(stream or "dashboard")
+    if stream not in LOG_STREAMS:
+        return {"error": f"no log called {stream[:40]}: the logs are {', '.join(LOG_STREAMS)}"}
+    try:
+        lines = max(1, min(LOG_MAX, int(lines)))
+        boot = max(0, min(999, int(boot)))
+    except (TypeError, ValueError):
+        return {"error": "lines and boot are numbers"}
+    want = " ".join(str(grep or "").split())[:200]
+    low = want.lower()
+    name = f"{stream}.log" + (f".{boot}" if boot else "")
+    try:
+        with open(Path(log_dir()) / name, encoding="utf-8", errors="replace") as f:
+            written = os.fstat(f.fileno()).st_mtime
+            tail = collections.deque((x for x in f if not low or low in x.lower()), maxlen=lines)
+    except FileNotFoundError:
+        return {"error": f"there is no {name}: " + ("this start has written none" if not boot
+                                                    else f"no log is kept from {boot} starts back")}
+    return {"file": name, "written": _ago(written), "grep": want,
+            "lines": [redact(x.rstrip("\n"))[:LOG_LINE_MAX] for x in tail]}
+
+
 def audit(n=30):
     return [{"when": _ago(r.get("at")), "who": redact(r.get("principal", "")),
              "action": r.get("action", ""), "target": redact(r.get("target", ""))}
@@ -255,20 +294,22 @@ def reports_now(n=40):
 
 _BUILD = {"controller": controller, "images": images, "settings": settings_now, "tunnel": tunnel_now,
           "doctor": doctor, "nodes": nodes_now, "plugins": plugins_now, "jobs": jobs, "errors": errors,
-          "audit": audit, "reports": reports_now}
+          "audit": audit, "reports": reports_now, "log": log}
 
 
-def report(sections=None):
+def report(sections=None, log_opts=None):
     """The whole report, or the sections asked for. A section that fails says
-    so in place rather than taking the rest down with it."""
+    so in place rather than taking the rest down with it. `log_opts` are
+    the log section's (lines, grep, stream, boot)."""
     unknown = [s for s in (sections or []) if s not in _BUILD]
     if unknown:
-        return {"error": f"no section {', '.join(unknown)}: the sections are {', '.join(SECTIONS)}"}
+        return {"error": f"no section {', '.join(unknown)}: the sections are {', '.join(SECTIONS + BY_NAME)}"}
     want = [s for s in (sections or SECTIONS) if s in _BUILD]
     out = {"at": int(time.time())}
     for s in want:
         try:
-            out[s] = _BUILD[s]()
+            out[s] = log(**{k: v for k, v in (log_opts or {}).items() if k in ("lines", "grep", "stream", "boot")}) \
+                if s == "log" else _BUILD[s]()
         except Exception as e:                                   # noqa: BLE001 (each section is another module's; one failing is reported in place)
             out[s] = {"error": redact(f"{type(e).__name__}: {e}")[:200]}
             print(f"dashboard: diag: section {s} failed: {out[s]['error']}",

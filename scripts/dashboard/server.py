@@ -12740,7 +12740,10 @@ class Handler(BaseHTTPRequestHandler):
         if self._diag_refused():
             return None
         want = req.get("sections") if isinstance(req.get("sections"), list) else None
-        r = diag.report([str(x) for x in want] if want else None)
+        # ...the log section's own: how many lines, which of them, which
+        # log and which start (diag.log).
+        lo = {k: req[k] for k in ("lines", "grep", "stream", "boot") if k in req}
+        r = diag.report([str(x) for x in want] if want else None, log_opts=lo)
         return self._result(r)
 
     def _diag_why(self):

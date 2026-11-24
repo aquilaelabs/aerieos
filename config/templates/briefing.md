@@ -213,7 +213,8 @@ What ran is read rather than guessed: `aerie jobs [--node NAME] [--type T]`
 lists the jobs this space may see and `aerie jobs ID [--all]` prints one's
 log; `aerie tests log` is the last test run, `aerie ci-log` a CI run's, `aerie devapp
 log NAME` a container's, each with `-p NAME` for a space it reads. The
-diagnostics (`aerie diag [SECTION]`) and a node's machine logs (`aerie logs --node
+diagnostics (`aerie diag [SECTION]`, and the controller's own log with `aerie diag
+log [N] [--grep WORDS]`) and a node's machine logs (`aerie logs --node
 NAME --agent|--runner|--nginx|--system|--kernel|--crash [N]`) are read only
 with debug mode on, the space granted them and your account holding the
 debug grant, each the operator's; a refusal names which is missing, so say

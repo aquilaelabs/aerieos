@@ -13,6 +13,11 @@ import bbapi
 
 
 body = {"sections": sys.argv[1:]} if sys.argv[1:] else {}
+# The log section's own, from aerie diag log's options (BB_DIAG_LINES and
+# the rest, set only when given).
+for key, env in (("lines", "BB_DIAG_LINES"), ("grep", "BB_DIAG_GREP"), ("stream", "BB_DIAG_STREAM"), ("boot", "BB_DIAG_BOOT")):
+    if os.environ.get(env):
+        body[key] = os.environ[env]
 d = bbapi.call("/api/diag", body, timeout=60)
 if d.get("error") and len(d) == 1:
     sys.exit(f"[builderbot] ERROR: {d['error']}")
@@ -76,6 +81,12 @@ for name, v in d.items():
         for j in v.get("failed") or []:
             print(f"  {j['when']:>8}  {j.get('id', ''):<11} {j['state']:<9} {j['type']:<6} {j['project'] or '-'} on {j['node'] or '-'}"
                   f"{' exit ' + str(j['exit']) if j['exit'] is not None else ''}{': ' + j['error'] if j['error'] else ''}")
+    elif name == "log":
+        # The controller's own words, as it wrote them: no indent, so a line
+        # reads and copies as the file has it.
+        print(f"  {v.get('file')}, last written {v.get('written')}"
+              + (f", the lines holding '{v['grep']}'" if v.get("grep") else "") + f": {len(v.get('lines') or [])} lines")
+        print("\n".join(v.get("lines") or []) or "  (none)")
     elif name == "errors":
         print("\n".join(f"  {x}" for x in v) or "  nothing that looks like a fault")
     elif name == "audit":

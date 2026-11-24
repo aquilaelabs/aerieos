@@ -811,7 +811,8 @@ aerie forge pr|issue|run|release ACTION [ARGS]
                    --json for the host's answer whole. Each needs what the
                    token allows and the space's Permissions, On the git
                    host, permit (docs/git-hosts.md)
-aerie logs [-f] [N]   this boot's log
+aerie logs [-f] [N]   this boot's log; on a node the controller's, read
+                   through its diagnostics (aerie diag log), and not followed
 aerie logs -p [N]     a previous boot's log
 aerie logs --list     the kept boot logs, newest first
 aerie logs --node NAME [--agent|--runner|--nginx|--system|--kernel|--crash] [N]
@@ -845,6 +846,14 @@ aerie diag [--json] [SECTION...]
                    the Debug page, and its account has Controller Write.
                    Its `reports` section is what sessions on any space
                    reported about AerieOS, kept until a person clears them
+aerie diag log [N] [--grep WORDS] [--file dashboard|builderbot|docker] [-p [STARTS]]
+                   the controller's own log whole, redacted as the rest: the
+                   last N lines (300, at most 5000), or the last of those
+                   holding WORDS in any case; the dashboard's own output
+                   (the default), the boot log with every warning after it,
+                   or the Docker manager's compose calls; this start's, or
+                   the one STARTS back. Asked for by name, never in the
+                   whole report, under the diagnostics' own grants
 aerie report "..." [--area A] [--repro "..." --reproduces always|sometimes|once|untried]
                    a problem with AerieOS itself, from a session on any
                    space: it goes into the controller's diagnostics rather

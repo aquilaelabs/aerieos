@@ -713,7 +713,8 @@ aerie forge pr|issue|run|release ACTION [ARGS]
                    --json for the host's answer whole. Each needs what the
                    token allows and the space's Permissions, On the git
                    host, permit (docs/git-hosts.md)
-aerie logs [-f] [N]   this boot's log
+aerie logs [-f] [N]   this boot's log; on a node the controller's, read
+                   through its diagnostics (aerie diag log), and not followed
 aerie logs -p [N]     a previous boot's log
 aerie logs --list     the kept boot logs, newest first
 aerie logs --node NAME [--agent|--runner|--nginx|--system|--kernel|--crash] [N]
@@ -747,6 +748,14 @@ aerie diag [--json] [SECTION...]
                    the Debug page, and its account has Controller Write.
                    Its `reports` section is what sessions on any space
                    reported about AerieOS, kept until a person clears them
+aerie diag log [N] [--grep WORDS] [--file dashboard|builderbot|docker] [-p [STARTS]]
+                   the controller's own log whole, redacted as the rest: the
+                   last N lines (300, at most 5000), or the last of those
+                   holding WORDS in any case; the dashboard's own output
+                   (the default), the boot log with every warning after it,
+                   or the Docker manager's compose calls; this start's, or
+                   the one STARTS back. Asked for by name, never in the
+                   whole report, under the diagnostics' own grants
 aerie report "..." [--area A] [--repro "..." --reproduces always|sometimes|once|untried]
                    a problem with AerieOS itself, from a session on any
                    space: it goes into the controller's diagnostics rather
@@ -2368,10 +2377,10 @@ EOF
 # machine. Says nothing at all on the controller, where the path is right.
 logs_are_the_controllers() {
     on_node || return 0
-    die "there is no container log here: this is a node, and that log is the" \
-        "controller's. From here: \`aerie diag errors\` for the controller's faults," \
-        "\`aerie jobs\` for a job's log, \`aerie logs --node NAME --agent\` for a node's own," \
-        "and \`aerie ci-log\` for a CI run (the first three need the space's Debug grants)"
+    die "this is a node, and the logs are the controller's, read through its diagnostics:" \
+        "\`aerie logs [N] [-p STARTS]\` its boot log, \`aerie diag log [N] [--grep WORDS]" \
+        "[--file dashboard|builderbot|docker]\` any of its three; \`aerie logs --node NAME --agent\`" \
+        "for a node's own (each needs the space's Debug grants)"
 }
 
 # aerie diag: the controller's diagnostics (scripts/dashboard/diag.py). One
@@ -2380,17 +2389,26 @@ logs_are_the_controllers() {
 # and an account with the debug grant behind it. Read-only; secrets are redacted
 # there, not here.
 cmd_diag() {
-    local json=0 sections=()
+    local json=0 sections=() lines="" grep="" stream="" boot=""
     while [ $# -gt 0 ]; do
         case "$1" in
             --json) json=1 ;;
-            -h|--help) printf 'usage: aerie diag [--json] [controller|images|settings|tunnel|doctor|nodes|plugins|jobs|errors|audit|reports]...\n'; return 0 ;;
+            -h|--help) printf 'usage: aerie diag [--json] [controller|images|settings|tunnel|doctor|nodes|plugins|jobs|errors|audit|reports]...\n       aerie diag log [N] [--grep WORDS] [--file dashboard|builderbot|docker] [-p [STARTS]]\n'; return 0 ;;
+            # The log section's own (diag.log): which lines, which log, which start.
+            --grep) grep="${2:-}"; [ -n "$grep" ] || die "aerie diag log --grep takes the words to look for"; shift ;;
+            --file) stream="${2:-}"; [ -n "$stream" ] || die "aerie diag log --file takes dashboard, builderbot or docker"; shift ;;
+            -p|--prev) case "${2:-}" in ''|*[!0-9]*) boot=1 ;; *) boot="$2"; shift ;; esac ;;
             -*) die "aerie diag: no such option \`$1'" ;;
-            *) sections+=("$1") ;;
+            *[!0-9]*) sections+=("$1") ;;
+            *) lines="$1" ;;
         esac
         shift
     done
-    BB_DIAG_JSON="$json" api_py diag.py "${sections[@]}"
+    if [ -n "$lines$grep$stream$boot" ] && [[ " ${sections[*]} " != *" log "* ]]; then
+        die "aerie diag: a line count, --grep, --file and -p are the log section's: aerie diag log [N] [--grep WORDS] [--file dashboard|builderbot|docker] [-p [STARTS]]"
+    fi
+    BB_DIAG_JSON="$json" BB_DIAG_LINES="$lines" BB_DIAG_GREP="$grep" BB_DIAG_STREAM="$stream" BB_DIAG_BOOT="$boot" \
+        api_py diag.py "${sections[@]}"
 }
 
 # aerie report: a problem with AerieOS itself, from a session on any project
@@ -2469,6 +2487,14 @@ cmd_logs() {
         # follow: said, rather than -f quietly printing once.
         [ "$follow" = 0 ] || die "aerie logs --node reads the last lines once; -f follows only the controller's own log"
         BB_LOG_NODE="$want_node" BB_LOG_STREAM="${stream:-agent}" BB_LOG_LINES="$lines" api_py node-log.py
+        return
+    fi
+    # On a node the controller's log is read through its diagnostics, under
+    # the same grants (the operator, 24 Nov): its boot log, every warning
+    # after the boot among it.
+    if on_node; then
+        [ "$follow" = 0 ] || die "aerie logs -f follows the controller's log on the controller alone: from a node, aerie logs N reads its last lines"
+        cmd_diag log "$lines" --file builderbot ${gen:+-p "$gen"}
         return
     fi
     if [ -n "$gen" ]; then
