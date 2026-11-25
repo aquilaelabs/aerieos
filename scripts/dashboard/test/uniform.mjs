@@ -741,6 +741,26 @@ function rowsWearTheClass(){
   return page.evaluate(() => [...document.querySelectorAll('.doc.on :is(.setrow, .addbar, .prefrow, .histbar, .logdays, .imgadd, .memadd, .uadd, .ndpaths, .ndname)')]
     .filter(e => !e.classList.contains('ctlrow')).map(e => e.className.split(' ').slice(0, 3).join('.')));
 }
+// An add band whose button stands alone sits at the right of what it is in,
+// where a row's Edit and a section's actions are, and one with a field keeps
+// its button on the field's line (R283: Add route stood alone at the left
+// over a table whose Edit was at the right; a hostname's Add fell under its
+// field). Each one on show, measured: the button's right edge against its
+// container's, and a field's button against the field's top.
+function addBarsPlaced(){
+  return page.evaluate(() => [...document.querySelectorAll('.doc.on .addbar')].filter(a => a.checkVisibility()).flatMap(a => {
+    const btns = [...a.querySelectorAll(':scope > button, :scope > a.btn')].filter(b => b.checkVisibility());
+    if (!btns.length) return [];
+    const field = a.querySelector(':scope > input:not([type=checkbox]):not([type=radio]), :scope > select, :scope > textarea');
+    const name = btns[btns.length - 1].textContent.trim().slice(0, 24);
+    if (field){
+      const f = field.getBoundingClientRect(), b = btns[0].getBoundingClientRect();
+      return Math.abs(b.top - f.top) > 6 && f.width > 120 && a.getBoundingClientRect().width > 360 ? [`${name}: under its field`] : [];
+    }
+    const box = (a.closest('.addline') || a.parentElement).getBoundingClientRect(), b = btns[btns.length - 1].getBoundingClientRect();
+    return box.right - b.right > 8 ? [`${name}: ${Math.round(box.right - b.right)}px short of the right`] : [];
+  }));
+}
 // A pulldown in a bar or a row is as wide as its longest answer and no wider
 // (the operator, 18 Nov: Sort and the wiki's page stretched across a phone):
 // each one on show measured against itself with its longest answer chosen
@@ -1114,6 +1134,8 @@ for (const kind of kinds){
   ok(side.length === 0, `[${kind}] nothing in a section or a placeholder sits on its side wall${side.length ? `; on it: ${side.slice(0, 8).join(', ')}` : ''}`);
   const bare = await rowsWearTheClass();
   ok(bare.length === 0, `[${kind}] every row of controls wears .ctlrow${bare.length ? `; not: ${[...new Set(bare)].join(', ')}` : ''}`);
+  const adds = await addBarsPlaced();
+  ok(adds.length === 0, `[${kind}] an add band's lone button stands at the right, and a field's beside it${adds.length ? `; not: ${[...new Set(adds)].join('; ')}` : ''}`);
   const forms = await formsHold();
   ok(forms.length === 0, `[${kind}] its forms hold the rule: a label over its field, fields not touching${forms.length ? `; not: ${forms.slice(0, 10).join('; ')}` : ''}`);
   const wide = await pickersFit();

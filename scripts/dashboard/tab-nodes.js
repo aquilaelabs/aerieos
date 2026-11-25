@@ -893,10 +893,10 @@ function nodeHostRow(n){
         and a container's data in a copy or a move.</div>
        ${n.config?.tunnel?.kind === "public"
          ? `<div class="sub dim ndhostfixed">It reaches the controller through a public hostname, so it stays hosting only.</div>`
-         : `<div><button type="button" data-nd="host-off">Let spaces use it again</button></div>`}`
-    : `<div class="sub dim">A node that only runs containers sent to it (a web-facing one) can be made
+         : `<div class="addbar ctlrow"><button type="button" data-nd="host-off">Let spaces use it again</button></div>`}`
+    : `<div class="addline"><div class="sub dim">A node that only runs containers sent to it (a web-facing one) can be made
         hosting only: no code, no sessions, and nothing of it comes back but its own jobs.</div>
-       <div><button type="button" data-nd="host-only" ${n.live ? "" : "disabled"}>Make it hosting only</button></div>`;
+       <div class="addbar ctlrow"><button type="button" data-nd="host-only" ${n.live ? "" : "disabled"}>Make it hosting only</button></div></div>`;
 }
 
 // Why a node cannot be disabled or un-enrolled now, as nodes.node_in_use
@@ -1585,8 +1585,8 @@ function nodePathsTable(n, c){
       `<code>${esc(here)}</code>`, `<code>${esc(there)}</code>`,
       ed?.i === i ? "" : `<button type="button" data-pedit="${i}">Edit</button>`])}${ed?.i === i ? form(ed.form, i) : ""}</div>`).join("");
   const fresh = ed?.i === -1 ? `<div class="row ndpath open" data-i="-1">${form(ed.form, -1)}</div>` : "";
-  return `<div class="ndpathmap"><div class="fsub">Path mapping${helpIcon("What a path a compose file names is called on this node, where it is somewhere else there. Nothing is needed where a path is the same on both.")}</div>
-    <div class="addbar ctlrow"><button type="button" data-padd${ed?.i === -1 ? " disabled" : ""}>Add a mapping</button></div>
+  return `<div class="ndpathmap"><div class="addline"><div class="fsub">Path mapping${helpIcon("What a path a compose file names is called on this node, where it is somewhere else there. Nothing is needed where a path is the same on both.")}</div>
+    <div class="addbar ctlrow"><button type="button" data-padd${ed?.i === -1 ? " disabled" : ""}>Add a mapping</button></div></div>
     ${rows || fresh ? tblWrap(PATH_COLS, fresh + rows, "ndpaths") : `<div class="hint">none: every path a compose file names is the same on this node</div>`}</div>`;
 }
 
@@ -1756,9 +1756,9 @@ function nodeConfSections(n){
     <button type="button" class="caution" data-nrevert ${c.dirty ? "" : "disabled"}
       title="put the fields back to what is saved">Revert</button>`;
   const storage = `
-      <div class="sub">Shares mounted at boot.${
+      <div class="addline"><div class="sub">Shares mounted at boot.${
         d.fromNode ? ` <span class="dim">As the node reports them: a Save on one manages them all from here.</span>` : ""}</div>
-      <div class="addbar ctlrow"><button type="button" data-madd${c.mountEdit?.i === -1 || locked ? " disabled" : ""}>Add a mount</button></div>
+      <div class="addbar ctlrow"><button type="button" data-madd${c.mountEdit?.i === -1 || locked ? " disabled" : ""}>Add a mount</button></div></div>
       ${mounts}
       <div class="sub">Where job data, toolchains, caches and artifacts live.</div>
       <div class="fgrid ndstores">${stores}</div>${storePlaces}

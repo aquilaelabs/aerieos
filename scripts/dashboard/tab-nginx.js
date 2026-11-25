@@ -181,7 +181,7 @@ function nginxHostLines(){
       h.used.length ? "" : rmIcon(`data-nghostrm="${esc(h.name)}"`, `delete ${h.name}`)])}</div>`).join("");
   return `<div class="field"><div class="addbar ctlrow"><input id="ngHostNew" data-nghostnew value="${esc(nginxHostTyped)}" placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
       <button type="button" data-nghostadd>Add</button></div></div>
-    ${rows ? `<div class="field">${tblWrap(NG_HOST_COLS, rows, "nghosts")}</div>` : `<div class="field"><div class="hint">none yet</div></div>`}`;
+    ${rows ? `<div class="field">${tblWrap(NG_HOST_COLS, rows, "nghosts")}</div>` : ""}`;
 }
 
 // Routes as records (R218 step 44, the design's record-lists rule, the
@@ -360,9 +360,9 @@ function nginxBody(n){
       "The public names this AerieOS answers for, on every node's nginx: added once here, picked on any route below. Each points at the node its routes are on (a DNS record, or a tunnel's). Added and deleted at the press.")}</div></div>
       ${nginxHostLines()}`);
   const routes = ngSect("routes", count ? `${count} route${count === 1 ? "" : "s"}` : "no route yet",
-    `<div class="field"><div class="hint">Each hostname or path to a port a container publishes on ${esc(n.name)}.${helpIcon(
-      "nginx runs on the host network and reaches a container at 127.0.0.1. A route serves 443 with the pair it picks, or with its domain's when it picks none; nothing is a default. A name nothing routes is answered by closing the connection.")}</div></div>
-      <div class="field"><div class="addbar ctlrow" data-add="route"><button type="button" data-ngadd${nginxEdit?.node === n.node && nginxEdit.i === -1 ? " disabled" : ""}>Add route</button></div></div>
+    `<div class="field addline"><div class="hint">Each hostname or path to a port a container publishes on ${esc(n.name)}.${helpIcon(
+      "nginx runs on the host network and reaches a container at 127.0.0.1. A route serves 443 with the pair it picks, or with its domain's when it picks none; nothing is a default. A name nothing routes is answered by closing the connection.")}</div>
+      <div class="addbar ctlrow" data-add="route"><button type="button" data-ngadd${nginxEdit?.node === n.node && nginxEdit.i === -1 ? " disabled" : ""}>Add route</button></div></div>
       <div class="field ngroutes">${nginxRoutesTable(n)}</div>`);
   // The pairs held, and Add a certificate unrolling the form under them: a
   // paste is now and then, not on every visit (the operator, step 29).

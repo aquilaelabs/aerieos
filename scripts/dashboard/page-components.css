@@ -1017,6 +1017,15 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    place: never at the foot, where a phone scrolls past the list to find it. */
 .addbar,.roadmapadd{display:flex;gap:var(--field-gap);align-items:center}
 .addbar button{flex:0 0 auto;min-height:var(--tap)}
+/* An add band with its button alone stands at the right, where a row's Edit
+   and a section's actions are (the record-lists and bars rules), across the
+   whole section; one with a field keeps the field and its button on one line,
+   the field taking what is left (R283: Add route stood alone at the left over
+   a table whose Edit was at the right, and a hostname's Add fell under its
+   field). As specific as the row cap (:is(.doctab,.nb) .ctlrow), which held
+   it to 30rem and so to the left of a section. */
+:is(.doctab,.nb,.modal) .addbar:not(:has(input,select,textarea)),.addbar:not(:has(input,select,textarea)){justify-content:flex-end;max-width:none}
+.addbar>input:not([type=checkbox]):not([type=radio]){flex:1 1 12rem;width:auto;min-width:0}
 /* The Design view's new page is three pickers and Add page on one row,
    sharing it, where each picker took the row and they stacked. */
 .addbar[data-add="design"]>select{flex:1 1 8rem;width:auto;min-width:0}
