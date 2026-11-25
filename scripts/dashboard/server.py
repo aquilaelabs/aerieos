@@ -7278,6 +7278,17 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return name
 
+    def _not_space(self, key):
+        """True, with the 400 written, when `key` is not a space's key this
+        account sees: what a whole space's verbs (rename, delete, a repository
+        put into it) ask of the key they name. _not_card's question without
+        its fall back to a repository's name; five handlers wrote it out
+        (R283 step 3)."""
+        if key and registry.is_repos(key) and users.may_see(self._who(), key):
+            return False
+        self._json({"error": f"not a space: {key}" if key else "not a space"}, 400)
+        return True
+
     def _not_card(self, name):
         """_not_project, for what is a whole project's (R138: its pin,
         group, color, lock, archive, name and its deletion): a project's key
@@ -7334,6 +7345,18 @@ class Handler(BaseHTTPRequestHandler):
             if self._refused_on_node("node", nid):
                 return True
         return False
+
+    def _account(self, behind=False):
+        """(the caller, its account's uid), or (None, "") with the 403 written
+        when it is no account. `behind` reads the account a session's token
+        stands for (users.whose), else the caller's own (users.uid_of). Six
+        handlers each wrote this out (R283 step 3)."""
+        me = self._who()
+        uid = (users.whose(me) if behind else users.uid_of(me)) if me else ""
+        if not me or not uid:
+            self._json({"error": "not an account"}, 403)
+            return None, ""
+        return me, uid
 
     def _session_elsewhere(self, name, words):
         """True, with the 403 written, when a session asks about a space other
@@ -10686,8 +10709,8 @@ class Handler(BaseHTTPRequestHandler):
             if self._refused("jobs"):
                 return
             name = field(req, "project")
-            if name not in set(project_names(self._who())):
-                return self._json({"error": "not a space"}, 400)
+            if self._not_project(name):
+                return None
             # ...and by grant on the node the job would run on (R137 step
             # 3): the one named, else the project's primary, as run_job
             # picks it.
@@ -12397,8 +12420,8 @@ class Handler(BaseHTTPRequestHandler):
         # repository then lives on the project's node.
         into = field(req, "project")
         if into:
-            if not registry.is_repos(into) or not users.may_see(me, into):
-                return self._json({"error": f"not a space: {into}"}, 400)
+            if self._not_space(into):
+                return None
             if not users.may_work(me, into):
                 return self._json({"error": f"{registry.label(into)} is not on your list of spaces: "
                                             "add it to your own list on the Users page first"}, 403)
@@ -12436,9 +12459,9 @@ class Handler(BaseHTTPRequestHandler):
         """The signed-in account's own settings (the Profile page): read on
         GET, saved on POST, by profiletab.py. Anybody signed in, because this
         is about themselves."""
-        me = self._who()
-        if not me or not users.uid_of(me):
-            return self._json({"error": "not an account"}, 403)
+        me, _uid = self._account()
+        if not me:
+            return None
         if req is None:
             return self._json(*profiletab.view(me))
         payload, status, renamed = profiletab.verb(me, field(req, "action"), req, origin=self._origin())
@@ -12482,10 +12505,9 @@ class Handler(BaseHTTPRequestHandler):
         house rules that can be counted instead (transcripts.audit). Anybody signed in, their own only, a session
         included: on its own project and on one its project reads, it
         lists the account's conversations there for `aerie transcripts`."""
-        me = self._who()
-        uid = users.whose(me) if me else ""
-        if not me or not uid:
-            return self._json({"error": "not an account"}, 403)
+        me, uid = self._account(behind=True)
+        if not me:
+            return None
         q = self._q()
         if not (name := self._project_asked(query=q)):
             return
@@ -12517,10 +12539,9 @@ class Handler(BaseHTTPRequestHandler):
         which that person's own session may do too (aerie transcripts
         label), since it changes nothing but what its person reads of their
         own conversations."""
-        me = self._who()
-        uid = users.whose(me) if me else ""
-        if not me or not uid:
-            return self._json({"error": "not an account"}, 403)
+        me, uid = self._account(behind=True)
+        if not me:
+            return None
         sid, act = field(req, "id"), field(req, "action")
         # Of these four a person's own session may say too; the rest are the
         # person's alone, which SESSION_ACTIONS holds at the gate.
@@ -12552,10 +12573,9 @@ class Handler(BaseHTTPRequestHandler):
         and on one its project reads: the file is looked for under the
         account's own transcripts directory and nowhere else, so another
         account's id is simply not found."""
-        me = self._who()
-        uid = users.whose(me) if me else ""
-        if not me or not uid:
-            return self._json({"error": "not an account"}, 403)
+        me, uid = self._account(behind=True)
+        if not me:
+            return None
         q = self._q()
         if not (name := self._project_asked(query=q)):
             return
@@ -12638,8 +12658,8 @@ class Handler(BaseHTTPRequestHandler):
         if not me or not users.uid_of(me):
             return self._json({"error": "an account's, not a session's: a session uses aerie git"}, 403)
         name = field(req, "project")
-        if name not in set(project_names(me)):
-            return self._json({"error": "not a space"}, 400)
+        if self._not_project(name):
+            return None
         if self._readonly(name):
             return None
         action = field(req, "action")
@@ -12755,9 +12775,9 @@ class Handler(BaseHTTPRequestHandler):
         # an account setting its OWN appearance. Everything below acts on
         # another account and is an administrator's.
         if act == "prefs":
-            me = self._who()
-            if not me or not users.uid_of(me):
-                return self._json({"error": "not an account"}, 403)
+            me, _uid = self._account()
+            if not me:
+                return None
             return self._json(*users.own_prefs(me["name"], req.get("prefs")))
         if self._refused("admin"):
             return None
@@ -13958,15 +13978,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(got)
         if act == "rename":
             key = field(req, "key")
-            if not registry.is_repos(key) or not users.may_see(me, key):
-                return self._json({"error": f"not a space: {key}"}, 400)
+            if self._not_space(key):
+                return None
             if not mine(key):
                 return self._json({"error": "the space's owner or an administrator renames it"}, 403)
             return self._result(registry.set_name(key, field(req, "to")))
         if act == "delete":
             key = field(req, "key")
-            if not registry.is_repos(key) or not users.may_see(me, key):
-                return self._json({"error": f"not a space: {key}"}, 400)
+            if self._not_space(key):
+                return None
             if not mine(key):
                 return self._json({"error": "the space's owner or an administrator deletes it"}, 403)
             got = repos.delete(key)
@@ -13989,8 +14009,8 @@ class Handler(BaseHTTPRequestHandler):
             name, to = field(req, "name"), field(req, "to")
             if self._not_project(name):
                 return None
-            if not registry.is_repos(to) or not users.may_see(me, to):
-                return self._json({"error": f"not a space: {to}"}, 400)
+            if self._not_space(to):
+                return None
             was = repos.project_of(name)
             if not all(users.may_work(me, k) for k in (to, was or name)) or not (mine(to) and mine(was or name)):
                 return self._json({"error": "the owner of both spaces, or an administrator, moves a repository "
@@ -14150,8 +14170,8 @@ class Handler(BaseHTTPRequestHandler):
         if why := self._trash_why(field(req, "name")):
             return self._json({"error": why}, 403)
         into = field(req, "project")
-        if into and (not registry.is_repos(into) or not users.may_see(self._who(), into)):
-            return self._json({"error": f"not a space: {into}"}, 400)
+        if into and self._not_space(into):
+            return None
         if into and self._refused("trash", into):
             return
         was = registry.last_project(projects.restore_dir(field(req, "name")))
@@ -14924,10 +14944,9 @@ class Handler(BaseHTTPRequestHandler):
         conversation is its two ends' and a project feed is whoever may see
         the project. The store holds lines; the door decides.
         """
-        me = self._who()
-        uid = users.uid_of(me)
-        if not uid:
-            return self._json({"error": "not an account"}, 403)
+        me, uid = self._account()
+        if not me:
+            return None
         act = field(req, "action") or "read"
         store = users.load()["users"]
         by_name = {n: u.get("uid") for n, u in store.items() if u.get("uid")}
