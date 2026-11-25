@@ -343,6 +343,12 @@ function foldHeight(el, from, to, done){
   // from under the finger between its press and its release and the click
   // went to the box (B1113). Hidden stands where clip is not known.
   el.style.overflow = "hidden"; el.style.overflow = "clip";
+  // Held at where it ends until its end has been drawn: a finished tween
+  // lets go of the box, which stood back at its natural height (a job's row
+  // with its log still in it) while `done` drew it shut, and a list redrawn
+  // there (reflow) read the rows under it from that height and slid them up
+  // a second time (the operator, 25 Nov: a skip as a job folds).
+  el.style.height = to + "px";
   const anim = el.animate([{height: from + "px"}, {height: to + "px"}],
                           {duration: 180, easing: "ease"});
   anim.id = "fold";
