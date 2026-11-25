@@ -53,10 +53,10 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/router-key` | exact | `_get_router_key` | GET /api/router-key?project=NAME: the router address and the project's own key, for a session of that project at its start (bb-tty's launcher) or a person who may work on it; {} where no router allows the project. | refused: work |
 | GET | `/api/storage` | prefix | `_get_storage` | The Storage page (storage.view, R169): every node this account holds the Storage area on, what its disks hold, by project where the account sees the project and as one line otherwise. |  |
 | GET | `/api/history` | prefix | `_get_history` | GET /api/history?node=ID&span=6h\\|day\\|week\\|month (R164 step 4): the controller's own machine's CPU, memory, network, disk I/O and temperatures over the span, at the resolution kept for it (five minutes for a day, an hour  |  |
-| GET | `/api/schedules` | exact | `_get_schedules` | GET /api/schedules (R117): every schedule, its words, its next run and its last run's state, and the nodes it may run on. |  |
+| GET | `/api/schedules` | exact | `_get_schedules` | GET /api/schedules (R117): every schedule, its words, its next run and its last run's state, and the nodes it may run on. | refused: schedules-read |
 | GET | `/api/extmounts` | exact | `_get_extmounts` | GET /api/extmounts (R162 step 4): the other disks and shares the controller's own machine mounts, as recorded, never a password. |  |
-| GET | `/api/nasapps` | exact | `_get_nasapps` | GET /api/nasapps (R164 step 2): the catalog of ready apps the New container dialog offers, each with what it is and the blanks it takes. |  |
-| GET | `/api/catalog` | prefix | `_get_catalog` | GET /api/catalog[?fresh=1] (R169 step 2): the vetted catalog's index as kept (fetched again when older than an hour, or on fresh), verified against the key this install ships; with the reason when the newest could not be |  |
+| GET | `/api/nasapps` | exact | `_get_nasapps` | GET /api/nasapps (R164 step 2): the catalog of ready apps the New container dialog offers, each with what it is and the blanks it takes. | refused: docker-write |
+| GET | `/api/catalog` | prefix | `_get_catalog` | GET /api/catalog[?fresh=1] (R169 step 2): the vetted catalog's index as kept (fetched again when older than an hour, or on fresh), verified against the key this install ships; with the reason when the newest could not be | refused: toolchains-write |
 | GET | `/api/library` | prefix | `_get_library` | GET /api/library?node=ID (R170): everything an AerieOS installs or runs as one list for one node (library.rows): the toolchains and packs with what the node's store holds, the coding agents, the apps a NAS runs, the vett |  |
 | GET | `/api/pack-icon` | prefix | `_get_pack_icon` | GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an app's own icon, as the image its file is and nothing else: its type set here and never sniffed, and a policy that runs no script and sandboxes it, so an SVG  |  |
 | GET | `/api/storebackups` | exact | `_get_storebackups` | GET /api/storebackups (R162 step 5): the backups the controller's own machine copies, as recorded. |  |
@@ -92,7 +92,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/bugs` | prefix | `_get_bugs` | GET /api/bugs. |  |
 | GET | `/api/pubkeys` | prefix | `_get_pubkeys` | GET /api/pubkeys. | refused: create |
 | POST | `/api/v1/nodes` | prefix | `_nodes` | The Nodes page's verbs. |  |
-| POST | `/api/v1/jobs` | prefix | `_jobs` | The Jobs page's one verb, and where `aerie run`, `aerie build`, `aerie test` and `aerie emu` land from the controller (nodes.run_job). |  |
+| POST | `/api/v1/jobs` | prefix | `_jobs` | The Jobs page's one verb, and where `aerie run`, `aerie build`, `aerie test` and `aerie emu` land from the controller (nodes.run_job). | refused: jobs |
 | POST | `/api/v1/bb` | exact | `_bb_relay` | A bb verb from a session on a NODE, run here (roadmap #24). | refused: bb |
 | POST | `/api/v1/claude-login` | exact | `_claude_login` | A node saying what this account is signed in to Claude, or another coding agent, AS there (R47), or that it is not: never the login itself, which stays on the machine that made it (claudegrant.py says why). |  |
 | POST | `/api/v1/hook` | exact | `_hook` | What a session's hooks have to say, from a NODE (roadmap #24): hooks.py says what each kind means. |  |
@@ -127,9 +127,9 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/library` | exact | `_library` | POST /api/library (R172): a card's Configure, Install and Remove for a service (the model router, router.py's own verbs, docker-write as the nginx page), the router's models, spend and Ollama's pulls, and Configure for a |  |
 | POST | `/api/images` | exact | `_images` | Check for updates on the Containers page (imagecheck.py, R195): every container's registry images on one node, or all, asked now. | refused: docker-write |
 | POST | `/api/storage` | exact | `_storage` | Measure now on the Storage page: a node's disks walked at once (nodes.node_storage_measure). |  |
-| POST | `/api/schedules` | exact | `_schedules` | POST /api/schedules (R117): save (add or change, turning one on or off among them), remove, or run now. |  |
+| POST | `/api/schedules` | exact | `_schedules` | POST /api/schedules (R117): save (add or change, turning one on or off among them), remove, or run now. | refused: schedules |
 | POST | `/api/extmounts` | exact | `_extmounts` | POST /api/extmounts (R162 step 4): set (add or change), remove, or on and off (Eject is off: the agent unmounts within a minute). |  |
-| POST | `/api/nasapps` | exact | `_nasapps` | POST /api/nasapps (R164 step 2): one app's compose and environment with its blanks filled (its data folder, its media folder, the user it runs as, the time zone, its port), for the dialog to show before Create makes it a |  |
+| POST | `/api/nasapps` | exact | `_nasapps` | POST /api/nasapps (R164 step 2): one app's compose and environment with its blanks filled (its data folder, its media folder, the user it runs as, the time zone, its port), for the dialog to show before Create makes it a | refused: docker-write, refused: curate |
 | POST | `/api/storebackups` | exact | `_storebackups` | POST /api/storebackups (R162 step 5): set (add or change) or remove a backup's record; Run now is the nodes verb storage-backup. |  |
 | POST | `/api/pin` | prefix | `_pin` | Pin or unpin a command: macros.pin. | refused: command-pin |
 | POST | `/api/reset` | exact | `_reset` | POST /api/reset: start over at onboarding (settings.reset), and the dashboard re-executes itself so the next page is Create the owner. | refused: controller |

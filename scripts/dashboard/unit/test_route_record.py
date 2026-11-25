@@ -46,7 +46,7 @@ class Record(unittest.TestCase):
             self.assertRegex(SERVER, r"(?m)^    def " + re.escape(r.handler) + r"\(self", f"{r.path} names a method the handler has not")
         for r in MATCHED:
             g = r.gate
-            self.assertTrue(g == "handler" or (isinstance(g, tuple) and len(g) == 2 and g[0] in ("owner", "person") and g[1]),
+            self.assertTrue(g == "handler" or (isinstance(g, tuple) and len(g) == 2 and g[0] in ("owner", "admin", "person") and g[1]),
                             f"{r.method} {r.path} names no gate")
 
     def test_a_handler_s_routes_say_one_thing(self):

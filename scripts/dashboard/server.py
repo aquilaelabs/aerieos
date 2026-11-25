@@ -6606,6 +6606,8 @@ def _snapshot(who):
 #   somebody has said who may reach it. Past being signed in, which _get and
 #   _post hold for every route:
 #     ("owner", words)   the owner's alone, never a session's
+#     ("admin", words)   an administrator's (the owner among them), never a
+#                        session's: six handlers each wrote it out (R283)
 #     ("person", words)  anybody's own sign-in, never a session's token
 #     "handler"          the handler holds its own, as it reads the request
 #                        (which space, which node, which action): the state
@@ -6690,10 +6692,10 @@ ROUTES = (
     Route("GET", "prefix", "/api/trace", "_get_trace", "handler", session=True),
     Route("GET", "prefix", "/api/status", "_get_status", "handler"),
     Route("GET", "exact", "/api/reset", "_get_reset", "handler"),
-    Route("GET", "exact", "/api/move", "_get_move", "handler"),
+    Route("GET", "exact", "/api/move", "_get_move", ("admin", "moving the controller is an administrator's")),
     Route("GET", "exact", "/api/move-bundle", "_get_move_bundle", ("owner", "the move bundle is its owner's")),
     Route("GET", "exact", "/api/move-backup", "_get_move_backup", ("owner", "the controller's backup is its owner's")),
-    Route("GET", "exact", "/api/backup", "_get_backup", "handler"),
+    Route("GET", "exact", "/api/backup", "_get_backup", ("admin", "the backup is an administrator's")),
     Route("GET", "exact", "/api/backup-file", "_get_backup_file", ("owner", "a backup's download is the owner's")),
     Route("GET", "prefix", "/api/findings", "_get_findings", "handler",
           instead="a session reads its space's findings with aerie findings", needs_repo=True),
@@ -6737,13 +6739,13 @@ ROUTES = (
     Route("GET", "prefix", "/api/history", "_get_history", "handler"),
     Route("GET", "exact", "/api/schedules", "_get_schedules", "handler",
           instead="schedules are a person's: a session has no say in them"),
-    Route("GET", "exact", "/api/extmounts", "_get_extmounts", "handler"),
+    Route("GET", "exact", "/api/extmounts", "_get_extmounts", ("admin", "the machine's other disks and shares are an administrator's")),
     Route("GET", "exact", "/api/nasapps", "_get_nasapps", "handler"),
     Route("GET", "prefix", "/api/catalog", "_get_catalog", "handler", session=True),
     Route("GET", "prefix", "/api/library", "_get_library", "handler",
           instead="a session finds a tool pack with aerie tool search and asks for one with aerie tool install"),
     Route("GET", "prefix", "/api/pack-icon", "_get_pack_icon", "handler"),
-    Route("GET", "exact", "/api/storebackups", "_get_storebackups", "handler"),
+    Route("GET", "exact", "/api/storebackups", "_get_storebackups", ("admin", "the machine's backups are an administrator's")),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
     Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
@@ -6841,9 +6843,9 @@ ROUTES = (
     Route("POST", "exact", "/api/storage", "_storage", "handler"),
     Route("POST", "exact", "/api/schedules", "_schedules", "handler",
           instead="schedules are a person's: a session has no say in them"),
-    Route("POST", "exact", "/api/extmounts", "_extmounts", "handler"),
+    Route("POST", "exact", "/api/extmounts", "_extmounts", ("admin", "the machine's other disks and shares are an administrator's")),
     Route("POST", "exact", "/api/nasapps", "_nasapps", "handler"),
-    Route("POST", "exact", "/api/storebackups", "_storebackups", "handler"),
+    Route("POST", "exact", "/api/storebackups", "_storebackups", ("admin", "the machine's backups are an administrator's")),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -6990,6 +6992,8 @@ def route_gate(name, me, action=None):
     if me.get("session"):
         return words
     if kind == "owner" and not users.is_owner(me):
+        return words
+    if kind == "admin" and not users.is_admin(me):
         return words
     return ""
 
@@ -7330,6 +7334,18 @@ class Handler(BaseHTTPRequestHandler):
             if self._refused_on_node("node", nid):
                 return True
         return False
+
+    def _session_elsewhere(self, name, words):
+        """True, with the 403 written, when a session asks about a space other
+        than its own; `words` says what a session does here instead. Its own
+        is any repository of its space, as users.may_work holds it: eight
+        handlers each compared the raw name, so a session was refused on its
+        own space's second repository (R283 step 3)."""
+        sess = (self._who() or {}).get("session")
+        if not sess or name == sess or users.key_of(name or "") == users.key_of(sess):
+            return False
+        self._json({"error": words}, 403)
+        return True
 
     def _refused_on_node(self, action, nid):
         """True, with the 403 written, when this account may not do `action`
@@ -9321,8 +9337,8 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/agents: install (or update), remove or check one coding
         agent on one node (agentcode.verb), the one way an agent is managed
         (R95, the operator 22 Oct): whoever may install toolchains there."""
-        if (why := users.may_node(self._who(), "toolchains-write", field(req, "node"))):
-            return self._json({"error": why}, 403)
+        if self._refused_on_node("toolchains-write", field(req, "node")):
+            return
         return self._json(*agentcode.verb(self._principal(), req))
 
     def _get_emulator(self):
@@ -9876,8 +9892,8 @@ class Handler(BaseHTTPRequestHandler):
         if req.get("node_agent") is True and not sess and self._refused_on_node("nodes-write", ""):
             return
         if sess:
-            if project != sess:
-                return self._json({"error": f"a session works on {sess}'s VMs alone, not {project}'s"}, 403)
+            if self._session_elsewhere(project, f"a session works on {sess}'s VMs alone, not {project}'s"):
+                return
             if self._session_held("vms-write", sess):
                 return
             if req.get("node_agent") is True and prefs.get(sess)["makevms"] != "deny":
@@ -10667,8 +10683,8 @@ class Handler(BaseHTTPRequestHandler):
             # a password instead of a token is the same command in the same
             # docker group. Nothing on the page queues one for a plain user; bb
             # on the controller does, for an administrator.
-            if (why := users.may(self._who(), "jobs")):
-                return self._json({"error": why}, 403)
+            if self._refused("jobs"):
+                return
             name = field(req, "project")
             if name not in set(project_names(self._who())):
                 return self._json({"error": "not a space"}, 400)
@@ -10677,8 +10693,8 @@ class Handler(BaseHTTPRequestHandler):
             # picks it.
             pf = prefs.get(name) or {}
             on = field(req, "node") or pf.get("node") or (pf.get("nodes") or [""])[0]
-            if (why := users.may_node(self._who(), "jobs", on)):
-                return self._json({"error": why}, 403)
+            if self._refused_on_node("jobs", on):
+                return
             return self._json(*nodes.run_job(name, req, self._principal()))
         if act != "cancel":
             return self._json({"error": "unknown action"}, 400)
@@ -11638,8 +11654,8 @@ class Handler(BaseHTTPRequestHandler):
             # aerie version release (R138): its own project only, under its
             # dial. The tag and the forge's release are made here, with the
             # project's own credentials, which the session never holds.
-            if name != who["session"]:
-                return self._json({"error": "a session releases its own space and no other"}, 403)
+            if self._session_elsewhere(name, "a session releases its own space and no other"):
+                return None
             mode = self._dialed(name, "release", "; a person cuts it with Release on the Artifacts view")
             if not mode:
                 return None
@@ -11678,8 +11694,8 @@ class Handler(BaseHTTPRequestHandler):
         if act == "release-drafts":
             # The drafts waiting to be read and published (the operator,
             # 1 Nov), each with the files it still lacks.
-            if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session reads its own space's drafts and no other"}, 403)
+            if self._session_elsewhere(name, "a session reads its own space's drafts and no other"):
+                return None
             d = forgerelease.drafts(name)
             if d.get("error"):
                 # No release page to read (no forge, no token): no drafts,
@@ -11725,8 +11741,8 @@ class Handler(BaseHTTPRequestHandler):
         is asked, by an account with the version area on the space."""
         ch = RELEASE_CHANGES[act]
         session = who.get("session")
-        if session and name != session:
-            return self._json({"error": f"a session {ch.does} its own space's release and no other"}, 403)
+        if self._session_elsewhere(name, f"a session {ch.does} its own space's release and no other"):
+            return None
         if not session and self._refused("version", name):
             return None
         tag = field(req, "tag")
@@ -12005,9 +12021,9 @@ class Handler(BaseHTTPRequestHandler):
             # Sign a build). It never receives the key, the list, or a
             # backup; asking to sign is all a session does here.
             act = field(req, "action")
-            if name != who["session"]:
-                return self._json({"error": "a session signs with aerie sign, which never hands it the key; "
-                                            "the keys are a person's to manage"}, 403)
+            if self._session_elsewhere(name, "a session signs with aerie sign, which never hands it the key; "
+                                             "the keys are a person's to manage"):
+                return None
             owner = membership.owner_of(name)
             acct = users.account_of(who) or {}
             if act == "release":
@@ -12124,9 +12140,8 @@ class Handler(BaseHTTPRequestHandler):
         project's work there is counted, never named."""
         q = self._q()
         name = q.get("project", [""])[0]
-        who = self._who() or {}
-        if who.get("session") and name != who["session"]:
-            return self._json({"error": "a session asks about its own space's nodes"}, 403)
+        if self._session_elsewhere(name, "a session asks about its own space's nodes"):
+            return None
         if self._not_project(name):
             return None
         if NODES_OK:
@@ -12597,8 +12612,8 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         name = field(req, "project")
         if me.get("session"):
-            if name != me["session"]:
-                return self._json({"error": "a session works its own space's git host and no other"}, 403)
+            if self._session_elsewhere(name, "a session works its own space's git host and no other"):
+                return None
             if self._session_held("work", name):
                 return None
         elif self._not_project(name) or self._readonly(name):
@@ -12814,8 +12829,8 @@ class Handler(BaseHTTPRequestHandler):
         action does with which names."""
         # By grant, on the node named (R137 step 3): an administrator's
         # everywhere, a role of your own where it says.
-        if (why := users.may_node(self._who(), "toolchains-write", field(req, "node"))):
-            return self._json({"error": why}, 403)
+        if self._refused_on_node("toolchains-write", field(req, "node")):
+            return
         # An agreement (Google's Android SDK terms, NVIDIA's CUDA license) is
         # a person's to accept, by name, before anything installs under it;
         # the page asks, and the acceptance is on the record.
@@ -12911,8 +12926,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._nodes_down()
         action, nid = req.get("action"), field(req, "node")
         # ...on that node (R260): a role holding Toolchains on named nodes.
-        if (why := users.may_node(self._who(), "toolchains-write", nid)):
-            return self._json({"error": why}, 403)
+        if self._refused_on_node("toolchains-write", nid):
+            return
         # A project's phone off the node (R123), one this account sees.
         if action == "phone-remove":
             project = field(req, "project")
@@ -13146,9 +13161,8 @@ class Handler(BaseHTTPRequestHandler):
         and its last run's state, and the nodes it may run on. Read on
         Schedules; never a session's, whatever its token holds."""
         who = self._who() or {}
-        why = users.may(who, "schedules-read")
-        if why:
-            return self._json({"error": why}, 403)
+        if self._refused("schedules-read"):
+            return
         rows = schedules.listing()
         for r in rows:
             last = r.get("last") or {}
@@ -13166,10 +13180,8 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/schedules (R117): save (add or change, turning one on or
         off among them), remove, or run now. Write on Schedules; never a
         session's."""
-        who = self._who() or {}
-        why = users.may(who, "schedules")
-        if why:
-            return self._json({"error": why}, 403)
+        if self._refused("schedules"):
+            return
         act, by = field(req, "action"), self._principal()
         if act == "save":
             r = schedules.save(req, by)
@@ -13194,18 +13206,12 @@ class Handler(BaseHTTPRequestHandler):
     def _get_storebackups(self):
         """GET /api/storebackups (R162 step 5): the backups the controller's
         own machine copies, as recorded. An administrator's."""
-        who = self._who() or {}
-        if not users.is_admin(who):
-            return self._json({"error": "the machine's backups are an administrator's"}, 403)
         return self._json({"backups": storebackups.rows()})
 
     def _storebackups(self, req):
         """POST /api/storebackups (R162 step 5): set (add or change) or
         remove a backup's record; Run now is the nodes verb storage-backup.
         An administrator's."""
-        who = self._who() or {}
-        if not users.is_admin(who):
-            return self._json({"error": "the machine's backups are an administrator's"}, 403)
         act, by = field(req, "action"), self._principal()
         if act == "set":
             r = storebackups.set_backup(req)
@@ -13372,8 +13378,8 @@ class Handler(BaseHTTPRequestHandler):
         if kind == "router":
             # Configure on this node (R174): its settings, its deploy and
             # removal; the router's containers are this node's.
-            if (why := users.may_node(who, "configure", nid)):
-                return self._json({"error": why}, 403)
+            if self._refused_on_node("configure", nid):
+                return
             gpu = bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card"))
             if act == "configure":
                 v = req.get("values") if isinstance(req.get("values"), dict) else {}
@@ -13421,8 +13427,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "your own settings here are for whoever works on this node's spaces"}, 403)
             r = packconfig.set_mine(nid, pack, fields, req.get("values"), users.uid_of(who))
             return self._result(r)
-        if (why := users.may_node(who, "configure", nid)):
-            return self._json({"error": why}, 403)
+        if self._refused_on_node("configure", nid):
+            return
         if not fields:
             return self._json({"error": f"{pack or 'nothing'} is not an added pack that asks for anything"}, 400)
         if act != "configure":
@@ -13457,9 +13463,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"packs": rows[:50], "more": max(0, len(rows) - 50), "error": idx.get("error", "")})
         if who.get("session"):
             return self._json({"error": "the catalog is a person's to read here; aerie tool search is a session's way"}, 403)
-        why = users.may(who, "toolchains-write")
-        if why:
-            return self._json({"error": why}, 403)
+        if self._refused("toolchains-write"):
+            return
         r = catalogindex.index(settings.get("catalog_url") or None, fresh=(q.get("fresh") or [""])[0] == "1")
         # Its entries as this build takes them: the page looks at and adds
         # the pin it is handed, which is the one this build reads.
@@ -13470,10 +13475,8 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/nasapps (R164 step 2): the catalog of ready apps the New
         container dialog offers, each with what it is and the blanks it
         takes. For whoever may make a container; never a session's."""
-        who = self._who() or {}
-        why = users.may(who, "docker-write")
-        if why:
-            return self._json({"error": why}, 403)
+        if self._refused("docker-write"):
+            return
         # ...and the folders a folder field suggests on the node picked (R238):
         # its pools, shares and disks under /mnt or /srv, as the Files page
         # lists its places.
@@ -13493,9 +13496,8 @@ class Handler(BaseHTTPRequestHandler):
         it runs as, the time zone, its port), for the dialog to show before
         Create makes it as any container."""
         who = self._who() or {}
-        why = users.may(who, "docker-write")
-        if why:
-            return self._json({"error": why}, 403)
+        if self._refused("docker-write"):
+            return
         # An app of a person's own (R170 step 3): looked at (preview), kept
         # (add), read back for Edit (source) and dropped (remove); an
         # administrator's, as a tool pack is, since every person's New
@@ -13509,8 +13511,8 @@ class Handler(BaseHTTPRequestHandler):
             r = nasapps.add_catalog(entry, by=who.get("name") or "", fetch=toolpacks.fetch_folder)
             return self._result(r)
         if action in ("preview", "add", "source", "remove"):
-            if (why := users.may(who, "curate")):
-                return self._json({"error": why}, 403)
+            if self._refused("curate"):
+                return
             if action == "preview":
                 r = nasapps.check(req.get("compose"))
             elif action == "add":
@@ -13532,18 +13534,12 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/extmounts (R162 step 4): the other disks and shares the
         controller's own machine mounts, as recorded, never a password.
         An administrator's."""
-        who = self._who() or {}
-        if not users.is_admin(who):
-            return self._json({"error": "the machine's other disks and shares are an administrator's"}, 403)
         return self._json({"mounts": extmounts.rows()})
 
     def _extmounts(self, req):
         """POST /api/extmounts (R162 step 4): set (add or change), remove,
         or on and off (Eject is off: the agent unmounts within a minute).
         An administrator's; the own machine's agent follows at its hello."""
-        who = self._who() or {}
-        if not users.is_admin(who):
-            return self._json({"error": "the machine's other disks and shares are an administrator's"}, 403)
         act, by = field(req, "action"), self._principal()
         if act == "set":
             r = extmounts.set_mount(req)
@@ -13660,9 +13656,8 @@ class Handler(BaseHTTPRequestHandler):
         router allows the project."""
         if not (name := self._project_asked()):
             return
-        who = self._who() or {}
-        if who.get("session") and who.get("session") != name and users.key_of(who.get("session") or "") != users.key_of(name):
-            return self._json({"error": "a session is handed its own space's key"}, 403)
+        if self._session_elsewhere(name, "a session is handed its own space's key"):
+            return None
         # ...and only to one who may work on it, as said (R277, the audit of 24
         # Nov: seeing the space was enough), a session's account included.
         if self._refused("work", name):
@@ -14363,8 +14358,6 @@ class Handler(BaseHTTPRequestHandler):
         not yet here; an administrator's. An armed move asks the new
         address whether it landed on the way, once a minute at most."""
         me = self._who() or {}
-        if not users.is_admin(me):
-            return self._json({"error": "moving the controller is an administrator's"}, 403)
         q = self._q()
         with contextlib.suppress(Exception):                     # noqa: BLE001 (the ask never holds the read)
             move.ask_new()
@@ -14398,9 +14391,6 @@ class Handler(BaseHTTPRequestHandler):
         controller marked moved to the new one, read-only from here on),
         ask (the new address asked now whether the bundle landed, R175).
         The owner's."""
-        me = self._who() or {}
-        if not users.is_owner(me):
-            return self._json({"error": "moving the controller is its owner's"}, 403)
         act = field(req, "action")
         if act == "prepare":
             stores = req.get("stores")
@@ -14478,9 +14468,6 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/move-bundle[?name=]: the bundle as a download, packed
         fresh under the armed move's key at this moment (R175 step 1), or the
         one just packed by name; the owner's."""
-        me = self._who() or {}
-        if not users.is_owner(me):
-            return self._json({"error": "the move bundle is its owner's"}, 403)
         # ?name= is the bundle the page just packed (action pack), served as
         # it is; with no name, packed fresh here as before.
         q = self._q()
@@ -14505,9 +14492,6 @@ class Handler(BaseHTTPRequestHandler):
     def _get_move_backup(self):
         """GET /api/move-backup?name=: the controller's backup packed under a
         token of its own, as a download; the owner's."""
-        me = self._who() or {}
-        if not users.is_owner(me):
-            return self._json({"error": "the controller's backup is its owner's"}, 403)
         q = self._q()
         p = move.backup_path(q.get("name", [""])[0])
         if not p:
@@ -14524,8 +14508,6 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/backup (R161 step 4): the password set or not, the last
         copy, where the copies go and the copies found; an administrator's."""
         me = self._who() or {}
-        if not users.is_admin(me):
-            return self._json({"error": "the backup is an administrator's"}, 403)
         # ...with whether this account is the owner, whose Back up now and
         # Download are (_backup's own test): the poll carries the name alone.
         # ...and the disks and shares a copy may also go to, off the machine.
@@ -14536,9 +14518,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def _backup(self, req):
         """POST /api/backup {action: now}: a copy written now, the owner's."""
-        me = self._who() or {}
-        if not users.is_owner(me):
-            return self._json({"error": "a backup now is the owner's"}, 403)
         if field(req, "action") != "now":
             return self._json({"error": "action is now"}, 400)
         r = backup.make(self._principal(), "asked")
@@ -14550,9 +14529,6 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/backup-file?name=NAME: a copy under the state as a
         download, the owner's; sealed, so a download is only ever a sealed
         file."""
-        me = self._who() or {}
-        if not users.is_owner(me):
-            return self._json({"error": "a backup's download is the owner's"}, 403)
         name = (self._q().get("name") or [""])[0]
         if not re.fullmatch(r"builderbot-backup-[A-Za-z0-9.+-]+-\d{8}-\d{6}(-\d+)?\.bbbackup", name):
             return self._json({"error": "which copy?"}, 400)

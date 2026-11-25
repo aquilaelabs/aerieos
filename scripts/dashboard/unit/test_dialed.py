@@ -15,7 +15,7 @@ from fields import field  # noqa: E402
 
 SERVER = open(os.path.join(HERE, "..", "server.py"), encoding="utf-8").read()
 TABLES = ("DIALS", "DIAL_ACTION", "ReleaseChange", "RELEASE_CHANGES")
-LIFTED = ("_dialed", "_release_change", "_result", "_refused")
+LIFTED = ("_dialed", "_release_change", "_result", "_refused", "_session_elsewhere")
 SESSION = {"name": "session:alpha", "session": "alpha"}
 PERSON = {"name": "olga", "uid": "u_1"}
 
@@ -55,7 +55,10 @@ def lifted(answers):
     """(stand-in handler class, the log its modules write, the tables)."""
     log = []
     # The session's account holds the grant unless a test says it does not.
-    answers = {"users._session_account_why": "", **answers}
+    answers = {"users._session_account_why": "",
+               # A space's key is its own name here: no repository stands for
+               # another (_session_elsewhere compares by key).
+               "users.key_of": lambda name: name, **answers}
     ns = {"collections": collections, "field": field}
     for name in ("prefs", "forgerelease", "phone", "version", "users", "membership",
                  "_release_remover", "_release_withdrawer", "_release_editor"):
@@ -164,7 +167,19 @@ class Changes(unittest.TestCase):
             h = stand(SESSION)
             h._release_change(act, "beta", {"tag": "v1.0.0"}, SESSION)
             self.assertEqual(h.said, [(403, {"error": f"a session {does} its own space's release and no other"})])
-            self.assertEqual(log, [], act)
+            # Nothing asked of any module but which space each name is.
+            self.assertEqual([row for row in log if row[0] != "users.key_of"], [], act)
+
+    def test_a_session_s_own_space_is_every_repository_of_it(self):
+        # alpha-web is a repository of alpha's space; beta is another space.
+        keys = {"alpha": "alpha", "alpha-web": "alpha", "beta": "beta"}
+        stand, _, _ = lifted(answers("auto", **{"users.key_of": lambda n: keys.get(n, n)}))
+        h = stand(SESSION)
+        self.assertFalse(h._session_elsewhere("alpha-web", "no"), "its space's second repository is its own")
+        self.assertFalse(h._session_elsewhere("alpha", "no"))
+        self.assertTrue(h._session_elsewhere("beta", "a session stays on its own space"))
+        self.assertEqual(h.said, [(403, {"error": "a session stays on its own space"})])
+        self.assertFalse(stand(PERSON)._session_elsewhere("beta", "no"), "a person is not held by it")
 
     def test_deny_refuses_a_session_before_a_plan_is_made(self):
         for act, (_, instead) in self.WORDS.items():
