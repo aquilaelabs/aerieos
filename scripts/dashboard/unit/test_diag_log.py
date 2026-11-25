@@ -69,5 +69,13 @@ class Log(unittest.TestCase):
         self.assertIn("log", diag.report(["nope"])["error"])
 
 
+class Redact(unittest.TestCase):
+    def test_a_github_installation_token_is_taken_out_whole(self):
+        # A JWT since GitHub's change of 2 Oct 2026: ghs_ and two dots.
+        got = diag.redact("run ghs_eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiIxMjM0NSJ9.abcDEF-ghi_JKLmnoPQRstuVWX kept words")
+        self.assertEqual(got, "run <redacted> kept words")
+        self.assertEqual(diag.redact("ghp_0123456789abcdefABCD."), "<redacted>", "a full stop after one goes with it, a word at most")
+
+
 if __name__ == "__main__":
     unittest.main()

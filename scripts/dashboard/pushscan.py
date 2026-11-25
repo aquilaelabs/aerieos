@@ -40,7 +40,7 @@ def configure(*, state, write_json):
 # A kind is the word the bell shows, so it is the thing, not the regex.
 PATTERNS = [
     ("a private key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY( BLOCK)?-----")),
-    ("a GitHub token", re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{22,})")),
+    ("a GitHub token", re.compile(r"\b(gh[pousr]_[A-Za-z0-9._-]{30,}|github_pat_[A-Za-z0-9_]{22,})")),
     ("a GitLab token", re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}")),
     ("a Slack token", re.compile(r"\bxox[abpr]-[A-Za-z0-9-]{10,}")),
     ("an AWS key", re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b")),

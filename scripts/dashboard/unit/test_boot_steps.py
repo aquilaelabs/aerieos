@@ -97,6 +97,17 @@ class Steps(unittest.TestCase):
             self.assertIn("NPM_TOKEN=npm_abcdefghijklmnopqrstu", r.stdout)
             self.assertIn("\n700\n600", r.stdout)
 
+    def test_the_log_takes_out_a_github_installation_token_whole(self):
+        # A JWT since GitHub's change of 2 Oct 2026 (ghs_ and two dots):
+        # the rule stopped at its first dot, and the eyJ rule never saw the rest.
+        with tempfile.TemporaryDirectory() as d:
+            run = os.path.join(d, "run")
+            r = sh('stash_secrets; echo "pulled with ghs_eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiIxMjM0NSJ9.abcDEF-ghi_JKLmnoPQRstuVWX done" | sed -f "$BB_RUN_DIR/redact.sed"',
+                   {"BB_SECRETS_DIR": os.path.join(d, "none"), "BB_RUN_DIR": run})
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("pulled with [REDACTED] done", r.stdout)
+            self.assertNotIn("eyJ", r.stdout)
+
     def test_a_secrets_file_is_read_as_words_and_never_run(self):
         # B779: the start is root and sourced these files whole, so a line
         # that set PATH left the controller in a restart loop ('chmod:

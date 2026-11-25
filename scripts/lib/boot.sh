@@ -257,9 +257,11 @@ stash_secrets() {
     : > "$stash";  chmod 600 "$stash"
     : > "$redact"; chmod 600 "$redact"
 
-    # Pattern rules: catch well-known token shapes wherever they appear.
+    # Pattern rules: catch well-known token shapes wherever they appear. A
+    # GitHub token takes dots, dashes and underscores: an installation token
+    # is a JWT now (ghs_ and two dots), whose rest the eyJ rule never reached.
     cat >> "$redact" <<'SED'
-s/gh[pousr]_[A-Za-z0-9]\{8,\}/[REDACTED]/g
+s/gh[pousr]_[A-Za-z0-9._-]\{8,\}/[REDACTED]/g
 s/github_pat_[A-Za-z0-9_]\{20,\}/[REDACTED]/g
 s/sk-ant-[A-Za-z0-9_-]\{8,\}/[REDACTED]/g
 s/npm_[A-Za-z0-9]\{16,\}/[REDACTED]/g

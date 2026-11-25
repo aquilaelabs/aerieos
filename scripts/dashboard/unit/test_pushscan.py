@@ -51,6 +51,9 @@ class Classify(unittest.TestCase):
         self.assertEqual(pushscan.classify("host = 192.168.1.16"), "an IP address")
         self.assertEqual(pushscan.classify("AWS_KEY=AKIAIOSFODNN7EXAMPLE"), "an AWS key")
         self.assertEqual(pushscan.classify("key: sk-ant-api03-abcdefghijklmnopqrstuvwxyz"), "an Anthropic key")
+        # A GitHub App's installation token as it is now: a JWT, its first
+        # part shorter than the old shape asked for before a dot.
+        self.assertEqual(pushscan.classify('X = "ghs_eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiIxMjM0NSJ9.abcDEF-ghi_JKLmnoPQRstuVWX"'), "a GitHub token")
 
     def test_placeholders_and_documentation_addresses_are_not(self):
         for line in ('password = "${PASSWORD}"', "token = process.env.TOKEN", "secret: <your secret>",

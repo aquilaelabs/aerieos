@@ -60,8 +60,11 @@ def configure(**deps):
 # keeps X, which diag.mjs caught), then anything written as key=value or
 # key: value under a name that means secret. Deliberately broad: a false
 # positive costs a word.
+# A GitHub App's installation token is a JWT now (ghs_, about 520 characters
+# with two dots: GitHub, 2 Oct 2026), so a GitHub token's shape takes dots,
+# dashes and underscores, or all after its first dot stayed in the clear.
 _SECRETS = (
-    re.compile(r"bb[a-z]_[A-Za-z0-9_\-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}"
+    re.compile(r"bb[a-z]_[A-Za-z0-9_\-]{8,}|gh[pousr]_[A-Za-z0-9._\-]{16,}"
                r"|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_\-]{16,}"),
     re.compile(r"(?i)\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=\-]{6,}"),
     re.compile(r"(?i)\b(?:token|password|passwd|secret|authorization|api[_-]?key)[\"']?\s*[:=]\s*[\"']?"
