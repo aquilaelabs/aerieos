@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A GitHub App's installation token, a longer token with dots in it since GitHub changed its shape in October, is taken out of diagnostics and the controller's log whole, where everything after its first dot stayed in them, and a push holding one is held (2e98d75)
+
 ## 0.9.0-dev.6312: 2026-11-25
 
 ### Fixed
