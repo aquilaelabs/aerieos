@@ -1,33 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- A session in a space of several repositories runs the aerie verbs its space allows in another repository's tree too, where the coding agent's own check had refused them (a357339)
-
-## 0.9.0-dev.6308: 2026-11-25
-
-### Added
-
-- An approved ask's row in History opens what it okayed: a push's flagged lines, a container's compose file or a release's new notes (e457254)
-- aerie forge owed lists what a repository's git host settings owe its own workflows (a required reviewer on each environment a job is gated by, no repository-level secret standing in for an environment's, a tag ruleset, outside contributors' runs approved first), and aerie version release refuses while one is owed (913cd44)
-- aerie diag log reads the controller's own log whole: the dashboard's output, the boot log or Docker's, this start's or an earlier one, the last lines or those holding some words, redacted as the rest of the diagnostics; on a node, aerie logs reads it the same way (92cc568)
-
-### Changed
-
-- The warning color on every dark theme is a warmer gold (e5105b3)
-- A dialog's title is a band in the same voice as the pages' sections, no longer small capitals, and the page behind a dialog is softened in the theme's own color rather than blacked out (151147d)
-- Dialogs lay out their fields on the same grid as the pages: a new space's name beside its version, a container's name beside its space, an account beside its person's name, each label over its field (d5f6edb, c02819b)
-- aerie version release refuses a pre-release on a commit no release rehearsal passed on, in a repository that has one, and says to rehearse it first (f9d77fc)
-- A repository's git host settings are drawn in its Settings under Repository, where the chain on its card and its menu now lead, and a space whose Authentication is Disabled says over its tokens that pushes are off (bf3b7c3)
-- A page says what is news on one line in its head, a card at a desk, the same on every page and a node's, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4, 6f2809d)
-- Each person's pushes, pulls and git host work on a space run with their own token alone, at the same time as everyone else's, and the Repository section says so: Your access token, each person's row saying their own work uses it, and Authentication as Off, Deploy key or Each person's token. Upgrading: somebody who had not given a space a token of their own, whose pushes ran with another person's, gives theirs under Repository in its notebook's Settings (87f5103)
-- Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
-- A picked row in a list (a settings section, a user, a role, a commit) is lifted with a bar of the theme's highlight at its left, where the default scheme washed it brown (22e730c)
-- nginx, the scanners and the model router open for Configure Read on their node, and a page read without Configure Write says so and draws no control, where every control was drawn and refused on the press (91409d8)
-- On a phone a page's placeholder opens the one section the page opens on, where it stood every section open and folded the rest away as the page came, and a space's Overview opens on its first section (8c583d2)
-- The bell and the Notifications page are two sections: Active, what waits on your answer (every ask queued, at the top in gold) and what stops work, none of which can be dismissed; and Earlier, where an ask moves once answered or expired, saying how it went, beside what can be dismissed and what the page said, with no gold, since none of it waits on you; the page's Clear history clears History and never Active (9c87cc5, 5173174)
+## 0.9.0-dev.6310: 2026-11-25
 
 ### Fixed
 
@@ -63,6 +36,28 @@
 - A space linked to its git host before AerieOS moved to /opt/aerieos no longer reads as Authentication Off, and its pushes are no longer refused for it (df45793)
 - Dismiss on the bell holds for a release missing its files, a space left beside its repository and a space whose git access went, where those came back on the next read (7038df4)
 - The Containers and VMs pages group by space: a space of several repositories is one group and one chip, each row naming its repository beside the space, where each repository stood apart and was called a space (538b294)
+- A session in a space of several repositories runs the aerie verbs its space allows in another repository's tree too, where the coding agent's own check had refused them (a357339)
+
+### Added
+
+- An approved ask's row in History opens what it okayed: a push's flagged lines, a container's compose file or a release's new notes (e457254)
+- aerie forge owed lists what a repository's git host settings owe its own workflows (a required reviewer on each environment a job is gated by, no repository-level secret standing in for an environment's, a tag ruleset, outside contributors' runs approved first), and aerie version release refuses while one is owed (913cd44)
+- aerie diag log reads the controller's own log whole: the dashboard's output, the boot log or Docker's, this start's or an earlier one, the last lines or those holding some words, redacted as the rest of the diagnostics; on a node, aerie logs reads it the same way (92cc568)
+
+### Changed
+
+- The warning color on every dark theme is a warmer gold (e5105b3)
+- A dialog's title is a band in the same voice as the pages' sections, no longer small capitals, and the page behind a dialog is softened in the theme's own color rather than blacked out (151147d)
+- Dialogs lay out their fields on the same grid as the pages: a new space's name beside its version, a container's name beside its space, an account beside its person's name, each label over its field (d5f6edb, c02819b)
+- aerie version release refuses a pre-release on a commit no release rehearsal passed on, in a repository that has one, and says to rehearse it first (f9d77fc)
+- A repository's git host settings are drawn in its Settings under Repository, where the chain on its card and its menu now lead, and a space whose Authentication is Disabled says over its tokens that pushes are off (bf3b7c3)
+- A page says what is news on one line in its head, a card at a desk, the same on every page and a node's, where it had a row of tiles or a block of facts, and its other facts sit beside what they describe (27a3891, b9d8698, cb225a4, 6f2809d)
+- Each person's pushes, pulls and git host work on a space run with their own token alone, at the same time as everyone else's, and the Repository section says so: Your access token, each person's row saying their own work uses it, and Authentication as Off, Deploy key or Each person's token. Upgrading: somebody who had not given a space a token of their own, whose pushes ran with another person's, gives theirs under Repository in its notebook's Settings (87f5103)
+- Where a repository links, its address, its Authentication, its deploy key, Link and Unlink are changed by the space's owner or AerieOS's owner alone; anybody else reads them under a line naming the owner and gives or takes back their own token (87f5103)
+- A picked row in a list (a settings section, a user, a role, a commit) is lifted with a bar of the theme's highlight at its left, where the default scheme washed it brown (22e730c)
+- nginx, the scanners and the model router open for Configure Read on their node, and a page read without Configure Write says so and draws no control, where every control was drawn and refused on the press (91409d8)
+- On a phone a page's placeholder opens the one section the page opens on, where it stood every section open and folded the rest away as the page came, and a space's Overview opens on its first section (8c583d2)
+- The bell and the Notifications page are two sections: Active, what waits on your answer (every ask queued, at the top in gold) and what stops work, none of which can be dismissed; and Earlier, where an ask moves once answered or expired, saying how it went, beside what can be dismissed and what the page said, with no gold, since none of it waits on you; the page's Clear history clears History and never Active (9c87cc5, 5173174)
 
 ### Security
 
