@@ -1133,6 +1133,21 @@ A pulldown in a bar or a row of controls (a page's bar, a band over a list, a pi
 
 **A group header's node picker is as wide as the name it shows, in every browser** (the operator, 19 Nov: bb-sand… on a phone with room beside it). It is measured (`fitHeadPickers`): the name's ink at the header's face, its padding, and 52px for the closed picker's arrow, which each engine draws at a different width; left to the browser, Firefox on a phone and WebKit cut the name short. The header's own max-width still lets it give way to the pill beside it on a screen too narrow for both.
 
+### connections
+
+Applies to: scripts/dashboard/tab-settings.js, scripts/dashboard/page-projsettings.js, scripts/dashboard/tab-profile.js, scripts/dashboard/page-shell.js; connection, connect, integration, credential, cluster, discord, webhook, registry
+
+Where a connection lives (the operator, 25 Nov: future-proof, and never convoluted in settings). A connection is a credential AerieOS holds for an outside service: a git host, a Kubernetes cluster, a Discord server, a registry, a cloud account, a chat or notification service. It is placed by whose it is and what it is for, and never gathered into a Connect or Integrations page of its own:
+
+- **Shared by spaces** (a cluster, a registry, a runner's host): a page of the Machines group beside Nodes, an administrator's to add, granted instance by instance on the Roles page.
+- **One space's** (its git host and remote, its Discord server, its deploy environments): a section of that space's settings, beside its repository's.
+- **One person's** (their git token, their coding agents' sign-ins, their own notification channels): their Profile.
+- **The install's own** (the bell's webhooks and email, the update channel): Controller settings.
+
+Controller settings also holds the one read-only list of every connection, **Connected services**: who added each, when it was last used, its expiry, and Forget, so what the install can reach and with what is one list. Nothing is added or changed from that list, only where the connection lives, and a row there links to it.
+
+Every kind shares one mechanism underneath: the credential sealed and never shown again or handed to a session, Test and Forget, the Doctor's warning near expiry or on failure, a session reaching it only through relayed aerie verbs under a dial with anything destructive asked on the bell, and an audit row a call. A new kind of connection is a new row in the table above and a new place where its owner already looks, never a new page of settings.
+
 ## Pages
 
 Each page is a layout of labeled blocks on a frame, named for what it is for, on the platform it is built for.
