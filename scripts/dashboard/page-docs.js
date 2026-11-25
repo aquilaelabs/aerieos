@@ -759,7 +759,7 @@ function wireSections(root){
     // `:scope > summary` because a section can contain folds of its own, and
     // the section must not answer for theirs.
     const sum = d.querySelector(":scope > summary");
-    if (sum) sum.onclick = e => { e.preventDefault(); if (sectFixed(d)) return; const will = !foldOpen(d); if (will) soleOpen(d); slideDetails(d, will); };
+    if (sum) sum.onclick = e => { e.preventDefault(); if (sectFixed(d)) return; const will = !foldOpen(d); if (will) soleOpen(d); else soleShut(d); slideDetails(d, will); };
   });
   const view = root.closest?.(".nbview, .doctab") || root.querySelector?.(".doctab");
   if (view){
@@ -872,6 +872,18 @@ let sectVisit = 0;
 function sectNewVisit(){ sectVisit++; }
 // Nobody has opened or shut it, and its caller left it to the default.
 const sectDefault = o => !(o.dataset.sect && o.dataset.sect in sectOpen) && !o.hasAttribute("data-set");
+// What a group remembers when a hand shut the one that stood open on a
+// phone: none, for the rest of this visit of the page. The next draw's oneOpen
+// opened the top one again with no motion, so a section shut by a press
+// sprang open a moment later (the operator, 25 Nov: smooth everywhere; R285).
+const SECT_NONE = "\u0000none";
+function soleShut(d){
+  const g = sectGroup(d);
+  if (!sectRuled(g) || !isPhone()) return;
+  if (sectsOf(g).some(o => o !== d && o.open)) return;
+  sectRemember(g, SECT_NONE);
+  if (d.dataset.sect) sectOpen[d.dataset.sect] = false;
+}
 function soleOpen(d){
   const g = sectGroup(d);
   if (!sectRuled(g)) return;
@@ -919,6 +931,8 @@ function oneOpen(g){
   // top of the page. A fold on purpose is one of the one at a time too: it
   // is never what a phone opens on, but opening it shuts the rest.
   const last = sectRecall(g);
+  // A hand shut the last one open in this visit: all of them stay shut.
+  if (last === SECT_NONE){ for (const o of mine) if (o.open && !o.dataset.slideTo) o.open = false; return; }
   const keep = mine.find(o => last && (o.dataset.sect || "") === last)
     || mine.find(o => !o.hasAttribute("data-fold")) || mine[0];
   for (const o of mine) o.open = o === keep;
