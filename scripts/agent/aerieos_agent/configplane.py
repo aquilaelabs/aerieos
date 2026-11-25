@@ -272,8 +272,11 @@ class ConfigPlaneMixin:
             job.say("refused: this machine is not a bare-metal controller's own node, so there is no installer here to run\n")
             return "failed", 77
         tag = str(cfg.get("release") or "")
-        if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+", tag):
-            job.say("refused: a release is named by its tag, vX.Y.Z\n")
+        # A pre-release's tag too (vX.Y.Z-dev.N), as the controller sends
+        # and the installer verifies it: with no stable release yet, every
+        # update a bare-metal controller was offered was refused here (B1164).
+        if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
+            job.say("refused: a release is named by its tag, vX.Y.Z or vX.Y.Z-dev.N\n")
             return "failed", 64
         argv = ["bash", installer, "--update"] + (["--release", tag] if tag else [])
         job.say(f"controller update: {' '.join(argv[1:])}\n")

@@ -104,6 +104,32 @@ def plane(sh_rc=0):
     return type("Plane", (agent.Agent,), body)(), calls
 
 
+class ControllerUpdate(unittest.TestCase):
+    """A bare-metal controller's update, as its own node's root agent runs it:
+    the tag a release is named by, a pre-release's included (B1164: every
+    vX.Y.Z-dev.N the controller offered was refused), and nothing else."""
+
+    def run_one(self, tag):
+        me, calls = plane()
+        job = SaidJob()
+        with mock.patch.object(configplane.os.path, "isfile", return_value=True):
+            got = agent.Agent._apply_controller_update(me, job, {"release": tag})
+        return got, [c for c in calls if c[0] == "_sh"], "".join(job.said)
+
+    def test_a_release_and_a_pre_release_are_taken(self):
+        for tag in ("v0.9.0", "v0.9.0-dev.6312", "0.9.1-rc.2"):
+            got, sh, _ = self.run_one(tag)
+            self.assertEqual(got, ("succeeded", 0), tag)
+            self.assertEqual(sh[0][1][1][-2:], ["--release", tag], tag)
+
+    def test_anything_else_is_refused_before_the_installer_runs(self):
+        for tag in ("latest", "v0.9", "v0.9.0-dev", "v0.9.0-dev.1; reboot", "v0.9.0 --dev"):
+            got, sh, said = self.run_one(tag)
+            self.assertEqual(got, ("failed", 64), tag)
+            self.assertEqual(sh, [], tag)
+            self.assertIn("vX.Y.Z-dev.N", said)
+
+
 class Applies(unittest.TestCase):
     def setUp(self):
         d = tempfile.TemporaryDirectory()
