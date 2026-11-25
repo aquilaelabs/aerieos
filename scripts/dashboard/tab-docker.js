@@ -2731,7 +2731,10 @@ let dmChip = "";
 // repository, and a space of several (R208) holds all their containers in
 // one group, named and colored as the space. System, an owner since deleted
 // and no owner are each their own.
-const dmSpaceOf = o => !o || o === "System" ? (o || "") : reposOf(o) || o;
+// The repository's own record, or the owner itself where it is a space (one
+// a move left a container with) or gone.
+const dmSpaceOf = o => !o || o === "System" ? (o || "")
+  : (state?.projects || []).find(p => p.name === o && p.project)?.project || o;
 const dmSpaceLabel = k => state?.repos?.[k]?.name || projLabel(k);
 const dmKeyOf = r => dmSpaceOf(r.owner || "");
 // What the groups are drawn from beside the list: each space's name, color

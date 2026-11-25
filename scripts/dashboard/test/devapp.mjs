@@ -5839,25 +5839,50 @@ await section("a space of several repositories is one group on the Containers pa
     return { status: r.status, ...(await r.json()) };
   }, [path, body]);
   const spaceOf = async n => (((await api('/api/status')).projects || []).find(p => p.name === n) || {}).project;
+  // One of ep.silon's own, whatever the sections before left it.
+  const helper = await api('/api/container', { action: 'create', name: 'both-helper', owner: 'ep.silon',
+                                              compose: 'services:\n  app:\n    image: alpine\n', env: '' });
   const was = { gamma: await spaceOf('gamma'), 'ep.silon': await spaceOf('ep.silon') };
   const made = await api('/api/repos', { action: 'create', name: 'Both Repos' });
-  const moved = [await api('/api/repos', { action: 'move', name: 'gamma', to: made.key }),
-                 await api('/api/repos', { action: 'move', name: 'ep.silon', to: made.key })];
-  ok(made.ok && moved.every(m => m.status === 200),
-     `two repositories go into one space (${JSON.stringify([made.error, ...moved.map(m => m.error)])})`);
-  await page.evaluate(() => { dmChip = ""; refresh(); openDocker(); });
+  // Its containers ticked to go with it, and the nodes they are on brought
+  // along, as the move dialog offers: unticked, the space it leaves keeps them.
+  const along = async (name, to) => {
+    const plan = await api('/api/repos', { action: 'move-check', name, to });
+    return api('/api/repos', { action: 'move', name, to,
+      give: (plan.things || []).filter(t => t.kind === 'container').map(t => t.key),
+      add_nodes: (plan.nodes || []).filter(n => !n.have).map(n => n.id) });
+  };
+  const moved = [await along('gamma', made.key), await along('ep.silon', made.key)];
+  ok(helper.ok && made.ok && moved.every(m => m.status === 200),
+     `two repositories go into one space (${JSON.stringify([helper.error, made.error, ...moved.map(m => m.error)])})`);
+  // Any menu an earlier part left open holds the pane's redraw (menuHolds): shut first.
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { closeMore(); document.querySelectorAll('.actmenu:not([hidden])').forEach(m => { m.hidden = true; });
+    dmEditing.clear(); dmChip = ""; refresh(); openDocker(); });
+  let last = null;
   const seen = await until(async () => {
-    const r = await page.evaluate(() => { drawPanes(); return {
-      heads: [...document.querySelectorAll('.dmtab .dmgroup b')].map(b => b.textContent.trim()),
-      chips: [...document.querySelectorAll('.dmtab .chips .chip')].map(c => c.textContent.replace(/\s+/g, ' ').trim()),
-      pill: document.querySelector('.dmtab [data-inst^="ep.silon|"]')?.textContent.replace(/\s+/g, ' ') || '' }; });
-    return r.heads.includes('Both Repos') ? r : null;
+    const r = last = await page.evaluate(async () => {
+      // The list read again (both-helper is new to it) and the status, and only
+      // the page on show read: a kept copy of the tab may be in the DOM too.
+      if (!readBusy('docker')) loadDocker();
+      await refresh(); drawPanes();
+      const tab = document.querySelector('.pane .doc.on .dmtab') || document;
+      return {
+        heads: [...tab.querySelectorAll('.dmgroup b')].map(b => b.textContent.trim()),
+        chips: [...tab.querySelectorAll('.chips .chip')].map(c => c.textContent.replace(/\s+/g, ' ').trim()),
+        pill: (tab.querySelector('[data-inst="both-helper|main"]')?.textContent.match(/Space\s*[^\n]*?(?=Reached|Agent|Branch|$)/) || [''])[0].replace(/\s+/g, ' ').trim(),
+        ep: (state.projects || []).find(p => p.name === 'ep.silon')?.project || '(not listed)',
+        space: Object.entries(state.repos || {}).filter(([, r]) => r.name === 'Both Repos').map(([k, r]) => `${k}:${(r.members || []).join('+')}`).join(),
+        owner: (dockerList?.instances || []).find(d => d.project === 'both-helper')?.owner || '' };
+    });
+    return r.heads.includes('Both Repos') && r.pill ? r : null;
   }, 20000, 400);
   ok(seen && seen.heads.filter(h => h === 'Both Repos').length === 1 && !seen.heads.some(h => /^(gamma|ep\.silon)$/.test(h))
      && seen.chips.some(c => /^Both Repos/.test(c)) && !seen.chips.some(c => /^ep\.silon/.test(c))
-     && /Space Both Repos · ep\.silon/.test(seen.pill),
-     `...and the Containers page draws its containers as the space's one group and chip, a row naming its repository beside the space (${JSON.stringify(seen && { heads: seen.heads, chips: seen.chips })})`);
-  for (const [n, k] of Object.entries(was)) await api('/api/repos', { action: 'move', name: n, to: k });
+     && /Space\s*Both Repos · ep\.silon/.test(seen.pill),
+     `...and the Containers page draws its containers as the space's one group and chip, a row naming its repository beside the space (${JSON.stringify(seen || last)})`);
+  for (const [n, k] of Object.entries(was)) await along(n, k);
+  await api('/api/devapp', { project: 'both-helper', action: 'remove' });
   await api('/api/repos', { action: 'delete', key: made.key });
   await page.evaluate(() => refresh());
 });
