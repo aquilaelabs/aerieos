@@ -1882,7 +1882,7 @@ for table in ("GET_ROUTES", "POST_ROUTES"):
 gates = ns["ROUTE_GATES"]
 named = {n for t in out.values() for _, _, n in t["routes"]}
 out["GATES"] = {"none": sorted(named - set(gates)), "stale": sorted(set(gates) - named),
-                "odd": sorted(n for n, g in gates.items() if g != "handler" and not (isinstance(g, tuple) and g[0] in ("owner", "person") and g[1])),
+                "odd": sorted(n for n, g in gates.items() if g != "handler" and not (isinstance(g, tuple) and g[0] in ("owner", "admin", "person") and g[1])),
                 "central": sum(1 for g in gates.values() if g != "handler")}
 out["SESSION"] = sorted(ns["SESSION_ROUTES"])
 print(json.dumps(out))`], { encoding: 'utf8' }));
