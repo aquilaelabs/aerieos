@@ -525,6 +525,36 @@ ok((await bins()).includes('1'),
    '...including a step in the middle of a plan, which used to need the two '
    + 'in front of it deleted first');
 
+// ---- a box on its way in is clipped, never scrolled ------------------------
+// A box arriving folds open over its height; what the fold has not reached
+// is clipped and cannot be scrolled up into it. Scrolled to show its Save
+// (a browser's scroll into view does), the box let it fall back as it grew,
+// so the button slid from under a press and the click went to the box: a
+// step never dropped, a target never set (B1113).
+await section("a box on its way in is clipped, never scrolled", async () => {
+  const got = await page.evaluate(() => {
+    const host = document.querySelector('.pane .doc.on #roadmapList') || document.body;
+    const box = document.createElement('div');
+    box.className = 'dropbox ctlown';
+    box.innerHTML = '<div style="height:240px">words</div><div class="actbar"><button type="button" class="primary">Save</button></div>';
+    host.prepend(box);
+    arriveBox(box);
+    const folding = box.getAnimations().some(a => a.id === 'fold' && a.playState === 'running');
+    const clip = getComputedStyle(box).overflowY;
+    box.querySelector('button').scrollIntoView({ block: 'nearest' });
+    box.scrollTop = 40;
+    const top = box.scrollTop;
+    box.getAnimations().forEach(a => a.finish());
+    return new Promise(done => setTimeout(() => {
+      const after = getComputedStyle(box).overflowY;
+      box.remove();
+      done({ folding, clip, top, after });
+    }, 50));
+  });
+  ok(got.folding && got.clip === 'clip' && got.top === 0 && got.after === 'visible',
+     `a box on its way in is clipped and cannot be scrolled, and lets go once in (${JSON.stringify(got)})`);
+});
+
 // ---- dropping one step out of a plan -----------------------------------
 // With the reason it went. Nothing here can be undone, so the note is the
 // only thing standing between a dropped line and somebody adding it back,

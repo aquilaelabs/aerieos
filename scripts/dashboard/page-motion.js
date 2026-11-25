@@ -336,7 +336,13 @@ function flip(els, key, ms = 140){
 function foldHeight(el, from, to, done){
   // Only its own kind: another animation on the element is not this fold's.
   el.getAnimations().forEach(a => { if (a.id === "fold") a.cancel(); });
-  el.style.overflow = "hidden";
+  // Clipped, never scrolled: a box with overflow hidden can still be
+  // scrolled, and a browser bringing a control in it into view (a focus,
+  // a test's press) scrolled what the fold had not reached yet up into
+  // it, the scroll falling back as the box grew, so the control slid
+  // from under the finger between its press and its release and the click
+  // went to the box (B1113). Hidden stands where clip is not known.
+  el.style.overflow = "hidden"; el.style.overflow = "clip";
   const anim = el.animate([{height: from + "px"}, {height: to + "px"}],
                           {duration: 180, easing: "ease"});
   anim.id = "fold";
@@ -419,7 +425,7 @@ function leaveBox(el, done){
   const cs = getComputedStyle(el), px = v => parseFloat(v) || 0;
   const was = {height: el.offsetHeight + "px", opacity: 1, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom,
                marginTop: cs.marginTop, marginBottom: cs.marginBottom};
-  el.style.overflow = "hidden";
+  el.style.overflow = "hidden"; el.style.overflow = "clip";   // as a fold is (foldHeight)
   const anim = el.animate([was, {height: "0px", opacity: 0, paddingTop: "0px", paddingBottom: "0px",
                                  marginTop: px(cs.marginTop) < 0 ? cs.marginTop : "0px", marginBottom: "0px"}],
                           {duration: 180, easing: "ease", fill: "forwards"});
@@ -543,7 +549,7 @@ function morphThrough(pick, swap, key = e => e.dataset.key || ""){
   for (const [i, [e, w]] of kept.entries()){
     const to = ends[i];
     if (getComputedStyle(e).position === "static"){ e.style.position = "relative"; e.dataset.morphPos = "1"; }
-    e.style.overflow = "hidden";
+    e.style.overflow = "hidden"; e.style.overflow = "clip";     // as a fold is (foldHeight)
     const size = [{height: `${w.r.height}px`, width: `${w.r.width}px`}, {height: `${to.height}px`, width: `${to.width}px`}];
     const a = e.animate(size, {duration: ms, easing: ease});
     a.id = "morph";
