@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A session in a space of several repositories runs the aerie verbs its space allows in another repository's tree too, where the coding agent's own check had refused them (a357339)
+
 ## 0.9.0-dev.6308: 2026-11-25
 
 ### Added
