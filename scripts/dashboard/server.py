@@ -7346,6 +7346,26 @@ class Handler(BaseHTTPRequestHandler):
                 return True
         return False
 
+    def _ws_refused(self):
+        """True, with the 403 written, when a websocket is asked from another
+        site (_ws_cross_origin's reason): three sockets wrote it out."""
+        cross = self._ws_cross_origin()
+        if not cross:
+            return False
+        self._json({"error": cross}, 403)
+        return True
+
+    def _feature_off(self, method, path, req=None):
+        """True, with the 403 written, when what `method path` reaches is a
+        feature this install switched off (FEATURES_OFF): the reason and
+        off, which the page draws as a dead control with its reason. Four
+        doors wrote it out (R283 step 3)."""
+        why = featuresoff.refused(method, path, req) if req is not None else featuresoff.refused(method, path)
+        if not why:
+            return False
+        self._json({"error": why, "off": True}, 403)
+        return True
+
     def _account(self, behind=False):
         """(the caller, its account's uid), or (None, "") with the 403 written
         when it is no account. `behind` reads the account a session's token
@@ -8282,8 +8302,8 @@ class Handler(BaseHTTPRequestHandler):
         a screen is driving the machine, so it takes VMs Write on the VM's
         project; the request upstream carries this controller's signature for
         that VM and this minute, keyed with the node's token hash."""
-        if (cross := self._ws_cross_origin()):
-            return self._json({"error": cross}, 403)
+        if self._ws_refused():
+            return None
         q = self._q()
         project, _, name = str((q.get("vm") or [""])[0]).partition("/")
         if not registry.is_project(project):
@@ -8399,8 +8419,8 @@ class Handler(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(query)
         args = "?" + "&".join(f"arg={urllib.parse.quote(a, safe='')}" for a in q.get("arg", []))
         dims = {k: termws.term()._dim((q.get(k) or [""])[0], d) for k, d in (("cols", 80), ("rows", 24))}
-        if (cross := self._ws_cross_origin()):
-            return self._json({"error": cross}, 403)
+        if self._ws_refused():
+            return None
         # A log, read-only and followed (R133 step 12): no program runs.
         if _term_arg(args).startswith("log:"):
             return self._log_own(_term_arg(args), args, dims)
@@ -8960,8 +8980,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return self.wfile.write(body)
         # A feature this install switched off (R81) answers its sentence.
-        if why := featuresoff.refused("GET", path):
-            return self._json({"error": why, "off": True}, 403)
+        if self._feature_off("GET", path):
+            return None
         # An exact route is the path without its query (B409): /api/audit?n=50
         # and /api/router?node=N are the exact routes' own reads.
         if path.startswith("/api/") and (why := self._get_cross_site()):
@@ -9804,8 +9824,8 @@ class Handler(BaseHTTPRequestHandler):
         q = self._q()
         if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
-        if (cross := self._ws_cross_origin()):
-            return self._json({"error": cross}, 403)
+        if self._ws_refused():
+            return None
         nid, root, path, name = (q.get(k, [""])[0] for k in ("node", "root", "path", "name"))
         n = self._content_length(missing=-1)
         if n < 0:
@@ -10316,8 +10336,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         # A feature this install switched off (R81): refused here, whatever
         # drew the button, with the install's own sentence.
-        if why := featuresoff.refused("POST", path, req):
-            return self._json({"error": why, "off": True}, 403)
+        if self._feature_off("POST", path, req):
+            return None
         # Door 2, at the one funnel every mutation passes: when, who, what,
         # on what, with a parameter digest, never the parameters, which
         # carry tokens and env text. The principal is the signed-in account
@@ -11030,8 +11050,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._nodes_down()
         verb = self.path.split("?")[0][len("/api/v1/device/"):]
         q = self._q()
-        if why := featuresoff.refused(self.command, "/api/v1/device/" + verb):
-            return self._json({"error": why, "off": True}, 403)
+        if self._feature_off(self.command, "/api/v1/device/" + verb):
+            return None
         # An app from before a break in the door is told so, whatever it
         # asked; except where it asks what to update to.
         if ((why := devices.door_refused(self.headers.get("X-BB-Door"), self.headers.get("X-BB-App")))
@@ -12691,8 +12711,8 @@ class Handler(BaseHTTPRequestHandler):
         project = (q.get("project") or [""])[0]
         if (self._who() or {}).get("session"):
             return self._json({"error": "uploading an installer ISO is a person's, on the VMs page"}, 403)
-        if why := featuresoff.refused("POST", "/api/vms", {}):
-            return self._json({"error": why, "off": True}, 403)
+        if self._feature_off("POST", "/api/vms", {}):
+            return None
         if not registry.is_project(project):
             return self._json({"error": "which space's VMs is it for? name one"}, 400)
         if self._refused("vms-write", project):
