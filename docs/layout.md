@@ -1,9 +1,10 @@
 # Layout
 
 ```
-README.md                        the front page: what it is, its features, screenshots, and the way into docs/
+README.md                        the front page: what it is, why to try it, how to start, and the way into docs/
 CLAUDE.md                        working inside this repository: what a session here is told
 CONTRIBUTING.md                  a person's way in: a checkout, seeing a change, proving it, the house rules, landing it
+SECURITY.md                      how to report a vulnerability privately, and what happens next
 CHANGELOG.md                     the user-facing record, by release and category; aerie changelog writes it
 VERSION                          this repository's own version, moved per commit by tools/version-stamp
 LICENSE                          the Apache License 2.0
