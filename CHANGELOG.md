@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Every theme has more presence: the dark halves are lighter, the light halves darker so cards stand off the page, and accents and the status colors are more saturated, each still readable at 4.5:1 or better (f392d26)
+
 ### Fixed
 
 - A GitHub App's installation token, a longer token with dots in it since GitHub changed its shape in October, is taken out of diagnostics and the controller's log whole, where everything after its first dot stayed in them, and a push holding one is held (2e98d75)
