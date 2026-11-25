@@ -18,7 +18,7 @@
 
 "use strict";
 
-let lib = null, libNode = "", libFollow = null;
+let lib = null, libNode = "";
 // The narrowing the list is waiting on (libQuery()), "" when none: while a
 // press's read is out its list is its placeholder, drawn by the page's own
 // render so the patcher's record is what is on screen.
@@ -147,14 +147,6 @@ function loadLibrary(){
     }
     // What the store's own lines and tcAct read off this page's read.
     if (!lib.error) toolchainsSeen(lib);
-    // One follow-up while a job writes a row, not a poll: the toolchains
-    // revision moves when the job ends, and the row's "installing" until then.
-    // ...and only while the Library or an entry's page is on show (B1096):
-    // left during a long install it read every three seconds until the
-    // install ended. Shown again, its open reads it.
-    clearTimeout(libFollow); libFollow = null;
-    if (libKnown().some(r => r.running || r.queued))
-      libFollow = setTimeout(() => { libFollow = null; if (shown("library") || shown("entry")) loadLibrary(); }, 3000);
   }, {join: 500, about: libQuery()});
 }
 

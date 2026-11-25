@@ -45,10 +45,9 @@ function loadToolchains(){
     if (tcNode !== node) return;
     toolchains = got;
     clearTimeout(tcSizeTimer); tcSizeTimer = null;
-    // ...and while Claude Code's own job runs (R145), which is not a toolchain
-    // job and so moves nothing the tab waits on otherwise.
+    // The sizes a worker measures land without a job: one follow-up while
+    // they do. A row's own install is a job, read on the jobs revision.
     if (toolchains && toolchains.sizing) tcSizeTimer = setTimeout(loadToolchains, 1500);
-    else if ((toolchains?.machine || []).some(m => m.running)) tcSizeTimer = setTimeout(loadToolchains, 3000);
   });
 }
 

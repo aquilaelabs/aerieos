@@ -177,6 +177,8 @@ function bootTermWindow(){
   // The window closing is the tab coming back: polled, because a window on the
   // terminal's own URL runs none of this page's script to say so.
   setInterval(() => {
+    // Nothing to look at while no terminal is in a window of its own.
+    if (!popWins.size) return;
     let back = false;
     for (const [id, w] of popWins){
       if (!w.closed) continue;
@@ -733,6 +735,18 @@ function bootAway(){
     // ...and the jobs a toast is following (R218 step 6).
     if (jobToasts.size) jobToastsCheck();
     if (shown("emulator")) loadEmulator();
+    // ...and a page whose rows are a node's installs while one runs (the
+    // Library, an entry's page, Installed, the node's store): each kept a
+    // three-second timer of its own, which went on reading after the page
+    // was left and stacked on the entry's page (B1161; R283 step 4).
+    const busy = rows => (rows || []).some(r => r.running || r.queued);
+    if ((shown("library") || shown("entry")) && busy(typeof libKnown === "function" ? libKnown() : [])) loadLibrary();
+    if (shown("entry") && busy(entryLib?.rows)) loadEntry();
+    if ((shown("installed") || shown("thing")) && busy(inst?.rows)) loadInstalled();
+    if ((shown("installed") || shown("thing") || shown("library")) && busy(toolchains?.machine)) loadToolchains();
+    // ...and a sign-in to a coding agent while it runs: its URL and the
+    // answer to its code are lines its job writes (watchSignin).
+    if (watchSignin()) refresh();
   });
   // The Phone tab's data (tab-phone.js): fetched here too, because the bell
   // carries the same asks whether or not the tab is open.

@@ -13,7 +13,7 @@
 
 "use strict";
 
-let inst = null, instNode = "", instFollow = null;
+let inst = null, instNode = "";
 let instWantAgent = "";        // the agent whose page a door asked for, until the rows land
 const instDraft = {};          // what was typed into a Configure form and not saved yet, by row
 const INST_KINDS = [["agent", "Coding agents"], ["toolchain", "Toolchains"], ["pack", "Tool packs"], ["service", "Services"]];
@@ -60,8 +60,6 @@ function loadInstalled(){
         if (r) wantPage = `agent:${r.name}`;
       }
     }
-    clearTimeout(instFollow); instFollow = null;
-    if ((inst.rows || []).some(r => r.running)) instFollow = setTimeout(loadInstalled, 3000);
     if (wantPage) setTimeout(() => openThing(instNode, wantPage, "signin"));
   });
 }

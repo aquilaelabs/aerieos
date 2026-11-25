@@ -541,11 +541,14 @@ function nbArtWireList(av, list, rows, cf, cfFiles){
 // flight.
 function nbArtPoll(av, job, inst){
   const {root} = av;
-  clearInterval(av.artTimer); av.artTimer = null;
+  clearTimeout(av.artTimer); av.artTimer = null;
   // Polled while either thing is in flight. An install is the slower of the
-  // two (a 24MB APK over wifi) and is the reason this exists at all.
-  if ((job.running || inst.running)
-      && !root.querySelector('[data-view="artifacts"]').hidden)
+  // two (a 24MB APK over wifi) and is the reason this exists at all. Only
+  // while the view is in front and the page is seen: behind another page or
+  // in a hidden browser tab it read every two seconds for nobody (R283 step
+  // 4); the view's own open reads it again when it comes back.
+  const view = root.querySelector('[data-view="artifacts"]');
+  if ((job.running || inst.running) && view && !view.hidden && !document.hidden && view.checkVisibility())
     av.artTimer = setTimeout(() => nbArtLoad(av), 2000);
 }
 

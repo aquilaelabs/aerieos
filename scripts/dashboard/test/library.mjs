@@ -4,7 +4,7 @@
 // /api/library; the search and the chips narrow the list and save nothing;
 // a row opens on its description; the verbs are the pages' own (an install
 // is the toolchain job, which the bb stub runs in a second).
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, section, libraryRowsWrong } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, URL, DIR, section, libraryRowsWrong } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -593,10 +593,11 @@ await section("a narrowing's placeholder has no foot", async () => {
   await toLibrary();
 });
 
-// A row still installing is read again three seconds on, once at a time,
-// while the Library is on show, and not once it is left (B1096): left during
-// a long install it read every three seconds until the install ended.
-await section("a row still installing is followed only while the Library is on show", async () => {
+// A row still installing is read again as the jobs revision moves, while the
+// Library is on show, and never on a clock of its own (R283 step 4; before
+// it, a three-second timer read on after the page was left, B1096, and an
+// entry's page stacked them, B1161).
+await section("a row still installing is read again as the jobs revision moves, only while the Library is on show", async () => {
   await toLibrary();
   await page.route('**/api/library?*', async r => {
     const res = await r.fetch(), j = await res.json().catch(() => null);
@@ -612,19 +613,27 @@ await section("a row still installing is followed only while the Library is on s
   // and the one out was sent before the route: asked again once none is
   // out, until one with the route behind it has landed.
   await page.waitForFunction(() => {
-    if (libFollow) return true;
+    if (libKnown().some(r => r.running || r.queued)) return true;
     if (!readBusy('library')) loadLibrary();
     return false;
   }, null, { timeout: 20000, polling: 700 });
+  await until(() => page.evaluate(() => !readBusy('library')), 5000);
+  // The jobs revision moving, as each step of a node's install moves it.
+  const moved = () => page.evaluate(() => revWatch.filter(w => w.key === 'jobs').forEach(w => w.fn('jobs')));
+  reads = 0;
   await sleep(3600);
+  const still = reads;
+  await moved(); await sleep(900); await moved(); await sleep(900);
   const onShow = reads;
   await page.evaluate(() => openHome());
+  await sleep(400);
   reads = 0;
-  await sleep(7000);
+  await moved(); await sleep(900); await moved(); await sleep(900);
   const away = reads;
   page.off('request', count);
   await page.unroute('**/api/library?*');
-  ok(onShow >= 2 && away <= 1, `followed while on show, and at most the one already armed once left (${onShow} on show, ${away} away)`);
+  ok(still === 0 && onShow >= 1 && away === 0,
+     `read when the jobs revision moves while on show, never on a clock, and not once left (${still} with nothing moved, ${onShow} on show, ${away} away)`);
   await toLibrary();
 });
 

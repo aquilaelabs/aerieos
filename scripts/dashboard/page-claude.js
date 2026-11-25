@@ -220,12 +220,15 @@ async function restartNow(name, r, say = () => {}){
   dropAgentTab(id, name, n.several && n.id ? n.id : "", slot);
   if (j.gone === false){
     const began = Date.now() - 25000;
-    let gone = false;
-    while (!gone && j.name && Date.now() - began < RESTART_WAIT_S * 1000){
-      say(`Waiting for ${node} to end it: its agent is busy or starting, ${Math.round((Date.now() - began) / 1000)} seconds so far`);
-      await new Promise(done => setTimeout(done, 2000));
-      gone = (await postJSON("/api/session", {action: "gone", node: j.node, name: j.name}).catch(() => ({}))).gone === true;
-    }
+    // The words count the seconds; the question is asked when the sessions
+    // move (live) or every five seconds besides, where it was every two.
+    const words = () => say(`Waiting for ${node} to end it: its agent is busy or starting, ${Math.round((Date.now() - began) / 1000)} seconds so far`);
+    words();
+    const count = setInterval(words, 1000);
+    const gone = !j.name ? false : !!(await revUntil("live",
+      async () => (await postJSON("/api/session", {action: "gone", node: j.node, name: j.name}).catch(() => ({}))).gone === true,
+      {max: RESTART_WAIT_S * 1000 - (Date.now() - began), slow: 5000}));
+    clearInterval(count);
     if (!gone)
       return `${node} has not said your session ended in ${RESTART_WAIT_S / 60} minutes: its row on the Nodes page says whether its agent is away; Restart again once it is back`;
     say("");

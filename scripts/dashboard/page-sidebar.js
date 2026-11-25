@@ -240,7 +240,10 @@ function pJobSeen(j){
 
 // `landed`, when given, runs as the read lands and before it is drawn.
 async function pJobPoll(landed){
-  pJobTimer = null;
+  // A press reads it at once (Abort, a new create): the read the timer was
+  // waiting to make goes with it, or the two chains ran side by side, each
+  // reading every second until the job ended (B1162).
+  clearTimeout(pJobTimer); pJobTimer = null;
   try{ const j = await getJSON("/api/project-job"); landed?.(); pJobSeen(j); }
   catch{ landed?.(); pJobTimer = setTimeout(pJobPoll, 3000); }   // a blip, not a finish
 }

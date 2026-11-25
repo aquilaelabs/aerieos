@@ -22,7 +22,6 @@ function loadEntry(){
     const got = await getJSON(`/api/library?node=${encodeURIComponent(node)}&key=${encodeURIComponent(key)}`);
     if (libNode !== node || entryKey !== key) return;
     entryLib = got;
-    if ((got.rows || []).some(r => r.running || r.queued)) setTimeout(() => { if (entryKey === key) loadEntry(); }, 3000);
   }, {join: 500, about: `${libNode} ${entryKey}`});
 }
 

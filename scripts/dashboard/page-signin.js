@@ -185,14 +185,12 @@ async function signinCancel(btn){
 
 // While a sign-in is going, its row is worth more than one look every
 // fifteen seconds: the URL arrives a second in, and the answer to the code
-// lands a second after it is sent. Stops the moment there is nothing running.
-let signinTimer = null;
-function watchSignin(){
-  const lg = state?.signin;
-  const live = !!lg?.running;
-  if (live && !signinTimer) signinTimer = setInterval(() => refresh(), 1200);
-  if (!live && signinTimer){ clearInterval(signinTimer); signinTimer = null; }
-}
+// lands a second after it is sent. The sign-in is a job on the node, so the
+// jobs revision moves with each line it writes, and the page reads the status
+// on it while one runs (page-boot.js); a timer of its own read the whole
+// status every 1.2 s, hidden or not (R283 step 4). Kept as the place a draw
+// says a sign-in is on show.
+function watchSignin(){ return !!state?.signin?.running; }
 
 // The code from the browser, handed to the flow on the node: the two steps
 // a phone is worst at are the two this takes off it.

@@ -341,12 +341,14 @@ async function setupInTurn(calls, btn, word){
     if (calls.length > 1) busy(btn, `${word} ${i + 1} of ${calls.length}`);
     const j = await postJSON("/api/v1/nodes", c);
     if (j.error) return j.error;
-    for (let tries = 0; j.job && tries < 900; tries++){
+    if (!j.job) continue;
+    // Followed on the jobs revision, which moves with each of its steps, for
+    // up to thirty minutes as before.
+    const d = await revUntil("jobs", async () => {
       const d = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`);
-      if (d.state === "failed" || d.state === "canceled") return `${d.error || "that job failed"}: its log is on the Jobs page, after Finish`;
-      if (!d.state || d.state === "succeeded") break;
-      await new Promise(r => setTimeout(r, 2000));
-    }
+      return !d.state || ["succeeded", "failed", "canceled"].includes(d.state) ? d : null;
+    }, {max: 30 * 60 * 1000});
+    if (d && (d.state === "failed" || d.state === "canceled")) return `${d.error || "that job failed"}: its log is on the Jobs page, after Finish`;
   }
   return "";
 }

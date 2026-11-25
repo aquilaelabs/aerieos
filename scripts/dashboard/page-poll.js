@@ -459,6 +459,36 @@ function onRev(key, fn){
   return () => { const i = revWatch.indexOf(w); if (i >= 0) revWatch.splice(i, 1); };
 }
 
+// A wait on a revision rather than a clock (R283 step 4): `check` is asked
+// at once, again each time `key` moves, and every `slow` ms besides in case
+// the token stays still (the controller away); its first truthy answer is
+// what this resolves to, or null once `max` ms have gone. One check at a
+// time, a move during one asked once more after it. A press that follows
+// what it started (a job, a session ending) waits here, where it used to ask
+// every two seconds whether the page was seen or not.
+function revUntil(key, check, {max = 60000, slow = 10000} = {}){
+  return new Promise(resolve => {
+    let done = false, busy = false, again = false;
+    const t0 = Date.now();
+    let stop = () => {}, tick = 0;
+    const finish = v => { if (done) return; done = true; stop(); clearInterval(tick); resolve(v); };
+    const look = async () => {
+      if (done) return;
+      if (busy){ again = true; return; }
+      busy = true;
+      let v = null;
+      try{ v = await check(); }catch{ v = null; }
+      busy = false;
+      if (v) return finish(v);
+      if (Date.now() - t0 > max) return finish(null);
+      if (again){ again = false; look(); }
+    };
+    stop = onRev(key, look);
+    tick = setInterval(look, slow);
+    look();
+  });
+}
+
 // One out at a time, as refresh() is (R88): the timer, a tab coming back
 // into view and a menu let go all start one, and with no guard an older
 // reply landing second set revs back to the past, every watch fired again
