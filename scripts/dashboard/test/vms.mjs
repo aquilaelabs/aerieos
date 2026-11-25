@@ -5,7 +5,7 @@
 // a snapshot and Remove each a vm job; a session's aerie vm is held to its
 // project's Make VMs dial (deny refuses, ask goes to the bell, auto does it),
 // and a session never makes Windows.
-import { URL, launch, newPage, ok, done, ready, DIR, until, OWNER as H, asSession, REPO } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, until, OWNER as H, asSession, REPO, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -79,7 +79,7 @@ ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alp
 // ...the space's, never the repository's (the operator, 24 Nov): alpha's
 // space renamed (a session there holds it from a move) heads alpha's VMs
 // by the space's new name, and its own again when renamed back.
-{
+await section("A VM stands under its repository's space, named as the space", async () => {
   const key = (((await call('/api/status')).projects || []).find(p => p.name === 'alpha') || {}).project;
   const was = ((await call('/api/status')).repos || {})[key]?.name;
   const rn = await call('/api/repos', { action: 'rename', key, to: 'Fleet' });
@@ -94,7 +94,7 @@ ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alp
      `a VM stands under its repository's space, named as the space (${JSON.stringify(fleet || last)} ${rn.error || ''})`);
   await call('/api/repos', { action: 'rename', key, to: was });
   await page.evaluate(() => refresh());
-}
+});
 // What it cannot take while it is made is drawn dead, never left out, and
 // the row says why (the operator, 22 Nov).
 const making = await page.$eval('.vmtab [data-vm-key="alpha/db"]', e => ({
