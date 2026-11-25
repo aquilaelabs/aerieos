@@ -9,6 +9,7 @@
 ### Fixed
 
 - A GitHub App's installation token, a longer token with dots in it since GitHub changed its shape in October, is taken out of diagnostics and the controller's log whole, where everything after its first dot stayed in them, and a push holding one is held (2e98d75)
+- A controller installed on its own machine updates to a dev build from the dashboard, where its node's agent refused every dev build's tag (bcb63df)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
