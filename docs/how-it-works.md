@@ -103,9 +103,12 @@ manager, and drops to its own account):
 | `35-publishing.sh` | npm publish auth, when an `NPM_TOKEN` is in the secrets folder |
 | `40-projects.sh` | space report, optional per-space bootstrap |
 
-Your own hooks go in `config/startup.d/` on the share: `*.root.sh` runs as
-root, `*.disabled.sh` is skipped, filename order. All hooks are idempotent:
-they check state before installing.
+Your own hooks go in `config/startup.d/` on the share: `*.disabled.sh` is
+skipped, the rest run in filename order. A `*.root.sh` runs as root, and only
+once an administrator has read it and approved it as it is, under Controller
+settings, Startup hooks: the dashboard's account can write that folder, so a
+new one, or one changed since its approval, waits there until approved. All
+hooks are idempotent: they check state before installing.
 
 The dashboard starts early in the boot, before any space's own `setup.sh`
 and the SDK/Playwright hooks, so the web UI is reachable in seconds rather

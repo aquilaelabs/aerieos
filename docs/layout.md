@@ -48,6 +48,7 @@ scripts/
   supervisor.sh                  keeps the box alive; the graceful shutdown
   mint-runner-token              root-only token helper (one of the two sudo commands)
   deploy-key                     root-only deploy key helper: make, keep, forget, load; each key sealed under the install key and opened only into the ssh agent (the other)
+  root-hook                      root-only helper keeping the root startup hooks an administrator approved (list, approve, revoke, check); a start runs one only as approved
   secrets-carry                  root-only carrier of the secrets folder across a move on a machine of its own: pack, land (a third sudo command there, B728)
   healthcheck.sh                 docker healthcheck
   aerie                          in-container helper CLI
@@ -187,6 +188,7 @@ scripts/
     history.py                   reporting for the controller's own machine (R164 step 4): the heartbeat's samples kept for weeks at falling resolution, one file per node under the state, read by /api/history
     extmounts.py                 the other disks and shares the controller's own machine mounts (R162 step 4): the record, a share's password sealed, what the hello hands the agent
     storebackups.py              the backups the controller's own machine copies (R162 step 5): the record, what the hello hands the agent, the summary Home and the bell read
+    roothooks.py                 the root startup hooks for Controller settings, read and approved through the root-hook helper (B1166)
     poolkeys.py                  the passphrases of the own machine's encrypted pools (R162 step 3): kept sealed, or asked after every boot and offered once; what the hello hands the agent, nothing in Safe mode
     nasapps.py                   the Docker apps New container offers (R164 step 2, R238): none shipped, each kept from the vetted catalog at the commit its signed index pins or added by a person; a compose file with every image held by its digest (pack format 5) or pinned to a tag, the fields its panel asks for filled into its environment by render_with, and a kept app's newer definition taken when the index pins another commit
     schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words and its timer

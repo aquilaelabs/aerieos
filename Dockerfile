@@ -235,9 +235,11 @@ RUN set -eux; \
     # root-only secret stash, and the deploy keys below. System packages install via EXTRA_APT_PACKAGES,
     # which runs as root during startup.
     # ...and keeping the deploy keys made or pasted in a project's settings,
-    # whose private halves the builder user never reads (deploy-key).
+    # whose private halves the builder user never reads (deploy-key), and the
+    # root startup hooks an administrator approved (root-hook, B1166).
     printf '%s\n' 'builder ALL=(root) NOPASSWD: /opt/aerieos/scripts/mint-runner-token' \
-        'builder ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key' > /etc/sudoers.d/builder; \
+        'builder ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key' \
+        'builder ALL=(root) NOPASSWD: /opt/aerieos/scripts/root-hook' > /etc/sudoers.d/builder; \
     chmod 0440 /etc/sudoers.d/builder; \
     # Explicitly lock both accounts' passwords: password auth must never be a
     # path to privilege in this container, and there is nothing to brute-force,

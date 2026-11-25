@@ -206,6 +206,8 @@ function renderSettingsInto(i){
     ${sect("idle", "Idle sessions", idle === undefined ? "" : idle ? `${idle} min` : "never",
            `<div class="row stack2" data-group="Idle sessions"><div class="grow">${withRevert(idleSection(), "idle")}</div></div>`)}
     ${pathsSection() ? sect("paths", "Storage on this controller", `${paths.length} path${paths.length === 1 ? "" : "s"}`, withRevert(pathsSection(), "paths")) : ""}
+    ${rootHooksSection() && rootHooks?.hooks?.length ? sect("roothooks", "Startup hooks", rootHooksWaiting() ? `${rootHooksWaiting()} waiting` : `${rootHooks.hooks.length} approved`,
+        rootHooksSection(), {cls: rootHooksWaiting() ? "warn" : "", loud: !!rootHooksWaiting()}) : ""}
     ${state?.release?.running !== undefined ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : ""}
     ${groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})
         // The copies made go right under the Backup group that makes them.
@@ -220,6 +222,7 @@ function renderSettingsInto(i){
     </div>`)}`);
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
+  wireRootHooks(d.el);
   const run = d.el.querySelector("#setDocRun");
   if (run) run.onclick = () => runDoctor();
   // A page of settings (page-docs.js splitSects): the sections a list beside
@@ -333,6 +336,44 @@ function updatesSection(){
     </div></div>`;
 }
 // ---- the copies kept (R161 step 4) ----
+// The root startup hooks (B1166): each STATE/startup.d/*.root.sh with what it
+// says, and whether the start runs it. One runs only as an administrator
+// approved it, read here first: a new one, or one changed since, waits.
+let rootHooks = null, rootHooksAsked = false;
+function loadRootHooks(){
+  rootHooksAsked = true;
+  return reading("settings.roothooks", async () => {
+    const j = await getJSON("/api/root-hooks");
+    rootHooks = j.error ? {error: j.error, hooks: []} : j;
+    readMoved("settings");
+  });
+}
+function rootHooksWaiting(){ return (rootHooks?.hooks || []).filter(h => h.state !== "approved").length; }
+function rootHooksSection(){
+  if (rootHooks === null){ if (!rootHooksAsked) loadRootHooks(); return ""; }
+  if (rootHooks.error) return `<div class="hint bad">${esc(rootHooks.error)}</div>`;
+  const may = state?.can?.controller !== false;
+  return `<div class="field"><div class="hint">A script in the state's startup.d named *.root.sh runs as root at every start, once an administrator has read it and approved it as it is; a new one, or one changed since, waits here.</div></div>
+    ${rootHooks.hooks.map(h => `<div class="field rhook" data-rhook="${esc(h.name)}">
+      <div class="actbar"><span class="state"><code>${esc(h.name)}</code> <span class="pill ${h.state === "approved" ? "ok" : "warn"}">${
+        h.state === "approved" ? "runs at start" : h.state === "changed" ? "changed since approved" : "waits for approval"}</span></span>
+        <span class="sp"></span>${h.state === "approved"
+          ? `<button type="button" data-rhact="revoke"${may ? "" : " disabled"}>Revoke</button>`
+          : `<button type="button" class="primary" data-rhact="approve" data-sha="${esc(h.sha)}"${may ? "" : " disabled"}>Approve</button>`}</div>
+      <pre class="dmlog rhtext">${esc(h.text || "")}</pre></div>`).join("")}`;
+}
+function wireRootHooks(root){
+  root.querySelectorAll("[data-rhook] [data-rhact]").forEach(b => b.onclick = async () => {
+    const name = b.closest("[data-rhook]").dataset.rhook;
+    busy(b, b.dataset.rhact === "approve" ? "Approving" : "Revoking");
+    const j = await postJSON("/api/root-hooks", {action: b.dataset.rhact, name, sha: b.dataset.sha || ""});
+    if (j.error){ notify(j.error, true); await loadRootHooks(); return drawPanes(); }
+    rootHooks = j;
+    readMoved("settings");
+    drawPanes();
+  });
+}
+
 // Back up now writes a copy to every folder where they go; the list is what
 // is there, newest first, each under the state downloadable (sealed).
 let backupData = null, backupAsked = false;

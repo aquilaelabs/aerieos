@@ -85,15 +85,18 @@ await section("a role reads only what its areas say", async () => {
 });
 
 await section("a shell on one space is no shell on every space", async () => {
-  // Terminal Write on alpha opens a shell in alpha's tree; one at
-  // /workspace, on no space, reaches every space's trees and asks it
-  // Everywhere, so the dock draws no + for it.
+  // Terminal Write on alpha is a shell in alpha's tree, on alpha's node; one
+  // at /workspace, on no space, reaches every space's trees and asks it
+  // Everywhere, so the dock draws no + for it. Alpha here has no node, and a
+  // shell on this controller is an administrator's (B1166): refused, saying
+  // it opens on a node.
   const can = (await call('/api/status', undefined, sheller)).body.can || {};
   const bare = await call('/termws?arg=sh%3A1%3A', undefined, sheller);
   const there = await call(`/termws?arg=sh%3A1%3A${ALPHA}`, undefined, sheller);
   ok(can.terminal === true && can['terminal-any'] === false && bare.status === 403
-     && /a shell needs Terminal Write Everywhere/.test(bare.body.error || '') && there.status !== 403,
-     `Terminal Write on alpha is a shell there and none on no space (can ${can.terminal}/${can['terminal-any']}; ${bare.status} ${bare.body.error || ''}; alpha ${there.status})`);
+     && /a shell needs Terminal Write Everywhere/.test(bare.body.error || '')
+     && there.status === 403 && /administrator's/.test(there.body.error || '') && /node/.test(there.body.error || ''),
+     `Terminal Write on alpha is a shell there on its node, none on no space, and none on this controller (can ${can.terminal}/${can['terminal-any']}; ${bare.status} ${bare.body.error || ''}; alpha ${there.status} ${there.body.error || ''})`);
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 },
     httpCredentials: { username: `sh${stamp}`, password: 'sh-pass-word-1' }, extraHTTPHeaders: { Authorization: sheller.Authorization } });
   await page.goto(URL); await ready(page);

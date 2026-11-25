@@ -60,6 +60,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/library` | prefix | `_get_library` | GET /api/library?node=ID (R170): everything an AerieOS installs or runs as one list for one node (library.rows): the toolchains and packs with what the node's store holds, the coding agents, the apps a NAS runs, the vett |  |
 | GET | `/api/pack-icon` | prefix | `_get_pack_icon` | GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an app's own icon, as the image its file is and nothing else: its type set here and never sniffed, and a policy that runs no script and sandboxes it, so an SVG  |  |
 | GET | `/api/storebackups` | exact | `_get_storebackups` | GET /api/storebackups (R162 step 5): the backups the controller's own machine copies, as recorded. |  |
+| GET | `/api/root-hooks` | exact | `_get_root_hooks` | GET /api/root-hooks (B1166): every root startup hook in the state's startup.d, what it says, and whether the start runs it (approved, changed since, new). | refused: controller-read |
 | GET | `/api/old-compose` | exact | `_get_old_compose` | GET /api/old-compose: the old system's containers as compose files in a zip, one each, to import from New container (adoptapps.export_zip). |  |
 | GET | `/api/v1/nodes` | prefix | `_get_nodes` | GET /api/v1/nodes: the Nodes page's read (nodes.tab_view), scoped to this account. |  |
 | GET | `/api/v1/jobs` | prefix | `_get_jobs` | GET /api/v1/jobs: nodes.jobs_view, narrowed to the projects this account may see unless it administers. |  |
@@ -131,6 +132,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/extmounts` | exact | `_extmounts` | POST /api/extmounts (R162 step 4): set (add or change), remove, or on and off (Eject is off: the agent unmounts within a minute). |  |
 | POST | `/api/nasapps` | exact | `_nasapps` | POST /api/nasapps (R164 step 2): one app's compose and environment with its blanks filled (its data folder, its media folder, the user it runs as, the time zone, its port), for the dialog to show before Create makes it a | refused: docker-write, refused: curate |
 | POST | `/api/storebackups` | exact | `_storebackups` | POST /api/storebackups (R162 step 5): set (add or change) or remove a backup's record; Run now is the nodes verb storage-backup. |  |
+| POST | `/api/root-hooks` | exact | `_root_hooks` | POST /api/root-hooks {action: approve, name, sha} or {action: revoke, name} (B1166): a root hook approved as it was shown, or its approval taken back, through the root-only helper. | refused: controller |
 | POST | `/api/pin` | prefix | `_pin` | Pin or unpin a command: macros.pin. | refused: command-pin |
 | POST | `/api/reset` | exact | `_reset` | POST /api/reset: start over at onboarding (settings.reset), and the dashboard re-executes itself so the next page is Create the owner. | refused: controller |
 | POST | `/api/move` | exact | `_move` | POST /api/move (R90 step 12): prepare (the move armed, the token answered once, a bundle packed), forget (withdrawn), moved (this controller marked moved to the new one, read-only from here on), ask (the new address aske |  |

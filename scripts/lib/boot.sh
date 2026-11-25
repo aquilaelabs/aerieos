@@ -650,6 +650,17 @@ run_hooks() {
                 log "skipping $name (needs root, and this container is not)"
                 continue
             fi
+            # A root hook in the state's own folder runs only as an
+            # administrator approved it (B1166): the dashboard's account can
+            # write that folder, and anything else that writes there (another
+            # container sharing the user id, a network share) could otherwise
+            # put a script here for the next start to run as root. The image's
+            # own hooks are root's already.
+            if [ "$(id -u)" -eq 0 ] && [[ "$script" == *.root.sh ]] && [ "$dir" != /opt/aerieos/scripts/startup.d ] \
+                    && ! /opt/aerieos/scripts/root-hook check "$name" >/dev/null 2>&1; then
+                log "skipping $name (a root hook not approved as it is now: approve it under Controller settings, Startup hooks)"
+                continue
+            fi
             chmod +x "$script" 2>/dev/null || true
             started=$SECONDS
             if [ "$(id -u)" -ne 0 ]; then

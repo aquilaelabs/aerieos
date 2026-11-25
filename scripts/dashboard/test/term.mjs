@@ -255,67 +255,63 @@ await section("A log in the dock", async () => {
   await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:dm::bad name').id));
 });
 
-// A grant taken away ends the terminal it opened (R133 step 9): an account
-// on alpha opens a shell there, is taken off alpha, and within the server's
-// re-check (every few seconds) its socket closes, saying why.
-await section("A grant taken away ends the terminal it opened", async () => {
+// A shell on this controller is an administrator's (B1166, the operator, 25
+// Nov): it runs as the dashboard's own account, so an account with Terminal
+// Write on a space with no node is told the shell opens on a node; and a
+// terminal is its account's alone (R133 step 8): an administrator naming the
+// owner's account on the argument opens one of their own, never the owner's
+// session, whose screen holds what the owner typed above. (A grant taken
+// away ends a terminal it opened, R133 step 9: now a node's shell's, which
+// this fixture's nodes do not serve.)
+await section("A shell on this controller is an administrator's, and opens as one's own account", async () => {
   const h = OWNER;
   const base = URL.replace(/\/$/, '');
-  await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'add', name: 'w.term', password: 'w.term-pass-1', role: 'user' }) });
-  await member('w.term');
-  // ...with a role on alpha that opens a shell there.
-  await fetch(`${base}/api/roles`, { method: 'POST', headers: h, body: JSON.stringify({ action: 'set', name: 'termer', scope: 'projects',
-    perms: { projects: 'write', terminal: 'write' }, note: 'a suite\'s shell' }) });
-  await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'assign', name: 'w.term', project_roles: { [projectKey('alpha')]: ['termer'] } }) });
-  // A shell is refused an account with no author for its commits.
-  await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'edit', name: 'w.term', profile: { full_name: 'W Term', email: 'w.term@example.invalid' } }) });
-  await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'edit', name: 'w.term', projects: [projectKey('alpha')] }) });
-  // The header sent up front, as lib's pages send theirs: a websocket's
-  // handshake carries no credentials the browser was only asked for.
-  const ctx = await browser.newContext({ extraHTTPHeaders: { Authorization: 'Basic ' + Buffer.from('w.term:w.term-pass-1').toString('base64') } });
-  const other = await ctx.newPage();
-  await other.goto(URL);
-  // A terminal is its account's alone (R133 step 8): naming the owner's
-  // account on the argument opens one of its own, never the owner's session,
-  // whose screen holds what the owner typed above.
-  const ownerUid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
-  const forged = await other.evaluate(arg => new Promise(res => {
+  const account = async (name, role, roles) => {
+    await fetch(`${base}/api/users`, { method: 'POST', headers: h,
+      body: JSON.stringify({ action: 'add', name, password: `${name}-pass-1`, role }) });
+    await member(name);
+    if (roles) await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
+      body: JSON.stringify({ action: 'assign', name, project_roles: { [projectKey('alpha')]: roles } }) });
+    // A shell is refused an account with no author for its commits.
+    await fetch(`${base}/api/users`, { method: 'POST', headers: h,
+      body: JSON.stringify({ action: 'edit', name, profile: { full_name: name, email: `${name}@example.invalid` } }) });
+    await fetch(`${base}/api/users`, { method: 'POST', headers: h,
+      body: JSON.stringify({ action: 'edit', name, projects: [projectKey('alpha')] }) });
+    // The header sent up front, as lib's pages send theirs: a websocket's
+    // handshake carries no credentials the browser was only asked for.
+    const ctx = await browser.newContext({ extraHTTPHeaders: { Authorization: 'Basic ' + Buffer.from(`${name}:${name}-pass-1`).toString('base64') } });
+    const p = await ctx.newPage();
+    await p.goto(URL);
+    return { ctx, p };
+  };
+  const open = (p, arg) => p.evaluate(arg => new Promise(res => {
     const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/termws?arg=' + encodeURIComponent(arg) + '&cols=80&rows=20');
     ws.binaryType = 'arraybuffer';
-    let seen = '';
+    let seen = '', closed = null;
     ws.onmessage = e => { seen += new TextDecoder().decode(e.data instanceof ArrayBuffer ? e.data : new Uint8Array()); };
-    setTimeout(() => { ws.close(); res(seen); }, 4000);
-  }), `u:${ownerUid}:sh:7:alpha`);
-  const termUid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.term'].uid;
+    ws.onclose = e => { closed = { code: e.code, reason: e.reason }; };
+    setTimeout(() => { try { ws.close(); } catch {} res({ seen, closed }); }, 4000);
+  }), arg);
+  // ...with a role on alpha that would open a shell there, were it a node's.
+  await fetch(`${base}/api/roles`, { method: 'POST', headers: h, body: JSON.stringify({ action: 'set', name: 'termer', scope: 'projects',
+    perms: { projects: 'write', terminal: 'write' }, note: 'a suite\'s shell' }) });
+  const plain = await account('w.term', 'user', ['termer']);
+  const refused = await open(plain.p, 'sh:8:alpha');
+  await plain.ctx.close();
+  ok(/administrator's/.test(refused.closed?.reason || refused.seen) && /node/.test(refused.closed?.reason || refused.seen),
+     `a shell on this controller is refused an account that is not an administrator, saying it opens on a node (${JSON.stringify(refused.closed)})`);
+  const admin = await account('w.admin', 'admin');
+  const ownerUid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
+  const forged = await open(admin.p, `u:${ownerUid}:sh:7:alpha`);
+  await admin.ctx.close();
+  const adminUid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.admin'].uid;
   let sessions = '';
   await until(() => {
     try { sessions = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }); } catch { sessions = ''; }
-    return sessions.split('\n').includes(`${termUid}~shell-alpha-7`);
+    return sessions.split('\n').includes(`${adminUid}~shell-alpha-7`);
   });
-  ok(!/own-42-terminal/.test(forged) && sessions.split('\n').includes(`${termUid}~shell-alpha-7`),
-     `naming another account on a terminal's argument opens one of your own, never theirs (${forged.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)})`);
-  const opened = await other.evaluate(() => new Promise(res => {
-    const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/termws?arg=' + encodeURIComponent('sh:8:alpha') + '&cols=80&rows=20');
-    ws.binaryType = 'arraybuffer';
-    window.bbWs = ws; window.bbClosed = null;
-    ws.onclose = e => { window.bbClosed = { code: e.code, reason: e.reason }; };
-    ws.onopen = () => setTimeout(() => res(window.bbClosed ? 'closed' : 'open'), 1500);
-    setTimeout(() => res(window.bbClosed ? 'closed' : 'pending'), 8000);
-  }));
-  // Its roles on alpha taken away, which is what being on it is (R155).
-  await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'assign', name: 'w.term', project_roles: { [projectKey('alpha')]: [] } }) });
-  await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'edit', name: 'w.term', projects: [] }) });
-  const closed = await other.waitForFunction(() => window.bbClosed, null, { timeout: 20000 })
-    .then(x => x.jsonValue(), () => null);
-  await ctx.close();
-  ok(opened === 'open' && closed && closed.reason,
-     `a terminal whose grant is taken away while it is open is ended, saying why (${opened}; ${JSON.stringify(closed)})`);
+  ok(!/own-42-terminal/.test(forged.seen) && sessions.split('\n').includes(`${adminUid}~shell-alpha-7`),
+     `naming another account on a terminal's argument opens one of your own, never theirs (${forged.seen.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)})`);
 });
 
 // A terminal closed while a frame of its own is still pending (B802): xterm

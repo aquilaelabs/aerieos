@@ -4715,6 +4715,7 @@ import nodes                                                     # noqa: E402
 import history                                                   # noqa: E402
 import extmounts                                                 # noqa: E402
 import storebackups                                              # noqa: E402
+import roothooks                                                 # noqa: E402
 import poolkeys                                                  # noqa: E402
 import packconfig                                                # noqa: E402
 import termws                                                    # noqa: E402
@@ -4766,6 +4767,7 @@ try:
     nodes.ext_mounts = extmounts.wanted
     # ...and the backups it copies (R162 step 5), the bell and Home reading their last runs.
     storebackups.configure(state=STATE, write_json=write_json)
+    roothooks.configure(state=STATE)
     nodes.store_backups = storebackups.wanted
     nodes.backup_summary = lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or ""))
     # ...and its encrypted pools' passphrases (R162 step 3), none in Safe mode.
@@ -6746,6 +6748,7 @@ ROUTES = (
           instead="a session finds a tool pack with aerie tool search and asks for one with aerie tool install"),
     Route("GET", "prefix", "/api/pack-icon", "_get_pack_icon", "handler"),
     Route("GET", "exact", "/api/storebackups", "_get_storebackups", ("admin", "the machine's backups are an administrator's")),
+    Route("GET", "exact", "/api/root-hooks", "_get_root_hooks", "handler"),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
     Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
@@ -6846,6 +6849,7 @@ ROUTES = (
     Route("POST", "exact", "/api/extmounts", "_extmounts", ("admin", "the machine's other disks and shares are an administrator's")),
     Route("POST", "exact", "/api/nasapps", "_nasapps", "handler"),
     Route("POST", "exact", "/api/storebackups", "_storebackups", ("admin", "the machine's backups are an administrator's")),
+    Route("POST", "exact", "/api/root-hooks", "_root_hooks", "handler"),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -8427,6 +8431,18 @@ class Handler(BaseHTTPRequestHandler):
         # (R81): what a node runs is the node's, and stays.
         if target["where"] != "node" and (why := featuresoff.sentences().get("shell")):
             return None, None, (why, 403)
+        # A shell on this controller is an administrator's (B1166, the operator,
+        # 25 Nov): it runs as the dashboard's own account, which reads every
+        # space's tree and what unseals the install's secrets, and could write
+        # what a start runs as root. Anyone else's shell opens on a node; a
+        # read-only view runs nothing and is not held to it.
+        me = self._who() or {}
+        if target["where"] == "local" and not ctr and not vmm and not users.is_admin(me) \
+                and not self._term_ro(me, arg0):
+            proj = _arg_project(arg0)
+            return None, None, ((f"{roles.shown(proj)} has no node to open its shell on, and a shell on this controller is "
+                                 "an administrator's: pick a node in the space's settings") if proj else
+                                "a shell on this controller is an administrator's", 403)
         return target, vmm, None
 
     def _term_own(self):
@@ -13264,6 +13280,26 @@ class Handler(BaseHTTPRequestHandler):
         else:
             return self._json({"error": "action is save, remove or run"}, 400)
         return self._result(r)
+
+    def _get_root_hooks(self):
+        """GET /api/root-hooks (B1166): every root startup hook in the state's
+        startup.d, what it says, and whether the start runs it (approved,
+        changed since, new). Read on Controller Read."""
+        if self._refused("controller-read"):
+            return None
+        return self._json(roothooks.listing())
+
+    def _root_hooks(self, req):
+        """POST /api/root-hooks {action: approve, name, sha} or {action:
+        revoke, name} (B1166): a root hook approved as it was shown, or its
+        approval taken back, through the root-only helper. Controller Write."""
+        if self._refused("controller"):
+            return None
+        r, status = roothooks.act(req)
+        if status == 200:
+            db.audit(self._principal(), "root-hook-" + field(req, "action"), field(req, "name"),
+                     {"sha": field(req, "sha")[:12]})
+        return self._json(r, status)
 
     def _get_storebackups(self):
         """GET /api/storebackups (R162 step 5): the backups the controller's
