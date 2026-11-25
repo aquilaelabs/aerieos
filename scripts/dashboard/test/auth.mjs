@@ -59,7 +59,7 @@ await section("the login page is the one open door", async () => {
   ok(r.status === 200 && html.includes('Sign in'), 'the login page is the one open door');
   // ...in AerieOS's own colors: nobody is signed in, so no scheme a person
   // picked is worn there (the operator, 17 Oct).
-  ok(html.includes('--bg:#0b1322') && !html.includes('bb.theme'),
+  ok(html.includes('--bg:#172136') && !html.includes('bb.theme'),
      '...wearing the Default scheme and never the scheme this browser kept');
 });
 

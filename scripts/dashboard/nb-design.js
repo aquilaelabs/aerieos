@@ -537,7 +537,7 @@ const DS_WEAR = {header: "panel", nav: "panel", tabs: "panel", sidebar: "panel",
 // (presets.roles), falling back to the dashboard's own scheme: the board
 // is painted in the language, and a theme with a "page" and a "surface"
 // is still a page and a surface.
-const DS_FALLBACK = {bg: "#0b1322", panel: "#121c30", ink: "#eaf1fc", line: "#3e5378", accent: "#2fc6ff"};
+const DS_FALLBACK = {bg: "#172136", panel: "#24314b", ink: "#edf4ff", line: "#455e89", accent: "#00c1fd"};
 function nbDsPaint(ds, role){
   const {nb} = ds;
   const t = (nb.dsLang.themes || [])[0];

@@ -25,9 +25,9 @@
 /* The design language is docs/design-language.md, held by the house rule
    `design` and measured by test/uniform.mjs. */
 :root,.sw[data-theme="default"]{
-  --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
-  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#fbbf24; --bad:#f2707a;
-  --note:#8cc8ff;
+  --bg:#172136; --panel:#24314b; --line:#455e89; --ink:#edf4ff;
+  --dim:#b2c2db; --accent:#00c1fd; --warn:#fbbf24; --bad:#ff6b79;
+  --note:#37a5fb;
   /* Good, warning and error are one set in every scheme: they mean the same
      whatever the theme, a shade for the dark half here and one for the
      light half below, never a scheme's own: green, a warm gold, and red.
@@ -41,7 +41,7 @@
      solid yellow had replaced a tint over the space's color that read
      dirty); in the light half a pale wash. */
   --pass:#3fb950;
-  --ground:#141922; --ground-ink:#eef1f6;
+  --ground:#1c2029; --ground-ink:#eef1f6;
   /* What a dialog lays over the page (Perch, the operator 23 Nov): the
      theme's own page, most of the way, so what is behind stays its
      color and reads as set back; in the light half the ink at about a
@@ -284,43 +284,43 @@
    are the same in every scheme and a scheme that had to restate them would
    invite them apart. */
 html[data-theme="nostromo"],.sw[data-theme="nostromo"]{
-  --bg:#0b0f13; --panel:#121920; --line:#33404c; --ink:#d3dbe3;
-  --dim:#8b98a5; --accent:#ffb000; --note:#6fa8dc}
+  --bg:#1d2228; --panel:#29333c; --line:#50606e; --ink:#ecf5fd;
+  --dim:#b4c3d2; --accent:#f6a900; --note:#3da5f9}
 /* Square corners are the dark half's, the hallways (the operator,
    16 Oct); the light half, the white corridors, is rounded like every other
    scheme. */
 html[data-theme="nostromo"]:not([data-mode="light"]),html:not([data-mode="light"]) .sw[data-theme="nostromo"]{
   --r-surface:0; --r-control:0; --r-small:0}
 html[data-theme="slate"],.sw[data-theme="slate"]{
-  --bg:#181c23; --panel:#1f242d; --line:#4f5a68; --ink:#dfe5ec;
-  --dim:#9fa6ae; --accent:#6ea8fe; --note:#a6d96a}
+  --bg:#1d222b; --panel:#2b323e; --line:#525f6f; --ink:#eef4fb;
+  --dim:#bac2cb; --accent:#569aff; --note:#97dd24}
 html[data-theme="carbon"],.sw[data-theme="carbon"]{
-  --bg:#141417; --panel:#1c1c1f; --line:#53535b; --ink:#e8e8ea;
-  --dim:#9d9da4; --accent:#e64e53; --note:#3cc6b5}
+  --bg:#212127; --panel:#313138; --line:#5c5c69; --ink:#f3f3f5;
+  --dim:#c0c0c8; --accent:#ff6a6b; --note:#00e2cd}
 html[data-theme="nocturne"],.sw[data-theme="nocturne"]{
-  --bg:#181825; --panel:#202031; --line:#53537b; --ink:#e4e2f5;
-  --dim:#a2a0c1; --accent:#9d7cff; --note:#5fdcb4}
+  --bg:#202030; --panel:#2f2f45; --line:#585886; --ink:#f3f2ff;
+  --dim:#bfbce0; --accent:#a386ff; --note:#00e5b2}
 html[data-theme="moss"],.sw[data-theme="moss"]{
-  --bg:#161f1b; --panel:#1d2920; --line:#48604f; --ink:#dfe9df;
-  --dim:#9daba0; --accent:#63c98a; --note:#b49cf0}
+  --bg:#192520; --panel:#26362a; --line:#496552; --ink:#edf7ed;
+  --dim:#b6c6b9; --accent:#00de7e; --note:#ad87ff}
 html[data-theme="ember"],.sw[data-theme="ember"]{
-  --bg:#1f1814; --panel:#271f1a; --line:#67533e; --ink:#f0e4d8;
-  --dim:#af9f90; --accent:#f0873f; --note:#4cc9d0}
+  --bg:#281f1a; --panel:#3a2f28; --line:#705940; --ink:#fdf1e5;
+  --dim:#d0bdac; --accent:#ff7f08; --note:#00dee8}
 html[data-theme="abyss"],.sw[data-theme="abyss"]{
-  --bg:#111d20; --panel:#18262a; --line:#3e5e66; --ink:#dcecee;
-  --dim:#93a9ac; --accent:#2fb8c6; --note:#e391d9}
+  --bg:#152428; --panel:#22353a; --line:#3f646e; --ink:#e7f7f9;
+  --dim:#adc6ca; --accent:#00d3e4; --note:#eb69df}
 html[data-theme="plum"],.sw[data-theme="plum"]{
-  --bg:#1e1623; --panel:#261d2d; --line:#654d73; --ink:#eddff2;
-  --dim:#ae9cb7; --accent:#c874d8; --note:#7dd8a0}
+  --bg:#271d2e; --panel:#382c41; --line:#6d507d; --ink:#fbefff;
+  --dim:#cdb8d7; --accent:#da6cef; --note:#2de78d}
 html[data-theme="rust"],.sw[data-theme="rust"]{
-  --bg:#1e1614; --panel:#261d1a; --line:#6a4e4a; --ink:#ecdedb;
-  --dim:#ae9d99; --accent:#cf6a4c; --note:#6cc2a8}
+  --bg:#291f1c; --panel:#3a2e2a; --line:#755450; --ink:#fef0ed;
+  --dim:#cfbcb7; --accent:#ff6738; --note:#35e3b9}
 html[data-theme="ice"],.sw[data-theme="ice"]{
-  --bg:#151c21; --panel:#1c252c; --line:#465b6c; --ink:#e3edf5;
-  --dim:#9aa8ae; --accent:#58c7e8; --note:#b8a2ff}
+  --bg:#1a2329; --panel:#27333c; --line:#486175; --ink:#ebf5fd;
+  --dim:#b4c4cb; --accent:#00cffb; --note:#a685ff}
 html[data-theme="sepia"],.sw[data-theme="sepia"]{
-  --bg:#1f1b14; --panel:#272219; --line:#63563e; --ink:#ece0cb;
-  --dim:#b0a28c; --accent:#d3a94f; --note:#5fbdb0}
+  --bg:#262118; --panel:#373125; --line:#6b5b3f; --ink:#fef2dd;
+  --dim:#cebfa6; --accent:#ebb000; --note:#00e2ce}
 /* ---- the light half (R216) -----------------------------------------------
    Every scheme has a light half: the same hue family token for token, with
    the page near white, the ink dark, and the accent and the marks pulled
@@ -334,7 +334,7 @@ html[data-theme="sepia"],.sw[data-theme="sepia"]{
    wear, flip with it. */
 html[data-mode="light"]{
   color-scheme:light;
-  --pass:#1a7f37;
+  --pass:#00752c;
   --ground:#fbfbf8; --ground-ink:#1d2633;
   --veil:color-mix(in srgb, var(--ink) 34%, transparent);
   --warn-wash:#fdf1bf; --warn-wash-ink:#1d2633; --warn-edge:#d8b62a;
@@ -363,8 +363,8 @@ html[data-mode="light"]{
   --red2:#b03a30;   --red2-edge:#f3cdc9;
 }
 html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
-  --bg:#eef3fb; --panel:#fbfdff; --line:#c4d2e6; --ink:#1d2633;
-  --dim:#566275; --accent:#0059c7; --warn:#7d6608; --bad:#c62828; --note:#0a5fb0}
+  --bg:#dde5f2; --panel:#fbfdff; --line:#adbfd9; --ink:#18212e;
+  --dim:#4c596d; --accent:#005ed2; --warn:#796200; --bad:#cb0017; --note:#0065be}
 /* The default scheme alone fills what is pressed in its third hue, copper, so
    words and links stay blue and information never reads as a warning. */
 html:not([data-theme]),.sw[data-theme="default"]{--lit:#ff8f4a}
@@ -373,38 +373,38 @@ html[data-mode="light"]:not([data-theme]),html[data-mode="light"] .sw[data-theme
    walls and panels and the hazard marking's red-orange for what is the one
    (the operator, 16 Oct); its graphics are with the dark half's, below. */
 html[data-mode="light"][data-theme="nostromo"],html[data-mode="light"] .sw[data-theme="nostromo"]{
-  --bg:#e4e5e2; --panel:#f6f6f3; --line:#bfc1bc; --ink:#232628;
-  --dim:#595d60; --accent:#b23a0a; --note:#3d7322}
+  --bg:#e3e6de; --panel:#fdfdfa; --line:#bbbfb5; --ink:#1e2123;
+  --dim:#54595c; --accent:#ba3900; --note:#327500}
 html[data-mode="light"][data-theme="slate"],html[data-mode="light"] .sw[data-theme="slate"]{
-  --bg:#f1f3f7; --panel:#fcfdff; --line:#cbd2da; --ink:#24272a;
-  --dim:#606468; --accent:#2a61b1; --note:#4e761e}
+  --bg:#e1e5eb; --panel:#fcfdff; --line:#b6bfc9; --ink:#1e2124;
+  --dim:#54595d; --accent:#1461c7; --note:#467200}
 html[data-mode="light"][data-theme="carbon"],html[data-mode="light"] .sw[data-theme="carbon"]{
-  --bg:#f3f3f5; --panel:#fdfdfe; --line:#d0d0d5; --ink:#262627;
-  --dim:#636367; --accent:#b6192c; --note:#22776c}
+  --bg:#e4e4eb; --panel:#fdfdfe; --line:#bdbcc7; --ink:#202021;
+  --dim:#57575c; --accent:#ca002b; --note:#007368}
 html[data-mode="light"][data-theme="nocturne"],html[data-mode="light"] .sw[data-theme="nocturne"]{
-  --bg:#f2f3f9; --panel:#fdfdff; --line:#cecfe6; --ink:#26252e;
-  --dim:#626173; --accent:#6a44c2; --note:#1b795b}
+  --bg:#e2e4ed; --panel:#fcfcfe; --line:#babbd8; --ink:#201f28;
+  --dim:#575669; --accent:#7339e0; --note:#007253}
 html[data-mode="light"][data-theme="moss"],html[data-mode="light"] .sw[data-theme="moss"]{
-  --bg:#f0f5f3; --panel:#fbfefc; --line:#c8d5cb; --ink:#232823;
-  --dim:#5e6660; --accent:#00783f; --note:#794ee4}
+  --bg:#dee7e3; --panel:#fbfefc; --line:#b2c3b6; --ink:#1d221d;
+  --dim:#525b54; --accent:#00743d; --note:#7137e4}
 html[data-mode="light"][data-theme="ember"],html[data-mode="light"] .sw[data-theme="ember"]{
-  --bg:#f6f3f1; --panel:#fffdfb; --line:#dbcfc3; --ink:#2b2520;
-  --dim:#6a6159; --accent:#a34100; --note:#21787d}
+  --bg:#eae3de; --panel:#fefcfa; --line:#cabbab; --ink:#251f1a;
+  --dim:#60564d; --accent:#ab4500; --note:#007177}
 html[data-mode="light"][data-theme="abyss"],html[data-mode="light"] .sw[data-theme="abyss"]{
-  --bg:#eff5f6; --panel:#fbfeff; --line:#c3d5d9; --ink:#212829;
-  --dim:#5a6667; --accent:#007480; --note:#bb30aa}
+  --bg:#dde7e8; --panel:#fafdfe; --line:#abc3c8; --ink:#1b2223;
+  --dim:#4e5b5c; --accent:#00717c; --note:#b804a7}
 html[data-mode="light"][data-theme="plum"],html[data-mode="light"] .sw[data-theme="plum"]{
-  --bg:#f6f2f8; --panel:#fffcff; --line:#d9cbe1; --ink:#2a242c;
-  --dim:#695f6e; --accent:#8c3a9b; --note:#247b45}
+  --bg:#e8e2eb; --panel:#fffcff; --line:#c8b6d2; --ink:#241e26;
+  --dim:#5e5364; --accent:#9f31b2; --note:#007439}
 html[data-mode="light"][data-theme="rust"],html[data-mode="light"] .sw[data-theme="rust"]{
-  --bg:#f7f2f1; --panel:#fffdfc; --line:#ddcdca; --ink:#2b2523;
-  --dim:#6a615f; --accent:#a14123; --note:#247b60}
+  --bg:#ebe2e0; --panel:#fefcfb; --line:#cdb8b5; --ink:#251f1d;
+  --dim:#5f5653; --accent:#b53806; --note:#007256}
 html[data-mode="light"][data-theme="ice"],html[data-mode="light"] .sw[data-theme="ice"]{
-  --bg:#f0f4f6; --panel:#fbfeff; --line:#c7d3dd; --ink:#23272b;
-  --dim:#5d6568; --accent:#00708f; --note:#7347ff}
+  --bg:#dee6ea; --panel:#fafdfe; --line:#b1c0cd; --ink:#1d2125;
+  --dim:#515a5d; --accent:#006e8c; --note:#6538e5}
 html[data-mode="light"][data-theme="sepia"],html[data-mode="light"] .sw[data-theme="sepia"]{
-  --bg:#f5f3f0; --panel:#fffdfb; --line:#d7d0c3; --ink:#2b261c;
-  --dim:#6a6256; --accent:#835c00; --note:#22776b}
+  --bg:#e8e4dd; --panel:#fefcfa; --line:#c6bdac; --ink:#252016;
+  --dim:#5f574a; --accent:#865e00; --note:#007064}
 
 /* ---- Nostromo -----------------------------------------------------------
    The one scheme that is more than a recolor: the ship itself, a half for

@@ -242,11 +242,11 @@ await page.selectOption(`${NB} #dsThemeFrom`, 'default');
 await page.click(`${NB} #dsThemeAdd`);
 await page.waitForSelector(`${NB} [data-dstheme="0"] [data-dst="from"]`, { timeout: 5000 });
 await page.selectOption(`${NB} [data-dstheme="0"] [data-dst="from"]`, 'moss');
-await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-5')?.value === '#63c98a', null, { timeout: 5000 });
+await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-5')?.value === '#00de7e', null, { timeout: 5000 });
 await section("filling a theme from a preset", async () => {
   const filled = { board: await page.$eval(`${NB} [data-dspage] .dsboard`, e => e.style.backgroundColor.replace(/\s/g, '')),
                    from: await page.$eval(`${NB} [data-dstheme="0"] [data-dst="from"]`, e => e.value) };
-  ok(filled.board === 'rgb(22,31,27)' && filled.from === '',
+  ok(filled.board === 'rgb(25,37,32)' && filled.from === '',
      `filling a theme from a preset sets its ten colors and repaints the boards in it, and the picker goes back to keeping them (${JSON.stringify(filled)})`);
 });
 await page.fill(`${NB} #dst-0-hex-5`, '#ff8800');
@@ -984,14 +984,14 @@ await openSect('themes');   // one section open at a time (the operator, 5 Oct)
 await page.selectOption(`${NB} #dsThemePick`, '0');
 await page.waitForSelector(`${NB} [data-dstheme="0"]`, { timeout: 5000 });
 await page.selectOption(`${NB} [data-dstheme="0"] [data-dst="from"]`, 'default');
-await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-0')?.value === '#0b1322', null, { timeout: 5000 });
+await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-0')?.value === '#172136', null, { timeout: 5000 });
 await page.selectOption(`${NB} #dsThemePick`, '1');
 await page.waitForSelector(`${NB} [data-dstheme="1"]`, { timeout: 5000 });
 await page.click(`${NB} [data-dstheme="1"] [data-dstrm]`);
 await page.waitForFunction(() => document.querySelector('.nb #dsThemePick')?.options.length === 1, null, { timeout: 5000 });
 await saved();
 const gone = await api(`/api/design?project=${P}`);
-ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language.themes[0].colors[0].hex === '#0b1322',
+ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language.themes[0].colors[0].hex === '#172136',
    'Remove page and Save take the page out, and the language goes back to one theme filled from Default');
 // A record saved under the build before the choices were each theme's,
 // with a custom map naming the language's rules and a second theme with

@@ -423,7 +423,7 @@ LOGIN_HTML = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0b1322">
+<meta name="theme-color" content="#172136">
 <title><!--PRODUCT-->: <!--TITLE--></title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -434,8 +434,8 @@ LOGIN_HTML = """<!doctype html>
      dashboard derives them (index.html :root): the lit fill from the second
      color, the sunk field from the panel. */
   :root{
-    --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
-    --dim:#a9b7ce; --accent:#2fc6ff; --bad:#f8524a; --note:#ff8f4a;
+    --bg:#172136; --panel:#24314b; --line:#455e89; --ink:#edf4ff;
+    --dim:#b2c2db; --accent:#00c1fd; --bad:#f8524a; --note:#ff8f4a;
     --deep:#99562c; --deep:color-mix(in srgb, var(--note), #000000 40%);
     --deep-edge:#db7b40; --deep-edge:color-mix(in srgb, var(--note), #000000 14%);
     --sunk:#101829; --sunk:color-mix(in srgb, var(--panel), #000000 12%);

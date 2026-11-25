@@ -12,225 +12,225 @@ Color comes only from these tokens, named once in the stylesheet. The app starts
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#0b1322` | the page |
-| `--panel` | `#121c30` | a raised box: a card, a pane, a modal |
-| `--ink` | `#eaf1fc` | the text, and text on a filled accent |
-| `--dim` | `#a9b7ce` | secondary text and field labels |
-| `--line` | `#3e5378` | hairlines and borders, 1px |
-| `--accent` | `#2fc6ff` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#172136` | the page |
+| `--panel` | `#24314b` | a raised box: a card, a pane, a modal |
+| `--ink` | `#edf4ff` | the text, and text on a filled accent |
+| `--dim` | `#b2c2db` | secondary text and field labels |
+| `--line` | `#455e89` | hairlines and borders, 1px |
+| `--accent` | `#00c1fd` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d29922` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#f07178` | an error, a destructive verb |
-| `--note` | `#8cc8ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#37a5fb` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#eef3fb` |
+| `--bg` | `#dde5f2` |
 | `--panel` | `#fbfdff` |
-| `--ink` | `#1d2633` |
-| `--dim` | `#566275` |
-| `--line` | `#c4d2e6` |
-| `--accent` | `#0059c7` |
+| `--ink` | `#18212e` |
+| `--dim` | `#4c596d` |
+| `--line` | `#adbfd9` |
+| `--accent` | `#005ed2` |
 | `--warn` | `#996200` |
 | `--bad` | `#c3131b` |
-| `--note` | `#0a5fb0` |
+| `--note` | `#0065be` |
 
 ### Abyss (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#111d20` | the page |
-| `--panel` | `#18262a` | a raised box: a card, a pane, a modal |
-| `--ink` | `#dcecee` | the text, and text on a filled accent |
-| `--dim` | `#93a9ac` | secondary text and field labels |
-| `--line` | `#3e5e66` | hairlines and borders, 1px |
-| `--accent` | `#2fb8c6` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#152428` | the page |
+| `--panel` | `#22353a` | a raised box: a card, a pane, a modal |
+| `--ink` | `#e7f7f9` | the text, and text on a filled accent |
+| `--dim` | `#adc6ca` | secondary text and field labels |
+| `--line` | `#3f646e` | hairlines and borders, 1px |
+| `--accent` | `#00d3e4` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d7ab4c` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ef6a63` | an error, a destructive verb |
-| `--note` | `#e391d9` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#eb69df` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#eff5f6` |
-| `--panel` | `#fbfeff` |
-| `--ink` | `#212829` |
-| `--dim` | `#5a6667` |
-| `--line` | `#c3d5d9` |
-| `--accent` | `#007480` |
+| `--bg` | `#dde7e8` |
+| `--panel` | `#fafdfe` |
+| `--ink` | `#1b2223` |
+| `--dim` | `#4e5b5c` |
+| `--line` | `#abc3c8` |
+| `--accent` | `#00717c` |
 | `--warn` | `#906700` |
 | `--bad` | `#b53433` |
-| `--note` | `#bb30aa` |
+| `--note` | `#b804a7` |
 
 ### Carbon (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#141417` | the page |
-| `--panel` | `#1c1c1f` | a raised box: a card, a pane, a modal |
-| `--ink` | `#e8e8ea` | the text, and text on a filled accent |
-| `--dim` | `#9d9da4` | secondary text and field labels |
-| `--line` | `#53535b` | hairlines and borders, 1px |
-| `--accent` | `#e64e53` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#212127` | the page |
+| `--panel` | `#313138` | a raised box: a card, a pane, a modal |
+| `--ink` | `#f3f3f5` | the text, and text on a filled accent |
+| `--dim` | `#c0c0c8` | secondary text and field labels |
+| `--line` | `#5c5c69` | hairlines and borders, 1px |
+| `--accent` | `#ff6a6b` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d9a441` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ff6b6b` | an error, a destructive verb |
-| `--note` | `#3cc6b5` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#00e2cd` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f3f3f5` |
+| `--bg` | `#e4e4eb` |
 | `--panel` | `#fdfdfe` |
-| `--ink` | `#262627` |
-| `--dim` | `#636367` |
-| `--line` | `#d0d0d5` |
-| `--accent` | `#b6192c` |
+| `--ink` | `#202021` |
+| `--dim` | `#57575c` |
+| `--line` | `#bdbcc7` |
+| `--accent` | `#ca002b` |
 | `--warn` | `#905e00` |
 | `--bad` | `#bb2933` |
-| `--note` | `#22776c` |
+| `--note` | `#007368` |
 
 ### Ember (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#1f1814` | the page |
-| `--panel` | `#271f1a` | a raised box: a card, a pane, a modal |
-| `--ink` | `#f0e4d8` | the text, and text on a filled accent |
-| `--dim` | `#af9f90` | secondary text and field labels |
-| `--line` | `#67533e` | hairlines and borders, 1px |
-| `--accent` | `#f0873f` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#281f1a` | the page |
+| `--panel` | `#3a2f28` | a raised box: a card, a pane, a modal |
+| `--ink` | `#fdf1e5` | the text, and text on a filled accent |
+| `--dim` | `#d0bdac` | secondary text and field labels |
+| `--line` | `#705940` | hairlines and borders, 1px |
+| `--accent` | `#ff7f08` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#e8bb50` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ef5f52` | an error, a destructive verb |
-| `--note` | `#4cc9d0` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#00dee8` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f6f3f1` |
-| `--panel` | `#fffdfb` |
-| `--ink` | `#2b2520` |
-| `--dim` | `#6a6159` |
-| `--line` | `#dbcfc3` |
-| `--accent` | `#a34100` |
+| `--bg` | `#eae3de` |
+| `--panel` | `#fefcfa` |
+| `--ink` | `#251f1a` |
+| `--dim` | `#60564d` |
+| `--line` | `#cabbab` |
+| `--accent` | `#ab4500` |
 | `--warn` | `#8b6100` |
 | `--bad` | `#ba2c25` |
-| `--note` | `#21787d` |
+| `--note` | `#007177` |
 
 ### Ice (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#151c21` | the page |
-| `--panel` | `#1c252c` | a raised box: a card, a pane, a modal |
-| `--ink` | `#e3edf5` | the text, and text on a filled accent |
-| `--dim` | `#9aa8ae` | secondary text and field labels |
-| `--line` | `#465b6c` | hairlines and borders, 1px |
-| `--accent` | `#58c7e8` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#1a2329` | the page |
+| `--panel` | `#27333c` | a raised box: a card, a pane, a modal |
+| `--ink` | `#ebf5fd` | the text, and text on a filled accent |
+| `--dim` | `#b4c4cb` | secondary text and field labels |
+| `--line` | `#486175` | hairlines and borders, 1px |
+| `--accent` | `#00cffb` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d3ab52` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ee6a68` | an error, a destructive verb |
-| `--note` | `#b8a2ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#a685ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f0f4f6` |
-| `--panel` | `#fbfeff` |
-| `--ink` | `#23272b` |
-| `--dim` | `#5d6568` |
-| `--line` | `#c7d3dd` |
-| `--accent` | `#00708f` |
+| `--bg` | `#dee6ea` |
+| `--panel` | `#fafdfe` |
+| `--ink` | `#1d2125` |
+| `--dim` | `#515a5d` |
+| `--line` | `#b1c0cd` |
+| `--accent` | `#006e8c` |
 | `--warn` | `#886200` |
 | `--bad` | `#b43439` |
-| `--note` | `#7347ff` |
+| `--note` | `#6538e5` |
 
 ### Moss (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#161f1b` | the page |
-| `--panel` | `#1d2920` | a raised box: a card, a pane, a modal |
-| `--ink` | `#dfe9df` | the text, and text on a filled accent |
-| `--dim` | `#9daba0` | secondary text and field labels |
-| `--line` | `#48604f` | hairlines and borders, 1px |
-| `--accent` | `#63c98a` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#192520` | the page |
+| `--panel` | `#26362a` | a raised box: a card, a pane, a modal |
+| `--ink` | `#edf7ed` | the text, and text on a filled accent |
+| `--dim` | `#b6c6b9` | secondary text and field labels |
+| `--line` | `#496552` | hairlines and borders, 1px |
+| `--accent` | `#00de7e` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d6ad4e` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#e8695f` | an error, a destructive verb |
-| `--note` | `#b49cf0` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#ad87ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f0f5f3` |
+| `--bg` | `#dee7e3` |
 | `--panel` | `#fbfefc` |
-| `--ink` | `#232823` |
-| `--dim` | `#5e6660` |
-| `--line` | `#c8d5cb` |
-| `--accent` | `#00783f` |
+| `--ink` | `#1d221d` |
+| `--dim` | `#525b54` |
+| `--line` | `#b2c3b6` |
+| `--accent` | `#00743d` |
 | `--warn` | `#8e6800` |
 | `--bad` | `#b33833` |
-| `--note` | `#794ee4` |
+| `--note` | `#7137e4` |
 
 ### Nocturne (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#181825` | the page |
-| `--panel` | `#202031` | a raised box: a card, a pane, a modal |
-| `--ink` | `#e4e2f5` | the text, and text on a filled accent |
-| `--dim` | `#a2a0c1` | secondary text and field labels |
-| `--line` | `#53537b` | hairlines and borders, 1px |
-| `--accent` | `#9d7cff` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#202030` | the page |
+| `--panel` | `#2f2f45` | a raised box: a card, a pane, a modal |
+| `--ink` | `#f3f2ff` | the text, and text on a filled accent |
+| `--dim` | `#bfbce0` | secondary text and field labels |
+| `--line` | `#585886` | hairlines and borders, 1px |
+| `--accent` | `#a386ff` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#e0b24d` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#f2637b` | an error, a destructive verb |
-| `--note` | `#5fdcb4` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#00e5b2` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f2f3f9` |
-| `--panel` | `#fdfdff` |
-| `--ink` | `#26252e` |
-| `--dim` | `#626173` |
-| `--line` | `#cecfe6` |
-| `--accent` | `#6a44c2` |
+| `--bg` | `#e2e4ed` |
+| `--panel` | `#fcfcfe` |
+| `--ink` | `#201f28` |
+| `--dim` | `#575669` |
+| `--line` | `#babbd8` |
+| `--accent` | `#7339e0` |
 | `--warn` | `#916600` |
 | `--bad` | `#b72b4c` |
-| `--note` | `#1b795b` |
+| `--note` | `#007253` |
 
 ### Nostromo (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#0b0f13` | the page |
-| `--panel` | `#121920` | a raised box: a card, a pane, a modal |
-| `--ink` | `#d3dbe3` | the text, and text on a filled accent |
-| `--dim` | `#8b98a5` | secondary text and field labels |
-| `--line` | `#33404c` | hairlines and borders, 1px |
-| `--accent` | `#ffb000` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#1d2228` | the page |
+| `--panel` | `#29333c` | a raised box: a card, a pane, a modal |
+| `--ink` | `#ecf5fd` | the text, and text on a filled accent |
+| `--dim` | `#b4c3d2` | secondary text and field labels |
+| `--line` | `#50606e` | hairlines and borders, 1px |
+| `--accent` | `#f6a900` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#e0913a` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ff5f45` | an error, a destructive verb |
-| `--note` | `#6fa8dc` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#3da5f9` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#e4e5e2` |
-| `--panel` | `#f6f6f3` |
-| `--ink` | `#232628` |
-| `--dim` | `#595d60` |
-| `--line` | `#bfc1bc` |
-| `--accent` | `#b23a0a` |
+| `--bg` | `#e3e6de` |
+| `--panel` | `#fdfdfa` |
+| `--ink` | `#1e2123` |
+| `--dim` | `#54595c` |
+| `--line` | `#bbbfb5` |
+| `--accent` | `#ba3900` |
 | `--warn` | `#8b6100` |
 | `--bad` | `#a8002a` |
-| `--note` | `#3d7322` |
+| `--note` | `#327500` |
 
 Nostromo differs from the default in:
 
@@ -262,113 +262,113 @@ This scheme squares all three corner tokens in its dark half; its light half is 
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#1e1623` | the page |
-| `--panel` | `#261d2d` | a raised box: a card, a pane, a modal |
-| `--ink` | `#eddff2` | the text, and text on a filled accent |
-| `--dim` | `#ae9cb7` | secondary text and field labels |
-| `--line` | `#654d73` | hairlines and borders, 1px |
-| `--accent` | `#c874d8` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#271d2e` | the page |
+| `--panel` | `#382c41` | a raised box: a card, a pane, a modal |
+| `--ink` | `#fbefff` | the text, and text on a filled accent |
+| `--dim` | `#cdb8d7` | secondary text and field labels |
+| `--line` | `#6d507d` | hairlines and borders, 1px |
+| `--accent` | `#da6cef` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#dfae52` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ee6183` | an error, a destructive verb |
-| `--note` | `#7dd8a0` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#2de78d` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f6f2f8` |
+| `--bg` | `#e8e2eb` |
 | `--panel` | `#fffcff` |
-| `--ink` | `#2a242c` |
-| `--dim` | `#695f6e` |
-| `--line` | `#d9cbe1` |
-| `--accent` | `#8c3a9b` |
+| `--ink` | `#241e26` |
+| `--dim` | `#5e5364` |
+| `--line` | `#c8b6d2` |
+| `--accent` | `#9f31b2` |
 | `--warn` | `#936500` |
 | `--bad` | `#b62b55` |
-| `--note` | `#247b45` |
+| `--note` | `#007439` |
 
 ### Rust (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#1e1614` | the page |
-| `--panel` | `#261d1a` | a raised box: a card, a pane, a modal |
-| `--ink` | `#ecdedb` | the text, and text on a filled accent |
-| `--dim` | `#ae9d99` | secondary text and field labels |
-| `--line` | `#6a4e4a` | hairlines and borders, 1px |
-| `--accent` | `#cf6a4c` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#291f1c` | the page |
+| `--panel` | `#3a2e2a` | a raised box: a card, a pane, a modal |
+| `--ink` | `#fef0ed` | the text, and text on a filled accent |
+| `--dim` | `#cfbcb7` | secondary text and field labels |
+| `--line` | `#755450` | hairlines and borders, 1px |
+| `--accent` | `#ff6738` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d9a441` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#e8544a` | an error, a destructive verb |
-| `--note` | `#6cc2a8` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#35e3b9` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f7f2f1` |
-| `--panel` | `#fffdfc` |
-| `--ink` | `#2b2523` |
-| `--dim` | `#6a615f` |
-| `--line` | `#ddcdca` |
-| `--accent` | `#a14123` |
+| `--bg` | `#ebe2e0` |
+| `--panel` | `#fefcfb` |
+| `--ink` | `#251f1d` |
+| `--dim` | `#5f5653` |
+| `--line` | `#cdb8b5` |
+| `--accent` | `#b53806` |
 | `--warn` | `#905e00` |
 | `--bad` | `#bc2825` |
-| `--note` | `#247b60` |
+| `--note` | `#007256` |
 
 ### Sepia (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#1f1b14` | the page |
-| `--panel` | `#272219` | a raised box: a card, a pane, a modal |
-| `--ink` | `#ece0cb` | the text, and text on a filled accent |
-| `--dim` | `#b0a28c` | secondary text and field labels |
-| `--line` | `#63563e` | hairlines and borders, 1px |
-| `--accent` | `#d3a94f` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#262118` | the page |
+| `--panel` | `#373125` | a raised box: a card, a pane, a modal |
+| `--ink` | `#fef2dd` | the text, and text on a filled accent |
+| `--dim` | `#cebfa6` | secondary text and field labels |
+| `--line` | `#6b5b3f` | hairlines and borders, 1px |
+| `--accent` | `#ebb000` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#e3c069` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#e0705f` | an error, a destructive verb |
-| `--note` | `#5fbdb0` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#00e2ce` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f5f3f0` |
-| `--panel` | `#fffdfb` |
-| `--ink` | `#2b261c` |
-| `--dim` | `#6a6256` |
-| `--line` | `#d7d0c3` |
-| `--accent` | `#835c00` |
+| `--bg` | `#e8e4dd` |
+| `--panel` | `#fefcfa` |
+| `--ink` | `#252016` |
+| `--dim` | `#5f574a` |
+| `--line` | `#c6bdac` |
+| `--accent` | `#865e00` |
 | `--warn` | `#8a6900` |
 | `--bad` | `#ac4133` |
-| `--note` | `#22776b` |
+| `--note` | `#007064` |
 
 ### Slate (dark)
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#181c23` | the page |
-| `--panel` | `#1f242d` | a raised box: a card, a pane, a modal |
-| `--ink` | `#dfe5ec` | the text, and text on a filled accent |
-| `--dim` | `#9fa6ae` | secondary text and field labels |
-| `--line` | `#4f5a68` | hairlines and borders, 1px |
-| `--accent` | `#6ea8fe` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#1d222b` | the page |
+| `--panel` | `#2b323e` | a raised box: a card, a pane, a modal |
+| `--ink` | `#eef4fb` | the text, and text on a filled accent |
+| `--dim` | `#bac2cb` | secondary text and field labels |
+| `--line` | `#525f6f` | hairlines and borders, 1px |
+| `--accent` | `#569aff` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d9a441` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#ef6f6c` | an error, a destructive verb |
-| `--note` | `#a6d96a` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#97dd24` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f1f3f7` |
+| `--bg` | `#e1e5eb` |
 | `--panel` | `#fcfdff` |
-| `--ink` | `#24272a` |
-| `--dim` | `#606468` |
-| `--line` | `#cbd2da` |
-| `--accent` | `#2a61b1` |
+| `--ink` | `#1e2124` |
+| `--dim` | `#54595d` |
+| `--line` | `#b6bfc9` |
+| `--accent` | `#1461c7` |
 | `--warn` | `#905e00` |
 | `--bad` | `#b2373a` |
-| `--note` | `#4e761e` |
+| `--note` | `#467200` |
 
 ## Type
 
