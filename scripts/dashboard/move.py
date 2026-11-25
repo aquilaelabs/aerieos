@@ -1489,6 +1489,23 @@ def _land_carried(src):
     return [f"the old controller's secrets, placed as root: {'; '.join(lines)[:900]}"] if lines else []
 
 
+def hooks_aside(state):
+    """A landing's startup hooks set aside, never put where a start runs them
+    (B1165): a bundle or a backup, made by anybody before an owner exists,
+    could carry a *.root.sh that the next start ran as root. They land as
+    startup.d.carried beside the state, for a person to read and put back by
+    hand. Returns whether there were any."""
+    hooks = Path(state) / "startup.d"
+    if not hooks.is_dir():
+        return False
+    kept = Path(state) / "startup.d.carried"
+    with contextlib.suppress(OSError):
+        if kept.exists():
+            shutil.rmtree(kept, ignore_errors=True)
+        os.rename(hooks, kept)
+    return True
+
+
 def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
             work_root=None):
     """The bundle unsealed under the token and put in place of the state here
@@ -1649,6 +1666,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             if dk_src.is_dir() and dk_dest.is_dir() and not os.access(dk_dest, os.W_OK) and place_deploy_keys:
                 carried_keys = work / "deploy-keys-carried"
                 os.rename(dk_src, carried_keys)
+            hooks_aside(work / "state")
             _into(work / "state", state_dir)
             # The stores, where the restored records name them; one whose path
             # cannot be made on this machine lands under the state, and the

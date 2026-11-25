@@ -7002,6 +7002,13 @@ def route_gate(name, me, action=None):
 # The mark a Finish of the setup leaves under the state, never taken off: a
 # move lands only on a controller never finished (Handler._move_land), and
 # the setup_done setting alone could be turned back (B720).
+# The first account is made by whoever reaches the setup page first (B1165),
+# so the page takes one only for a while after a start: the person who just
+# started AerieOS is there, and somebody on the network who finds it later
+# is not let in first (Portainer's way; the operator, 25 Nov: no code to type).
+SETUP_WINDOW_S = 15 * 60
+SETUP_SHUT_SAID = ("Setting up is open for 15 minutes after AerieOS starts, so nobody else on the network can claim "
+                   "it first. Restart AerieOS (its container, or its machine) to open it again.")
 ACCOUNTS_UNREADABLE = "The accounts file in /config (users.json) is there and cannot be read, so nobody can sign in and no first account is offered over it. Put back a copy from /config/backups, or mend the file, then restart."
 SETUP_FINISHED = ".setup-finished"
 
@@ -7497,6 +7504,9 @@ class Handler(BaseHTTPRequestHandler):
         """
         if not error and not setup and settings.get("maintenance_mode"):
             error = MAINTENANCE_SAID
+        shut = setup and time.time() - STARTED > SETUP_WINDOW_S
+        if shut:
+            error = SETUP_SHUT_SAID
         err = f'<p class="err">{error}</p>' if error else ""
         # A browser that lost its way back in while a move is being set up:
         # the account has no password anybody chose (_setup_post).
@@ -7512,7 +7522,7 @@ class Handler(BaseHTTPRequestHandler):
                 .replace("<!--TITLE-->", "set up" if setup else "sign in")
                 .replace("<!--SAID-->", "Make the first account" if setup else "Sign in to continue")
                 .replace("<!--ACTION-->", "/setup" if setup else "/login")
-                .replace("<!--FIELDS-->", SETUP_FIELDS if setup else LOGIN_FIELDS)
+                .replace("<!--FIELDS-->", "" if shut else SETUP_FIELDS if setup else LOGIN_FIELDS)
                 .replace("<!--WALKNEW-->", "" if moving else " checked")
                 .replace("<!--WALKMOVE-->", " checked" if moving else "")
                 .replace("<!--MOVENOW-->", move_now)
@@ -7556,6 +7566,16 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": "bad request"}, 400)
             return None
 
+    def _setup_shut(self):
+        """Why a first-run door takes nothing now, or "" (B1165): asked from
+        another site's page, which could have made the owner for whoever
+        built it, or past SETUP_WINDOW_S after this start."""
+        if self._post_cross_site():
+            return "The first account is made from this page, not from another site's."
+        if time.time() - STARTED > SETUP_WINDOW_S:
+            return SETUP_SHUT_SAID
+        return ""
+
     def _setup_post(self):
         """Make the owner, once. Refused the moment there is one.
 
@@ -7567,6 +7587,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This container already has an account.")
+        if (why := self._setup_shut()):
+            return self._login_page(why, setup=True)
         form = self._read_form()
         if form is None:
             return None
@@ -14631,6 +14653,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account: its pools are imported on the Storage page.")
+        if (why := self._setup_shut()):
+            return self._login_page(why, setup=True)
         n = self._content_length()
         if not 0 < n <= 1 << 20:
             return self._restore_page("pick a pool and type its name; a copy to upload goes with Restore it")
@@ -14662,6 +14686,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account; a saved configuration lands only on a fresh install.")
+        if (why := self._setup_shut()):
+            return self._login_page(why, setup=True)
         n = self._content_length()
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
@@ -14765,6 +14791,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account; a move lands only on a fresh install.")
+        if (why := self._setup_shut()):
+            return self._login_page(why, setup=True)
         if nodes.on_stick():
             return self._move_page(STICK_MOVE_FIRST)
         r, why = self._receive_move(Path(STATE))

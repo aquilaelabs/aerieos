@@ -119,7 +119,10 @@ docker logs -f Aerie-Workshop          # banner → hooks → ready
 docker exec -it Aerie-Workshop aerie doctor
 ```
 
-Then open the dashboard. The first page makes the owner account; the setup
+Then open the dashboard. The first page makes the owner account. It is open
+for 15 minutes after AerieOS starts, so somebody else on the network cannot
+claim the controller before you do; past that, restart AerieOS to open it
+again. The setup
 page after it is four steps, each a card with its own button: your first
 node (**Enroll node** for a machine you already have, **New VM**
 for a new VM), your name and email, Claude Code on that node, and a first

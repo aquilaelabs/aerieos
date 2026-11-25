@@ -101,8 +101,9 @@ sudo bash nodes/install-controller.sh --install
 
 **As its own OS** from a USB stick: experimental, see [the image](docs/image.md).
 
-Then open `http://YOUR-SERVER:7680` and make the owner account right away:
-until you do, anyone who reaches the page can. The dashboard walks you through
+Then open `http://YOUR-SERVER:7680` and make the owner account. The page is
+open for 15 minutes after AerieOS starts, so nobody else on your network can
+claim it first. The dashboard walks you through
 the rest: a machine for the agents, an agent on it, and your first space.
 Every option is in [the install guide](docs/install.md).
 
