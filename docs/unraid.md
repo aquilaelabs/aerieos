@@ -362,21 +362,25 @@ everything a session asks this container to run on its behalf, and so is
 anything in `/home/builder`. The shielded path for both kinds of credential is one
 root-only folder:
 
-1. Create it on the host and drop your secrets in:
+1. Create it on the host and drop your secrets in. Keep it out of
+   `appdata`: the first start makes the install key in this folder, and a
+   backup of `appdata` would then carry the key beside the state it seals.
+   The `system` share is the template's default; a folder made before this
+   default changed can stay where it is.
    ```bash
-   mkdir -p /mnt/user/appdata/Aerie-Workshop/secrets/ssh
+   mkdir -p /mnt/user/system/aerie-workshop/secrets/ssh
 
    # any publishing token a session should use but never read (optional);
    # the install key is made here by the first start, saved from Controller, Keys
-   cat > /mnt/user/appdata/Aerie-Workshop/secrets/aerie.env <<'EOF'
+   cat > /mnt/user/system/aerie-workshop/secrets/aerie.env <<'EOF'
    NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
    EOF
 
    # any git ssh keys (no passphrase; filename doesn't matter)
-   cp /path/to/id_ed25519 /mnt/user/appdata/Aerie-Workshop/secrets/ssh/
+   cp /path/to/id_ed25519 /mnt/user/system/aerie-workshop/secrets/ssh/
 
-   chown -R root:root /mnt/user/appdata/Aerie-Workshop/secrets
-   chmod -R go-rwx   /mnt/user/appdata/Aerie-Workshop/secrets
+   chown -R root:root /mnt/user/system/aerie-workshop/secrets
+   chmod -R go-rwx   /mnt/user/system/aerie-workshop/secrets
    ```
 2. Set the template's **Secrets directory** field (or uncomment the
    `/secrets` volume in compose) to that folder, read-write, so the first

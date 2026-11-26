@@ -395,7 +395,7 @@ reason silently breaks the sandbox. On the host:
 
 ```bash
 ssh-keygen -t ed25519 -N "" -C bb-sandbox \
-    -f /mnt/user/appdata/Aerie-Workshop/secrets/ssh/bb_sandbox
+    -f /mnt/user/system/aerie-workshop/secrets/ssh/bb_sandbox
 ```
 
 The private half lands where the entrypoint loads it into the agent at boot;

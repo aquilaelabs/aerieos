@@ -45,19 +45,19 @@ Keep `home/` on a cache/SSD-backed share: it does heavy small-file IO.
 Root-owned, so its contents are **never readable by sessions**:
 
 ```bash
-mkdir -p /mnt/user/appdata/Aerie-Workshop/secrets/ssh
+mkdir -p /mnt/user/system/aerie-workshop/secrets/ssh
 
-cp /path/to/git-key /mnt/user/appdata/Aerie-Workshop/secrets/ssh/id_ed25519
+cp /path/to/git-key /mnt/user/system/aerie-workshop/secrets/ssh/id_ed25519
 
 # any publishing token a controller shell should use: any *.env file here
 # is loaded the same way, as NAME=value lines read as words and never run.
 # The install key is made here by the first start.
-cat > /mnt/user/appdata/Aerie-Workshop/secrets/aerie.env <<'EOF'
+cat > /mnt/user/system/aerie-workshop/secrets/aerie.env <<'EOF'
 NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
 EOF
 
-chown -R root:root /mnt/user/appdata/Aerie-Workshop/secrets
-chmod -R go-rwx    /mnt/user/appdata/Aerie-Workshop/secrets
+chown -R root:root /mnt/user/system/aerie-workshop/secrets
+chmod -R go-rwx    /mnt/user/system/aerie-workshop/secrets
 ```
 
 The install key seals the settings' tokens, the signing keys and the git

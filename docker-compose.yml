@@ -144,7 +144,7 @@ services:
       # is mounted read-write. Secrets provided here are shielded from Claude
       # sessions (keys are served via a root-owned ssh-agent); keys in
       # home/.ssh are not.
-      # - /mnt/user/appdata/Aerie-Workshop/secrets:/secrets
+      # - /mnt/user/system/aerie-workshop/secrets:/secrets
 
       # --- host Docker access (OFF by default) ------------------------------
 
