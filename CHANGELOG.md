@@ -19,6 +19,7 @@
 - A Kubernetes view in a space's notebook, under Ship: each environment's workloads with how many are ready, the version running and where it answers, their pods' state, restarts and node, Deploy, Roll back, Restart and Scale, and a pod's log in the dock; everything through the environment's own deployer, so it sees and touches that namespace alone (c66d1e0)
 - A session reaches its space's Kubernetes environments with aerie k8s (what runs, a pod's log, deploy and roll back) through the controller, which keeps every credential, under a new Deploy to Kubernetes setting that is deny until you change it; an environment marked production always asks you first. Environments that deploy on a push or on a release now do, a stuck or short environment is a row on the bell until it recovers, and Home counts your clusters ready (a4702d1)
 - The Clusters page says each cluster's CPU and memory in use where it reports them, and the Doctor warns about a cluster that does not answer or whose certificate is about to end (808d205)
+- A space can run a Discord server: connect its bot in the space's settings, and the Discord view pulls the server into deploy/discord.yml, plans what applying it changes and applies it; agents do the same with aerie discord under the new Manage Discord setting (42ca615)
 
 ### Changed
 
