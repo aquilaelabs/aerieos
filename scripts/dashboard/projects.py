@@ -2194,13 +2194,9 @@ def _pins_file():
     return STATE / "pinned-projects.json"
 
 
-def _load_user_sets(path, legacy_list=False):
-    """Every account's set of names kept in `path`, {uid: [names]}, sorted.
-    `legacy_list` reads a file that is one flat list for everybody as
-    everyone's default under "*"."""
+def _load_user_sets(path):
+    """Every account's set of names kept in `path`, {uid: [names]}, sorted."""
     v = statefile.read_json(path)            # read once while the same file (R228 step 1)
-    if legacy_list and isinstance(v, list):
-        return {"*": sorted({x for x in v if isinstance(x, str)})}
     if not isinstance(v, dict):
         return {}
     return {k: sorted({x for x in names if isinstance(x, str)})
@@ -2215,10 +2211,9 @@ def _rename_in_sets(path, sets, old, new):
 
 
 def _load_pins():
-    """Every account's pinned set, {uid: [names]}. The file was one flat list
-    for everybody until 27 Sep; read as everyone's default under "*" once,
-    and written back keyed by account the first time anybody pins."""
-    return _load_user_sets(_pins_file(), legacy_list=True)
+    """Every account's pinned set, {uid: [names]}, everyone's default under
+    "*" (migration 0035 wrote the flat list from before 27 Sep that way)."""
+    return _load_user_sets(_pins_file())
 
 
 def load_project_pins(uid, fresh=False):

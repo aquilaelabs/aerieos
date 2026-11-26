@@ -1,6 +1,6 @@
-"""Migration 0034: a space's `devtest` boolean, from before where its tests
-run was one of three places, written as `tests_in` once (R295), so prefs.py
-reads one shape."""
+"""Migrations 0034 and 0035 (R295): a space's `devtest` boolean written as
+`tests_in`, and the favorites' flat list from before 27 Sep written by
+account, once each, so the readers take one shape."""
 import importlib
 import json
 import os
@@ -40,6 +40,26 @@ class TestsIn(unittest.TestCase):
         self.f.write_text("not json")
         self.mig.run({"state": str(self.d)})
         self.assertEqual(self.f.read_text(), "not json")
+
+
+
+class Favorites(unittest.TestCase):
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.f = self.d / "pinned-projects.json"
+        self.mig = importlib.import_module("statemigrations.0035_favorites_by_account")
+
+    def test_the_flat_list_is_everyones_default_and_one_by_account_is_left(self):
+        self.f.write_text(json.dumps(["web", "api", "web", 3]))
+        os.chmod(self.f, 0o640)
+        self.mig.run({"state": str(self.d)})
+        self.assertEqual(json.loads(self.f.read_text()), {"*": ["api", "web"]})
+        self.assertEqual(self.f.stat().st_mode & 0o777, 0o640)
+        kept = json.dumps({"u_1": ["web"]})
+        self.f.write_text(kept)
+        self.mig.run({"state": str(self.d)})
+        self.assertEqual(self.f.read_text(), kept)
 
 
 if __name__ == "__main__":
