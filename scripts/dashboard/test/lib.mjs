@@ -389,7 +389,9 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // real cross-origin refusal "Origin ... is not allowed by
   // Access-Control-Allow-Origin"), and each of those is still an error.
   const cutByWebKit = text => {
-    const m = /^Fetch API cannot load (\w+:\s*\/+\S+?)\.? due to access control checks\.?$/.exec(text);
+    // Read whole: a line WebKit ends with a break, or prefixes, matched no
+    // anchored pattern and was counted (cards.mjs, 26 Nov).
+    const m = /Fetch API cannot load (\w+:\s*\/+\S+?)\.?\s+due to access control checks\.?\s*$/.exec(String(text).trim());
     if (!m) return false;
     // The page's origin, or the harness's own server's: mid-reload WebKit
     // can say the page is elsewhere (sessions.mjs's phone, 26 Nov, B1133).
