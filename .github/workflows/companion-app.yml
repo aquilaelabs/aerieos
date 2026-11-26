@@ -193,11 +193,15 @@ jobs:
             -r tools/companion-requirements.txt
           v="$VER"
           printf '%s\n' "$v" > apps/windows/bbcompanion/VERSION
+          # Who may sign a release, carried so an update is checked against
+          # the release's signed list with keys of its own.
+          cp config/release-signers apps/windows/bbcompanion/release-signers
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"
           python -m PyInstaller --noconfirm --onefile --windowed --name "aerieos-companion-$v" \
             --paths apps/windows --paths scripts/agent \
             --hidden-import aerieos_agent.wssync --hidden-import aerieos_agent.controller \
             --add-data "apps/windows/bbcompanion/VERSION;bbcompanion" \
+            --add-data "apps/windows/bbcompanion/release-signers;bbcompanion" \
             --distpath dist "$RUNNER_TEMP/companion.py"
           # An entry point PyInstaller could not find still builds, into an
           # .exe that stops at start (B572): its warnings file says so.

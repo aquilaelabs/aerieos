@@ -114,6 +114,70 @@ def signed(path):
     return ctypes.windll.wintrust.WinVerifyTrust(None, ctypes.byref(action), ctypes.byref(td)) == 0
 
 
+# Who may sign a release, as AerieOS's own config/release-signers names them,
+# carried in this copy (the build puts the file beside VERSION), and the
+# namespace each signs in (apps.py's SIG_RELEASE and SIG_DEV).
+NAMESPACES = ("aerieos-release", "aerieos-dev")
+
+
+def signers():
+    """The release signers this copy carries, as ssh-keygen's allowed
+    signers lines; a checkout reads the repository's own file."""
+    try:
+        text = (pkgutil.get_data("bbcompanion", "release-signers") or b"").decode()
+    except OSError:
+        text = ""
+    if not text.strip():
+        here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "config", "release-signers")
+        try:
+            with open(here, encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            text = ""
+    return [ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+
+
+def proven(proof, name, sha):
+    """Why the file `name` with `sha` is not one the release's signed list
+    names under a key this copy carries, or "" when it is: the list's
+    signature checked here with Windows' own ssh-keygen (OpenSSH Client),
+    never on the controller's word (B1168)."""
+    keys = signers()
+    if not keys:
+        return "this copy carries no release signer to check the update with"
+    if not isinstance(proof, dict) or not proof.get("sums") or not proof.get("sig"):
+        return "the controller sent no signed list of the release's files"
+    import base64
+    import tempfile
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            allowed, sigf = os.path.join(d, "signers"), os.path.join(d, "SHA256SUMS.sig")
+            with open(allowed, "w", encoding="utf-8") as f:
+                f.write("\n".join(keys) + "\n")
+            with open(sigf, "wb") as f:
+                f.write(base64.b64decode(proof["sig"]))
+            ok = False
+            for ns in NAMESPACES:
+                r = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", ns, "-n", ns, "-s", sigf],
+                                   input=proof["sums"].encode(), capture_output=True, check=False, timeout=30,
+                                   **({"creationflags": 0x08000000} if os.name == "nt" else {}))
+                if r.returncode == 0:
+                    ok = True
+                    break
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return "this PC has no ssh-keygen to check the update's signature with (Windows' OpenSSH Client)"
+    if not ok:
+        return "the release's list of files is signed by no key this copy carries"
+    listed = {}
+    for line in proof["sums"].splitlines():
+        parts = line.split()
+        if len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0].lower()):
+            listed[parts[1].lstrip("*")] = parts[0].lower()
+    if listed.get(name) != str(sha or "").lower():
+        return f"{name} is not in the release's signed list as it was fetched"
+    return ""
+
+
 def check(ctl):
     """Ask the controller what it holds of this app and fetch it when it is
     newer: {current | pending | said}. `ctl` is the door's connection."""
@@ -139,6 +203,11 @@ def check(ctl):
     if _sha256(dest) != f.get("sha256"):
         os.remove(dest)
         return {"said": "the update did not match the controller's sha256: not kept"}
+    # ...and its sha256 one the release's signed list gives it, the list's
+    # signature checked here with the keys this copy carries (B1168).
+    if why := proven(r.get("proof"), f["file"], _sha256(dest)):
+        os.remove(dest)
+        return {"said": f"{why}: the update is not kept"}
     if signed(me) and not signed(dest):
         os.remove(dest)
         return {"said": "the update is not signed where this copy is: not kept"}

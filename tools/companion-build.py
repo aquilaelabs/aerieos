@@ -27,6 +27,9 @@ def build(version, out):
             shutil.copy2(os.path.join(AGENT, m), os.path.join(tmp, "aerieos_agent", m))
         with open(os.path.join(tmp, "bbcompanion", "VERSION"), "w") as f:
             f.write(version + "\n")
+        # Who may sign a release, carried, so an update is checked against
+        # the release's signed list with keys of its own (B1168).
+        shutil.copy2(os.path.join(REPO, "config", "release-signers"), os.path.join(tmp, "bbcompanion", "release-signers"))
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         zipapp.create_archive(tmp, out, interpreter="/usr/bin/env python3", main="bbcompanion.__main__:entry")
     return out

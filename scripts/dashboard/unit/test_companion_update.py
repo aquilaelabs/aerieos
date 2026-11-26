@@ -47,6 +47,40 @@ class Update(unittest.TestCase):
         for p in self.patches:
             p.stop()
 
+    def test_an_update_is_held_to_the_releases_signed_list(self):
+        # B1168: the controller's sha256 alone was the check; the list's
+        # signature is checked here, with keys this copy carries.
+        import base64
+        import shutil
+        import subprocess
+        import tempfile
+        from unittest import mock
+        from bbcompanion import update
+        if not shutil.which("ssh-keygen"):
+            self.skipTest("no ssh-keygen here")
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        key = os.path.join(d, "k")
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key], check=True)
+        sha = "ab" * 32
+        sums = f"{sha}  aerieos-companion-0.9.1.exe\n"
+        with open(os.path.join(d, "SHA256SUMS"), "w") as f:
+            f.write(sums)
+        subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", key, "-n", "aerieos-dev", os.path.join(d, "SHA256SUMS")], check=True)
+        with open(os.path.join(d, "SHA256SUMS.sig"), "rb") as f:
+            proof = {"sums": sums, "sig": base64.b64encode(f.read()).decode()}
+        pub = open(key + ".pub").read().split()
+        line = f'aerieos-dev namespaces="aerieos-dev" {pub[0]} {pub[1]}'
+        with mock.patch.object(update, "signers", lambda: [line]):
+            self.assertEqual(update.proven(proof, "aerieos-companion-0.9.1.exe", sha), "")
+            self.assertIn("not in the release's signed list", update.proven(proof, "aerieos-companion-0.9.1.exe", "cd" * 32))
+            self.assertIn("no signed list", update.proven(None, "x", sha))
+        other = f'aerieos-dev namespaces="aerieos-dev" {pub[0]} AAAAC3NzaC1lZDI1NTE5AAAAIOPvfyW1PRPVrLqx4qcUHkV6vEGtM2WwOHrL7uAkNNt7'
+        with mock.patch.object(update, "signers", lambda: [other]):
+            self.assertIn("signed by no key this copy carries", update.proven(proof, "aerieos-companion-0.9.1.exe", sha))
+        with mock.patch.object(update, "signers", lambda: []):
+            self.assertIn("carries no release signer", update.proven(proof, "aerieos-companion-0.9.1.exe", sha))
+
     def test_a_later_dev_build_is_newer(self):
         # B1171: -dev.N was ignored, so a dev companion never moved on.
         from bbcompanion import update
@@ -66,7 +100,9 @@ class Update(unittest.TestCase):
         self.assertEqual(ctl.fetched, [])
 
     def test_a_newer_copy_is_fetched_beside_this_one(self):
-        got = update.check(Ctl("1.1.0", b"new"))
+        # Its signed list holds it (the check of that is the test above).
+        with mock.patch.object(update, "proven", lambda proof, name, sha: ""):
+            got = update.check(Ctl("1.1.0", b"new"))
         self.assertEqual(got, {"pending": "1.1.0"})
         with open(self.me + ".new", "rb") as f:
             self.assertEqual(f.read(), b"new")
@@ -76,8 +112,14 @@ class Update(unittest.TestCase):
         self.assertIn("did not match", got["said"])
         self.assertFalse(os.path.exists(self.me + ".new"))
 
+    def test_one_no_signed_list_holds_is_not_kept(self):
+        got = update.check(Ctl("1.1.0", b"new"))
+        self.assertIn("no signed list", got["said"])
+        self.assertFalse(os.path.exists(self.me + ".new"))
+
     def test_the_next_start_swaps_it_in_and_starts_from_it(self):
-        update.check(Ctl("1.1.0", b"new"))
+        with mock.patch.object(update, "proven", lambda proof, name, sha: ""):
+            update.check(Ctl("1.1.0", b"new"))
         with mock.patch.object(update.subprocess, "Popen") as popen, self.assertRaises(SystemExit):
             update.apply_pending([])
         with open(self.me, "rb") as f:

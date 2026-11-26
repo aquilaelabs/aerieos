@@ -34,6 +34,7 @@ maker follow; test_release_signing.py holds the four to one table of cases.
     start()                    the boot look and the daily one
     seed()                     apply /config/seed.json once
 """
+import base64
 import hashlib
 import json
 import os
@@ -160,6 +161,9 @@ def view():
             "release": idx.get("release", ""), "matched": bool(idx.get("matched")),
             # Who signed the release's list of files, or that nothing was checked.
             "signature": idx.get("signature", ""),
+            # ...and the list and its signature, for a client that checks them
+            # itself: {sums, sig (base64)} or None.
+            "proof": idx.get("proof"),
             "checking": _state["checking"], "version": _version()}
 
 
@@ -221,6 +225,12 @@ def signers():
         return []
 
 
+# The signed list itself and its signature, by tag, as the last look read
+# them: handed to the companion with the files, so it checks the signature
+# with keys of its own and not on this controller's word (B1168).
+_proof = {}
+
+
 def _signed_list(rel):
     """({file: sha256}, what to say of it, "") for release `rel`'s SHA256SUMS
     when its signature is one the tag may carry, by a key this install
@@ -269,6 +279,7 @@ def _signed_list(rel):
     if kind == "stable" and ns != SIG_RELEASE:
         return None, "", (f"{tag} is a stable release and its list is signed by the key dev builds are signed with: "
                           "a stable release takes its own key's signature alone")
+    _proof[tag] = {"sums": sums.decode("utf-8", "replace"), "sig": base64.b64encode(sig).decode()}
     listed = {}
     for line in sums.decode("utf-8", "replace").splitlines():
         parts = line.split()
@@ -339,8 +350,13 @@ def check():
             absent[name] = str(rel.get("tag_name") or "")
         elif missing and not err:
             err = f"{a['title']}: {', '.join(missing)} not in {rel.get('tag_name')}"
+    tag = str((rel or {}).get("tag_name") or "")
     idx = {"apps": held, "checked": int(time.time()), "problem": err, "absent": absent, "signature": signature,
-           "release": str((rel or {}).get("tag_name") or idx.get("release") or ""), "matched": matched}
+           "release": tag or idx.get("release") or "", "matched": matched,
+           # The signed list the held files were taken on, kept for the
+           # companion's own check (B1168); the one before stays while
+           # nothing new was taken.
+           "proof": _proof.get(tag) if tag and not refused else idx.get("proof")}
     write_json(INDEX, idx)
     return view()
 

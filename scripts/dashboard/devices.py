@@ -210,7 +210,10 @@ def verb(name, auth, req):
     if name == "apps":
         v = APPS.view() if APPS else {"apps": []}
         return {"version": v.get("version", ""), "door": DOOR, "door_min": DOOR_MIN,
-                "apps": [{k: a[k] for k in ("name", "version", "files")} for a in v["apps"] if a["offered"]]}, 200
+                "apps": [{k: a[k] for k in ("name", "version", "files")} for a in v["apps"] if a["offered"]],
+                # The release's signed list of files and its signature, which
+                # the companion checks with keys it carries (B1168).
+                "proof": v.get("proof")}, 200
     if name == "whoami":
         return {"device": auth["device"], "name": auth["name"], "kind": auth["kind"],
                 "account": auth["account"]["name"]}, 200

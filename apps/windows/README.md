@@ -53,8 +53,11 @@ arrived first is kept and the other is saved beside it as
 The app is downloaded from the controller's **Devices** page, and keeps
 itself current from there: at start and once a day it asks the controller
 what it holds of the companion, and when that is newer it fetches it,
-checks it against the controller's sha256 (and, once the app is signed,
-that the new copy is signed too) and swaps it in the next time it starts.
+checks it against the controller's sha256, and against the release's signed
+list of files, whose signature it checks itself with Windows' own ssh-keygen
+and the release signers it carries (and, once the app is signed, that the new
+copy is signed too), and swaps it in the next time it starts. A copy the
+release's signed list does not hold is not kept, whatever the controller says.
 A controller newer than the app by a break in the device door answers
 "update the app", and the app looks at once. Run from a checkout, it is
 never replaced.
