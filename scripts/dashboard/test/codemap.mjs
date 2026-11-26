@@ -155,10 +155,11 @@ ok(/ProjectScreen\.kt:\d+  from Roadmap\b/.test(pill) && /Screens\.kt:\d+  from 
 // written into this copy, since the tree's own page has none.
 await section("Dead code by measurement", async () => {
   const dead = `${REPO}/scripts/dashboard/zz-probe-dead.js`;
-  writeFileSync(dead, 'function neverUsedAnywhere(){ return 1; }\nfunction handedOver(){ return 2; }\nconst pick = handedOver;\n');
+  writeFileSync(dead, 'function neverUsedAnywhere(){ return 1; }\nfunction handedOver(){ return 2; }\nconst pick = handedOver;\n'
+    + 'function boxed(){ return box({\n  onSend: async () => {\n    await pick();\n  },\n}); }\nboxed();\n');
   const un = map('unused', 'scripts/dashboard/zz-probe-dead.js');
-  ok(/neverUsedAnywhere/.test(un) && !/handedOver/.test(un),
-     'unused lists the function no token names, and not the one passed by name');
+  ok(/neverUsedAnywhere/.test(un) && !/handedOver/.test(un) && !/onSend/.test(un),
+     `unused lists the function no token names, and not the one passed by name nor an object's async key (${un.split('\n').slice(1).join('; ')})`);
   // ...and who-calls says where it was passed, rather than "nothing calls"
   // and silence (B222): the answer that read a live handler as dead.
   const wc = map('who-calls', 'handedOver');

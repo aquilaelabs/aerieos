@@ -1317,6 +1317,9 @@ class JSScanner:
         m = re.search(r"(?:^|[{,])\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?" + self.params + r"\s*=>\s*$",
                       head, re.M)
         if m:
+            # ...which its object's holder calls, as a single-line one is
+            # read (`onSend: async () => {` was named never called).
+            self._prop = True
             return m.group(1)
         return ""
 
