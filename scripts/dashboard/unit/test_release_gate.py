@@ -293,6 +293,13 @@ class Gate(unittest.TestCase):
                                 "type=semver,pattern={{version}}"])
         self.assertEqual(meta["flavor"], "latest=false")
 
+    def test_a_release_tag_s_image_is_built_with_no_cache(self):
+        # B1169: :main's cache is any merge's to write, and a release's image
+        # is built from its own commit alone.
+        build = load("build-image.yml")["jobs"]["build"]
+        push = next(s for s in build["steps"] if "no-cache" in (s.get("with") or {}))["with"]
+        self.assertIn("startsWith(github.ref, 'refs/tags/')", push["no-cache"])
+
     def test_the_iso_and_the_stick_are_held_to_what_their_build_put_out_before_they_are_attested(self):
         osi = load("os-image.yml")
         outs = osi["on"]["workflow_call"]["outputs"]

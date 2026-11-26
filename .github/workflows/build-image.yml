@@ -423,7 +423,10 @@ jobs:
           # died, run it again" arrive through the same button and want
           # opposite answers. `inputs.no_cache` is null on a push, and
           # `null == true` is false, so every other trigger stays cached.
-          no-cache: ${{ github.event_name == 'schedule' || inputs.no_cache == true }}
+          # A release's tag never is (B1169): :main's layers are any
+          # branch's merge's to write, and what a release ships, attests and
+          # lists is built from nothing but its own commit.
+          no-cache: ${{ github.event_name == 'schedule' || inputs.no_cache == true || startsWith(github.ref, 'refs/tags/') }}
 
       - name: Stop the clock
         id: elapsed
