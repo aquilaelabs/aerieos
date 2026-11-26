@@ -34,7 +34,7 @@ def fresh():
                       "911": {"id": "911", "name": "rules", "type": 0, "parent_id": "910", "topic": "read first", "position": 1,
                               "permission_overwrites": []},
                       "912": {"id": "912", "name": "general", "type": 0, "position": 2, "permission_overwrites": []}},
-            "automod": {}, "pins": {}}
+            "automod": {}, "pins": {}, "features": [], "onboarding": {"prompts": [], "default_channel_ids": [], "enabled": False}}
 
 
 def load():
@@ -79,6 +79,15 @@ class Discord(BaseHTTPRequestHandler):
         if p == "/users/@me/guilds":
             return 200, w["guilds"]
         g = f"/guilds/{GUILD}"
+        if p == g and method == "GET":
+            return 200, {"id": GUILD, "name": w["guilds"][0]["name"], "features": w.get("features") or []}
+        if p == g + "/onboarding":
+            if "COMMUNITY" not in (w.get("features") or []):
+                return 403, {"message": "Missing Access", "code": 50001}
+            if method == "PUT":
+                w["onboarding"] = {"prompts": body.get("prompts") or [], "default_channel_ids": body.get("default_channel_ids") or [],
+                                   "enabled": bool(body.get("enabled"))}
+            return 200, {"guild_id": GUILD, **(w.get("onboarding") or {})}
 
         def made(table):
             w["n"] += 1

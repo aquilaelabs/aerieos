@@ -59,6 +59,15 @@ automod:
 pins:
   rules:
     - Be kind. No spam.
+onboarding:
+  default_channels: [rules, general]
+  questions:
+    - title: What brings you here?
+      single: true
+      options:
+        - title: Helping out
+          roles: [Moderators]
+          channels: [introductions]
 ```
 
 - **roles**: each by its name, with its color, whether it is shown apart
@@ -72,6 +81,11 @@ pins:
 - **automod**: keyword rules that block a message, each by its name.
 - **pins**: messages the bot posts and pins in a channel. Only the bot's own
   pins are the layout's; a pin a person made is left as it is.
+- **onboarding**: what a new member is asked as they join, each question's
+  options naming the roles they are given and the channels they are shown,
+  and the channels every member sees. Discord has onboarding on a Community
+  server alone: on another the plan says so and leaves it, and nothing here
+  turns Community on. Rules screening stays in the server's own settings.
 
 A field left out is its default: no topic, no overwrites, no permissions.
 
@@ -89,8 +103,9 @@ presses:
   overwrite's), is marked **asks**: a session's apply waits on a person for
   it, whatever its dial says.
 - **Apply** makes every change in the plan, in order: roles first, then
-  categories, channels and their permissions, AutoMod and pins, and what the
-  file no longer names last. A person's Apply is all of it, after one
+  categories, channels and their permissions, AutoMod, pins and onboarding,
+  and what the file no longer names last. Onboarding reaches every new
+  member, so it is marked **asks** as a removal is. A person's Apply is all of it, after one
   question. Each change is on the audit log; Discord's rate limits are
   waited out.
 

@@ -39,6 +39,8 @@ class World:
         # Pinned by a person: not the layout's, which are the bot's own.
         self.pins = {"911": [{"id": "990", "content": "Be kind.", "author": {"id": "777"}}]}
         self.n = 1000
+        self.features = []
+        self.onboarding = {"prompts": [], "default_channel_ids": [], "enabled": False}
 
 
 class Discord(BaseHTTPRequestHandler):
@@ -70,6 +72,14 @@ class Discord(BaseHTTPRequestHandler):
         if p == "/users/@me/guilds":
             return self._send(200, w.guilds)
         g = f"/guilds/{GUILD}"
+        if p == g and method == "GET":
+            return self._send(200, {"id": GUILD, "name": "Shop community", "features": w.features})
+        if p == g + "/onboarding":
+            if "COMMUNITY" not in w.features:
+                return self._send(403, {"message": "Missing Access"})
+            if method == "PUT":
+                w.onboarding = {k: body.get(k) for k in ("prompts", "default_channel_ids", "enabled")}
+            return self._send(200, {"guild_id": GUILD, **w.onboarding})
         if p == g + "/roles":
             if method == "POST":
                 w.n += 1
@@ -261,6 +271,43 @@ class Apply(Base):
         self.assertEqual(int(mods["permissions"]), discord.PERMS["manage_messages"] | discord.PERMS["kick_members"])
         self.assertEqual(discord.plan("shop", LAYOUT)["changes"], [])
         self.assertTrue(any(a[1] == "discord-apply" for a in self.audits))
+
+    def test_onboarding_is_left_on_a_server_that_is_not_community_and_set_on_one(self):
+        # The operator, 26 Nov: onboarding questions in the layout; nothing
+        # turns Community on, and the plan says so where it is off.
+        self.connect()
+        self.w.pins["911"][0]["author"]["id"] = "800"
+        layout = LAYOUT + """onboarding:
+  default_channels: [rules]
+  questions:
+    - title: What brings you here?
+      single: true
+      options:
+        - title: Helping out
+          description: the moderators' corner
+          roles: [Regulars]
+          channels: [introductions]
+"""
+        plan = discord.plan("shop", layout)
+        row = next(c for c in plan["changes"] if c["kind"] == "onboarding")
+        self.assertTrue(row.get("cannot") and "not a Community server" in row["said"], row)
+        got = discord.apply("shop", layout, by="user:ann", allowed=True)
+        self.assertTrue(got["ok"], got)
+        self.assertTrue(any("onboarding left" in x for x in got["left"]))
+        self.w.features = ["COMMUNITY"]
+        row = next(c for c in discord.plan("shop", layout)["changes"] if c["kind"] == "onboarding")
+        self.assertTrue(row["asks"] and row["said"] == "onboarding set: 1 question, 1 default channel", row)
+        self.assertTrue(discord.apply("shop", layout, by="session:shop")["left"], "what new members are asked waits on a person")
+        got = discord.apply("shop", layout, by="user:ann", allowed=True)
+        self.assertIn("onboarding set: 1 question, 1 default channel", got["done"])
+        prompt = self.w.onboarding["prompts"][0]
+        regulars = next(k for k, r in self.w.roles.items() if r["name"] == "Regulars")
+        intro = next(k for k, c in self.w.chans.items() if c["name"] == "introductions")
+        self.assertEqual((prompt["title"], prompt["single_select"], prompt["options"][0]["role_ids"], prompt["options"][0]["channel_ids"]),
+                         ("What brings you here?", True, [regulars], [intro]))
+        self.assertEqual(self.w.onboarding["default_channel_ids"], ["911"])
+        self.assertEqual(discord.plan("shop", layout)["changes"], [], "read back as the file says")
+        self.assertIn("What brings you here?", discord.pull("shop")["text"])
 
 
 if __name__ == "__main__":

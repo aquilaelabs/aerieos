@@ -311,7 +311,7 @@ def normalize(layout):
     """A layout file's value in the one shape a plan compares, or raises
     ValueError in a sentence."""
     if not isinstance(layout, dict):
-        raise ValueError(f"{LAYOUT} is a mapping of roles, categories, channels, automod and pins")
+        raise ValueError(f"{LAYOUT} is a mapping of roles, categories, channels, automod, pins and onboarding")
     roles = []
     for r in layout.get("roles") or []:
         if not isinstance(r, dict) or not str(r.get("name") or "").strip():
@@ -348,7 +348,34 @@ def normalize(layout):
     for ch, msgs in (layout.get("pins") or {}).items():
         pins[_chan_name(ch, "text")] = [str(m).strip() for m in msgs or [] if str(m).strip()]
     return {"roles": roles, "categories": cats, "channels": chans(layout.get("channels"), "outside a category"),
-            "automod": automod, "pins": pins}
+            "automod": automod, "pins": pins, "onboarding": _onboarding(layout.get("onboarding"))}
+
+
+def _onboarding(ob):
+    """The onboarding a layout asks for (the operator, 26 Nov: its questions,
+    Discord's documented onboarding; rules screening stays the server's own),
+    or None where it names none, which leaves the server's as it is."""
+    if ob is None:
+        return None
+    if not isinstance(ob, dict):
+        raise ValueError("onboarding is a mapping of default_channels and questions")
+    qs = []
+    for q in ob.get("questions") or []:
+        if not isinstance(q, dict) or not str(q.get("title") or "").strip():
+            raise ValueError("every onboarding question has a title")
+        opts = []
+        for o in q.get("options") or []:
+            if not isinstance(o, dict) or not str(o.get("title") or "").strip():
+                raise ValueError(f"every option of the onboarding question {q['title']} has a title")
+            opts.append({"title": str(o["title"]).strip(), "description": str(o.get("description") or "").strip(),
+                         "roles": sorted(str(x).strip() for x in o.get("roles") or []),
+                         "channels": sorted(_chan_name(x, "text") for x in o.get("channels") or [])})
+        if not opts:
+            raise ValueError(f"the onboarding question {q['title']} has no options")
+        qs.append({"title": str(q["title"]).strip(), "single": bool(q.get("single")), "required": bool(q.get("required")),
+                   "options": opts})
+    return {"enabled": ob.get("enabled", True) is not False,
+            "default_channels": sorted(_chan_name(x, "text") for x in ob.get("default_channels") or []), "questions": qs}
 
 
 def read(space):
@@ -400,8 +427,24 @@ def read(space):
         if mine:
             pins[name] = [str(m.get("content") or "") for m in reversed(mine)]
             ids["pins"][name] = {str(m.get("content") or ""): str(m["id"]) for m in mine}
+    # Onboarding, on a Community server alone, which is the only kind that has it.
+    g = _call(token, "GET", f"/guilds/{guild}") or {}
+    ids["community"] = "COMMUNITY" in (g.get("features") or [])
+    onboarding = None
+    if ids["community"]:
+        ob = _call(token, "GET", f"/guilds/{guild}/onboarding") or {}
+        chan_of = {v: name for (_c, name, what), v in ids["channels"].items() if what == "channel"}
+        onboarding = {"enabled": bool(ob.get("enabled")),
+                      "default_channels": sorted(chan_of[str(x)] for x in ob.get("default_channel_ids") or [] if str(x) in chan_of),
+                      "questions": [{"title": str(q.get("title") or ""), "single": bool(q.get("single_select")),
+                                     "required": bool(q.get("required")),
+                                     "options": [{"title": str(o.get("title") or ""), "description": str(o.get("description") or ""),
+                                                  "roles": sorted(by_id[str(x)] for x in o.get("role_ids") or [] if str(x) in by_id),
+                                                  "channels": sorted(chan_of[str(x)] for x in o.get("channel_ids") or [] if str(x) in chan_of)}
+                                                 for o in q.get("options") or []]}
+                                    for q in ob.get("prompts") or []]}
     return {"roles": out_roles, "categories": list(cats.values()), "channels": top,
-            "automod": automod, "pins": pins}, ids
+            "automod": automod, "pins": pins, "onboarding": onboarding}, ids
 
 
 def as_file(layout):
@@ -438,7 +481,7 @@ def _change(op, kind, name, said, asks=False, **more):
     return {"op": op, "kind": kind, "name": name, "said": said, "asks": bool(asks), **more}
 
 
-def diff(want, have):
+def diff(want, have, community=True):
     """What applying `want` to a server that is `have` changes, in order:
     [{op: add|edit|remove, kind, name, said, asks}]. `asks` is a change a
     person allows whatever a session's dial says: a removal, a permission
@@ -505,6 +548,20 @@ def diff(want, have):
         for m in msgs:
             if m not in (have["pins"].get(ch) or []):
                 out.append(_change("add", "pin", ch, f"a message pinned in #{ch}: {m[:60]}", text=m))
+    # Onboarding, once the channels and roles it names are there: what a new
+    # member is asked reaches people, so it asks a person. A server that is
+    # not a Community server has none, and the plan says so rather than
+    # turning Community on.
+    wo = want.get("onboarding")
+    if wo is not None and wo != have.get("onboarding"):
+        n = len(wo["questions"])
+        if not community:
+            out.append(_change("edit", "onboarding", "onboarding", "onboarding left: the server is not a Community server; "
+                               "turn Community on in its settings and plan again", cannot=True))
+        else:
+            out.append(_change("edit", "onboarding", "onboarding", f"onboarding set: {n} question{'s' if n != 1 else ''}, "
+                               f"{len(wo['default_channels'])} default channel{'s' if len(wo['default_channels']) != 1 else ''}",
+                               asks=True, want=wo))
     # Removals last: what the file no longer names. Each asks a person.
     wr = {r["name"] for r in want["roles"]}
     for r in have["roles"]:
@@ -542,10 +599,10 @@ def plan(space, text, by=""):
     except Exception as e:                                  # noqa: BLE001 (the reader's own words)
         return {"error": f"{LAYOUT} does not read as YAML: {e}"}
     try:
-        have, _ = read(space)
+        have, ids = read(space)
     except Refused as e:
         return {"error": str(e)}
-    changes = diff(want, have)
+    changes = diff(want, have, community=ids.get("community", False))
     n_ask = sum(1 for c in changes if c["asks"])
     said = (f"{len(changes)} change{'s' if len(changes) != 1 else ''}" + (f", {n_ask} a person allows" if n_ask else "")
             if changes else "nothing to change: the server is as the file says")
@@ -655,6 +712,25 @@ def _do(token, guild, ids, c):
             _call(token, "PATCH", f"/guilds/{guild}/auto-moderation/rules/{ids['automod'][c['name']]}", body)
         else:
             _call(token, "DELETE", f"/guilds/{guild}/auto-moderation/rules/{ids['automod'][c['name']]}")
+    elif kind == "onboarding":
+        chans = {name: v for (_c, name, what), v in ids["channels"].items() if what == "channel"}
+
+        def chan(n):
+            if n not in chans:
+                raise ValueError(f"no channel #{n} on the server")
+            return chans[n]
+
+        def role(n):
+            if n not in ids["roles"]:
+                raise ValueError(f"no role {n} on the server")
+            return ids["roles"][n]
+        prompts = [{"type": 0, "title": q["title"], "single_select": q["single"], "required": q["required"], "in_onboarding": True,
+                    "options": [{"title": o["title"], "description": o["description"] or None,
+                                 "role_ids": [role(x) for x in o["roles"]], "channel_ids": [chan(x) for x in o["channels"]]}
+                                for o in q["options"]]}
+                   for q in w["questions"]]
+        _call(token, "PUT", f"/guilds/{guild}/onboarding", {"prompts": prompts, "default_channel_ids": [chan(x) for x in w["default_channels"]],
+                                                            "enabled": w["enabled"], "mode": 0})
     elif kind == "pin":
         cid = next((v for (cat, name, what), v in ids["channels"].items() if what == "channel" and name == c["name"]), "")
         if not cid:
