@@ -10,6 +10,7 @@
 - Your time zone on Profile: the hours of your quiet windows on the bell and the times every browser of yours shows, unless a browser picks its own in the gear's menu (6336f51)
 - Every node's page says how many updates wait for its system's own packages, the security ones among them and a restart asked for, and the bell says so for every node, where it did for the controller's own machine alone (6336f51)
 - Gradle builds into, under a repository's Build and test: the node's own disk (the default) or the repository's tree (6336f51)
+- Kubernetes tools in the Library: kubectl, Helm and kind, installed on a node as one toolchain with every download pinned to its publisher's checksum (1fba7b9)
 
 ### Changed
 
