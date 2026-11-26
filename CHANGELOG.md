@@ -5,6 +5,7 @@
 ### Changed
 
 - Every theme has more presence: the dark halves are lighter, the light halves darker so cards stand off the page, and accents and the status colors are more saturated, each still readable at 4.5:1 or better (f392d26)
+- Pushing and On the git host on a repository's Permissions view are that repository's own when set there, the space's settings holding the default for the rest; a change on one repository of a space no longer changes the others (19a792a)
 
 ### Fixed
 
