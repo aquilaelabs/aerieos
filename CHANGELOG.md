@@ -37,6 +37,11 @@
 - Just for you saved from a space's settings (model, effort, replies, questions, commit name and email) reaches every repository of the space, where it reached its first repository alone and sessions on the others started on the defaults (660d861)
 - Times on Schedules, Audit, Storage, the Keys page, nginx's certificates, the charts and several settings ignored the time zone picked in the gear's menu, and follow it now (6336f51)
 - Open on the Keys page's rows for a model router's keys and the dashboard's certificate did nothing; they open the router's page and the Network page (6336f51)
+- aerie version rehearse refuses up front for what the release would refuse, such as a Fixed line owed or what the git host owes, instead of after a green rehearsal (34b1157)
+- A release whose tag's push started no build on GitHub is said on the bell with the way out: withdraw it and release again (34b1157)
+- Withdrawing a GitHub release takes the container image its build pushed too, unless people follow it by another tag (34b1157)
+- A Library entry's page stops reading when it is left, where each visit while something installed added another read every three seconds (1dbdbee)
+- A new space's progress is read once a second, where Abort could set two reads going (1dbdbee)
 
 ### Security
 
