@@ -3221,6 +3221,54 @@ await section("a finger, not a pointer", async () => {
 });
 }
 
+// What is drawn over a tint reads 4.5:1 or more (R286 step 4): a pill, a
+// chip, the quiet voice, a placeholder and a note, each against the first
+// painted ground under it, in a theme of each family and both of its halves,
+// on two pages that hold every kind. Measured settled: the crossfade between
+// themes is off, or a color read mid-fade.
+if (runs('c')) await section("what is drawn over a tint reads 4.5:1 or more in every half of the themes", async () => {
+  const look = await newPage(browser, { viewport: { width: 1440, height: 1000 } });
+  await look.emulateMedia({ reducedMotion: 'reduce' });
+  await look.goto(URL); await ready(look);
+  const KINDS = { pill: '.pill', chip: '.chip, .chips button', quiet: '.hint, .dim, .sub, .bsum', placeholder: 'input[placeholder], textarea[placeholder]', note: '.notice, .warn, .bad' };
+  const low = [];
+  for (const hash of ['#/build/library', '#/spaces/alpha/roadmap']){
+    await look.evaluate(x => { location.hash = x; }, hash); await sleep(1500);
+    for (const t of ['default', 'nostromo', 'ember', 'moss', 'ice', 'plum']) for (const mode of ['dark', 'light']){
+      await look.evaluate(([t, mode]) => { applyTheme(t); applyMode(mode, { save: false }); }, [t, mode]);
+      await sleep(250);
+      const got = await look.evaluate(KINDS => {
+        const rgb = s => { s = s || '';
+          const c = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\)/.exec(s);
+          if (c) return [c[1] * 255, c[2] * 255, c[3] * 255, c[4] === undefined ? 1 : c[4].endsWith('%') ? parseFloat(c[4]) / 100 : +c[4]];
+          const m = /rgba?\(([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:[ ,/]+([\d.]+%?))?/.exec(s); if (!m) return null;
+          return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]]; };
+        const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+        const ground = e => { const layers = []; for (let x = e; x; x = x.parentElement){ const c = rgb(getComputedStyle(x).backgroundColor); if (c && c[3] > 0){ layers.push(c); if (c[3] >= 1) break; } }
+          let base = rgb(getComputedStyle(document.body).backgroundColor) || [0, 0, 0, 1];
+          for (const l of layers.reverse()) base = base.map((v, i) => i < 3 ? l[i] * l[3] + v * (1 - l[3]) : 1); return base; };
+        const out = [];
+        for (const [k, sel] of Object.entries(KINDS)){
+          for (const e of [...document.querySelectorAll(sel)].filter(x => x.checkVisibility() && x.getBoundingClientRect().width > 0
+                 && !x.closest('button:disabled, [aria-disabled="true"]') && (k === 'placeholder' ? !x.value : (x.textContent || '').trim())).slice(0, 40)){
+            const cs = getComputedStyle(e), ph = k === 'placeholder' ? getComputedStyle(e, '::placeholder') : null;
+            let fg = rgb(ph ? ph.color : cs.color); if (!fg) continue;
+            const a = fg[3] * (ph ? parseFloat(ph.opacity || '1') : 1) * parseFloat(cs.opacity || '1'), bg = ground(e);
+            fg = fg.slice(0, 3).map((v, i) => v * a + bg[i] * (1 - a));
+            const r = (Math.max(lum(fg), lum(bg)) + 0.05) / (Math.min(lum(fg), lum(bg)) + 0.05);
+            if (r < 4.5) out.push(`${k} ${String(e.className || e.tagName).split(' ')[0]} "${((ph ? e.placeholder : e.textContent) || '').trim().slice(0, 20)}" ${r.toFixed(2)}`);
+          }
+        }
+        return out;
+      }, KINDS);
+      low.push(...got.map(g => `${hash} ${t}/${mode}: ${g}`));
+    }
+  }
+  await look.evaluate(() => { applyTheme('default'); applyMode('dark', { save: false }); });
+  ok(low.length === 0, `pills, chips, the quiet voice, placeholders and notes read 4.5:1 or more in six themes' both halves${low.length ? `: ${[...new Set(low)].slice(0, 6).join('; ')}` : ''}`);
+  await look.close();
+});
+
 ok(page.errors.length === 0,
    `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
 await done(browser);
