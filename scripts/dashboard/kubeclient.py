@@ -68,7 +68,9 @@ class Client:
             req.add_header("Authorization", "Bearer " + self.token)
         try:
             with self._context() as ctx, urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as r:
-                body_bytes = r.read(LOG_MAX + 1 if raw else -1)
+                # Whole unless it is a log, which is read to LOG_MAX.
+                body_bytes = r.read(LOG_MAX + 1) if raw else r.read()
+                kind = r.headers.get("Content-Type") or "no content type"
         except urllib.error.HTTPError as e:
             with e:
                 words = _said(e)
@@ -82,7 +84,9 @@ class Client:
         try:
             return json.loads(body_bytes or b"{}")
         except ValueError:
-            raise KubeError("it answered something that is not the API's JSON") from None
+            # What it was, never what it said: a body can carry anything.
+            raise KubeError(f"it answered {kind.split(';')[0]} ({len(body_bytes)} bytes) to {method} {path.split('?')[0]}, "
+                            "not the API's JSON") from None
 
     def get(self, path):
         return self.call("GET", path)
