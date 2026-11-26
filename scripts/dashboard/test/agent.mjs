@@ -2119,6 +2119,11 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(said === `W:${uid}:test:1:bbs:node:current/scripts/aerie`,
          `a space shell on alpha opens on agentbox as the account, with its name, the owner mark, a session token, the node's role and its bb through .bb/current (${
            said || sh.why || sh.out.slice(-160)})`);
+      // ...and the pair it was given is kept against the node (R288 step 7),
+      // so its heartbeat may be handed a fresh token for it and for no other.
+      const asked = existsSync(`${DIR}/state/sessions-asked.json`) ? JSON.parse(readFileSync(`${DIR}/state/sessions-asked.json`, 'utf8')) : {};
+      ok(Object.values(asked).some(m => (m || {})[`${uid}/alpha`] > 0),
+         `the terminal's account and space are kept against the node it opened on (${JSON.stringify(asked).slice(0, 160)})`);
       const root = await term('shell');
       ok(root.status === 400 && OPENS.test(root.body),
          'the workspace shell stays on this container');

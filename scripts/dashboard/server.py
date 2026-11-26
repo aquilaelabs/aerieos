@@ -2987,6 +2987,10 @@ def session_tokens_for(nid, sessions):
         who = users.get(names.get(uid) or "") if names.get(uid) else None
         if not who or not users.may_work(who, project):
             continue
+        # ...and only for a pair this controller opened a terminal of on
+        # this node (R288 step 7): what the node was given already.
+        if not sessionsasked.asked(nid, uid, project):
+            continue
         seen.add((uid, project))
         out.append({"project": project, "uid": uid,
                     "token": users.mint_session(project, uid=uid)})
@@ -4423,6 +4427,10 @@ tls.configure(state=STATE, seal_fn=signing.seal, unseal_fn=signing.unseal,
 import csp                                                       # noqa: E402
 import leanpage                                                  # noqa: E402
 csp.configure(state=STATE)
+# Whose terminals were opened on which node (R288 step 7): a node is handed
+# a fresh session token only for a pair this controller gave it.
+import sessionsasked                                             # noqa: E402
+sessionsasked.configure(state=STATE, write_json_fn=write_json)
 try:
     if (_sealed := gitcreds.seal_all()):
         print(f"dashboard: sealed {_sealed} git token(s) under the install's key", flush=True)
@@ -8624,7 +8632,7 @@ class Handler(BaseHTTPRequestHandler):
         ag = agents.of_arg(arg)[0] or agents.default()
         return agentcode.start_hold(project, t["id"], ag.id) or ""
 
-    def _scoped_arg(self, rest, node=False):
+    def _scoped_arg(self, rest, node=False, nid=""):
         """Stamp the terminal's argument with the account that asked for it.
 
         bb-tty runs with the words `?arg=` carries, so this is where a
@@ -8661,6 +8669,9 @@ class Handler(BaseHTTPRequestHandler):
                 # user rights, an expiry), never the account's credential.
                 project = _arg_project(want)
                 if node and uid and project:
+                    # ...and that node is one this pair's token was given to,
+                    # whose heartbeat may then be handed a fresh one (R288).
+                    sessionsasked.note(nid, uid, project)
                     out.append("arg=" + urllib.parse.quote(
                         f"tok:{users.mint_session(project, uid=uid)}", safe=""))
                     out.append("arg=" + urllib.parse.quote(
@@ -8868,7 +8879,7 @@ class Handler(BaseHTTPRequestHandler):
             return termws.close(down, nodes.relay_unheard(target["name"]))
         node = target["where"] == "node"
         words = [v for k, v in urllib.parse.parse_qsl(urllib.parse.urlsplit(
-            self._scoped_arg(args, node=node)).query) if k == "arg"]
+            self._scoped_arg(args, node=node, nid=target["id"] if node else "")).query) if k == "arg"]
         who_raw = self._who_raw()
 
         def alive():

@@ -6,7 +6,7 @@
 // exactly the page it was.
 import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section, libraryShow, libraryFront, libraryRowsWrong, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
 
 // Self-sufficient: the compose file the seam test acts on, whether or not
 // devapp.mjs ran first in this invocation.
@@ -763,6 +763,18 @@ await section("the configuration plane on the row", async () => {
        `a node that names a session of a space it does not work on is handed no token for it (${JSON.stringify((stray.session_tokens || []).map(t => t.project))})`);
     await napi('/api/prefs', { project: 'alpha', node: minted.id, nodes: [minted.id] });
     await beat([{ name: `${uid}~claude-alpha` }, { name: 'u_0badc0de~claude-alpha' }, { name: `${uid}~shell-3` }]);
+    // ...and only for an account and space whose terminal this controller
+    // opened on that node (R288 step 7), so a stolen node token is handed no
+    // token the node was not given already.
+    const unasked = await napi('/api/v1/agent/hello', {
+      census: CENSUS, version: shipped.version, digest: shipped.digest },
+      { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' });
+    ok((unasked.session_tokens || []).length === 0,
+       `a session this controller opened no terminal of on the node is handed no token (${JSON.stringify((unasked.session_tokens || []).map(t => t.project))})`);
+    // The pair a terminal opened there leaves (agent.mjs opens a real one).
+    const askedFile = `${DIR}/state/sessions-asked.json`;
+    const askedWas = existsSync(askedFile) ? readFileSync(askedFile, 'utf8') : null;
+    writeFileSync(askedFile, JSON.stringify({ [minted.id]: { [`${uid}/alpha`]: Math.floor(Date.now() / 1000) } }));
     const hello = await napi('/api/v1/agent/hello', {
       census: CENSUS, version: shipped.version, digest: shipped.digest },
       { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' });
@@ -783,6 +795,7 @@ await section("the configuration plane on the row", async () => {
       { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' });
     ok((none.session_tokens || []).length === 0,
        '...while a node running no Claude session is handed none');
+    if (askedWas === null) unlinkSync(askedFile); else writeFileSync(askedFile, askedWas);
     await napi('/api/prefs', { project: 'alpha', node: '', nodes: [] });
   }
   // A heartbeat, in the shape the real one has: the sample flattens each

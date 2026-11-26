@@ -53,6 +53,26 @@ class Rotation(unittest.TestCase):
         nodes.authenticate(new)
         self.assertEqual(nodes.screen_key(self.nid), nodes.relay_key(new), "...and it moves with the token in use")
 
+    def test_a_runner_s_tokens_go_only_to_the_job_installing_it(self):
+        # R288 step 7: a stolen node token mints no runner registration.
+        self.assertFalse(nodes.runner_job_on(self.nid, "gh", "registration"))
+        self.assertFalse(nodes.runner_job_on(self.nid, "gh", "remove"))
+
+        def job(want):
+            j = nodes.job_add("user:test", {"node": self.nid}, "system",
+                              {"apply": "runner", "config": {"want": want, "slot": "gh"}, "timeout": 60})
+            nodes._exec("UPDATE jobs SET state = 'running' WHERE id = ?", (j["job"],))
+            return j["job"]
+        jid = job(True)
+        self.assertTrue(nodes.runner_job_on(self.nid, "gh", "registration"))
+        self.assertTrue(nodes.runner_job_on(self.nid, "gh", "remove"), "a reinstall clears the one before")
+        self.assertFalse(nodes.runner_job_on(self.nid, "other", "registration"), "that runner's job, no other's")
+        nodes._exec("UPDATE jobs SET state = 'succeeded' WHERE id = ?", (jid,))
+        self.assertFalse(nodes.runner_job_on(self.nid, "gh", "registration"), "while it runs, not after")
+        job(False)
+        self.assertFalse(nodes.runner_job_on(self.nid, "gh", "registration"), "a removal registers nothing")
+        self.assertTrue(nodes.runner_job_on(self.nid, "gh", "remove"))
+
     def test_no_token_is_handed_out_while_a_move_is_armed(self):
         # B935: the move's bundle carries the token this node holds now, so a
         # new one handed out after it was packed would be one the new home

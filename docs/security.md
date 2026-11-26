@@ -355,6 +355,16 @@ For the few seconds after the controller starts, before a node's first
 call, a relay to it says so and is tried again. An agent from before this
 took the token's sha256, and is signed with that until it is updated.
 
+**What a node's token is handed.** A node's token is the node, so whoever
+holds a copy can ask what the node may. What the controller hands a node
+is held to what the node was given already: a fresh session token only for
+an account and space whose terminal the controller opened on that node
+itself (kept a month after it was last seen), a project's signing key only
+to the sign job running there that asked, once, and a runner's registration
+or removal token only to the job installing or removing that runner while
+it runs. A token copied off a node gets no other account's session and
+registers no runner.
+
 **A renewed certificate, and a replaced key.** The controller remakes its
 own certificate a month before it ends, and when a name is added, over the
 same key, so a node that pinned the key sees nothing. In the `acme` mode the name's certificate

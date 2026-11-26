@@ -396,6 +396,11 @@ def verb(name, auth, req, addr):
         # here, the hour-long token goes to the node that asked.
         kind = "remove" if field(req, "kind") == "remove" else "registration"
         slot = re.sub(r"[^a-z0-9.-]", "", field(req, "slot"))[:60]
+        # Only to the job installing (or removing) that runner, while it
+        # runs (R288 step 7), so a stolen node token mints none.
+        if not nodes.runner_job_on(nid, slot, kind):
+            db.audit(auth["principal"], "runner-token", nid, {"kind": kind, "ok": False, "why": "no runner job"})
+            return {"error": f"no job here is {'installing' if kind == 'registration' else 'installing or removing'} that runner now"}, 403
         r = runners.mint(kind, nid, slot, field(req, "runner_id"))
         db.audit(auth["principal"], "runner-token", nid, {"kind": kind, "ok": not r.get("error")})
         return _answer(r)

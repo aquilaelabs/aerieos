@@ -3315,6 +3315,23 @@ def node_runner_forget(principal, node_id, slot):
     return {"ok": True}
 
 
+def runner_job_on(node_id, slot, kind):
+    """Whether this node is running the job that installs its runner `slot`
+    now, or for a "remove" token the one that installs or removes it (R288
+    step 7): a runner's tokens are handed only to that job, so a stolen node
+    token mints none."""
+    for r in _rows("SELECT spec FROM jobs WHERE node = ? AND type = 'system' AND state IN ('assigned', 'running')",
+                   (node_id,)):
+        try:
+            spec = json.loads(r["spec"] or "{}")
+        except (ValueError, TypeError):
+            continue
+        cfg = spec.get("config") if isinstance(spec.get("config"), dict) else {}
+        if spec.get("apply") == "runner" and str(cfg.get("slot") or "") == slot and (kind == "remove" or cfg.get("want")):
+            return True
+    return False
+
+
 def node_runner(principal, node_id, slot, want, labels=None, token=False, pins=None):
     """Install or remove one of a node's runners, as a system job (phase
     7). The desired state per runner (wanted or not, with which labels)
