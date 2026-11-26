@@ -7376,6 +7376,15 @@ class Handler(BaseHTTPRequestHandler):
         u = self._who()
         return f"user:{u['name']}" if u else "anonymous"
 
+    def _space_write(self, area, req):
+        """The space a write names, once this account may act in `area` on it
+        and has taken it on, or "" with the refusal already written: the
+        three questions a space's own write asks, asked once (R283 step 3)."""
+        name = self._project_asked(req)
+        if not name or self._refused(area, name) or self._readonly(name):
+            return ""
+        return name
+
     def _readonly(self, name):
         """True, with the 403 already written, when this account may see the
         project but has not taken it on.
@@ -12492,9 +12501,7 @@ class Handler(BaseHTTPRequestHandler):
         have been the way around the whole arrangement. The only writer is a
         person signed in to this dashboard with the project on their list.
         """
-        if not (name := self._project_asked(req)):
-            return
-        if self._refused("rules", name) or self._readonly(name):
+        if not (name := self._space_write("rules", req)):
             return None
         return self._json(*rules.verb(name, field(req, "action"), req))
 
@@ -12517,9 +12524,7 @@ class Handler(BaseHTTPRequestHandler):
         pending.verb. The operator's, by name: a session's own token is
         refused here the way it is for the rules, because a session approving
         its own additions is the setting not existing."""
-        if not (name := self._project_asked(req)):
-            return
-        if self._refused("pending", name) or self._readonly(name):
+        if not (name := self._space_write("pending", req)):
             return None
         return self._json(*pending.verb(name, field(req, "action"), req))
 
@@ -14407,15 +14412,24 @@ class Handler(BaseHTTPRequestHandler):
         got["items"] = [x for x in got.get("items") or [] if not self._trash_why(x["name"])]
         return self._json(got)
 
+    def _trash_refused(self, name):
+        """True, with the 403 already written, when this account may not act
+        on the bin, or on this repository in it (_trash_why): restore and
+        purge ask the one question (R283 step 3)."""
+        if self._refused("trash"):
+            return True
+        if why := self._trash_why(name):
+            self._json({"error": why}, 403)
+            return True
+        return False
+
     def _trash_restore(self, req):
         """A repository out of the bin, back into the project it was in, or
         into the one named (`project`) where that one is gone or another is
         wanted (R138); one from before projects into a project of its own.
         It is never put back into none."""
-        if self._refused("trash"):
-            return
-        if why := self._trash_why(field(req, "name")):
-            return self._json({"error": why}, 403)
+        if self._trash_refused(field(req, "name")):
+            return None
         into = field(req, "project")
         if into and self._not_space(into):
             return None
@@ -14445,10 +14459,8 @@ class Handler(BaseHTTPRequestHandler):
         (the path is resolved against the bin and the name has to be typed
         back), and this is only the route to them; asked of the space the
         repository was in (_trash_why)."""
-        if self._refused("trash"):
-            return
-        if why := self._trash_why(field(req, "name")):
-            return self._json({"error": why}, 403)
+        if self._trash_refused(field(req, "name")):
+            return None
         return self._json(*projects.trash_purge(req))
 
     def _rename(self, req):

@@ -89,8 +89,8 @@ def _job_file(auth, q):
     """A job input from the project's dist/, such as the APK an emulator job
     installs (docs/nodes.md phase 9). Only the job's own node, only while it
     runs, only dist/."""
-    j = nodes.job(q.get("job", [""])[0], with_log=False)
-    if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE:
+    j = _running_job(auth["node"], q.get("job", [""])[0])
+    if not j:
         return {"error": "not this node's running job"}, 403
     if j.get("type") == "sign-key":
         # A release's unsigned APK, handed to the sign-key job signing
@@ -109,10 +109,9 @@ def _job_file(auth, q):
 def _iso(auth, q):
     """An installer's ISO uploaded on the VMs page (R99), for the node whose
     running vm job was queued to fetch it, and nobody else."""
-    j = nodes.job(q.get("job", [""])[0], with_log=False)
+    j = _running_job(auth["node"], q.get("job", [""])[0])
     up = str(q.get("upload", [""])[0])
-    if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE \
-            or ((j.get("spec") or {}).get("iso") or {}).get("upload") != up:
+    if not j or ((j.get("spec") or {}).get("iso") or {}).get("upload") != up:
         return {"error": "not this node's running ISO job"}, 403
     path = vms.upload_path(up)
     if path is None:
@@ -176,11 +175,18 @@ def fetch(verb, auth, q, authed):
             "headers": {"X-Agent-Digest": f["digest"], **({"X-Agent-Sig": sig} if sig else {})}}, 200
 
 
+def _running_job(node_id, jid, kind=""):
+    """The job `jid` while it runs on this node (`node_id`), of the type
+    `kind` where one is named, or None: the one test every hand-off to a
+    job asks before it gives the job anything (R283 step 3)."""
+    j = nodes.job(jid, with_log=False)
+    ok = j and j["node"] == node_id and j["state"] in nodes.JOB_ACTIVE and (not kind or j.get("type") == kind)
+    return j if ok else None
+
+
 def _sign_key_job(auth, jid):
     """The running sign-key job `jid` of this node, or None."""
-    j = nodes.job(jid, with_log=False)
-    ok = j and j.get("type") == "sign-key" and j["node"] == auth.get("node") and j["state"] in nodes.JOB_ACTIVE
-    return j if ok else None
+    return _running_job(auth.get("node"), jid, "sign-key")
 
 
 @node_only
@@ -272,8 +278,8 @@ def oldapps_put(auth, q, stream, length):
     """The old system's containers' settings, from the read that found them
     on the controller's own machine (adoptapps.py writes their compose
     files): only that machine's running read-apps job, while it runs."""
-    j = nodes.job(q.get("job", [""])[0], with_log=False)
-    if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE:
+    j = _running_job(auth["node"], q.get("job", [""])[0])
+    if not j:
         return {"error": "not this node's running job"}, 403
     spec = j.get("spec") or {}
     if spec.get("apply") != "storage-adopt" or (spec.get("config") or {}).get("adopt") != "read-apps" \
@@ -414,8 +420,8 @@ def verb(name, auth, req, addr):
         # (R106): only that job's own node, only while it runs, once. The
         # spec names the route and never carries a secret, so a session
         # reading the job sees which key and not the key.
-        j = nodes.job(field(req, "job"), with_log=False)
-        if not j or j.get("type") != "sign" or j["node"] != nid or j["state"] not in nodes.JOB_ACTIVE:
+        j = _running_job(nid, field(req, "job"), "sign")
+        if not j:
             return {"error": "not this node's running sign job"}, 403
         if j["id"] in _keys_given:
             return {"error": "the key was handed to this job already"}, 409

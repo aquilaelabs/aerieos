@@ -2639,6 +2639,38 @@ if (runs('c')) {
 // opening a tab asks each endpoint at most once, whichever kind it is. The
 // polls, the layout save an open makes, and the node list a picker fills
 // are the allowed noise.
+// ---- a page left open does not grow (R283 step 4) -------------------------
+// A tab left open for hours meets thousands of polls and redraws: each pass
+// here is one (a status read, a page drawn, another opened), and what the
+// page hangs on the window and the document, and the document itself, are
+// the same after a hundred of them as after the first ten.
+await section("a page left open does not grow", async () => {
+  await page.evaluate(() => {
+    const live = window.__ls = new Map();
+    for (const t of [window, document]){
+      const add = t.addEventListener, rm = t.removeEventListener;
+      t.__lsWas = [add, rm];
+      t.addEventListener = function(type, fn, o){ const k = (t === window ? 'w:' : 'd:') + type;
+        if (!live.has(k)) live.set(k, new Set()); live.get(k).add(fn); return add.call(this, type, fn, o); };
+      t.removeEventListener = function(type, fn, o){ live.get((t === window ? 'w:' : 'd:') + type)?.delete(fn); return rm.call(this, type, fn, o); };
+    }
+  });
+  const pass = () => page.evaluate(async () => {
+    for (const open of [openHome, openNodesTab, openSettingsTab, openProfileTab, openProjectsTab]){
+      open(); await refresh(); drawPanes();
+    }
+  });
+  const measure = () => page.evaluate(() => ({ listeners: [...window.__ls.values()].reduce((n, s) => n + s.size, 0),
+                                              nodes: document.getElementsByTagName('*').length }));
+  for (let i = 0; i < 4; i++) await pass();
+  const early = await measure();
+  for (let i = 0; i < 20; i++) await pass();
+  const late = await measure();
+  await page.evaluate(() => { for (const t of [window, document]){ [t.addEventListener, t.removeEventListener] = t.__lsWas; } });
+  ok(late.listeners - early.listeners <= 2 && late.nodes - early.nodes <= early.nodes * 0.05,
+     `a hundred page opens later the page holds as many listeners on the window and the document, and as much of a document, as after twenty (${JSON.stringify({ early, late })})`);
+});
+
 await section("a quiet page is quiet, and a tab opens once", async () => {
   const POLLS = new Set(['/api/status', '/api/revs', '/api/presence', '/api/layout', '/api/v1/nodes', '/api/live']);
   await page.evaluate(() => { for (const t of [...tabs]) if (t.kind !== 'term') dropTab(t.id); });
@@ -2665,9 +2697,28 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
   await page.evaluate(() => { window.__f = {}; const f = window.fetch;
     window.fetch = (...a) => { const s = String(a[0]), u = /^\/api\/home\?light=1/.test(s) ? '/api/home?light' : s.split('?')[0];
       window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
+  // ...and its timers (R283 step 4): every timer made while it sits idle,
+  // kept while it waits, so an idle page holds as many as its polls do and
+  // makes no interval of its own.
+  await page.evaluate(() => {
+    const live = window.__tm = new Set(), st = window.setTimeout, ct = window.clearTimeout, si = window.setInterval, ci = window.clearInterval;
+    window.__tmWas = { st, ct, si, ci };
+    window.__iv = 0;
+    window.setTimeout = function(fn, ms, ...a){ const id = st.call(window, function(){ live.delete(id); return typeof fn === 'function' ? fn.apply(this, a) : undefined; }, ms); live.add(id); return id; };
+    window.clearTimeout = id => { live.delete(id); ct.call(window, id); };
+    window.setInterval = (...a) => { window.__iv++; return si.apply(window, a); };
+    window.clearInterval = id => ci.call(window, id);
+  });
   await MARK();
   await quietFor(8000);
   const idle = await page.evaluate(() => window.__f);
+  const timers = await page.evaluate(() => {
+    const got = { waiting: window.__tm.size, intervals: window.__iv };
+    Object.assign(window, { setTimeout: window.__tmWas.st, clearTimeout: window.__tmWas.ct, setInterval: window.__tmWas.si, clearInterval: window.__tmWas.ci });
+    return got;
+  });
+  ok(timers.intervals === 0 && timers.waiting <= 12,
+     `an idle page makes no interval and keeps only its polls' timers waiting (${JSON.stringify(timers)})`);
   const idleMoved = await MOVED();
   // Home re-reads on the jobs token and on nothing else.
   const noise = Object.keys(idle).filter(u => !POLLS.has(u) && !(/^\/api\/home/.test(u) && idleMoved.includes('jobs')));
