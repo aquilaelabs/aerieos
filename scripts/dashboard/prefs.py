@@ -463,13 +463,6 @@ def _load():
     p = d.get("projects")
     u = d.get("users")
     p = p if isinstance(p, dict) else {}
-    # Where the tests run was a boolean, `devtest`, before it was one of
-    # three places: read as tests_in on the way in, and the file follows on
-    # the next save of any project, which writes the whole of it back.
-    for rec in p.values():
-        if isinstance(rec, dict) and "devtest" in rec:
-            if rec.pop("devtest") is True and "tests_in" not in rec:
-                rec["tests_in"] = "only"
     return {"projects": p, "users": u if isinstance(u, dict) else {}}
 
 

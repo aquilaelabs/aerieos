@@ -5257,13 +5257,6 @@ installkey.settle()
 for _u in users.all_users():
     if _u.get("uid"):
         accountkeys.key_of(_u["uid"])
-# A project's token from before tokens were a person's: into its owner's key
-# store, the project linked to it (0011, the operator, 27 Oct).
-try:
-    if (_moved := gitcreds.adopt(membership.owner_of)):
-        print(f"dashboard: {_moved} space token(s) moved into their owners' key stores", flush=True)
-except OSError as e:
-    print(f"dashboard: space tokens left as they were: {e}", flush=True)
 
 # An account's conversations with Claude as a download: transcripts.py.
 import transcripts                                               # noqa: E402

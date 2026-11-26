@@ -173,15 +173,6 @@ class Store(unittest.TestCase):
         gitcreds.seal_all(again=True)
         self.assertEqual(gitcreds.linked_to("web"), (UID, self.fid))
 
-    def test_a_token_from_before_goes_to_the_project_owner(self):
-        gitcreds.write_line("web", "https://x:projtoken123@github.com")
-        gitcreds.write_line("api", "https://y:apitoken123@gitlab.com")
-        self.assertEqual(gitcreds.adopt(lambda p: UID), 2)
-        self.assertEqual(gitcreds.linked_to("web")[0], UID)
-        self.assertEqual(gitcreds.read_line("web"), "https://x:projtoken123@github.com")
-        self.assertEqual(gitcreds.read_line("api"), "https://y:apitoken123@gitlab.com")
-        self.assertEqual(gitcreds.adopt(lambda p: UID), 0, "once: a linked space is left as it is")
-
     def test_a_token_given_is_the_givers(self):
         self.assertTrue(gitcreds.keep_for("web", UID, "https://x:given123@github.com", "x"))
         uid, fid = gitcreds.linked_to("web")

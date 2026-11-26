@@ -28,10 +28,8 @@ import base64
 import contextlib
 import contextvars
 import os
-import re
 import shlex
 import threading
-import urllib.parse
 from pathlib import Path
 
 import unlocks            # the opened tokens and their handouts (R158 step 5)
@@ -323,35 +321,6 @@ def remap(uid, olds, new):
             if any(u == uid and x in olds for u, x in rows):
                 moved = [(u, new if u == uid and x in olds else x) for u, x in rows]
                 _write_givers(f.name, list(dict.fromkeys(moved)))
-
-
-def adopt(owner_of):
-    """Each token kept as a project's own (from before tokens were a
-    person's) moved into its project owner's store, the project linked to
-    it: AerieOS's owner where a project has none (owner_of says). Done
-    once a key can seal it; returns how many moved."""
-    if not (seal and sealing and sealing()):
-        return 0
-    d = STATE / "gitcreds"
-    n = 0
-    for f in (sorted(d.iterdir()) if d.is_dir() else []):
-        try:
-            text = f.read_text().strip()
-        except OSError:
-            continue
-        if not text or givers(f.name):
-            continue
-        line = open_text(text)
-        uid = owner_of(f.name) if line else ""
-        m = re.match(r"https?://([^:@/]*):[^@/]*@", line)
-        if not uid or not m:
-            continue
-        got, _code = _accounts().link_forge(uid, line.rsplit("@", 1)[-1], line, urllib.parse.unquote(m.group(1)))
-        if got.get("ok"):
-            # The owner's now, in their store: the project's own line goes.
-            _write_givers(f.name, [(uid, got["id"])], keep_own=False)
-            n += 1
-    return n
 
 
 def _gone_file():

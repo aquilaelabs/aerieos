@@ -1653,11 +1653,6 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                     continue
                 with contextlib.suppress(OSError):
                     os.rename(p, aside / p.name)
-            # A bundle an older build packed carries its controller's
-            # process files: never put in place of this one's.
-            for p in (work / "state").glob(".server.*") if (work / "state").is_dir() else []:
-                with contextlib.suppress(OSError):
-                    p.unlink()
             # The old controller's deploy keys, where this home keeps its own
             # in a folder only the root helper writes (B966: every landing
             # carrying one stopped there and went back): the helper keeps them.
@@ -1821,24 +1816,6 @@ def _unpack(src, mode, work, counts):
     return ""
 
 
-# A token's state as the revoked column held it until the database's
-# migration 0008, which either of two stores met here may not have run yet.
-_TOKEN_STATES = {0: "live", 1: "revoked", 2: "pending", 3: "retired"}
-
-
-def _token_as(row, cols):
-    """A token's row from one store, in the columns of another: its state
-    said the way the other keeps it, whichever of the two is from before the
-    state had a column of its own."""
-    state = row.get("state") or _TOKEN_STATES.get(row.get("revoked"), "revoked")
-    out = {c: row[c] for c in cols if c in row and c not in ("state", "revoked")}
-    if "state" in cols:
-        out["state"] = state
-    if "revoked" in cols:
-        out["revoked"] = next(n for n, word in _TOKEN_STATES.items() if word == state)
-    return out
-
-
 def carry_here(aside, state_dir, source_bare_metal=True):
     """What belongs to this machine rather than to the controller that moved
     in, carried from the state set aside into the one put in place (the
@@ -1878,7 +1855,7 @@ def carry_here(aside, state_dir, source_bare_metal=True):
                             said += _own_node_handed_on(state_dir, oid, nid)
                     dst.execute(f"INSERT INTO nodes ({', '.join(ncols)}) VALUES ({', '.join('?' * len(ncols))})", r)
                     for t in src.execute(f"SELECT {', '.join(scols)} FROM tokens WHERE node_id = ? AND kind = 'node'", (nid,)):
-                        row = _token_as(dict(zip(scols, t, strict=True)), dcols)
+                        row = {c: v for c, v in zip(scols, t, strict=True) if c in dcols}
                         dst.execute(f"INSERT OR IGNORE INTO tokens ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})", list(row.values()))
                     said.append(f"this machine's own node ({r[ncols.index('name')]}) is the moved controller's too")
                 dst.commit()

@@ -65,7 +65,7 @@ install_key_where() {
 
 install_key_file() {
     local f=/run/builderbot-key key="${INSTALL_KEY:-}"
-    rm -f "$f" /run/builderbot-signing
+    rm -f "$f"
     install_key_where ""
     if [ -z "$key" ] && [ -n "${SIGNING_SECRET:-}" ]; then
         key="$SIGNING_SECRET"
