@@ -5992,7 +5992,8 @@ def _container_age():
 import doctor                                                    # noqa: E402
 # The Doctor asks each Kubernetes cluster kept again, and says one that does
 # not answer or whose certificate ends soon (R281 step 2).
-doctor.extra = lambda: [*clusters.doctor(), *tls.doctor_lines(settings.get)]
+doctor.extra = lambda: [*clusters.doctor(), *tls.doctor_lines(settings.get),
+                        *catalogindex.doctor_lines(settings.get("catalog_url") or None)]
 
 doctor.configure(run=run, wait_for_boot=lambda: (wait_for_boot(), wait_for_nodes()),
                  runner_named=lambda nid, slot: (

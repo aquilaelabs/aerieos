@@ -12,6 +12,7 @@ line on the bell for every install that holds the pack. Read on demand with the 
 the state, and fetched again on a press.
 """
 import calendar
+import hashlib
 import json
 import os
 import re
@@ -26,6 +27,14 @@ mirror_index = None      # catalogmirror.index: the imported mirror's index, for
 write_json = None
 PUB_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "config", "catalog.pub")
 DEFAULT_URL = "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/"
+# Which signed index is current (R290 step 7): the catalog's fresh workflow
+# says it weekly in fresh.json, signed by a key that can say nothing else,
+# on its branch `fresh`; a mirror at another address keeps the pair beside
+# its index. Held only by an install that ships that key's public half.
+FRESH_PUB_FILE = os.path.join(os.path.dirname(PUB_FILE), "catalog-fresh.pub")
+FRESH_URL = "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/fresh/"
+FRESH_GRACE_S = 14 * 86400
+FRESH_MOST_S = 60 * 86400
 KEEP_S = 3600
 MISS_S = 300
 # An index as big as a catalog of tens of thousands of entries gets (R256):
@@ -81,6 +90,73 @@ def verify(index_bytes, sig_text, pub=None):
         except Exception:                                              # noqa: BLE001, PERF203 (any failure is one answer)
             continue
     return "the index's signature does not match: it was changed on the way or signed by another key, and is refused"
+
+
+def _fresh_keys(path=None):
+    """The freshness key's public half (and its spare) as this install
+    ships them, or [] where it ships none, and then no index is held to a
+    freshness statement."""
+    try:
+        with open(path or os.path.normpath(FRESH_PUB_FILE), encoding="utf-8") as f:
+            lines = [ln.split() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+        if not 1 <= len(lines) <= 2 or any(len(w) != 2 or w[0] != "builderbot-catalog-fresh-ed25519" for w in lines):
+            return []
+        keys = [bytes.fromhex(w[1]) for w in lines]
+        return keys if all(len(k) == 32 for k in keys) else []
+    except (OSError, ValueError):
+        return []
+
+
+def fresh_until(index_bytes, made_s, fresh_bytes, fresh_sig, keys=None, now=None):
+    """Until when an index is current, in seconds: fourteen days from when
+    it was made, or later where a freshness statement signed by the key this
+    install ships names this very index (its sha256) and says so, never
+    more than sixty days on. A statement that names another index, is not
+    signed by that key or cannot be read leaves the fourteen days."""
+    keys = _fresh_keys() if keys is None else keys
+    base = (made_s or 0) + FRESH_GRACE_S
+    if not keys or not fresh_bytes or not fresh_sig:
+        return base
+    words = str(fresh_sig).split()
+    if len(words) != 2 or words[0] != "builderbot-catalog-fresh-ed25519-signature":
+        return base
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519  # noqa: PLC0415
+    except ImportError:
+        return base
+    for key in keys:
+        try:
+            ed25519.Ed25519PublicKey.from_public_bytes(key).verify(bytes.fromhex(words[1]), fresh_bytes)
+            break
+        except Exception:                                              # noqa: BLE001, PERF203 (any failure is one answer)
+            continue
+    else:
+        return base
+    try:
+        said = json.loads(fresh_bytes)
+        until = calendar.timegm(time.strptime(str(said.get("expires")), "%Y-%m-%dT%H:%M:%SZ"))
+    except (ValueError, TypeError, AttributeError):
+        return base
+    if said.get("index_sha256") != hashlib.sha256(index_bytes).hexdigest():
+        return base
+    now = time.time() if now is None else now
+    return max(base, min(until, int(now) + FRESH_MOST_S))
+
+
+def doctor_lines(url=None, now=None):
+    """The Doctor's line for an index in use past the time it is current
+    (fresh_until), on an install that ships the freshness key: a mirror or
+    something on the way may be holding a newer one back. [] otherwise, and
+    for an imported mirror's, which is offline by its nature."""
+    idx = known(url)
+    if not _fresh_keys() or not idx or not int(idx.get("fetched_at") or 0):
+        return []
+    until = int(idx.get("fresh_until") or ((made(idx) or 0) + FRESH_GRACE_S))
+    now = time.time() if now is None else now
+    if now <= until:
+        return []
+    return [{"level": "warn", "text": f"the vetted catalog has not said its index is current since {time.strftime('%d %b', time.gmtime(until))}",
+             "detail": "a mirror or something between this install and the catalog may be holding a newer index back; Check under Controller settings asks again"}]
 
 
 def _pin(p, own=True):
@@ -384,6 +460,16 @@ def fetch(url=None, opener=None):
         return {"error": why, "index": _fallback(base)}
     idx["fetched_at"] = int(time.time())
     idx["url"] = base
+    # Until when it is current (R290 step 7), where this install ships the
+    # freshness key: the statement beside the catalog's, or the fresh
+    # branch's for the catalog's own address.
+    if _fresh_keys():
+        fresh_base = FRESH_URL if base == DEFAULT_URL else base
+        try:
+            fb, fs = get(fresh_base + "fresh.json"), get(fresh_base + "fresh.sig").decode("utf-8", "replace")
+        except Exception:                                              # noqa: BLE001 (a missing statement is the fourteen days)
+            fb, fs = None, None
+        idx["fresh_until"] = fresh_until(data, made(idx), fb, fs)
     with _lock:
         # Signed, and still not taken when it was made before the one kept
         # from this address (older): the kept one stands and the reason is
@@ -473,7 +559,8 @@ def said(url=None):
     says none; `read` when this install last took it from the address, 0
     for a mirror's. An index the address keeps answering is never replaced
     by a newer one, so its age is said where a person can see it: nothing
-    here expires one, since a catalog may be quiet for weeks."""
+    here expires one, since a catalog may be quiet for weeks; the freshness
+    statement says when it is still current (fresh_until, doctor_lines)."""
     idx = known(url)
     if not idx:
         return None

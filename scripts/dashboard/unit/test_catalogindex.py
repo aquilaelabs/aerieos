@@ -57,6 +57,48 @@ class Index(unittest.TestCase):
         with open(os.path.join(self.d, "catalog-index.json"), encoding="utf-8") as f:
             return json.load(f)
 
+    def test_an_index_is_current_as_long_as_its_freshness_statement_says(self):
+        # R290 step 7: a frozen index (one a mirror keeps answering after it
+        # was replaced) is said on the Doctor once it is no longer current.
+        import calendar
+        import hashlib
+        import time
+        fresh = ed25519.Ed25519PrivateKey.generate()
+        fpub = fresh.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        data, sig = self.signed([ENTRY], generated="2026-11-01T00:00:00Z")
+        made = calendar.timegm(time.strptime("2026-11-01T00:00:00Z", "%Y-%m-%dT%H:%M:%SZ"))
+
+        def stmt(sha, expires="2026-12-01T00:00:00Z", key=fresh):
+            body = json.dumps({"version": 1, "index_sha256": sha, "made": "2026-11-17T00:00:00Z", "expires": expires}).encode()
+            return body, "builderbot-catalog-fresh-ed25519-signature " + key.sign(body).hex() + "\n"
+        sha = hashlib.sha256(data).hexdigest()
+        until = calendar.timegm(time.strptime("2026-12-01T00:00:00Z", "%Y-%m-%dT%H:%M:%SZ"))
+        now = made + 20 * 86400
+        self.assertEqual(catalogindex.fresh_until(data, made, *stmt(sha), keys=[fpub], now=now), until)
+        self.assertEqual(catalogindex.fresh_until(data, made, *stmt("0" * 64), keys=[fpub], now=now), made + catalogindex.FRESH_GRACE_S,
+                         "a statement about another index says nothing of this one")
+        self.assertEqual(catalogindex.fresh_until(data, made, *stmt(sha, key=self.priv), keys=[fpub], now=now),
+                         made + catalogindex.FRESH_GRACE_S, "the index's own key does not say it is current")
+        self.assertEqual(catalogindex.fresh_until(data, made, None, None, keys=[fpub], now=now), made + catalogindex.FRESH_GRACE_S)
+        self.assertEqual(catalogindex.fresh_until(data, made, *stmt(sha, "2030-01-01T00:00:00Z"), keys=[fpub], now=now),
+                         now + catalogindex.FRESH_MOST_S, "never more than sixty days on")
+        # Fetched with the statement beside it, and the Doctor's word on it.
+        fpubfile = os.path.join(self.d, "catalog-fresh.pub")
+        open(fpubfile, "w").write("builderbot-catalog-fresh-ed25519 " + fpub.hex() + "\n")
+        was = catalogindex.FRESH_PUB_FILE
+        catalogindex.FRESH_PUB_FILE = fpubfile
+        self.addCleanup(setattr, catalogindex, "FRESH_PUB_FILE", was)
+        fb, fs = stmt(sha)
+        files = {"index.json": data, "index.sig": sig.encode(), "fresh.json": fb, "fresh.sig": fs.encode()}
+        got = catalogindex.fetch("https://mirror.example/", opener=lambda u: files[u.rsplit("/", 1)[1]])
+        self.assertEqual(got["index"]["fresh_until"], until)
+        self.assertEqual(catalogindex.doctor_lines("https://mirror.example/", now=until - 60), [])
+        lines = catalogindex.doctor_lines("https://mirror.example/", now=until + 60)
+        self.assertEqual([ln["level"] for ln in lines], ["warn"])
+        self.assertIn("has not said its index is current since 01 Dec", lines[0]["text"])
+        catalogindex.FRESH_PUB_FILE = os.path.join(self.d, "none.pub")
+        self.assertEqual(catalogindex.doctor_lines("https://mirror.example/", now=until + 60), [], "an install shipping no freshness key asks for none")
+
     def test_an_older_signed_index_is_refused_and_the_kept_one_still_answers(self):
         # Whoever can answer at the catalog's address can serve an index the
         # maintainers signed once and have replaced since: its signature is

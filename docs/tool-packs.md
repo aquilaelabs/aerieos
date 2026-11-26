@@ -1001,7 +1001,16 @@ index it was prepared against) and one made before that is refused too. A
 release carrying a floor older than the newest index the catalog has signed
 is refused before its tag, until the floor moves to it. `config/catalog.pub`
 may name a spare key on a second line, and an index signed by either is
-read ([security.md](security.md#the-signing-keys-and-replacing-one)). Where it
+read ([security.md](security.md#the-signing-keys-and-replacing-one)).
+A signature never says an index is still the newest, so the catalog also
+says, every week, which signed index is current (`fresh.json` on its branch
+`fresh`, signed by a key of its own that can say nothing else), and an
+install that ships that key (`config/catalog-fresh.pub`) takes an index as
+current for fourteen days from when it was made, or until the newest
+statement naming it says. One past that is said on the Doctor: a mirror,
+or something between the install and the catalog, may be holding a newer
+index, and a withdrawal in it, back. A mirror at another address keeps the
+two files beside its index. Where it
 is read from is the **Address** in Controller settings' Vetted catalog group. A pack the
 catalog withdraws (`withdrawn: true` in the next signed index) is a line on
 the bell for every install that holds it, saying to remove it. The Library
