@@ -34,10 +34,12 @@ WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
 def screen_key(token):
-    """The signing key: the controller's stored hash of this node's token."""
-    secret = str(token or "")
-    secret = secret[4:] if secret.startswith("bbn_") else secret
-    return hashlib.sha256(secret.encode()).hexdigest()
+    """The signing key (R288): an HMAC of this node's token, which the
+    controller works out from the token as the node presents it and keeps in
+    memory alone. The token's sha256, which the controller's database holds,
+    signed it before, so a copy of that file could open this node's
+    terminals; that is not taken here."""
+    return hmac.new(str(token or "").encode(), b"aerieos node relay v1", hashlib.sha256).hexdigest() if token else ""
 
 
 def sign(key, domain, when):

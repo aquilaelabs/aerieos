@@ -8728,7 +8728,9 @@ class Handler(BaseHTTPRequestHandler):
         if not rec:
             return self._json({"error": f"{project} has no VM called {name}"}, 404)
         host, key = nodes.route_host(rec["node"]), nodes.screen_key(rec["node"])
-        if not host or not key:
+        if host and not key:
+            return self._json({"error": nodes.relay_unheard(rec.get("node_name"))}, 503)
+        if not host:
             return self._json({"error": f"{rec.get('node_name')} cannot be reached for a screen"}, 503)
         t = int(time.time())
         # Over TLS to the certificate the node reported, and signed with a
@@ -8862,6 +8864,8 @@ class Handler(BaseHTTPRequestHandler):
         if target["where"] == "node" and not target.get("term"):
             return termws.close(down, f"{target['name']}'s agent is from before AerieOS's own terminal: "
                                       "update it on its Nodes row, and this opens")
+        if target["where"] == "node" and not nodes.screen_key(target["id"]):
+            return termws.close(down, nodes.relay_unheard(target["name"]))
         node = target["where"] == "node"
         words = [v for k, v in urllib.parse.parse_qsl(urllib.parse.urlsplit(
             self._scoped_arg(args, node=node)).query) if k == "arg"]
@@ -9071,6 +9075,8 @@ class Handler(BaseHTTPRequestHandler):
                 if kept_out(who_raw):
                     return "the controller is in maintenance mode"
                 return self._ctr_log_refused(arg, self._who())
+            if not nodes.screen_key(target["id"]):
+                return termws.close(self.connection, nodes.relay_unheard(target["name"]))
             return termws.node(self.connection, host=target["host"], port=target["screen"], key=nodes.screen_key(target["id"]),
                                kind="ctr", words=words, alive=alive, **nodes.relay_of(target["id"]), **dims)
         read, why = self._log_reader(arg)

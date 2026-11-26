@@ -20,6 +20,7 @@ db.py's, and so are the one-way doors it was built to keep.
 """
 import contextlib
 import hashlib
+import hmac
 import importlib.util
 import json
 import math
@@ -882,13 +883,49 @@ def _addr(n):
     return ""
 
 
+# The relay's keys (R288): an HMAC of each node token, worked out from the
+# token as the node presents it (authenticate) and kept in this process's
+# memory alone, {node id: {token id: key}}. Nothing on disk signs a relay
+# request, so a copy of the database or of /config opens no terminal; after a
+# restart a node's key is back with its next call, within its 20 seconds.
+_relay_keys = {}
+_relay_lock = threading.Lock()
+
+
+def relay_key(bearer):
+    """The key a node's relay takes, from its token (the agent's screen_key)."""
+    return hmac.new(str(bearer or "").encode(), b"aerieos node relay v1", hashlib.sha256).hexdigest() if bearer else ""
+
+
+def _relay_learn(node_id, tid, bearer):
+    with _relay_lock:
+        held = _relay_keys.setdefault(node_id, {})
+        held.pop(tid, None)
+        held[tid] = relay_key(bearer)
+        while len(held) > 4:
+            held.pop(next(iter(held)))
+
+
+def relay_unheard(name):
+    """What a relay to a node whose key is not known yet says (screen_key's
+    "" for a node not heard from since this start)."""
+    return f"{name} has not called in since the controller started: try again in a few seconds"
+
+
 def screen_key(node_id):
-    """The key a VM's screen request to this node is signed with (R99): its
-    live node token's stored hash, which the agent computes from the token it
-    holds; "" for a node with none."""
-    rows = _rows("SELECT secret_hash FROM tokens WHERE node_id = ? AND kind = 'node' AND state = 'live' "
+    """The key a relay request to this node (a VM's screen, a terminal, its
+    files) is signed with: the key derived from its live token, held in
+    memory; "" for a node with none, or not heard from since this start.
+    An agent from before R288 takes the token's stored hash alone, inside
+    the agent's window."""
+    rows = _rows("SELECT id, secret_hash FROM tokens WHERE node_id = ? AND kind = 'node' AND state = 'live' "
                  "ORDER BY created DESC LIMIT 1", (node_id,))
-    return str(rows[0]["secret_hash"]) if rows else ""
+    if not rows:
+        return ""
+    if not relay_of(node_id).get("derived"):
+        return str(rows[0]["secret_hash"])
+    with _relay_lock:
+        return (_relay_keys.get(node_id) or {}).get(rows[0]["id"], "")
 
 
 def ssh_addr_of(node_id):
@@ -1122,6 +1159,8 @@ def authenticate(bearer):
         n = node(n["id"])
     if not n or n["state"] == "retired":
         return {"error": "credential revoked"}
+    if kind == "node":
+        _relay_learn(n["id"], t["id"], bearer)
     return {"principal": f"node:{n['id']}", "node": n["id"], "kind": kind,
             "token": t["id"]}
 
@@ -2484,7 +2523,7 @@ def _c_relay(c, out):
     if isinstance(c.get("relay"), dict):
         tls = str(c["relay"].get("tls") or "")
         out["relay"] = {"tls": tls if re.fullmatch(r"sha256:[0-9a-f]{64}", tls) else "",
-                        "once": c["relay"].get("once") is True}
+                        "once": c["relay"].get("once") is True, "derived": c["relay"].get("derived") is True}
 
 
 def _c_session(c, out):
@@ -4901,15 +4940,16 @@ def _share_cfg(sh, req):
 
 
 def relay_of(node_id):
-    """How a node's relay port is spoken to (R243): {pin, once}. `pin` is
-    the sha256 of the certificate its agent made and reported, the only one
-    the controller then takes there, empty for a node that has none (a
-    machine with neither the cryptography library nor openssl), whose relay
-    relaytls.connect then refuses to open; `once`, that it takes a signed
-    request a single time, so the controller signs a value of its own with
-    each."""
+    """How a node's relay port is spoken to (R243): {pin, once, derived}.
+    `pin` is the sha256 of the certificate its agent made and reported, the
+    only one the controller then takes there, empty for a node that has none
+    (a machine with neither the cryptography library nor openssl), whose
+    relay relaytls.connect then refuses to open; `once`, that it takes a
+    signed request a single time, so the controller signs a value of its own
+    with each; `derived`, that it takes the key derived from its token alone
+    (R288, screen_key)."""
     r = ((node(node_id) or {}).get("reported") or {}).get("relay") or {}
-    return {"pin": str(r.get("tls") or ""), "once": bool(r.get("once"))}
+    return {"pin": str(r.get("tls") or ""), "once": bool(r.get("once")), "derived": bool(r.get("derived"))}
 
 
 def smb_named():

@@ -730,7 +730,10 @@ class Agent(unittest.TestCase):
         sc = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".screen"]
         key = sc.screen_key("bbn_secret")
         import hashlib
-        self.assertEqual(key, hashlib.sha256(b"secret").hexdigest(), "the controller's stored hash of the token")
+        import hmac
+        # R288: derived from the token, never the hash the controller's database keeps.
+        self.assertEqual(key, hmac.new(b"bbn_secret", b"aerieos node relay v1", hashlib.sha256).hexdigest())
+        self.assertNotEqual(key, hashlib.sha256(b"secret").hexdigest())
         t = 1_800_000_000
         sig = sc.sign(key, "bbvm-web-db", t)
         self.assertTrue(sc.signed(key, "bbvm-web-db", t, sig, now=t + 30))

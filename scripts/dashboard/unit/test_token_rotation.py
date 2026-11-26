@@ -36,6 +36,23 @@ class Rotation(unittest.TestCase):
         self.assertNotEqual(nodes.screen_key(self.nid), key, "...and moves once the new one is used")
         self.assertIn("node", nodes.authenticate(self.first), "the old one within its grace")
 
+    def test_a_relay_key_is_derived_from_the_token_and_kept_in_memory_alone(self):
+        # R288: an agent that says so takes the key derived from its token,
+        # which the controller learns from the node's own call; the hash in
+        # the database is never it.
+        derived = dict(CENSUS, relay={"tls": "", "once": True, "derived": True})
+        nodes._relay_keys.clear()
+        nodes.hello(self.nid, derived, "10.0.0.5", rotates=False)
+        self.assertEqual(nodes.screen_key(self.nid), "", "not heard from since this start: no key, so nothing is signed")
+        nodes.authenticate(self.first)
+        key = nodes.screen_key(self.nid)
+        self.assertEqual(key, nodes.relay_key(self.first))
+        held = [r["secret_hash"] for r in nodes._rows("SELECT secret_hash FROM tokens WHERE node_id = ?", (self.nid,))]
+        self.assertNotIn(key, held, "no key in the database signs a relay request")
+        new = nodes.hello(self.nid, derived, "10.0.0.5", rotates=True)["token"]
+        nodes.authenticate(new)
+        self.assertEqual(nodes.screen_key(self.nid), nodes.relay_key(new), "...and it moves with the token in use")
+
     def test_no_token_is_handed_out_while_a_move_is_armed(self):
         # B935: the move's bundle carries the token this node holds now, so a
         # new one handed out after it was packed would be one the new home

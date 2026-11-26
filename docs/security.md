@@ -346,6 +346,15 @@ terminal, a file request or a VM's screen on the node's relay is signed
 and crosses in TLS of the node's own. A browser at `http://` is what the
 Connection section says, and is not changed by any of this.
 
+**The relay's key.** A request to a node's relay is signed with a key
+derived from the node's token, which the controller works out from the
+token as the node presents it on its own calls and keeps in its memory
+alone. The database keeps only each token's sha256, which signs nothing
+there, so a copy of `/config` opens no terminal, file or screen on a node.
+For the few seconds after the controller starts, before a node's first
+call, a relay to it says so and is tried again. An agent from before this
+took the token's sha256, and is signed with that until it is updated.
+
 **A renewed certificate, and a replaced key.** The controller remakes its
 own certificate a month before it ends, and when a name is added, over the
 same key, so a node that pinned the key sees nothing. In the `acme` mode the name's certificate

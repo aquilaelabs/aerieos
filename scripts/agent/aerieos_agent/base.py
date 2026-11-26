@@ -64,9 +64,11 @@ REFUSED_MOST = 200
 # once it has moved or where nothing was named. The census says it.
 CHANNEL = {}
 # What the screen relay says of itself in the hello (census, R243): its
-# certificate's sha256 once it has one, which the controller pins, and that
-# it takes a signed request once. Set by screen.py.
-RELAY = {"tls": "", "once": True}
+# certificate's sha256 once it has one, which the controller pins, that it
+# takes a signed request once, and that it takes only the key derived from
+# the token it holds (R288), never the token's hash the controller's
+# database keeps. Set by screen.py.
+RELAY = {"tls": "", "once": True, "derived": True}
 # How often a node whose loop is held by a census says it is still there
 # (census_beating): well inside the controller's three missed polls.
 BEAT_S = 20

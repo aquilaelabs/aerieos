@@ -95,7 +95,10 @@ def _target(principal_ok, node_id, root):
     if not fs.get("port"):
         return {"error": f"{n.get('name') or node_id}'s agent does not serve files yet: update it from the Nodes page"}
     host, key = host_fn(node_id), key_fn(node_id)
-    if not host or not key:
+    if host and not key:
+        # Its relay's key is learned from the node's own call (R288).
+        return {"error": f"{n.get('name') or node_id} has not called in since the controller started: try again in a few seconds"}
+    if not host:
         return {"error": f"{n.get('name') or node_id} cannot be reached from here"}
     # How its relay is spoken to (R243): the certificate it reported, which
     # is the only one taken, and whether it takes a request once.
