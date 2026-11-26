@@ -1114,3 +1114,52 @@ export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrow
     return wrong;
   }));
 }
+
+// A Kubernetes API server the suites stand up the way agent-stub stands in
+// for a node (R281): it answers /version, nodes and namespaces, and keeps
+// what it is sent (POST makes, PUT replaces) by path, so a space's
+// environment saved through the page makes its namespace, its deployer and
+// their Role here. `token` is what it takes as a bearer token; `forbid` the
+// paths a POST to is refused (403); `calls` what it was asked, in order.
+export async function kubeApi({ token = 'good', namespaces = [] } = {}){
+  const { createServer } = await import('node:http');
+  const api = { token, forbid: new Set(), calls: [], objs: new Map() };
+  for (const ns of namespaces) api.objs.set(`/api/v1/namespaces/${ns.metadata.name}`, ns);
+  const srv = createServer((req, res) => {
+    let raw = '';
+    req.on('data', c => { raw += c; });
+    req.on('end', () => {
+      const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+      api.calls.push(`${req.method} ${req.url}`);
+      if (req.headers.authorization !== 'Bearer ' + api.token) return send(401, { message: 'Unauthorized' });
+      if (req.method === 'GET'){
+        if (req.url === '/version') return send(200, { gitVersion: 'v1.37.3+k3s1' });
+        if (req.url === '/api/v1/nodes') return send(200, { items: [{ status: { conditions: [{ type: 'Ready', status: 'True' }] } },
+                                                                    { status: { conditions: [{ type: 'Ready', status: 'False' }] } }] });
+        if (req.url === '/api/v1/namespaces')
+          return send(200, { items: [{ metadata: { name: 'default' } }, ...[...api.objs].filter(([p]) => /^\/api\/v1\/namespaces\/[^/]+$/.test(p)).map(([, o]) => o)] });
+        const o = api.objs.get(req.url);
+        return o ? send(200, o) : send(404, { message: 'not found' });
+      }
+      const body = raw ? JSON.parse(raw) : {};
+      if (req.method === 'POST'){
+        if (api.forbid.has(req.url)) return send(403, { message: `${req.url.split('/').pop()} is forbidden` });
+        const p = `${req.url}/${body.metadata?.name}`;
+        if (api.objs.has(p)) return send(409, { message: 'already exists' });
+        api.objs.set(p, body);
+        return send(201, body);
+      }
+      if (req.method === 'PUT'){
+        if (!api.objs.has(req.url)) return send(404, { message: 'not found' });
+        api.objs.set(req.url, body);
+        return send(200, body);
+      }
+      return send(405, { message: 'not here' });
+    });
+  });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  api.url = `http://127.0.0.1:${srv.address().port}`;
+  api.close = () => srv.close();
+  api.kubeconfig = (user = `    token: ${api.token}\n`) => `apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: ${api.url}\n  name: lab\ncontexts:\n- context:\n    cluster: lab\n    user: me\n  name: lab\ncurrent-context: lab\nusers:\n- name: me\n  user:\n${user}`;
+  return api;
+}

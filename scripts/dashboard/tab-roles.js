@@ -265,7 +265,7 @@ function rolesInsts(key){
   const d = rolesData;
   if (!(d.instance_areas || []).includes(key)) return [];
   return key === "runner" ? (d.runners || []).map(r => ({id: r.id, name: `${r.name} on ${r.node}`}))
-                          : (d.nodes || []);
+    : key === "clusters" ? (d.clusters || []) : (d.nodes || []);
 }
 function rolesLvlAt(key, id){
   const m = rolesDraft.only?.[key];
@@ -334,7 +334,7 @@ function rolesRoleBody(){
     const rAll = lv.every(Boolean), rSome = lv.some(Boolean);
     const wAll = lv.every(x => x === "write"), wSome = lv.some(x => x === "write");
     const open = insts.length && rolesExp.has(key);
-    const what = key === "runner" ? "runner" : "node";
+    const what = {runner: "runner", clusters: "cluster"}[key] || "node";
     const exp = insts.length ? `<button type="button" class="rexp" data-rexp="${esc(key)}" aria-expanded="${open ? "true" : "false"}"
       aria-label="${esc(label)} on each ${what}">${rSome && !rAll ? `${lv.filter(Boolean).length} of ${insts.length} ${what}s` : `each ${what}`}</button>` : "";
     const head = tblLine(ROLE_AREA_COLS, [

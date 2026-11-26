@@ -1041,6 +1041,7 @@ function renameProject(name, mode = "all"){
   if (!p?.work) rnLoadSnapshots(name);
   rnLoadPeople(name);
   if (!p?.work) rnLoadFtp(name);
+  if (!p?.work) rnLoadDeploy(name);
   rnFillPrefs(p);
   rnSpaceMarks(name, proj);
   rnFillHostsOwn(p);
@@ -1062,7 +1063,7 @@ function renameProject(name, mode = "all"){
 // controls dead, with one press to the space's own dialog; the repository's
 // own settings beside them stay live. A section wholly the space's, and the
 // parts of a section that are.
-const RN_SPACE_SECTS = ["rn:people", "rn:sees", "rn:tools"];
+const RN_SPACE_SECTS = ["rn:people", "rn:deploy", "rn:sees", "rn:tools"];
 const RN_SPACE_PARTS = ["rnNodeSpace", "rnAgentsField"];
 let rnSpaceOn = false;
 let rnVmCapsShown = () => {};

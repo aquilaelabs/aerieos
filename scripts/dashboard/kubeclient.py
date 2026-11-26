@@ -101,7 +101,8 @@ def _said(e):
 
 def facts(client):
     """What a cluster is, as its own API says: {version, nodes, ready,
-    namespaces: [{name, space}]}. Raises KubeError."""
+    namespaces: [{name, labels}]}, each namespace's AerieOS labels alone
+    (kube.owner_of reads whose it is). Raises KubeError."""
     v = client.get("/version")
     nodes = client.get("/api/v1/nodes").get("items") or []
     ready = sum(1 for n in nodes if any(c.get("type") == "Ready" and c.get("status") == "True"
@@ -109,5 +110,6 @@ def facts(client):
     ns = client.get("/api/v1/namespaces").get("items") or []
     return {"version": str(v.get("gitVersion") or ""), "nodes": len(nodes), "ready": ready,
             "namespaces": [{"name": (x.get("metadata") or {}).get("name", ""),
-                            "space": ((x.get("metadata") or {}).get("labels") or {}).get("aerieos.io/space", "")}
+                            "labels": {k: str(v)[:80] for k, v in ((x.get("metadata") or {}).get("labels") or {}).items()
+                                       if str(k).startswith("aerieos.io/")}}
                            for x in ns]}

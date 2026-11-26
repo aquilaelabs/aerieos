@@ -224,6 +224,17 @@ class Model(unittest.TestCase):
         self.assertIsNone(roles.nodes_for(o, "nodes"), "a role holding it on every node: every node")
         self.assertEqual(roles.level_of(o, "nodes", node="n3"), "read")
 
+    def test_clusters_held_cluster_by_cluster(self):
+        # R281: Clusters asked of each cluster, as Nodes is of each node.
+        r = roles.set_role("kube", "global", {"clusters": "read"}, only={"clusters": {"k_a": "write", "k_b": "read"}})
+        self.assertEqual(r["only"], {"clusters": {"k_a": "write", "k_b": "read"}})
+        k = {"name": "k", "role": "user", "roles": ["kube"], "projects": []}
+        self.assertTrue(roles.granted(k, "clusters", instance="k_a"))
+        self.assertFalse(roles.granted(k, "clusters", instance="k_b"), "read on k_b, not write")
+        self.assertTrue(roles.granted(k, "clusters-read", instance="k_b"))
+        self.assertFalse(roles.granted(k, "clusters-read", instance="k_c"), "a cluster it does not name")
+        self.assertEqual(roles.nodes_for(k, "clusters", "write"), ["k_a"])
+
     def test_a_role_given_on_one_project_holds_there_alone(self):
         roles.set_role("releaser", "projects", {"projects": "read", "releases": "write"})
         u = {"name": "r", "role": "user", "roles": [], "projects": ["alpha", "beta"],

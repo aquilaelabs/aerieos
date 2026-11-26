@@ -5,7 +5,7 @@
 // (the operator, 17 Oct).
 // Honored by the gate where they hold and nowhere else; a project's owner
 // gives roles on the projects they own and nothing Global.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey, asUser, call as api, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey, asUser, call as api, section, REPO, kubeApi } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -275,4 +275,30 @@ await api('/api/roles', { action: 'remove', name: 'deployer' });
 ok((await api('/api/version', { project: 'alpha', action: 'nothing-much' }, depAuth)).status === 403,
    'the role removed, what it gave goes with it');
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
+// Clusters asked cluster by cluster (R281), as Nodes is node by node: a
+// role holding it on one cluster reads that one alone and changes it by its
+// own level there, and a new cluster is a role's on every one.
+await section("Clusters asked cluster by cluster", async () => {
+  const k = await kubeApi();
+  const one = (await api('/api/clusters', { action: 'add', name: 'one', kubeconfig: k.kubeconfig() })).body.cluster.id;
+  const two = (await api('/api/clusters', { action: 'add', name: 'two', kubeconfig: k.kubeconfig() })).body.cluster.id;
+  const rl = (await api('/api/roles')).body;
+  ok((rl.instance_areas || []).includes('clusters') && (rl.clusters || []).map(c => c.name).sort().join() === 'one,two',
+     `the Roles page opens Clusters on each cluster (${(rl.clusters || []).map(c => c.name)})`);
+  await api('/api/roles', { action: 'set', name: 'kube-one', scope: 'global', perms: { clusters: 'read' }, only: { clusters: { [one]: 'write' } } });
+  await api('/api/roles', { action: 'assign', name: 'dep', roles: ['kube-one'] });
+  const seen = (await api('/api/clusters', undefined, depAuth)).body;
+  ok((seen.clusters || []).map(c => `${c.name}:${c.may}`).join() === 'one:true' && seen.may_add === false,
+     `it reads the cluster its role names alone, may change it, and may add none (${JSON.stringify((seen.clusters || []).map(c => c.name))}, add ${seen.may_add})`);
+  const other = await api('/api/clusters', { action: 'test', id: two }, depAuth);
+  const fresh = await api('/api/clusters', { action: 'add', name: 'three', kubeconfig: k.kubeconfig() }, depAuth);
+  const mine = await api('/api/clusters', { action: 'test', id: one }, depAuth);
+  ok(other.status === 403 && /Clusters Write on two/.test(other.body.error || '') && fresh.status === 403 && /every cluster/.test(fresh.body.error || '')
+     && mine.status === 200, `another cluster and a new one are refused by name, its own answers (${other.body.error || ''} | ${fresh.body.error || ''})`);
+  await api('/api/roles', { action: 'assign', name: 'dep', roles: [] });
+  await api('/api/roles', { action: 'remove', name: 'kube-one' });
+  for (const id of [one, two]) await api('/api/clusters', { action: 'forget', id });
+  k.close();
+});
+
 await done(browser);

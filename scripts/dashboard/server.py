@@ -5089,8 +5089,15 @@ connections.kind("router", "Model router key", "shared", _conn_router, _conn_rou
 # The Kubernetes clusters (R281 step 2): each a connection shared by spaces,
 # its credential sealed under the install key like the router's keys.
 import clusters                                                  # noqa: E402
+import kube                                                      # noqa: E402
 clusters.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                   sealing=lambda: signing.MASTER is not None, used=lambda cid: connections.used("cluster", cid))
+                   sealing=lambda: signing.MASTER is not None, used=lambda cid: connections.used("cluster", cid),
+                   owner_of=kube.owner_of)
+# A space's environments on those clusters (R281 step 3): each a namespace
+# kube.py makes ready with the cluster's credential, labeled with the space's
+# id, which never changes, and this install's mark.
+kube.configure(state=STATE, write_json=write_json, clusters=clusters, space_id=registry.pid,
+               space_of_id=lambda sid: registry.resolve(sid) if re.fullmatch(r"P\d+", str(sid or "")) else "")
 connections.kind("cluster", "Kubernetes cluster", "shared",
                  lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
                            "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
@@ -6894,6 +6901,7 @@ ROUTES = (
     Route("GET", "exact", "/api/root-hooks", "_get_root_hooks", "handler"),
     Route("GET", "exact", "/api/connections", "_get_connections", "handler"),
     Route("GET", "exact", "/api/clusters", "_get_clusters", "handler"),
+    Route("GET", "exact", "/api/deploy", "_get_deploy", "handler"),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
     Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
@@ -6997,6 +7005,7 @@ ROUTES = (
     Route("POST", "exact", "/api/root-hooks", "_root_hooks", "handler"),
     Route("POST", "exact", "/api/connections", "_connections", "handler"),
     Route("POST", "exact", "/api/clusters", "_clusters", "handler"),
+    Route("POST", "exact", "/api/deploy", "_deploy", "handler"),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -7565,6 +7574,18 @@ class Handler(BaseHTTPRequestHandler):
         a node's services were gated by Containers Write held on any space)."""
         who = self._who()
         why = users.may_node(who, action, nid) if nid else users.may_instance(who, action, "")
+        if not why:
+            return False
+        self._json({"error": why}, 403)
+        return True
+
+    def _refused_instance(self, action, inst, name=""):
+        """True, with the 403 written, when this account may not do `action`
+        on one instance of its area held instance by instance (a cluster:
+        roles.INSTANCE_AREAS), or, with `inst` "", on a new one, which a role
+        holding the area on some alone does not reach (R281). `name` is how
+        the refusal names it."""
+        why = users.may_instance(self._who(), action, inst, name)
         if not why:
             return False
         self._json({"error": why}, 403)
@@ -9704,6 +9725,9 @@ class Handler(BaseHTTPRequestHandler):
                            "nodes": [] if NODES_OK or not can["admin"] else
                            [{"id": n["id"], "name": n["name"]} for n in nodes.node_list()
                             if n.get("kind") != "local" and n.get("state") != "retired"],
+                           # ...and each cluster for Clusters (R281).
+                           "clusters": [] if not can["admin"] else
+                           [{"id": c["id"], "name": c["name"]} for c in clusters.listing()["clusters"]],
                            "runners": [] if NODES_OK or not can["admin"] else
                            # Named by what it serves: its registered name is
                            # its node's, which the line already says.
@@ -13450,10 +13474,20 @@ class Handler(BaseHTTPRequestHandler):
     def _get_clusters(self):
         """GET /api/clusters (R281 step 2): the Kubernetes clusters this
         install may deploy to, each with its facts as last asked; never a
-        credential. Read on Clusters Read."""
+        credential. Read on Clusters Read, cluster by cluster where a role
+        holds it on some (roles.INSTANCE_AREAS): the ones it reads, each
+        saying whether it may be changed, and whether one may be added."""
         if self._refused("clusters-read"):
             return None
-        return self._json(clusters.listing())
+        who = self._who()
+        got = clusters.listing()
+        got["clusters"] = [c for c in got["clusters"] if not users.may_instance(who, "clusters-read", c["id"])]
+        for c in got["clusters"]:
+            c["may"] = not users.may_instance(who, "clusters", c["id"])
+            # The spaces each deploys for, which Forget names before it asks.
+            c["spaces"] = [registry.label(k) for k in kube.using(c["id"])]
+        got["may_add"] = not users.may_instance(who, "clusters", "")
+        return self._json(got)
 
     def _clusters(self, req):
         """POST /api/clusters {action: add, name, kubeconfig} | {action:
@@ -13461,9 +13495,11 @@ class Handler(BaseHTTPRequestHandler):
         answers, asked again, renamed or forgotten here (nothing on the
         cluster changes). Clusters Write, an administrator's unless a role
         gives it; a session never reaches it (SESSION_ROUTES)."""
-        if self._refused("clusters"):
-            return None
         act, cid, by = field(req, "action"), field(req, "id"), self._principal()
+        # Add is a new cluster, which a role holding Clusters on some alone
+        # does not reach; the rest act on one, by its own level.
+        if self._refused_instance("clusters", "" if act == "add" else cid, (clusters.listing_one(cid) or {}).get("name", "")):
+            return None
         if act == "add":
             r = clusters.add(req.get("kubeconfig"), field(req, "name"), by)
             if r.get("ok"):
@@ -13485,6 +13521,57 @@ class Handler(BaseHTTPRequestHandler):
                 db.audit(by, "cluster-forget", cid, {})
             return self._json(r, 200 if r.get("ok") else 404)
         return self._json({"error": "action is add, test, rename or forget"}, 400)
+
+    def _get_deploy(self):
+        """GET /api/deploy?project= (R281 step 3): the space's environments,
+        each with its cluster's name, and the clusters this account may pick
+        one from (Clusters Read; none, with why, otherwise). Deploy Read on
+        the space."""
+        name = self._project_asked()
+        if not name or self._refused("deploy-read", name):
+            return None
+        key, who = repos.key_of(name), self._who()
+        kept = clusters.listing()["clusters"]
+        readable = [c for c in kept if not users.may_instance(who, "clusters-read", c["id"])]
+        pick = "" if readable else users.may(who, "clusters-read") or "your roles read none of the clusters kept"
+        # Who may change them, as _deploy asks it, said on the section.
+        why = users.may(who, "settings", name) or users.may(who, "write", name) \
+            or (projects.locked_out(name, users.whose(who)) or {}).get("error", "") \
+            or ("picking a cluster is Clusters Read" if pick and not kube.envs(key) else "")
+        return self._json({"envs": kube.envs(key), "kept": len(kept), "may": not why, "why": why,
+                           "clusters": [{"id": c["id"], "name": c["name"]} for c in readable]})
+
+    def _deploy(self, req):
+        """POST /api/deploy {project, action: save, env, was} | {project,
+        action: remove, name} (R281 step 3): an environment added or changed
+        once its namespace is ready on its cluster, or taken off the space's
+        list (its namespace stays on the cluster). Space settings Write on
+        the space, and Clusters Read to name a cluster; a session never
+        reaches it."""
+        name = self._space_write("settings", req)
+        if not name:
+            return None
+        key, act, by = repos.key_of(name), field(req, "action"), self._principal()
+        if act == "save":
+            env = req.get("env") if isinstance(req.get("env"), dict) else {}
+            # The cluster named is one this account reads (cluster by cluster).
+            cid = str(env.get("cluster") or "")
+            if self._refused_instance("clusters-read", cid, (clusters.listing_one(cid) or {}).get("name", "")):
+                return None
+            r = kube.save(key, env, field(req, "was"), by)
+            if r.get("ok"):
+                e = next((x for x in r["envs"] if x["name"] == str(env.get("name") or "").strip().lower()), {})
+                db.audit(by, "deploy-env", key, {"env": e.get("name"), "cluster": e.get("cluster"), "namespace": e.get("namespace"),
+                                                  "was": field(req, "was")})
+                if e.get("cluster"):
+                    connections.used("cluster", e["cluster"])
+            return self._json(r, 200 if r.get("ok") else 400)
+        if act == "remove":
+            r = kube.remove(key, field(req, "name"))
+            if r.get("ok"):
+                db.audit(by, "deploy-env-remove", key, {"env": field(req, "name")})
+            return self._json(r, 200 if r.get("ok") else 404)
+        return self._json({"error": "action is save or remove"}, 400)
 
     def _get_connections(self):
         """GET /api/connections (R294 step 9): Connected services, every

@@ -62,6 +62,11 @@ def refusals(fn):
                 and node.func.attr == "_space_write" and node.args \
                 and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
             seen.append(f"refused: {node.args[0].value}")
+        # ...and the ones asking it of one instance: a node, a cluster.
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr in ("_refused_on_node", "_refused_instance") and node.args \
+                and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+            seen.append(f"refused: {node.args[0].value} (on the {'node' if node.func.attr == '_refused_on_node' else 'instance'})")
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "_trash_refused":
             seen.append("refused: trash")
     out = []

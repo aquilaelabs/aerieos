@@ -731,7 +731,7 @@ def may_instance(u, action, instance="", name=""):
     if area not in roles.INSTANCE_AREAS or is_admin(u) or (u or {}).get("session"):
         return ""
     label = next((a[1] for a in roles.AREAS if a[0] == area), area)
-    lvl, what = ("Write" if need == "write" else "Read"), ("runner" if area == "runner" else "node")
+    lvl, what = ("Write" if need == "write" else "Read"), {"runner": "runner", "clusters": "cluster"}.get(area, "node")
     if not instance:
         if roles.nodes_for(u, area, need) is None:
             return ""

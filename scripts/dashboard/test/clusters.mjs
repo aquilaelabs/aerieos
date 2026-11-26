@@ -1,26 +1,13 @@
 // The Clusters page (R281 step 2): a Kubernetes cluster added from a
-// kubeconfig against a stub API server this file runs (as agent-stub stands
+// kubeconfig against the stub API server lib.mjs runs (kubeApi, as agent-stub stands
 // in for a node), its facts and namespaces drawn, Test, Rename and Forget,
 // a cloud CLI's sign-in refused with the way out, the credential never in
 // what the page reads, and the cluster a connection Controller settings lists.
-import { launch, newPage, ok, done, ready, URL, section, until } from './lib.mjs';
-import http from 'node:http';
+import { launch, newPage, ok, done, ready, URL, section, until, kubeApi } from './lib.mjs';
 
-let token = 'good';
-const stub = http.createServer((req, res) => {
-  const answers = {
-    '/version': { gitVersion: 'v1.37.3+k3s1' },
-    '/api/v1/nodes': { items: [{ status: { conditions: [{ type: 'Ready', status: 'True' }] } }, { status: { conditions: [{ type: 'Ready', status: 'False' }] } }] },
-    '/api/v1/namespaces': { items: [{ metadata: { name: 'default' } }, { metadata: { name: 'alpha-staging', labels: { 'aerieos.io/space': 'alpha' } } }] },
-  };
-  const okAuth = req.headers.authorization === 'Bearer ' + token;
-  const body = !okAuth ? { message: 'Unauthorized' } : answers[req.url] || { message: 'not found' };
-  res.writeHead(!okAuth ? 401 : answers[req.url] ? 200 : 404, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(body));
-});
-await new Promise(r => stub.listen(0, '127.0.0.1', r));
-const API = `http://127.0.0.1:${stub.address().port}`;
-const kubeconfig = user => `apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: ${API}\n  name: lab\ncontexts:\n- context:\n    cluster: lab\n    user: me\n  name: lab\ncurrent-context: lab\nusers:\n- name: me\n  user:\n${user}`;
+// One a hand made for a space of the same name, without this install's mark.
+const api = await kubeApi({ namespaces: [{ metadata: { name: 'alpha-staging', labels: { 'aerieos.io/space': 'alpha' } } }] });
+const kubeconfig = user => api.kubeconfig(user);
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -47,12 +34,22 @@ await section("a cluster added from a kubeconfig", async () => {
   await page.click('.clusterstab details[data-sect^="clusters:c:"] > summary');
   await page.waitForSelector('.clusterstab [data-clact="test"]', { state: 'visible', timeout: 10000 });
   const body = await page.$eval('.clusterstab details[data-sect^="clusters:c:"]', d => d.textContent.replace(/\s+/g, ' '));
-  ok(/alpha-staging \(alpha\)/.test(body) && /a token/.test(body), `opened, it says its namespaces with the space that owns each and how it signs in (${body.slice(0, 160)})`);
+  ok(/default, alpha-staging/.test(body) && !/\(alpha\)/.test(body) && /a token/.test(body),
+     `opened, it says its namespaces, one this install did not make nobody's, and how it signs in (${body.slice(0, 160)})`);
 });
 
 await section("a cloud CLI's sign-in is refused, with the way out", async () => {
   const r = await page.evaluate(k => postJSON('/api/clusters', { action: 'add', name: 'eks', kubeconfig: k }),
     kubeconfig('    exec:\n      command: aws\n'));
+  // ...and pressed on the page, the press comes back live for another try.
+  await page.click('.clusterstab #clAddOpen');
+  await page.waitForSelector('.clusterstab #clName', { timeout: 10000 });
+  await page.fill('.clusterstab #clName', 'eks');
+  await page.fill('.clusterstab #clText', kubeconfig('    exec:\n      command: aws\n'));
+  await page.click('.clusterstab #clAdd');
+  const back = await page.waitForFunction(() => { const b = document.querySelector('.clusterstab #clAdd'); return b && !b.disabled && !b.classList.contains('busy'); }, null, { timeout: 10000 }).then(() => true, () => false);
+  ok(back, 'a refused Add comes back live, what was typed still there');
+  await page.click('.clusterstab #clCancel');
   ok(/cloud CLI/.test(r.error || '') && /ServiceAccount's token/.test(r.error || '') && !/`|kubectl/.test(r.error || ''),
      `refused in one sentence saying the way out, its command left to the page's hint (${(r.error || '').slice(0, 90)})`);
   // The refusal's 400 is what was asked for, and the browser logs it.
@@ -63,13 +60,13 @@ await section("Test, Rename and Forget", async () => {
   const conn = await page.evaluate(async () => (await (await fetch('/api/connections')).json()).rows || []);
   ok(conn.some(r => r.kind === 'cluster' && r.name === 'lab' && r.whose === 'shared' && r.by),
      'Connected services lists it, shared by spaces, with who added it');
-  token = 'rotated';
+  api.token = 'rotated';
   await page.click('.clusterstab [data-clact="test"]');
   await page.waitForFunction(() => /not answering/.test(document.querySelector('.clusterstab details[data-sect^="clusters:c:"] > summary')?.textContent || ''), null, { timeout: 15000 })
     .catch(() => {});
   const down = await page.$eval('.clusterstab details[data-sect^="clusters:c:"]', d => ({ head: d.querySelector('summary').textContent, said: d.textContent }));
   ok(/not answering/.test(down.head) && /401/.test(down.said), `Test on a credential it no longer takes says so on the section (${down.head.replace(/\s+/g, ' ')})`);
-  token = 'good';
+  api.token = 'good';
   page.answers.push({ index: 0, text: 'lab two' });
   await page.click('.clusterstab [data-clact="rename"]');
   await page.waitForFunction(() => document.querySelector('.clusterstab details[data-sect^="clusters:c:"] summary .t')?.textContent === 'lab two', null, { timeout: 15000 }).catch(() => {});
@@ -81,5 +78,5 @@ await section("Test, Rename and Forget", async () => {
   ok(page.errors.length === 0, `no console error through any of it (${page.errors.slice(0, 2).join(' | ')})`);
 });
 
-stub.close();
+api.close();
 await done(browser);

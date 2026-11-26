@@ -14,9 +14,9 @@ refused too: the file is on the machine the kubeconfig came from.
 
 Each cluster is a connection (connections.py, kind "cluster", shared by
 spaces): who added it and when, its last use, Forget. Its facts (the
-version, nodes ready of all, its namespaces and which space owns each by
-the aerieos.io/space label) are asked of its API on Add and Test and kept
-with when, so the page reads them without a call.
+version, nodes ready of all, its namespaces and which space owns each, by
+the labels kube.py puts on the ones it makes) are asked of its API on Add
+and Test and kept with when, so the page reads them without a call.
 """
 import base64
 import json
@@ -41,6 +41,7 @@ seal = None             # bytes -> bytes
 unseal = None           # bytes -> bytes, or raises
 sealing = None          # () -> whether an install key is loaded now
 used = None             # (cluster id) -> None: a use, for Connected services
+owner_of = None         # (a namespace's labels) -> the space key this install made it for, or ""
 SEALED = "bbseal:"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,60}$")
 TEXT_MAX = 64 * 1024
@@ -169,10 +170,21 @@ def client_of(cid):
 
 
 def _row(cid, c):
-    """A cluster as the page reads it: never a credential."""
+    """A cluster as the page reads it: never a credential, and each
+    namespace with the space this install made it for."""
+    f = dict(c.get("facts") or {})
+    if isinstance(f.get("namespaces"), list):
+        f["namespaces"] = [{"name": n.get("name", ""), "space": owner_of(n.get("labels")) if owner_of else ""}
+                           for n in f["namespaces"] if isinstance(n, dict)]
     return {"id": cid, "name": c.get("name", cid), "server": c.get("server", ""), "context": c.get("context", ""),
             "auth": "token" if c.get("token") else "certificate", "insecure": bool(c.get("insecure")),
-            "added_by": c.get("added_by", ""), "added_at": c.get("added_at", 0), "facts": c.get("facts") or {}}
+            "added_by": c.get("added_by", ""), "added_at": c.get("added_at", 0), "facts": f}
+
+
+def listing_one(cid):
+    """One cluster as the page reads it, or None."""
+    c = _load().get(str(cid or ""))
+    return _row(str(cid), c) if c else None
 
 
 def listing():

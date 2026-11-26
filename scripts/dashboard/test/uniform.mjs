@@ -2857,7 +2857,16 @@ const DIALOGS = {
   firstsession: () => openBrief('alpha', ''),
   senddocker: () => openSendToDocker('ep.silon'), devenv: () => openDevEnv('ep.silon', 'main'),
   relocate: () => openRelocate('ep.silon', 'main'),
-  projsettings: () => renameProject('alpha'),
+  // ...with its Deploy section drawn as a space with a cluster kept has it
+  // (page-deploy.js), a record and Add environment's form open, so the
+  // records and their form are measured like the rest.
+  projsettings: async () => { renameProject('alpha');
+    for (let i = 0; i < 40 && rnDeploy === null; i++) await new Promise(r => setTimeout(r, 250));
+    rnDeploy = { envs: [{ name: 'staging', cluster: 'k_1', cluster_name: 'lab', namespace: 'alpha-staging', registry: '', when: 'push',
+                          branch: 'main', production: true }], clusters: [{ id: 'k_1', name: 'lab' }], kept: 1, may: true, why: '' };
+    rnEnvEdit = { i: -1, nsTyped: false, form: { name: 'prod', cluster: 'k_1', namespace: 'alpha-prod', registry: '', when: 'push',
+                                                 branch: 'main', production: false } };
+    rnDrawDeploy(); },
   // Reset AerieOS (the operator, 12 Oct): the nodes to un-enroll first,
   // what un-enrolling does, and the word. Opened, measured, never pressed.
   reset: () => askReset(),

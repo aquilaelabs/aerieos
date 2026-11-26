@@ -37,7 +37,7 @@ function clStatus(c){
 }
 
 function clBody(c){
-  const f = c.facts || {}, may = state?.areas?.clusters === "write";
+  const f = c.facts || {}, may = !!c.may;
   const ns = (f.namespaces || []).filter(n => !/^kube-/.test(n.name));
   const facts = factGrid([["API server", c.server], ["Signs in with", c.auth === "token" ? "a token" : "a client certificate"],
     ["Added", c.added_at ? `${ago(c.added_at)}${c.added_by ? ` by ${c.added_by}` : ""}` : ""],
@@ -78,13 +78,13 @@ function renderClustersInto(i){
     if (!clustersErr && !readBusy("clusters")) loadClusters();
     return;
   }
-  const rows = clustersData.clusters || [], may = state?.areas?.clusters === "write";
+  const rows = clustersData.clusters || [], may = !!clustersData.may_add;
   const down = rows.filter(c => c.facts?.error).length;
   const head = pageHead({title: "Clusters", line: [{text: rows.length ? `${rows.length} cluster${rows.length === 1 ? "" : "s"}` : "none yet"},
     down ? {text: `${down} not answering`, tone: "warn"} : null]});
   const items = rows.map(c => docSection("clusters", `c:${c.id}`, c.name, clStatus(c), clBody(c),
     {item: true, cls: c.facts?.error ? "warn" : "", open: false})).join("");
-  const add = !may ? (rows.length ? "" : `<div class="empty">No cluster is kept yet. Adding one is Clusters Write.</div>`)
+  const add = !may ? (rows.length ? "" : `<div class="empty">No cluster is kept yet. Adding one is Clusters Write on every cluster.</div>`)
     : !rows.length || clAdding ? docSection("clusters", "add", "Add cluster", "", clAddBody(rows.length > 0))
     : `<div class="field addbar"><button type="button" id="clAddOpen">Add cluster</button></div>`;
   patch(d.list, head + items + add);
@@ -114,7 +114,9 @@ function wireClusters(root){
   if (add) add.onclick = async () => {
     busy(add, "Asking the cluster");
     const j = await postJSON("/api/clusters", {action: "add", name: clDraft.name.trim(), kubeconfig: clDraft.text});
-    if (j.error){ notify(j.error, true); if (add.isConnected) unbusy(add, "Add cluster"); return; }
+    // Drawn again from the draft: the press given back as its markup was
+    // drawn, before anything was typed, would come back dead.
+    if (j.error){ notify(j.error, true); if (add.isConnected) unbusy(add, "Add cluster"); readMoved("clusters"); drawPanes(); return; }
     notify(`${j.cluster.name} added: ${clStatus(j.cluster)}`);
     clAdding = false; clDraft = {name: "", text: ""};
     await loadClusters();
@@ -124,7 +126,8 @@ function wireClusters(root){
     if (!c) return;
     const act = b.dataset.clact;
     if (act === "forget"){
-      if (!await askYes(`Forget ${c.name}? Its credential leaves this controller, and spaces deploy to it no more. Nothing on the cluster changes.`)) return;
+      const sp = c.spaces || [];
+      if (!await askYes(`Forget ${c.name}? Its credential leaves this controller${sp.length ? `, and ${sp.join(", ")} deploy${sp.length === 1 ? "s" : ""} to it no more` : ""}. Nothing on the cluster changes.`)) return;
     }
     let body = {action: act, id};
     if (act === "rename"){

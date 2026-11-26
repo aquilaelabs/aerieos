@@ -77,7 +77,8 @@ class Stub(BaseHTTPRequestHandler):
             {"status": {"conditions": [{"type": "Ready", "status": "True"}]}},
             {"status": {"conditions": [{"type": "Ready", "status": "False"}]}}]},
         "/api/v1/namespaces": {"items": [{"metadata": {"name": "default"}},
-                                         {"metadata": {"name": "shop-staging", "labels": {"aerieos.io/space": "shop"}}}]},
+                                         {"metadata": {"name": "shop-staging", "labels": {"aerieos.io/space": "P7", "aerieos.io/install": "ours"}}},
+                                         {"metadata": {"name": "theirs", "labels": {"aerieos.io/space": "P7", "aerieos.io/install": "another"}}}]},
     }
 
     def do_GET(self):
@@ -112,7 +113,8 @@ class Kept(unittest.TestCase):
         self.addCleanup(self.d.cleanup)
         self.uses = []
         clusters.configure(state=self.d.name, write_json=write_json, seal=lambda b: b[::-1], unseal=lambda b: b[::-1],
-                           sealing=lambda: True, used=self.uses.append)
+                           sealing=lambda: True, used=self.uses.append,
+                           owner_of=lambda lb: "shop" if (lb or {}).get("aerieos.io/install") == "ours" else "")
 
     def test_added_asked_renamed_and_forgotten(self):
         r = clusters.add(kubeconfig(self.url, "    token: good\n"), "lab", "ada")
@@ -120,6 +122,8 @@ class Kept(unittest.TestCase):
         c = r["cluster"]
         self.assertEqual((c["facts"]["version"], c["facts"]["ready"], c["facts"]["nodes"]), ("v1.37.3+k3s1", 1, 2))
         self.assertIn({"name": "shop-staging", "space": "shop"}, c["facts"]["namespaces"])
+        self.assertIn({"name": "theirs", "space": ""}, c["facts"]["namespaces"],
+                      "a namespace another install made for a space of the same id is nobody's here")
         kept = json.loads((Path(self.d.name) / "clusters.json").read_text())
         self.assertTrue(kept[c["id"]]["token"].startswith(clusters.SEALED), "the token is kept sealed")
         self.assertNotIn("good", json.dumps(clusters.listing()), "the page never reads the credential")

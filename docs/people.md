@@ -64,8 +64,10 @@ roles, made on the **Roles** page (R152, the operator, 7 Oct). A role is a
 **kind** (**Everywhere**, which holds on every space and is the only kind
 that reaches the machinery, or **On a space**, given per space and
 holding there) and, per area, **Read** and **Write**: Spaces, Space
-settings, Releases and versions, Git authentication, File access, Containers
-and Terminal on a space; Nodes, Clusters (the Kubernetes clusters a space
+settings, Releases and versions, Git authentication, File access, Containers,
+VMs, Terminal and Deploy (its Kubernetes environments: Read sees them and
+what runs in them, Write deploys, rolls back, restarts and scales; every
+space owner's role holds it at Write) on a space; Nodes, Clusters (the Kubernetes clusters a space
 may deploy to: Read sees them, Write adds, tests and forgets one), Install,
 Configure, Curate, Jobs, CI runner, Accounts and roles, New spaces,
 Controller and Storage beside them.
@@ -75,8 +77,10 @@ and deploying or removing a service there; **Curate** the catalog's own
 entries every node shares, a pack or an app of your own (R174; before 0.9
 the first two were one area, Toolchains). On an Everywhere role the areas
 that reach a machine (Nodes, Install, Configure, Jobs, New spaces,
-Storage) open on the nodes, and CI runner on each runner, with Read and Write
-on each, every one ticked being every node, those added later included: a
+Storage) open on the nodes, CI runner on each runner and Clusters on each
+cluster, with Read and Write on each, every one ticked being every node,
+those added later included (a new cluster is added on Clusters Write held
+on every cluster): a
 role with New spaces to write on bb-sandbox alone lets an
 account make spaces there and nowhere else, a space made elsewhere or on
 no node being refused by name, and the account owns what it makes, so it

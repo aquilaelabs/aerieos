@@ -296,7 +296,9 @@ offered to a node that did not enroll as a sandbox.
 
 The Kubernetes clusters a space may deploy to, beside the nodes under
 Machines: infrastructure the install keeps, read on Clusters Read and
-added, tested, renamed and forgotten on Clusters Write. **Add cluster** takes
+tested, renamed and forgotten on Clusters Write, each asked of the cluster
+itself where a role holds the area on some clusters alone (as Nodes is of
+each node); adding one is Clusters Write on every cluster. **Add cluster** takes
 a kubeconfig, pasted or read from its file, and keeps its current context:
 the API server, its certificate authority, and a token or a client
 certificate, sealed under the install key, never shown again and never
@@ -306,9 +308,27 @@ how to make a token-based one; a path where data belongs is refused,
 `kubectl config view --raw --flatten --minify` writing the files in. A
 cluster is added only once its API answers. Each is a section that opens on
 its facts as its API last said (the version, nodes ready of all), its
-namespaces with the space that owns each (the `aerieos.io/space` label), and
-Test, Rename and Forget; Forget changes nothing on the cluster. Each is a
-connection too, on Controller settings' Connected services.
+namespaces with the space that owns each, and Test, Rename and Forget;
+Forget changes nothing on the cluster. Each is a connection too, on
+Controller settings' Connected services.
+
+**A space's environments.** Once a cluster is kept, each space's settings
+carry a **Deploy** section: its environments as records (staging,
+production, any name), each a cluster, a namespace on it, the registry its
+images are pushed to, and when it deploys (by hand, on a push to a branch,
+on a release); one marked production always asks a person before a
+session's deploy lands. An environment's Save makes its namespace ready
+with the cluster's own credential first: the namespace, labeled with the
+space's id (`aerieos.io/space`) and this install's mark
+(`aerieos.io/install`), and in it a ServiceAccount, `aerie-deployer`, with a
+Role and a RoleBinding confined to that namespace (its workloads, services,
+configuration, secrets, jobs and ingresses; no RBAC of its own), so what
+deploys for one space never reaches another's or the cluster's own. A
+namespace anybody else made (another space, another install, a hand) is
+refused, never taken over. Remove takes an environment off the space's list
+and leaves its namespace and what runs in it on the cluster. Changing them
+is Space settings Write on the space with Clusters Read on the cluster
+picked; seeing them is Deploy Read.
 
 ## Storage
 

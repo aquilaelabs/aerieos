@@ -44,6 +44,10 @@ AREAS = (
     # starts, stops, snapshots and removes them.
     ("vms", "VMs", "project", "its VMs and their state", "make, start, stop, snapshot and remove them"),
     ("terminal", "Terminal", "project", "the shielded agent console", "the full tmux shell"),
+    # Where its software goes (R281, the operator, 25 Nov): Read sees its
+    # Kubernetes environments and what runs in them, Write deploys, rolls
+    # back, restarts and scales. Owner roles gained it on upgrade (0033).
+    ("deploy", "Deploy", "project", "its environments and their logs", "deploy, roll back, restart and scale"),
     ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a space's sessions reach"),
     # The Kubernetes clusters a space may deploy to (R281 step 2): Read sees
     # them and their namespaces, Write adds, tests and forgets one.
@@ -72,10 +76,11 @@ NODE_AREAS = frozenset({"nodes", "install", "configure", "jobs", "newprojects", 
 # The areas an Everywhere role may hold instance by instance, each at its own
 # level (the operator, 16 Oct: expand an area's row to say which nodes, which
 # runners, Read or Write on each, the area's own boxes ticking every one).
-# A node area's instances are nodes, by id; a runner is NODE_ID/SLOT. Held
+# A node area's instances are nodes, by id; a runner is NODE_ID/SLOT; a
+# Kubernetes cluster its id (R281 step 2, as Nodes is asked node by node). Held
 # in a role's `only`: {area: {instance: level}}; an area not in it holds on
 # every instance, those added later included.
-INSTANCE_AREAS = NODE_AREAS | {"runner"}
+INSTANCE_AREAS = NODE_AREAS | {"runner", "clusters"}
 ONLY_MAX = 256
 AREA_KEYS = tuple(a[0] for a in AREAS)
 PROJECT_AREAS = frozenset(a[0] for a in AREAS if a[2] == "project")
@@ -107,6 +112,7 @@ CAP_AREA = {
     "controller": ("controller", "write"), "controller-read": ("controller", "read"),
     "nodes-write": ("nodes", "write"), "containers-read": ("containers", "read"),
     "clusters": ("clusters", "write"), "clusters-read": ("clusters", "read"),
+    "deploy": ("deploy", "write"), "deploy-read": ("deploy", "read"),
     "vms-write": ("vms", "write"), "vms-read": ("vms", "read"),
     "settings": ("settings", "write"), "signing": ("releases", "write"),
     # A container written on the Containers page for no space: every space's

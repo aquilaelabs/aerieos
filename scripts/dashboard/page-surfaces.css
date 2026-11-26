@@ -1594,7 +1594,7 @@ body.firstrun #panes{display:none}
    sections are each notebook's, and a project with no repository has no
    dial, test-run pick or commit identity that needs code. */
 #rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:releases"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
-#rnmodal .box.rnwork details.rngroup[data-sect="rn:releases"]{display:none}
+#rnmodal .box.rnwork details.rngroup:is([data-sect="rn:releases"],[data-sect="rn:deploy"]){display:none}
 #rnmodal .box.rnwork .rncode{display:none}
 /* ...and General holds nothing to save on that door (its name is the
    card's back's), so its bar is not drawn. */

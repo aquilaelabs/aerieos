@@ -482,6 +482,7 @@ function bootContainerDialogs(){
   // ...and so do its records, which redraw them when they move.
   // Add an address opens its form at the table's top.
   $("rnReachAdd").onclick = () => { rnReachEdit = {i: -1, form: {addr: "", nodes: []}}; rnDrawReach(true); };
+  $("rnEnvAdd").onclick = rnEnvAddOpen;
   $("cGo").onclick = cSubmit;
   // The controller restarted under unsaved work: the band's one press (page-poll.js).
   $("newBuildGo").onclick = () => { leaveOnPurpose(); location.reload(); };
