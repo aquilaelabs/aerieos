@@ -91,8 +91,11 @@ services:
       # that does not hold this checkout (a dev instance on its own share,
       # 15 Sep). Outside /workspace on purpose, so it is not a project of
       # this instance's; the image's own copy at /opt/aerieos is laid out
-      # for running, not for the suite.
-      - .:/opt/aerieos/src
+      # for running, not for the suite. Read-only (R290 step 7): this folder
+      # holds this very compose file and its .env, and a controller that
+      # could write them would choose what the next `docker compose up` runs
+      # with; a suite run here keeps its timings and coverage in its own copy.
+      - .:/opt/aerieos/src:ro
 
       # --- the toolchain store --------------------------------------------
       # This controller's own toolchains (the browsers `aerie capture shot`
