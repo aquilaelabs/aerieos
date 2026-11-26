@@ -1553,7 +1553,20 @@ def dialog_save(name, req, uid):
     # should be able to change the other's (17 Sep).
     mine = {k: req[k] for k in YOURS if k in req}
     if mine and not r.get("error"):
-        r = dict(r) | {"yours": set_for_user(uid, name, mine)}
+        # From the space's own door, for every repository of it (R294 step 5):
+        # it wrote the first repository's alone, so a session on another
+        # started on the defaults. A repository's own Settings view writes
+        # that repository, its own choice over the space's.
+        names = [name]
+        if req.get("scope") == "project" and _rp():
+            key = _rp()[0](name)
+            names = list(dict.fromkeys([name, *(_rp()[1](key) or [])])) if key else [name]
+        yours = None
+        for n in names:
+            got = set_for_user(uid, n, mine)
+            if n == name:
+                yours = got
+        r = dict(r) | {"yours": yours}
     # The restart is asked for by the dialog, which is where the
     # operator was told what it costs, and never inferred here from the
     # change alone, because the same write happens when nothing is

@@ -36,6 +36,18 @@ class Overrides(unittest.TestCase):
         for d in ("app", "server"):
             self.assertTrue(repos.add(self.key, d).get("ok"))
 
+    def test_just_for_you_from_the_space_s_door_reaches_every_repository(self):
+        # R294 step 5: the space's card wrote the first repository's alone.
+        r, status = prefs.dialog_save("app", {"scope": "project", "codex_model": "gpt-5.5"}, "u_0000aaaa")
+        self.assertEqual(status, 200, r)
+        for repo in ("app", "server"):
+            self.assertEqual(prefs.for_user("u_0000aaaa", repo).get("codex_model"), "gpt-5.5", repo)
+        # ...and a repository's own Settings view writes that repository alone.
+        prefs.dialog_save("app", {"scope": "project", "codex_effort": "high"}, "u_0000aaaa")
+        prefs.dialog_save("server", {"scope": "repository", "codex_effort": "low"}, "u_0000aaaa")
+        self.assertEqual((prefs.for_user("u_0000aaaa", "app").get("codex_effort"),
+                          prefs.for_user("u_0000aaaa", "server").get("codex_effort")), ("high", "low"))
+
     def test_push_rules_are_the_space_s_default_and_a_repository_s_own(self):
         # R294 step 4 (the operator, 25 Nov): how a repository pushes and what
         # the git host allows were the space's alone while edited on one
