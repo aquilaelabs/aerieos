@@ -1198,6 +1198,8 @@ function resetBusy(n){
 async function askReset(){
   const modal = $("resetmodal"), body = $("resetBody");
   if (!modal || !body) return;
+  // The nodes as last read where they cannot be read now: the list below
+  // names the agents a reset ends, and an older list still names them.
   try { await loadNodes(); } catch {}
   const list = liveAgents();
   const shut = () => { modal.hidden = true; body.innerHTML = ""; };

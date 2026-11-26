@@ -747,7 +747,9 @@ async function pollRevsOnce(){
     const k = typeof w.key === "function" ? w.key() : w.key;
     if (!k) continue;
     if (!first && now[k] !== undefined && was[k] !== now[k]){
-      try { w.fn(k); } catch(e){}
+      // One watcher's failure stops neither the others nor the poll, and is
+      // said: an empty catch here hid a view that could no longer re-read.
+      try { w.fn(k); } catch(e){ console.error(`the ${k} revision's watcher failed:`, e); }
     }
   }
 }
