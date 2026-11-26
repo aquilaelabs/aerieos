@@ -91,6 +91,15 @@ await section("projects first", async () => {
   ok(asked?.title === 'New space' && JSON.stringify(asked?.choices) === '["Create"]',
      `New space asks for a name alone (${JSON.stringify(asked)})`);
   const key = await page.evaluate(() => Object.entries(state.repos).find(([, r]) => r.name === 'Web shop, v2')[0]);
+  // ...then its first repository at once, named for it, where the card's
+  // Add repository was a second trip with the name typed again (R284 step
+  // 4); Cancel there leaves a space with no repository.
+  await page.waitForSelector('#pmodal:not([hidden])', { timeout: 10000 });
+  const first = await page.evaluate(() => ({ name: $('pName').value, mode: pMode, into: pInto }));
+  ok(first.name === 'Web shop, v2' && first.mode === 'init' && first.into === key,
+     `...and asks its first repository at once, into it and named for it (${JSON.stringify(first)})`);
+  await page.click('#pCancel');
+  await page.waitForFunction(() => $('pmodal').hidden, null, { timeout: 5000 });
   const card = `.pgrid .pcard[data-pkey="${key}"]`;
   await page.waitForSelector(card, { timeout: 15000 });
   // The page goes to it, and it wears a ring in the accent that fades

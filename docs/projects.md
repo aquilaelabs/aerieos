@@ -38,9 +38,11 @@ different promise.
 In the page's bar, **New space** asks for a name and nothing else, and
 makes a space with no repository in it. Its name is what people read, so
 spaces and punctuation are kept ("Web shop, v2"); two spaces never share
-one. **Add repository** on its card then makes or clones a repository into
-it, in the dialog described next, which leaves out the node and the Agents
-may dials, since those are the space's. First run and Home's Getting
+one. Its first repository is asked at once, in the dialog described next,
+named for the space (a clone takes the repository's own name as its address
+is typed), which leaves out the node and the Agents may dials, since those
+are the space's; **Cancel** there leaves the space with none. **Add
+repository** on its card makes or clones another. First run and Home's Getting
 started open the same dialog on its own, and the space is made around the
 repository, named as it is.
 

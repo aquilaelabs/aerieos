@@ -344,19 +344,22 @@ function flipCard(key){
   flipCard.t = setTimeout(() => drawProjects(state?.projects || []), 450);
 }
 
-// New project (R138): its name, and nothing else; its repositories are
-// added on its card.
+// New project (R138): its name, and nothing else; then its first
+// repository is asked at once, named for the space, since a space is a
+// coding one far more often than not and asking on its card took a second
+// trip and the name typed twice (R284 step 4). Cancel there leaves a space
+// with no repository, which builds containers and VMs.
 async function newProjectByName(){
   const said = await ask({title: "New space", field: {label: "Name"}, choices: [{label: "Create", value: true}],
-                         text: "Spaces and punctuation are fine in its name. Its repositories are added on its card."});
+                         text: "Spaces and punctuation are fine in its name. Its first repository is asked next."});
   const got = said?.text?.trim();
   if (!got) return;
   const j = await postJSON("/api/repos", {action: "create", name: got});
   if (j.error){ notify(j.error, true); return; }
   pjEditing.delete(j.key);
-  notify(`${j.name} made: Add repository on its card makes or clones its first one`);
   await refresh();
   showNewCard(j.key);
+  openAddRepository(j.key, j.name);
 }
 
 // A project just made: the page scrolls to its card wherever the order put
@@ -1071,7 +1074,12 @@ function pFillNode(){
 // project (R138), which keeps the project's node and dials and asks neither.
 function openNewProject(){ pLink = null; pInto = ""; pOpen("init"); }
 
-function openAddRepository(key){ pLink = null; pInto = key; pOpen("init"); }
+function openAddRepository(key, name = ""){
+  pLink = null; pInto = key; pOpen("init");
+  // Named for the space it was made for, as a person would have typed it;
+  // the preview under the field says what a git host makes of it.
+  if (name){ $("pName").value = name; pNameShow(); }
+}
 
 function openLinkProject(name){ pLink = name; pOpen("link"); }
 
