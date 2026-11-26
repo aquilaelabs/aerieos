@@ -195,3 +195,41 @@ class SignIn(unittest.TestCase):
             self.assertIn("use http://", self.said("https://ctl:7680", e))
         self.assertIn("RECORD_LAYER", self.said("http://ctl:7680", "SSLError: [SSL: RECORD_LAYER_FAILURE] x"))
         self.assertEqual(self.said("https://ctl", "wrong username or password"), "wrong username or password")
+
+
+class KeptPin(unittest.TestCase):
+    """R290 step 2: the companion holds the controller to what it met at
+    sign-in: a name's certificate by the system's authorities, else the key."""
+
+    def ctl(self, scheme):
+        from bbcompanion import core
+
+        class C:
+            CA = core._controller.CA_PIN
+            host, port, seen_key = "ctl", 7680, "sha256//" + "A" * 43 + "="
+        c = C()
+        c.scheme = scheme
+        return c
+
+    def test_plain_http_holds_to_nothing(self):
+        from bbcompanion import core
+        self.assertEqual(core.kept_pin(self.ctl("http")), "")
+
+    def test_a_certificate_no_authority_vouches_for_is_held_by_its_key(self):
+        import socket
+        from bbcompanion import core
+        with mock.patch.object(socket, "create_connection", side_effect=OSError("self-signed")):
+            self.assertEqual(core.kept_pin(self.ctl("https")), "sha256//" + "A" * 43 + "=")
+
+    def test_a_name_the_authorities_vouch_for_is_held_to_them(self):
+        import contextlib
+        import socket
+        import ssl
+        from bbcompanion import core
+
+        class Ctx:
+            def wrap_socket(self, raw, server_hostname=None):
+                return contextlib.nullcontext()
+        with mock.patch.object(socket, "create_connection", lambda *a, **k: contextlib.nullcontext()), \
+                mock.patch.object(ssl, "create_default_context", lambda: Ctx()):
+            self.assertEqual(core.kept_pin(self.ctl("https")), "ca")

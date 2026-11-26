@@ -263,4 +263,22 @@ def sign_in(url, username, password, name, pin=""):
             said = ("that address answers in plain HTTP, not HTTPS: use http:// in front of it "
                     "(https:// is for an address behind nginx with a certificate)")
         return {"error": said}
-    return r
+    return {**r, "pin": pin or kept_pin(ctl)}
+
+
+def kept_pin(ctl):
+    """What this PC holds the controller to from now on (R290 step 2),
+    from the sign-in's own connection: over https, the name's certificate
+    by the system's authorities where it is one (a Let's Encrypt name, an
+    edge in front), else the key the controller met at sign-in, so a
+    machine in the middle later is refused; "" over plain http."""
+    if ctl.scheme != "https":
+        return ""
+    import socket
+    import ssl
+    try:
+        with socket.create_connection((ctl.host, ctl.port), timeout=10) as raw, \
+                ssl.create_default_context().wrap_socket(raw, server_hostname=ctl.host):
+            return ctl.CA
+    except (OSError, ssl.SSLError):
+        return getattr(ctl, "seen_key", "") or ""

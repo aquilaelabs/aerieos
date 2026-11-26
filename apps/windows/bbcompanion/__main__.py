@@ -35,8 +35,9 @@ def signin(url, user, password=None, name=None):
     creds.save({"url": url.rstrip("/"), "token": r["token"], "device": r["device"]["id"], "account": r["account"]})
     s = settings.load()
     s["url"] = url.rstrip("/")
+    s["pin"] = r.get("pin", "")
     settings.save(s)
-    _say(f"signed in as {r['account']} on {r['device']['name']}")
+    _say(f"signed in as {r['account']} on {r['device']['name']}" + (f", held to {r['pin'][:23]}" if r.get("pin") else ""))
     return 0
 
 

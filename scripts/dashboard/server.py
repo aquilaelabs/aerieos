@@ -5989,7 +5989,7 @@ def _container_age():
 import doctor                                                    # noqa: E402
 # The Doctor asks each Kubernetes cluster kept again, and says one that does
 # not answer or whose certificate ends soon (R281 step 2).
-doctor.extra = clusters.doctor
+doctor.extra = lambda: [*clusters.doctor(), *tls.doctor_lines(settings.get)]
 
 doctor.configure(run=run, wait_for_boot=lambda: (wait_for_boot(), wait_for_nodes()),
                  runner_named=lambda nid, slot: (
@@ -7397,6 +7397,10 @@ class Handler(BaseHTTPRequestHandler):
         elif sent is not None and not sent["connection"] and (
                 (not sent["length"] and sent["code"] not in (204, 304)) or self._had_body()):
             self.send_header("Connection", "close")
+        # HSTS to the Let's Encrypt name alone, over TLS (R290 step 2).
+        if sent is not None and tls.over_tls(self.connection) and \
+                (v := tls.hsts(settings.get, self.headers.get("Host", "") if self.headers else "")):
+            self.send_header("Strict-Transport-Security", v)
         super().end_headers()
 
     def _had_body(self):
@@ -8030,6 +8034,8 @@ class Handler(BaseHTTPRequestHandler):
         fetch."""
         users.touch(u["name"])
         sec = "; Secure" if self._over_tls() else ""
+        if not sec:
+            tls.plain_sign_in(self._peer())
         cookies = [f"bb_session={make_token(u, self._mint_lid(u))}; Path=/; Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Strict{sec}",
                    "bb_mfa=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"]
         if remember:
@@ -16167,6 +16173,11 @@ def main():
     # asks Let's Encrypt again for the name's as well.
     with contextlib.suppress(Exception):                 # noqa: BLE001 (http is the fallback, said on the Doctor)
         tls.apply(settings.get, names=_tls_names())
+    # ...and its key's pin on the console at every start (R290 step 2), the
+    # same the Enroll dialog's command carries, so a person enrolling a node
+    # can see the page they copied it from is this controller's.
+    if (_pin := tls.key_pin()):
+        print(f"dashboard: this controller's key is {_pin}; the Enroll dialog's command names the same", flush=True)
 
     def _tls_loop():
         while True:

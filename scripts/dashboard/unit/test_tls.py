@@ -44,6 +44,39 @@ class Mode(unittest.TestCase):
         self.assertEqual(tls.mode_of({"tls_mode": "ACME", "tls_host": "x"}.get), "acme")
 
 
+class Hsts(unittest.TestCase):
+    # R290 step 2 (the operator, 26 Nov): HSTS for the Let's Encrypt name
+    # alone, never over the install's own certificate, which a browser
+    # under HSTS could not click past.
+    def test_hsts_goes_to_the_lets_encrypt_name_alone(self):
+        from unittest import mock
+        acme = {"tls_mode": "acme", "tls_host": "bb.example.com"}.get
+        with mock.patch.object(tls, "_cert_text", lambda kind=tls.OWN: "PEM" if kind == tls.ACME else ""):
+            self.assertEqual(tls.hsts(acme, "bb.example.com"), f"max-age={tls.HSTS_S}")
+            self.assertEqual(tls.hsts(acme, "BB.example.com:443"), f"max-age={tls.HSTS_S}")
+            self.assertEqual(tls.hsts(acme, "192.168.1.5:7680"), "", "an address, under the install's own")
+            self.assertEqual(tls.hsts({"tls_mode": "self", "tls_host": "bb.example.com"}.get, "bb.example.com"), "")
+            self.assertEqual(tls.hsts({"tls_mode": "http"}.get, "bb.example.com"), "")
+        with mock.patch.object(tls, "_cert_text", lambda kind=tls.OWN: ""):
+            self.assertEqual(tls.hsts(acme, "bb.example.com"), "", "not before its certificate is held")
+
+    def test_a_password_over_plain_http_from_outside_is_said_for_a_week(self):
+        tls._plain.clear()
+        http_ = {"tls_mode": "http"}.get
+        for near in ("192.168.1.20", "10.0.0.4", "127.0.0.1", "100.101.102.103", "fe80::1", "not an address"):
+            tls.plain_sign_in(near, now=1000)
+        self.assertEqual(tls.doctor_lines(http_, now=1001), [], "the network's own, and a tailnet's, are not outside")
+        tls.plain_sign_in("203.0.113.9", now=1000)
+        tls.plain_sign_in("8.8.8.8", now=1000)
+        lines = tls.doctor_lines(http_, now=1001)
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["level"], "warn")
+        self.assertIn("8.8.8.8", lines[0]["text"])
+        self.assertEqual(tls.doctor_lines(http_, now=1000 + tls.PLAIN_SAID_S + 1), [], "a week, then not")
+        self.assertEqual(tls.doctor_lines({"tls_mode": "self"}.get, now=1001), [], "said only while the page is plain http")
+        tls._plain.clear()
+
+
 class Pair(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()

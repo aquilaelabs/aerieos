@@ -45,6 +45,7 @@ way.
 import base64
 import contextlib
 import datetime
+import ipaddress
 import json
 import os
 import selectors
@@ -391,6 +392,53 @@ def self_signed(names, key_pem=""):
 # name or address of its own: the pin is of the key, so a node asks for no
 # name at all, and a browser warns whatever it says.
 DEFAULT_NAME = "aerieos"
+
+
+# Strict-Transport-Security, in the acme mode alone (R290 step 2; the
+# operator, 26 Nov): a browser that keeps it refuses to click past a
+# certificate's warning, which the install's own certificate always brings.
+HSTS_S = 180 * 86400
+
+
+def hsts(settings_get, host):
+    """The Strict-Transport-Security value for a response over TLS to the
+    Host `host`: the Let's Encrypt name's alone, while its certificate is
+    held; "" for any other."""
+    if mode_of(settings_get) != ACME or not _cert_text(ACME):
+        return ""
+    name = str(settings_get("tls_host") or "").strip().lower()
+    h = str(host or "").strip().lower()
+    h = h.rsplit(":", 1)[0] if h.count(":") == 1 else h
+    return f"max-age={HSTS_S}" if name and h == name else ""
+
+
+# The last sign-in over plain http from an address outside the network
+# (R290 step 2): {at, addr}, said by the Doctor for a week.
+_plain = {}
+PLAIN_SAID_S = 7 * 86400
+
+
+def plain_sign_in(addr, now=None):
+    """A sign-in that crossed over plain http, from `addr`: kept where that
+    address is outside the network (not private, loopback, link-local or a
+    tailnet's)."""
+    try:
+        far = ipaddress.ip_address(str(addr or "").strip()).is_global
+    except ValueError:
+        far = False
+    if far:
+        _plain.update(at=time.time() if now is None else now, addr=str(addr))
+
+
+def doctor_lines(settings_get, now=None):
+    """The Doctor's line for a password sent over plain http from outside
+    the network within the week, in the http mode; [] otherwise."""
+    now = time.time() if now is None else now
+    at = _plain.get("at") or 0
+    if mode_of(settings_get) != "http" or not at or now - at > PLAIN_SAID_S:
+        return []
+    return [{"level": "warn", "text": f"someone signed in over plain http from outside your network ({_plain.get('addr')})",
+             "detail": "their password crossed the internet unencrypted: set a hostname under Controller settings, Connection, for https"}]
 
 
 def mode_of(settings_get):

@@ -19,6 +19,12 @@ own, and is kept nowhere; the token is kept in Windows' credential store.
 The machine is then listed under your devices on the Profile page, where
 Disconnect ends its token.
 
+At an https address the app keeps what it met at sign-in and is held to it
+after: a certificate the system's authorities vouch for by its name, else
+the controller's own key, which the console prints at every start. A
+controller presenting another key later is refused; sign in again where the
+controller was moved on purpose.
+
 ## Picking a project
 
 The list says each project's lock and archive as the dashboard has them:

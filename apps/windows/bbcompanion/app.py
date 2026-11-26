@@ -78,6 +78,7 @@ class App(tk.Tk):
             creds.save({"url": url, "token": r["token"], "device": r["device"]["id"], "account": r["account"]})
             s2 = settings.load()
             s2["url"] = url
+            s2["pin"] = r.get("pin", "")
             settings.save(s2)
             self.main()
         ttk.Button(f, text="Sign in", command=go).pack(anchor="e", **PAD)
