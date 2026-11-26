@@ -1131,11 +1131,15 @@ async function nbRmAdd($, nb){
 // half typed keeps the box open. The button stays where it is, a press
 // while the box is open taking the caret back to it.
 function nbRmForm($, on){
+  // Rolled back with the caret in it, the caret goes back to the press that
+  // opened it (R286: a keyboard's place was lost with the box).
+  const back = !on && $("roadmapAddBar").contains(document.activeElement);
   // Unrolled and rolled back over its height, as it says (the motion rule).
   slideShow($("roadmapForm"), !!on);
   slideShow($("roadmapAddBar"), !!on);
   $("roadmapShow").setAttribute("aria-expanded", String(!!on));
   if (on) $("roadmapText").focus();
+  else if (back) $("roadmapShow").focus();
 }
 
 // Put the list back the way it was found. The server never saw any of it, so

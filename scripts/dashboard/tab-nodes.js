@@ -557,7 +557,7 @@ function nodeUsbSection(n){
   const vmsHere = (vmsData?.vms || []).filter(v => v.node === n.id && !["making", "removing", "failed", "missing"].includes(v.state));
   const admin = !!state?.can?.admin && nodeMay(n) === "write";
   const why = !n.live ? ND_UNREACHED : "";
-  const pick = (u, key) => vmsHere.length ? `<select data-usbvm="${key}">${vmsHere.map(v => `<option value="${esc(v.project)}/${esc(v.name)}">${esc(v.project)}/${esc(v.name)} (${esc(v.state)})</option>`).join("")}</select>
+  const pick = (u, key) => vmsHere.length ? `<select data-usbvm="${key}" aria-label="the VM to give ${esc(u.name || "this device")} to">${vmsHere.map(v => `<option value="${esc(v.project)}/${esc(v.name)}">${esc(v.project)}/${esc(v.name)} (${esc(v.state)})</option>`).join("")}</select>
       <button type="button" data-usbgive="${key}">Give to a VM</button>` : `<span class="sub dim">no VM on this node to give it to</span>`;
   const rows = (hw.usb || []).map((u, i) => {
     const key = String(i);

@@ -238,8 +238,9 @@ function nbBugsView({$, nb, project}){
   // what a role does not give is not advertised), and its form shut.
   function drawBugAdd(){
     const box = $("bugAdd"), btn = $("bugNew");
-    const shut = () => swapBox(box, () => {
-      box.innerHTML = ""; box.hidden = true; btn.setAttribute("aria-expanded", "false"); });
+    // ...and the caret back on the press where it was in the form (R286).
+    const shut = () => { const back = box.contains(document.activeElement); swapBox(box, () => {
+      box.innerHTML = ""; box.hidden = true; btn.setAttribute("aria-expanded", "false"); if (back) btn.focus(); }); };
     btn.hidden = !!projWriteWhy(project);
     if (btn.hidden){ if (!box.hidden) shut(); return; }
     // The same fold the memory writer opens with: the two are the same control
