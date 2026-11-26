@@ -54,6 +54,8 @@
 - A root startup hook in config/startup.d runs only once an administrator has read and approved it as it is, under Controller settings, Startup hooks, and a shell on the controller itself is an administrator's: anything that could write that folder (a shell opened by anybody with Terminal Write on a space with no node, another container sharing the user id) could otherwise become root at the next restart. Upgrading: approve each *.root.sh of yours under Startup hooks once; until then it is skipped, and the start says so (59e9c37)
 - Signing in can no longer be sent on to another site or carry a header of its own, adding a second factor beside one asks for it first, and another site's page can neither sign you in nor out (8b32dc5)
 - A bare-metal controller's update never moves back to an older release (05cbf12)
+- An Android APK is signed only for a release's own tag, and, where the release's workflows ask for an approval, only from a run a person approved (52a7707)
+- The Windows companion checks an update against the release's signed list of files with keys it carries, not on the controller's word (189cb11)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
