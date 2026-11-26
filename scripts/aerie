@@ -6737,8 +6737,11 @@ esac
 # ...and anywhere after a subcommand of a verb whose words are never free
 # text: `aerie forge pr create --help` answered "--help needs a value", and
 # `aerie design show --help` looked for a page called that (R289).
-case "${1:-}" in
-    forge|design|tests|k8s|discord|devapp|jobs|map|capture|vm|container|node|sign|ci-log)
+# A subcommand with help of its own answers it itself: design save prints
+# the record it takes, and capture and sign their own usage.
+case "${1:-}:${2:-}" in
+    design:save) ;;
+    forge:*|design:*|tests:*|k8s:*|discord:*|devapp:*|jobs:*|map:*|vm:*|container:*|node:*|ci-log:*)
         for _a in "${@:2}"; do
             case "$_a" in -h|--help) verb_help "$1" && exit 0 ;; esac
         done ;;

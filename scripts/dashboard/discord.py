@@ -111,14 +111,19 @@ def _open(v):
     return v
 
 
-def seal_all():
-    """Every token sealed again under the install key in force (installkey's
-    passes): one kept plain before a key existed, or under the one before."""
+def seal_all(again=False):
+    """Every token sealed under the install key in force (installkey's
+    passes): one kept plain before a key existed, and every one again
+    after the key changed (`again`)."""
+    if not (seal and sealing and sealing()):
+        return 0
     with _lock:
         d = _load()
         n = 0
         for rec in d.values():
             if isinstance(rec, dict) and rec.get("token"):
+                if str(rec["token"]).startswith(SEALED) and not again:
+                    continue
                 plain = _open(rec["token"])
                 if plain:
                     rec["token"] = _keep(plain)

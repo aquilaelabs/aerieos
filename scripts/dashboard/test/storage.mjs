@@ -189,7 +189,7 @@ await section("Each share's places on an array taken over", async () => {
     } finally { ownMachine = keepOwn; postJSON = keepPost; }
     return out;
   });
-  ok(/New files land on cache; the mover takes them from cache to the array/.test(got.line) && /the mover takes 1 share's files from one place to another/.test(got.hint),
+  ok(/New files land on cache; the mover takes them from cache to the array/.test(got.line) && /the mover takes 1 share's files where each share's Edit says/.test(got.hint),
      `a share's row says where its new files land and what the mover does, and the array counts the shares it moves (${got.line.slice(0, 200)})`);
   ok(JSON.stringify(got.lands) === '["cache","fast","array"]' && got.movers.includes('') && got.movers.includes('cache>array') && got.movers.includes('array>fast') && !got.movers.includes('cache>cache'),
      `its Edit offers the pools in front of the disks and the array, and the mover from any of them to another (${JSON.stringify([got.lands, got.movers])})`);

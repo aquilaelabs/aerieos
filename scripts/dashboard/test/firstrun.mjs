@@ -958,7 +958,7 @@ await section("a bare-metal install's first run", async () => {
                acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm),
                tick: sect?.querySelector('[data-adoptvmauto="Windows 11"]')?.checked === false };
     });
-    ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
+    ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /opens each read-only and runs nothing/.test(apps.unread),
        `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
     ok(/1 started with the machine/.test(apps.text) && /plex br0 · starts with the machine/.test(apps.text) && /Import a compose file/.test(apps.text)
        && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)

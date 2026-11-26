@@ -899,6 +899,7 @@ const RN_LIST = {
   yours: "your replies, questions and commit name here",
   repo: "how it pushes and pulls", runs: "the space's nodes, and where its containers go",
   build: "commands, outputs, and what is kept", releases: "what a release waits for, and its files described",
+  discord: "the server it builds out, and its bot",
   sees: "other spaces, shares, addresses",
   tools: "the toolchains and tool packs its sessions use",
   files: "its files over FTP and in an editor", snapshots: "the days kept, and putting one back",
