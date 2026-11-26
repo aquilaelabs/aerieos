@@ -573,8 +573,8 @@ two: a digest, or a tag that is not `latest`. An app whose every image has
 its digest reads **pinned**, as a tool whose every download is held does,
 and its entry in the index says so, so its card does before it is kept.
 
-AerieOS's own services are held the same way: the model router, nginx and
-the Scanners each name every image they run in their entry's `images`, a
+AerieOS's own services are held the same way: the model router, nginx, the
+Scanners and k3s each name every image they run in their entry's `images`, a
 name of the service's own for each and the image as `name:tag@sha256:...`,
 written from the one file that holds them
 (`scripts/dashboard/service-images.json`). `images` is an official service

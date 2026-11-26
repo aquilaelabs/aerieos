@@ -5096,6 +5096,14 @@ clusters.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal
 # A space's environments on those clusters (R281 step 3): each a namespace
 # kube.py makes ready with the cluster's credential, labeled with the space's
 # id, which never changes, and this install's mark.
+# k3s on a node (R281 step 1): a service from the Library, added to
+# Clusters with the bootstrap token it was made with.
+import k3s                                                       # noqa: E402
+k3s.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+              sealing=lambda: signing.MASTER is not None, node_list=nodes.node_list,
+              node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
+              node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
+              nginx_on=lambda nid: bool(nginxproxy.deployed(devapp, nid)), run_wait=nodes.run_wait, clusters=clusters)
 kube.configure(state=STATE, write_json=write_json, clusters=clusters, space_id=registry.pid,
                space_of_id=lambda sid: registry.resolve(sid) if re.fullmatch(r"P\d+", str(sid or "")) else "")
 connections.kind("cluster", "Kubernetes cluster", "shared",
@@ -5119,7 +5127,7 @@ def _acting_name():
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
                              accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
                              poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
-                             clusters.seal_all),
+                             clusters.seal_all, k3s.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
@@ -13487,21 +13495,31 @@ class Handler(BaseHTTPRequestHandler):
             # The spaces each deploys for, which Forget names before it asks.
             c["spaces"] = [registry.label(k) for k in kube.using(c["id"])]
         got["may_add"] = not users.may_instance(who, "clusters", "")
+        # Each node running k3s not on the page yet, offered as one press
+        # where this account may add a cluster and configure that node.
+        got["k3s"] = [] if not got["may_add"] else [
+            {"node": n["id"], "name": n.get("name") or n["id"]} for n in nodes.node_list()
+            if k3s.service_deployed(n["id"]) and not k3s.service_row(n["id"])["cluster"]
+            and not users.may_node(who, "configure", n["id"])]
         return self._json(got)
 
     def _clusters(self, req):
         """POST /api/clusters {action: add, name, kubeconfig} | {action:
-        test|rename|forget, id} (R281 step 2): a cluster added once its API
-        answers, asked again, renamed or forgotten here (nothing on the
-        cluster changes). Clusters Write, an administrator's unless a role
+        from-k3s, node, name} | {action: test|rename|forget, id} (R281 step
+        2): a cluster added once its API answers (from a kubeconfig, or the
+        k3s a node runs, which is Configure on that node too), asked again,
+        renamed or forgotten here (nothing on the cluster changes). Clusters Write, an administrator's unless a role
         gives it; a session never reaches it (SESSION_ROUTES)."""
         act, cid, by = field(req, "action"), field(req, "id"), self._principal()
         # Add is a new cluster, which a role holding Clusters on some alone
         # does not reach; the rest act on one, by its own level.
         if self._refused_instance("clusters", "" if act == "add" else cid, (clusters.listing_one(cid) or {}).get("name", "")):
             return None
-        if act == "add":
-            r = clusters.add(req.get("kubeconfig"), field(req, "name"), by)
+        if act in ("add", "from-k3s"):
+            if act == "from-k3s" and self._refused_on_node("configure", field(req, "node")):
+                return None
+            r = clusters.add(req.get("kubeconfig"), field(req, "name"), by) if act == "add" \
+                else k3s.add_cluster(field(req, "node"), field(req, "name"), by)
             if r.get("ok"):
                 connections.added("cluster", r["cluster"]["id"], by=by)
                 db.audit(by, "cluster-add", r["cluster"]["id"], {"name": r["cluster"]["name"], "server": r["cluster"]["server"]})
@@ -13520,7 +13538,7 @@ class Handler(BaseHTTPRequestHandler):
                 connections.gone("cluster", cid)
                 db.audit(by, "cluster-forget", cid, {})
             return self._json(r, 200 if r.get("ok") else 404)
-        return self._json({"error": "action is add, test, rename or forget"}, 400)
+        return self._json({"error": "action is add, from-k3s, test, rename or forget"}, 400)
 
     def _get_deploy(self):
         """GET /api/deploy?project= (R281 step 3): the space's environments,
@@ -13769,10 +13787,12 @@ class Handler(BaseHTTPRequestHandler):
         # router, set on its card, has the branch under it. Each branch
         # names its own gate, which docs/api.md is written from.
         kind = services.of_pack(pack)
-        if kind and services.paged(kind):
-            # nginx's and the Scanners' Install and Remove (R264): what
-            # their pages' Deploy and Remove do, a service's, so Configure
-            # on the node, as the router's branch below asks.
+        if kind and kind != "router":
+            # Every service but the router is installed and removed here and
+            # no more: nginx's and the Scanners' (R264), what their pages'
+            # Deploy and Remove do, and k3s's, which has nothing to set
+            # (R281); a service's, so Configure on the node, as the router's
+            # branch below asks.
             if self._refused_on_node("configure", nid):
                 return None
             if act not in ("install", "remove"):

@@ -7213,7 +7213,17 @@ def host_exec_ok(type, spec):
     if [str(a) for a in argv[1:3]] == ["update", "--restart"] and len(argv) > 4 \
             and str(argv[3]) in ("unless-stopped", "no"):
         return True
+    # ...and k3s's certificate authority read from its container, the one
+    # form Add k3s on NODE sends (k3s.py): a cluster is what a hosting-only
+    # node is for, and the file is public.
+    if len(argv) == 5 and str(argv[1]) == "exec" and re.fullmatch(r"k3s-[a-z0-9-]{1,56}", str(argv[2])) \
+            and [str(a) for a in argv[3:]] == list(K3S_CA_READ):
+        return True
     return str(argv[1]) in HOST_DOCKER
+
+
+# What reading k3s's certificate authority runs in its container (k3s.CA_PATH).
+K3S_CA_READ = ("cat", "/var/lib/rancher/k3s/server/tls/server-ca.crt")
 
 
 # Whether a container answers on its node's loopback (R248): a TCP connect

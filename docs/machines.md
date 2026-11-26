@@ -312,6 +312,19 @@ namespaces with the space that owns each, and Test, Rename and Forget;
 Forget changes nothing on the cluster. Each is a connection too, on
 Controller settings' Connected services.
 
+**k3s on a node.** The Library's **k3s** card installs a one-node cluster on
+the node picked, as a System container (the rancher/k3s image its entry
+names by digest, privileged as k3s in a container is, its state in a volume
+Update keeps). Where the node runs AerieOS's nginx, k3s's own Traefik and
+load balancer are left off so nginx stays the front door on 80 and 443;
+elsewhere the cluster answers there itself. Once it is up, the Clusters
+page offers **Add k3s on NODE** (Clusters Write on every cluster, and
+Configure on that node): the controller's way in is a bootstrap token
+AerieOS made and wrote as a manifest k3s applies as it starts, kept sealed
+here, and the cluster's certificate authority is read from the container.
+Removing k3s takes the cluster and what was deployed to it, and forgets it
+on the Clusters page.
+
 **A space's environments.** Once a cluster is kept, each space's settings
 carry a **Deploy** section: its environments as records (staging,
 production, any name), each a cluster, a namespace on it, the registry its
@@ -715,7 +728,7 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   last ran and **Check for updates** beside it: a newer AerieOS (a bare-metal
   install's), the container images and the Library (the
   toolchains' and coding agents' newest versions and the vetted catalog's
-  index). nginx, the model router and the scanners are not among them:
+  index). nginx, the model router, the scanners and k3s are not among them:
   each runs the images this AerieOS names by digest. Off leaves only Check for updates. A node's own check of what it holds is
   its **Version check** on its row's Advanced section, weekly unless set.
 - **Idle sessions**: the idle rule, which ends any agent's session after N minutes

@@ -3,7 +3,8 @@
 // in for a node), its facts and namespaces drawn, Test, Rename and Forget,
 // a cloud CLI's sign-in refused with the way out, the credential never in
 // what the page reads, and the cluster a connection Controller settings lists.
-import { launch, newPage, ok, done, ready, URL, section, until, kubeApi } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, until, kubeApi } from './lib.mjs';
+import { writeFileSync, rmSync } from 'node:fs';
 
 // One a hand made for a space of the same name, without this install's mark.
 const api = await kubeApi({ namespaces: [{ metadata: { name: 'alpha-staging', labels: { 'aerieos.io/space': 'alpha' } } }] });
@@ -76,6 +77,42 @@ await section("Test, Rename and Forget", async () => {
   const gone = await until(async () => (await page.evaluate(async () => (await (await fetch('/api/clusters')).json()).clusters || [])).length === 0, 10000, 200);
   ok(page.dialogs.some(d => /Forget lab two\?/.test(d)) && gone, 'Forget asks first, then the cluster is gone from here');
   ok(page.errors.length === 0, `no console error through any of it (${page.errors.slice(0, 2).join(' | ')})`);
+});
+
+// k3s from the Library (R281 step 1): a node running it is one press on the
+// page, and one whose cluster is still starting says so in one sentence with
+// the press live again. Its record is written as the Library's Install
+// leaves it: this world has no k3s to install.
+await section("Add k3s on a node", async () => {
+  const nid = await page.evaluate(async () => ((await (await fetch('/api/v1/nodes')).json()).nodes || [])
+    .find(n => n.kind === 'agent' && n.state !== 'retired' && !n.config?.host_only)?.id);
+  const kf = `${DIR}/state/k3s.json`;
+  writeFileSync(kf, JSON.stringify({ [nid]: { deployed: 1, token_id: 'abc123', secret: '0123456789abcdef', traefik: false } }));
+  await page.evaluate(() => loadClusters());
+  const b = await page.waitForSelector('.clusterstab [data-clk3s]', { timeout: 15000 }).catch(() => null);
+  ok(!!b && /^Add k3s on /.test(await b.textContent()), 'a node running k3s from the Library is a press of its own on the page');
+  page.answers.push({ index: 0, text: 'lab k3s' });
+  await b.click();
+  // The refusal's own toast, then the press: waited for in that order, since
+  // the press is not busy yet while its name is asked.
+  await page.waitForFunction(() => [...document.querySelectorAll('.toast, .tmsg')].some(t => /still be starting/.test(t.textContent)),
+    null, { timeout: 60000 }).catch(() => {});
+  const back = await page.waitForFunction(() => { const x = document.querySelector('.clusterstab [data-clk3s]'); return x && !x.classList.contains('busy') && !x.disabled; },
+    null, { timeout: 15000 }).then(() => true, () => false);
+  const said = await page.evaluate(() => [...document.querySelectorAll('.toast, .tmsg')].map(t => t.textContent.trim()).filter(t => /k3s|starting/.test(t)).slice(-1)[0] || '');
+  ok(back && /still be starting/.test(said), `a cluster that does not say its authority yet is said in one sentence, the press live again (${said})`);
+  page.errors = page.errors.filter(e => !/status of 400 .*\/api\/clusters/.test(e));
+  rmSync(kf, { force: true });
+  await page.evaluate(n => { libNode = n; lib = null; openLibrary(); }, nid);
+  const card = await page.waitForSelector('.doc .librarytab .lcard[data-lrow="service:k3s"]', { timeout: 20000 }).catch(() => null);
+  ok(!!card, 'k3s has its card in the Library, beside the other services');
+  // Its Install reaches k3s's own deploy, as nginx's and the Scanners' do,
+  // and Remove takes it off again.
+  const inst = await page.evaluate(n => postJSON('/api/library', { action: 'install', node: n, pack: 'k3s' }), nid);
+  ok(!inst.error && /^k3s-/.test(inst.name || '') && (inst.job || inst.note), `its Install makes k3s's System container on the node (${JSON.stringify(inst).slice(0, 120)})`);
+  const rm = await page.evaluate(n => postJSON('/api/library', { action: 'remove', node: n, pack: 'k3s' }), nid);
+  ok(!rm.error, `...and Remove takes it off (${JSON.stringify(rm).slice(0, 120)})`);
+  ok(page.errors.length === 0, `no console error (${page.errors.slice(0, 2).join(' | ')})`);
 });
 
 api.close();

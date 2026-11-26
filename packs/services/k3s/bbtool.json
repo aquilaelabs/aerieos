@@ -1,0 +1,27 @@
+{
+ "about": "A one-node Kubernetes cluster on this node for your spaces to deploy to. Once it is up, the Clusters page under Machines adds it with one press. Where this node runs AerieOS's nginx, the cluster's own Traefik is left off so nginx stays the front door.",
+ "config": [],
+ "credits": [
+  {
+   "maker": "SUSE",
+   "name": "k3s"
+  }
+ ],
+ "format": 5,
+ "framework": "5.1",
+ "images": {
+  "k3s": "rancher/k3s:v1.37.2-k3s1@sha256:21ea6e0fac4e3930c2ce8aa40ddd41a8b18cb3e9a0222c030dc005e7e88c4332"
+ },
+ "label": "k3s",
+ "maker": "SUSE",
+ "name": "k3s",
+ "platforms": [
+  "linux/amd64",
+  "linux/arm64"
+ ],
+ "service": {
+  "kind": "k3s"
+ },
+ "terms": [],
+ "tier": "official"
+}

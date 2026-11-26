@@ -18,6 +18,7 @@ import checks      # noqa: E402
 import containers  # noqa: E402
 import devactions  # noqa: E402
 import devapp      # noqa: E402
+import k3s         # noqa: E402
 import library     # noqa: E402
 import nginxproxy  # noqa: E402
 import router      # noqa: E402
@@ -30,6 +31,7 @@ import toolpacks   # noqa: E402
 
 NGINX_REMOVES = "Its routes and certificates are kept here; the hostnames it answers for stop answering."
 SCANNERS_REMOVES = "What they found is kept; nothing scans the spaces on this node until they are installed again."
+K3S_REMOVES = "The cluster and everything deployed to it go with it, and it leaves the Clusters page."
 
 
 def write_json(path, d, mode=0o644):
@@ -39,7 +41,7 @@ def write_json(path, d, mode=0o644):
 
 class Table(unittest.TestCase):
     def test_every_list_reads_the_table_in_its_order(self):
-        self.assertEqual(services.KINDS, ("router", "nginx", "scanners"))
+        self.assertEqual(services.KINDS, ("router", "nginx", "scanners", "k3s"))
         # Read from the one table, said in toolpacks' own source: the same
         # object only while no other test of the tier has reloaded services
         # (test_seams, test_features_off and test_auto_update do), which
@@ -51,7 +53,7 @@ class Table(unittest.TestCase):
         self.assertEqual([k for k in settings.KEYS if k.startswith("check_")], [f"check_{k}" for k in checks.KINDS])
 
     def test_each_pack_names_its_kind_and_is_found_by_its_name(self):
-        self.assertEqual([m["name"] for m in services.packs()], ["model-router", "nginx", "scanners"])
+        self.assertEqual([m["name"] for m in services.packs()], ["model-router", "nginx", "scanners", "k3s"])
         for kind, m in zip(services.KINDS, services.packs(), strict=True):
             clean, errors = toolpacks.validate(m, shipped=(), official=True)
             self.assertEqual(errors, [], kind)
@@ -87,7 +89,7 @@ class Table(unittest.TestCase):
 
     def test_the_grants_differ_and_only_the_router_is_set_on_its_card(self):
         self.assertEqual({k: services.grant(k) for k in services.KINDS},
-                         {"router": "configure", "nginx": "configure", "scanners": "configure"})
+                         {"router": "configure", "nginx": "configure", "scanners": "configure", "k3s": "configure"})
         self.assertEqual([k for k in services.KINDS if services.paged(k)], ["nginx", "scanners"])
 
 
@@ -109,6 +111,9 @@ class OnANode(unittest.TestCase):
         scanners.configure(state=self.tmp, write_json=write_json, node_list=lambda: nodes, node_name=lambda nid: "GPU Box",
                            project_nodes=lambda: {"web": "n1"}, project_names=lambda: ["web", "app"],
                            job_add=job_add, job_state=lambda jid: "", next_after=schedules.next_after, cron_words=schedules.words)
+        k3s.configure(state=self.tmp, write_json=write_json, seal=None, unseal=None, sealing=lambda: False, node_list=lambda: nodes,
+                      node_name=lambda nid: "GPU Box", node_addr=lambda nid: "10.0.0.5", nginx_on=lambda nid: True,
+                      run_wait=None, clusters=None)
         # The node's nginx is on the Containers page; nothing else written is.
         for name, fn in (("is_file_source", lambda name: name == "nginx-gpu-box"), ("_read_rec", lambda name, inst: {"node": "n1"})):
             p = mock.patch.object(devapp, name, fn)
@@ -116,13 +121,15 @@ class OnANode(unittest.TestCase):
             self.addCleanup(p.stop)
 
     def spelled_out(self, nid):
-        """The rows as the server made them with the three spelled out."""
+        """The rows as the server made them with each spelled out."""
         return ([{"manifest": toolpacks.validate(router.pack(), shipped=(), official=True)[0], "status": router.status(nid),
                   "ready": router._ready(nid), "all_projects": sorted(["web", "app"])}],
                 [{"manifest": toolpacks.validate(nginxproxy.pack(), shipped=(), official=True)[0],
                   "status": {"deployed": bool(nginxproxy.deployed(devapp, nid))}, "ready": "", "removes": NGINX_REMOVES},
                  {"manifest": toolpacks.validate(scanners.pack(), shipped=(), official=True)[0],
-                  "status": {"deployed": bool(scanners.record(nid).get("deployed"))}, "ready": "", "removes": SCANNERS_REMOVES}])
+                  "status": {"deployed": bool(scanners.record(nid).get("deployed"))}, "ready": "", "removes": SCANNERS_REMOVES},
+                 {"manifest": toolpacks.validate(k3s.pack(), shipped=(), official=True)[0],
+                  "status": {"deployed": False}, "ready": "", "removes": K3S_REMOVES, "cluster": ""}])
 
     def drawn(self, rows):
         return json.dumps(library.rows({"items": []}, [], [], None, None, services=rows), sort_keys=False)
@@ -134,7 +141,7 @@ class OnANode(unittest.TestCase):
                 self.assertTrue(scanners.deploy("n1", "ann")["ok"])
             the_router, the_paged = self.spelled_out("n1")
             got = services.rows("n1")
-            self.assertEqual([r["manifest"]["name"] for r in got], ["model-router", "nginx", "scanners"], step)
+            self.assertEqual([r["manifest"]["name"] for r in got], ["model-router", "nginx", "scanners", "k3s"], step)
             self.assertEqual(self.drawn(got), self.drawn(the_router + the_paged), step)
             # The router's row keeps its own keys, each as it was.
             for k in ("manifest", "status", "ready", "all_projects"):
@@ -151,11 +158,11 @@ class OnANode(unittest.TestCase):
 
     def test_a_pack_that_does_not_validate_is_left_out(self):
         with mock.patch.object(nginxproxy, "pack", lambda: {"name": "nginx"}):
-            self.assertEqual([r["manifest"]["name"] for r in services.rows("n1")], ["model-router", "scanners"])
+            self.assertEqual([r["manifest"]["name"] for r in services.rows("n1")], ["model-router", "scanners", "k3s"])
 
     def test_the_containers_of_each_are_known_by_name(self):
         self.assertEqual(services.container_names("n1"),
-                         {"router-gpu-box": "router", "nginx-gpu-box": "nginx", "scanners-gpu-box": "scanners"})
+                         {"router-gpu-box": "router", "nginx-gpu-box": "nginx", "scanners-gpu-box": "scanners", "k3s-gpu-box": "k3s"})
 
     def test_install_and_remove_are_each_module_s_own_verbs(self):
         said = []
@@ -165,7 +172,8 @@ class OnANode(unittest.TestCase):
         with mock.patch.object(nginxproxy, "deploy", verb("nginx deploy")), mock.patch.object(nginxproxy, "remove", verb("nginx remove")), \
                 mock.patch.object(router, "deploy", verb("router deploy")), mock.patch.object(router, "remove", verb("router remove")), \
                 mock.patch.object(router, "node_gpu", lambda nid: nid == "n1"), \
-                mock.patch.object(scanners, "deploy", verb("scanners deploy")), mock.patch.object(scanners, "remove", verb("scanners remove")):
+                mock.patch.object(scanners, "deploy", verb("scanners deploy")), mock.patch.object(scanners, "remove", verb("scanners remove")), \
+                mock.patch.object(k3s, "deploy", verb("k3s deploy")), mock.patch.object(k3s, "remove", verb("k3s remove")):
             for kind in services.KINDS:
                 self.assertEqual(services.install(kind, "n1", "ann")["name"], f"{kind} deploy")
                 self.assertEqual(services.remove(kind, "n1", "ann")["name"], f"{kind} remove")
@@ -173,10 +181,11 @@ class OnANode(unittest.TestCase):
         self.assertEqual(said, [("router deploy", ("n1", containers, devactions, devapp, True)), ("router remove", ("n1", devactions, devapp)),
                                 ("nginx deploy", ("n1", containers, devactions, devapp)), ("nginx remove", ("n1", devactions, devapp)),
                                 ("scanners deploy", ("n1", "ann")), ("scanners remove", ("n1", "ann")),
+                                ("k3s deploy", ("n1", containers, devactions, devapp)), ("k3s remove", ("n1", devactions, devapp)),
                                 ("router deploy", ("n2", containers, devactions, devapp, False))])
 
     def test_deployed_is_each_one_s_own_answer(self):
-        self.assertEqual([services.deployed(k, "n1") for k in services.KINDS], [False, True, False])
+        self.assertEqual([services.deployed(k, "n1") for k in services.KINDS], [False, True, False, False])
         self.assertFalse(services.deployed("nginx", "n2"), "the written container is another node's")
         scanners.deploy("n1")
         self.assertTrue(services.deployed("scanners", "n1"))

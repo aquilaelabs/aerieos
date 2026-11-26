@@ -1,8 +1,8 @@
 """AerieOS's own services on a node, as one table (R172, R264).
 
 A service is a deployed thing of AerieOS's that the Library lists as an
-official pack: the model router (router.py), nginx (nginxproxy.py) and the
-Scanners (scanners.py). Each is named here once, what differs between them
+official pack: the model router (router.py), nginx (nginxproxy.py), the
+Scanners (scanners.py) and k3s (k3s.py). Each is named here once, what differs between them
 as plain data, and every list of them reads this table: the kinds a pack's
 service block may name (toolpacks.SERVICES), the packs written under
 packs/services (tools/packs-export.py), which of a node's System containers
@@ -49,6 +49,9 @@ TABLE = {
     "router": {"module": "router", "grant": "configure", "page": False},
     "nginx": {"module": "nginxproxy", "grant": "configure", "page": True},
     "scanners": {"module": "scanners", "grant": "configure", "page": True},
+    # A one-node Kubernetes cluster (R281): installed and removed from its
+    # card, and added to the Clusters page from there.
+    "k3s": {"module": "k3s", "grant": "configure", "page": False},
 }
 KINDS = tuple(TABLE)
 

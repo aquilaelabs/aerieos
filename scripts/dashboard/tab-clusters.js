@@ -4,7 +4,8 @@
 // again. Each cluster a section of its own that folds open (rows you open):
 // its facts as its API last said, its namespaces and the space that owns
 // each, and Test, Rename and Forget on its action bar. Add cluster is the
-// form under them, or the page itself while there is none.
+// form under them, or the page itself while there is none; a node running
+// k3s from the Library is a press of its own beside it.
 //
 // Chrome from docSurface(); data from GET /api/clusters, read when the page
 // opens and after each change.
@@ -84,9 +85,13 @@ function renderClustersInto(i){
     down ? {text: `${down} not answering`, tone: "warn"} : null]});
   const items = rows.map(c => docSection("clusters", `c:${c.id}`, c.name, clStatus(c), clBody(c),
     {item: true, cls: c.facts?.error ? "warn" : "", open: false})).join("");
+  // A node running k3s from the Library is one press away (k3s.py).
+  const k3s = (clustersData.k3s || []).map(k => `<button type="button" data-clk3s="${esc(k.node)}" data-clk3sname="${esc(k.name)}">Add k3s on ${esc(k.name)}</button>`).join("");
   const add = !may ? (rows.length ? "" : `<div class="empty">No cluster is kept yet. Adding one is Clusters Write on every cluster.</div>`)
-    : !rows.length || clAdding ? docSection("clusters", "add", "Add cluster", "", clAddBody(rows.length > 0))
-    : `<div class="field addbar"><button type="button" id="clAddOpen">Add cluster</button></div>`;
+    : !rows.length || clAdding ? docSection("clusters", "add", "Add cluster", "",
+        (k3s ? `<div class="field"><div class="actbar"><span class="state">k3s runs on ${esc((clustersData.k3s || []).map(k => k.name).join(", "))}.</span><span class="sp"></span>${k3s}</div></div>` : "")
+        + clAddBody(rows.length > 0))
+    : `<div class="field addbar">${k3s}<button type="button" id="clAddOpen">Add cluster</button></div>`;
   patch(d.list, head + items + add);
   wireSections(d.el);
   wireClusters(d.el);
@@ -121,6 +126,15 @@ function wireClusters(root){
     clAdding = false; clDraft = {name: "", text: ""};
     await loadClusters();
   };
+  root.querySelectorAll("[data-clk3s]").forEach(b => b.onclick = async () => {
+    const name = await askText(`Add k3s on ${b.dataset.clk3sname}`, {verb: "Add", value: `${b.dataset.clk3sname} k3s`, label: "its name here"});
+    if (!name) return;
+    busy(b, "Asking the cluster");
+    const j = await postJSON("/api/clusters", {action: "from-k3s", node: b.dataset.clk3s, name});
+    if (j.error){ notify(j.error, true); if (b.isConnected) unbusy(b, `Add k3s on ${b.dataset.clk3sname}`); return; }
+    notify(`${j.cluster.name} added: ${clStatus(j.cluster)}`);
+    await loadClusters();
+  });
   root.querySelectorAll("[data-clact]").forEach(b => b.onclick = async () => {
     const id = b.dataset.cl, c = (clustersData?.clusters || []).find(x => x.id === id);
     if (!c) return;

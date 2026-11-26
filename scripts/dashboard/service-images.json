@@ -37,6 +37,17 @@
         "trivy": "aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa",
         "mobsfscan": "opensecurity/mobsfscan:0.4.5@sha256:7d1d06ee36ec550d11071c6aa6f4a9d5c8ce60197067d59da0c86d8ba529834f"
       }
+    },
+    {
+      "name": "k3s",
+      "rev": 1,
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "images": {
+        "k3s": "rancher/k3s:v1.37.2-k3s1@sha256:21ea6e0fac4e3930c2ce8aa40ddd41a8b18cb3e9a0222c030dc005e7e88c4332"
+      }
     }
   ]
 }
