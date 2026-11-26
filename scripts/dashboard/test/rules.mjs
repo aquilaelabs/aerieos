@@ -548,8 +548,17 @@ await section("A project's rules beside the global ones", async () => {
   // staged edits by now, and a panel holding edits does not re-read.
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'notebook'); if (t) hideTab(t.id); });
   await page.evaluate(() => openNotebook('alpha', 'briefing'));
+  // The view reads the rules, the global ones and the briefing they make;
+  // under a whole gate's load that ran past forty seconds (B970), its read
+  // having gone out before the save above had landed. Asked again each time
+  // round, as the loop below asks, until the rows are drawn.
+  for (let i = 0; i < 150; i++){
+    if (await page.evaluate(() => !!document.querySelector('.pane .nb #rulesBox .rulerow, .pane .nb #rulesBox .grule'))) break;
+    await page.evaluate(() => pollRevs());
+    await new Promise(r => setTimeout(r, 400));
+  }
   await page.waitForFunction(() => !!document.querySelector('.pane .nb #rulesBox .rulerow, .pane .nb #rulesBox .grule'),
-                             null, { timeout: 20000 });
+                             null, { timeout: 5000 });
   let seen = null;
   for (let i = 0; i < 30 && !seen?.global; i++){
     await page.evaluate(() => pollRevs());
