@@ -1730,7 +1730,7 @@ ok(await phone.evaluate(() => {
 // From the keyboard (R286): Enter on Add to roadmap unrolls the box with the
 // caret in it, and Escape in the empty box rolls it back with the caret on
 // the press again, where a keyboard's place was lost.
-{
+await section("the add box from the keyboard", async () => {
   await phone.focus('#roadmapShow');
   await phone.keyboard.press('Enter');
   await phone.waitForFunction(() => document.activeElement?.id === 'roadmapText', null, { timeout: 5000 }).catch(() => {});
@@ -1739,7 +1739,7 @@ ok(await phone.evaluate(() => {
   await phone.waitForFunction(() => document.getElementById('roadmapAddBar').hidden || document.activeElement?.id === 'roadmapShow', null, { timeout: 5000 }).catch(() => {});
   const back = await phone.evaluate(() => document.activeElement?.id);
   ok(inBox === 'roadmapText' && back === 'roadmapShow', `the keyboard opens the box with the caret in it, and Escape gives the caret back to the press (${inBox}, ${back})`);
-}
+});
 // The strip does not spill off a phone. Five labels are wider than 360px and
 // flex items will not shrink below their text, so it scrolls sideways
 // instead, and the tab that is current has to be inside the visible part of it.
