@@ -35,6 +35,7 @@
 - A hosting-only node's Library offers only the services and apps it runs, and says where toolchains, coding agents and tool packs go instead (4321767)
 - The container template's secrets folder, where the first start makes the install key, defaults to the system share instead of appdata, so a backup of appdata no longer carries the key beside what it seals; an existing install keeps its folder (44f56aa)
 - The install key's name from before 0.8.0, SIGNING_SECRET, is read no more. Upgrading: an install that still sets it rather than INSTALL_KEY stops at start and says so; rename it INSTALL_KEY in the secrets folder (4e2e2e2)
+- Placeholders and the green state pills in light themes read at 4.5:1 or more in every theme (1ef1f0b)
 
 ### Fixed
 
