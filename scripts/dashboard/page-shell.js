@@ -17,11 +17,11 @@
 // One stroke voice with TOOL_ICONS (page-tabs.js), 16px, for the groups
 // that have no tool icon of their own.
 const RAIL_ICONS = {
+  you: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.6" r="2.5"/><path d="M3.2 13.4c.7-2.7 2.5-4.1 4.8-4.1s4.1 1.4 4.8 4.1"/></svg>`,
   home: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8.2 8 3.2l5.5 5"/><path d="M4 7v6h8V7"/><path d="M6.6 13V9.6h2.8V13"/></svg>`,
   projects: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h4l1.2 1.4h5.8v7.1H2.5z"/><path d="M2.5 7.4h11"/></svg>`,
   sessions: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.4" y="3" width="11.2" height="8.6" rx="1.2"/><path d="M4.6 6.2l1.8 1.4-1.8 1.4"/><path d="M7.6 9h3"/><path d="M5.5 13.5h5"/></svg>`,
   people: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.2" cy="5.6" r="2.3"/><path d="M2.4 13c.3-2.6 1.9-4 3.8-4s3.5 1.4 3.8 4"/><circle cx="11.2" cy="6.2" r="1.8"/><path d="M10.4 9.6c1.9 0 3 1.3 3.2 3.4"/></svg>`,
-  settings: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.6 1.9h2.8l.35 1.72 1.2.7 1.66-.57 1.4 2.42-1.3 1.16v1.4l1.3 1.16-1.4 2.42-1.66-.57-1.2.7-.35 1.72H6.6l-.35-1.72-1.2-.7-1.66.57-1.4-2.42 1.3-1.16v-1.4L1.99 6.17l1.4-2.42 1.66.57 1.2-.7z"/><circle cx="8" cy="8" r="2.1"/></svg>`,
   more: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>`,
   // A server: two units in a rack, each with its light.
   controller: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.8" width="11" height="4.4" rx="1"/><rect x="2.5" y="8.8" width="11" height="4.4" rx="1"/><circle cx="5" cy="5" r=".6"/><circle cx="5" cy="11" r=".6"/><path d="M8 5h3.5M8 11h3.5"/></svg>`,
@@ -44,7 +44,10 @@ const RAIL_GROUPS = [
   {key: "sessions", label: "Sessions", icon: "sessions"},
   {key: "jobs", label: "Jobs", icon: "jobs"},
   {key: "people", label: "People", icon: "people"},
-  {key: "settings", label: "Settings", icon: "settings"},
+  // Each person's own (Profile): named You (the operator, 25 Nov, R294 step
+  // 15), so Controller > Settings is the one thing called Settings and a
+  // press meaning the install's settings does not land on one's profile.
+  {key: "settings", label: "You", icon: "you"},
   {key: "help", label: "Help", icon: "help"},
 ];
 
@@ -105,16 +108,6 @@ const PAGE_KINDS = {
       const ns = typeof ph !== "undefined" && ph?.nodes;
       return Array.isArray(ns) && ns.length && !ns.some(x => x.id === nid) ? "no adb on this node: install Android platform tools from the Library" : "";
     }},
-  // CI runner is offered by grant too (R137 step 3). Its page is drawn from
-  // the nodes' read.
-  runner: {group: "build", label: "CI runner", open: () => openRunnerTab(),
-    // ...drawn for CI runner Read, which reads the runners it may (R277).
-    may: a => state?.can?.["runner-read"] !== false && a.runner !== "",
-    node: () => runnerNode, setNode: v => { runnerNode = v; }, moved: "nodes",
-    off: n => {
-      const has = (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
-      return has ? "" : "no CI runner on this node yet: Add runner is on its page";
-    }},
   // A Library entry's own page (R183), the Library's areas.
   entry: {group: "build", label: "Library", may: a => PAGE_KINDS.library.may(a), back: "library"},
 
@@ -170,6 +163,21 @@ const PAGE_KINDS = {
     }},
   scanners: {group: "machines", label: "Scanners", open: () => openScannersTab(), may: a => !!a.nodes || !!a.configure,
     back: "installed", own: false},
+  // CI runner is offered by grant too (R137 step 3). Its page is drawn from
+  // the nodes' read.
+  // A node's service, as nginx and the Scanners are, so under Machines (R294
+  // step 15), after Installed so the group still opens on Nodes; its
+  // #/build/runner address still opens it (openRoute). Unlike theirs its
+  // list is the node's own row (services.runners), not an Installed row, so
+  // it keeps its place on the sub-nav.
+  runner: {group: "machines", label: "CI runner", open: () => openRunnerTab(),
+    // ...drawn for CI runner Read, which reads the runners it may (R277).
+    may: a => state?.can?.["runner-read"] !== false && a.runner !== "",
+    node: () => runnerNode, setNode: v => { runnerNode = v; }, moved: "nodes",
+    off: n => {
+      const has = (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
+      return has ? "" : "no CI runner on this node yet: Add runner is on its page";
+    }},
   // A machine's files (R224): an administrator's alone.
   files: {group: "machines", label: "Files", open: () => openFilesTab(), may: () => !!state?.admin,
     node: () => flNode, setNode: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },

@@ -34,7 +34,7 @@ const PAGES = [
   // lands with no tiles; a node that has carries them, as the template does.
   ['emulator', '#/build/emulator', 'emu = null; renderEmulatorInto(0)', ['tiles']],
   ['phone', '#/build/phone', 'ph = null; renderPhoneInto(0)'],
-  ['runner', '#/build/runner', 'nodesList = null; renderRunnerInto(0)'],
+  ['runner', '#/machines/runner', 'nodesList = null; renderRunnerInto(0)'],
   ['users', '#/people/users', 'usersList = null; renderUsersInto(0)'],
   ['roles', '#/people/roles', 'rolesData = null; renderRolesInto(0)'],
   ['profile', '#/settings', 'profile = null; renderProfileInto(0)'],

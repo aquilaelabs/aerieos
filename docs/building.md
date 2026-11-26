@@ -133,7 +133,7 @@ to fix.
 
 ## CI runners
 
-The **CI runner** page (Build > CI runner) lists every node's CI runner
+The **CI runner** page (Machines > CI runner) lists every node's CI runner
 (this container runs none), one row each with its state (listening, idle;
 running a job; quiet; install failed, with when and why; installing;
 removing), above the chosen node's runner section, where one is installed,

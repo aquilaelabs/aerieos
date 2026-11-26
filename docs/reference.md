@@ -988,7 +988,7 @@ once.
 | Where | What |
 |---|---|
 | Build, Apps | each offered app with its version, **Download**, and how to connect it |
-| Settings, Profile | the browsers signed in as you, each with **Sign out**, and the devices, each with **Disconnect** |
+| You, Profile | the browsers signed in as you, each with **Sign out**, and the devices, each with **Disconnect** |
 | `GET /apps/NAME/FILE` | one file the controller holds (`android`), for anybody signed in |
 | `GET /api/apps` | what is offered and held: each app's files, their sha256 and size, the release, when it last looked |
 | `POST /api/v1/device/apps` | the same for a device's app (its own token), to update itself from; `GET /api/v1/device/app-file?app=NAME&file=FILE` fetches one |
