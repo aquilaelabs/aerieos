@@ -1972,8 +1972,11 @@ await section("maintenance mode", async () => {
     c.on('error', () => {});
     c.on('close', () => { t.closed = true; res(t); });
     c.on('data', d => { got += d; if (!t.status && got.includes('\r\n\r\n')) { t.status = got.split('\r\n')[0]; t.sock = c; res(t); } });
+    // ...with the User-Agent the sign-in was made with (fetch's, node), as a
+    // browser's socket carries its own: a sign-in is held to its browser,
+    // and one with none is refused (R288).
     c.write(`GET /termws?arg=sh%3A${n}%3Aalpha&cols=80&rows=24 HTTP/1.1\r\nHost: ${u0.host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n`
-      + `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nCookie: ${cookie}\r\n\r\n`);
+      + `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nUser-Agent: node\r\nCookie: ${cookie}\r\n\r\n`);
   });
   const cookieOf = async (u, pw) => ((await form(u, pw)).headers.get('set-cookie') || '').split(';')[0];
   // An author first: a terminal is refused to an account with none. And
