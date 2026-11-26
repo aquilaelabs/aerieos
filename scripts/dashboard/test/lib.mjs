@@ -391,7 +391,10 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   const cutByWebKit = text => {
     const m = /^Fetch API cannot load (\w+:\s*\/+\S+?)\.? due to access control checks\.?$/.exec(text);
     if (!m) return false;
-    try { return new globalThis.URL(m[1].replace(/^(\w+):\s*\/+/, '$1://')).origin === new globalThis.URL(page.url()).origin; } catch { return false; }
+    // The page's origin, or the harness's own server's: mid-reload WebKit
+    // can say the page is elsewhere (sessions.mjs's phone, 26 Nov, B1133).
+    const own = [page.url(), URL].map(u => { try { return new globalThis.URL(u).origin; } catch { return ''; } }).filter(Boolean);
+    try { return own.includes(new globalThis.URL(m[1].replace(/^(\w+):\s*\/+/, '$1://')).origin); } catch { return false; }
   };
   page.on('console', m => {
     if (m.type() !== 'error') return;
