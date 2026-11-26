@@ -44,9 +44,12 @@ jobs:
   follow:
     runs-on: ubuntu-24.04
     steps:
-      # The signers this run's own tree names, and nothing else of it.
+      # The signers the default branch names, and nothing else of it: the
+      # tag's own tree is the one being judged, and a tag cut from a branch
+      # that added a key would have vouched for itself (R290).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
+          ref: ${{ github.event.repository.default_branch }}
           sparse-checkout: |
             config/release-signers
           sparse-checkout-cone-mode: false
@@ -107,7 +110,24 @@ jobs:
             *-*) ;;
             *) follow+=(latest "$(printf '%s' "$ver" | cut -d. -f1-2)") ;;
           esac
+          # Forward only (R290): a tag people follow that names a newer
+          # release already stays there, so publishing an older release late,
+          # or again, never moves it back. Its version is the image's own label.
+          newer() {
+            python3 -c 'import re, sys
+          k = lambda v: (lambda m: (int(m[1]), int(m[2]), int(m[3]), 0 if m[4] else 1, int(m[4] or 0)) if m else None)(
+              re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(?:-[a-z][a-z0-9]*\.(\d+))?", v.strip()))
+          a, b = k(sys.argv[1]), k(sys.argv[2])
+          sys.exit(0 if a and b and a > b else 1)' "$1" "$2"
+          }
           for t in "${follow[@]}"; do
+            cur="$(docker buildx imagetools inspect "$img:$t" --format '{{json .Image}}' 2>/dev/null | python3 -c 'import json, sys
+          d = json.load(sys.stdin); d = d if "config" in d else next(iter(d.values()), {})
+          print(((d.get("config") or {}).get("Labels") or {}).get("org.opencontainers.image.version", ""))' 2>/dev/null || true)"
+            if [ -n "$cur" ] && newer "$cur" "$ver"; then
+              echo "$img:$t is $cur, newer than $ver: left there" | tee -a "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
             docker buildx imagetools create -t "$img:$t" "$ref"
             echo "$img:$t is $ver (${ref#*@})" | tee -a "$GITHUB_STEP_SUMMARY"
           done

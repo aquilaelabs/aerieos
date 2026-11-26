@@ -86,6 +86,13 @@ if [ -z "$id" ]; then
     echo "release $id made for $tag (a draft)"
 else
     echo "release $id is $tag's"
+    # A published release is what people downloaded: no file of it is
+    # replaced or added after (R290), whatever job asks. A re-run's files
+    # go on a release cut again from a fixed commit.
+    if [ "${#files[@]}" -gt 0 ] && [ "$(gh api "repos/$repo/releases/$id" --jq '.draft')" = false ]; then
+        echo "release-attach: $tag is published, and a published release's files are not changed: cut another" >&2
+        exit 4
+    fi
 fi
 
 for f in "${files[@]}"; do

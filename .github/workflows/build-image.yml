@@ -201,7 +201,7 @@ jobs:
           name: agent-signature
           path: scripts/agent/agent.sig
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   build:
     # After the tag's three checks and the agent's signature, or at once
@@ -673,7 +673,7 @@ jobs:
             ${{ steps.pack.outputs.name }}.sha256
             notes.md
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   # The apps a person installs (companion-app.yml) and the Android app
   # (android-app.yml), as jobs of this run (R206 step 1): the bundle's job

@@ -98,7 +98,9 @@ class Gate(unittest.TestCase):
         ups = [s["with"] for s in jobs["bundle"]["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@")]
         self.assertEqual([u["name"] for u in ups], ["release-bundle"])
         self.assertIn("notes.md", ups[0]["path"])
-        self.assertEqual(ups[0]["retention-days"], 1)
+        # A week: a release's last job can wait on its approval past a day,
+        # and a re-run of it needs what was handed on (R290).
+        self.assertEqual(ups[0]["retention-days"], 7)
         downs = [s["with"] for s in last["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact@")]
         self.assertIn({"name": "aerieos-os", "path": "out"}, downs)
         self.assertIn({"pattern": "release-*", "path": "rel", "merge-multiple": True}, downs)
@@ -152,7 +154,7 @@ class Gate(unittest.TestCase):
         self.assertIn("python3 tools/sign-agent.py --check ||", text, "a tag whose agent is not signed fails")
         self.assertIn("exit 1", text)
         up = next(s["with"] for s in sig["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
-        self.assertEqual((up["name"], up["path"], up["retention-days"]), ("agent-signature", "scripts/agent/agent.sig", 1))
+        self.assertEqual((up["name"], up["path"], up["retention-days"]), ("agent-signature", "scripts/agent/agent.sig", 7))
         # What packs the agent takes that signature and checks it, on a tag alone.
         jobs = load("build-image.yml")["jobs"]
         for name in ("build", "bundle"):
@@ -292,6 +294,16 @@ class Gate(unittest.TestCase):
                                 "type=ref,event=pr", "type=sha,format=short", "type=schedule,pattern={{date 'YYYYMMDD'}}",
                                 "type=semver,pattern={{version}}"])
         self.assertEqual(meta["flavor"], "latest=false")
+
+    def test_the_tags_people_follow_move_forward_only_on_the_default_branch_s_signers(self):
+        # R290: publishing an older release late never moves :dev back, and
+        # a tag cut from a branch that added a key does not vouch for itself.
+        follow = load("publish-release.yml")["jobs"]["follow"]
+        co = next(s for s in follow["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))["with"]
+        self.assertEqual(co["ref"], "${{ github.event.repository.default_branch }}")
+        run = next(s for s in follow["steps"] if s.get("name") == "Move the tags people follow")["run"]
+        self.assertIn('newer "$cur" "$ver"', run)
+        self.assertIn("left there", run)
 
     def test_a_release_tag_s_image_is_built_with_no_cache(self):
         # B1169: :main's cache is any merge's to write, and a release's image
@@ -572,7 +584,7 @@ esac
             self.assertEqual([s["if"] for s in attach], ["env.TAG != '' && !inputs.hand-on"])
             self.assertEqual([s["if"] for s in hand], ["inputs.hand-on"])
             names.append(hand[0]["with"]["name"])
-            self.assertEqual(hand[0]["with"]["retention-days"], 1)
+            self.assertEqual(hand[0]["with"]["retention-days"], 7)
             self.assertIn(".sha256", hand[0]["with"]["path"])
         self.assertEqual(sorted(names), ["release-apps-portable", "release-apps-windows"])
         # The Windows job is handed its version by the Linux one: aerie

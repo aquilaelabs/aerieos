@@ -159,7 +159,7 @@ jobs:
             dist/aerieos-vscode-*.vsix
             dist/aerieos-vscode-*.vsix.sha256
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   build:
     needs: portable
@@ -289,4 +289,4 @@ jobs:
             dist/aerieos-usb-maker-*.exe
             dist/aerieos-usb-maker-*.exe.sha256
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7

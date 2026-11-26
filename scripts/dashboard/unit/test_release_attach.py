@@ -77,6 +77,19 @@ class ReleaseAttach(unittest.TestCase):
         with open(self.env["GH_ASSETS"], "w", encoding="utf-8") as f:
             f.write("".join(n + "\n" for n in names))
 
+    def test_a_published_release_s_files_are_not_changed(self):
+        # R290: what people downloaded stays as it was; a re-run's files
+        # go on a release cut again.
+        with open(self.releases, "w", encoding="utf-8") as f:
+            json.dump([{"id": 777, "tag_name": "v1.2.3-dev.9", "draft": False}], f)
+        with open(self.env["GH_DRAFT"], "w", encoding="utf-8") as f:
+            f.write("false\n")
+        r = self.run_tool(self.f)
+        self.assertEqual(r.returncode, 4, r.stderr)
+        self.assertIn("is published, and a published release's files are not changed", r.stderr)
+        with open(self.log, encoding="utf-8") as f:
+            self.assertNotIn("uploads.github.com", f.read())
+
     def test_a_dev_build_s_release_is_published_once_every_file_is_on_it(self):
         # The operator, 11 Nov: two dev builds were published from the git
         # host's page minutes after their tags, and one never got its image.
