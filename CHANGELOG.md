@@ -12,6 +12,8 @@
 - Gradle builds into, under a repository's Build and test: the node's own disk (the default) or the repository's tree (6336f51)
 - Kubernetes tools in the Library: kubectl, Helm and kind, installed on a node as one toolchain with every download pinned to its publisher's checksum (1fba7b9)
 - Clusters, under Machines beside Nodes: a Kubernetes cluster added once from its kubeconfig, its credential sealed and never shown again, each with its version, nodes ready and namespaces, and Test, Rename and Forget; a new Clusters area on the Roles page says who may (c3d41b6)
+- A Deploy section in each space's settings once a Kubernetes cluster is kept: its environments, each a cluster, a namespace AerieOS makes ready there with a deployer that reaches that namespace alone, the registry its images go to and when it deploys (dd10fda)
+- A Deploy area on the Roles page for who sees a space's environments and who deploys to them; every space owner holds it, and Clusters can be given cluster by cluster as Nodes is node by node (dd10fda)
 
 ### Changed
 
