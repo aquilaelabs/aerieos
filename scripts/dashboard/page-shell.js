@@ -591,6 +591,9 @@ function shellBar(t, i){
   // sub-nav's line at its right (the operator, 28 Oct).
   // A page of the group about no one node (Clusters) wears the group's name
   // where the picker stands, as a space's header wears the space's.
+  // The group's actions wait on the node list, which the picker's header
+  // reads; a page with none still asks for it.
+  if (grouped && !NODE_PICKED[t.kind] && nodesList === null) nodesKnown();
   const head = !grouped ? "" : NODE_PICKED[t.kind] ? groupHeader(t, g)
     : `<span class="phead mchead"><span class="pname">${esc(g.label)}</span><span class="sp"></span></span>`;
   return grouped ? head + `<span class="subrow">${nav}<span class="sp"></span>${GROUP_HEADS[g.key].actions ? GROUP_HEADS[g.key].actions() : ""}</span>` : nav;

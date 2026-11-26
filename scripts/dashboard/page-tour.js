@@ -134,6 +134,10 @@ const TOUR_STEPS = {
     {at: TOUR_MHEAD, say: "Pick a node here; it holds across Nodes, Storage and Installed. Enroll node makes the script that adds a machine."},
     {at: TOUR_FIRST, say: "A node's sections: its health, the spaces on it, its sessions, its features, and the advanced verbs at the end."},
   ],
+  clusters: [
+    {say: "Clusters: the Kubernetes clusters your spaces may deploy to, each added once from a kubeconfig. Its credential is kept sealed on the controller and never shown again."},
+    {at: TOUR_FIRST, say: "Each cluster is a section: its version and nodes ready on the heading, its namespaces and the space that owns each inside, and Test, Rename and Forget at its foot."},
+  ],
   storage: [
     {say: "Storage: what every node's disks hold, by space and by kind, and where the room is going."},
   ],

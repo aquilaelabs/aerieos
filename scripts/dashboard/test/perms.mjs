@@ -28,8 +28,8 @@ ok(!await page.$('.rolestab .rlist input, .rolestab [data-rwho]') && !!await pag
    '...no account and no field in the list, and New role at the right of the page\'s bar');
 await page.click('.rolestab [data-rpick="admin"]');
 await faded(page);
-ok(await page.$eval('.rolestab', t => !t.querySelector('#rolesSave') && t.querySelectorAll('[data-rread]:checked').length === 19
-     && [...t.querySelectorAll('[data-rread]')].every(c => c.disabled)),
+ok(await page.$eval('.rolestab', t => { const all = [...t.querySelectorAll('[data-rread]')];
+     return !t.querySelector('#rolesSave') && all.length > 10 && all.every(c => c.checked && c.disabled); }),
    '...a built-in one reads as every area, with nothing to change and no Save');
 
 // A role added: its scope, Read and Write per area, Write only with Read.
