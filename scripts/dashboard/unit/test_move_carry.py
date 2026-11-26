@@ -54,10 +54,11 @@ class Carry(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(state, "firstboot.json")))
         self.assertEqual(len(said), 2, said)
 
-    def test_a_token_keeps_its_state_whichever_store_is_the_older(self):
+    def test_a_token_keeps_its_state_across_a_move(self):
         # R227 step 14: a token's state has a column of its own since the
-        # database's migration 0008, which either store may not have run.
-        for old_aside, old_state in ((True, True), (True, False), (False, True), (False, False)):
+        # database's migration 0008, which every supported store has run
+        # (R295: the conversion for a store from before it is gone).
+        for old_aside, old_state in ((False, False),):
             d = tempfile.mkdtemp()
             aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
             os.makedirs(aside)
