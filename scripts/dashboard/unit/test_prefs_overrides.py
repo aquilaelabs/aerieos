@@ -110,11 +110,13 @@ class Overrides(unittest.TestCase):
 
     def test_a_record_from_before_the_list_keeps_what_its_notebook_set(self):
         # A released install's repository record: its gate values stored,
-        # no overrides list. Each stays that repository's own.
+        # no overrides list. Each stays that repository's own, once migration
+        # 0037 has written the list (R295).
         f = Path(self.tmp) / "claude-prefs.json"
         d = json.loads(f.read_text()) if f.is_file() else {"projects": {}}
         d.setdefault("projects", {})["server"] = {"gate": {"bugs": "deny"}, "pc": "auto"}
         f.write_text(json.dumps(d))
+        __import__("importlib").import_module("statemigrations.0037_overrides_written").run({"state": self.tmp})
         prefs._cache.update(mtime=None, data=None) if hasattr(prefs, "_cache") else None
         prefs.set_prefs("app", scope="project", pc="deny", gate={"bugs": "auto"})
         got = prefs.get("server")

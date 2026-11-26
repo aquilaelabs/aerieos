@@ -194,18 +194,10 @@ def _dial_parts():
 
 def _overrides_of(rec):
     """The dials this repository sets apart from its project, as names: the
-    record's own list, or, for a record from before there was one (every
-    released install's), each dial it stores a value for, so what a
-    repository's notebook had set before stays its own."""
+    record's own list (migration 0037 wrote one for every record from before
+    there was one)."""
     ok = set(OVERRIDABLE) | _dial_parts()
-    if isinstance(rec.get("overrides"), list):
-        return sorted({str(x) for x in rec["overrides"] if str(x) in ok})
-    # A value at its default is nothing somebody chose: a record written
-    # whole carries every field, chosen or not.
-    got = {f for f in OVERRIDABLE if rec.get(f) not in (None, DIAL_DEFAULTS[f])}
-    gate = rec.get("gate") if isinstance(rec.get("gate"), dict) else {}
-    got |= {f"gate.{k}" for k in GATE_KINDS if gate.get(k) not in (None, "auto") and gate_ok(k, gate.get(k))}
-    return sorted(got)
+    return sorted({str(x) for x in rec.get("overrides") or [] if str(x) in ok}) if isinstance(rec.get("overrides"), list) else []
 # repos.py's answers, handed over by the server: (project_of, members,
 # is_repos). Unset (bb loading this by path), _rp reads the same from the files.
 _repos = None
