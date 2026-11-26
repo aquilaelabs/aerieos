@@ -45,12 +45,14 @@
 - Withdrawing a GitHub release takes the container image its build pushed too, unless people follow it by another tag (34b1157)
 - A Library entry's page stops reading when it is left, where each visit while something installed added another read every three seconds (1dbdbee)
 - A new space's progress is read once a second, where Abort could set two reads going (1dbdbee)
+- The Windows companion takes a later dev build, where it stayed on the one it had (05cbf12)
 
 ### Security
 
 - A fresh install's first account can be made only for 15 minutes after AerieOS starts, and only from its own page, so nobody else on the network or another site's page can claim it first; restart AerieOS to open it again. A restored backup or a landed move no longer brings startup hooks back live: they are kept as startup.d.carried (a3fc1a5)
 - A root startup hook in config/startup.d runs only once an administrator has read and approved it as it is, under Controller settings, Startup hooks, and a shell on the controller itself is an administrator's: anything that could write that folder (a shell opened by anybody with Terminal Write on a space with no node, another container sharing the user id) could otherwise become root at the next restart. Upgrading: approve each *.root.sh of yours under Startup hooks once; until then it is skipped, and the start says so (59e9c37)
 - Signing in can no longer be sent on to another site or carry a header of its own, adding a second factor beside one asks for it first, and another site's page can neither sign you in nor out (8b32dc5)
+- A bare-metal controller's update never moves back to an older release (05cbf12)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
