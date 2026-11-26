@@ -92,6 +92,14 @@ administrator) on the bell, auto starts it, and an environment marked
 production asks a person whatever it says. Handing a session that is Deploy
 Write's.
 
+**Testing from a session.** A session tests what it deploys in an
+environment kept for it: one on a node's own k3s (a cluster added from a
+node running it), named test or whatever the space likes, which `aerie k8s
+deploy test` ships to and `aerie k8s status test` and `aerie k8s logs` read
+back. A throwaway cluster of a session's own is not offered: kind needs a
+Docker daemon, and a session has none of its own, so the Kubernetes tools'
+kind is for a person whose Docker is theirs.
+
 **When it deploys.** An environment that deploys on a push to a branch is
 deployed at the commit a push leaves there, a push from the Git view or one
 `aerie git push` relays; one that deploys on a release, at the release's

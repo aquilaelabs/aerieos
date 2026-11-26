@@ -773,4 +773,7 @@ where it answers) and `aerie k8s logs ENV POD` a pod's log, at any setting;
 settings` shows, and an environment marked production waits for a person
 whatever it says. The controller holds every credential: no kubeconfig is
 here to find, and `kubectl` from this session reaches no environment.
+To test what it deploys, a session deploys to an environment the space keeps
+for testing, on a node's k3s; kind is not for a session, which has no Docker
+of its own.
 <!-- BUILDERBOT:END -->
