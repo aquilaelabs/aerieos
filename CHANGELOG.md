@@ -11,6 +11,7 @@
 - Every node's page says how many updates wait for its system's own packages, the security ones among them and a restart asked for, and the bell says so for every node, where it did for the controller's own machine alone (6336f51)
 - Gradle builds into, under a repository's Build and test: the node's own disk (the default) or the repository's tree (6336f51)
 - Kubernetes tools in the Library: kubectl, Helm and kind, installed on a node as one toolchain with every download pinned to its publisher's checksum (1fba7b9)
+- Clusters, under Machines beside Nodes: a Kubernetes cluster added once from its kubeconfig, its credential sealed and never shown again, each with its version, nodes ready and namespaces, and Test, Rename and Forget; a new Clusters area on the Roles page says who may (c3d41b6)
 
 ### Changed
 
