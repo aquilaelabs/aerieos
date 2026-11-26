@@ -113,5 +113,6 @@ Every option is in [the install guide](docs/install.md).
 - [Start here](docs/start-here.md), for someone given an account
 - [How it works](docs/how-it-works.md), and [the rest of the docs](docs/README.md)
 - [Data and privacy](docs/privacy.md): nothing is sent to us
+- [Found a vulnerability?](SECURITY.md) Report it privately, on GitHub
 
 [Apache License 2.0](LICENSE). Copyright 2026 aquilaeLabs; see [NOTICE](NOTICE).

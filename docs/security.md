@@ -12,6 +12,10 @@ not beside it, and is handed to the one process that needs it for the one
 moment it needs it. Root on the running controller reads everything the
 controller can; nobody else reads anything whole.
 
+Found a way past any of it? Report it privately, as
+[SECURITY.md](../SECURITY.md) says: on GitHub, this repository's Security
+tab, Report a vulnerability.
+
 ## Who is trusted for what
 
 | Who | Trusted to | Not trusted to |
