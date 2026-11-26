@@ -1,9 +1,10 @@
 # AerieOS documentation
 
-AerieOS is your own server, for your files, your apps and your code: your disks,
-shares, apps, VMs and spaces, with coding agents (Claude Code, ChatGPT's Codex
-CLI, GitHub's Copilot CLI, xAI's Grok Build, and any model through OpenCode) when
-you want them. The **controller** serves this dashboard and keeps every space's plan, bugs
+AerieOS is your own server, with coding agents that keep working after you
+close the tab: open a space from any browser and Claude Code, Codex CLI,
+Copilot CLI, Grok Build or any model through OpenCode starts on a machine you
+own, already briefed; underneath is a real home server, your disks, shares,
+apps and VMs in the same dashboard. The **controller** serves this dashboard and keeps every space's plan, bugs
 and rules; the machines it enrolls, the **nodes**, do the work: the agents'
 sessions, builds, tests, CI, Android emulators, containers and VMs. On a
 machine of its own it runs the storage too. These
