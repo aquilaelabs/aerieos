@@ -315,10 +315,12 @@ class Controller(unittest.TestCase):
                     "n_no_openssl": {"reported": {"relay": {"tls": "", "once": True}}},
                     "n_before": {"reported": {"session": {"screen": 7684}}}}
         with mock.patch.object(nodes, "node", lambda nid: reported.get(nid)):
-            self.assertEqual(nodes.relay_of("n_new"), {"pin": "sha256:" + "a" * 64, "once": True, "derived": True})
-            self.assertEqual(nodes.relay_of("n_no_openssl"), {"pin": "", "once": True, "derived": False})
-            self.assertEqual(nodes.relay_of("n_before"), {"pin": "", "once": False, "derived": False}, "an agent from before: plain and unvalued, as it was")
-            self.assertEqual(nodes.relay_of("n_gone"), {"pin": "", "once": False, "derived": False})
+            self.assertEqual(nodes.relay_of("n_new"), {"pin": "sha256:" + "a" * 64, "once": True})
+            self.assertEqual(nodes.relay_of("n_no_openssl"), {"pin": "", "once": True})
+            self.assertEqual(nodes.relay_of("n_before"), {"pin": "", "once": False}, "an agent from before: plain and unvalued, as it was")
+            self.assertEqual(nodes.relay_of("n_gone"), {"pin": "", "once": False})
+            # ...the words termws.node takes, and whether it takes the derived key apart (R288).
+            self.assertEqual([nodes.relay_derived(n) for n in ("n_new", "n_no_openssl", "n_before", "n_gone")], [True, False, False, False])
 
     def test_a_nodes_report_of_its_relay_is_kept_by_the_controller(self):
         # A report is kept key by key (nodes._census): the relay's was not
@@ -338,7 +340,7 @@ class Controller(unittest.TestCase):
         # ...and through to what the callers ask.
         kept = {"reported": nodes._census({"relay": {"tls": pin, "once": True}})}
         with mock.patch.object(nodes, "node", lambda nid: kept):
-            self.assertEqual(nodes.relay_of("n1"), {"pin": pin, "once": True, "derived": False})
+            self.assertEqual(nodes.relay_of("n1"), {"pin": pin, "once": True})
 
     def test_the_controller_loads_the_agents_own_tls(self):
         was = termws.AGENT_DIR

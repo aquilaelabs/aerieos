@@ -922,7 +922,7 @@ def screen_key(node_id):
                  "ORDER BY created DESC LIMIT 1", (node_id,))
     if not rows:
         return ""
-    if not relay_of(node_id).get("derived"):
+    if not relay_derived(node_id):
         return str(rows[0]["secret_hash"])
     with _relay_lock:
         return (_relay_keys.get(node_id) or {}).get(rows[0]["id"], "")
@@ -4957,16 +4957,21 @@ def _share_cfg(sh, req):
 
 
 def relay_of(node_id):
-    """How a node's relay port is spoken to (R243): {pin, once, derived}.
-    `pin` is the sha256 of the certificate its agent made and reported, the
-    only one the controller then takes there, empty for a node that has none
-    (a machine with neither the cryptography library nor openssl), whose
-    relay relaytls.connect then refuses to open; `once`, that it takes a
-    signed request a single time, so the controller signs a value of its own
-    with each; `derived`, that it takes the key derived from its token alone
-    (R288, screen_key)."""
+    """How a node's relay port is spoken to (R243): {pin, once}, the words
+    relaytls.connect and termws.node take. `pin` is the sha256 of the
+    certificate its agent made and reported, the only one the controller
+    then takes there, empty for a node that has none (a machine with neither
+    the cryptography library nor openssl), whose relay relaytls.connect then
+    refuses to open; `once`, that it takes a signed request a single time,
+    so the controller signs a value of its own with each."""
     r = ((node(node_id) or {}).get("reported") or {}).get("relay") or {}
-    return {"pin": str(r.get("tls") or ""), "once": bool(r.get("once")), "derived": bool(r.get("derived"))}
+    return {"pin": str(r.get("tls") or ""), "once": bool(r.get("once"))}
+
+
+def relay_derived(node_id):
+    """Whether a node's relay takes the key derived from its token alone
+    (R288, screen_key), as its agent reports."""
+    return bool((((node(node_id) or {}).get("reported") or {}).get("relay") or {}).get("derived"))
 
 
 def smb_named():
