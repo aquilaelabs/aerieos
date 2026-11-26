@@ -651,6 +651,8 @@ def push(nid, node, rel, size, project, apk, uid, name, by="phone"):
                       {"argv": ["sh", "-c", PUSH_SH, "push", dest, apk, dev["serial"], ADB_PORT],
                        "env": {"ANDROID_ADB_SERVER_PORT": ADB_PORT},
                        "timeout": 12 * 3600, "files": [rel], "sizes": {rel: size},
+                       # Named in words on the Jobs page and Home, not as its shell line.
+                       "title": f"push {Path(rel).name} to the phone in Firefox"[:120],
                        "project": project}, project)
     if r.get("error"):
         return r
