@@ -45,6 +45,9 @@ AREAS = (
     ("vms", "VMs", "project", "its VMs and their state", "make, start, stop, snapshot and remove them"),
     ("terminal", "Terminal", "project", "the shielded agent console", "the full tmux shell"),
     ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a space's sessions reach"),
+    # The Kubernetes clusters a space may deploy to (R281 step 2): Read sees
+    # them and their namespaces, Write adds, tests and forgets one.
+    ("clusters", "Clusters", "global", "the Clusters page", "add, test and forget clusters"),
     # What the Library and the Installed page do (R174, the operator, 28
     # Oct): Install and Configure on a node, each grantable node by node,
     # and Curate, the catalog's own entries, which every node shares.
@@ -103,6 +106,7 @@ CAP_AREA = {
     # did not say what it could do.
     "controller": ("controller", "write"), "controller-read": ("controller", "read"),
     "nodes-write": ("nodes", "write"), "containers-read": ("containers", "read"),
+    "clusters": ("clusters", "write"), "clusters-read": ("clusters", "read"),
     "vms-write": ("vms", "write"), "vms-read": ("vms", "read"),
     "settings": ("settings", "write"), "signing": ("releases", "write"),
     # A container written on the Containers page for no space: every space's

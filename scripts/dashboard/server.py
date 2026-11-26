@@ -5086,6 +5086,15 @@ def _conn_git_forget(ref, by):
 connections.kind("setting", "Controller setting", "install", _conn_settings, _conn_setting_forget)
 connections.kind("git", "Space's git token", "space", _conn_git, _conn_git_forget)
 connections.kind("router", "Model router key", "shared", _conn_router, _conn_router_forget)
+# The Kubernetes clusters (R281 step 2): each a connection shared by spaces,
+# its credential sealed under the install key like the router's keys.
+import clusters                                                  # noqa: E402
+clusters.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                   sealing=lambda: signing.MASTER is not None, used=lambda cid: connections.used("cluster", cid))
+connections.kind("cluster", "Kubernetes cluster", "shared",
+                 lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
+                           "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
+                 lambda ref, by: clusters.forget(ref))
 gitcreds.on_added = lambda p: connections.added("git", p, by=_acting_name())
 gitcreds.on_gone = lambda p: connections.gone("git", p)
 gitcreds.on_used = lambda p: connections.used("git", p)
@@ -5102,7 +5111,8 @@ def _acting_name():
 # secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
                              accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
-                             poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all),
+                             poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
+                             clusters.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
@@ -6883,6 +6893,7 @@ ROUTES = (
     Route("GET", "exact", "/api/storebackups", "_get_storebackups", ("admin", "the machine's backups are an administrator's")),
     Route("GET", "exact", "/api/root-hooks", "_get_root_hooks", "handler"),
     Route("GET", "exact", "/api/connections", "_get_connections", "handler"),
+    Route("GET", "exact", "/api/clusters", "_get_clusters", "handler"),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
     Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
@@ -6985,6 +6996,7 @@ ROUTES = (
     Route("POST", "exact", "/api/storebackups", "_storebackups", ("admin", "the machine's backups are an administrator's")),
     Route("POST", "exact", "/api/root-hooks", "_root_hooks", "handler"),
     Route("POST", "exact", "/api/connections", "_connections", "handler"),
+    Route("POST", "exact", "/api/clusters", "_clusters", "handler"),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -13434,6 +13446,45 @@ class Handler(BaseHTTPRequestHandler):
         if self._refused("controller-read"):
             return None
         return self._json(roothooks.listing())
+
+    def _get_clusters(self):
+        """GET /api/clusters (R281 step 2): the Kubernetes clusters this
+        install may deploy to, each with its facts as last asked; never a
+        credential. Read on Clusters Read."""
+        if self._refused("clusters-read"):
+            return None
+        return self._json(clusters.listing())
+
+    def _clusters(self, req):
+        """POST /api/clusters {action: add, name, kubeconfig} | {action:
+        test|rename|forget, id} (R281 step 2): a cluster added once its API
+        answers, asked again, renamed or forgotten here (nothing on the
+        cluster changes). Clusters Write, an administrator's unless a role
+        gives it; a session never reaches it (SESSION_ROUTES)."""
+        if self._refused("clusters"):
+            return None
+        act, cid, by = field(req, "action"), field(req, "id"), self._principal()
+        if act == "add":
+            r = clusters.add(req.get("kubeconfig"), field(req, "name"), by)
+            if r.get("ok"):
+                connections.added("cluster", r["cluster"]["id"], by=by)
+                db.audit(by, "cluster-add", r["cluster"]["id"], {"name": r["cluster"]["name"], "server": r["cluster"]["server"]})
+            return self._json(r, 200 if r.get("ok") else 400)
+        if act == "test":
+            r = clusters.test(cid)
+            return self._json(r, 200 if r.get("cluster") else 404)
+        if act == "rename":
+            r = clusters.rename(cid, field(req, "name"))
+            if r.get("ok"):
+                db.audit(by, "cluster-rename", cid, {"name": r["cluster"]["name"]})
+            return self._json(r, 200 if r.get("ok") else 400)
+        if act == "forget":
+            r = clusters.forget(cid)
+            if r.get("ok"):
+                connections.gone("cluster", cid)
+                db.audit(by, "cluster-forget", cid, {})
+            return self._json(r, 200 if r.get("ok") else 404)
+        return self._json({"error": "action is add, test, rename or forget"}, 400)
 
     def _get_connections(self):
         """GET /api/connections (R294 step 9): Connected services, every

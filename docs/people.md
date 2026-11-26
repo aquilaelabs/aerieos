@@ -65,8 +65,10 @@ roles, made on the **Roles** page (R152, the operator, 7 Oct). A role is a
 that reaches the machinery, or **On a space**, given per space and
 holding there) and, per area, **Read** and **Write**: Spaces, Space
 settings, Releases and versions, Git authentication, File access, Containers
-and Terminal on a space; Nodes, Install, Configure, Curate, Jobs, CI
-runner, Accounts and roles, New spaces, Controller and Storage beside them.
+and Terminal on a space; Nodes, Clusters (the Kubernetes clusters a space
+may deploy to: Read sees them, Write adds, tests and forgets one), Install,
+Configure, Curate, Jobs, CI runner, Accounts and roles, New spaces,
+Controller and Storage beside them.
 **Install** is the Library's and the Installed page's install, update and
 remove on a node; **Configure** a service's and a pack's settings on a node,
 and deploying or removing a service there; **Curate** the catalog's own

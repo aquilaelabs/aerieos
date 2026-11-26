@@ -112,6 +112,11 @@ const DRIVERS = {
     open: () => page.evaluate(() => openSettingsTab()),
     readyWhen: '.settingstab .snav .rrow',
   },
+  // The Clusters page (R281 step 2): Add cluster while none is kept.
+  clusters: {
+    open: () => page.evaluate(() => openClustersTab()),
+    readyWhen: '.clusterstab details.sect',
+  },
   // The Network page (R165 step 4): Connection and Reach from outside, under its own list.
   network: {
     open: () => page.evaluate(() => openNetworkTab()),

@@ -62,6 +62,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/storebackups` | exact | `_get_storebackups` | GET /api/storebackups (R162 step 5): the backups the controller's own machine copies, as recorded. |  |
 | GET | `/api/root-hooks` | exact | `_get_root_hooks` | GET /api/root-hooks (B1166): every root startup hook in the state's startup.d, what it says, and whether the start runs it (approved, changed since, new). | refused: controller-read |
 | GET | `/api/connections` | exact | `_get_connections` | GET /api/connections (R294 step 9): Connected services, every credential the install holds for an outside service with who added it, its last use and its expiry, and how many people keep connections of their own, which a | refused: controller-read |
+| GET | `/api/clusters` | exact | `_get_clusters` | GET /api/clusters (R281 step 2): the Kubernetes clusters this install may deploy to, each with its facts as last asked; never a credential. | refused: clusters-read |
 | GET | `/api/old-compose` | exact | `_get_old_compose` | GET /api/old-compose: the old system's containers as compose files in a zip, one each, to import from New container (adoptapps.export_zip). |  |
 | GET | `/api/v1/nodes` | prefix | `_get_nodes` | GET /api/v1/nodes: the Nodes page's read (nodes.tab_view), scoped to this account. |  |
 | GET | `/api/v1/jobs` | prefix | `_get_jobs` | GET /api/v1/jobs: nodes.jobs_view, narrowed to the projects this account may see unless it administers. |  |
@@ -135,6 +136,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/storebackups` | exact | `_storebackups` | POST /api/storebackups (R162 step 5): set (add or change) or remove a backup's record; Run now is the nodes verb storage-backup. |  |
 | POST | `/api/root-hooks` | exact | `_root_hooks` | POST /api/root-hooks {action: approve, name, sha} or {action: revoke, name} (B1166): a root hook approved as it was shown, or its approval taken back, through the root-only helper. | refused: controller |
 | POST | `/api/connections` | exact | `_connections` | POST /api/connections {action: forget, kind, ref} (R294 step 9): a credential forgotten at once (a leak, a person gone), where its kind keeps it. | refused: admin |
+| POST | `/api/clusters` | exact | `_clusters` | POST /api/clusters {action: add, name, kubeconfig} \\| {action: test\\|rename\\|forget, id} (R281 step 2): a cluster added once its API answers, asked again, renamed or forgotten here (nothing on the cluster changes). | refused: clusters |
 | POST | `/api/pin` | prefix | `_pin` | Pin or unpin a command: macros.pin. | refused: command-pin |
 | POST | `/api/reset` | exact | `_reset` | POST /api/reset: start over at onboarding (settings.reset), and the dashboard re-executes itself so the next page is Create the owner. | refused: controller |
 | POST | `/api/move` | exact | `_move` | POST /api/move (R90 step 12): prepare (the move armed, the token answered once, a bundle packed), forget (withdrawn), moved (this controller marked moved to the new one, read-only from here on), ask (the new address aske |  |

@@ -136,6 +136,9 @@ const PAGE_KINDS = {
 
   nodes: {group: "machines", label: "Nodes", open: () => openNodesTab(), may: a => !!a.nodes,
     node: () => nodesPick, setNode: v => { nodesPick = v; }, moved: "nodes"},
+  // The Kubernetes clusters a space may deploy to (R281 step 2), beside
+  // the nodes: infrastructure the install keeps, an area of its own.
+  clusters: {group: "machines", label: "Clusters", open: () => openClustersTab(), may: a => !!a.clusters},
   // Storage has an area of its own (R169).
   storage: {group: "machines", label: "Storage", open: () => openStorageTab(), may: a => !!a.storage,
     node: () => storageNode, setNode: v => { storageNode = v; }, keep: "bb.stnode", moved: "storage"},

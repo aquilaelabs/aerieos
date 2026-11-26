@@ -292,6 +292,24 @@ are AerieOS's own footprint: are unaffected. For a node whose fstab and
 address are managed by hand, or by something else. Nothing here is
 offered to a node that did not enroll as a sandbox.
 
+## Clusters
+
+The Kubernetes clusters a space may deploy to, beside the nodes under
+Machines: infrastructure the install keeps, read on Clusters Read and
+added, tested, renamed and forgotten on Clusters Write. **Add cluster** takes
+a kubeconfig, pasted or read from its file, and keeps its current context:
+the API server, its certificate authority, and a token or a client
+certificate, sealed under the install key, never shown again and never
+handed to a session. One that signs in through a cloud CLI (an `exec`
+plugin or an `auth-provider`: EKS, GKE, AKS, kubelogin) is refused, saying
+how to make a token-based one; a path where data belongs is refused,
+`kubectl config view --raw --flatten --minify` writing the files in. A
+cluster is added only once its API answers. Each is a section that opens on
+its facts as its API last said (the version, nodes ready of all), its
+namespaces with the space that owns each (the `aerieos.io/space` label), and
+Test, Rename and Forget; Forget changes nothing on the cluster. Each is a
+connection too, on Controller settings' Connected services.
+
 ## Storage
 
 **Storage**, under Machines, is what a node's disks hold, and whose. It shows

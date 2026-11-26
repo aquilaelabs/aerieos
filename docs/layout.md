@@ -166,7 +166,7 @@ scripts/
     index.html                   the markup, and the head's script that reads the theme before the first paint
     page-*.css                   the stylesheet, a cascade layer a file (R9): page-skin.css (the tokens, the schemes, bare elements), page-components.css, page-surfaces.css, page-overrides.css
     terminal.html                one terminal on a page of its own: a tab popped out of the dock, and the Android app's session screen (R133)
-    tab-*.js                     one per document tab (Docker, Nodes, Jobs, Schedules, nginx, Scanners, Storage, Library, a Library entry's own page, Installed, an installed thing's own page, Files, Toolchains, Agents, Emulator, Phone, Apps, Settings, Keys, Audit, Users, Profile, Findings, Projects)
+    tab-*.js                     one per document tab (Docker, Nodes, Clusters, Jobs, Schedules, nginx, Scanners, Storage, Library, a Library entry's own page, Installed, an installed thing's own page, Files, Toolchains, Agents, Emulator, Phone, Apps, Settings, Keys, Audit, Users, Profile, Findings, Projects)
     nb-*.js                      one per notebook view; nb-core.js is the notebook itself
     page-*.js                    one per part of the page that is neither: the state, the tabs, the panes and the dock, a project's rows, the polls, the bell, the doctor and the rest
     page-boot.js                 what runs as the page loads, a function a part, called in order by boot(), which index.html runs once every script is in (R9)
@@ -190,6 +190,8 @@ scripts/
     storebackups.py              the backups the controller's own machine copies (R162 step 5): the record, what the hello hands the agent, the summary Home and the bell read
     roothooks.py                 the root startup hooks for Controller settings, read and approved through the root-hook helper (B1166)
     connections.py               Connected services (R294 step 9): every credential the install holds for an outside service but a person's own, each kind's lister and Forget, and the ledger of who added each, its last use and its expiry
+    clusters.py                  the Kubernetes clusters (R281 step 2): a kubeconfig's current context read and refused where it signs in through a cloud CLI, its credential sealed, each cluster's facts and namespaces as its API says
+    kubeclient.py                a Kubernetes API server asked over HTTPS with the standard library alone, by token or client certificate
     poolkeys.py                  the passphrases of the own machine's encrypted pools (R162 step 3): kept sealed, or asked after every boot and offered once; what the hello hands the agent, nothing in Safe mode
     nasapps.py                   the Docker apps New container offers (R164 step 2, R238): none shipped, each kept from the vetted catalog at the commit its signed index pins or added by a person; a compose file with every image held by its digest (pack format 5) or pinned to a tag, the fields its panel asks for filled into its environment by render_with, and a kept app's newer definition taken when the index pins another commit
     schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words and its timer
