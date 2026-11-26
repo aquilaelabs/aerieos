@@ -1978,7 +1978,7 @@ await section("Its Android signing keys", async () => {
     sect: !!document.querySelector('details.rngroup[data-sect="rn:signing"]'), hash: location.hash,
     head: (document.querySelector(`${v} #sgHint`)?.textContent || '').replace(/\s+/g, ' ').trim(),
     empty: document.querySelector(`${v} > .nbhead > .nbsaidslot`)?.textContent.replace(/\s+/g, ' ') || '' }), V);
-  ok(where.ship === 'artifacts,docker,vms,kubernetes,signing' && !where.sect && /\/spaces\/alpha\/signing$/.test(where.hash)
+  ok(where.ship === 'artifacts,docker,vms,kubernetes,discord,signing' && !where.sect && /\/spaces\/alpha\/signing$/.test(where.hash)
      && where.head === '' && /no key yet/.test(where.empty),
      `the keys are the notebook's Signing view, last in Ship, at its own address, no tiles over its head, and the settings have no signing section (${JSON.stringify(where)})`);
   const signRows = await page.$$eval(`${V} .rnsign[data-key]`, rs => rs.map(r => r.firstElementChild.textContent.trim()));

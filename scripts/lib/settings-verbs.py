@@ -226,6 +226,8 @@ def show():
                              ("Make VMs", "makevms", "deny"),
                              # R281 step 6: aerie k8s deploy and rollback.
                              ("Deploy to Kubernetes", "kube", "deny"),
+                             # R293: aerie discord apply.
+                             ("Manage Discord", "discord", "deny"),
                              # R169 step 5: a pack from the vetted catalog.
                              ("Install a tool pack", "installpacks", "ask"),
                              ("Report AerieOS bugs", "report", "auto"),

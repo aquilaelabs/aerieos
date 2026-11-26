@@ -1,6 +1,5 @@
-# The dashboard's API
-
-Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.
+docs/api.md: 195 routes
+ritten from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.
 Every request carries the account's credential (a session's token, or the person's cookie or
 basic auth); who may call what is decided in the handler, and the last column names the
 permission a handler refuses on (`refused: NAME`), or that it refuses a locked project
@@ -64,6 +63,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/connections` | exact | `_get_connections` | GET /api/connections (R294 step 9): Connected services, every credential the install holds for an outside service with who added it, its last use and its expiry, and how many people keep connections of their own, which a | refused: controller-read |
 | GET | `/api/clusters` | exact | `_get_clusters` | GET /api/clusters (R281 step 2): the Kubernetes clusters this install may deploy to, each with its facts as last asked; never a credential. | refused: clusters-read |
 | GET | `/api/deploy` | exact | `_get_deploy` | GET /api/deploy?project= (R281 step 3): the space's environments, each with its cluster's name, and the clusters this account may pick one from (Clusters Read; none, with why, otherwise). | refused: deploy-read |
+| GET | `/api/discord` | exact | `_get_discord` | GET /api/discord?project= (R293): the space's Discord connection (never its token), its last plans, and whether this account changes it: whoever sees the space looks, Space settings Write connects and applies. |  |
 | GET | `/api/kubernetes` | exact | `_get_kubernetes` | GET /api/kubernetes?project=&env= (R281 step 5): what runs in one of the space's environments, read with its own deployer, so nothing outside its namespace: each workload with ready of desired, its version, its pods and  | refused: deploy-read |
 | GET | `/api/old-compose` | exact | `_get_old_compose` | GET /api/old-compose: the old system's containers as compose files in a zip, one each, to import from New container (adoptapps.export_zip). |  |
 | GET | `/api/v1/nodes` | prefix | `_get_nodes` | GET /api/v1/nodes: the Nodes page's read (nodes.tab_view), scoped to this account. |  |
@@ -142,6 +142,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/deploy` | exact | `_deploy` | POST /api/deploy {project, action: save, env, was} \\| {project, action: remove, name} (R281 step 3): an environment added or changed once its namespace is ready on its cluster, or taken off the space's list (its namespace | refused: settings, refused: write, refused: clusters-read (on the instance) |
 | POST | `/api/kubernetes` | exact | `_kubernetes` | POST /api/kubernetes {project, env, action: restart\\|scale, kind, name, replicas} (R281 step 5): a workload in one of the space's environments restarted or scaled, with its own deployer. | refused: deploy |
 | POST | `/api/k8s` | exact | `_k8s` | POST /api/k8s {project, action: status\\|logs\\|deploy\\|rollback, env, ref, pod, container, tail, why} (R281 step 6): aerie k8s, from a session as from a person, relayed by the controller, which holds every credential; a sess | refused: deploy-read |
+| POST | `/api/discord` | exact | `_discord` | POST /api/discord {project, action: connect\\|forget\\|pull\\|plan\\|apply, token, guild, text, write, why} (R293). | refused: settings, refused: write |
 | POST | `/api/pin` | prefix | `_pin` | Pin or unpin a command: macros.pin. | refused: command-pin |
 | POST | `/api/reset` | exact | `_reset` | POST /api/reset: start over at onboarding (settings.reset), and the dashboard re-executes itself so the next page is Create the owner. | refused: controller |
 | POST | `/api/move` | exact | `_move` | POST /api/move (R90 step 12): prepare (the move armed, the token answered once, a bundle packed), forget (withdrawn), moved (this controller marked moved to the new one, read-only from here on), ask (the new address aske |  |

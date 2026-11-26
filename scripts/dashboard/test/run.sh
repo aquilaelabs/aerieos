@@ -989,8 +989,10 @@ pid=""
 suite_pid=""
 agent_pid=""
 stub_pid=""
+discord_pid=""
 cleanup() {
     [ -n "${suite_pid:-}" ] && kill -TERM -- -"$suite_pid" 2>/dev/null || true
+    [ -n "$discord_pid" ] && kill "$discord_pid" 2>/dev/null || true
     [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
     [ -n "$stub_pid" ] && kill "$stub_pid" 2>/dev/null || true
     # The server's counts are written on its way out, so the merge waits for
@@ -1820,6 +1822,7 @@ rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
     BB_COMPAT_SWEEP=1 \
     BB_CLOUDFLARED="$DASH/test/cloudflared-stub.sh" \
     BB_TUNNEL_ROUTE_BASE="http://127.0.0.1:$PORT" \
+    BB_DISCORD_API="http://127.0.0.1:${DISCORD_PORT:-9}" \
     BUILDERBOT_ROLE=controller BB_TOKEN= \
     DEBUG_MODE=1 \
     python3 "$DASH/server.py" >> "$S/server.log" 2>&1 &
@@ -1846,6 +1849,14 @@ for _ in $(seq 40); do
     sleep 0.25
 done
 }
+# Discord's API, stood in for (R293): the controller's BB_DISCORD_API. Its
+# server is a file under the world, put back with the rest before each
+# suite, and read on every call, so the stand-in runs once for the run.
+DISCORD_PORT="$(free_port)"
+( DISCORD_STUB_PORT="$DISCORD_PORT" DISCORD_STUB_STATE="$S/discord-world.json" \
+    python3 "$HERE/discord-stub.py" >> "$S/discord-stub.log" 2>&1 &
+  echo $! > "$S/discord-stub.pid" )
+discord_pid="$(cat "$S/discord-stub.pid")"
 start_server
 
 # ---- the owner ---------------------------------------------------------------
@@ -1965,7 +1976,7 @@ stop_world() {
 }
 # ...and the coverage counts, which every suite adds to and a restore must not
 # take back to the empty directory the snapshot holds (R76).
-WORLD_OUT=(tmux ssh-agent.sock server.log agent-stub.log .world.tar coverage)
+WORLD_OUT=(tmux ssh-agent.sock server.log agent-stub.log discord-stub.log discord-stub.pid .world.tar coverage)
 snapshot_world() {
     local ex=() n
     for n in "${WORLD_OUT[@]}"; do ex+=("--exclude=./$n"); done

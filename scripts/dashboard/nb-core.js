@@ -899,6 +899,7 @@ const NB_VIEWS = [
   // What runs in the space's Kubernetes environments (R281 step 5): read
   // again as an environment or a deploy moves.
   {key: "kubernetes", label: "Kubernetes", group: "ship", read: nb => nbKubeLoad(nb), watch: {deploy: nb => nbKubeLoad(nb)}},
+  {key: "discord", label: "Discord", group: "ship", read: nb => nbDiscordLoad(nb), watch: {discord: nb => nbDiscordLoad(nb)}},
   // A release's APK looked for and signed (R106), by the press or the
   // hourly look: the Releases section follows it to its end.
   {key: "signing", label: "Signing", group: "ship", read: nb => nb.loadSigning(), watch: {releasesign: nb => nb.loadSigning()}},

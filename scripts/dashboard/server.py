@@ -5161,6 +5161,10 @@ def _session_deploy(name, act, env, ref, principal, uid, asker, allowed_by=""):
 
 
 phone.deployer = _session_deploy
+# A session's Discord apply a person allowed (R293): every change, the ones
+# that ask a person included, since the person read each before Allow.
+phone.discorder = lambda project, text, principal, allowed_by: discord.apply(
+    repos.key_of(project), text, by=principal, allowed=True)
 
 
 def _deploy_on(name, when, refs, uid, asker, by_session):
@@ -5202,6 +5206,18 @@ connections.kind("cluster", "Kubernetes cluster", "shared",
                  lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
                            "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
                  lambda ref, by: clusters.forget(ref))
+# A space's Discord server (R293): its bot's token sealed here, the server
+# built out from the space's layout file. BB_DISCORD_API is the suites' stand-in.
+import discord                                                   # noqa: E402
+discord.configure(state=STATE, write_json_fn=write_json, seal_fn=signing.seal, unseal_fn=signing.unseal,
+                  sealing_fn=lambda: signing.MASTER is not None,
+                  audit_fn=lambda who, verb, target, detail: db.audit(who, verb, target, detail),
+                  api=os.environ.get("BB_DISCORD_API") or None)
+connections.kind("discord", "Discord server", "space",
+                 lambda: [{"ref": k, "name": f"{registry.label(k) or k}: {g}", "sealed": True,
+                           "uses": "builds out and changes the space's Discord server", "go": ["project", k]}
+                          for k, g in discord.spaces()],
+                 lambda ref, by: discord.forget(ref, by))
 gitcreds.on_added = lambda p: connections.added("git", p, by=_acting_name())
 gitcreds.on_gone = lambda p: connections.gone("git", p)
 gitcreds.on_used = lambda p: connections.used("git", p)
@@ -5219,7 +5235,7 @@ def _acting_name():
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
                              accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
                              poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
-                             clusters.seal_all, k3s.seal_all),
+                             clusters.seal_all, k3s.seal_all, discord.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
@@ -5598,13 +5614,14 @@ phone.release_signer = _release_signer
 # does not do, and the dial's name in the space's settings.
 DIALS = {"release": ("release it", "Tag and publish a release"),
          "kube": ("deploy it to Kubernetes", "Deploy to Kubernetes"),
+         "discord": ("change its Discord server", "Manage Discord"),
          "sign": ("sign its builds", "Sign a build"),
          "keys": ("manage its signing keys", "Manage signing keys")}
 # The grant each dial stands for, which the session's account must hold as
 # well: the dial says what a session may do on its own, the roles what its
 # person may do at all (R277, the audit of 24 Nov: a session released on a
 # dial set to auto for an account with no Releases Write).
-DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing", "kube": "deploy"}
+DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing", "kube": "deploy", "discord": "settings"}
 
 # The changes to a published release, by /api/version's action
 # (_release_change). `does` is the word a session on another space is refused
@@ -6461,6 +6478,9 @@ def _revisions(who=None, projects=None):
         # environment saved, a deploy started or ended. The Kubernetes view
         # re-reads its environments on it.
         "deploy": kube.rev(),
+        # A space's Discord server connected, forgotten, planned or applied
+        # (R293): its settings section and its view re-read on it.
+        "discord": discord.rev(),
         # A release's APK being looked for and signed (R106): the Signing
         # view follows a look to its end, and the bell's row goes with it.
         "releasesign": releasesign.rev(),
@@ -7013,6 +7033,7 @@ ROUTES = (
     Route("GET", "exact", "/api/connections", "_get_connections", "handler"),
     Route("GET", "exact", "/api/clusters", "_get_clusters", "handler"),
     Route("GET", "exact", "/api/deploy", "_get_deploy", "handler"),
+    Route("GET", "exact", "/api/discord", "_get_discord", "handler"),
     Route("GET", "exact", "/api/kubernetes", "_get_kubernetes", "handler"),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
@@ -7120,6 +7141,7 @@ ROUTES = (
     Route("POST", "exact", "/api/deploy", "_deploy", "handler"),
     Route("POST", "exact", "/api/kubernetes", "_kubernetes", "handler"),
     Route("POST", "exact", "/api/k8s", "_k8s", "handler", session=True),
+    Route("POST", "exact", "/api/discord", "_discord", "handler", session=True),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -11102,6 +11124,11 @@ class Handler(BaseHTTPRequestHandler):
         if req.get("kube") is not None and str(req.get("kube")) != prefs.get(name)["kube"] \
                 and self._refused("deploy", name):
             return
+        # Handing a session the space's Discord server (R293) is Space
+        # settings Write, the connection's own.
+        if req.get("discord") is not None and str(req.get("discord")) != prefs.get(name)["discord"] \
+                and self._refused("settings", name):
+            return
         held = (("node" in req or "nodes" in req) and prefs.node_changed(name, req)) \
             or (req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")))
         # Then the rest: the project's own settings are the Project settings area's to
@@ -13967,6 +13994,120 @@ class Handler(BaseHTTPRequestHandler):
                                                  membership.owner_name(key) or "the space's owner",
                                                  asker_name=str(me.get("name") or ""), principal=self._principal(), uid=uid))
         return self._result(_session_deploy(name, act, env_name, ref, self._principal(), uid, str(me.get("name") or "")))
+
+    def _discord_text(self, req, name):
+        """The layout a plan or an apply reads: the one a session sends from
+        its own tree, else the repository's deploy/discord.yml here."""
+        if isinstance(req.get("text"), str) and req["text"].strip():
+            return req["text"], ""
+        f = WORKSPACE / name / discord.LAYOUT
+        try:
+            return f.read_text(encoding="utf-8"), ""
+        except OSError:
+            return "", f"{registry.label(name) or name} has no {discord.LAYOUT} yet: Pull writes the server into it"
+
+    def _get_discord(self):
+        """GET /api/discord?project= (R293): the space's Discord connection
+        (never its token), its last plans, and whether this account changes
+        it: whoever sees the space looks, Space settings Write connects and applies."""
+        name = self._project_asked()
+        if not name or self._not_project(name):
+            return None
+        who = self._who()
+        st = discord.status(repos.key_of(name))
+        st["layout"] = (WORKSPACE / name / discord.LAYOUT).is_file()
+        st["may"] = not (users.may(who, "settings", name) or projects.locked_out(name, users.whose(who)))
+        return self._json(st)
+
+    def _discord(self, req):
+        """POST /api/discord {project, action: connect|forget|pull|plan|apply,
+        token, guild, text, write, why} (R293). A person connects, forgets
+        and applies on Space settings Write, and pulls and plans where they see the space;
+        Pull with write lays deploy/discord.yml into the repository's tree,
+        uncommitted, a write to its tree. A session reads (pull, plan) on its
+        own space freely and applies under its Manage Discord dial: deny
+        refuses, ask puts the whole apply to the space's owner, auto makes
+        what asks nobody and asks for the rest; a change that removes, grants
+        or takes a permission or reaches members always waits for a person."""
+        me = self._who() or {}
+        sess = me.get("session")
+        act = field(req, "action")
+        name = field(req, "project") or sess or ""
+        if sess:
+            if self._session_elsewhere(name, "a session reaches its own space's Discord server alone"):
+                return None
+            if act not in ("status", "pull", "plan", "apply"):
+                return self._json({"error": "a session pulls, plans and applies; a person connects the server"}, 403)
+        elif act in ("connect", "forget", "apply"):
+            name = self._space_write("settings", req)
+            if not name:
+                return None
+        elif act == "pull" and req.get("write") is True:
+            name = self._space_write("write", req)
+            if not name:
+                return None
+        else:
+            name = self._project_asked(req)
+            if not name or self._not_project(name):
+                return None
+        key, by = repos.key_of(name), self._principal()
+        if act == "status":
+            return self._json({**discord.status(key), "layout": (WORKSPACE / name / discord.LAYOUT).is_file()})
+        if act == "connect":
+            r = discord.connect(key, field(req, "token"), field(req, "guild"), by)
+            if r.get("ok"):
+                connections.added("discord", key, by=(me or {}).get("name") or by)
+            return self._json(r, 200 if r.get("ok") else 400)
+        if act == "forget":
+            r = discord.forget(key, by)
+            if r.get("ok"):
+                connections.gone("discord", key)
+            return self._json(r, 200 if r.get("ok") else 400)
+        if act == "pull":
+            r = discord.pull(key)
+            if r.get("text") and not sess and req.get("write") is True:
+                f = WORKSPACE / name / discord.LAYOUT
+                try:
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    f.write_text(r["text"], encoding="utf-8")
+                except OSError as e:
+                    return self._json({"error": f"{discord.LAYOUT} could not be written: {e.strerror or e}"}, 400)
+                db.audit(by, "discord-pull", key, {"repo": name})
+                r["wrote"] = discord.LAYOUT
+            connections.used("discord", key)
+            return self._json(r, 200 if r.get("text") else 400)
+        if act not in ("plan", "apply"):
+            return self._json({"error": "action is connect, forget, pull, plan or apply"}, 400)
+        text, why = self._discord_text(req, name)
+        if why:
+            return self._json({"error": why}, 400)
+        connections.used("discord", key)
+        if act == "plan":
+            r = discord.plan(key, text, by)
+            return self._json(r, 400 if r.get("error") else 200)
+        if not sess:
+            r = discord.apply(key, text, by, allowed=True)
+            return self._json(r, 400 if r.get("error") else 200)
+        mode = self._dialed(name, "discord", "; a person applies it from the space's Discord view")
+        if not mode:
+            return None
+        got = discord.plan(key, text, by)
+        if got.get("error"):
+            return self._json(got, 400)
+        if not got["changes"]:
+            return self._json({"ok": True, "done": [], "left": [], "said": got["said"]})
+        asker = str(me.get("name") or "")
+        if mode == "ask":
+            return self._result(phone.ask_discord(field(req, "why"), name, text, got["changes"], membership.owner_of(key),
+                                                  membership.owner_name(key) or "the space's owner", asker_name=asker,
+                                                  principal=by))
+        r = discord.apply(key, text, by, allowed=False)
+        if r.get("error") or not r.get("left"):
+            return self._json(r, 400 if r.get("error") else 200)
+        rest = [c for c in got["changes"] if c["said"] in r["left"]]
+        a = phone.ask_discord(field(req, "why"), name, text, rest, membership.owner_of(key),
+                              membership.owner_name(key) or "the space's owner", asker_name=asker, principal=by)
+        return self._json({**r, "asked": a.get("id"), "to": a.get("to"), **({"ask_error": a["error"]} if a.get("error") else {})})
 
     def _deploy_run(self, req, act):
         """A deploy or a rollback (_deploy): queued as the asker's job, its

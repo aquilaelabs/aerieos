@@ -88,6 +88,9 @@ deployer = None
 # (project, plan, asker_name, principal) -> (payload, status): an edit of a
 # published release (R139), the controller's, with the project's token.
 release_editor = None
+# (project, layout text, principal, allowed by) -> {ok, done, left} or {error}:
+# a session's Discord layout applied, a person having allowed it (R293).
+discorder = None
 # (project, plan, asker_name, principal) -> (payload, status): files taken
 # off a published release, its own ask (the operator, 5 Oct).
 release_remover = None
@@ -736,6 +739,9 @@ def _req_public(r):
     # A release names the tag and the commit it would mark (R138).
     if r.get("kind") == "release":
         out["tag"], out["sha"] = r.get("tag") or "", r.get("sha") or ""
+    # A Discord apply is read change by change (R293), each that asks marked.
+    if r.get("kind") == "discord":
+        out["detail"] = r.get("detail") or ""
     # A deploy names its environment and what it would send there (R281).
     if r.get("kind") == "deploy":
         out["env"], out["ref"], out["production"] = r.get("env") or "", r.get("ref") or "", bool(r.get("production"))
@@ -1154,6 +1160,20 @@ def ask_deploy(why, project, action, env, ref, to_uid, to_name, asker_name="", p
                "uid": str(uid or ""), "asker_name": str(asker_name or ""), "production": bool(env.get("production"))})
 
 
+def ask_discord(why, project, text, changes, to_uid, to_name, asker_name="", principal=""):
+    """A session asking to apply its space's Discord layout (R293) where its
+    Manage Discord dial is `ask`, or where the plan removes something,
+    changes a permission or reaches members, which asks whatever the dial
+    says. It goes to the space's owner (and any administrator), who reads
+    each change before Allow; Allow applies all of them."""
+    asks = [c["said"] for c in changes if c.get("asks")]
+    return _owner_ask(
+        "discord", why, "say what it is for: --why \"...\" (the channels for the launch ...)", project,
+        ["discord", "apply", f"({len(changes)} change{'s' if len(changes) != 1 else ''}, {len(asks)} a person allows)"], to_uid, to_name, asker_name,
+        extra={"text": str(text or "")[:200000], "principal": principal, "asker_name": str(asker_name or ""),
+               "detail": "\n".join(("! " if c.get("asks") else "  ") + c["said"] for c in changes)[:20000]})
+
+
 def ask_release_edit(why, project, plan, to_uid, to_name, asker_name="", principal=""):
     """A session asking to change its project's published release (R139):
     the notes replaced, files attached. Every edit is its own ask, to the
@@ -1514,6 +1534,13 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             r.update(state="done", code=1 if got.get("error") else 0,
                      out=str(got.get("error") or got.get("job") or "started"))
         return {"error": got["error"]} if got.get("error") else {"ok": True}
+    if r.get("kind") == "discord":
+        res = (discorder(r["project"], r.get("text") or "", r.get("principal") or "", name or "")
+               if discorder is not None else {"error": "nothing here reaches Discord"})
+        with _lock:
+            r.update(state="done", code=1 if res.get("error") else 0,
+                     out=str(res.get("error") or f"applied {len(res.get('done') or [])}"))
+        return {"error": res["error"]} if res.get("error") else {"ok": True}
     if r.get("kind") == "deploy":
         res = (deployer(r["project"], r.get("action") or "deploy", r.get("env") or "", r.get("ref") or "",
                         r.get("principal") or "", r.get("uid") or "", r.get("asker_name") or "", name or "")

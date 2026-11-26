@@ -162,18 +162,18 @@ def configure(*, write_json, state):
 # session enters into its notebook) stays the repository's.
 GROUP_FIELDS = ("node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "test_node",
                 "agents_off", "agent_default", "agent_slots", "gitpol", "forgepol", "devbuild", "makevms", "vm_caps", "installpacks",
-                "kube", "test_change", "gpu", "report", "sign", "keys", "release", "pc", "log_from", "diag")
+                "kube", "discord", "test_change", "gpu", "report", "sign", "keys", "release", "pc", "log_from", "diag")
 # The dials a repository may set apart from its project (R208 step 6, the
 # operator, 3 Nov): the project's Agents may holds the defaults, and a
 # repository inherits each unless its record names the dial in `overrides`,
 # the notebook's own choice. A gate is named gate.KIND. "inherit" written
 # to one takes the override away.
-OVERRIDABLE = ("devbuild", "makevms", "kube", "installpacks", "report", "sign", "keys", "release", "pc", "test_change", "test_node")
+OVERRIDABLE = ("devbuild", "makevms", "kube", "discord", "installpacks", "report", "sign", "keys", "release", "pc", "test_change", "test_node")
 INHERIT = "inherit"
 
 
 # What each dial reads as when nothing is set.
-DIAL_DEFAULTS = {"devbuild": "deny", "makevms": "deny", "kube": "deny", "installpacks": "ask", "report": "auto", "sign": "ask",
+DIAL_DEFAULTS = {"devbuild": "deny", "makevms": "deny", "kube": "deny", "discord": "deny", "installpacks": "ask", "report": "auto", "sign": "ask",
                  "keys": "ask", "release": "ask", "pc": "deny", "test_change": "wait", "test_node": ""}
 
 
@@ -592,6 +592,10 @@ def _clean(rec):
             # `deny` by default, `ask` puts each in front of a person, `auto`
             # lets it; an environment marked production asks whatever it says.
             "kube": _devbuild(rec.get("kube")),
+            # Whether a session may apply its space's Discord layout (R293),
+            # read as kube is; a change that removes, changes a permission or
+            # reaches members asks a person whatever it says.
+            "discord": _devbuild(rec.get("discord")),
             # Whether a session may add a tool pack from the vetted catalog
             # (R169 step 5): `ask` by default puts it to a person who may
             # curate, `auto` adds it at the index's pin, `deny` refuses.
@@ -1061,7 +1065,7 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
               test_change=None, capture_days=None, reads=None, sees=None, gpu=None, dev_keep=None,
               snapshot_days=None, release_gate=None, files_table=None, files=None,
               release=None, log_from=None, diag=None, build_local=None, reaches=None, hosts=None,
-              pc=None, tc_off=None, packs_on=None, makevms=None, kube=None, vm_caps=None, installpacks=None, agents_off=None,
+              pc=None, tc_off=None, packs_on=None, makevms=None, kube=None, discord=None, vm_caps=None, installpacks=None, agents_off=None,
               agent_default=None, agent_slots=None, overrides=None):
     """Change any of one project's settings; None leaves it, "" clears it.
     `overrides` is {dial name: True to set it apart from the project,
@@ -1209,6 +1213,10 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
             if kube not in DEVBUILD_MODES:
                 return {"error": f"kube is one of {', '.join(DEVBUILD_MODES)}, not {kube}"}
             cur["kube"] = kube
+        if discord is not None:
+            if discord not in DEVBUILD_MODES:
+                return {"error": f"discord is one of {', '.join(DEVBUILD_MODES)}, not {discord}"}
+            cur["discord"] = discord
         if installpacks is not None:
             if installpacks not in DEVBUILD_MODES:
                 return {"error": f"installpacks is one of {', '.join(DEVBUILD_MODES)}, not {installpacks}"}
@@ -1350,6 +1358,8 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                 rec.pop("makevms", None)
             if cur["kube"] == "deny":
                 rec.pop("kube", None)
+            if cur["discord"] == "deny":
+                rec.pop("discord", None)
             if cur["installpacks"] == "ask":
                 rec.pop("installpacks", None)
             if cur["vm_caps"] == VM_CAPS:
@@ -1535,7 +1545,7 @@ def dialog_save(name, req, uid):
                   test=req.get("test"), outputs=req.get("outputs"),
                   gate=req.get("gate"), gitpol=req.get("gitpol"), forgepol=req.get("forgepol"),
                   devbuild=req.get("devbuild"),
-                  makevms=req.get("makevms"), kube=req.get("kube"), vm_caps=req.get("vm_caps"), installpacks=req.get("installpacks"),
+                  makevms=req.get("makevms"), kube=req.get("kube"), discord=req.get("discord"), vm_caps=req.get("vm_caps"), installpacks=req.get("installpacks"),
                   tests_in=req.get("tests_in"), test_node=req.get("test_node"),
                   test_change=req.get("test_change"), gpu=req.get("gpu"),
                   report=req.get("report"), capture_days=req.get("capture_days"),

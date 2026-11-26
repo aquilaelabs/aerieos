@@ -50,6 +50,7 @@ dashboard's rail.
 - [submitting.md](submitting.md): submitting a tool pack, a coding agent or a Docker app to the vetted catalog, from writing it to a merged entry
 - [containers.md](containers.md): the Containers page and nginx: dev instances, how one is reached, their networks and image updates
 - [vms.md](vms.md): the VMs page and `aerie vm`: VM host on a node, the OS catalog, Make VMs, the network, snapshots, a VM made a node
+- [discord.md](discord.md): a space's Discord server built out from deploy/discord.yml: connecting its bot, Pull, Plan and Apply, `aerie discord` and Manage Discord
 - [kubernetes.md](kubernetes.md): a space's Kubernetes environments, what a deploy is, Draft from the compose, the Kubernetes view, `aerie k8s` and Deploy to Kubernetes, when it deploys by itself
 - [nas.md](nas.md): the installed edition as a NAS, its design: Python the management plane and never the data path, the two storage profiles, and what AerieOS does not build
 - [image.md](image.md): AerieOS, the appliance image the installed editions are made from: Debian pinned to a snapshot, two root slots, what persists, how it boots and how it is built

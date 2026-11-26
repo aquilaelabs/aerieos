@@ -675,6 +675,20 @@ aerie k8s rollback ENV --why "..."
                    the space's *Agents may: Deploy to Kubernetes*: refused at
                    deny, asked at ask, started at auto, and an environment
                    marked production asks a person whatever it says
+aerie discord [status]
+                   this space's Discord server (R293): the server its bot is
+                   in and the last plans, read through the controller, which
+                   holds the bot's token; a person connects it in the space's
+                   settings
+aerie discord pull    the server as it stands, written into deploy/discord.yml
+                   in this repository, uncommitted, so a server is adopted
+aerie discord plan    what applying deploy/discord.yml would add, change and
+                   remove, each change that asks a person marked
+aerie discord apply --why "..."
+                   the layout made so, under the space's *Agents may: Manage
+                   Discord*: refused at deny, asked at ask, made at auto, and
+                   whatever removes, changes a permission or reaches members
+                   asks a person whatever it says
 aerie container       what container asks are waiting on an administrator
 aerie container new --why "..." --name NAME --compose FILE [--env FILE] [--node NODE] [--for PROJECT]
                    a container built from a compose file the session wrote,
@@ -3417,6 +3431,15 @@ cmd_k8s() {
     auth="$(bb_auth_or_die)"
     BB_AUTH_HEADER="$auth" BB_PROJECT="$(need_project --or-dir)" \
         exec python3 "$BB_LIB/k8s-verbs.py" "$@"
+}
+
+# aerie discord (R293): the space's Discord server from its layout file,
+# through the controller, which holds the bot's token.
+cmd_discord() {
+    local auth
+    auth="$(bb_auth_or_die)"
+    BB_AUTH_HEADER="$auth" BB_PROJECT="$(need_project --or-dir)" \
+        exec python3 "$BB_LIB/discord-verbs.py" "$@"
 }
 
 # aerie container: ask for a container (roadmap R71). The root shape applied to
@@ -6715,7 +6738,7 @@ esac
 # text: `aerie forge pr create --help` answered "--help needs a value", and
 # `aerie design show --help` looked for a page called that (R289).
 case "${1:-}" in
-    forge|design|tests|k8s|devapp|jobs|map|capture|vm|container|node|sign|ci-log)
+    forge|design|tests|k8s|discord|devapp|jobs|map|capture|vm|container|node|sign|ci-log)
         for _a in "${@:2}"; do
             case "$_a" in -h|--help) verb_help "$1" && exit 0 ;; esac
         done ;;
@@ -6853,6 +6876,7 @@ case "${1:-help}" in
     container) shift; cmd_container "$@" ;;
     vm)       shift; cmd_vm "$@" ;;
     k8s)      shift; cmd_k8s "$@" ;;
+    discord)  shift; cmd_discord "$@" ;;
     doctor)   cmd_doctor ;;
     dashboard) shift; cmd_dashboard "$@" ;;
     drift)    shift; cmd_drift "$@" ;;

@@ -669,7 +669,7 @@ program on the host finds it then, and `aerie gpu` says so.
 <!-- BUILDERBOT:END -->
 
 ## Containers
-<!-- BUILDERBOT:TOPIC containers: this project's containers, its dev instance (aerie devapp), aerie container new, hosting-only nodes, the nginx page, its VMs (aerie vm), its Kubernetes environments (aerie k8s) -->
+<!-- BUILDERBOT:TOPIC containers: this project's containers, its dev instance (aerie devapp), aerie container new, hosting-only nodes, the nginx page, its VMs (aerie vm), its Kubernetes environments (aerie k8s), its Discord server (aerie discord) -->
 
 A container belongs to one space or to none (the operator sets it on its
 Containers page row), and a session sees and works on its own space's only. `aerie
@@ -777,4 +777,11 @@ here to find, and `kubectl` from this session reaches no environment.
 To test what it deploys, a session deploys to an environment the space keeps
 for testing, on a node's k3s; kind is not for a session, which has no Docker
 of its own.
+
+A space's Discord server, where its settings connect one, is built out from
+the repository's `deploy/discord.yml`: `aerie discord pull` writes the server
+as it stands into it, `aerie discord plan` says what applying it would change,
+and `aerie discord apply --why "..."` makes it so under the space's Manage
+Discord setting, a removal or a permission changed always waiting on a person.
+The controller holds the bot's token; none is here to find.
 <!-- BUILDERBOT:END -->

@@ -773,6 +773,20 @@ aerie k8s rollback ENV --why "..."
                    the space's *Agents may: Deploy to Kubernetes*: refused at
                    deny, asked at ask, started at auto, and an environment
                    marked production asks a person whatever it says
+aerie discord [status]
+                   this space's Discord server (R293): the server its bot is
+                   in and the last plans, read through the controller, which
+                   holds the bot's token; a person connects it in the space's
+                   settings
+aerie discord pull    the server as it stands, written into deploy/discord.yml
+                   in this repository, uncommitted, so a server is adopted
+aerie discord plan    what applying deploy/discord.yml would add, change and
+                   remove, each change that asks a person marked
+aerie discord apply --why "..."
+                   the layout made so, under the space's *Agents may: Manage
+                   Discord*: refused at deny, asked at ask, made at auto, and
+                   whatever removes, changes a permission or reaches members
+                   asks a person whatever it says
 aerie container       what container asks are waiting on an administrator
 aerie container new --why "..." --name NAME --compose FILE [--env FILE] [--node NODE] [--for PROJECT]
                    a container built from a compose file the session wrote,

@@ -103,6 +103,7 @@ scripts/
   lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
   lib/proc-verbs.py              `aerie proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
   lib/container-verbs.py         `aerie container`: status and new
+  lib/discord-verbs.py           `aerie discord` (R293): a space's Discord server from a session through /api/discord, its status, pull into deploy/discord.yml, plan and apply, an ask followed to its answer
   lib/k8s-verbs.py               `aerie k8s` (R281 step 6): a space's Kubernetes environments from a session through /api/k8s, status, a pod's log, deploy and rollback, an ask followed to its answer and a job to its end
   lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a shipped toolchain or a pack asked for on the session's node as the space's Install a tool pack setting says (R169 step 5)
   lib/vm-verbs.py                `aerie vm`: a project's VMs listed, made, started, stopped, snapshotted and removed (R91)
@@ -197,6 +198,7 @@ scripts/
     kube.py                      a space's Kubernetes environments (R281 step 3): each a cluster, a namespace this install makes ready there with a deployer confined to it, a registry and when it deploys; a namespace anybody else made refused, never taken over
     deploys.py                   a repository's deploy to one of its space's environments (R281 step 4): the commit's tree, the image built and pushed or imported into a k3s of this install, the chart or manifests applied with a token made for that deploy alone, each deploy kept on its environment, and Roll back
     chartdraft.py                Draft from the compose (R281 step 4): a Helm chart written from a repository's compose file into its tree, uncommitted
+    discord.py                   a space's Discord server (R293): its bot's token sealed, Discord's REST API asked with the standard library, the server read into a layout's shape and deploy/discord.yml's text, a plan of what applying it changes with what asks a person marked, and apply
     kubeview.py                  what runs in a space's Kubernetes environment (R281 step 5): each workload's ready of desired, version, pods and address, Restart, Scale and a pod's log, always through the environment's own deployer
     kubeexec.py                  a shell in a pod in the dock (R281): the dock's terminal frames spliced to the API's exec channels, the controller the cluster's client as the environment's deployer
     poolkeys.py                  the passphrases of the own machine's encrypted pools (R162 step 3): kept sealed, or asked after every boot and offered once; what the hello hands the agent, nothing in Safe mode
@@ -523,6 +525,7 @@ docs/containers.md               the Containers page and nginx: dev instances, h
 docs/scanners.md                 the Scanners page: AerieOS's own scanners on each node, their schedule, and the reports
 docs/versions.md                 versions and release lines: aerie version line, forward, backport, a patch line's rules
 docs/vms.md                      the VMs page and aerie vm: VM host, the OS catalog, the dial, the limits, the network, snapshots, a VM made a node
+docs/discord.md                  a space's Discord server: connecting its bot, deploy/discord.yml, Pull, Plan and Apply, aerie discord and Manage Discord
 docs/kubernetes.md               a space's Kubernetes environments: k3s and a cluster to start with, what a deploy is, Draft from the compose, the Kubernetes view, aerie k8s and its dial, when it deploys by itself
 docs/nas.md                      the installed edition's storage design (R56): Python the management plane and never the data path, the two storage profiles, what is not built
 docs/machines.md                 Controller settings, Nodes, Storage, the logs, the Jobs page, a Mac as a node

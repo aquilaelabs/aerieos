@@ -165,6 +165,7 @@
         <button type="button" data-v="docker" data-in="ship">Docker</button>
         <button type="button" data-v="vms" data-in="ship">VMs</button>
         <button type="button" data-v="kubernetes" data-in="ship">Kubernetes</button>
+        <button type="button" data-v="discord" data-in="ship">Discord</button>
         <button type="button" data-v="signing" data-in="ship">Signing</button>
         <button type="button" data-v="wiki" data-in="docs">Wiki</button>
         <button type="button" data-v="design" data-in="docs">Design</button>
@@ -452,6 +453,16 @@
       <!-- The glance (R109): the workloads ready of all. -->
       <div class="nbglance" id="kbHint" data-tiles="1" data-said></div>
       <div id="kbList" data-skel="rows"></div>
+    </div>
+    <!-- The space's Discord server (R293), drawn by nb-discord.js: the
+         server it is connected to, what applying deploy/discord.yml would
+         change (each change a person allows marked), Pull, Plan and Apply on
+         its bar, and its last plans. -->
+    <div class="nbview dcview" data-view="discord" hidden>
+      <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
+        <span class="actbar" id="dcActs"><button type="button" id="dcPull">Pull</button><button type="button" id="dcPlan">Plan</button><button type="button" class="primary" id="dcApply">Apply</button></span></div>
+      <div class="nbglance" id="dcHint" data-tiles="1" data-said></div>
+      <div id="dcList" data-skel="rows"></div>
     </div>
     <!-- This project's Android signing keys (R106), a view of their own in
          Ship (R103, the operator, 22 Oct), drawn by nb-signing.js: a section
@@ -785,6 +796,11 @@
              production asks a person whatever this says. -->
         <label class="pick">Deploy to Kubernetes <select id="rnGateKube"
           aria-label="deploying to and rolling back this space's Kubernetes environments, from a session"></select></label>
+        <!-- Its Discord server (R293): aerie discord apply from a session.
+             Deny by default; a removal, a permission changed or members
+             reached asks a person whatever this says. -->
+        <label class="pick">Manage Discord <select id="rnGateDiscord"
+          aria-label="applying this space's Discord layout to its server, from a session"></select></label>
         <!-- A tool on a session's node (R169 step 5): aerie tool install
              from a session, a toolchain AerieOS ships or a pack from the
              vetted catalog. Ask by default: a toolchain goes into a node's
@@ -1109,6 +1125,13 @@
       <label id="rnShipLabel">What deploys<span class="help" data-help="what each repository of the space sends to an environment: a Helm chart in deploy/chart, or manifests in deploy/k8s, as committed at the branch, tag or commit a deploy picks, with the image built from the Dockerfile at its root. Draft from the compose writes a chart from the repository's compose file into its tree, uncommitted, to read and commit" tabindex="0">?</span></label>
       <div id="rnShipRows" role="group" aria-labelledby="rnShipLabel"></div>
     </div>
+    </div></details>
+    <!-- The space's Discord server (R293, nb-discord.js): its bot's token
+         given once and sealed, never shown again; the server built out from
+         the repository's deploy/discord.yml in the Discord view. The
+         space's; drawn for a space with a repository. -->
+    <details class="sect rngroup" data-sect="rn:discord" hidden><summary><span class="t">Discord</span></summary><div class="body">
+    <div class="field" id="rnDcField"></div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:sees"><summary><span class="t">What sessions reach</span></summary><div class="body">
     <!-- The projects a session here may read (prefs.reads): their trees
@@ -1963,6 +1986,7 @@
 <script src="nb-artifacts.js"></script>
 <script src="nb-signing.js"></script>
 <script src="nb-kubernetes.js"></script>
+<script src="nb-discord.js"></script>
 <script src="nb-analysis.js"></script>
 <script src="nb-design.js"></script>
 <script src="nb-wiki.js"></script>
