@@ -20,7 +20,7 @@
 // (lib.mjs's quiet, a pause that is a check of absence, is quietFor here:
 // the idle block has a page of its own named quiet.)
 import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring, faded,
-         quiet as quietFor, section } from './lib.mjs';
+         quiet as quietFor, section, ENGINE } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -3267,6 +3267,38 @@ if (runs('c')) await section("what is drawn over a tint reads 4.5:1 or more in e
   await look.evaluate(() => { applyTheme('default'); applyMode('dark', { save: false }); });
   ok(low.length === 0, `pills, chips, the quiet voice, placeholders and notes read 4.5:1 or more in six themes' both halves${low.length ? `: ${[...new Set(low)].slice(0, 6).join('; ')}` : ''}`);
   await look.close();
+});
+
+// A finger's target (R286 step 3): at a phone's width every press is at least
+// the 24px WCAG asks, or nothing else to press lies within 12px of its centre,
+// or it carries a press area of its own around its words (an absolutely
+// placed ::after, B1006); a link in a sentence is the sentence's.
+if (runs('c')) await section("every press at a phone's width is a finger's target", async () => {
+  const thumb = await newPage(browser, { viewport: { width: 393, height: 852 }, isMobile: ENGINE === 'chromium', hasTouch: ENGINE === 'chromium' });
+  await thumb.goto(URL); await ready(thumb);
+  const small = [];
+  for (const hash of ['#/spaces', '#/spaces/alpha/roadmap', '#/build/library', '#/machines/nodes', '#/jobs', '#/settings']){
+    await thumb.evaluate(x => { location.hash = x; }, hash); await sleep(1500);
+    small.push(...(await thumb.evaluate(() => {
+      const els = [...document.querySelectorAll('button, a[href], [role="button"], select, input[type="checkbox"], input[type="radio"], summary')]
+        .filter(e => e.checkVisibility() && !e.disabled);
+      const out = [];
+      for (const e of els){
+        const r = e.getBoundingClientRect();
+        if (!r.width || !r.height || (r.width >= 24 && r.height >= 24)) continue;
+        const after = getComputedStyle(e, '::after');
+        if (after.content !== 'none' && after.position === 'absolute') continue;
+        if (e.tagName === 'A' && /\S/.test((e.parentElement?.textContent || '').replace(e.textContent, ''))) continue;
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        if (!els.some(o => o !== e && !o.contains(e) && !e.contains(o) && (() => { const q = o.getBoundingClientRect();
+          return q.width && Math.hypot(Math.max(q.left - cx, 0, cx - q.right), Math.max(q.top - cy, 0, cy - q.bottom)) < 12; })())) continue;
+        out.push(`${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]} "${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 16)}" ${Math.round(r.width)}x${Math.round(r.height)}`);
+      }
+      return out;
+    })).map(x => `${hash} ${x}`));
+  }
+  ok(small.length === 0, `every press at 393 is 24px or has room or a press area of its own${small.length ? `: ${[...new Set(small)].slice(0, 6).join('; ')}` : ''}`);
+  await thumb.close();
 });
 
 ok(page.errors.length === 0,

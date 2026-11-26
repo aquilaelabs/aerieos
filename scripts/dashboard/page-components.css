@@ -374,6 +374,11 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
   text-align:left;white-space:normal;cursor:pointer;display:inline}
 @media(hover:hover){ .namelink:hover{background:none;--sheen:none;text-decoration:underline}
 }
+/* ...and a finger's target all the same (R286 step 3): the box a name takes
+   grows to the 24px WCAG asks, measured at 393 (a space's name was 18 tall
+   beside its card's other presses), the words where they were, since an
+   inline box's padding moves no line. */
+.namelink{padding-block:3px}
 /* One .sub, the note voice, wherever it is (the operator, 17 Nov): a line
    under a name says something in words. A line of facts (ids, sizes,
    paths, versions, a node and an age) is .sub.data, in the data voice. */
