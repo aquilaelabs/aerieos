@@ -56,6 +56,14 @@ def refusals(fn):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
                 and node.func.attr in ("_readonly", "_not_project") and not node.args:
             seen.append(node.func.attr[1:])
+        # The helpers that ask _refused for an area of their own (R283 step 3):
+        # a space's own write names its area first; the bin's acts are trash's.
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "_space_write" and node.args \
+                and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+            seen.append(f"refused: {node.args[0].value}")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "_trash_refused":
+            seen.append("refused: trash")
     out = []
     for s in seen:
         if s not in out:
