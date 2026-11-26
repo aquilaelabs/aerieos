@@ -48,13 +48,18 @@ function nbPermsView({$, nb, project, root}){
     if (!host) return;
     const p = (state?.projects || []).find(x => x.name === project);
     const locked = !!p?.locked_me || !!projWriteWhy(project);
-    const saved = p?.prefs?.gitpol || {}, pol = {...saved, ...draft};
+    // Each part the space's default until this repository sets it apart
+    // (R294 step 4): "as the space (word)" first, as every dial here is.
+    const saved = {}, pol = {...(p?.prefs?.gitpol || {})};
+    for (const k of Object.keys(GITPOL_DEFAULT)) saved[k] = rnDialVal(p, `gitpol.${k}`, GITPOL_DEFAULT[k]);
+    const pick = k => k in draft ? draft[k] : saved[k];
+    const opts = (k, modes) => optionList(rnDialChoices(p, `gitpol.${k}`, modes.map(m => [m, m]), GITPOL_DEFAULT[k]), pick(k));
     const dirty = Object.keys(draft).length > 0;
     const body = `<div class="row stack2 gpolicy"><div class="grow">
         <div class="prefrow ctlrow">
-          <label class="pick">Push its branches <select data-gitpol="push"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], pol.push || "allow")}</select></label>
-          <label class="pick">Push to its main branch <select data-gitpol="main"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], pol.main || "deny")}</select></label>
-          <label class="pick">Hold a push that looks sensitive<span class="help" data-help="a push whose added lines look like a token, key, password, email or IP address waits until a person reads it and approves it" tabindex="0">?</span> <select data-gitpol="scan"${locked ? " disabled" : ""}>${optionList(["hold", "off"], pol.scan || "hold")}</select></label>
+          <label class="pick">Push its branches <select data-gitpol="push"${locked ? " disabled" : ""}>${opts("push", ["allow", "deny"])}</select></label>
+          <label class="pick">Push to its main branch <select data-gitpol="main"${locked ? " disabled" : ""}>${opts("main", ["allow", "deny"])}</select></label>
+          <label class="pick">Hold a push that looks sensitive<span class="help" data-help="a push whose added lines look like a token, key, password, email or IP address waits until a person reads it and approves it" tabindex="0">?</span> <select data-gitpol="scan"${locked ? " disabled" : ""}>${opts("scan", ["hold", "off"])}</select></label>
         </div>
         <div class="actbar">
           <span class="state">${locked ? "this space is locked: its owner changes these" : `its own branches, one at a time ${helpIcon("Applies to pushes only. Tags, deletions and remote-only branches stay yours; commits and merges here are always allowed.")}`}</span>
@@ -66,7 +71,7 @@ function nbPermsView({$, nb, project, root}){
     if (!patch(host, html)) return;
     wireSections(host);
     host.querySelectorAll("[data-gitpol]").forEach(sel => sel.onchange = () => {
-      if (sel.value === (saved[sel.dataset.gitpol] || GITPOL_DEFAULT[sel.dataset.gitpol])) delete draft[sel.dataset.gitpol];
+      if (sel.value === saved[sel.dataset.gitpol]) delete draft[sel.dataset.gitpol];
       else draft[sel.dataset.gitpol] = sel.value;
       const b = host.querySelector(".permGitApply"); if (b) b.disabled = !Object.keys(draft).length;
     });
@@ -74,7 +79,9 @@ function nbPermsView({$, nb, project, root}){
     if (pa) pa.onclick = async () => {
       busy(pa, "Applying");
       try{
-        const j = await postJSON("/api/prefs", {project, gitpol: {...pol, ...draft}});
+        // Only what changed: each part sent is this repository's own, and
+        // "inherit" gives one back to the space (prefs.set_prefs).
+        const j = await postJSON("/api/prefs", {project, gitpol: {...draft}});
         if (j.error) return notify(j.error, true);
         draft = {};
         notify("saved");
@@ -122,7 +129,8 @@ function nbPermsView({$, nb, project, root}){
           : `<div class="sub">${m?.error ? esc(m.error) : "not measured yet: Measure asks the host what this space's token may do, changing nothing"}</div>`}</div>
           <div class="actbar"><button type="button" class="permHostMeasure"${locked ? " disabled" : ""}>Measure</button></div></div>`;
     const list = rows.map(r => {
-      const set = hostDraft[r.id] || r.set;
+      const own = rnDialVal(p, `forgepol.${r.id}`, r.set);
+      const set = hostDraft[r.id] || own;
       const tok = r.token === true ? `<span class="ok">the token may</span>` : r.token === false
         ? `the token may not: it needs ${esc(r.needs)}` : "not measured";
       const how = r.verbs.length ? `aerie forge ${r.verbs.join(", ")}` : r.how;
@@ -130,7 +138,7 @@ function nbPermsView({$, nb, project, root}){
       // set (B559): its deny was told to sessions and enforced nowhere.
       return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how && !r.fixed ? ` · ${esc(how)}` : ""}</div></div>
         ${r.fixed ? `<span class="state">${esc(r.fixed)}</span>`
-          : `<label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], set)}</select></label>`}</div>`;
+          : `<label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}" data-own="${esc(own)}"${locked ? " disabled" : ""}>${optionList(rnDialChoices(p, `forgepol.${r.id}`, [["allow", "allow"], ["deny", "deny"]], r.set), set)}</select></label>`}</div>`;
     }).join("");
     const foot = rows.length ? `<div class="row"><div class="grow"><span class="state">${locked ? "this space is locked: its owner changes these"
       : "a Deny here takes an ability away whatever the token allows; the token decides what is possible"}</span></div>
@@ -141,8 +149,7 @@ function nbPermsView({$, nb, project, root}){
     if (!patch(el, html)) return;
     wireSections(el);
     el.querySelectorAll("[data-forgepol]").forEach(sel => sel.onchange = () => {
-      const r = rows.find(x => x.id === sel.dataset.forgepol);
-      if (r && sel.value === r.set) delete hostDraft[r.id]; else hostDraft[sel.dataset.forgepol] = sel.value;
+      if (sel.value === sel.dataset.own) delete hostDraft[sel.dataset.forgepol]; else hostDraft[sel.dataset.forgepol] = sel.value;
       const b = el.querySelector(".permHostApply"); if (b) b.disabled = !Object.keys(hostDraft).length;
     });
     const mb = el.querySelector(".permHostMeasure");

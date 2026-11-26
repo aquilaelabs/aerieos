@@ -1253,16 +1253,19 @@ await section("step 3: the policy, and Send to Claude", async () => {
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-gitpol="push"]', 'allow');
   // On the git host (R188): every ability with what the token says (here
   // never measured: no token) and an Allow or Deny over it, merging at
-  // Deny, staged until Apply and saved as the project's forgepol.
+  // Deny, staged until Apply and saved as the project's forgepol. Each is the
+  // space's until this repository sets it apart (R294 step 4): "as the space
+  // (deny)" first, as every dial on this view is.
   await page.waitForSelector('.nb .nbview[data-view="permissions"] [data-forgepol="merge"]', { state: 'visible', timeout: 10000 });
   const hostSect = await page.$eval('.nb .nbview[data-view="permissions"] .permhost', el => ({
-    n: el.querySelectorAll('[data-forgepol]').length, merge: el.querySelector('[data-forgepol="merge"]').value,
-    pr: el.querySelector('[data-forgepol="pr_write"]').value, apply: el.querySelector('.permHostApply')?.disabled,
+    n: el.querySelectorAll('[data-forgepol]').length,
+    merge: el.querySelector('[data-forgepol="merge"]').selectedOptions[0]?.textContent,
+    pr: el.querySelector('[data-forgepol="pr_write"]').selectedOptions[0]?.textContent, apply: el.querySelector('.permHostApply')?.disabled,
     said: /not measured/.test(el.textContent), measure: !!el.querySelector('.permHostMeasure'),
     elsewhere: /set under Pushing/.test(el.textContent) && /set under Agents may: Tag and publish a release/.test(el.textContent) }));
   // Push, Read the code and Publish and edit releases have no switch here
   // (B559): another setting governs each, and the row says which.
-  ok(hostSect.n === 9 && hostSect.merge === 'deny' && hostSect.pr === 'allow' && hostSect.apply === true && hostSect.said && hostSect.measure
+  ok(hostSect.n === 9 && /^(as the space \()?deny\)?$/.test(hostSect.merge) && /^(as the space \()?allow\)?$/.test(hostSect.pr) && hostSect.apply === true && hostSect.said && hostSect.measure
      && hostSect.elsewhere,
      `Permissions lists each git host ability it governs with an Allow or Deny, merging at Deny, the rest where they are set, and Measure (${JSON.stringify(hostSect)})`);
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-forgepol="pr_write"]', 'deny');

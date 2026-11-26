@@ -36,6 +36,33 @@ class Overrides(unittest.TestCase):
         for d in ("app", "server"):
             self.assertTrue(repos.add(self.key, d).get("ok"))
 
+    def test_push_rules_are_the_space_s_default_and_a_repository_s_own(self):
+        # R294 step 4 (the operator, 25 Nov): how a repository pushes and what
+        # the git host allows were the space's alone while edited on one
+        # repository's Permissions view, so a change there changed every one.
+        r = prefs.set_prefs("app", scope="project", gitpol={"main": "allow"}, forgepol={"workflows": "deny"})
+        self.assertTrue(r.get("ok"), r)
+        for repo in ("app", "server"):
+            got = prefs.get(repo)
+            self.assertEqual((got["gitpol"]["main"], got["forgepol"]["workflows"]), ("allow", "deny"), repo)
+        # One repository's notebook sets a part apart: the other keeps the space's.
+        r = prefs.set_prefs("server", gitpol={"main": "deny"})
+        self.assertTrue(r.get("ok"), r)
+        self.assertEqual(prefs.get("server")["gitpol"]["main"], "deny")
+        self.assertIn("gitpol.main", prefs.get("server")["overrides"])
+        self.assertEqual(prefs.get("app")["gitpol"]["main"], "allow", "the other repository still inherits")
+        self.assertEqual(prefs.get("server")["project_dials"]["gitpol"]["main"], "allow", "...and says what it would inherit")
+        # The space's default moves under the one that inherits, not the override.
+        prefs.set_prefs("app", scope="project", gitpol={"main": "deny", "push": "deny"})
+        self.assertEqual((prefs.get("app")["gitpol"]["push"], prefs.get("server")["gitpol"]["push"]), ("deny", "deny"))
+        prefs.set_prefs("app", scope="project", gitpol={"main": "allow"})
+        self.assertEqual((prefs.get("app")["gitpol"]["main"], prefs.get("server")["gitpol"]["main"]), ("allow", "deny"))
+        # Inherit gives the part back.
+        r = prefs.set_prefs("server", gitpol={"main": "inherit"})
+        self.assertTrue(r.get("ok"), r)
+        self.assertEqual(prefs.get("server")["gitpol"]["main"], "allow")
+        self.assertNotIn("gitpol.main", prefs.get("server")["overrides"])
+
     def test_a_repository_inherits_the_projects_dials_until_its_notebook_sets_one(self):
         # The project's own door sets the defaults.
         r = prefs.set_prefs("app", scope="project", makevms="auto", gate={"roadmap": "ask"})

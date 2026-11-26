@@ -176,12 +176,27 @@ DIAL_DEFAULTS = {"devbuild": "deny", "makevms": "deny", "installpacks": "ask", "
                  "keys": "ask", "release": "ask", "pc": "deny", "test_change": "wait", "test_node": ""}
 
 
+def _dict_dials():
+    """The dials made of parts, each part a repository may set apart from
+    its space on its own: the gates, and how it pushes and what the git host
+    allows (R294 step 4, the operator 25 Nov: a space default with each
+    repository's override; they were the space's alone while edited on one
+    repository's Permissions view, so a change there changed every one)."""
+    return {"gate": (GATE_KINDS, lambda k: "auto"),
+            "gitpol": (tuple(GITPOL_DEFAULT), lambda k: GITPOL_DEFAULT[k]),
+            "forgepol": (tuple(FORGEPOL_DEFAULT), lambda k: FORGEPOL_DEFAULT[k])}
+
+
+def _dial_parts():
+    return {f"{d}.{k}" for d, (keys, _) in _dict_dials().items() for k in keys}
+
+
 def _overrides_of(rec):
     """The dials this repository sets apart from its project, as names: the
     record's own list, or, for a record from before there was one (every
     released install's), each dial it stores a value for, so what a
     repository's notebook had set before stays its own."""
-    ok = set(OVERRIDABLE) | {f"gate.{k}" for k in GATE_KINDS}
+    ok = set(OVERRIDABLE) | _dial_parts()
     if isinstance(rec.get("overrides"), list):
         return sorted({str(x) for x in rec["overrides"] if str(x) in ok})
     # A value at its default is nothing somebody chose: a record written
@@ -250,9 +265,12 @@ def _over(project, rec, raw):
     if key:
         g = _clean(raw.get(key))
         own = set(rec.get("overrides") or [])
-        rec.update({f: g[f] for f in GROUP_FIELDS if not (f in OVERRIDABLE and f in own)})
-        rec["gate"] = {k: rec["gate"][k] if f"gate.{k}" in own else g["gate"][k] for k in GATE_KINDS}
-        rec["project_dials"] = {f: g[f] for f in OVERRIDABLE} | {"gate": dict(g["gate"])}
+        dicts = _dict_dials()
+        mine = {d: dict(rec.get(d) or {}) for d in dicts}
+        rec.update({f: g[f] for f in GROUP_FIELDS if not (f in OVERRIDABLE and f in own) and f not in dicts})
+        for d, (keys, _) in dicts.items():
+            rec[d] = {k: mine[d].get(k, g[d][k]) if f"{d}.{k}" in own else g[d][k] for k in keys}
+        rec["project_dials"] = {f: g[f] for f in OVERRIDABLE} | {d: dict(g[d]) for d in dicts}
         # The space's hosting nodes, less the ones this repository keeps its
         # containers off (R223); the space's whole list beside them.
         off = set(rec.get("hosts_off") or [])
@@ -982,7 +1000,7 @@ def set_prefs(project, scope=None, **kw):
     if not key:
         return _set_prefs(project, **_no_inherit(kw))
     to_project = scope == "project"
-    dial = lambda k: k in OVERRIDABLE or k == "gate"                   # noqa: E731
+    dial = lambda k: k in OVERRIDABLE or k in _dict_dials()            # noqa: E731
     mine = {k: v for k, v in kw.items() if (k not in GROUP_FIELDS or dial(k)) and not (to_project and dial(k))}
     theirs = {k: v for k, v in kw.items() if v is not None and ((k in GROUP_FIELDS and not dial(k)) or (to_project and dial(k)))}
     if theirs:
@@ -1001,16 +1019,18 @@ def set_prefs(project, scope=None, **kw):
             else:
                 mine[k] = v
                 over[k] = True
-        gate = mine.get("gate")
-        if isinstance(gate, dict):
+        for d in _dict_dials():
+            parts = mine.get(d)
+            if not isinstance(parts, dict):
+                continue
             kept = {}
-            for k, v in gate.items():
+            for k, v in parts.items():
                 if v == INHERIT:
-                    over[f"gate.{k}"] = False
+                    over[f"{d}.{k}"] = False
                 else:
                     kept[k] = v
-                    over[f"gate.{k}"] = True
-            mine["gate"] = kept
+                    over[f"{d}.{k}"] = True
+            mine[d] = kept
         if over:
             mine["overrides"] = over
     got = _set_prefs(project, **mine)
@@ -1024,7 +1044,7 @@ def _no_inherit(kw):
     for k, v in kw.items():
         if k in OVERRIDABLE and v == INHERIT:
             continue
-        if k == "gate" and isinstance(v, dict):
+        if k in _dict_dials() and isinstance(v, dict):
             v = {gk: gv for gk, gv in v.items() if gv != INHERIT}
         out[k] = v
     return out
@@ -1050,7 +1070,7 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
             if not isinstance(overrides, dict):
                 return {"error": "overrides is {dial: true|false}"}
             have = set(cur["overrides"])
-            ok = set(OVERRIDABLE) | {f"gate.{k}" for k in GATE_KINDS}
+            ok = set(OVERRIDABLE) | _dial_parts()
             for k, on in overrides.items():
                 if k not in ok:
                     return {"error": f"not a dial a repository may set apart: {k}"}
@@ -1059,8 +1079,9 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                 # record read as one from before the list (the stored
                 # value alone) does not bring the override back.
                 if not on:
-                    if k.startswith("gate."):
-                        cur["gate"][k[5:]] = "auto"
+                    dial_name, _, part = k.partition(".")
+                    if part and dial_name in _dict_dials():
+                        cur[dial_name][part] = _dict_dials()[dial_name][1](part)
                     else:
                         cur[k] = DIAL_DEFAULTS[k]
             cur["overrides"] = sorted(have)

@@ -97,14 +97,22 @@ const gateKey = g => Object.keys(GATE_IDS).map(k => g?.[k] || "auto").join(",");
 // plainly the value.
 const rnDialMode = p => rnMode === "project" ? "project"
   : p?.project && p.project !== p.name && p?.prefs?.project_dials ? "inherit" : "plain";
-// A dial's value as the form holds it: a gate is "gate.KIND".
+// A dial made of parts is named DIAL.PART: a gate ("gate.roadmap"), how a
+// repository pushes ("gitpol.main"), an ability on the git host
+// ("forgepol.workflows"), each part a repository may set apart (R294 step 4).
+const RN_DICT_DIALS = ["gate", "gitpol", "forgepol"];
+function rnDialPart(f){
+  const [d, part] = f.split(".");
+  return part && RN_DICT_DIALS.includes(d) ? [d, part] : ["", ""];
+}
+// A dial's value as the form holds it.
 function rnDialVal(p, f, dflt){
-  const gate = f.startsWith("gate.") ? f.slice(5) : "";
-  const own = gate ? p?.prefs?.gate?.[gate] : p?.prefs?.[f];
+  const [d, part] = rnDialPart(f);
+  const own = d ? p?.prefs?.[d]?.[part] : p?.prefs?.[f];
   const mode = rnDialMode(p);
   if (mode === "project"){
     const pd = p?.prefs?.project_dials;
-    return (gate ? pd?.gate?.[gate] : pd?.[f]) || own || dflt;
+    return (d ? pd?.[d]?.[part] : pd?.[f]) || own || dflt;
   }
   if (mode === "inherit") return (p?.prefs?.overrides || []).includes(f) ? own || dflt : "inherit";
   return own || dflt;
@@ -113,8 +121,8 @@ function rnDialVal(p, f, dflt){
 // the dial can be inherited.
 function rnDialChoices(p, f, modes, dflt){
   if (rnDialMode(p) !== "inherit") return modes;
-  const gate = f.startsWith("gate.") ? f.slice(5) : "";
-  const pd = p?.prefs?.project_dials, v = (gate ? pd?.gate?.[gate] : pd?.[f]) || dflt;
+  const [d, part] = rnDialPart(f);
+  const pd = p?.prefs?.project_dials, v = (d ? pd?.[d]?.[part] : pd?.[f]) || dflt;
   const word = (modes.find(([m]) => m === v) || [v, v])[1];
   return [["inherit", `as the space (${word})`], ...modes];
 }
