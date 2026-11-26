@@ -202,7 +202,7 @@ function jobsShowSet(v){
 // column holds whole at a desk beside the Job column's room ("automatic
 // update" was cut to "automatic …"); the Kind column beside it says what
 // it updated.
-const jobBy = j => esc(principalWords(j.requested_by));
+function jobBy(j){ return esc(principalWords(j.requested_by)); }
 // The Job column has the room (B112): a title wraps at a word only when
 // its column holds the longest word, so it takes most of the shares; Node
 // and By keep a floor that holds a node's and an account's name whole, and
