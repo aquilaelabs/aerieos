@@ -47,6 +47,14 @@ class Update(unittest.TestCase):
         for p in self.patches:
             p.stop()
 
+    def test_a_later_dev_build_is_newer(self):
+        # B1171: -dev.N was ignored, so a dev companion never moved on.
+        from bbcompanion import update
+        self.assertTrue(update.newer("0.9.0-dev.6312", "0.9.0-dev.6168"))
+        self.assertTrue(update.newer("0.9.0", "0.9.0-dev.6312"), "the release above its dev builds")
+        self.assertFalse(update.newer("0.9.0-dev.6168", "0.9.0-dev.6312"))
+        self.assertFalse(update.newer("0.9.0-dev.9999", "0.9.0"))
+
     def test_versions_compare_as_numbers(self):
         self.assertTrue(update.newer("1.10.0", "1.9.3"))
         self.assertFalse(update.newer("1.0.0", "1.0.0"))

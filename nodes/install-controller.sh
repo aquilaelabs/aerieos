@@ -920,6 +920,12 @@ cmd_update() {
     read -r ver rev <<<"$(tree_stamp "$t")"
     cur="$(sed -n 's/^BB_VERSION=//p' "$OPT/build.env" 2>/dev/null || true)"
     say "update: ${cur:-?} to ${ver}"
+    # Never back to an older release (B1170; the operator, 28 Oct: no roll
+    # back): a signed older one still carries the holes later ones closed.
+    # The way back after a failed update is back_to_previous, never this.
+    if [ -n "$cur" ] && [[ "$(ver_key "$ver")" < "$(ver_key "$cur")" ]]; then
+        die "${ver} is older than ${cur}, which runs here: an update never moves back to an older release"
+    fi
     if [ "$ver" = "$cur" ] && [ "$(sed -n 's/^BB_IMAGE_REV=//p' "$OPT/build.env")" = "$rev" ]; then
         printf '   already on it\n'; return 0
     fi
@@ -960,6 +966,21 @@ cmd_update() {
         fi
         exit 1
     fi
+}
+
+# ver_key VERSION: a string that sorts as versions do: X.Y.Z, then a dev
+# build (-dev.N) before the release it leads to, by its number.
+ver_key() {
+    local v="${1#v}" base rel=1 n=0 a b c
+    base="${v%%-*}"
+    if [ "$v" != "$base" ]; then
+        rel=0
+        n="${v##*.}"
+        case "$n" in ''|*[!0-9]*) n=0 ;; esac
+    fi
+    IFS=. read -r a b c <<<"$base"
+    case "$a$b$c" in ''|*[!0-9]*) a=0 b=0 c=0 ;; esac
+    printf '%06d%06d%06d%d%09d' "$((10#$a))" "$((10#$b))" "$((10#$c))" "$rel" "$((10#$n))"
 }
 
 # back_to_previous: the release before, put back by an update whose new

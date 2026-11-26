@@ -52,8 +52,13 @@ def version():
 
 
 def _parts(v):
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(v or ""))
-    return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+    """Where a version stands: X.Y.Z, then a dev build (-dev.N) before the
+    release it leads to and by its number, so one dev build is newer than
+    the last (B1171: -dev.N was ignored, and a dev companion never moved)."""
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)(?:-[a-z][a-z0-9]*\.(\d+))?", str(v or ""))
+    if not m:
+        return (0, 0, 0, 0, 0)
+    return (int(m[1]), int(m[2]), int(m[3]), 0 if m[4] else 1, int(m[4] or 0))
 
 
 def newer(theirs, mine):
