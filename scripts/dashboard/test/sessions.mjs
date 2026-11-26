@@ -630,10 +630,8 @@ const rest = await (await phone.waitForFunction(() => { const el = document.quer
            in: m.top >= 0 && m.bottom <= innerHeight + 1 }; }, null, { timeout: 10000 })).jsonValue();
 ok(rest.in && rest.dialog, `...a dialog over the page, wholly on the screen however the page under it is scrolled (${JSON.stringify(rest)})`);
 await phone.setViewportSize({ width: 400, height: 800 });
+// New opens it at once, on the model and effort under Start (R284 step 4).
 await phone.click('.resumemenu [data-n]');
-// New conversation turns the menu to the model and effort it starts on
-// (R197), and Start is what opens it.
-await phone.click('.resumemenu [data-start]');
 await phone.waitForFunction(() => tabs.some(t => t.arg === 'claude:alpha') && tabOf(panes[1])?.arg === 'claude:alpha' && dockUp);
 ok(true, 'phone: New conversation opens the Claude tab in the dock, pulled up');
 // ...and alpha goes back to having no node, which is how every other file

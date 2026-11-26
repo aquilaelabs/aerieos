@@ -36,16 +36,17 @@ lists every agent installed on its node.
 
 ## Starting a session
 
-**The model and effort are picked when a session starts** (the operator, 12
-Oct), not kept in the space's settings: pressing Start agent opens a menu
-(the node, Resume or New conversation), and that choice turns the menu to
-Model and Effort with Start, opening on the last ones picked here and naming
-on *Claude's default* the model the last session answered on. Start keeps
-the picks as yours for the space (`claude-prefs.json`, what the launcher
-reads) and opens the session on them. A new space's first session picks
-them beside its brief instead. While a session of yours is running, the menu
-offers a red **Restart** beside Open tab and End session, which ends it and
-turns to the same Model and Effort before resuming the conversation; and
+**The model and effort are picked where a session starts** (the operator, 12
+Oct and 26 Nov), not in the space's settings: pressing Start agent opens a
+menu (the node, Start and Resume), and under the agent picked to start are
+its Model and Effort, opening on the last ones picked here and naming on
+*Claude's default* the model the last session answered on. A pick is kept as
+yours for the space as you make it (`claude-prefs.json`, what the launcher
+reads), and **New** and **Resume** start at once on them. A new space's first
+session picks them beside its brief instead. While a session of yours is
+running, the menu offers **Restart** beside Open and End, which turns the menu
+to the same Model and Effort, with Restart as the answer, before it ends the
+session and resumes the conversation; and
 the space's card says, under that session in the warning color, what has
 changed since it started that it will not see until it is started again (a
 toolchain installed on its node that puts something on `PATH`, or

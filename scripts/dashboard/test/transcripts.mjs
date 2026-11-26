@@ -110,20 +110,20 @@ const empty = await page.evaluate(() => { const was = $('cvBody').innerHTML;
 ok(empty < 260 && tall > empty * 2, `...and a conversation with nothing said in it is a dialog its own size (${empty}px, a read one ${tall}px)`);
 await page.click('#cvClose');
 // Any one of them resumed (the operator, 22 Oct: the Claude button resumes
-// only the last): Resume opens the chooser on that conversation, at the
-// model and effort step, and nothing starts until Start.
+// only the last): Resume opens the chooser with that conversation picked
+// under its Resume, whose press starts it (R284 step 4), and nothing starts
+// until then.
 await page.click(`${SESS} .cvlogs .artrow [data-cvresume="conv-two-2025"]`);
-await page.waitForSelector('.resumemenu .rmhead', { state: 'attached', timeout: 10000 }).catch(() => {});
-const rm = await page.evaluate(() => ({ head: document.querySelector('.resumemenu .rmhead')?.textContent.replace(/\s+/g, ' ').trim() || '',
-  pick: typeof resumePick === 'object' && resumePick ? resumePick.sessionId : null,
+await page.waitForSelector('.resumemenu', { state: 'attached', timeout: 10000 }).catch(() => {});
+const rm = await page.evaluate(() => ({ open: resumeFor, pick: rmConv?.project === 'alpha' ? rmConv.id : null, step: !!resumePick,
   anchor: !!document.querySelector('[data-c="alpha"]'),
   said: (typeof notes !== 'undefined' ? notes : []).map(n => n.msg).join(' '),
   started: tabs.some(t => /:r:conv-two-2025/.test(String(t.arg))) }));
 // With Start Claude on show it opens the chooser there; without (Claude Code
 // not installed on this fixture's node) it says why rather than doing nothing.
-ok(!rm.started && (rm.anchor ? /Resume the Claude conversation/.test(rm.head) && rm.pick === 'conv-two-2025'
-                             : /not installed|cannot start/.test(rm.said)),
-   `Resume opens the chooser on the conversation picked, or says why it cannot, starting nothing yet (${JSON.stringify(rm)})`);
+ok(!rm.started && !rm.step && (rm.anchor ? rm.open === 'alpha' && rm.pick === 'conv-two-2025'
+                                         : /not installed|cannot start/.test(rm.said)),
+   `Resume opens the chooser with the conversation picked under Resume, or says why it cannot, starting nothing yet (${JSON.stringify(rm)})`);
 await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(state.projects); });
 
 // A label, a note and Kept (R236, the operator, 12 Nov): Edit swaps a row's

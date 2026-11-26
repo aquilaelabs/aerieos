@@ -2829,6 +2829,8 @@ body.firstrun #panes{display:none}
 /* ...a note in the person's own lines, and in ink: it is theirs to read. */
 .resumemenu .rmconv .rmnote{white-space:pre-line;color:var(--ink);overflow-wrap:anywhere;max-height:6.5em;overflow-y:auto}
 .resumemenu .rmfields select{min-width:0}
+/* What New and Resume start on, under the agent's line (R284 step 4). */
+.resumemenu .rmstarton{margin-top:var(--label-gap)}
 /* The dock (R218 step 4): the second pane at the page's foot, one line when
    shut, --dock-h tall when up (half the area to begin with, a drag on its
    line changes it); on a phone up is the whole height above the bottom bar.

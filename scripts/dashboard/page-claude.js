@@ -279,8 +279,8 @@ function openClaude(name, ev){
 
 // One conversation picked to go on with (the notebook's Sessions view, the
 // operator, 22 Oct: the project's Claude button resumes only the last): the
-// chooser opens on it at the model and effort step, in the lowest slot of
-// its agent free (R143). One running in a session of yours already is
+// chooser opens with it picked under Resume, in the lowest slot of its
+// agent free (R143). One running in a session of yours already is
 // opened there rather than started twice, which would write over it; with
 // every slot taken it is said, and nothing starts.
 function resumeConversation(name, id, when, ev, agent = "claude"){
@@ -299,13 +299,13 @@ function resumeConversation(name, id, when, ev, agent = "claude"){
   if (!slot)
     return notify(`every ${agentById(agent).name} session you may run on ${projLabel(name)} is running: end one to resume this`, true);
   // A conversation resumes in the agent it is with, and in no other (R95
-  // step 8): the chooser turns to that agent's own step, its model and
-  // effort, on the project's node.
-  const ns = claudeNodes(p), several = ns.length > 1;
+  // step 8): the chooser opens with it picked under Resume, whose press
+  // starts it at once on that agent's kept model and effort (R284 step 4).
+  void when;
   resumeFor = name;
-  resumePick = {project: name, sessionId: id, when, node: several ? (ns[0]?.id || "") : "", slot,
-                ...(claude ? {} : {agent}),
-                model: p.yours?.[claude ? "model" : `${agent}_model`] || "", effort: p.yours?.[claude ? "effort" : `${agent}_effort`] || ""};
+  resumePick = null;
+  rmConv = {project: name, id};
+  loadRmConvs(name);
   drawProjects(state.projects);
   syncResumeMenu();
   // Nowhere to start it (placeResumeMenu found no Start agent on show):
@@ -561,19 +561,48 @@ function resumePicker(p, m, dlg, ns, several){
     resumePick = null;
     startClaude(p.name, r.sessionId, r.node, r.slot || 1);
   };
-  // What the last session here answered on, for Claude's default to name.
-  if (resumeModelNow.project !== p.name){
-    resumeModelNow = {project: p.name, model: ""};
-    getJSON(`/api/claude-now?project=${encodeURIComponent(p.name)}`)
-      .then(j => {
-        if (!j.model || resumeModelNow.project !== p.name) return;
-        resumeModelNow.model = j.model;
-        const o = document.querySelector('#rmModel option[value=""]');
-        if (o) o.textContent = `Claude's default (last session: ${(MODELS.find(([x]) => x === j.model) || [])[1] || j.model})`;
-      })
-      .catch(() => {});
-  }
+  rmLastModel(p);
   rmHold(m, p.name);
+}
+
+// What the last session here answered on, for Claude's default to name,
+// read once per space the chooser opens on, in whichever Model it shows.
+function rmLastSaid(model){
+  return `Claude's default (last session: ${(MODELS.find(([x]) => x === model) || [])[1] || model})`;
+}
+function rmLastModel(p){
+  if (resumeModelNow.project === p.name) return;
+  resumeModelNow = {project: p.name, model: ""};
+  getJSON(`/api/claude-now?project=${encodeURIComponent(p.name)}`)
+    .then(j => {
+      if (!j.model || resumeModelNow.project !== p.name) return;
+      resumeModelNow.model = j.model;
+      document.querySelectorAll('#rmModel option[value=""], #rmStartModel[data-agent="claude"] option[value=""]')
+        .forEach(o => { o.textContent = rmLastSaid(j.model); });
+    })
+    .catch(() => {});
+}
+
+// What New and Resume start on (R284 step 4, the operator, 26 Nov): the
+// agent picked's model and effort under it, this person's kept ones for
+// the space, saved as they change, so New and Resume start at once where
+// they turned the chooser to a step of its own. Restart keeps its step.
+function rmStartKeys(id){
+  return id === "claude" ? ["model", "effort"] : [`${id}_model`, `${id}_effort`];
+}
+function rmStartOn(p, a){
+  const claude = a.id === "claude";
+  const t = claude ? {models: MODELS.slice(1), efforts: EFFORTS.slice(1)}
+    : a.id === "open" ? routerModels(p) : (AGENT_MODELS[a.id] || {models: [], efforts: []});
+  if (!t.models.length && !t.efforts.length) return "";
+  const [mk, ek] = rmStartKeys(a.id), cur = p.yours || {};
+  const first = claude && resumeModelNow.project === p.name && resumeModelNow.model ? rmLastSaid(resumeModelNow.model) : `${a.name}'s default`;
+  const sel = (id, label, rows, v, def) => `<div class="setrow col ctlrow"><label class="lbl" for="${id}">${label}</label><select id="${id}" data-agent="${
+    esc(a.id)}" aria-label="the ${label.toLowerCase()} a new ${esc(a.name)} session starts on">${optionList([["", def], ...rows], v)}</select></div>`;
+  const warn = a.id === "open" ? routerSays(p, cur[mk] || "") : "";
+  return `<div class="fgrid rmfields rmstarton">${t.models.length ? sel("rmStartModel", "Model", t.models, cur[mk] || "", first) : ""}${
+    t.efforts.length ? sel("rmStartEffort", "Effort", t.efforts, cur[ek] || "", `${a.name}'s default`) : ""}</div>${
+    warn ? `<div class="rmstate warn">${esc(warn)}</div>` : ""}`;
 }
 
 // The same step for another agent's new conversation (R95 step 9): which
@@ -728,7 +757,9 @@ function placeResumeMenu(){
     if (!list.length) return `<div class="rmstate">No coding agent this space uses is installed on ${esc(n.name || "its node")}.</div>`;
     if (rmAgent.project !== p.name || !list.some(a => a.id === rmAgent.agent)) rmAgent = {project: p.name, agent: list[0].id};
     const a = list.find(x => x.id === rmAgent.agent);
-    return startLine(a, list.length > 1 ? `<select id="rmAgentSel" aria-label="the coding agent to start">${optionList(list.map(x => [x.id, x.name]), a.id)}</select>` : "");
+    const can = (a.id === "claude" ? claudeSigned(n) : !(n.id && !agentOn(a.id, n.id))) && freeSlot(p.name, a.id);
+    return startLine(a, list.length > 1 ? `<select id="rmAgentSel" aria-label="the coding agent to start">${optionList(list.map(x => [x.id, x.name]), a.id)}</select>` : "")
+      + (can ? rmStartOn(p, a) : "");
   };
   // Resume: your conversations here as one pulldown (R236, the operator,
   // 12 Nov: a list of rows with a button each was the longest thing on the
@@ -820,33 +851,34 @@ function placeResumeMenu(){
   });
   const slotOf = b => +(b.dataset.slot || 1);
   const nodeBy = id => ns.find(x => x.id === id) || {id: "", name: ""};
-  // New picked: the menu turns to the model and effort to start on, with
-  // Start. A new project's first session goes to its brief instead, which
-  // asks the same two beside the brief.
-  m.querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
-    const node = b.dataset.node, slot = slotOf(b);
-    if (p.brief && slot === 1 && !claudeLiveOn(p.name, {id: node || ""})) return startClaude(p.name, null, node);
-    resumePick = {project: p.name, sessionId: null, node, slot, model: p.yours?.model || "", effort: p.yours?.effort || ""};
-    drawProjects(state.projects);
+  // Model and Effort kept as they change: the page has the pick at once,
+  // the server follows, and a refusal puts the old one back and says why.
+  m.querySelectorAll("#rmStartModel, #rmStartEffort").forEach(sel => sel.onchange = async () => {
+    const key = rmStartKeys(sel.dataset.agent)[sel.id === "rmStartModel" ? 0 : 1];
+    const was = p.yours?.[key] || "", v = sel.value;
+    p.yours = {...(p.yours || {}), [key]: v};
+    placeResumeMenu();
+    const j = await postJSON("/api/prefs", {project: p.name, [key]: v});
+    if (j.error){ p.yours = {...(p.yours || {}), [key]: was}; placeResumeMenu(); notify(j.error, true); }
   });
+  // A new conversation starts at once on the picks above. A new project's
+  // first session goes to its brief instead, which asks the same two beside
+  // the brief.
+  const kept = ag => { const [mk, ek] = rmStartKeys(ag); return [p.yours?.[mk] || "", p.yours?.[ek] || ""]; };
+  m.querySelectorAll("[data-n]").forEach(b => b.onclick = () => startClaude(p.name, null, b.dataset.node, slotOf(b)));
   m.querySelectorAll("[data-anew]").forEach(b => b.onclick = () => {
     const ag = b.dataset.anew, slot = slotOf(b);
     // A brief still waiting is the first prompt whichever agent starts.
     if (p.brief && slot === 1) return openBrief(p.name, b.dataset.node, ag);
-    resumePick = {project: p.name, sessionId: null, node: b.dataset.node, agent: ag, slot,
-                  model: p.yours?.[`${ag}_model`] || "", effort: p.yours?.[`${ag}_effort`] || ""};
-    drawProjects(state.projects);
+    launchAgent(ag, p.name, b.dataset.node, ...kept(ag), "", slot);
   });
-  // A conversation picked to go on with: in the lowest slot of its agent
-  // free, at the model and effort step.
+  // A conversation picked to go on with, at once, in the lowest slot of its
+  // agent free, on that agent's kept model and effort.
   m.querySelectorAll("[data-cv]").forEach(b => b.onclick = () => {
     const ag = b.dataset.cvagent || "claude", slot = freeSlot(p.name, ag);
     if (!slot) return notify(`every ${agentById(ag).name} session you may run here is running: end one to resume this`, true);
-    const claude = ag === "claude";
-    resumePick = {project: p.name, sessionId: b.dataset.cv, when: +b.dataset.cvat, node: b.dataset.node, slot,
-                  ...(claude ? {} : {agent: ag}),
-                  model: p.yours?.[claude ? "model" : `${ag}_model`] || "", effort: p.yours?.[claude ? "effort" : `${ag}_effort`] || ""};
-    drawProjects(state.projects);
+    if (ag === "claude") return startClaude(p.name, b.dataset.cv, b.dataset.node, slot);
+    launchAgent(ag, p.name, b.dataset.node, ...kept(ag), b.dataset.cv, slot);
   });
   m.querySelectorAll("[data-open]").forEach(b => b.onclick = () => launchClaude(p.name, null, b.dataset.node, slotOf(b)));
   m.querySelectorAll("[data-end]").forEach(b => b.onclick = () => claudeEnd(p.name, nodeBy(b.dataset.end), several, slotOf(b)));
@@ -863,5 +895,6 @@ function placeResumeMenu(){
     drawProjects(state.projects);
     openNodeClaude(b.dataset.nid, b.dataset.asignin);
   });
+  rmLastModel(p);
   rmHold(m, p.name);
 }

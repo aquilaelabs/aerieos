@@ -3065,7 +3065,7 @@ await section("a project on several nodes", async () => {
   ok(/^rh is offline/.test(gone.state) && !gone.lines.length,
      `...and one where no session can start, only its reason (${gone.state})`);
   await page.selectOption('#rmNodeSel', 'n_ubu');
-  // The last session here answered on Fable: the next step's Model names it
+  // The last session here answered on Fable: Model under Start names it
   // on "Claude's default", read from the newest transcript.
   const slug = `${DIR}/ws/alpha`.replace(/\//g, '-');
   const tdir = `${DIR}/home/.claude/projects/${slug}`;
@@ -3073,47 +3073,45 @@ await section("a project on several nodes", async () => {
   writeFileSync(`${tdir}/aaaaaaaa-0000-4000-8000-000000000001.jsonl`,
     '{"type":"user","message":{"role":"user","content":"hi"}}\n'
     + '{"type":"assistant","message":{"model":"claude-fable-5-1","role":"assistant","content":[]}}\n');
+  // What New starts on is under the agent's line (R284 step 4, the operator,
+  // 26 Nov: the step of its own was a fourth press for two picks already
+  // kept): Model and Effort, this account's for the space, with the last
+  // session's model named on the default; New starts at once.
+  await page.evaluate(() => { resumeModelNow = { project: '', model: '' }; placeResumeMenu(); });
+  await page.waitForFunction(() => /last session: Fable/.test(document.querySelector('#resumemenu #rmStartModel option[value=""]')?.textContent || ''),
+                             null, { timeout: 8000 });
+  const step = await page.$eval('#resumemenu', m => ({
+    models: [...m.querySelectorAll('#rmStartModel option')].map(o => o.value), efforts: [...m.querySelectorAll('#rmStartEffort option')].map(o => o.value),
+    labels: [...m.querySelectorAll('.rmstarton label')].map(l => l.textContent.trim()), steps: !!m.querySelector('#rmModel, [data-start]') }));
+  ok(step.models.includes('opus') && step.models.includes('fable') && step.efforts.includes('high')
+     && step.labels.join() === 'Model,Effort' && !step.steps,
+     `New's Model and Effort are under Start, naming the last session's model on the default, with no step of their own (${JSON.stringify(step)})`);
   // The chooser is the house dialog: over the dimmed page, centered as every
-  // dialog is, its box titled, its lines field bands, its presses the box's
-  // foot, held where it opened while its step changes.
+  // dialog is, its box titled, its lines field bands, Close its foot, held
+  // where it opened while its picks change.
   const top1 = await page.evaluate(() => { const d = document.getElementById('rmModal');
     return d && !d.hidden ? Math.round(d.querySelector('.box').getBoundingClientRect().top) : null; });
-  await page.waitForFunction(() => { const b = document.querySelector('#resumemenu [data-n][data-node="n_ubu"]');
-    if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
-  // New conversation picked: the menu turns to the model and effort to start
-  // on, with Start (the operator, 12 Oct), and starts nothing yet.
-  await page.waitForSelector('#resumemenu #rmModel', { timeout: 10000 });
-  await page.waitForFunction(() => /last session: Fable/.test(document.querySelector('#rmModel option[value=""]')?.textContent || ''),
-                             null, { timeout: 8000 });
-  const step = await page.$eval('#resumemenu', m => ({ text: `${m.querySelector('.rmhead b')?.textContent.trim()} ${m.querySelector('.rmhead .rmfacts')?.textContent.trim()}`,
-    models: [...m.querySelectorAll('#rmModel option')].map(o => o.value), efforts: [...m.querySelectorAll('#rmEffort option')].map(o => o.value),
-    buttons: [...m.querySelectorAll('button')].map(b => b.textContent.trim()) }));
-  ok(/^A new Claude conversation Claude Code on ubu$/.test(step.text) && step.models.includes('opus') && step.models.includes('fable')
-     && step.efforts.includes('high') && step.buttons.join() === 'Start,Back'
-     && !(await page.evaluate(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'))),
-     `...New conversation turns the menu to Model and Effort with Start, naming the last session's model on the default, and starts nothing yet (${step.text}; ${step.buttons.join(' | ')})`);
+  await page.selectOption('#rmStartModel', 'sonnet');
+  await page.selectOption('#rmStartEffort', 'high');
   const dlg = await page.evaluate(() => { const d = document.getElementById('rmModal'), b = d?.querySelector(':scope > .box');
     const r = b?.getBoundingClientRect();
     return { up: !!d && !d.hidden, inIt: b?.id === 'resumemenu', dim: d ? getComputedStyle(d).backgroundColor : '',
              top: r ? Math.round(r.top) : null, h3: !!b?.querySelector(':scope > h3'), fields: b ? b.querySelectorAll(':scope > .field').length : 0,
-             foot: !!b?.querySelector(':scope > .foot [data-start]'), mid: r ? Math.round(r.top + r.height / 2) : null, vmid: Math.round(innerHeight / 2) }; });
+             foot: !!b?.querySelector(':scope > .foot [data-rmclose]'), mid: r ? Math.round(r.top + r.height / 2) : null, vmid: Math.round(innerHeight / 2) }; });
   ok(dlg.up && dlg.inIt && !/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(dlg.dim) && dlg.h3 && dlg.fields >= 2 && dlg.foot
-     && Math.abs(dlg.mid - dlg.vmid) <= 2 && top1 !== null && dlg.top === top1,
-     `the chooser is the house dialog over the dimmed page, centered, titled, its lines fields and its presses the box's foot, held where it opened as its step changes (${JSON.stringify({ ...dlg, top1 })})`);
-  // A poll redraws the card: the step and what was picked stay.
-  await page.selectOption('#rmModel', 'sonnet');
-  await page.selectOption('#rmEffort', 'high');
-  await page.evaluate(() => refresh());
-  // No read still out, so the card is drawn again from the one just asked for.
-  await page.waitForFunction(() => !refreshBusy && !!document.querySelector('#rmModel') && !!document.querySelector('#rmEffort'),
-    null, { timeout: 10000 }).catch(() => {});
-  ok(await page.$eval('#rmModel', e => e.value) === 'sonnet' && await page.$eval('#rmEffort', e => e.value) === 'high',
-     '...and a poll redrawing the card keeps the step and the picks');
-  await page.click('#resumemenu [data-start]');
-  await page.waitForFunction(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'), null, { timeout: 10000 });
+     && Math.abs(dlg.mid - dlg.vmid) <= 2 && top1 !== null && Math.abs(dlg.top - top1) <= 2,
+     `the chooser is the house dialog over the dimmed page, centered, titled, its lines fields and Close its foot, held where it opened as its picks change (${JSON.stringify({ ...dlg, top1 })})`);
+  // A pick is this account's for the space as it is made, which the
+  // launcher reads; a poll redrawing the card keeps it.
   await refreshUntil(page, () => { const y = (state?.projects || []).find(p => p.name === 'alpha')?.yours || {};
     return y.model === 'sonnet' && y.effort === 'high'; }, { timeout: 20000 });
-  ok(true, '...and Start saves them as this account\'s for the space, which the launcher reads, and opens the session');
+  await page.evaluate(() => refresh());
+  await page.waitForFunction(() => !refreshBusy && !!document.querySelector('#rmStartModel'), null, { timeout: 10000 }).catch(() => {});
+  ok(await page.$eval('#rmStartModel', e => e.value) === 'sonnet' && await page.$eval('#rmStartEffort', e => e.value) === 'high',
+     '...a pick is kept as this account\'s for the space as it is made, and a poll redrawing the card keeps it');
+  await page.click('#resumemenu [data-n][data-node="n_ubu"]');
+  await page.waitForFunction(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'), null, { timeout: 10000 });
+  ok(true, '...and New opens the session at once, on them');
   await (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
     headers: OWNER,
     body: JSON.stringify({ project: 'alpha', model: '', effort: '' }) })).json();
