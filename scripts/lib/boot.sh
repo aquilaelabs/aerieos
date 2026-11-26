@@ -41,7 +41,8 @@ BB_RUN_DIR="${BB_RUN_DIR:-/run/builderbot}"
 # INSTALL_KEY seals at rest what the install keeps that would open something
 # (R135; R111 began it with the signing keys): handed to the dashboard as a
 # file of its own in /run below, never kept in /config. SIGNING_SECRET, its
-# name before 0.8.0, is read when it is not set, for this release.
+# name before 0.8.0, is read no more and refused by name (R295), so an
+# install still setting it alone is never handed a new key over its seals.
 SECRET_VARS=(NPM_TOKEN UV_PUBLISH_TOKEN INSTALL_KEY INSTALL_KEY_PREVIOUS SIGNING_SECRET)
 # ...named for the hooks, which run with them: the one that starts the
 # dashboard starts it without them (B389).
@@ -68,8 +69,7 @@ install_key_file() {
     rm -f "$f"
     install_key_where ""
     if [ -z "$key" ] && [ -n "${SIGNING_SECRET:-}" ]; then
-        key="$SIGNING_SECRET"
-        warn "SIGNING_SECRET is INSTALL_KEY now: rename it in your secrets folder, since the old name is read for this release only"
+        die "SIGNING_SECRET is set and INSTALL_KEY is not: the old name is read no more, so rename it INSTALL_KEY in your secrets folder and start again"
     fi
     if [ -z "$key" ]; then
         install_key_made

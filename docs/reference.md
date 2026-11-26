@@ -132,8 +132,9 @@ first start copies that key into its key folder (never beside the state),
 and the Keys page says so: take `INSTALL_KEY` out and restart, and the
 install carries on with the same key, changed on the page from then on.
 Until it is copied, the Keys page says to change it there, with the old one as `INSTALL_KEY_PREVIOUS=` beside it until each
-sign-in has moved. `SIGNING_SECRET=`, its name before 0.8.0, is read for one
-release.
+sign-in has moved. `SIGNING_SECRET=`, its name before 0.8.0, is read no
+more: a start that finds it set and `INSTALL_KEY=` not stops and says to
+rename it, rather than make a new key over what the old one sealed.
 
 ## The `aerie` helper
 

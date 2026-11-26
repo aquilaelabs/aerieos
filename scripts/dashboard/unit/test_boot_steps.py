@@ -43,6 +43,15 @@ def steps(path, fn="main"):
 
 
 class Order(unittest.TestCase):
+    def test_signing_secret_alone_is_refused_by_name_never_read(self):
+        # R295: its name before 0.8.0 was read for one release; a start that
+        # read it no more and made a new key would lock what it sealed.
+        r = sh('INSTALL_KEY=; SIGNING_SECRET=old-words; install_key_file; echo "went on"',
+               env={"INSTALL_KEY": "", "SIGNING_SECRET": "old-words"})
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("rename it INSTALL_KEY", r.stderr)
+        self.assertNotIn("went on", r.stdout)
+
     def test_the_container_boots_as_it_always_has(self):
         self.assertEqual(steps(os.path.join(SCRIPTS, "entrypoint.sh")), [
             "stash_secrets", "BOOT_READY_FILE", "state_gate", "setup_logging", "banner",
