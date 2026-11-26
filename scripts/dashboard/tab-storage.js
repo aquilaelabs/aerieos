@@ -234,7 +234,7 @@ function storageShares(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
   const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
-    : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+    : !n.live ? ND_UNREACHED : "";
   const shares = n.shares || [];
   // On an array taken over, each share at the top of /mnt/user has its
   // places (where new files land, the mover's from and to).
@@ -372,7 +372,7 @@ function storagePools(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
   const why = !n.zfs ? `No zpool on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
-    : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+    : !n.live ? ND_UNREACHED : "";
   const pools = n.pools || [];
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));
   const used = (n.disks || []).filter(d => !d.system && !free.includes(d));
@@ -488,7 +488,7 @@ function storageSnapshots(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
   const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
-    : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+    : !n.live ? ND_UNREACHED : "";
   const pools = n.pools || [], snaps = n.snapshots || {}, scheds = storageScheds(n);
   const when = at => at ? fmtTime(at * 1000) : "";
   const rows = pools.map(p => {
@@ -575,7 +575,7 @@ function storageArray(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
   const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
-    : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+    : !n.live ? ND_UNREACHED : "";
   const a = n.array || {}, has = (a.data || []).length > 0, scheds = storageScheds(n).filter(x => x.array);
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));
   const used = (n.disks || []).filter(d => !d.system && !free.includes(d) && !(d.parts || []).some(p => /^(xfs|btrfs) at \/mnt\/(disks|parity)\//.test(p.holds || "")) && !/^(xfs|btrfs) at \/mnt\/(disks|parity)\//.test(d.holds || ""));
@@ -697,7 +697,7 @@ function wireStorageArray(root, n){
 function storageOther(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
-  const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+  const why = !n.live ? ND_UNREACHED : "";
   const recs = (n.extmounts || []).filter(r => !going(`storage:mount:${r.id}`)), live = n.ext_mounts || [];
   const kindWord = {disk: "a disk here", smb: "an SMB share", nfs: "an NFS export"};
   const rows = recs.map(r => {
@@ -769,7 +769,7 @@ function wireStorageOther(root, n){
 function storageBackups(n){
   if (!n.own) return "";
   const admin = !!state?.admin && n.may_measure;
-  const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+  const why = !n.live ? ND_UNREACHED : "";
   const recs = (n.backups || []).filter(r => !going(`storage:backup:${r.id}`)), live = n.store_backups || [], scheds = storageScheds(n).filter(x => x.backup);
   const places = [...(n.pools || []).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]).filter(x => x[0]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : []),

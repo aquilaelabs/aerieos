@@ -12,6 +12,10 @@
 
 "use strict";
 
+// Why a node's verbs are dead while its agent is not dialing in: one
+// sentence for every section of its page and of Storage (R287).
+const ND_UNREACHED = "Its agent is not dialing in, so nothing from here reaches the machine.";
+
 let nodesList = null;            // last answer, or null before the first
 let ndHistory = {};              // the own machine's reporting per node: {span, data} (R164 step 4)
 // ...and stale when the nodes token moved while no page that draws the list
@@ -552,7 +556,7 @@ function nodeUsbSection(n){
   if (vmsData === null && !nodeUsbAsked){ nodeUsbAsked = true; loadVms().then(() => { readMoved("nodes"); drawPanes(); }); }
   const vmsHere = (vmsData?.vms || []).filter(v => v.node === n.id && !["making", "removing", "failed", "missing"].includes(v.state));
   const admin = !!state?.can?.admin && nodeMay(n) === "write";
-  const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+  const why = !n.live ? ND_UNREACHED : "";
   const pick = (u, key) => vmsHere.length ? `<select data-usbvm="${key}">${vmsHere.map(v => `<option value="${esc(v.project)}/${esc(v.name)}">${esc(v.project)}/${esc(v.name)} (${esc(v.state)})</option>`).join("")}</select>
       <button type="button" data-usbgive="${key}">Give to a VM</button>` : `<span class="sub dim">no VM on this node to give it to</span>`;
   const rows = (hw.usb || []).map((u, i) => {
@@ -612,7 +616,7 @@ function nodeMachineSection(n){
   if (!n.config?.own) return "";
   const r = n.reported || {};
   const admin = !!state?.can?.admin && nodeMay(n) === "write";
-  const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+  const why = !n.live ? ND_UNREACHED : "";
   let zones = [];
   try{ zones = Intl.supportedValuesOf("timeZone"); }catch(e){ zones = []; }
   const body = `<div class="field"><div class="sub">What the machine is called on the network, and the time zone its clock, logs and schedules read.</div></div>
@@ -754,7 +758,7 @@ function nodeFeaturesSection(n){
     && Date.now() / 1000 - (la.ended || 0) < 300 ? la.feature : "";
   const why = !n.reported ? ""
     : !n.reported.administers ? "This node's agent is not root on a managed machine, so its features are set on the machine itself."
-    : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
+    : !n.live ? ND_UNREACHED : "";
   const row = (fid, title, has, about, cant, more = "") => {
     // One pressed while another feature's job runs is queued behind it, so
     // it stays live and the press says so (ndQueuedSay).
