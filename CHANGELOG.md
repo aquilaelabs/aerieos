@@ -14,6 +14,7 @@
 - Clusters, under Machines beside Nodes: a Kubernetes cluster added once from its kubeconfig, its credential sealed and never shown again, each with its version, nodes ready and namespaces, and Test, Rename and Forget; a new Clusters area on the Roles page says who may (c3d41b6)
 - A Deploy section in each space's settings once a Kubernetes cluster is kept: its environments, each a cluster, a namespace AerieOS makes ready there with a deployer that reaches that namespace alone, the registry its images go to and when it deploys (dd10fda)
 - A Deploy area on the Roles page for who sees a space's environments and who deploys to them; every space owner holds it, and Clusters can be given cluster by cluster as Nodes is node by node (dd10fda)
+- k3s in the Library: a one-node Kubernetes cluster on a node, kept out of nginx's way on 80 and 443, and added on the Clusters page with one press (ad49655)
 
 ### Changed
 
