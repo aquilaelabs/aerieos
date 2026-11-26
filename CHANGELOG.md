@@ -61,6 +61,7 @@
 - A copy of a node's token is handed only what the node was given already: a fresh session token only for an account whose terminal was opened there, and a runner's registration token only to the job installing it (45fbb6f)
 - A dashboard served under a Let's Encrypt certificate sends HSTS, and the Doctor says when someone signed in over plain http from outside your network (2bb02ee)
 - The Windows companion keeps the controller's key (or its name's certificate) from sign-in and refuses another after (2bb02ee)
+- A release's container image is signed with cosign by the release's own build, and the container edition checks once a day that the registry serves the image its signed release names, saying a difference on the bell (858004a)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
