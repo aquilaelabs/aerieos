@@ -53,7 +53,8 @@ await section("a cluster added from a kubeconfig", async () => {
 await section("a cloud CLI's sign-in is refused, with the way out", async () => {
   const r = await page.evaluate(k => postJSON('/api/clusters', { action: 'add', name: 'eks', kubeconfig: k }),
     kubeconfig('    exec:\n      command: aws\n'));
-  ok(/cloud CLI/.test(r.error || '') && /kubectl create token/.test(r.error || ''), `refused, saying how to make a token-based one (${(r.error || '').slice(0, 90)})`);
+  ok(/cloud CLI/.test(r.error || '') && /ServiceAccount's token/.test(r.error || '') && !/`|kubectl/.test(r.error || ''),
+     `refused in one sentence saying the way out, its command left to the page's hint (${(r.error || '').slice(0, 90)})`);
   // The refusal's 400 is what was asked for, and the browser logs it.
   page.errors = page.errors.filter(e => !/status of 400 .*\/api\/clusters/.test(e));
 });

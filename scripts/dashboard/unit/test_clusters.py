@@ -53,11 +53,12 @@ class Parse(unittest.TestCase):
             with self.assertRaises(ValueError) as e:
                 clusters.parse(kubeconfig("https://eks.example", user))
             self.assertIn("cloud CLI", str(e.exception))
-            self.assertIn("kubectl create token", str(e.exception))
+            self.assertIn("ServiceAccount's token", str(e.exception))
+            self.assertNotIn("`", str(e.exception), "one sentence, no command in it")
 
     def test_paths_where_data_belongs_and_nothing_to_sign_in_with(self):
-        cases = [(kubeconfig("https://x", "    token: t\n", "    certificate-authority: /home/me/ca.crt\n"), "--flatten"),
-                 (kubeconfig("https://x", "    client-certificate: /home/me/c.crt\n    client-key: /home/me/c.key\n"), "--flatten"),
+        cases = [(kubeconfig("https://x", "    token: t\n", "    certificate-authority: /home/me/ca.crt\n"), "flatten"),
+                 (kubeconfig("https://x", "    client-certificate: /home/me/c.crt\n    client-key: /home/me/c.key\n"), "flatten"),
                  (kubeconfig("https://x", "    username: me\n"), "neither a token"),
                  (kubeconfig("https://x", f"    client-certificate-data: {B64('C')}\n"), "half"),
                  ("kind: Pod\n", "kind: Config"),

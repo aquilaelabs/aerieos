@@ -56,14 +56,14 @@ function clBody(c){
 }
 
 function clAddBody(canCancel){
-  return `<div class="field"><div class="hint">A kubeconfig whose user carries a token or a client certificate; its current context is the cluster added. One that signs in through a cloud CLI (EKS, GKE, AKS, kubelogin) is refused: a ServiceAccount's token works, from <code>kubectl create token NAME --duration=8760h</code>.</div></div>
+  return `<div class="field"><div class="hint">A kubeconfig whose user carries a token or a client certificate; its current context is the cluster added. One that signs in through a cloud CLI (EKS, GKE, AKS, kubelogin) is refused: a ServiceAccount's token works, from <code>kubectl create token NAME --duration=8760h</code>. One that names files is flattened first: <code>kubectl config view --raw --flatten --minify</code>.</div></div>
     <div class="field">
       <div class="setrow col ctlrow">${lbl("clName", "Name", "what this cluster is called here, as spaces and the bell name it")}
         <input id="clName" type="text" autocomplete="off" spellcheck="false" value="${esc(clDraft.name)}" placeholder="production"></div>
       <div class="setrow col ctlrow">${lbl("clText", "Kubeconfig", "pasted, or read from its file; kept sealed on the controller and never shown again")}
         <textarea id="clText" rows="8" spellcheck="false" autocomplete="off" placeholder="apiVersion: v1&#10;kind: Config&#10;...">${esc(clDraft.text)}</textarea></div>
-      <div class="actbar"><label class="pick"><input type="file" id="clFile" accept=".yaml,.yml,.json,.conf,.config,text/plain"> Read its file</label>
-        <span class="sp"></span>${canCancel ? `<button type="button" class="stop" id="clCancel">Cancel</button>` : ""}
+      <div class="actbar"><input type="file" id="clFile" hidden accept=".yaml,.yml,.json,.conf,.config,text/plain">
+        <button type="button" id="clPick">Read its file</button><span class="sp"></span>${canCancel ? `<button type="button" class="stop" id="clCancel">Cancel</button>` : ""}
         <button type="button" class="primary" id="clAdd"${clDraft.name.trim() && clDraft.text.trim() ? "" : " disabled"}>Add cluster</button></div>
     </div>`;
 }
@@ -97,7 +97,8 @@ function wireClusters(root){
   const wake = () => { if (add) add.disabled = !(clDraft.name.trim() && clDraft.text.trim()); };
   if (name) name.oninput = () => { clDraft.name = name.value; wake(); };
   if (text) text.oninput = () => { clDraft.text = text.value; wake(); };
-  const file = root.querySelector("#clFile");
+  const file = root.querySelector("#clFile"), pick = root.querySelector("#clPick");
+  if (pick && file) pick.onclick = () => file.click();
   if (file) file.onchange = async () => {
     const f = file.files?.[0];
     if (!f) return;

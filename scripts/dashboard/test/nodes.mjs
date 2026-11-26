@@ -1658,6 +1658,11 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     {
       const F = `${ROW} [data-room="room_floor_gb"]`;
       await page.waitForSelector(F, { timeout: 10000 });
+      // Root asks were switched back on through the API just now, behind the
+      // page: the section's one Save sends every box as drawn, so the page is
+      // read again until it shows what the API set before anything is saved.
+      await page.evaluate(() => loadNodes());
+      await page.waitForFunction(sel => document.querySelector(sel + ' [data-k="rootasks"]')?.checked === true, ROW, { timeout: 15000 }).catch(() => {});
       const was = await page.$eval(F, el => ({ v: el.value, ph: el.placeholder, said: el.closest('.setrow')?.textContent || '' }));
       await page.fill(F, '25');
       await page.click(`${ROW} [data-nd="sess-save"]`);

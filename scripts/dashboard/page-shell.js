@@ -589,7 +589,11 @@ function shellBar(t, i){
   // A group that wears one header over its sub-nav (R177, R178): the node
   // picked once for every page of the group, the group's actions on the
   // sub-nav's line at its right (the operator, 28 Oct).
-  return grouped ? groupHeader(t, g) + `<span class="subrow">${nav}<span class="sp"></span>${GROUP_HEADS[g.key].actions ? GROUP_HEADS[g.key].actions() : ""}</span>` : nav;
+  // A page of the group about no one node (Clusters) wears the group's name
+  // where the picker stands, as a space's header wears the space's.
+  const head = !grouped ? "" : NODE_PICKED[t.kind] ? groupHeader(t, g)
+    : `<span class="phead mchead"><span class="pname">${esc(g.label)}</span><span class="sp"></span></span>`;
+  return grouped ? head + `<span class="subrow">${nav}<span class="sp"></span>${GROUP_HEADS[g.key].actions ? GROUP_HEADS[g.key].actions() : ""}</span>` : nav;
 }
 // Where Back on a page a press opened goes (R181): the address it was
 // opened from, kept as it opens, with what that page is called; none when it

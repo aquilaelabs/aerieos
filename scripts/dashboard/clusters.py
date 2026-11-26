@@ -44,8 +44,10 @@ used = None             # (cluster id) -> None: a use, for Connected services
 SEALED = "bbseal:"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,60}$")
 TEXT_MAX = 64 * 1024
-TOKEN_WAY = ("make one that carries a token: a ServiceAccount's, `kubectl create token NAME --duration=8760h` "
-             "printing it, in a kubeconfig whose user is `token: ...`")
+# Said in one sentence with no command in it (a failure line's rule); the
+# commands are the page's, in the hint over the field.
+TOKEN_WAY = "a kubeconfig with a ServiceAccount's token works"
+FLATTEN_WAY = "flatten the kubeconfig so they are written in"
 _lock = threading.Lock()
 
 
@@ -133,16 +135,13 @@ def parse(text):
     if not re.match(r"^https?://[A-Za-z0-9.\-\[\]:]+(/[A-Za-z0-9._~/-]*)?$", server):
         raise ValueError(f"its server is not an address: {server[:80]}")
     if cl.get("certificate-authority"):
-        raise ValueError("its certificate authority is a path on the machine it came from: "
-                         "`kubectl config view --raw --flatten --minify` writes it in")
+        raise ValueError(f"its certificate authority is a file on the machine it came from: {FLATTEN_WAY}")
     if us is None:
         raise ValueError(f"its context {cur} names no user")
     if us.get("exec") or us.get("auth-provider"):
-        raise ValueError(f"it signs in through a cloud CLI ({'exec' if us.get('exec') else 'auth-provider'}), which "
-                         f"AerieOS does not run: {TOKEN_WAY}")
+        raise ValueError(f"it signs in through a cloud CLI, which AerieOS does not run: {TOKEN_WAY}")
     if us.get("client-certificate") or us.get("client-key") or us.get("tokenFile"):
-        raise ValueError("its user is files on the machine it came from: "
-                         "`kubectl config view --raw --flatten --minify` writes them in")
+        raise ValueError(f"its user is files on the machine it came from: {FLATTEN_WAY}")
     out = {"server": server, "context": str(cur), "insecure": bool(cl.get("insecure-skip-tls-verify")),
            "ca": _b64(cl["certificate-authority-data"], "certificate authority") if cl.get("certificate-authority-data") else "",
            "token": str(us.get("token") or ""), "cert": "", "key": ""}
