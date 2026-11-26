@@ -1121,9 +1121,12 @@ export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrow
 // environment saved through the page makes its namespace, its deployer and
 // their Role here. `token` is what it takes as a bearer token; `forbid` the
 // paths a POST to is refused (403); `calls` what it was asked, in order.
+// A deployer's token it mints (TokenRequest) reaches that namespace alone;
+// a collection's GET lists what is kept under it, PATCH merges into what is
+// kept (a /scale into its workload), and `logs` holds a pod's log by name.
 export async function kubeApi({ token = 'good', namespaces = [] } = {}){
   const { createServer } = await import('node:http');
-  const api = { token, forbid: new Set(), calls: [], objs: new Map() };
+  const api = { token, forbid: new Set(), calls: [], objs: new Map(), deployers: new Map(), logs: new Map() };
   for (const ns of namespaces) api.objs.set(`/api/v1/namespaces/${ns.metadata.name}`, ns);
   const srv = createServer((req, res) => {
     let raw = '';
@@ -1131,7 +1134,29 @@ export async function kubeApi({ token = 'good', namespaces = [] } = {}){
     req.on('end', () => {
       const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
       api.calls.push(`${req.method} ${req.url}`);
-      if (req.headers.authorization !== 'Bearer ' + api.token) return send(401, { message: 'Unauthorized' });
+      // A deployer's token (R281 step 5) reaches its own namespace and
+      // nothing else, as its Role does on a real cluster.
+      const bearer = String(req.headers.authorization || '').replace(/^Bearer /, '');
+      const nsOf = api.deployers.get(bearer);
+      if (bearer !== api.token && !nsOf) return send(401, { message: 'Unauthorized' });
+      if (nsOf && !req.url.includes(`/namespaces/${nsOf}/`)) return send(403, { message: `deployer may not reach ${req.url}` });
+      const path = req.url.split('?')[0];
+      if (req.method === 'POST' && /\/serviceaccounts\/aerie-deployer\/token$/.test(path)){
+        const ns = path.split('/')[4], t = `deployer-${ns}-${api.deployers.size}`;
+        api.deployers.set(t, ns);
+        return send(201, { status: { token: t, expirationTimestamp: '2099-01-01T00:00:00Z' } });
+      }
+      if (req.method === 'GET' && /\/pods\/[^/]+\/log$/.test(path))
+        { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end(api.logs.get(path.split('/')[6]) || ''); }
+      if (req.method === 'GET' && /\/namespaces\/[^/]+\/[a-z]+$/.test(path) && !/^\/api\/v1\/namespaces\/[^/]+$/.test(path))
+        return send(200, { items: [...api.objs].filter(([p]) => p.startsWith(path + '/') && !p.slice(path.length + 1).includes('/')).map(([, o]) => o) });
+      if (req.method === 'PATCH'){
+        const scale = path.endsWith('/scale'), key = scale ? path.slice(0, -6) : path, o = api.objs.get(key);
+        if (!o) return send(404, { message: 'not found' });
+        const merge = (a, b) => { for (const [k, v] of Object.entries(b)) a[k] = v && typeof v === 'object' && !Array.isArray(v) ? merge(a[k] || {}, v) : v; return a; };
+        merge(o, JSON.parse(raw || '{}'));
+        return send(200, o);
+      }
       if (req.method === 'GET'){
         if (req.url === '/version') return send(200, { gitVersion: 'v1.37.3+k3s1' });
         if (req.url === '/api/v1/nodes') return send(200, { items: [{ status: { conditions: [{ type: 'Ready', status: 'True' }] } },

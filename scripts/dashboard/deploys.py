@@ -64,6 +64,7 @@ job_add = None            # nodes.job_add
 job = None                # nodes.job
 tree = None               # (repo) -> its working tree, a Path
 compose_of = None         # (repo) -> the compose file its containers are made from, a Path, or None
+tools_of = None           # (row) -> the toolchains in a node's store (toolchains.node_has), empty where unknown
 
 SINCE_LIMIT = 3600        # the longest a deploy may run, and its token's life
 IMPORT_PREFIX = "aerieos.local"
@@ -195,8 +196,10 @@ def _node_why(n):
     jobs_as = (n.get("config") or {}).get("user") or "bb"
     if se.get("user") and se.get("user") == jobs_as:
         return f"{name} runs its sessions as the account its jobs run as, so a session could read a deploy's token"
-    tc = (n.get("reported") or {}).get("toolchains")
-    if isinstance(tc, dict) and tc and not tc.get("kubernetes"):
+    # The Library's own answer, from the node's toolchain store; a node
+    # that has not reported its store is not judged.
+    have = tools_of(n) if tools_of else set()
+    if have and "kubernetes" not in have:
         return f"{name} has no Kubernetes tools: install them from the Library with {name} picked"
     return ""
 

@@ -374,6 +374,21 @@ Roll back deploys the last one that succeeded before the newest again.
 Deploying is Deploy Write on the space; drafting a chart is the
 repository's Write.
 
+**The Kubernetes view.** A notebook's Ship group carries a **Kubernetes**
+view: each of the space's environments a section, its status how many of
+its workloads are ready, with **Deploy** (a branch, tag or commit, followed
+as a job) and **Roll back** on its bar. Each workload (Deployment,
+StatefulSet, DaemonSet) says ready of desired, the version its image is
+tagged with and where it answers (an Ingress's address, a load balancer's,
+a node port, or its Service's name inside the cluster), with **Restart**
+and **Scale**; its pods say their state, restarts and node, and a pod's
+**Logs** opens in the dock, its end read again every few seconds. Its last
+deploys are listed under it. Everything the view reads and does goes
+through the environment's own deployer, a token made for its namespace and
+kept in memory for its life, so the view sees and touches that namespace
+and nothing else. Reading it is Deploy Read on the space; its presses are
+Deploy Write.
+
 ## Storage
 
 **Storage**, under Machines, is what a node's disks hold, and whose. It shows

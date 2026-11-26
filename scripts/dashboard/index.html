@@ -164,6 +164,7 @@
         <button type="button" data-v="artifacts" data-in="ship">Artifacts</button>
         <button type="button" data-v="docker" data-in="ship">Docker</button>
         <button type="button" data-v="vms" data-in="ship">VMs</button>
+        <button type="button" data-v="kubernetes" data-in="ship">Kubernetes</button>
         <button type="button" data-v="signing" data-in="ship">Signing</button>
         <button type="button" data-v="wiki" data-in="docs">Wiki</button>
         <button type="button" data-v="design" data-in="docs">Design</button>
@@ -439,6 +440,18 @@
       <!-- Narrowing it to one node, where its VMs are on more than one. -->
       <div class="field lfilter" hidden><div class="chips" id="nvChips"></div></div>
       <div id="nvList" data-skel="rows"></div>
+    </div>
+    <!-- What runs in the space's Kubernetes environments (R281 step 5),
+         drawn by nb-kubernetes.js: an environment a section, Deploy and Roll
+         back on its bar, its workloads as rows with Restart and Scale, each
+         workload's pods under it with their Logs in the dock, and its last
+         deploys. Read and pressed with the environment's own deployer. -->
+    <div class="nbview kubetab" data-view="kubernetes" hidden>
+      <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
+        <span class="actbar"><button type="button" id="kbSettings">Deploy<span class="lng"> settings</span></button></span></div>
+      <!-- The glance (R109): the workloads ready of all. -->
+      <div class="nbglance" id="kbHint" data-tiles="1" data-said></div>
+      <div id="kbList" data-skel="rows"></div>
     </div>
     <!-- This project's Android signing keys (R106), a view of their own in
          Ship (R103, the operator, 22 Oct), drawn by nb-signing.js: a section
@@ -1944,6 +1957,7 @@
 <script src="nb-sessions.js"></script>
 <script src="nb-artifacts.js"></script>
 <script src="nb-signing.js"></script>
+<script src="nb-kubernetes.js"></script>
 <script src="nb-analysis.js"></script>
 <script src="nb-design.js"></script>
 <script src="nb-wiki.js"></script>

@@ -18,6 +18,7 @@ import urllib.error
 import urllib.request
 
 TIMEOUT = 10
+LOG_MAX = 512 * 1024       # the most of a pod's log one read carries
 
 
 class KubeError(Exception):
@@ -55,18 +56,19 @@ class Client:
             ctx.load_cert_chain(cp, kp)
             yield ctx
 
-    def call(self, method, path, body=None, content_type="application/json"):
-        """The JSON the API answers, or a KubeError saying why not."""
+    def call(self, method, path, body=None, content_type="application/json", raw=False):
+        """The JSON the API answers (its text, with `raw`: a pod's log), or a
+        KubeError saying why not."""
         data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode())
         req = urllib.request.Request(self.server + path, data=data, method=method)
-        req.add_header("Accept", "application/json")
+        req.add_header("Accept", "*/*" if raw else "application/json")
         if data is not None:
             req.add_header("Content-Type", content_type)
         if self.token:
             req.add_header("Authorization", "Bearer " + self.token)
         try:
             with self._context() as ctx, urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as r:
-                raw = r.read()
+                body_bytes = r.read(LOG_MAX + 1 if raw else -1)
         except urllib.error.HTTPError as e:
             with e:
                 words = _said(e)
@@ -75,8 +77,10 @@ class Client:
             raise KubeError(f"its certificate is not the one the kubeconfig's authority signs ({e.verify_message or 'not verified'})") from None
         except (urllib.error.URLError, OSError, ssl.SSLError) as e:
             raise KubeError(f"it does not answer at {self.server}: {getattr(e, 'reason', e)}") from None
+        if raw:
+            return body_bytes.decode("utf-8", "replace")
         try:
-            return json.loads(raw or b"{}")
+            return json.loads(body_bytes or b"{}")
         except ValueError:
             raise KubeError("it answered something that is not the API's JSON") from None
 

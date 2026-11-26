@@ -133,5 +133,48 @@ await section("what each repository deploys, Draft from the compose, and a deplo
   ok(/no earlier deploy/.test(rb.error || ''), `Roll back with nothing deployed before says so (${rb.error})`);
 });
 
+await section("the Kubernetes view: what runs, Scale, Restart and a pod's log, through the deployer", async () => {
+  // The refusals asked for above log their 400s in some engines: this
+  // section counts only its own.
+  page.errors.length = 0;
+  // Step 5: a Deployment and its pod in qa's namespace, as a rollout leaves them.
+  const ns = '/apis/apps/v1/namespaces/alpha-qa/deployments';
+  api.objs.set(`${ns}/web`, { metadata: { name: 'web' }, spec: { replicas: 2, selector: { matchLabels: { app: 'web' } },
+    template: { metadata: { labels: { app: 'web' } }, spec: { containers: [{ name: 'web', image: 'ghcr.io/owner/alpha:abc123def456' }] } } },
+    status: { readyReplicas: 1 } });
+  api.objs.set('/api/v1/namespaces/alpha-qa/pods/web-1', { metadata: { name: 'web-1', labels: { app: 'web' } }, spec: { nodeName: 'lab-1', containers: [{ name: 'web' }] },
+    status: { phase: 'Running', containerStatuses: [{ ready: true, restartCount: 2 }] } });
+  api.objs.set('/api/v1/namespaces/alpha-qa/services/web', { metadata: { name: 'web' }, spec: { selector: { app: 'web' }, ports: [{ port: 8080 }] } });
+  api.logs.set('web-1', 'GET / 200\nGET /health 200\n');
+  await page.evaluate(() => openNotebook('alpha', 'kubernetes'));
+  await page.waitForSelector('.pane .nb .nbview[data-view="kubernetes"] details[data-sect="kb:qa"]', { timeout: 20000 });
+  const sect = 'details[data-sect="kb:qa"]';
+  const wl = await page.$eval(`${sect} .kbwl .row`, r => r.textContent.replace(/\s+/g, ' ').trim());
+  const pod = await page.$eval(`${sect} .kbpods .row`, r => r.textContent.replace(/\s+/g, ' ').trim());
+  const head = await page.$eval(`${sect} > summary`, s => s.textContent.replace(/\s+/g, ' ').trim());
+  ok(/web/.test(wl) && /1 of 2/.test(wl) && /abc123def456/.test(wl) && /web:8080 inside the cluster/.test(wl) && /0 of 1 ready/.test(head),
+     `a workload says ready of desired, its version and where it answers, and the section how many are ready (${head} | ${wl})`);
+  ok(/web-1/.test(pod) && /Running/.test(pod) && /2/.test(pod) && /lab-1/.test(pod), `its pod says its state, restarts and node (${pod})`);
+  const minted = [...api.deployers.values()];
+  ok(minted.length && minted.every(n => n === 'alpha-qa') && !api.calls.some(c => /namespaces\/(?!alpha-qa)[^/]+\/(deployments|pods)/.test(c)),
+     `read with a deployer token made for alpha-qa, asking nothing outside it (${minted.join(',')})`);
+  page.answers.push({ index: 0, text: '3' });
+  await page.click(`${sect} [data-kbscale^="qa:deployment:web"]`);
+  const scaled = await until(() => api.objs.get(`${ns}/web`)?.spec?.replicas === 3, 10000, 200);
+  ok(scaled, 'Scale asks how many and sets the replicas on the cluster');
+  page.answers.push(0);
+  await page.click(`${sect} [data-kbrestart="qa:deployment:web"]`);
+  const restarted = await until(() => !!api.objs.get(`${ns}/web`)?.spec?.template?.metadata?.annotations?.['kubectl.kubernetes.io/restartedAt'], 10000, 200);
+  ok(restarted && page.dialogs.some(d => /Restart web\?/.test(d)), 'Restart asks first, then marks the rollout as kubectl rollout restart does');
+  await page.click(`${sect} [data-kblogs="qa:web-1"]`);
+  const tab = await until(() => page.evaluate(() => tabs.some(t => t.arg === 'log:pod:alpha:qa:web-1' && t.label === 'Log: web-1')), 10000, 200);
+  ok(tab, 'a pod\'s Logs opens a tab in the dock');
+  const said = await until(() => api.calls.some(c => /\/pods\/web-1\/log\?/.test(c)), 10000, 200);
+  const ended = await page.evaluate(() => [...TERMS.values()].find(r => r.t.arg === 'log:pod:alpha:qa:web-1')?.ended || '');
+  ok(said && !ended, `its log is read through the deployer and followed (${ended})`);
+  await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:pod:alpha:qa:web-1').id));
+  ok(page.errors.length === 0, `no console error through the view (${page.errors.slice(0, 2).join(' | ')})`);
+});
+
 api.close();
 await done(browser);

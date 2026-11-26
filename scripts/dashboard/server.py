@@ -5119,9 +5119,13 @@ deploys.configure(remote_url=lambda repo: gitview.remote_url(WORKSPACE / repo), 
                   snapshot_at=workspace.snapshot_at, snapshot_path=workspace.path_for,
                   token_line=lambda repo, uid: gitcreds.read_line(repo, uid, why="deploy") or "",
                   job_add=nodes.job_add, job=nodes.job, tree=lambda repo: WORKSPACE / repo,
-                  compose_of=lambda repo: devapp.compose_file(repo))
+                  compose_of=lambda repo: devapp.compose_file(repo), tools_of=toolchains.node_has)
 workspace.own_git = gitview._own
 nodes.on_done("exec:deploy", deploys.done)
+# What runs in an environment, and Restart and Scale on it (R281 step 5),
+# always through the environment's own deployer.
+import kubeview                                                  # noqa: E402
+kubeview.configure(clusters=clusters)
 connections.kind("cluster", "Kubernetes cluster", "shared",
                  lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
                            "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
@@ -6374,6 +6378,10 @@ def _revisions(who=None, projects=None):
         "nginx": nginxproxy.rev(),
         # The VMs page (R91): a record written, or a node's census of them.
         "vms": vms.rev(),
+        # The spaces' Kubernetes environments and their deploys (R281): an
+        # environment saved, a deploy started or ended. The Kubernetes view
+        # re-reads its environments on it.
+        "deploy": kube.rev(),
         # A release's APK being looked for and signed (R106): the Signing
         # view follows a look to its end, and the bell's row goes with it.
         "releasesign": releasesign.rev(),
@@ -6926,6 +6934,7 @@ ROUTES = (
     Route("GET", "exact", "/api/connections", "_get_connections", "handler"),
     Route("GET", "exact", "/api/clusters", "_get_clusters", "handler"),
     Route("GET", "exact", "/api/deploy", "_get_deploy", "handler"),
+    Route("GET", "exact", "/api/kubernetes", "_get_kubernetes", "handler"),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
     Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
@@ -7030,6 +7039,7 @@ ROUTES = (
     Route("POST", "exact", "/api/connections", "_connections", "handler"),
     Route("POST", "exact", "/api/clusters", "_clusters", "handler"),
     Route("POST", "exact", "/api/deploy", "_deploy", "handler"),
+    Route("POST", "exact", "/api/kubernetes", "_kubernetes", "handler"),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -8789,6 +8799,33 @@ class Handler(BaseHTTPRequestHandler):
             return read, None
         if kind == "dm":
             return self._dm_log_reader(rest)
+        if kind == "pod":
+            # A pod's log in one of a space's environments (R281 step 5):
+            # log:pod:REPO:ENV:POD[:CONTAINER], read with the environment's
+            # deployer, its end read again every five seconds, as Deploy
+            # Read on the space allows, asked again with each read.
+            bits = rest.split(":")
+            if len(bits) not in (3, 4) or not all(bits):
+                return None, "a pod's log is named by its repository, its environment and the pod"
+            repo, env, pod, ctr = (bits + [""])[:4]
+            held = {"at": 0.0, "text": ""}
+
+            def read():
+                why = users.may(self._who(), "deploy-read", repo)
+                if why:
+                    raise ValueError(why)
+                if time.time() - held["at"] >= 5:
+                    held["at"] = time.time()
+                    r = kubeview.logs(repos.key_of(repo), env, pod, ctr, 400)
+                    if r.get("error"):
+                        raise ValueError(r["error"])
+                    held["text"] = r["text"]
+                return held["text"], ""
+            try:
+                read()
+            except ValueError as e:
+                return None, str(e)
+            return read, None
         return None, f"no log of the kind {kind or 'named'} is read here"
 
     def _dm_log_reader(self, rest):
@@ -13578,6 +13615,11 @@ class Handler(BaseHTTPRequestHandler):
         rows = [deploys.repo_facts(r) | {"may_draft": not users.may(who, "write", r)}
                 for r in (repos.members(key) or [name])]
         return self._json({"envs": envs, "kept": len(kept), "may": not why, "why": why, "repos": rows,
+                           # ...and whether this account deploys there (the
+                           # Kubernetes view's Deploy, Roll back, Restart
+                           # and Scale): Deploy Write on the space.
+                           "may_deploy": not (users.may(who, "deploy", name) or users.may(who, "write", name)
+                                              or projects.locked_out(name, users.whose(who))),
                            "clusters": [{"id": c["id"], "name": c["name"]} for c in readable]})
 
     def _deploy(self, req):
@@ -13617,6 +13659,7 @@ class Handler(BaseHTTPRequestHandler):
                 return None
             r = kube.save(key, env, field(req, "was"), by)
             if r.get("ok"):
+                kubeview.forget(key)
                 e = next((x for x in r["envs"] if x["name"] == str(env.get("name") or "").strip().lower()), {})
                 db.audit(by, "deploy-env", key, {"env": e.get("name"), "cluster": e.get("cluster"), "namespace": e.get("namespace"),
                                                   "was": field(req, "was")})
@@ -13626,9 +13669,42 @@ class Handler(BaseHTTPRequestHandler):
         if act == "remove":
             r = kube.remove(key, field(req, "name"))
             if r.get("ok"):
+                kubeview.forget(key)
                 db.audit(by, "deploy-env-remove", key, {"env": field(req, "name")})
             return self._json(r, 200 if r.get("ok") else 404)
         return self._json({"error": "action is save, remove, deploy or rollback"}, 400)
+
+    def _get_kubernetes(self):
+        """GET /api/kubernetes?project=&env= (R281 step 5): what runs in one
+        of the space's environments, read with its own deployer, so nothing
+        outside its namespace: each workload with ready of desired, its
+        version, its pods and where it answers. Deploy Read on the space."""
+        name = self._project_asked()
+        if not name or self._refused("deploy-read", name):
+            return None
+        r = kubeview.status(repos.key_of(name), self._q().get("env", [""])[0])
+        return self._json(r, 200 if not r.get("error") else 502)
+
+    def _kubernetes(self, req):
+        """POST /api/kubernetes {project, env, action: restart|scale, kind,
+        name, replicas} (R281 step 5): a workload in one of the space's
+        environments restarted or scaled, with its own deployer. Deploy
+        Write on the space; audited."""
+        name = self._space_write("deploy", req)
+        if not name:
+            return None
+        key, act, env = repos.key_of(name), field(req, "action"), field(req, "env")
+        kind, wl = field(req, "kind"), field(req, "name")
+        if act == "restart":
+            r = kubeview.restart(key, env, kind, wl)
+        elif act == "scale":
+            r = kubeview.scale(key, env, kind, wl, req.get("replicas"))
+        else:
+            return self._json({"error": "action is restart or scale"}, 400)
+        if r.get("ok"):
+            db.audit(self._principal(), f"kube-{act}", key, {"env": env, "kind": kind, "name": wl,
+                                                             **({"replicas": r["replicas"]} if "replicas" in r else {})})
+        return self._json(r, 200 if r.get("ok") else 400)
 
     def _deploy_run(self, req, act):
         """A deploy or a rollback (_deploy): queued as the asker's job, its

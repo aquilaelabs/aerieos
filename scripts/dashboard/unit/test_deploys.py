@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import deploys  # noqa: E402
 
 NODE = {"id": "n1", "name": "lab", "kind": "agent", "capabilities": ["docker-host"], "config": {"user": "bb"},
-        "reported": {"session": {"user": "builder"}, "toolchains": {"kubernetes": "1.37"}}}
+        "reported": {"session": {"user": "builder"}, "store": ["kubernetes", "node"]}}
 
 
 class Deploys(unittest.TestCase):
@@ -44,7 +44,8 @@ class Deploys(unittest.TestCase):
                           snapshot_at=lambda repo, ref: {"digest": "sha256:" + "a" * 64, "commit": "c0ffee" * 7,
                                                          "tag": "v1.2" if ref == "v1.2" else "", "files": 2, "bytes": 30},
                           snapshot_path=lambda d: self.tar, token_line=lambda repo, uid: self.line,
-                          job_add=self.job_add, job=lambda jid, with_log=False: None)
+                          job_add=self.job_add, job=lambda jid, with_log=False: None,
+                          tools_of=lambda n: set((n.get("reported") or {}).get("store") or []))
         k = deploys.kube
         was = (k.env_of, k.mint, k.note_deploy, k.deploy_ended)
         k.env_of = lambda space, name: self.env if name == "staging" else None
@@ -107,11 +108,13 @@ class Deploys(unittest.TestCase):
                              (lambda n: n["config"].update(own=True), "own machine"),
                              (lambda n: n.update(capabilities=[]), "Docker"),
                              (lambda n: n["reported"]["session"].update(user="bb"), "could read"),
-                             (lambda n: n["reported"].update(toolchains={"node": "22"}), "Kubernetes tools")):
+                             (lambda n: n["reported"].update(store=["node"]), "Kubernetes tools")):
             self.nodes["n1"] = {**NODE, "config": dict(NODE["config"]), "reported": {
-                "session": dict(NODE["reported"]["session"]), "toolchains": dict(NODE["reported"]["toolchains"])}}
+                "session": dict(NODE["reported"]["session"]), "store": list(NODE["reported"]["store"])}}
             change(self.nodes["n1"])
             self.assertIn(word, deploys.plan("shop", "staging", "main", "u1").get("error", ""), word)
+        self.nodes["n1"] = dict(NODE, reported={"session": {"user": "builder"}})
+        self.assertNotIn("error", deploys.plan("shop", "staging", "main", "u1"), "a store not reported is not judged")
 
     def test_what_ships(self):
         self.files = {"deploy/k8s/web.yaml": b"kind: Deployment\n"}
