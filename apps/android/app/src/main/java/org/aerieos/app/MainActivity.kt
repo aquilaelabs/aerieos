@@ -210,6 +210,19 @@ fun AerieApp(openOn: String, activity: MainActivity) {
     val store = remember { Store(context).also { org.aerieos.app.ui.Schemes.pick(it.scheme); it.scheme = org.aerieos.app.ui.Schemes.current.name
         org.aerieos.app.ui.Schemes.pickMode(it.mode) } }
     var signedIn by remember { mutableStateOf(store.signedIn) }
+    // A pairing from before tokens (R290): its kept password traded once
+    // for this phone's own token, and forgotten. One whose account asks a
+    // second factor, or a dashboard not answering, stays as it was until
+    // the next start or a sign-in.
+    LaunchedEffect(Unit) {
+        for (p in store.pairings.filter { it.token.isBlank() && it.password.isNotBlank() }) {
+            try {
+                val pin = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Pins.learn(p.server) }
+                val got = Api.signIn(p.server, p.user, p.password, android.os.Build.MODEL ?: "a phone", "", pin)
+                store.traded(p.id, got.token, pin)
+            } catch (e: Exception) { /* kept as it was; said by nothing, since nothing changed for the person */ }
+        }
+    }
     // Which pairing is in front (R132): the screens are keyed by it, so a
     // switch redraws every one of them from the other dashboard.
     var current by remember { mutableStateOf(store.pairing?.id ?: "") }

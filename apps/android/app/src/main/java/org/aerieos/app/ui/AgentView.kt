@@ -399,9 +399,11 @@ fun TerminalPane(api: Api, arg: String, label: String, onClose: () -> Unit) {
     androidx.activity.compose.BackHandler { onClose() }
     var url by remember(arg) { mutableStateOf<String?>(null) }
     var said by remember(arg) { mutableStateOf("") }
+    val ctxNow = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(arg) {
         try {
-            val cookie = api.webCookie()
+            // Made for the WebView's own User-Agent, the browser that carries it.
+            val cookie = api.webCookie(android.webkit.WebSettings.getDefaultUserAgent(ctxNow))
             val cm = android.webkit.CookieManager.getInstance()
             cm.setAcceptCookie(true)
             cm.setCookie(api.base.trimEnd('/'), "bb_session=$cookie; Path=/")
@@ -433,7 +435,18 @@ fun TerminalPane(api: Api, arg: String, label: String, onClose: () -> Unit) {
                     // The terminal is the dashboard's own page, and xterm is script.
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-                    webViewClient = android.webkit.WebViewClient()
+                    // A dashboard's own certificate (R290): taken where its key
+                    // is the one the phone kept at sign-in (Pins), which the
+                    // platform lets a page read from Android 10 on; any other
+                    // is refused, as the default client refuses every one.
+                    webViewClient = object : android.webkit.WebViewClient() {
+                        override fun onReceivedSslError(view: android.webkit.WebView, handler: android.webkit.SslErrorHandler,
+                                                        error: android.net.http.SslError) {
+                            val cert = if (android.os.Build.VERSION.SDK_INT >= 29) error.certificate.x509Certificate else null
+                            if (cert != null && api.pin.startsWith("sha256//") && org.aerieos.app.Pins.of(cert) == api.pin) handler.proceed()
+                            else handler.cancel()
+                        }
+                    }
                     loadUrl(u)
                 }
             },

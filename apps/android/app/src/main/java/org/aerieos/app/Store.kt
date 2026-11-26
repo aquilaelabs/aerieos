@@ -1,6 +1,9 @@
 // Where the app keeps the dashboards it is paired with and the account's
-// credential for each: an encrypted preferences file, keyed by the device's
-// keystore, so a password never sits in plain text. Everything else the app
+// credential for each: the phone's own device token, traded for the
+// password once at sign-in, and what its https address is held to (R290);
+// a pairing made before that keeps the password until it is traded. An
+// encrypted preferences file, keyed by the device's keystore, so neither
+// sits in plain text. Everything else the app
 // remembers is ordinary preferences.
 //
 // More than one AerieOS (R132): each pairing has a name, an address and
@@ -20,7 +23,7 @@ import org.json.JSONObject
 /** One dashboard the app is signed in to. `slot` is a small number of its
  *  own that keeps its notifications apart from another pairing's. */
 data class Pairing(val id: String, val name: String, val server: String, val user: String,
-                   val password: String, val slot: Int) {
+                   val password: String, val slot: Int, val token: String = "", val pin: String = "") {
     val label get() = name.ifBlank { server.removePrefix("https://").removePrefix("http://") }
 }
 
@@ -51,7 +54,8 @@ class Store(context: Context) {
     private fun write(ps: List<Pairing>) {
         val arr = JSONArray()
         for (p in ps) arr.put(JSONObject().put("id", p.id).put("name", p.name).put("server", p.server)
-            .put("user", p.user).put("password", p.password).put("slot", p.slot))
+            .put("user", p.user).put("password", p.password).put("slot", p.slot)
+            .put("token", p.token).put("pin", p.pin))
         secret.edit().putString("pairings", arr.toString()).apply()
     }
 
@@ -60,7 +64,8 @@ class Store(context: Context) {
             val arr = JSONArray(secret.getString("pairings", "[]") ?: "[]")
             (0 until arr.length()).map { arr.getJSONObject(it) }.map {
                 Pairing(it.optString("id"), it.optString("name"), it.optString("server"),
-                        it.optString("user"), it.optString("password"), it.optInt("slot", 1))
+                        it.optString("user"), it.optString("password"), it.optInt("slot", 1),
+                        it.optString("token"), it.optString("pin"))
             }.filter { it.id.isNotBlank() && it.server.isNotBlank() }
         } catch (e: Exception) { emptyList() }
 
@@ -82,14 +87,15 @@ class Store(context: Context) {
 
     val signedIn get() = pairings.isNotEmpty()
 
-    /** A new pairing, made current. The same address and account twice is
-     *  the one pairing, renamed. */
-    fun add(name: String, server: String, user: String, password: String): Pairing {
+    /** A new pairing, made current, with the token its sign-in handed the
+     *  phone and what its address is held to. The same address and account
+     *  twice is the one pairing, renamed and signed in again. */
+    fun add(name: String, server: String, user: String, token: String, pin: String): Pairing {
         val ps = pairings.toMutableList()
         val same = ps.indexOfFirst { it.server.trim() == server.trim() && it.user.trim() == user.trim() }
-        val p = if (same >= 0) ps[same].copy(name = name.trim(), password = password).also { ps[same] = it }
+        val p = if (same >= 0) ps[same].copy(name = name.trim(), password = "", token = token, pin = pin).also { ps[same] = it }
                 else Pairing("p" + System.currentTimeMillis().toString(36), name.trim(), server.trim(), user.trim(),
-                             password, (ps.maxOfOrNull { it.slot } ?: 0) + 1).also { ps.add(it) }
+                             "", (ps.maxOfOrNull { it.slot } ?: 0) + 1, token, pin).also { ps.add(it) }
         write(ps)
         current = p.id
         return p
@@ -108,7 +114,13 @@ class Store(context: Context) {
     fun signOut() { pairing?.let { forget(it.id) } }
 
     fun api(): Api? = pairing?.let { api(it) }
-    fun api(p: Pairing) = Api(p.server, p.user, p.password)
+    fun api(p: Pairing) = Api(p.server, p.user, p.password, p.token, p.pin)
+
+    /** A pairing from before tokens, its password traded for one (R290):
+     *  the password is forgotten as the token is kept. */
+    fun traded(id: String, token: String, pin: String) {
+        write(pairings.map { if (it.id == id) it.copy(password = "", token = token, pin = pin) else it })
+    }
 
     // The watch: whether it runs, and how often it asks. Fifteen seconds is
     // the dashboard's own poll; a phone on battery may want a minute.

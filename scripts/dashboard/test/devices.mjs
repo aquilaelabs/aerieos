@@ -151,6 +151,15 @@ await section("a phone's token is its person on the dashboard, until it is signe
   ok(phone.status === 200 && asPhone.status === 200 && (seen.projects || []).some(p => p.name === 'alpha'),
      `the phone's token reads the status as dv.rw, alpha among its spaces (${phone.status} ${asPhone.status})`);
   ok((await st(a.token)).status === 401, "a PC's token is no sign-in on the dashboard's own routes");
+  // Its terminal's WebView signs in with a cookie, made from the token and
+  // bound to the WebView's own User-Agent the app names.
+  const WV = 'Mozilla/5.0 (Linux; Android 15; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/141.0 Mobile Safari/537.36';
+  const web = await dev(phone.token, 'web', { ua: WV });
+  const page = c => fetch(`${base}/api/status`, { headers: { Cookie: `bb_session=${c}`, 'User-Agent': WV } }).then(r => r.status);
+  ok(web.status === 200 && web.cookie && await page(web.cookie) === 200
+     && await fetch(`${base}/api/status`, { headers: { Cookie: `bb_session=${web.cookie}`, 'User-Agent': 'curl/8' } }).then(r => r.status) !== 200,
+     `the phone's token makes its WebView's cookie, held to that browser (${web.status})`);
+  ok((await dev(a.token, 'web', { ua: WV })).status === 403, "...and a PC's token makes none");
   const out = await call('/api/profile', { action: 'device-signout', device: phone.device.id }, asUser('dv.rw', people['dv.rw']));
   ok(out.status === 200 && (await st(phone.token)).status === 401, `signed out from Profile, the phone's token is nobody's (${JSON.stringify(out.body)})`);
 });

@@ -37,6 +37,8 @@
     {"method": "GET", "path": "/api/pending?project=", "fields": ["pending", "counts", "gate"],
      "pending": ["id", "kind", "verb", "summary", "by", "settled"]},
     {"method": "POST", "path": "/api/pending", "actions": ["approve", "deny"]},
+    {"method": "POST", "path": "/api/v1/device/signin", "fields": ["token", "device", "account"]},
+    {"method": "POST", "path": "/api/v1/device/web", "fields": ["cookie"]},
     {"method": "GET", "path": "/api/roadmap?project=", "fields": ["items", "rev", "session"],
      "items": ["id", "text", "steps", "shelved", "info"]},
     {"method": "POST", "path": "/api/roadmap", "actions": ["add", "shelve", "remove", "send"]},

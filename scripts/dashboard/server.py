@@ -11646,6 +11646,19 @@ class Handler(BaseHTTPRequestHandler):
         req = self._read_json()
         if req is None:
             return None
+        if verb == "web":
+            # The phone app's terminal is the dashboard's page in a WebView,
+            # which signs in with the cookie a browser gets (R290): minted
+            # here for the phone's person from its token, as the password
+            # did at /login, and bound to the WebView's User-Agent the app
+            # names, the browser that will carry it.
+            if auth.get("error"):
+                return self._json({"error": auth["error"]}, 401)
+            u = users.get((auth.get("account") or {}).get("name") or "") if auth.get("kind") == "phone" else None
+            if not u:
+                return self._json({"error": "a phone's sign-in opens its terminal, and nothing else's"}, 403)
+            lid = logins.mint(u.get("uid") or "", "", str(req.get("ua") or "")[:400], self._client_ip())
+            return self._json({"cookie": make_token(u, lid)})
         return self._json(*devices.verb(verb, auth, req))
 
     def _send_file(self, got):

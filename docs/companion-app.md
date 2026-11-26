@@ -10,8 +10,16 @@ its notifications, and how it is kept in step with the dashboard and built.
 minus the terminals: the spaces and their notebooks (roadmap, bugs,
 briefing, wiki, design, artifacts, containers, tests, the repository's state),
 the approvals, the nodes, the jobs, the accounts and your profile, in the
-shape an Android app takes, screens and a bottom bar. Sign in with the dashboard's address and your account;
-the credential is kept in the device's encrypted preferences.
+shape an Android app takes, screens and a bottom bar. Sign in with the dashboard's address and your account,
+and your authenticator's code where the account has a second factor: the
+password is traded once for the phone's own token and kept nowhere, the
+token sits in the device's encrypted preferences, and Profile lists the
+phone under your devices, where Sign out ends it. At an https address the
+app keeps what it met at sign-in, the authorities' word for the name or
+else the dashboard's own key (the one its console prints at every start),
+and refuses another key after; the terminal's page is held to the same key.
+A phone signed in before this trades its kept password for a token at its
+next start.
 
 **More than one AerieOS.** The app pairs with as many dashboards as
 you have (R132): **Add another** under More signs in to the next, with a

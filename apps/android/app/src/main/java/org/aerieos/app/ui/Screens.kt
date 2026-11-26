@@ -49,7 +49,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.aerieos.app.Api
+import org.aerieos.app.ApiError
+import org.aerieos.app.Pins
 import org.aerieos.app.BuildConfig
 import org.aerieos.app.MainActivity
 import org.aerieos.app.Store
@@ -141,6 +145,9 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
     var user by remember { mutableStateOf(if (adding) "" else store.user) }
     var name by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    // The account's second factor, asked once the dashboard says it has one.
+    var code by remember { mutableStateOf("") }
+    var askCode by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -157,17 +164,27 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
         OutlinedTextField(password, { password = it }, label = { Text("Password") }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
+        if (askCode) OutlinedTextField(code, { code = it }, label = { Text("Code from your authenticator, or a recovery code") },
+            singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii), modifier = Modifier.fillMaxWidth())
         if (error.isNotBlank()) Text(error, color = Bad, modifier = Modifier.padding(vertical = 8.dp))
         Spacer(Modifier.height(12.dp))
         Button(enabled = !busy && server.length > 8 && user.isNotBlank() && password.isNotBlank(), onClick = {
             busy = true; error = ""
             scope.launch {
                 try {
-                    val api = Api(server, user, password)
+                    // What its https address is held to from now on, and the
+                    // password traded for this phone's own token over it: the
+                    // password is kept nowhere (R290).
+                    val pin = withContext(Dispatchers.IO) { Pins.learn(server.trim()) }
+                    val got = Api.signIn(server.trim(), user.trim(), password, android.os.Build.MODEL ?: "a phone", code, pin)
+                    val api = Api(server.trim(), user.trim(), "", got.token, pin)
                     val st = api.status()
                     if (st.str("me").isBlank()) throw Exception("that address answers, but not as an AerieOS")
-                    store.add(name, server, user, password)
+                    store.add(name, server, user, got.token, pin)
                     onDone(st.obj("can").optBoolean("admin", false))
+                } catch (e: ApiError) {
+                    if (e.secondFactor) askCode = true
+                    error = e.message ?: e.toString()
                 } catch (e: Exception) {
                     error = e.message ?: e.toString()
                 }
@@ -770,7 +787,7 @@ fun ProfileScreen(store: Store) {
             Row(Modifier.padding(top = 8.dp)) {
                 Spacer(Modifier.weight(1f))
                 Button(enabled = cur.isNotBlank() && next.length >= 8, onClick = { scope.launch {
-                    said = try { api.password(cur, next); store.password = next; cur = ""; next = ""; "password changed" }
+                    said = try { api.password(cur, next); if (store.pairing?.token.isNullOrBlank()) store.password = next; cur = ""; next = ""; "password changed" }
                            catch (e: Exception) { e.message ?: e.toString() }
                 } }) { Text("Change password") }
             }

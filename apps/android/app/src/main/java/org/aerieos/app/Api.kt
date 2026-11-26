@@ -1,6 +1,9 @@
-// The dashboard's API, as the app speaks it: Basic auth on every request
-// (the same credential the browser sends), JSON in and out, one place that
-// knows the server's address. Kept to the platform's own HTTP client and
+// The dashboard's API, as the app speaks it: the phone's own device token
+// on every request, traded for the person's password once at sign-in
+// (R290; a pairing made before it sends the password, Basic, until it is
+// traded), the connection held to what the phone kept of the dashboard's
+// certificate (Pins), JSON in and out, one place that knows the server's
+// address. Kept to the platform's own HTTP client and
 // org.json so the app carries no networking stack of its own. The surface
 // it calls is small, and android/api-surface.json names every path here.
 package org.aerieos.app
@@ -13,20 +16,32 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
-class ApiError(val status: Int, message: String) : IOException(message)
+/** A refusal with the dashboard's sentence; `secondFactor` where a sign-in
+ *  wants the account's code. */
+class ApiError(val status: Int, message: String, val secondFactor: Boolean = false) : IOException(message)
 
-class Api(val base: String, private val user: String, private val password: String) {
+/** What a sign-in hands the phone: its own token, and whose it is. */
+data class SignedIn(val token: String, val account: String)
+
+class Api(val base: String, private val user: String, private val password: String,
+          private val token: String = "", val pin: String = "") {
 
     private fun open(path: String, method: String): HttpURLConnection {
         val url = URL(base.trimEnd('/') + path)
         val c = url.openConnection() as HttpURLConnection
+        if (c is HttpsURLConnection) Pins.hold(c, pin)
         c.requestMethod = method
         c.connectTimeout = 15_000
         c.readTimeout = 60_000
         c.instanceFollowRedirects = false
-        val cred = Base64.encodeToString("$user:$password".toByteArray(), Base64.NO_WRAP)
-        c.setRequestProperty("Authorization", "Basic $cred")
+        if (token.isNotBlank()) {
+            c.setRequestProperty("Authorization", "Bearer $token")
+        } else if (user.isNotBlank()) {
+            val cred = Base64.encodeToString("$user:$password".toByteArray(), Base64.NO_WRAP)
+            c.setRequestProperty("Authorization", "Basic $cred")
+        }
         c.setRequestProperty("Accept", "application/json")
         c.setRequestProperty("User-Agent", "AerieOS-app/${BuildConfig.VERSION_NAME} api/${BuildConfig.TARGET_API}")
         return c
@@ -38,7 +53,7 @@ class Api(val base: String, private val user: String, private val password: Stri
         val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
         val obj = try { JSONObject(text) } catch (e: Exception) { JSONObject() }
         if (status >= 400) {
-            throw ApiError(status, obj.optString("error").ifBlank { "HTTP $status" })
+            throw ApiError(status, obj.optString("error").ifBlank { "HTTP $status" }, obj.optBoolean("second_factor", false))
         }
         return obj
     }
@@ -48,13 +63,15 @@ class Api(val base: String, private val user: String, private val password: Stri
         try { readJson(c) } finally { c.disconnect() }
     }
 
-    suspend fun post(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+    suspend fun post(path: String, body: JSONObject): JSONObject = withContext(Dispatchers.IO) { postNow(path, body) }
+
+    private fun postNow(path: String, body: JSONObject): JSONObject {
         val c = open(path, "POST")
         c.doOutput = true
         c.setRequestProperty("Content-Type", "application/json")
         try {
             c.outputStream.use { it.write(body.toString().toByteArray()) }
-            readJson(c)
+            return readJson(c)
         } finally { c.disconnect() }
     }
 
@@ -213,8 +230,16 @@ class Api(val base: String, private val user: String, private val password: Stri
      *  for there (an unsigned request is sent to /login), so the WebView
      *  carries the cookie a browser would get, from the same /login the VS
      *  Code extension signs in through. The cookie's value, or an error. */
-    suspend fun webCookie(): String = withContext(Dispatchers.IO) {
+    suspend fun webCookie(ua: String): String = withContext(Dispatchers.IO) {
+        // From the phone's token where it holds one (R290): the cookie made
+        // for the WebView's own User-Agent, the browser that carries it.
+        if (token.isNotBlank()) {
+            val cookie = postNow("/api/v1/device/web", JSONObject().put("ua", ua)).optString("cookie")
+            if (cookie.isBlank()) throw ApiError(0, "the dashboard made no sign-in for the terminal")
+            return@withContext cookie
+        }
         val c = URL(base.trimEnd('/') + "/login").openConnection() as HttpURLConnection
+        if (c is HttpsURLConnection) Pins.hold(c, pin)
         c.requestMethod = "POST"
         c.connectTimeout = 15_000
         c.readTimeout = 30_000
@@ -265,6 +290,19 @@ class Api(val base: String, private val user: String, private val password: Stri
         "/api/artifact?project=AerieOS&path=" + enc("dist/$apk")
 
     companion object {
+        /** Trade the person's name and password (and code, where the
+         *  account has a second factor) for this phone's own token, over a
+         *  connection held to `pin`. The password goes nowhere else. */
+        suspend fun signIn(base: String, user: String, password: String, device: String, code: String, pin: String): SignedIn =
+            withContext(Dispatchers.IO) {
+                val api = Api(base, "", "", "", pin)
+                val j = api.postNow("/api/v1/device/signin", JSONObject().put("username", user).put("password", password)
+                    .put("name", device).put("kind", "phone").apply { if (code.isNotBlank()) put("code", code.trim()) })
+                val tok = j.optString("token")
+                if (tok.isBlank()) throw ApiError(0, "the dashboard answered no token")
+                SignedIn(tok, j.optString("account"))
+            }
+
         fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
         fun json(vararg pairs: Pair<String, Any?>): JSONObject {
             val o = JSONObject()
