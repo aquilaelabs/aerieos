@@ -1541,6 +1541,9 @@ def _project_columns(who, facts):
                     # section asks for none of it where not, rather than being
                     # refused for every open.
                     "may_gitauth": not _tpart("projects:may", users.may, who, "git-auth", d.name) if who else True,
+                    # ...and whether its Deploy section is this account's to
+                    # read (R281): not asked for where a role does not give it.
+                    "may_deploy": not _tpart("projects:may", users.may, who, "deploy-read", d.name) if who else True,
                     # ...and why its notebook, its tree and the project itself
                     # are not this account's to change, or "" (B86): a role
                     # that gives Projects Read alone sees the page with every

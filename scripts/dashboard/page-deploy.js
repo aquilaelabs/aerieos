@@ -34,6 +34,9 @@ function envNamespaceFor(env){
 function rnLoadDeploy(name){
   rnDeploy = null; rnEnvEdit = null;
   rnDrawDeploy();
+  // Not asked for where a role does not give Deploy Read here, and not
+  // drawn: what a role does not give is not shown.
+  if ((state?.projects || []).find(p => p.name === name)?.may_deploy === false) return;
   return getJSON(`/api/deploy?project=${encodeURIComponent(name)}`).then(j => {
     if (rnFor !== name) return;
     rnDeploy = j.error ? null : j;
