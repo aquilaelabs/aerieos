@@ -314,7 +314,7 @@ function wireVms(el){
       const held = (v.on?.console || []).filter(w => !w.uid || w.uid !== vmsData?.me).map(w => w.name);
       if (held.length){
         if (!vmsData?.take?.[v.project])
-          return notify(`${andList(held)} ${held.length > 1 ? "have" : "has"} ${v.name}'s Console open: it is one person's at a time. Its Screen can be shared, or ask them.`, true);
+          return notify(`${andList(held)} ${held.length > 1 ? "have" : "has"} ${v.name}'s Console open, one person's at a time: its Screen can be shared, or ask them`, true);
         if (!await askYes(`Take ${v.name}'s Console from ${andList(held)}?\n\nA console is one person's at a time: theirs ends, and they are told you took it. Its Screen can be shared instead.`)) return;
         const j = await postJSON("/api/vms", {action: "console-take", project: v.project, name: v.name});
         if (j.error) return notify(j.error, true);

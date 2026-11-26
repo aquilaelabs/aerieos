@@ -580,8 +580,8 @@ function attRow(a){
     <div class="bsum">runs agent ${esc(a.from)}${a.newer ? ", newer than" : " and"} this controller ships ${esc(a.to)}${a.window
       ? `: ${a.projects.length ? `${a.projects.length} space${a.projects.length === 1 ? "" : "s"} cannot build, test or use the emulator there`
                                : "nothing works there"} until ${a.newer ? "the two agree" : "it is updated"}` : ""}</div>
-    ${a.window && a.projects.length ? `<details class="bdetail chev"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
-      a.projects.map(esc).join(", ")}</pre></details>` : ""}
+    ${a.window && a.projects.length ? `<details class="bdetail chev"${sectAttr("bell:agent:" + a.id)}><summary>spaces</summary><pre>${
+      a.projects.map(p => esc(projLabel(p))).join(", ")}</pre></details>` : ""}
     ${a.back ? `<div class="bsum bad">it took the update and went back to the agent it had: it ${esc(a.back)}</div>` : ""}
     ${a.failed && !a.back ? `<div class="bsum bad">its last update failed: ${esc(a.failed)}</div>` : ""}
     ${a.held && !a.failed && !a.back ? `<div class="bsum">${esc(a.held)}</div>` : ""}

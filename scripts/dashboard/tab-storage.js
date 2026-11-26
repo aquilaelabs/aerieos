@@ -419,7 +419,7 @@ function storagePools(n){
       <div class="name">${esc(p.name)} <span class="pill${p.state === "online" ? "" : " warn"}">${esc(p.state || "unknown")}</span></div>
       ${p.said ? `<div class="sub dim">${esc(p.said)}</div>` : ""}</div>${admin && !why
         ? `<span class="acts"><button type="button" data-stpool="import" data-name="${esc(p.name)}"${p.elsewhere ? ` data-elsewhere="1"` : ""} title="imported as it is, never upgraded">${p.elsewhere ? "Import anyway" : "Import"}</button></span>` : ""}</div>`).join("");
-  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks: importing one keeps it as it is, nothing upgraded, so the system that made it can take it back. One last used by another system and never exported (this machine's own pools, after its stick died and a new one was written) is imported anyway with its name typed, back where it was.</div><div class="rows">${importRows}</div></div>` : "";
+  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks: an import keeps it as it is, so the system that made it can take it back; one never exported is imported with its name typed.</div><div class="rows">${importRows}</div></div>` : "";
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet${n.zfs ? ": the form below makes one" : ""}.</div>`}${importBox}${form}`;
   const sick = pools.filter(p => !["online", ""].includes(p.health)).length;
   return docSection("storage", "pools", "Pools", pools.length ? `${pools.length}${sick ? `, ${sick} not online` : ""}` : "", body, {cls: sick ? "bad" : ""});
@@ -606,7 +606,7 @@ function storageArray(n){
                     ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
         <div class="sub">${kinds}</div>
         ${a.status ? `<div class="sub dim">${esc(a.status)}</div>` : ""}
-        ${a.adopted ? `<div class="hint">Taken over from another system: its data disks stay where they were (/mnt/diskN, merged at /mnt/user). Each share's new files land where its settings say, and the mover takes ${moving === 1 ? "1 share's" : `${moving || "no"} shares'`} files from one place to another${a.last_move ? `, last ${ago(a.last_move)}` : ""}: each share's Edit sets both.</div>` : ""}
+        ${a.adopted ? `<div class="hint">Taken over from another system: its data disks stay at /mnt/diskN, merged at /mnt/user, and the mover takes ${moving === 1 ? "1 share's" : `${moving || "no"} shares'`} files where each share's Edit says${a.last_move ? `, last ${ago(a.last_move)}` : ""}.</div>` : ""}
         <div class="hint">Parity is periodic: what was written since the last sync is not protected until the next one runs.</div>
       </div>${admin && !why ? `<span class="acts"><button type="button" data-starray="sync" title="bring the parity up to date now">Sync now</button>${actMore([
         `<button type="button" data-starray="scrub" title="read a part of the array back against its parity">Scrub</button>`,
@@ -796,7 +796,7 @@ function storageBackups(n){
                                         && !recs.some(r => r.source === p.mount));
   const presets = !admin || why || !n.array?.mounted || !lone.length ? "" : `<div class="field"><div class="hint">A pool of one disk has nothing to fall back on: nightly to the array, and a dead disk is restored from last night's run.</div>
       <div class="actbar"><span class="sp"></span>${lone.map(p => `<button type="button" data-stbackup="nightly" data-pool="${esc(p.name)}" data-mount="${esc(p.mount)}">Back up ${esc(p.name)} to the array nightly</button>`).join("")}</div></div>`;
-  const form = !admin || why ? "" : `${presets}<div class="field stnewbackup"><div class="hint">A new backup: a folder here, where its runs go (another pool, the array, a disk or a share under Other disks and shares), and how many runs to keep. Each run is whole and shares what did not change with the run before.</div>
+  const form = !admin || why ? "" : `${presets}<div class="field stnewbackup"><div class="hint">A new backup: a folder for its runs (another pool, the array, a disk or a share) and how many to keep; each run is whole and shares what did not change.</div>
       <div class="prefrow ctlrow">
         <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Name</span><input type="text" id="stBackupName" placeholder="media" maxlength="31" autocomplete="off" spellcheck="false"></label></div>
         <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Keep</span><input type="number" id="stBackupKeep" min="1" max="365" value="7"></label></div>

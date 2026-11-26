@@ -454,7 +454,7 @@ async function rnMoreSave(set){
     rnBars();
     return () => { rnMore = was.more; rnPrefWas.nodes = was.nodes; rnPrefWas.hosts = was.hosts; rnFillNodesMore(); rnBars(); };
   }, () => postJSON("/api/prefs", {project: name, scope: rnMode === "project" ? "project" : "repository", nodes, hosts}));
-  if (!j.error && myLiveSession(name)) notify(`${projLabel(name)}: saved. Its running session keeps the nodes it started with until it starts again.`);
+  if (!j.error && myLiveSession(name)) notify(`${projLabel(name)} saved; its running session keeps the nodes it started with until it starts again`);
 }
 
 // ---- Releases: what each of a release's files is for (R255) ---------------

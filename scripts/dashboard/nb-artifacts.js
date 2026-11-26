@@ -894,7 +894,7 @@ function nbArtLoadDrafts(av, force){
           <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
           ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
         </div>`;
-    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest. Publish it here: the git host's own form checks none of this, and one published there with its tag field emptied went out under a name nothing reads.</div>`, {cls: "warn"}));
+    }).join("") + `<div class="hint">Only this repository's people see a draft. Correct its notes, then Publish here, not on the git host, whose form checks none of this: it goes to everyone following its channel.</div>`, {cls: "warn"}));
     wireSections(box);
     box.querySelectorAll("[data-draft]").forEach(row => {
       const tag = row.dataset.draft, ta = row.querySelector("textarea");

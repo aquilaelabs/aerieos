@@ -721,7 +721,7 @@ function wireUsbSection(root, n){
     busy(b, "Giving");
     const j = await postJSON("/api/vms", {action: "usb-give", project, name, usb: named(u)});
     if (j.error) notify(j.error, true);
-    else notify(`giving ${u.name || "the device"} to ${project}/${name}; the row says once the node reports back`);
+    else notify(`giving ${u.name || "the device"} to ${projLabel(project)}'s ${name}; the row says once the node reports back`);
     setTimeout(loadVms, 4000);
   }));
   sect.querySelectorAll("[data-usbtake]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -888,9 +888,8 @@ function nodeDoorRow(n){
 function nodeHostRow(n){
   if (n.kind !== "agent") return "";
   return n.config?.host_only
-    ? `<div class="sub">It hosts containers only: no space lists it, no session or synced copy runs here,
-        and its agent may ask the controller for nothing but its own jobs, an image shipped to it
-        and a container's data in a copy or a move.</div>
+    ? `<div class="sub">It hosts containers only: no space lists it, nothing of a session runs here, and its agent may
+        ask for its own jobs, its images and a container's data alone.</div>
        ${n.config?.tunnel?.kind === "public"
          ? `<div class="sub dim ndhostfixed">It reaches the controller through a public hostname, so it stays hosting only.</div>`
          : `<div class="addbar ctlrow"><button type="button" data-nd="host-off">Let spaces use it again</button></div>`}`
@@ -2482,7 +2481,7 @@ function ndDialogs(){
         <div class="hint" id="ndEnSysWhy" hidden></div>
         <label class="ndcap"><input type="checkbox" id="ndEnSess" checked> Sessions run on it</label>
         <label class="ndcap"><input type="checkbox" id="ndEnHost"> Hosting only: it runs containers sent to it, and nothing of it comes back</label>
-        <div class="hint" id="ndEnHostHint" hidden>No project's code, no sessions and no aerie go to it; its agent may ask the controller for its own jobs and nothing else. For a public box such as a cloud VPS.</div>
+        <div class="hint" id="ndEnHostHint" hidden>No space's code, no sessions and no aerie go to it; its agent may ask the controller for its own jobs and nothing else. For a public box such as a cloud VPS.</div>
         <label class="ndcap" id="ndEnFwRow" hidden><input type="checkbox" id="ndEnFw" checked> Take in only 80 and 443</label>
         <div class="hint" id="ndEnFwHint" hidden>A firewall on the machine drops everything else coming in, a port a container publishes included, so nginx is the way to a container. Port 22 stays open unless the SSH door closes it. Going out is left alone.</div>
         <div class="setrow col ctlrow">${lbl("ndEnDoor", "SSH door",
@@ -3027,7 +3026,7 @@ function wireNodesTab(root){
         // A refusal is nodeAct's to say, once (B1028).
         if (j.error) return;
         const c = nodesConf[id]; if (c && c.draft) c.draft.nameText = undefined;
-        notify(`${was} is now ${name}. A runner already installed there keeps the label ${was} until it is reinstalled.`);
+        notify(`${was} is now ${name}; a runner already installed there keeps the label ${was} until it is reinstalled`);
         return;
       }
       if (act === "sess-revert"){

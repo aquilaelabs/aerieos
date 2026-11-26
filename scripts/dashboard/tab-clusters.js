@@ -60,7 +60,7 @@ function clBody(c){
 }
 
 function clAddBody(canCancel){
-  return `<div class="field"><div class="hint">A kubeconfig whose user carries a token or a client certificate; its current context is the cluster added. One that signs in through a cloud CLI (EKS, GKE, AKS, kubelogin) is refused: a ServiceAccount's token works, from <code>kubectl create token NAME --duration=8760h</code>. One that names files is flattened first: <code>kubectl config view --raw --flatten --minify</code>.</div></div>
+  return `<div class="field"><div class="hint">A kubeconfig with a token or a client certificate; its current context is the cluster added. One that signs in through a cloud CLI is refused, and says what to give instead.</div></div>
     <div class="field">
       <div class="setrow col ctlrow">${lbl("clName", "Name", "what this cluster is called here, as spaces and the bell name it")}
         <input id="clName" type="text" autocomplete="off" spellcheck="false" value="${esc(clDraft.name)}" placeholder="production"></div>

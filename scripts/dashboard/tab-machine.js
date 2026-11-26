@@ -225,7 +225,7 @@ function stickSection(n){
   ];
   const pick = stickPoolPick(n, s);
   return docSection("nodes", "stick", "Pool and spaces", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. The secrets and the install key go there too, so the stick alone opens nothing. Until one is picked, Docker and the VMs wait and no space can be made.</div></div>${projectsFolderField(n, s, admin)}`,
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool with the secrets and the install key, never on the stick; until one is picked, Docker, the VMs and new spaces wait.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 
@@ -457,7 +457,7 @@ function adoptAppsSection(n){
   const btn = (attr, word, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} ${attr}>${word}</button>`;
   if (!apps){
     return docSection("docker", "oldapps", "Containers and VMs from the old system", "not read yet",
-      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks${from.guessed ? ", read from where they usually are" : ""} (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run. A VM that was one of your nodes comes back as that node once it runs here.</div>
+      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks${from.guessed ? ", read from where they usually are" : ""} (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}): reading opens each read-only and runs nothing, and a VM that was one of your nodes comes back as that node.</div>
         <div class="actbar">${btn('data-adoptapp="read"', "Read what ran", "primary")}</div></div>`);
   }
   // A new read (its time) or other disks fetch the rows again.

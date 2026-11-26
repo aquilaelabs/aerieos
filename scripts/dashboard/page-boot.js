@@ -433,7 +433,7 @@ function bootNewProject(){
   $("pKey").onchange = pShowKey;
   $("pForge").onchange = () => { pForgeId = $("pForge").value; pDraw(); };
   $("pCopy").onclick = async () => {
-    await copyText($("pPub").textContent, "public key copied: paste it under the repo's Settings → Deploy keys");
+    await copyText($("pPub").textContent, "public key copied: paste it under the repository's Settings, Deploy keys");
   };
   $("pCancel").onclick = closeNewProject;
   $("pmodal").onclick = e => { if (e.target.id === "pmodal") closeNewProject(); };
