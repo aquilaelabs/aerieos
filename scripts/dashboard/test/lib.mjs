@@ -395,8 +395,12 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
     if (!m) return false;
     // The page's origin, or the harness's own server's: mid-reload WebKit
     // can say the page is elsewhere (sessions.mjs's phone, 26 Nov, B1133).
-    const own = [page.url(), URL].map(u => { try { return new globalThis.URL(u).origin; } catch { return ''; } }).filter(Boolean);
-    try { return own.includes(new globalThis.URL(m[1].replace(/^(\w+):\s*\/+/, '$1://')).origin); } catch { return false; }
+    // Any loopback name for the same port is the same server: the page and
+    // the harness name it 127.0.0.1 or localhost by turns (B1133, 26 Nov).
+    const loop = h => ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(h) ? 'loopback' : h;
+    const key = u => { try { const x = new globalThis.URL(u); return `${x.protocol}//${loop(x.hostname)}:${x.port}`; } catch { return ''; } };
+    const own = [page.url(), URL].map(key).filter(Boolean);
+    return own.includes(key(m[1].replace(/^(\w+):\s*\/+/, '$1://')));
   };
   page.on('console', m => {
     if (m.type() !== 'error') return;
