@@ -58,6 +58,8 @@
 - The Windows companion checks an update against the release's signed list of files with keys it carries, not on the controller's word (189cb11)
 - A request to a node's terminal, files or a VM's screen is signed with a key derived from the node's token and held only in the controller's memory, so a copy of the controller's data opens nothing on a node (5e837d6)
 - A copy of a node's token is handed only what the node was given already: a fresh session token only for an account whose terminal was opened there, and a runner's registration token only to the job installing it (45fbb6f)
+- A dashboard served under a Let's Encrypt certificate sends HSTS, and the Doctor says when someone signed in over plain http from outside your network (2bb02ee)
+- The Windows companion keeps the controller's key (or its name's certificate) from sign-in and refuses another after (2bb02ee)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
