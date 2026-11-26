@@ -43,6 +43,7 @@ import threading
 import time
 import zipfile
 from pathlib import Path
+import refusals
 
 WORKSPACE = None
 WORKTREES = None          # <workspace>/.worktrees: each account's tree, by uid
@@ -552,7 +553,7 @@ def source_download(name):
     except (OSError, subprocess.SubprocessError) as e:
         return {"error": str(e)}, 500
     if got is None:
-        return {"error": "no such space"}, 404
+        return {"error": refusals.NO_SPACE}, 404
     if isinstance(got, dict):
         return got, 413
     return got, 200

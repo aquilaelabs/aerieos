@@ -43,6 +43,7 @@ import time
 from pathlib import Path
 
 import db
+import refusals
 
 WORKSPACE = None
 nodes = None              # nodes.py: sync_hint, node
@@ -175,7 +176,7 @@ def _root(project, make=False):
         # .git line git itself writes (a node never sends that file:
         # git_guard), so git on the controller finds it as the worktree it is.
         if not _there(wt[0]):
-            raise ValueError("no such space")
+            raise ValueError(refusals.NO_SPACE)
         r = _worktrees() / wt[0] / wt[2]
         if not r.is_dir():
             if not make or not (WORKSPACE / wt[0] / ".git" / "worktrees" / wt[2]).is_dir():
@@ -186,10 +187,10 @@ def _root(project, make=False):
             dot.write_text(f"gitdir: {WORKSPACE / wt[0] / '.git' / 'worktrees' / wt[2]}\n")
         return r
     if not re.fullmatch(r"[A-Za-z0-9._-]+", project or "") or project.startswith("."):
-        raise ValueError("no such space")
+        raise ValueError(refusals.NO_SPACE)
     r = WORKSPACE / project
     if not r.is_dir():
-        raise ValueError("no such space")
+        raise ValueError(refusals.NO_SPACE)
     return r
 
 
@@ -448,7 +449,7 @@ _names = list             # set by configure_projects: () -> [project names]
 def _there(p):
     """A project on the controller's disk: a name the settings still carry
     for a project since deleted is none, or a node holding it is told of one
-    that answers "no such space" forever (walkme on the dev controller,
+    that answers that it is not a space, forever (walkme on the dev controller,
     9 Oct)."""
     return bool(re.fullmatch(r"[A-Za-z0-9._-]+", p or "")) and not p.startswith(".") \
         and (WORKSPACE / p).is_dir()

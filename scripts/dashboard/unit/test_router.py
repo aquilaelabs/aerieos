@@ -251,7 +251,7 @@ class Router(unittest.TestCase):
         self.assertTrue(router.record("n1")["deployed"])
         self.assertIn("router-gpu-box", self.containers.written)
         # A project allowed: a key of its own from the router, sealed here.
-        self.assertIn("no such space", router.allow("n1", "nope")["error"])
+        self.assertIn("not a space", router.allow("n1", "nope")["error"])
         self.assertTrue(router.allow("n1", "web", "ann")["ok"])
         path, auth, body = next(x for x in FakeLiteLLM.seen if x[0] == "/key/generate")
         self.assertTrue(auth.startswith("Bearer sk-"))

@@ -39,6 +39,7 @@ from pathlib import Path
 import services
 import statefile
 import syscontainer
+import refusals
 
 STATE = None
 write_json = None
@@ -472,7 +473,7 @@ def allow(nid, project, by=""):
     the next hello."""
     project = str(project or "")
     if project_names and project not in set(project_names()):
-        return {"error": "no such space"}
+        return {"error": refusals.NO_SPACE}
     rec = record(nid)
     if not rec.get("deployed"):
         return {"error": "the router is not deployed on this node yet"}

@@ -38,6 +38,7 @@ from pathlib import Path
 import agents
 import gitcreds
 from fields import field
+import refusals
 
 HERE = Path(__file__).resolve().parent
 
@@ -202,7 +203,7 @@ def admit(me, req):
                                 "this space alone on its notebook's Settings"}, 403)
     if not project or (WORKSPACE / project).name != project \
             or not (WORKSPACE / project).is_dir():
-        return None, ({"error": "not a space"}, 400)
+        return None, ({"error": refusals.NO_SPACE}, 400)
     return project, None
 
 

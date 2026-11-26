@@ -44,6 +44,7 @@ import urllib.parse
 import signing
 import statefile
 import unlocks
+import refusals
 
 STATE = None
 _lock = threading.RLock()
@@ -262,7 +263,7 @@ def move_to_own(uid, secret, how, passkey=""):
         return {"error": "this install has no key, so there is no key store to move"}, 409
     k = key_of(uid)
     if k is None:
-        return {"error": "your store is locked: unlock it first, then move it" if own_of(uid) else "no such account"}, 409
+        return {"error": "your store is locked: unlock it first, then move it" if own_of(uid) else refusals.NO_ACCOUNT}, 409
     if previous_of(uid) and not _drop_previous(uid):
         return {"error": "the key before this one still opens sign-ins on the nodes: open a terminal there first, "
                          "and each moves to today's key"}, 409
@@ -319,7 +320,7 @@ def change(uid, new=""):
         return {"error": "your store is under a key of your own: give it back to this AerieOS first, or change what you hold"}, 409
     old = key_of(uid)
     if old is None:
-        return {"error": "no such account"}, 404
+        return {"error": refusals.NO_ACCOUNT}, 404
     if previous_of(uid) and not _drop_previous(uid):
         n = on_nodes(uid, previous_of(uid)) if on_nodes else 0
         return {"error": f"the key before this one still opens {n} of your sign-in{'' if n == 1 else 's'} on the nodes: "

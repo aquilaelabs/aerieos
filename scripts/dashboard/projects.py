@@ -50,6 +50,7 @@ import membership
 import forges
 import registry
 import statefile
+import refusals
 
 # A personal access token belonging to ONE project.
 #
@@ -299,7 +300,7 @@ def rename(req):
     # host (set_address); "" leaves the remote where it points.
     address = _field(req, "address").strip()
     if not old or not PROJECT_NAME.fullmatch(old):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     if auth and auth not in ("https", "ssh", "none"):
         return {"error": "that is not an authentication mode"}, 400
     src = WORKSPACE / old
@@ -674,7 +675,7 @@ def deploy_key(project, action, text=""):
     (payload, status). A key made or kept is wired as the project's ssh
     remote to switch to (Deploy key, then Save); it does not switch."""
     if not PROJECT_NAME.fullmatch(project or "") or not (WORKSPACE / project).is_dir():
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     dest = WORKSPACE / project
     name = deploy_key_name(project)
     if action == "key-forget":
@@ -951,7 +952,7 @@ def trash(req):
     """
     name = _field(req, "name").strip()
     if not name or not PROJECT_NAME.fullmatch(name):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     src = WORKSPACE / name
     if not src.is_dir():
         return {"error": f"{name} is not a space under the workspace"}, 400
@@ -1847,7 +1848,7 @@ def link(req):
     except OSError:
         here = set()
     if name not in here:
-        return {"error": f"unknown space: {name}"}, 400
+        return {"error": refusals.no_space(name)}, 400
     dest = str(WORKSPACE / name)
     if run(["git", "-C", dest, "rev-parse", "--is-inside-work-tree"],
            timeout=10)["out"].strip() != "true":
@@ -1936,7 +1937,7 @@ def unlink(req):
     """
     name = _field(req, "name").strip()
     if not name or not PROJECT_NAME.fullmatch(name):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     dest = WORKSPACE / name
     if not dest.is_dir():
         return {"error": f"{name} is not a space under the workspace"}, 400
@@ -2259,7 +2260,7 @@ def pin(uid, name, on, fresh=False):
     here = _projects_here()
     name = _key(name)
     if name not in here:
-        return {"error": f"unknown space: {name}"}, 400
+        return {"error": refusals.no_space(name)}, 400
     with lock:
         pins = load_project_pins(uid, fresh)
         names = here.copy() if pins is None else set(pins)
@@ -2338,7 +2339,7 @@ def set_mark(kind, uid, name, value, start=None):
     rest are not lost. (payload, status)."""
     name = _key(name)
     if not name or name not in _projects_here():
-        return {"error": f"unknown space: {name}"}, 400
+        return {"error": refusals.no_space(name)}, 400
     with lock:
         d = _marks(kind)
         mine = _clean_marks(d.get(str(uid or ""), start))
@@ -2523,7 +2524,7 @@ def lock_verb(name, on, by="", admin=False):
     kind: a name-checked write. The sessions it ends are the server's to
     end, which sees every node's. (payload, status)."""
     if not _here(name):
-        return {"error": f"unknown space: {name}"}, 400
+        return {"error": refusals.no_space(name)}, 400
     name = _key(name)
     with lock:
         locks = load_locks()
@@ -2543,7 +2544,7 @@ def archive_verb(uid, name, on):
     Archived on that person's Spaces page, and nothing else, for nobody
     else. (payload, status)."""
     if not _here(name):
-        return {"error": f"unknown space: {name}"}, 400
+        return {"error": refusals.no_space(name)}, 400
     name = _key(name)
     with lock:
         d = _load_archives()
@@ -2565,10 +2566,10 @@ def auth_answer(name):
     and one subprocess per dialog is nothing where one per project per poll
     is not. (payload, status)."""
     if not PROJECT_NAME.fullmatch(name or ""):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     d = WORKSPACE / name
     if not d.is_dir():
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     return auth_options(name, d), 200
 
 
@@ -2586,10 +2587,10 @@ def forge_target(name):
     {error} saying what is missing. The token is the controller's to use
     and never leaves it."""
     if not PROJECT_NAME.fullmatch(name or ""):
-        return {"error": "unknown space"}
+        return {"error": refusals.NO_SPACE}
     d = WORKSPACE / name
     if not d.is_dir():
-        return {"error": "unknown space"}
+        return {"error": refusals.NO_SPACE}
     written = run(["git", "-C", str(d), "config", "--get", "remote.origin.url"], timeout=15)
     url = written["out"].strip() if written["code"] == 0 else ""
     if not url:
@@ -2653,10 +2654,10 @@ def auth_test(name, typed="", uid=None):
     tried with, the asker's own as their pushes are (the operator, 23 Nov).
     """
     if not PROJECT_NAME.fullmatch(name or ""):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     d = WORKSPACE / name
     if not d.is_dir():
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     url = origin_url(d)
     if not url:
         return {"error": "this space has no remote to test"}, 400

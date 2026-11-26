@@ -265,6 +265,7 @@ scripts/
     releasesign.py               a release's unsigned APK from CI, signed on the project's node with its sideload key and attached, from a run that passed or one still going once its release exists (R106)
     releasefiles.py              a release checked against the files its project lists in .release-files as its CI ends, a short one said on the bell and a complete one said once (R190)
     membership.py                a project's owner, whether it is invite only, and the invitations to it
+    refusals.py                  the refusals every module says alike (R287): not a space, not an account, each written once and held there by unit/test_refusals.py
     registry.py                  projects by id (R154): each directory's permanent number and the name it is shown under, in projects.json; a directory is never handed out twice
     repos.py                     projects and their repositories (R138): which project each repository is in, in project-repos.json; create, add, move, detach for the trash, delete an empty one, and place one in no project
     busy.py                      whether a node is quiet enough to time anything on, and why not (R108)

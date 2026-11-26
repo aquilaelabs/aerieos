@@ -22,6 +22,7 @@ import os
 import re
 import threading
 from pathlib import Path
+import refusals
 
 WORKSPACE = Path("/workspace")
 UID = re.compile(r"u_[0-9a-f]{8}")
@@ -74,7 +75,7 @@ def tail_sha(path, end):
 def _may(nid, uid, rel):
     """The file's path here, or the refusal."""
     if not UID.fullmatch(uid or ""):
-        return None, ({"error": "not an account"}, 400)
+        return None, ({"error": refusals.NO_ACCOUNT}, 400)
     if not rel_ok(rel):
         return None, ({"error": "not a transcripts path"}, 400)
     if not project_of(rel.split("/")[0], _held(nid)):

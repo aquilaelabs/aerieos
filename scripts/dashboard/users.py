@@ -37,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fields import field  # noqa: E402
 import roles  # noqa: E402
+import refusals
 
 STATE = Path("/config")
 write_json = None
@@ -776,7 +777,7 @@ def may(u, action, project=None):
     # have not taken on is read-only whoever you are. The remedy differs and
     # the sentence says so.
     if project is not None and not may_see(u, project):
-        return "not a space"              # the same answer a typo gets
+        return refusals.NO_SPACE              # the same answer a typo gets
     # A session on a project that reads this one: every read goes through,
     # and every write is refused with the reason, which is the whole of
     # what "reads" means. `aerie` is the relay, whose own door keeps the

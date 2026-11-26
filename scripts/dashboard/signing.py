@@ -44,6 +44,7 @@ import threading
 import time
 import zipfile
 from pathlib import Path
+import refusals
 
 ROUTES = ("play", "sideload")
 WORDS = {"play": "Play upload key", "sideload": "sideload signing key"}
@@ -413,7 +414,7 @@ def listing(project):
     which keys exist and their fingerprints is what lets a person check a
     signed build."""
     if not _ok_project(project):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     keys = {}
     for k in key_names(project):
         keys[k] = {r: (_public(rec) if (rec := _record(project, r, k)) else None) for r in ROUTES}
@@ -474,7 +475,7 @@ def needs_lock(project):
 
 def _check(project, route, key):
     if not _ok_project(project):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     if route not in ROUTES:
         return {"error": f"a key is for {' or '.join(ROUTES)}, not {route!r}"}, 400
     if not _ok_key(key):
@@ -532,7 +533,7 @@ def set_map(project, package, key):
     """Map an app's package to one of the project's keys, or unmap it with
     an empty key, which signs it with `default` again. (payload, status)."""
     if not _ok_project(project):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     if not PACKAGE.fullmatch(package or ""):
         return {"error": f"{package!r} is not an Android package name (com.example.app)"}, 400
     m = mapping(project)
@@ -755,7 +756,7 @@ def import_backup(project, route, blob_b64, key="", password="", alias="", filen
     Refused over a slot that holds a different key. The password goes into
     the key's record and nowhere else. (payload, status)."""
     if not _ok_project(project):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     if (no := needs_lock(project)):
         return no
     try:
@@ -830,7 +831,7 @@ def set_backup_password(project, current, new, by=""):
     asked for whenever there is one. (payload, status)."""
     import users
     if not _ok_project(project):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     was = backup_locked(project)
     if was and not users.check_password(was["hash"], current or ""):
         return {"error": "that is not the backup password now"}, 403
@@ -900,7 +901,7 @@ def release_key(project, package=""):
     only sideload key, followed through a rotation to the newest; or
     ("", None, why) said in words when there is none to use."""
     if not _ok_project(project):
-        return "", None, "unknown space"
+        return "", None, refusals.NO_SPACE
     held = [k for k in key_names(project) if _record(project, "sideload", k)]
     if not held:
         return "", None, (f"{project} has no sideload signing key, which signs its releases: an "
@@ -1148,7 +1149,7 @@ def refusal(project, rel, route, key=""):
     one is queued. With no key named, any key holding the route will do
     here: which one is decided on the node, by the build's package."""
     if not _ok_project(project):
-        return {"error": "unknown space"}, 400
+        return {"error": refusals.NO_SPACE}, 400
     if route not in ROUTES:
         return {"error": f"a build is signed for {' or '.join(ROUTES)}, not {route!r}"}, 400
     if key and not _record(project, route, key):

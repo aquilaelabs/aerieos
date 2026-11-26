@@ -56,7 +56,7 @@ class Groups(unittest.TestCase):
     def test_only_a_project_that_exists(self):
         got, status = projects.set_group("u1", "nope", "Work")
         self.assertEqual(status, 400)
-        self.assertIn("unknown space", got["error"])
+        self.assertIn("not a space", got["error"])
 
     def test_a_long_name_is_cut(self):
         projects.set_group("u1", "alpha", "x" * 100)

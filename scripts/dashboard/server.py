@@ -42,6 +42,7 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import refusals  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 WORKSPACE = Path(os.environ.get("WORKSPACE", "/workspace"))
@@ -7544,7 +7545,7 @@ class Handler(BaseHTTPRequestHandler):
         the same reply before this existed (R60)."""
         if name and name in set(project_names(self._who())):
             return False
-        self._json({"error": f"not a space: {name}" if name else "not a space"}, 400)
+        self._json({"error": refusals.no_space(name)}, 400)
         return True
 
     def _project_asked(self, req=None, *, query=None, write=False, files=False):
@@ -7575,7 +7576,7 @@ class Handler(BaseHTTPRequestHandler):
         (R283 step 3)."""
         if key and registry.is_repos(key) and users.may_see(self._who(), key):
             return False
-        self._json({"error": f"not a space: {key}" if key else "not a space"}, 400)
+        self._json({"error": refusals.no_space(key)}, 400)
         return True
 
     def _not_card(self, name):
@@ -7663,7 +7664,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         uid = (users.whose(me) if behind else users.uid_of(me)) if me else ""
         if not me or not uid:
-            self._json({"error": "not an account"}, 403)
+            self._json({"error": refusals.NO_ACCOUNT}, 403)
             return None, ""
         return me, uid
 
@@ -10627,7 +10628,7 @@ class Handler(BaseHTTPRequestHandler):
         got = memory.payload(name, sessions_anywhere(),
                              home=home_for(users.whose(self._who())))
         return self._json(got if got is not None
-                          else {"error": "not a space"}, 400 if got is None else 200)
+                          else {"error": refusals.NO_SPACE}, 400 if got is None else 200)
 
     def _get_tests(self):
         """GET /api/tests."""
@@ -11293,7 +11294,7 @@ class Handler(BaseHTTPRequestHandler):
         project = _arg_project(arg)
         if not project or project != who["session"]:
             return self._json({"error": f"this token is for {who['session']}, and the terminal "
-                                        f"asked for is {'for ' + project if project else 'not a space'}"},
+                                        f"asked for is {'for ' + project if project else refusals.NO_SPACE}"},
                               403)
         rest = "/?arg=" + urllib.parse.quote(arg, safe="")
         refused = self._term_refused(rest, me) or self._claude_held(rest, me)
@@ -12313,7 +12314,7 @@ class Handler(BaseHTTPRequestHandler):
             # its own (the operator, 27 Oct).
             acct = users.get(field(req, "account")) or {}
             if not acct.get("uid"):
-                return self._json({"error": "no such account"}, 404)
+                return self._json({"error": refusals.NO_ACCOUNT}, 404)
             print(f"dashboard: {who.get('name')} purged {acct.get('name')}'s key store", flush=True)
             return self._json(self._keys_purge(acct["uid"], acct.get("name") or acct["uid"]))
         if act == "change":
@@ -12349,7 +12350,7 @@ class Handler(BaseHTTPRequestHandler):
         the window picked, lock, the window alone, the uses, and the move
         under a key of the person's own and back."""
         if not uid:
-            return {"error": "no such account"}, 404
+            return {"error": refusals.NO_ACCOUNT}, 404
         name = who.get("name") or uid
         if act == "uses":
             labels = {}
@@ -13466,7 +13467,7 @@ class Handler(BaseHTTPRequestHandler):
         who = self._who() or {}
         proj = who.get("session") or field(req, "project")
         if proj and not who.get("session") and not users.may_see(who, proj):
-            return self._json({"error": "not a space"}, 400)
+            return self._json({"error": refusals.NO_SPACE}, 400)
         asking = prefs.get(proj)["node"] if proj else ""
         # The debug grant's, named only (the operator, 6 Oct): the session's
         # account, or the person asking, must hold it as well as the project
@@ -15735,12 +15736,12 @@ class Handler(BaseHTTPRequestHandler):
             # useful to them, while a user has the channels they were given
             # and no others. The list marks which are actually theirs.
             if not users.may_see(me, proj):
-                return self._json({"error": "not a space"}, 403)
+                return self._json({"error": refusals.NO_SPACE}, 403)
             key, box = f"p:{proj}", ("project", proj)
         elif who:
             other = by_name.get(who)
             if not other or other == uid:
-                return self._json({"error": "no such account"}, 403)
+                return self._json({"error": refusals.NO_ACCOUNT}, 403)
             key, box = f"dm:{other}", ("dm", other)
         else:
             return self._json({"error": "name a person or a space"}, 400)
