@@ -283,7 +283,9 @@ def plan(repo, env_name, ref, uid):
     secret["KUBE_TOKEN"] = tok["token"]
     rec = {"at": int(time.time()), "ref": str(ref), "commit": snap["commit"], "tag": tag, "state": "queued",
            "image": f"{where['image']}:{tag}" if got["build"] else "", "repo": repo}
-    spec = {"argv": ["sh", "-c", SCRIPT], "timeout": SINCE_LIMIT, "project": repo, "requires": ["docker-host"],
+    # Its row on the Jobs page says what it does, not its script.
+    title = f"Deploy {repo} {tag} to {env_name}"
+    spec = {"argv": ["sh", "-c", SCRIPT], "title": title, "timeout": SINCE_LIMIT, "project": repo, "requires": ["docker-host"],
             "env": env_vars, "secret_env": secret, "done": "deploy",
             "deploy": {"space": space, "env": env_name, "ref": str(ref), "commit": snap["commit"], "tag": tag}}
     source = {"digest": snap["digest"], "project": repo, "files": snap["files"], "bytes": snap["bytes"]}
@@ -367,3 +369,21 @@ def draft(repo, name=""):
         return got
     wrote = chartdraft.write(tree(repo), got["files"])
     return wrote if wrote.get("error") else wrote | {"app": got["app"]}
+
+
+def triggered(envs, when, refs, by_session, mode):
+    """What a push or a release starts (R281 step 6): [(env, ref, how)],
+    `how` "start" or "ask", for each of `envs` whose `when` it is: a push to
+    one of `refs` ({branch: commit}) or a release (`refs` {tag: commit}),
+    at that commit. A person's starts it; a session's follows the space's
+    Deploy to Kubernetes dial, `mode` (deny starts nothing, ask asks, auto
+    starts); an environment marked production asks a person whatever."""
+    out = []
+    for e in envs:
+        if e.get("when") != when or (when == "push" and e.get("branch") not in refs):
+            continue
+        ref = refs.get(e.get("branch")) if when == "push" else next(iter(refs.values()), "")
+        if not ref or (by_session and mode == "deny"):
+            continue
+        out.append((e, ref, "ask" if e.get("production") or (by_session and mode == "ask") else "start"))
+    return out

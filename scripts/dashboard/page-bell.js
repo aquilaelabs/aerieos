@@ -269,6 +269,13 @@ function attRow(a){
   // operator, 24 Nov): drawn without its key, it leaves when it stops being
   // true.
   if (a.active && a.key) a = {...a, key: ""};
+  // An environment whose workloads are stuck or short (R281 step 7),
+  // Active until it recovers or is rolled back.
+  if (a.kind === "deploy") return `<div class="bnote att bad">
+      <div class="bt">${esc(a.env)} in ${esc(projLabel(a.space))} is not healthy</div>
+      <div class="bsum">${esc(a.why)}</div>
+      <div class="bfoot"><span>until it recovers or is rolled back · ${esc(ago(a.at))}</span>
+        <span class="acts"><a href="#" data-bkube="${esc(a.repo || a.space)}">Kubernetes view</a></span></div></div>`;
   if (a.kind === "toolchain" || a.kind === "agents"){
     const keys = a.tools.map(t => t.key).filter(Boolean).join(" ");
     // The Claude sessions running there now, which an update ends (B57), not
@@ -1031,6 +1038,11 @@ function wireNeeds(root, after = () => {}){
     const j = await postJSON("/api/bell", {action: "restore"});
     if (j.error) notify(j.error, true);
     refresh();
+  });
+  root.querySelectorAll("[data-bkube]").forEach(a => a.onclick = e => {
+    e.preventDefault();
+    after();
+    openNotebook(a.dataset.bkube, "kubernetes");
   });
   root.querySelectorAll("[data-bci]").forEach(a => a.onclick = e => {
     e.preventDefault();

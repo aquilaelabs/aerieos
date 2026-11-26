@@ -8,7 +8,7 @@
 // repository deploys, Draft from the compose writing a chart into its tree
 // uncommitted, and a deploy refused where it has nowhere to build (step 4).
 // Against the stub API server lib.mjs runs (kubeApi).
-import { launch, newPage, ok, done, ready, URL, DIR, section, until, kubeApi } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, REPO, section, until, kubeApi, call, asSession } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -193,6 +193,47 @@ await section("the Kubernetes view: what runs, Scale, Restart and a pod's log, t
   }));
   ok(/not a pod's shell/.test(other), `a pod argument in any other shape is refused (${other})`);
   ok(page.errors.length === 0, `no console error through the view (${page.errors.slice(0, 2).join(' | ')})`);
+});
+
+await section("a session's aerie k8s: status at any dial, deploy under Deploy to Kubernetes, production always asked", async () => {
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
+    { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
+  const S = asSession(tok);
+  const st = await call('/api/k8s', { project: 'alpha', action: 'status', env: 'qa' }, S);
+  ok(st.status === 200 && st.body.envs?.[0]?.workloads?.[0]?.name === 'web', `a session reads what runs in an environment (${JSON.stringify(st.body).slice(0, 120)})`);
+  const lg = await call('/api/k8s', { project: 'alpha', action: 'logs', env: 'qa', pod: 'web-1' }, S);
+  ok(/GET \/health 200/.test(lg.body.text || ''), 'and a pod\'s log');
+  const denied = await call('/api/k8s', { project: 'alpha', action: 'deploy', env: 'qa', ref: 'HEAD', why: 'a fix' }, S);
+  ok(denied.status === 403 && /Deploy to Kubernetes/.test(denied.body.error || ''), `at deny a session's deploy is refused, naming the setting (${denied.body.error})`);
+  const other = await call('/api/k8s', { project: 'beta', action: 'status' }, S);
+  ok(other.status === 403, `and another space's environments are not a session's to read (${other.body.error})`);
+  await call('/api/prefs', { project: 'alpha', kube: 'ask' });
+  const asked = await call('/api/k8s', { project: 'alpha', action: 'deploy', env: 'qa', ref: 'HEAD', why: 'the fix for testers' }, S);
+  ok(asked.status === 200 && asked.body.id && !asked.body.job, `at ask it waits for a person on the bell (${JSON.stringify(asked.body).slice(0, 120)})`);
+  const bell = await call('/api/phone');
+  const row = (bell.body.asks || []).find(r => r.id === asked.body.id) || {};
+  ok(row.kind === 'deploy' && row.env === 'qa' && row.ref === 'HEAD', `the bell's row names the environment and the ref (${JSON.stringify(row).slice(0, 160)})`);
+  await call('/api/phone', { action: 'deny', id: asked.body.id });
+  await call('/api/prefs', { project: 'alpha', kube: 'auto' });
+  const cl = await page.evaluate(async () => ((await getJSON('/api/clusters')).clusters || [])[0]?.id);
+  await page.evaluate(c => postJSON('/api/deploy', { project: 'alpha', action: 'save', was: 'qa',
+    env: { name: 'qa', cluster: c, namespace: 'alpha-qa', registry: '', when: 'hand', production: true } }), cl);
+  const prod = await call('/api/k8s', { project: 'alpha', action: 'deploy', env: 'qa', ref: 'HEAD', why: 'the release' }, S);
+  ok(prod.status === 200 && prod.body.id && !prod.body.job, `an environment marked production asks a person even at auto (${JSON.stringify(prod.body).slice(0, 120)})`);
+  await call('/api/phone', { action: 'deny', id: prod.body.id });
+  await call('/api/prefs', { project: 'alpha', kube: 'deny' });
+});
+
+await section("Home's clusters tile and the bell's row for an environment that is not healthy", async () => {
+  // Step 7. The stub cluster has two nodes, one of them not ready.
+  const home = await call('/api/home');
+  ok(home.body.clusters?.all === 1 && home.body.clusters?.ready === 0, `Home counts the clusters kept and how many are ready (${JSON.stringify(home.body.clusters)})`);
+  const tile = await page.evaluate(() => { homeData = {...(homeData || {}), clusters: {ready: 0, all: 1}};
+    const t = homeTiles().find(x => x.key === 'clusters'); return t && `${t.value} ${t.label} ${t.sub} ${t.tone} ${homeHref('clusters')}`; });
+  ok(tile === '0 clusters ready of 1 kept warn #/machines/clusters', `its tile says so, in the warn tone, and opens the Clusters page (${tile})`);
+  const row = await page.evaluate(() => attRow({kind: 'deploy', space: 'alpha', env: 'qa', repo: 'alpha', active: true, why: 'web: CrashLoopBackOff', at: Date.now() / 1000 - 120}));
+  ok(/qa in alpha is not healthy/.test(row) && /CrashLoopBackOff/.test(row) && /data-bkube="alpha"/.test(row) && !/data-bdismiss/.test(row),
+     'the bell\'s row names the environment and what is stuck, opens the Kubernetes view, and has no Dismiss: it leaves when it recovers');
 });
 
 api.close();

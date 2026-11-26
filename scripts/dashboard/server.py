@@ -833,6 +833,17 @@ def compat_reap_once():
 LOG_SWEEP_EVERY = 3600
 
 
+def _kube_watch_loop():
+    """The spaces' Kubernetes environments looked at every minute (R281
+    step 7): one stuck or short is the bell's Active row until it is not."""
+    while True:
+        time.sleep(kubeview.WATCH_S)
+        try:
+            kubeview.watch_once(kube.all_spaces())
+        except Exception as e:                                                    # noqa: BLE001
+            print(f"[kube-watch] {type(e).__name__}: {e}", flush=True)
+
+
 def log_sweep_loop():
     while True:
         time.sleep(LOG_SWEEP_EVERY)
@@ -2253,6 +2264,9 @@ def _attention(who):
             # ...and a schedule whose last run failed or was skipped (R117),
             # for whoever may read the Schedules page.
             + ([] if users.may(who, "schedules-read") else schedules.attention(_job_state))
+            # ...and an environment whose workloads are stuck or short
+            # (R281 step 7), for whoever reads its space's Deploy section.
+            + kubeview.attention(lambda space: not users.may(who, "deploy-read", space))
             + signs)
     # ...less what this account has put away (bellseen.py, R144): an update
     # to a version it dismissed, until a newer one is out.
@@ -5129,6 +5143,55 @@ deploys.configure(remote_url=lambda repo: gitview.remote_url(WORKSPACE / repo), 
                   compose_of=lambda repo: devapp.compose_file(repo), tools_of=toolchains.node_has)
 workspace.own_git = gitview._own
 nodes.on_done("exec:deploy", deploys.done)
+
+
+def _session_deploy(name, act, env, ref, principal, uid, asker, allowed_by=""):
+    """A session's deploy or rollback started (R281 step 6): on its own
+    where the dial says auto, or once a person allowed it on the bell. As
+    the session's own job; its registry's token is its account's own."""
+    said = (f"a session of {asker}" if asker else "a session") + (f", allowed by {allowed_by}" if allowed_by else "")
+    r = (deploys.start(name, env, ref, principal, uid, said) if act == "deploy"
+         else deploys.rollback(name, env, principal, uid, said))
+    if r.get("ok"):
+        db.audit(principal, f"deploy-{act}", repos.key_of(name), {"repo": name, "env": env, "ref": ref,
+                                                                  "commit": r.get("commit"), "job": r.get("job"),
+                                                                  **({"allowed_by": allowed_by} if allowed_by else {})})
+    return r
+
+
+phone.deployer = _session_deploy
+
+
+def _deploy_on(name, when, refs, uid, asker, by_session):
+    """What a push or a release starts (R281 step 6): each environment of
+    the space whose `when` is a push to one of `refs` ({branch: commit}),
+    or a release (`refs` {tag: commit}), deployed at that commit. A
+    person's push or release starts them; a session's is under the space's
+    Deploy to Kubernetes dial as aerie k8s deploy is (deny starts nothing,
+    ask puts each to the owner, auto starts it), and an environment marked
+    production asks a person whatever the dial says. In a thread of its
+    own: the push or the release it follows has already answered."""
+    def run():
+        try:
+            key = repos.key_of(name)
+            principal = f"session:{name}" if by_session else (f"user:{asker}" if asker else "system:deploy-on-" + when)
+            said = f"a push to {next(iter(refs))}" if when == "push" else f"the release {next(iter(refs))}"
+            for e, ref, how in deploys.triggered(kube.envs(key), when, refs, by_session,
+                                                 prefs.get(name)["kube"] if by_session else "auto"):
+                if how == "ask":
+                    phone.ask_deploy(f"{said}, by {asker or 'a session'}", name, "deploy", e, ref, membership.owner_of(key),
+                                     membership.owner_name(key) or "the space's owner", asker_name=asker,
+                                     principal=principal, uid=uid)
+                    continue
+                r = deploys.start(name, e["name"], ref, principal, uid, f"{asker or 'a session'}, on {said}")
+                if r.get("ok"):
+                    db.audit(principal, "deploy-on-" + when, key, {"repo": name, "env": e["name"], "ref": ref, "job": r["job"]})
+                else:
+                    print(f"[deploy] {name} to {e['name']} on {when}: {r.get('error')}", flush=True)
+        except Exception as x:                                                    # noqa: BLE001
+            print(f"[deploy] {name} on {when}: {type(x).__name__}: {x}", flush=True)
+    threading.Thread(target=run, name=f"deploy-on-{when}", daemon=True).start()
+
 # What runs in an environment, and Restart and Scale on it (R281 step 5),
 # always through the environment's own deployer.
 import kubeview                                                  # noqa: E402
@@ -5533,13 +5596,14 @@ phone.release_signer = _release_signer
 # What a space's Agents-may dial says at deny (_dialed), by dial: what Claude
 # does not do, and the dial's name in the space's settings.
 DIALS = {"release": ("release it", "Tag and publish a release"),
+         "kube": ("deploy it to Kubernetes", "Deploy to Kubernetes"),
          "sign": ("sign its builds", "Sign a build"),
          "keys": ("manage its signing keys", "Manage signing keys")}
 # The grant each dial stands for, which the session's account must hold as
 # well: the dial says what a session may do on its own, the roles what its
 # person may do at all (R277, the audit of 24 Nov: a session released on a
 # dial set to auto for an account with no Releases Write).
-DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing"}
+DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing", "kube": "deploy"}
 
 # The changes to a published release, by /api/version's action
 # (_release_change). `does` is the word a session on another space is refused
@@ -5720,6 +5784,9 @@ gitrelay.configure(state=STATE, workspace=WORKSPACE,
                    host_of=forges.host_of, git_env=projects._git_env)
 # The modules that keep something that grows read where from paths.py.
 workspace.paths = gitview.paths = logs.paths = gitrelay.paths = paths
+# What a space's environments deploy on a push and on a release (R281 step 6).
+gitrelay.after_push = lambda project, refs, uid: _deploy_on(project, "push", refs, uid, _name_of_uid(uid) if uid else "", True)
+version.RELEASED = lambda project, tag, sha: _deploy_on(project, "release", {tag: sha}, "", "", False)
 
 # ---- the bb relay -----------------------------------------------------------
 # A bb verb from a session on a node, run here (roadmap #24): which verbs
@@ -6685,7 +6752,7 @@ def _snapshot(who):
         "emulator": {"ready": False, "why": "the node store did not open"} if NODES_OK
                     else emulator.ready(),
         "can": {name: not users.may(who, name) for name in
-                ("terminal", "terminal-any", "docker-write", "vms-write", "toolchains-write", "curate", "configure", "git-auth", "admin",
+                ("terminal", "terminal-any", "docker-write", "vms-write", "deploy", "toolchains-write", "curate", "configure", "git-auth", "admin",
                  # The CI runner tab, a job run and a project's node, by
                  # grant (R137 step 3): the Tools card hides CI runner on it.
                  "runner", "runner-read", "jobs", "node",
@@ -7048,6 +7115,7 @@ ROUTES = (
     Route("POST", "exact", "/api/clusters", "_clusters", "handler"),
     Route("POST", "exact", "/api/deploy", "_deploy", "handler"),
     Route("POST", "exact", "/api/kubernetes", "_kubernetes", "handler"),
+    Route("POST", "exact", "/api/k8s", "_k8s", "handler", session=True),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -9914,6 +9982,16 @@ class Handler(BaseHTTPRequestHandler):
         light = self._q().get("light", [""])[0] == "1"
         with timing.timed("home:read"):
             got = home.read(rows, names, machines, light)
+        # Clusters ready of those kept (R281 step 7), once one is, for an
+        # account whose roles read the Clusters page: ready is every node
+        # ready at its last read, which the Clusters page's Test asks again.
+        if got[1] == 200 and not users.may(self._who(), "clusters-read"):
+            kept = [c for c in clusters.listing()["clusters"]
+                    if not users.may_instance(self._who(), "clusters-read", c["id"])]
+            if kept:
+                ok = [c for c in kept if not (c.get("facts") or {}).get("error")
+                      and (c.get("facts") or {}).get("nodes") and c["facts"].get("ready") == c["facts"].get("nodes")]
+                got = ({**got[0], "clusters": {"ready": len(ok), "all": len(kept)}}, 200)
         return self._json(*got)
 
     def _get_jobs(self):
@@ -10970,6 +11048,11 @@ class Handler(BaseHTTPRequestHandler):
         if ((req.get("makevms") is not None and str(req.get("makevms")) != prefs.get(name)["makevms"])
                 or (req.get("vm_caps") is not None and req.get("vm_caps") != prefs.get(name)["vm_caps"])) \
                 and self._refused("vms-write", name):
+            return
+        # ...and Deploy to Kubernetes (R281 step 6): handing a session the
+        # space's deploys is Deploy Write's.
+        if req.get("kube") is not None and str(req.get("kube")) != prefs.get(name)["kube"] \
+                and self._refused("deploy", name):
             return
         held = (("node" in req or "nodes" in req) and prefs.node_changed(name, req)) \
             or (req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")))
@@ -13038,10 +13121,17 @@ class Handler(BaseHTTPRequestHandler):
         # A person's press is their own work: their own token first (R154).
         acting = gitview.ACTING.set(users.uid_of(me))
         try:
-            return self._result(gitview.verb(name, action, req, me, prefix=users.tmux_prefix(me),
-                                             principal=self._principal()))
+            r = gitview.verb(name, action, req, me, prefix=users.tmux_prefix(me), principal=self._principal())
         finally:
             gitview.ACTING.reset(acting)
+        # A person's Push lands what its environments deploy on a push
+        # (R281 step 6), as the branch stands now.
+        if action == "push" and r.get("ok"):
+            head = gitview._git(WORKSPACE / name, "rev-parse", "HEAD") or ""
+            branch = (gitview._git(WORKSPACE / name, "symbolic-ref", "--short", "HEAD") or "").strip()
+            if branch and head.strip():
+                _deploy_on(name, "push", {branch: head.strip()}, users.uid_of(me) or "", str(me.get("name") or ""), False)
+        return self._result(r)
 
     def _vms_iso_upload(self):
         """An ISO uploaded on the VMs page: VMs Write on the project the dialog
@@ -13764,6 +13854,57 @@ class Handler(BaseHTTPRequestHandler):
             db.audit(self._principal(), f"kube-{act}", key, {"env": env, "kind": kind, "name": wl,
                                                              **({"replicas": r["replicas"]} if "replicas" in r else {})})
         return self._json(r, 200 if r.get("ok") else 400)
+
+    def _k8s(self, req):
+        """POST /api/k8s {project, action: status|logs|deploy|rollback, env,
+        ref, pod, container, tail, why} (R281 step 6): aerie k8s, from a
+        session as from a person, relayed by the controller, which holds
+        every credential; a session never holds a kubeconfig. status and logs
+        read with the environment's deployer on Deploy Read. A session's
+        deploy and rollback are under its space's Deploy to Kubernetes dial
+        (deny refuses, ask puts it to the space's owner on the bell, auto
+        starts it) and never past its account's Deploy Write; an environment
+        marked production asks a person whatever the dial says. A person's
+        are Deploy Write, as the Kubernetes view's."""
+        me = self._who() or {}
+        sess = me.get("session")
+        name = field(req, "project") or sess or ""
+        if not name:
+            return self._json({"error": "which space? name one"}, 400)
+        if sess and self._session_elsewhere(name, "a session reaches its own space's environments alone"):
+            return None
+        act, env_name = field(req, "action"), field(req, "env")
+        if act in ("status", "logs"):
+            if self._session_held("deploy-read", name) if sess else self._refused("deploy-read", name):
+                return None
+            key = repos.key_of(name)
+            if act == "logs":
+                try:
+                    tail = int(req.get("tail") or 200)
+                except (TypeError, ValueError):
+                    tail = 200
+                return self._result(kubeview.logs(key, env_name, field(req, "pod"), field(req, "container"), tail))
+            names = [env_name] if env_name else [e["name"] for e in kube.envs(key)]
+            return self._json({"envs": [{"name": n, **kubeview.status(key, n)} for n in names]})
+        if act not in ("deploy", "rollback"):
+            return self._json({"error": "action is status, logs, deploy or rollback"}, 400)
+        if not sess:
+            return self._deploy_run(req, act)
+        if not registry.is_project(name):
+            return self._json({"error": f"not a space: {name}"}, 400)
+        key = repos.key_of(name)
+        env = kube.env_of(key, env_name)
+        if not env:
+            return self._json({"error": f"{name}'s space has no environment called {env_name}"}, 404)
+        mode = self._dialed(name, "kube", "; a person deploys from the Kubernetes view")
+        if not mode:
+            return None
+        uid, ref = users.whose(me) or "", field(req, "ref") or "HEAD"
+        if mode == "ask" or env.get("production"):
+            return self._result(phone.ask_deploy(field(req, "why"), name, act, env, ref, membership.owner_of(key),
+                                                 membership.owner_name(key) or "the space's owner",
+                                                 asker_name=str(me.get("name") or ""), principal=self._principal(), uid=uid))
+        return self._result(_session_deploy(name, act, env_name, ref, self._principal(), uid, str(me.get("name") or "")))
 
     def _deploy_run(self, req, act):
         """A deploy or a rollback (_deploy): queued as the asker's job, its
@@ -15775,6 +15916,7 @@ def main():
         apps.start()          # the apps from this controller's release, a while after the start, then daily
     threading.Thread(target=_compat_loop, name="compat", daemon=True).start()
     threading.Thread(target=log_sweep_loop, name="log-sweep", daemon=True).start()
+    threading.Thread(target=_kube_watch_loop, name="kube-watch", daemon=True).start()
     if BARE_METAL and "internet" not in featuresoff.off():
         releasecheck.start()      # a newer release, asked of GitHub a while after the start, then daily
         backup.start()            # a copy of the state onto the pools after every change (R161 step 4)

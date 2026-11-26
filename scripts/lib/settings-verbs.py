@@ -224,6 +224,8 @@ def show():
     for label, key, dflt in (("Run its container", "devbuild", "deny"),
                              # R91: its VMs, aerie vm.
                              ("Make VMs", "makevms", "deny"),
+                             # R281 step 6: aerie k8s deploy and rollback.
+                             ("Deploy to Kubernetes", "kube", "deny"),
                              # R169 step 5: a pack from the vetted catalog.
                              ("Install a tool pack", "installpacks", "ask"),
                              ("Report AerieOS bugs", "report", "auto"),

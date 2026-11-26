@@ -238,7 +238,7 @@ _BY_ID = {a.id: a for a in TABLE}
 # session's own (`aerie run`, `build`, `test`, `emu`, `gpu run`) is left to
 # the agent's check, as that command would be if it were typed bare.
 OWN_VERBS = ("version", "changelog", "roadmap", "bug", "rules", "design", "wiki", "memory", "report",
-             "git", "forge", "devapp", "container", "vm", "tool", "sign", "pc", "root", "phone",
+             "git", "forge", "devapp", "container", "vm", "k8s", "tool", "sign", "pc", "root", "phone",
              "settings", "tidy")
 OWN_NAMES = ("aerie",)
 # How an agent takes the list, which its row here or its pack's manifest

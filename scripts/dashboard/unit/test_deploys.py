@@ -80,6 +80,7 @@ class Deploys(unittest.TestCase):
         self.assertFalse(any("tok" in str(v) for v in sp["env"].values()), "nothing secret in the env a reader sees")
         self.assertEqual(sp["requires"], ["docker-host"])
         self.assertEqual(sp["done"], "deploy")
+        self.assertEqual(sp["title"], "Deploy shop c0ffeec0ffee to staging", "its Jobs row says what it does")
         self.assertEqual(got["source"]["digest"], "sha256:" + "a" * 64)
         self.line = ""
         self.assertIn("your own token for its git host", deploys.plan("shop", "staging", "main", "u1")["error"])
@@ -138,6 +139,27 @@ class Deploys(unittest.TestCase):
         self.assertIn("no earlier deploy", deploys.rollback("shop", "staging", "user:ada", "u1")["error"])
         deploys.done({"id": "j1", "spec": spec}, "succeeded")
         self.assertEqual(self.ended, [("shop", "staging", "j1", "succeeded")])
+
+
+class Triggered(unittest.TestCase):
+    """What a push or a release starts, by whose it was and the dial."""
+    ENVS = [{"name": "staging", "when": "push", "branch": "main"}, {"name": "prod", "when": "release", "production": True},
+            {"name": "qa", "when": "push", "branch": "next"}, {"name": "hand", "when": "hand"}]
+
+    def said(self, *a):
+        return [(e["name"], ref, how) for e, ref, how in deploys.triggered(self.ENVS, *a)]
+
+    def test_a_persons_push_and_release(self):
+        self.assertEqual(self.said("push", {"main": "c1"}, False, "deny"), [("staging", "c1", "start")])
+        self.assertEqual(self.said("release", {"v1.2": "c2"}, False, "auto"), [("prod", "c2", "ask")],
+                         "production asks a person even of a person's release")
+
+    def test_a_sessions_push_under_the_dial(self):
+        self.assertEqual(self.said("push", {"main": "c1", "next": "c3"}, True, "deny"), [])
+        self.assertEqual(self.said("push", {"main": "c1"}, True, "ask"), [("staging", "c1", "ask")])
+        self.assertEqual(self.said("push", {"main": "c1", "next": "c3"}, True, "auto"),
+                         [("staging", "c1", "start"), ("qa", "c3", "start")])
+        self.assertEqual(self.said("push", {"other": "c9"}, True, "auto"), [], "a branch no environment names starts nothing")
 
 
 class Script(unittest.TestCase):

@@ -780,6 +780,11 @@
              session, read as Run its container is. Deny by default. -->
         <label class="pick">Make VMs <select id="rnGateVms"
           aria-label="making, starting, stopping, snapshotting and removing this space's VMs, from a session"></select></label>
+        <!-- Its Kubernetes environments (R281 step 6): aerie k8s deploy and
+             rollback from a session. Deny by default; an environment marked
+             production asks a person whatever this says. -->
+        <label class="pick">Deploy to Kubernetes <select id="rnGateKube"
+          aria-label="deploying to and rolling back this space's Kubernetes environments, from a session"></select></label>
         <!-- A tool on a session's node (R169 step 5): aerie tool install
              from a session, a toolchain AerieOS ships or a pack from the
              vetted catalog. Ask by default: a toolchain goes into a node's

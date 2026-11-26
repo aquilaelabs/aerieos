@@ -2438,6 +2438,9 @@ MAY_PUSH = None
 SESSIONS = None
 AUDIT = None
 FORGE = None        # (project, tag, version, sha, comp) -> the forge's release (forgerelease.publish)
+# (project, tag, commit) once a release's tag is pushed: what a space's
+# environments deploy on a release (R281 step 6). Set by server.py.
+RELEASED = None
 MADE = None         # (project, tag): a release's tag pushed, dev or not (what follows it is looked for)
 UNSEALED = None     # (project) -> why the host would not start what finishes a release, or "" (releasesign.unstartable)
 _VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE", "MADE", "UNSEALED")
@@ -2496,6 +2499,9 @@ def verb(name, act, req, who, principal):
         # dev release's APK was left to the hourly look (B469).
         if r.get("pushed") and MADE:
             MADE(name, r["tag"])
+        # ...and what its environments deploy on a release (R281 step 6).
+        if r.get("pushed") and RELEASED:
+            RELEASED(name, r["tag"], r.get("sha") or "")
         if dev:
             r["dev"] = True
             r["pre"] = pre or "dev"

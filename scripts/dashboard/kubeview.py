@@ -229,3 +229,62 @@ def logs(space, env_name, pod, container="", tail=500):
     except kubeclient.KubeError as e:
         return {"error": f"{pod}'s log was not read: {e}"}
     return {"text": text[-kubeclient.LOG_MAX:]}
+
+
+# ---- the bell's rows (R281 step 7) -------------------------------------------
+# Each environment a space has deployed to is looked at every WATCH_S:
+# a workload short of what it wants for longer than SETTLE_S (a rollout
+# takes a while), or a pod waiting on a reason that does not pass by itself,
+# is the bell's Active row until it recovers or is rolled back.
+WATCH_S, SETTLE_S = 60, 180
+STUCK = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError",
+         "InvalidImageName", "RunContainerError")
+_health = {}              # (space, env) -> {"bad": [sentence], "since": t}
+
+
+def judge(st, short_since, now):
+    """The sentences that make an environment's status news: a workload
+    whose pods wait on STUCK, or short of what it wants since `short_since`
+    longer than SETTLE_S. ([sentences], when it first went short)."""
+    bad, short = [], 0
+    for w in st.get("workloads") or []:
+        stuck = sorted({p["state"] for p in w.get("pods") or [] if p.get("state") in STUCK})
+        if stuck:
+            bad.append(f"{w['name']}: {', '.join(stuck)}")
+        elif w.get("desired", 0) > 0 and w.get("ready", 0) < w["desired"]:
+            short = short_since or now
+            if now - short >= SETTLE_S:
+                bad.append(f"{w['name']}: {w['ready']} of {w['desired']} ready")
+    return bad, short
+
+
+def watch_once(spaces, now=None):
+    """Every environment of `spaces` ({space key: [env, ...]}) with a deploy
+    looked at once; what is news kept for attention()."""
+    now = now or time.time()
+    seen = set()
+    for space, envs in spaces.items():
+        for e in envs:
+            if not e.get("deploys"):
+                continue
+            k = (space, e["name"])
+            seen.add(k)
+            st = status(space, e["name"])
+            was = _health.get(k) or {}
+            repo = (e["deploys"][0] or {}).get("repo") or space
+            if st.get("error"):
+                _health[k] = {"bad": [st["error"]], "since": was.get("since") or now, "short": 0, "repo": repo}
+                continue
+            bad, short = judge(st, was.get("short", 0), now)
+            _health[k] = {"bad": bad, "since": (was.get("since") or now) if bad else 0, "short": short, "repo": repo}
+    for k in [k for k in _health if k not in seen]:
+        _health.pop(k, None)
+
+
+def attention(may_read):
+    """The bell's rows (kind deploy, Active): each environment whose
+    workloads are stuck or short, for an account `may_read(space)` lets
+    read its Deploy section."""
+    return [{"kind": "deploy", "id": f"{space}:{env}", "space": space, "env": env, "repo": h.get("repo") or space, "active": True,
+             "why": "; ".join(h["bad"][:3]), "at": h["since"]}
+            for (space, env), h in sorted(_health.items()) if h.get("bad") and may_read(space)]

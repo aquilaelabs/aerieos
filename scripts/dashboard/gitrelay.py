@@ -48,6 +48,9 @@ token_helper = None     # (project, uid) -> the credential helpers, the acting a
 parse_url = None        # forges.parse
 host_of = None          # forges.host_of: the real host behind an ssh alias
 git_env = None          # projects._git_env: the environment every git job gets
+# (project, {branch: commit}, uid) after a push that landed: what a space's
+# environments deploy on a push (R281 step 6). None in a module test.
+after_push = None
 
 VERBS = ("push", "fetch", "pull", "ls-remote")
 FLAGS = frozenset({"-u", "--set-upstream", "--tags", "--follow-tags", "--delete", "-d",
@@ -681,6 +684,15 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=Tr
         if r["code"] != 0 or dry:
             return r
         after = _shadow_refs(d)
+        if verb == "push" and after_push:
+            # The branches the push wrote, at the commit each now has there.
+            landed = {b: after[f"refs/remotes/{name}/{b}"] for b in push_plan([*flags, *pos], branch)["dests"]
+                      if f"refs/remotes/{name}/{b}" in after}
+            if landed:
+                try:
+                    after_push(project, landed, uid)
+                except Exception as e:                                       # noqa: BLE001
+                    print(f"[gitrelay] after the push of {project}: {type(e).__name__}: {e}", flush=True)
         apply = {}
         changes = [[n, after.get(n, "")] for n in sorted(set(tree_refs) | set(after))
                    if tree_refs.get(n) != after.get(n)]

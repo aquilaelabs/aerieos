@@ -758,6 +758,21 @@ aerie vm usb NAME give|take VENDOR:PRODUCT[:SERIAL] [--port 1-3]
                    person on the bell, since a device can be a disk or a key
 aerie vm ip NAME | ssh NAME [COMMAND...]
                    its address, and ssh in as its account
+aerie k8s [status] [ENV]
+                   this space's Kubernetes environments (R281): each
+                   workload's ready of desired, its version, its pods and
+                   where it answers, read through the controller, which
+                   holds every credential; a session never holds a kubeconfig
+aerie k8s logs ENV POD [--tail N] [--container NAME]
+                   the end of a pod's log
+aerie k8s deploy ENV [BRANCH|TAG|COMMIT] --why "..."
+aerie k8s rollback ENV --why "..."
+                   the repository at that ref built and deployed there (HEAD
+                   when none is named), or the last good deploy before the
+                   newest deployed again, its job followed to its end; under
+                   the space's *Agents may: Deploy to Kubernetes*: refused at
+                   deny, asked at ask, started at auto, and an environment
+                   marked production asks a person whatever it says
 aerie container       what container asks are waiting on an administrator
 aerie container new --why "..." --name NAME --compose FILE [--env FILE] [--node NODE] [--for PROJECT]
                    a container built from a compose file the session wrote,

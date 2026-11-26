@@ -48,6 +48,29 @@ class View(unittest.TestCase):
         self.assertIn("name a pod", kubeview.logs("s", "staging", "../etc")["error"])
 
 
+class Watch(unittest.TestCase):
+    """The bell's rows: a pod stuck at once, a workload short only once it
+    has been short longer than a rollout takes, gone when it recovers."""
+
+    def test_stuck_short_and_recovered(self):
+        crash = {"workloads": [{"name": "web", "desired": 2, "ready": 1, "pods": [{"state": "CrashLoopBackOff"}, {"state": "Running"}]}]}
+        self.assertEqual(kubeview.judge(crash, 0, 1000)[0], ["web: CrashLoopBackOff"])
+        short = {"workloads": [{"name": "web", "desired": 2, "ready": 1, "pods": [{"state": "Running"}]}]}
+        bad, since = kubeview.judge(short, 0, 1000)
+        self.assertEqual((bad, since), ([], 1000), "short, but not yet longer than a rollout takes")
+        self.assertEqual(kubeview.judge(short, since, 1000 + kubeview.SETTLE_S)[0], ["web: 1 of 2 ready"])
+        well = {"workloads": [{"name": "web", "desired": 2, "ready": 2, "pods": []}]}
+        self.assertEqual(kubeview.judge(well, since, 5000), ([], 0))
+
+    def test_rows_for_who_may_read(self):
+        kubeview._health.clear()
+        self.addCleanup(kubeview._health.clear)
+        kubeview._health[("shop", "staging")] = {"bad": ["web: CrashLoopBackOff"], "since": 10, "repo": "shop-api"}
+        kubeview._health[("other", "prod")] = {"bad": ["db: 0 of 1 ready"], "since": 20}
+        rows = kubeview.attention(lambda space: space == "shop")
+        self.assertEqual([(r["space"], r["env"], r["repo"], r["active"]) for r in rows], [("shop", "staging", "shop-api", True)])
+
+
 class Exec(unittest.TestCase):
     """A pod's shell (kubeexec.py): a client's frames masked, as the API
     requires, and read back whole by the reader the server's frames go

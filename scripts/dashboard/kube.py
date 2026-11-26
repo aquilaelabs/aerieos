@@ -102,6 +102,12 @@ def envs(space):
     return [dict(e, cluster_name=names.get(e.get("cluster"), "")) for e in _load()["spaces"].get(str(space), [])]
 
 
+def all_spaces():
+    """Every space's environments, {space key: [env, ...]}: what the bell's
+    watch looks at (kubeview.watch_once)."""
+    return {k: list(v) for k, v in _load()["spaces"].items()}
+
+
 def using(cid):
     """The spaces with an environment on this cluster, as keys."""
     return sorted(k for k, rows in _load()["spaces"].items() if any(e.get("cluster") == cid for e in rows))

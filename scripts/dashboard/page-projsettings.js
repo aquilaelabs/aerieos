@@ -748,6 +748,8 @@ function rnFillPrefsRest(p){
   fieldDial("devbuild", GATE_MODES).closest("label").hidden = state?.can?.["docker-write"] === false;
   // ...and its VMs' (R91), the VMs area's to change, deny unless set.
   fieldDial("makevms", GATE_MODES).closest("label").hidden = state?.can?.["vms-write"] === false;
+  // ...and its deploys (R281 step 6), Deploy Write's to hand a session.
+  fieldDial("kube", GATE_MODES).closest("label").hidden = state?.can?.deploy === false;
   fieldDial("installpacks", GATE_MODES).closest("label").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
   // What its VMs may hold, only where it may make VMs at all (R223).
@@ -1853,6 +1855,7 @@ const RN_FIELDS = [
    of: p => String(p?.prefs?.agent_slots ?? 3), read: el => el?.value || "3"},
   {k: "devbuild", id: "rnGateDocker", sect: "claude", label: "Agents may", dial: "deny"},
   {k: "makevms", id: "rnGateVms", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "kube", id: "rnGateKube", sect: "claude", label: "Agents may", dial: "deny"},
   {k: "vm_caps", sect: "claude", label: "Its VMs may hold"},
   {k: "installpacks", id: "rnGatePacks", sect: "claude", label: "Agents may", dial: "ask"},
   {k: "report", id: "rnGateReport", sect: "claude", label: "Agents may", dial: "auto"},

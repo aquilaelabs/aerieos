@@ -92,6 +92,9 @@ function homeTiles(){
     {key: "sessions", label: sessions === 1 ? "session open" : "sessions open", value: sessions, wait: !state, sub: claudes ? `${claudes} of them ${agentsWord(agentSs.map(s => s.name))}` : ""},
     {key: "updates", label: updates === 1 ? "update due" : "updates due", value: updates, wait: !state, tone: updates ? "warn" : ""},
     {key: "ci", label: "CI red", value: red, wait: !state, tone: red ? "bad" : "", sub: red === 1 ? projLabel(state.ci_red[0].project) : ""},
+    // The Kubernetes clusters kept (R281 step 7), once one is.
+    h.clusters ? {key: "clusters", label: h.clusters.ready === 1 ? "cluster ready" : "clusters ready", value: h.clusters.ready,
+                  sub: `of ${h.clusters.all} kept`, tone: h.clusters.ready < h.clusters.all ? "warn" : ""} : null,
     // The own machine's backups (R162 step 5): the last good run, or what
     // failed or went stale; only where a backup is recorded.
     h.backups ? {key: "backups", label: h.backups.count === 1 ? "backup" : "backups", value: h.backups.count,
@@ -114,7 +117,7 @@ function homeHref(key){
           // The updates due are toolchains, images, nginx and agents on every
           // node, which no one node's page holds: they are listed
           // on Home's own Attention card, so the tile brings that into view (B73).
-          updates: "#/home", backups: "#/machines/storage",
+          updates: "#/home", backups: "#/machines/storage", clusters: "#/machines/clusters",
           ci: c ? `#/spaces/${encodeURIComponent(c.project)}/git` : "#/spaces", sessions: "#"}[key] || "#";
 }
 function homeTilesHtml(tiles){

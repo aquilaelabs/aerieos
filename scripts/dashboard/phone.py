@@ -82,6 +82,9 @@ keymaker = None
 # release a session asked for, run as Release on the Artifacts tab runs it
 # (R138). Set by the server.
 releaser = None
+# (project, action, env, ref, principal, uid, asker, allowed by) -> {ok, job}
+# or {error}: a session's deploy or rollback, allowed (R281 step 6).
+deployer = None
 # (project, plan, asker_name, principal) -> (payload, status): an edit of a
 # published release (R139), the controller's, with the project's token.
 release_editor = None
@@ -731,6 +734,9 @@ def _req_public(r):
     # A release names the tag and the commit it would mark (R138).
     if r.get("kind") == "release":
         out["tag"], out["sha"] = r.get("tag") or "", r.get("sha") or ""
+    # A deploy names its environment and what it would send there (R281).
+    if r.get("kind") == "deploy":
+        out["env"], out["ref"], out["production"] = r.get("env") or "", r.get("ref") or "", bool(r.get("production"))
     # ...and an edit of one (R139) is approved by reading it: the notes it
     # would put on the page, whole, and each file with its size.
     if r.get("kind") == "release-edit":
@@ -1129,6 +1135,23 @@ def ask_release(why, project, comp, plan, to_uid, to_name, asker_name="", princi
                        **({"pre": str(pre)} if pre else {})})
 
 
+def ask_deploy(why, project, action, env, ref, to_uid, to_name, asker_name="", principal="", uid=""):
+    """A session asking to deploy to, or roll back, one of its space's
+    Kubernetes environments (R281 step 6), where the space's Deploy to
+    Kubernetes dial is `ask` or the environment is marked production. It
+    goes to the space's owner (and any administrator), who reads which
+    environment and which ref; Allow starts it as the session's own, with
+    the session's account's git token where its registry needs one."""
+    words = ["k8s", action, str(env.get("name") or "")] + ([str(ref)] if action == "deploy" and ref else [])
+    if env.get("production"):
+        words.append("(production)")
+    return _owner_ask(
+        "deploy", why, "say what it is for: --why \"...\" (the fix for testers, the release ...)", project,
+        words, to_uid, to_name, asker_name,
+        extra={"action": action, "env": str(env.get("name") or ""), "ref": str(ref or ""), "principal": principal,
+               "uid": str(uid or ""), "asker_name": str(asker_name or ""), "production": bool(env.get("production"))})
+
+
 def ask_release_edit(why, project, plan, to_uid, to_name, asker_name="", principal=""):
     """A session asking to change its project's published release (R139):
     the notes replaced, files attached. Every edit is its own ask, to the
@@ -1489,6 +1512,14 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             r.update(state="done", code=1 if got.get("error") else 0,
                      out=str(got.get("error") or got.get("job") or "started"))
         return {"error": got["error"]} if got.get("error") else {"ok": True}
+    if r.get("kind") == "deploy":
+        res = (deployer(r["project"], r.get("action") or "deploy", r.get("env") or "", r.get("ref") or "",
+                        r.get("principal") or "", r.get("uid") or "", r.get("asker_name") or "", name or "")
+               if deployer is not None else {"error": "nothing here deploys"})
+        with _lock:
+            r.update(state="done", code=1 if res.get("error") else 0,
+                     out=str(res.get("error") or res.get("job") or "started"))
+        return {"error": res["error"]} if res.get("error") else {"ok": True}
     if r.get("kind") == "release":
         res = (releaser(r["project"], r.get("comp") or "", r.get("asker_name") or "", r.get("principal") or "",
                         dev=r.get("dev") is True, **({"pre": str(r["pre"])} if r.get("pre") else {}))
