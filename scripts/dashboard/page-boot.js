@@ -357,6 +357,18 @@ function headerOnly(keep){
   if (keep !== "doctor" && docShown) toggleDoctor(false);
   if (keep !== "bell" && bellOpen) toggleBell(false);
 }
+// The header's three pop-outs and the keyboard (R286 step 1): opened from
+// the keyboard, the caret goes to the panel's first control, as a dialog's
+// does; shut with the caret inside it, the caret goes back to the button
+// that opened it, so a keyboard's place is never lost to the page's top.
+function popoutFocus(btn, panel, open){
+  if (open){
+    if (!btn.matches(":focus-visible")) return;
+    requestAnimationFrame(() => panel.querySelector('button:not([disabled]), a[href], input, select, [tabindex]:not([tabindex="-1"])')?.focus());
+  } else if (panel.contains(document.activeElement) || document.activeElement === document.body){
+    btn.focus({preventScroll: true});
+  }
+}
 function bootLogs(){
   $("bCards").onclick = e => { e.stopPropagation(); headerOnly("gear"); toggleUiMenu(); };
   document.addEventListener("click", e => {

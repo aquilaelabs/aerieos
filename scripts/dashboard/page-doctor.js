@@ -104,4 +104,5 @@ function toggleDoctor(open){
   $("bDocDot").setAttribute("aria-expanded", String(docShown));
   $("docPanel").hidden = !docShown;
   if (docShown) drawDoctor();
+  popoutFocus($("bDocDot"), $("docPanel"), docShown);
 }

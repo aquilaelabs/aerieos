@@ -984,6 +984,7 @@ function toggleBell(open){
   const panel = $("bellPanel"), bell = $("bBell");
   bellOpen = open === undefined ? !bellOpen : open;
   bell.setAttribute("aria-expanded", bellOpen ? "true" : "false");
+  popoutFocus(bell, panel, bellOpen);
   if (bellOpen){
     notesSeen = notes.length;          // opening it is reading it
     panel.hidden = false;

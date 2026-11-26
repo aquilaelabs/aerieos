@@ -465,5 +465,28 @@ await section("A request that never landed is the controller not answering, said
      `a fetch that never landed is said as the controller not answering, and the Phone page's own read keeps no failure for it (${JSON.stringify(r)})`);
 });
 
+// The header's pop-outs from the keyboard (R286 step 1): each opened by Enter
+// on its button takes the caret into itself, and Escape gives it back to the
+// button, as a dialog does.
+await section("the bell, the Doctor and the gear from the keyboard", async () => {
+  const got = [];
+  for (const [btn, panel] of [['#bBell', '#bellPanel'], ['#bDocDot', '#docPanel'], ['#bCards', '#uiMenu']]){
+    await page.evaluate(() => headerOnly(''));
+    // Arrived at by the keyboard, as a person does: Firefox counts a focus
+    // a script gave as no keyboard's.
+    await page.focus(btn);
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    const inside = await page.waitForFunction(p => document.querySelector(p)?.contains(document.activeElement), panel, { timeout: 5000 })
+      .then(() => true, () => false);
+    await page.keyboard.press('Escape');
+    const back = await page.waitForFunction(b => document.activeElement === document.querySelector(b), btn, { timeout: 5000 })
+      .then(() => true, () => false);
+    got.push(`${btn} ${inside ? 'in' : 'not in'}, ${back ? 'back' : 'not back'}`);
+  }
+  ok(got.every(g => /^\S+ in, back$/.test(g)), `each pop-out takes the caret in on Enter and gives it back on Escape (${got.join(' | ')})`);
+});
+
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);

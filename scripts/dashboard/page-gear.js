@@ -337,6 +337,7 @@ function toggleUiMenu(open){
   const el = $("uiMenu"), btn = $("bCards");
   uiMenuOpen = open === undefined ? !uiMenuOpen : open;
   btn.setAttribute("aria-expanded", uiMenuOpen ? "true" : "false");
+  popoutFocus(btn, el, uiMenuOpen);
   if (uiMenuOpen){
     // A close still playing is stopped, and its end hides only a menu still
     // meant to be shut: pressed again inside its 120ms, the menu opened and
