@@ -396,6 +396,10 @@ curl -fLO "$REL/aerieos-image-${TAG#v}.digest" && sha256sum --ignore-missing -c 
 docker pull "$(cat aerieos-image-${TAG#v}.digest)"   # by digest, never by tag
 ```
 
+The container edition makes this check itself once a day: it reads its own
+version's signed list, and where the registry serves another image under
+that version's tag than the list names, the bell says so.
+
 The image is also signed keylessly with cosign by the tag's own build, and
 the signature is in the public transparency log, so with
 [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):

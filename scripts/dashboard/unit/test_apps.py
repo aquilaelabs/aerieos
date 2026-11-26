@@ -75,6 +75,48 @@ class Apps(unittest.TestCase):
                    {"name": "SHA256SUMS.sig", "browser_download_url": f"file://{sums}.sig"}]
         return {"tag_name": tag, "assets": assets}
 
+    def test_the_container_edition_s_image_is_held_to_its_signed_release(self):
+        # R290 step 3 (the operator, 26 Nov): the registry's image under this
+        # build's version against the one its signed list names.
+        digest = "sha256:" + "ab" * 32
+        ref = f"ghcr.io/aquilaelabs/aerieos@{digest}"
+        rel = self.tmp / "img"
+        rel.mkdir()
+        name = "aerieos-image-0.7.0-dev.12.digest"
+        (rel / name).write_text(ref + "\n")
+        sums = rel / "SHA256SUMS"
+        sums.write_text(f"{hashlib.sha256((ref + chr(10)).encode()).hexdigest()}  {name}\n")
+        subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", KEY["path"], "-n", REL, str(sums)], check=True,
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
+        release = {"tag_name": "v0.7.0-dev.12", "assets": [
+            {"name": name, "browser_download_url": f"file://{rel / name}"},
+            {"name": "SHA256SUMS", "browser_download_url": f"file://{sums}"},
+            {"name": "SHA256SUMS.sig", "browser_download_url": f"file://{sums}.sig"}]}
+        asked = []
+
+        def registry(serves):
+            return lambda r: (asked.append(r), (serves, ""))[1]
+        conf = dict(state=self.tmp, version=lambda: "0.7.0-dev.12+abc", setting=self.settings.get,
+                    write_json=lambda p, d: (Path(p).parent.mkdir(parents=True, exist_ok=True), Path(p).write_text(json.dumps(d))))
+        apps.configure(**conf, container=lambda: True, registry_digest=registry(digest))
+        got = apps.own_image([release])
+        self.assertEqual(got, {"version": "0.7.0-dev.12", "signed": ref, "registry": digest, "ok": True})
+        self.assertEqual(asked, ["ghcr.io/aquilaelabs/aerieos:0.7.0-dev.12"], "the tag a person pulls this version by")
+        apps.configure(**conf, container=lambda: True, registry_digest=registry("sha256:" + "cd" * 32))
+        self.assertIs(apps.own_image([release])["ok"], False)
+        apps.configure(**conf, container=lambda: False, registry_digest=registry(digest))
+        self.assertEqual(apps.own_image([release]), {}, "bare metal holds its bundle to the list instead")
+        apps.configure(**conf, container=lambda: True, registry_digest=registry(digest))
+        self.assertEqual(apps.own_image([{**release, "tag_name": "v0.7.0-dev.11"}]), {}, "no release for this build")
+        # The digest file changed after the list was signed: not taken.
+        (rel / name).write_text(f"ghcr.io/aquilaelabs/aerieos@sha256:{'ef' * 32}\n")
+        self.assertIn("not the file", apps.own_image([release])["said"])
+        # The bell's row where they differ, and none where they agree.
+        apps.write_json(apps.INDEX, {"image": {"version": "0.7.0-dev.12", "registry": "sha256:" + "cd" * 32, "ok": False}})
+        self.assertEqual([r["kind"] for r in apps.image_attention("n_own")], ["image-signed"])
+        apps.write_json(apps.INDEX, {"image": {"version": "0.7.0-dev.12", "ok": True}})
+        self.assertEqual(apps.image_attention("n_own"), [])
+
     def test_a_build_belongs_to_its_release(self):
         self.assertEqual(apps.base_version("0.7.0-dev.3160+43218c1"), "0.7.0")
         self.assertEqual(apps.base_version("v1.2.3"), "1.2.3")

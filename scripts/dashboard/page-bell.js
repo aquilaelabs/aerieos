@@ -547,6 +547,17 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-brelease="${esc(a.id)}">Update</a></span></div></div>`;
   }
+  // The registry serving another image under this build's version than its
+  // signed release names (R290 step 3), on the container edition: a person
+  // pulls by the digest the release names, as the install guide says.
+  if (a.kind === "image-signed"){
+    return `<div class="bnote att">
+      <div class="bt">The registry's AerieOS ${esc(a.version)} is not its signed image</div>
+      <div class="bsum">the image served under that version is not the one its release signed: pull the release's own by its digest</div>
+      <div class="bfoot"><span>in the install guide</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#/help/install" data-bhelp="install">How to check</a></span></div></div>`;
+  }
   // A node's nginx behind the newest line (R192): its own note, to the
   // nginx tab on that node, where Update is.
   if (a.kind === "nginx"){
@@ -1056,6 +1067,9 @@ function wireNeeds(root, after = () => {}){
   });
   root.querySelectorAll("[data-bsettings]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); openSettingsTab();
+  });
+  root.querySelectorAll("[data-bhelp]").forEach(a => a.onclick = e => {
+    e.preventDefault(); after(); location.hash = `#/help/${a.dataset.bhelp}`;
   });
   root.querySelectorAll("[data-bsched]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); openSchedulesTab();

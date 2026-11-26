@@ -109,10 +109,65 @@ _lock = threading.Lock()
 _state = {"checking": False}
 
 
-def configure(*, state, version, setting, write_json, audit=None):
+def configure(*, state, version, setting, write_json, audit=None, container=None, registry_digest=None):
     globals().update(DIR=Path(state) / "apps", SEED=Path(state) / "seed.json", _version=version,
-                     _setting=setting, write_json=write_json, audit=audit)
+                     _setting=setting, write_json=write_json, audit=audit,
+                     _container=container or (lambda: False), _registry_digest=registry_digest or (lambda ref: ("", "")))
     globals()["INDEX"] = DIR / "index.json"
+
+
+_container = lambda: False                      # noqa: E731 (configure: the container edition)
+_registry_digest = lambda ref: ("", "")         # noqa: E731 (configure: imagecheck.remote_digest)
+IMAGE_REF = re.compile(r"[a-z0-9][a-z0-9.-]*(?::[0-9]+)?/[a-z0-9._/-]+@sha256:[0-9a-f]{64}")
+
+
+def own_image(releases):
+    """The container edition's image held to its signed release (R290 step
+    3; the operator, 26 Nov): the release for this very build, its signed
+    list verified, the image reference its aerieos-image-VERSION.digest
+    names, and what the registry serves under this version's tag now.
+    {version, signed, registry, ok} where it could be told, {said} where
+    the release cannot be read for it, {} on another edition or a build
+    no release is for. A container cannot read its own image's digest, so
+    what is held is the tag a person pulls this version by."""
+    ver = str(_version() or "").split("+")[0]
+    if not _container() or not ver:
+        return {}
+    tag = f"v{ver}"
+    rel = next((r for r in releases if isinstance(r, dict) and r.get("tag_name") == tag and not r.get("draft")), None)
+    if not rel:
+        return {}
+    listed, _sig, refused = _signed_list(rel)
+    if refused:
+        return {"version": ver, "said": refused}
+    name = f"aerieos-image-{ver}.digest"
+    asset = next((a for a in rel.get("assets") or [] if isinstance(a, dict) and a.get("name") == name), None)
+    if not asset or name not in listed:
+        return {"version": ver, "said": f"{tag} names no image in its signed list"}
+    try:
+        body = _get(_where(asset), 4096)
+    except (OSError, ValueError, KeyError) as e:
+        return {"version": ver, "said": f"{name} could not be read: {e}"}
+    if hashlib.sha256(body).hexdigest() != listed[name]:
+        return {"version": ver, "said": f"{name} is not the file {tag}'s signed list names"}
+    ref = body.decode("ascii", "replace").strip()
+    if not IMAGE_REF.fullmatch(ref):
+        return {"version": ver, "said": f"{name} does not name an image by its digest"}
+    repo, digest = ref.split("@", 1)
+    have, why = _registry_digest(f"{repo}:{ver}")
+    if not have:
+        return {"version": ver, "signed": ref, "said": why or "the registry did not say"}
+    return {"version": ver, "signed": ref, "registry": have, "ok": have == digest}
+
+
+def image_attention(own_node_id):
+    """The bell's row (kind image-signed) where the registry serves another
+    image under this build's version than its signed release names."""
+    im = _index().get("image") or {}
+    if im.get("ok") is not False:
+        return []
+    return [{"kind": "image-signed", "id": own_node_id or "controller", "version": im.get("version", ""),
+             "key": f"image-signed:{im.get('version')}:{str(im.get('registry') or '')[7:19]}"}]
 
 
 # Whether dev features are offered (settings' offer_unvetted), set by server.py.
@@ -294,9 +349,11 @@ def check():
     idx = _index()
     held = idx.get("apps") or {}
     err, rel, matched = "", None, False
+    image = idx.get("image") or {}
     try:
         releases = json.loads(_get(RELEASES_URL, 8 << 20))
         rel, matched = _pick(releases if isinstance(releases, list) else [], base_version(_version()))
+        image = own_image(releases if isinstance(releases, list) else [])
         if not rel:
             err = "no published release to take the apps from"
     except (OSError, ValueError) as e:
@@ -356,7 +413,9 @@ def check():
            # The signed list the held files were taken on, kept for the
            # companion's own check (B1168); the one before stays while
            # nothing new was taken.
-           "proof": _proof.get(tag) if tag and not refused else idx.get("proof")}
+           "proof": _proof.get(tag) if tag and not refused else idx.get("proof"),
+           # The container edition's image against its signed release (R290 step 3).
+           "image": image}
     write_json(INDEX, idx)
     return view()
 

@@ -2229,6 +2229,9 @@ def _attention(who):
                + nodes.bundle_attention() + _token_rows()
                # ...and a newer release for a bare-metal install (R90 step 5).
                + releasecheck.attention(_own_node_id())
+               # ...and the registry's image for this version not the one
+               # its signed release names, on the container edition (R290).
+               + apps.image_attention(_own_node_id())
                # ...and a disk failing or hot, a pool not online, an array
                # slot gone, on the controller's own machine (R164 step 3).
                + nodes.storage_attention()
@@ -6336,7 +6339,8 @@ move.tunnel_host = lambda nid: nodes.tunnel_host(nodes.node(nid) or {})
 channel.moved_answer = lambda nid: ({"answer": move.answer_for(nid), "url": move.node_url(nid, ""), "pin": ""} if move.tunnel_host(nid)
                                     else {"answer": move.answer_for(nid), "url": "", "pin": ""})
 apps.configure(state=STATE, version=lambda: image_stamp().get("version") or "",
-               setting=settings.get, write_json=write_json, audit=db.audit)
+               setting=settings.get, write_json=write_json, audit=db.audit,
+               container=lambda: not BARE_METAL, registry_digest=imagecheck.remote_digest)
 apps.unvetted_ok = channel.unvetted_ok      # the Windows companion and the VS Code extension are dev features
 devices.configure_apps(apps)
 
