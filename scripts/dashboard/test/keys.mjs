@@ -140,14 +140,10 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   ok((await keys({ action: 'change-mine', key: 'zz' })).error, '...and a pasted key that is not 64 hex characters is refused');
 
   // ---- Profile: the account's key store -----------------------------------------
-  // A token kept as web's own before tokens were a person's went into its
-  // owner's store at the start (0011), web linked to it; one given in app's
-  // settings goes into the giver's (the operator, 27 Oct). Nothing is linked
-  // on Profile itself.
-  let mine1 = await keys({ action: 'mine' });
-  const webTok = (mine1.forges || []).find(f => f.host === 'github.com');
-  ok(webTok && JSON.stringify(webTok.projects) === '["web"]',
-     `the token web kept from before is in its owner's store, web using it (${JSON.stringify(mine1.forges)})`);
+  // A token given in a space's settings goes into the giver's store (the
+  // operator, 27 Oct); one kept as the space's own stays its own (R157:
+  // the move of those from before 0.8 at every start is gone, R295).
+  // Nothing is linked on Profile itself.
   // The owner takes the projects on, as a fresh install's owner does on the
   // Users page: a role on each (lib's member(), on this controller).
   const rl = await (await fetch(base + '/api/roles', { headers: H })).json();
@@ -157,11 +153,17 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
     project_roles: Object.fromEntries((rl.projects || []).map(p => [p, ['keyrole']])) }) });
   const gave = await (await fetch(base + '/api/rename', { method: 'POST', headers: H,
     body: JSON.stringify({ name: 'app', token: 'apptoken0123456789' }) })).json();
-  mine1 = await keys({ action: 'mine' });
+  const gaveWeb = await (await fetch(base + '/api/rename', { method: 'POST', headers: H,
+    body: JSON.stringify({ name: 'web', token: 'webtoken0123456789' }) })).json();
+  let mine1 = await keys({ action: 'mine' });
+  const webTok = (mine1.forges || []).find(f => f.host === 'github.com');
+  ok(!gaveWeb.error && webTok && JSON.stringify(webTok.projects) === '["web"]',
+     `a token given in web's settings is in its giver's store, web using it (${gaveWeb.error || JSON.stringify(mine1.forges)})`);
   const appTok = (mine1.forges || []).find(f => f.host === 'lan.example.test:3000');
   ok(!gave.error && appTok?.scheme === 'http' && JSON.stringify(appTok.projects) === '["app"]',
      `a token given in a space's settings is the giver's, with its scheme (${gave.error || JSON.stringify(appTok)})`);
-  ok(!JSON.stringify(mine1).includes('apptoken0123456789') && !JSON.stringify(mine1).includes('plaintoken123'),
+  ok(!JSON.stringify(mine1).includes('apptoken0123456789') && !JSON.stringify(mine1).includes('webtoken0123456789')
+     && !JSON.stringify(mine1).includes('plaintoken123'),
      '...and nothing the page reads carries a token');
   ok(!readFileSync(`${w}/config/account-secrets.json`, 'utf8').includes('apptoken0123456789'), '...kept sealed on disk');
   const kept2 = (await keys({ action: 'status' })).kept || [];
