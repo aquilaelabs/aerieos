@@ -1853,6 +1853,10 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 /* The header's height, as the buttons beside it are (B142). */
 .jump input{width:100%;min-height:var(--tap);padding:4px 10px;background:var(--sunk);color:var(--ink);font:var(--f-data)}
 .jump input::placeholder{color:var(--dim)}
+/* Every field's placeholder in the quiet voice (R286 step 4): the browser's
+   own read 2 to 3:1 on the field in the themes, measured; Firefox's own
+   halves it again with an opacity. */
+::placeholder{color:var(--dim);opacity:1}
 @media(max-width:1000px){ .jump{flex:0 1 150px} .meta.host{display:none}
 }
 /* Its colors sit under the look a disabled button keeps when pointed at (a

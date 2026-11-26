@@ -334,7 +334,10 @@ html[data-theme="sepia"],.sw[data-theme="sepia"]{
    wear, flip with it. */
 html[data-mode="light"]{
   color-scheme:light;
-  --pass:#00752c;
+  /* AA on the page bar's band too, which is a step darker than the page
+     where it lays its 92% over the pane (R286 step 4: #00752c read 3.6:1
+     there, measured). */
+  --pass:#00622a;
   --ground:#fbfbf8; --ground-ink:#1d2633;
   --veil:color-mix(in srgb, var(--ink) 34%, transparent);
   --warn-wash:#fdf1bf; --warn-wash-ink:#1d2633; --warn-edge:#d8b62a;
