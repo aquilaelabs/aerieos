@@ -387,7 +387,7 @@ def read(space):
                         "enabled": bool(a.get("enabled", True))})
         ids["automod"][a["name"]] = str(a["id"])
     pins = {}
-    for (cat, name, what), cid in ids["channels"].items():
+    for (_cat, name, what), cid in ids["channels"].items():
         if what != "channel":
             continue
         got = _call(token, "GET", f"/channels/{cid}/pins") or []
