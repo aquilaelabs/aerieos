@@ -172,8 +172,11 @@ def seen(uid, lid, ua=None, ip=""):
         if ua:
             if r.get("ua") and r["ua"] != _ua_digest(ua):
                 return False
-            if not r.get("ua"):
+            if "ua" not in r:
                 # A row from before binding: bound to the first browser seen.
+                # One made with no User-Agent (a script, the editor's
+                # extension) says "" and stays bound to nothing, or the first
+                # request of its with one would bind it and refuse the rest.
                 r["ua"], r["agent"] = _ua_digest(ua), browser_words(ua)
                 r["last"], r["ip"] = now, str(ip or "")[:45]
                 _save(d)

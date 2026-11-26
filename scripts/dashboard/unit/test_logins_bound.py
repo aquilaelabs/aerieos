@@ -27,6 +27,23 @@ class Bound(unittest.TestCase):
         self.assertFalse(logins.seen("u1", lid, ""), "a bare request, once bound")
         self.assertTrue(logins.seen("u1", lid, FIREFOX), "and its own still")
 
+    def test_one_made_with_no_user_agent_stays_bound_to_nothing(self):
+        # The editor's extension signs in and asks with no User-Agent; a
+        # request of its with one (a fetch) bound it, and the next bare one
+        # was refused as a stolen cookie (deviceapi.mjs, 26 Nov).
+        lid = logins.mint("u1", "web", ua="", ip="10.0.0.2")
+        self.assertTrue(logins.seen("u1", lid, ""))
+        self.assertTrue(logins.seen("u1", lid, "node"))
+        self.assertTrue(logins.seen("u1", lid, ""), "still its own")
+
+    def test_a_row_from_before_binding_is_bound_to_the_first_browser(self):
+        lid = logins.mint("u1", "web", ua=FIREFOX)
+        d = logins._load()
+        d["u1"][lid].pop("ua")
+        logins._save(d)
+        self.assertTrue(logins.seen("u1", lid, FIREFOX))
+        self.assertFalse(logins.seen("u1", lid, CHROME))
+
 
 if __name__ == "__main__":
     unittest.main()
