@@ -5,7 +5,8 @@
 // branch, tag or commit) and Roll back; its workloads as a table, each with
 // ready of desired, the version its image is tagged with, where it answers,
 // and Restart and Scale; their pods as a table under it, state, restarts and
-// node, each pod's Logs a tab in the dock; and its last deploys. Every read
+// node, each pod's Logs and a running pod's Shell a tab in the dock; and
+// its last deploys. Every read
 // and press goes through the environment's own deployer (kubeview.py), so
 // nothing outside its namespace is drawn or touched.
 //
@@ -87,7 +88,8 @@ function nbKubeEnvHtml(project, e, st, may){
         `<span class="${/Running|Succeeded/.test(p.state) && p.ready === p.of ? "" : "warn"}">${esc(p.state)}${p.of ? ` <span class="dim">${p.ready}/${p.of}</span>` : ""}</span>`,
         `<span class="${p.restarts ? "warn" : ""}">${p.restarts}</span>`,
         esc(p.node || ""),
-        `<button type="button" data-kblogs="${esc(e.name)}:${esc(p.name)}">Logs</button>`], "div", "row"))).join(""), "kbpods") : "");
+        `<button type="button" data-kblogs="${esc(e.name)}:${esc(p.name)}">Logs</button>${
+          may && /Running/.test(p.state) ? `<button type="button" data-kbshell="${esc(e.name)}:${esc(p.name)}">Shell</button>` : ""}`], "div", "row"))).join(""), "kbpods") : "");
   const deps = (e.deploys || []).slice(0, 5);
   const hist = deps.length ? `<h4 class="kbsub">Deploys</h4>` + tblWrap(KB_DEP_COLS, deps.map(x => tblLine(KB_DEP_COLS, [
       esc(ago(x.at)),
@@ -142,6 +144,12 @@ function nbKubeWire(nb){
     if (j.error) return notify(j.error, true);
     notify(`${name} runs ${j.replicas} now`);
     nbKubeLoad(nb);
+  });
+  // A shell in a running pod, in the dock as a container's is (a person's,
+  // under the same rule; _pod_refused).
+  box.querySelectorAll("[data-kbshell]").forEach(b => b.onclick = () => {
+    const [env, pod] = b.dataset.kbshell.split(":");
+    openTab({kind: "term", arg: `pod:${project}:${env}:${pod}`, label: `in ${pod}`});
   });
   box.querySelectorAll("[data-kblogs]").forEach(b => b.onclick = () => {
     const [env, pod] = b.dataset.kblogs.split(":");

@@ -173,6 +173,25 @@ await section("the Kubernetes view: what runs, Scale, Restart and a pod's log, t
   const ended = await page.evaluate(() => [...TERMS.values()].find(r => r.t.arg === 'log:pod:alpha:qa:web-1')?.ended || '');
   ok(said && !ended, `its log is read through the deployer and followed (${ended})`);
   await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:pod:alpha:qa:web-1').id));
+  // A shell in the running pod (R281): a dock tab, the controller the
+  // cluster's client as its deployer, keys in and the pod's answer back.
+  await page.click(`${sect} [data-kbshell="qa:web-1"]`);
+  const opened = await until(() => page.evaluate(() => [...TERMS.values()].some(r => r.t.arg === 'pod:alpha:qa:web-1' && r.ws?.readyState === 1)), 15000, 200);
+  await page.evaluate(() => { const r = [...TERMS.values()].find(r => r.t.arg === 'pod:alpha:qa:web-1'); termType(r, new TextEncoder().encode('ls\r')); });
+  const echoed = await until(() => page.evaluate(() => {
+    const r = [...TERMS.values()].find(r => r.t.arg === 'pod:alpha:qa:web-1');
+    const b = r?.term?.buffer?.active; let t = '';
+    for (let i = 0; b && i < b.length; i++) t += b.getLine(i)?.translateToString(true) + '\n';
+    return /echo: ls/.test(t);
+  }), 10000, 200);
+  ok(opened && echoed && api.calls.some(c => /^EXEC .*\/namespaces\/alpha-qa\/pods\/web-1\/exec\?/.test(c)) && api.resizes.length > 0,
+     `Shell opens a dock tab spliced to the pod's exec as its deployer, keys in and its answer on the screen (${api.calls.filter(c => /^EXEC/.test(c)).join(' ')})`);
+  await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'pod:alpha:qa:web-1').id));
+  const other = await page.evaluate(() => new Promise(res => {
+    const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/termws?arg=${encodeURIComponent('pod:alpha:qa:web-1:../x')}`);
+    ws.onclose = e => res(e.reason); ws.onerror = () => {};
+  }));
+  ok(/not a pod's shell/.test(other), `a pod argument in any other shape is refused (${other})`);
   ok(page.errors.length === 0, `no console error through the view (${page.errors.slice(0, 2).join(' | ')})`);
 });
 

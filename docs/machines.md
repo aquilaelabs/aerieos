@@ -382,7 +382,10 @@ StatefulSet, DaemonSet) says ready of desired, the version its image is
 tagged with and where it answers (an Ingress's address, a load balancer's,
 a node port, or its Service's name inside the cluster), with **Restart**
 and **Scale**; its pods say their state, restarts and node, and a pod's
-**Logs** opens in the dock, its end read again every few seconds. Its last
+**Logs** opens in the dock, its end read again every few seconds, and a
+running pod's **Shell** opens there too, under a container's Shell's rule
+(a person who may deploy there; an administrator alone where the space's
+Run its container is Deny), the controller the cluster's client. Its last
 deploys are listed under it. Everything the view reads and does goes
 through the environment's own deployer, a token made for its namespace and
 kept in memory for its life, so the view sees and touches that namespace

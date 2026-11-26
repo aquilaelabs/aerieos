@@ -7,7 +7,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import kubeexec  # noqa: E402
 import kubeview  # noqa: E402
+import termws  # noqa: E402
 
 
 class View(unittest.TestCase):
@@ -44,6 +46,23 @@ class View(unittest.TestCase):
         self.assertIn("whole number", kubeview.scale("s", "staging", "deployment", "web", "two")["error"])
         self.assertIn("deployment, a statefulset", kubeview.restart("s", "staging", "pod", "web")["error"])
         self.assertIn("name a pod", kubeview.logs("s", "staging", "../etc")["error"])
+
+
+class Exec(unittest.TestCase):
+    """A pod's shell (kubeexec.py): a client's frames masked, as the API
+    requires, and read back whole by the reader the server's frames go
+    through; and the exec's end said in words."""
+
+    def test_a_clients_frames_read_back(self):
+        for body in (b"", bytes([0]) + b"ls\r", bytes([4]) + b'{"Width":80,"Height":24}', bytes([0]) + b"x" * 70000):
+            raw = kubeexec.masked(body)
+            self.assertTrue(raw[1] & 0x80, "masked")
+            self.assertEqual(termws.Frames().feed(raw), [(2, body)])
+
+    def test_its_end_in_words(self):
+        self.assertEqual(kubeexec._ended(b'{"status":"Success"}'), "the shell ended")
+        self.assertIn("command terminated with non-zero exit code",
+                      kubeexec._ended(b'{"status":"Failure","message":"command terminated with non-zero exit code"}'))
 
 
 if __name__ == "__main__":

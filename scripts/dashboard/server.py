@@ -2394,6 +2394,13 @@ _ARG_LOGCTR = re.compile(r"^log:ctr:([A-Za-z0-9][A-Za-z0-9._-]*):([A-Za-z0-9][A-
                          r"([A-Za-z0-9][A-Za-z0-9_.-]*)$")
 
 
+# `pod:REPOSITORY:ENVIRONMENT:POD[:CONTAINER]`: a shell in a pod of one of
+# a space's Kubernetes environments (R281), opened by the controller with the
+# environment's deployer (kubeexec.py). Names in the shapes Kubernetes allows.
+_ARG_POD = re.compile(r"^pod:([A-Za-z0-9][A-Za-z0-9._-]*):([a-z0-9][a-z0-9-]{0,23}):([a-z0-9][-a-z0-9.]{0,252})"
+                      r"(?::([a-z0-9][-a-z0-9]{0,62}))?$")
+
+
 # `vm:PROJECT:NAME`: a VM's serial console (R91), opened on its node's
 # container terminal server, as the jobs account, with virsh console.
 _ARG_VM = re.compile(r"^vm:([A-Za-z0-9][A-Za-z0-9._-]*):([a-z0-9][a-z0-9-]{0,30})$")
@@ -5125,6 +5132,7 @@ nodes.on_done("exec:deploy", deploys.done)
 # What runs in an environment, and Restart and Scale on it (R281 step 5),
 # always through the environment's own deployer.
 import kubeview                                                  # noqa: E402
+import kubeexec                                                  # noqa: E402
 kubeview.configure(clusters=clusters)
 connections.kind("cluster", "Kubernetes cluster", "shared",
                  lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
@@ -8340,6 +8348,54 @@ class Handler(BaseHTTPRequestHandler):
         return self._ctr_checks(_ARG_CTR.match(arg), me, "not a container's terminal: ctr:NAME:INSTANCE:CONTAINER",
                                 "terminal", owned, shell=True)
 
+    def _pod_refused(self, arg, me):
+        """A sentence when this account may not open a shell in the pod a
+        pod: argument names, and "" when it may: a container's Shell's rule
+        (R218 step 4) on the pod's repository, a person who may deploy and
+        work there, and an administrator alone where its Agents may: Run its
+        container is Deny. A session never; it has aerie k8s."""
+        m = _ARG_POD.match(arg)
+        if not m:
+            return "not a pod's shell: pod:REPOSITORY:ENVIRONMENT:POD"
+        if (me or {}).get("session"):
+            return "a shell in a pod is a person's"
+        repo = m.group(1)
+        why = users.may(me, "deploy", repo) or users.may(me, "write", repo)
+        if why:
+            return why
+        if not users.is_admin(me) and (prefs.get(repo) or {}).get("devbuild") == "deny":
+            return f"{repo}'s Agents may: Run its container is Deny, so a shell in its pods is an administrator's"
+        return ""
+
+    def _pod_shell(self, arg, dims):
+        """/termws?arg=pod:... (R281): a shell in a pod, the dock's socket
+        spliced to the API's exec by kubeexec, signed in as the
+        environment's deployer; asked again every few seconds and ended
+        when it is no longer allowed. Audited."""
+        no = self._pod_refused(arg, self._who())
+        if not termws.upgrade(self):
+            return self._json({"error": no or "a websocket is asked for here"}, 403 if no else 400)
+        if no:
+            return termws.close(self.connection, no)
+        m = _ARG_POD.match(arg)
+        key = repos.key_of(m.group(1))
+        t, why = kubeview.exec_target(key, m.group(2))
+        if not t:
+            return termws.close(self.connection, why)
+        try:
+            up, rest = kubeexec.open_exec(t["access"], t["token"], t["namespace"], m.group(3), m.group(4) or "",
+                                          dims["cols"], dims["rows"])
+        except ValueError as e:
+            return termws.close(self.connection, str(e))
+        db.audit(self._principal(), "kube-shell", key, {"env": m.group(2), "pod": m.group(3)})
+        who_raw = self._who_raw()
+
+        def alive():
+            if kept_out(who_raw):
+                return "the controller is in maintenance mode"
+            return self._pod_refused(arg, self._who())
+        return kubeexec.splice(self.connection, up, rest, alive)
+
     def _ctr_log_refused(self, arg, me):
         """A sentence when this account may not follow the log of the
         container a log:ctr: argument names, and "" when it may: as the
@@ -8673,6 +8729,9 @@ class Handler(BaseHTTPRequestHandler):
         # A log, read-only and followed (R133 step 12): no program runs.
         if _term_arg(args).startswith("log:"):
             return self._log_own(_term_arg(args), args, dims)
+        # A shell in a pod (R281): the controller is the cluster's client.
+        if _term_arg(args).startswith("pod:"):
+            return self._pod_shell(_term_arg(args), dims)
         target, vmm, no = self._term_decide(args)
         if not termws.upgrade(self):
             return self._json({"error": no[0] if no else "a websocket is asked for here"}, no[1] if no else 400)

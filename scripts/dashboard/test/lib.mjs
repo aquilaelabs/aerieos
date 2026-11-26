@@ -1182,6 +1182,38 @@ export async function kubeApi({ token = 'good', namespaces = [] } = {}){
       return send(405, { message: 'not here' });
     });
   });
+  // A pod's exec (R281): the channel protocol over a websocket, its token
+  // held to its namespace as above; what comes in on stdin goes back on
+  // stdout as "echo: ...", and each resize is kept on `resizes`.
+  api.resizes = [];
+  srv.on('upgrade', async (req, sock) => {
+    const { createHash } = await import('node:crypto');
+    const bearer = String(req.headers.authorization || '').replace(/^Bearer /, '');
+    const nsOf = api.deployers.get(bearer);
+    api.calls.push(`EXEC ${req.url}`);
+    if (!nsOf || !req.url.includes(`/namespaces/${nsOf}/`) || !/\/exec\?/.test(req.url))
+      return sock.end('HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\n\r\n{"message":"pods/exec is forbidden"}');
+    const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+    sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\nSec-WebSocket-Protocol: v4.channel.k8s.io\r\n\r\n`);
+    const send = buf => { const h = buf.length < 126 ? Buffer.from([0x82, buf.length]) : Buffer.concat([Buffer.from([0x82, 126]), Buffer.from([buf.length >> 8, buf.length & 255])]); sock.write(Buffer.concat([h, buf])); };
+    send(Buffer.from([1, ...Buffer.from('$ ')]));
+    let buf = Buffer.alloc(0);
+    sock.on('data', d => {
+      buf = Buffer.concat([buf, d]);
+      while (buf.length >= 2){
+        let n = buf[1] & 127, i = 2;
+        if (n === 126){ if (buf.length < 4) return; n = buf.readUInt16BE(2); i = 4; }
+        if (buf.length < i + 4 + n) return;
+        const mask = buf.subarray(i, i + 4), body = Buffer.from(buf.subarray(i + 4, i + 4 + n)).map((b, j) => b ^ mask[j % 4]);
+        const op = buf[0] & 15;
+        buf = buf.subarray(i + 4 + n);
+        if (op === 8){ sock.end(); return; }
+        if (body[0] === 0) send(Buffer.concat([Buffer.from([1]), Buffer.from('echo: '), body.subarray(1)]));
+        if (body[0] === 4) api.resizes.push(JSON.parse(body.subarray(1).toString()));
+      }
+    });
+    sock.on('error', () => {});
+  });
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   api.url = `http://127.0.0.1:${srv.address().port}`;
   api.close = () => srv.close();

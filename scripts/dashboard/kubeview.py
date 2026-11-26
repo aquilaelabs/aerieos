@@ -15,6 +15,7 @@ see or touch, whatever a bug here would ask for.
   restart(...)          a rollout restart, as kubectl rollout restart does
   scale(...)            a Deployment's or a StatefulSet's replicas
   logs(...)             the end of a pod's log
+  exec_target(...)      where a shell in a pod opens (kubeexec.py)
 """
 import re
 import threading
@@ -202,6 +203,15 @@ def scale(space, env_name, kind, name, replicas):
     except kubeclient.KubeError as e:
         return {"error": f"{name} was not scaled: {e}"}
     return {"ok": True, "replicas": n}
+
+
+def exec_target(space, env_name):
+    """Where a shell in one of the environment's pods is opened, as its
+    deployer: ({access, token, namespace}, "") or (None, why)."""
+    c, env = _client(space, env_name)
+    if c is None:
+        return None, env
+    return {"access": clusters.access(env.get("cluster")), "token": c.token, "namespace": env["namespace"]}, ""
 
 
 def logs(space, env_name, pod, container="", tail=500):
