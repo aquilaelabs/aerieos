@@ -18,6 +18,7 @@
 - A space's Deploy section says what each of its repositories deploys (a Helm chart in deploy/chart or manifests in deploy/k8s), and Draft from the compose writes a chart from a repository's compose file into its tree for you to read and commit. A deploy builds the image from the commit picked, sends it to the environment's registry, your git host's, or straight into a k3s cluster this install runs, and rolls it out with a token made for that deploy alone (91f3126)
 - A Kubernetes view in a space's notebook, under Ship: each environment's workloads with how many are ready, the version running and where it answers, their pods' state, restarts and node, Deploy, Roll back, Restart and Scale, and a pod's log in the dock; everything through the environment's own deployer, so it sees and touches that namespace alone (c66d1e0)
 - A session reaches its space's Kubernetes environments with aerie k8s (what runs, a pod's log, deploy and roll back) through the controller, which keeps every credential, under a new Deploy to Kubernetes setting that is deny until you change it; an environment marked production always asks you first. Environments that deploy on a push or on a release now do, a stuck or short environment is a row on the bell until it recovers, and Home counts your clusters ready (a4702d1)
+- The Clusters page says each cluster's CPU and memory in use where it reports them, and the Doctor warns about a cluster that does not answer or whose certificate is about to end (808d205)
 
 ### Changed
 
