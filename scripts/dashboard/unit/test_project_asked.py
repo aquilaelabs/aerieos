@@ -41,7 +41,8 @@ def handler():
     cls = next(n for n in ast.parse(SERVER).body if isinstance(n, ast.ClassDef) and n.name == "Handler")
     body = "\n".join("\n".join(lines[f.lineno - 1:f.end_lineno]) for f in cls.body
                      if isinstance(f, ast.FunctionDef) and f.name in LIFTED)
-    ns = {"field": field, "urllib": urllib, "users": _Users, "projects": _Projects,
+    import refusals                     # the one wording of a missing space (R287)
+    ns = {"field": field, "urllib": urllib, "users": _Users, "projects": _Projects, "refusals": refusals,
           "project_names": lambda who: who["sees"]}
     exec("class Lifted:\n" + body, ns)      # noqa: S102 (the repository's own source, read from beside this test)
 
