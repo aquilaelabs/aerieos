@@ -3,7 +3,7 @@
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
 // here writes through the dashboard, because this step has no actions.
-import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint, section, REPO, patience } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'node:fs';
 
@@ -104,8 +104,11 @@ ok((await api('what=status').then(() => fetch(URL.replace(/\/$/, '') + '/api/git
 
 // ---- the view ---------------------------------------------------------------
 await page.evaluate(() => openNotebook('beta', 'git'));
+// The view's first read runs git's status, log and branch list on the
+// space's tree, which under a whole gate's load took past twenty seconds
+// (B1172): its own budget, stretched as every wait here is.
 await page.waitForFunction(() => !!document.querySelector('.nb .nbview[data-view="git"] #gitPicker:not([hidden]) .gbpickname')?.textContent,
-                           null, { timeout: 20000 });
+                           null, { timeout: patience(45000) });
 const NB = '.nb .nbview[data-view="git"]';
 ok(new RegExp(`${st.files.length} changes? not committed`).test(await page.$eval(`${NB} #gitHint`, e => e.textContent.replace(/\s+/g, ' '))),
    'the glance counts what is not committed and the branches, the branch the picker beside them');
