@@ -10,6 +10,14 @@ deploy their own space as one made after can (the operator, 25 Nov). Any
 other role is left as it is: Deploy is given by whoever gives roles. The
 built-in roles are not in the file, and hold every area already.
 
+The same state adds what Kubernetes keeps, each made on first use and read
+as empty where it is not there, so nothing older needs moving: the clusters
+an administrator added (clusters.json, each credential sealed), the k3s a
+node runs from the Library (k3s.json, its bootstrap secret sealed), each
+space's environments and their deploys (environments.json), and a space's
+Agents may: Deploy to Kubernetes (its record's `kube`, deny where unset).
+A build before this state does not read them, and refuses this /config.
+
 Idempotent. Never edited once shipped (stateversion.py).
 """
 import json

@@ -668,7 +668,7 @@ program on the host finds it then, and `aerie gpu` says so.
 <!-- BUILDERBOT:END -->
 
 ## Containers
-<!-- BUILDERBOT:TOPIC containers: this project's containers, its dev instance (aerie devapp), aerie container new, hosting-only nodes, the nginx page, its VMs (aerie vm) -->
+<!-- BUILDERBOT:TOPIC containers: this project's containers, its dev instance (aerie devapp), aerie container new, hosting-only nodes, the nginx page, its VMs (aerie vm), its Kubernetes environments (aerie k8s) -->
 
 A container belongs to one space or to none (the operator sets it on its
 Containers page row), and a session sees and works on its own space's only. `aerie
@@ -760,4 +760,17 @@ with this session's key, `aerie vm start|stop|restart|rm NAME` work on one, and
 `aerie vm snapshot NAME SNAP` before changing a VM is the undo `aerie vm revert
 NAME SNAP` goes back to. `--node-agent` makes the VM a node, which an
 administrator always allows.
+
+A space may deploy to Kubernetes environments its settings name, each a
+cluster and a namespace of its own. What a repository deploys is its Helm
+chart in `deploy/chart` or its manifests in `deploy/k8s`, as committed, with
+the image built from its `Dockerfile`; a chart is drafted from the compose
+file by a person's press, and one written by hand is a chart like any other.
+`aerie k8s` says what runs in each (ready of desired, the version, the pods,
+where it answers) and `aerie k8s logs ENV POD` a pod's log, at any setting;
+`aerie k8s deploy ENV [REF] --why "..."` and `aerie k8s rollback ENV --why
+"..."` are under the space's Deploy to Kubernetes setting, which `aerie
+settings` shows, and an environment marked production waits for a person
+whatever it says. The controller holds every credential: no kubeconfig is
+here to find, and `kubectl` from this session reaches no environment.
 <!-- BUILDERBOT:END -->

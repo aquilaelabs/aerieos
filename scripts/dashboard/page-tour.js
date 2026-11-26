@@ -42,7 +42,7 @@ const TOUR_STEPS = {
   ],
   notebook: [
     {say: "A space's notebook: everything about it in one place, shared by the people and the sessions working on it."},
-    {at: `${TOUR_PANE} .nbtabs .nbgroups`, say: "Five groups: Overview (with your sessions here, what a session may do, and the settings), Plan (the roadmap and bugs), Code, Ship (artifacts, containers and VMs) and Docs. Each opens its views in the row under it."},
+    {at: `${TOUR_PANE} .nbtabs .nbgroups`, say: "Five groups: Overview (with your sessions here, what a session may do, and the settings), Plan (the roadmap and bugs), Code, Ship (artifacts, containers, VMs and Kubernetes) and Docs. Each opens its views in the row under it."},
     {at: `${TOUR_PANE} .phead, ${TOUR_PANE} .bar.proj`, say: "Start agent opens a session on this space; Shell a terminal in it. The menu holds its settings, its link and more."},
   ],
   findings: [

@@ -103,6 +103,7 @@ scripts/
   lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
   lib/proc-verbs.py              `aerie proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
   lib/container-verbs.py         `aerie container`: status and new
+  lib/k8s-verbs.py               `aerie k8s` (R281 step 6): a space's Kubernetes environments from a session through /api/k8s, status, a pod's log, deploy and rollback, an ask followed to its answer and a job to its end
   lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a shipped toolchain or a pack asked for on the session's node as the space's Install a tool pack setting says (R169 step 5)
   lib/vm-verbs.py                `aerie vm`: a project's VMs listed, made, started, stopped, snapshotted and removed (R91)
   lib/phone-verbs.py             `aerie phone`: status and run
@@ -521,6 +522,7 @@ docs/containers.md               the Containers page and nginx: dev instances, h
 docs/scanners.md                 the Scanners page: AerieOS's own scanners on each node, their schedule, and the reports
 docs/versions.md                 versions and release lines: aerie version line, forward, backport, a patch line's rules
 docs/vms.md                      the VMs page and aerie vm: VM host, the OS catalog, the dial, the limits, the network, snapshots, a VM made a node
+docs/kubernetes.md               a space's Kubernetes environments: k3s and a cluster to start with, what a deploy is, Draft from the compose, the Kubernetes view, aerie k8s and its dial, when it deploys by itself
 docs/nas.md                      the installed edition's storage design (R56): Python the management plane and never the data path, the two storage profiles, what is not built
 docs/machines.md                 Controller settings, Nodes, Storage, the logs, the Jobs page, a Mac as a node
 docs/people.md                   the first account, Users and Roles, owners and invitations, the chat, your Profile
