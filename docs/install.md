@@ -364,6 +364,51 @@ machine is set up today, and as an ISO that a machine already running it updates
 is not an installer: one on the machine's own screen is being built); [image.md](image.md) says
 what it is, how the stick is written and how it is built.
 
+## Checking a download yourself
+
+Every file a release carries is in its `SHA256SUMS`, and that list is signed
+by a key `config/release-signers` names: `aerieos-dev` for a pre-release
+(vX.Y.Z-dev.N and the like), `aerieos-release` alone for a stable one.
+Anybody can check a file with nothing but OpenSSH and the release's page:
+
+```bash
+TAG=v0.9.0-dev.6168                       # the release you downloaded from
+REL=https://github.com/aquilaelabs/aerieos/releases/download/$TAG
+curl -fLO "$REL/SHA256SUMS" -fLO "$REL/SHA256SUMS.sig"
+curl -fL "https://raw.githubusercontent.com/aquilaelabs/aerieos/$TAG/config/release-signers" -o release-signers
+ssh-keygen -lf <(grep -v '^#' release-signers | cut -d' ' -f3-4)   # compare with aerieos.org's
+ssh-keygen -Y verify -f release-signers -I aerieos-dev -n aerieos-dev -s SHA256SUMS.sig < SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS  # each file you have, against the signed list
+```
+
+For a stable release, `-I aerieos-release -n aerieos-release` in place of
+the two `aerieos-dev`. The keys' fingerprints are also printed on
+aerieos.org, so the signers file is not taken on the repository's word
+alone.
+
+The container image is named by its digest in the release's own
+`aerieos-image-X.Y.Z.digest`, a file the signed list holds, so the image a
+release ships is the one with that digest, whatever a tag on the registry
+says now:
+
+```bash
+curl -fLO "$REL/aerieos-image-${TAG#v}.digest" && sha256sum --ignore-missing -c SHA256SUMS
+docker pull "$(cat aerieos-image-${TAG#v}.digest)"   # by digest, never by tag
+```
+
+The controller bundle, the OS image, the stick and the Windows companion also
+carry a build attestation, which says which workflow built them from which
+commit; with the GitHub CLI:
+
+```bash
+gh attestation verify aerieos-controller-0.9.0-dev.6168.tar.gz --repo aquilaelabs/aerieos \
+  --signer-workflow aquilaelabs/aerieos/.github/workflows/build-image.yml --source-ref "refs/tags/$TAG"
+```
+
+The companion's are `.github/workflows/companion-app.yml`'s. Each was built on
+GitHub's hosted runners; an attestation from any other workflow or ref is
+not a release's.
+
 ## Building locally instead of pulling
 
 ```bash
