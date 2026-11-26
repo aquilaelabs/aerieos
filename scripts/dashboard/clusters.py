@@ -169,6 +169,13 @@ def client_of(cid):
                              key=_open(c.get("key")), insecure=bool(c.get("insecure")))
 
 
+def access(cid):
+    """Where a job reaches a kept cluster, without its credential: {server,
+    ca, insecure}, or None. A job signs in with a token minted for it."""
+    c = _load().get(str(cid or ""))
+    return {"server": c["server"], "ca": c.get("ca", ""), "insecure": bool(c.get("insecure"))} if c else None
+
+
 def _row(cid, c):
     """A cluster as the page reads it: never a credential, and each
     namespace with the space this install made it for."""

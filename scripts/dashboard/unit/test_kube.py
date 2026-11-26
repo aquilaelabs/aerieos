@@ -50,6 +50,10 @@ class Api(BaseHTTPRequestHandler):
         Api.calls.append(("POST", self.path))
         if self.path in Api.forbid:
             return self._send(403, {"message": "namespaces is forbidden"})
+        if self.path.endswith("/serviceaccounts/aerie-deployer/token"):
+            if self.path.replace("/token", "") not in Api.objs:
+                return self._send(404, {"message": "serviceaccounts not found"})
+            return self._send(201, {"status": {"token": f"minted-{b['spec']['expirationSeconds']}", "expirationTimestamp": "2026-11-26T12:00:00Z"}})
         p = f"{self.path}/{b['metadata']['name']}"
         if p in Api.objs:
             return self._send(409, {"message": "already exists"})
@@ -189,6 +193,15 @@ class Environments(unittest.TestCase):
         self.assertIn("/api/v1/namespaces/shop-staging", Api.objs)
         self.assertEqual(kube.envs("shop"), [])
         self.assertIn("no environment", kube.remove("shop", "staging")["error"])
+
+    def test_a_token_minted_for_one_use(self):
+        self.assertIn("no environment", kube.mint("shop", "staging")["error"])
+        kube.save("shop", self.env())
+        self.assertEqual(kube.mint("shop", "staging", 2400)["token"], "minted-2400")
+        self.assertEqual(kube.mint("shop", "staging", 5)["token"], "minted-600", "never shorter than a deploy needs")
+        self.assertNotIn("minted", (Path(self.d.name) / "environments.json").read_text(), "never kept")
+        self.assertEqual(clusters.access(self.cid)["server"], f"http://127.0.0.1:{self.srv.server_address[1]}")
+        self.assertNotIn("token", clusters.access(self.cid))
 
     def test_a_namespace_from_another_install_is_nobodys(self):
         self.assertEqual(kube.owner_of({"aerieos.io/space": "P7", "aerieos.io/install": "0123456789abcdef"}), "")

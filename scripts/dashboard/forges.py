@@ -75,6 +75,10 @@ def configure(*, run, state=None, write_json=None):      # noqa: A002 - injected
 # `user` is the username half of the stored credential when the host cannot be
 # asked for the real one: git's credential store is a URL, so a token has to
 # go in beside SOME name, and each of these publishes the one it wants.
+# `registry` is where the host keeps a repository's container images, which a
+# deploy pushes to with the person's own token for the host (R281 step 4):
+# "{host}" for one that serves them on its own address; absent where it is
+# not known from the address (a GitLab's is its own setting).
 
 # Whether unvetted hosts may be offered, from the controller's settings
 # (server.py sets it); None reads as no.
@@ -88,7 +92,7 @@ FORGES = (
     {"id": "github", "name": "GitHub", "host": "github.com", "fixed": True,
      "vetted": "in daily use: every space here that pushes, and create.mjs against the harness",
      "user": "x-access-token",
-     "kind": "github", "nested": False,
+     "kind": "github", "nested": False, "registry": "ghcr.io",
      "token": re.compile(r"[A-Za-z0-9_]{20,255}"),
      "hint": "ghp_… or github_pat_…",
      "about": "Repositories are created for you when the address names one "
@@ -96,7 +100,7 @@ FORGES = (
     {"id": "gitea", "name": "Gitea", "host": "", "fixed": False,
      "vetted": "2026-09-15: lab-forge.mjs against Gitea 1.24.7, and a runner registered from bb-dev-sandbox",
      "user": "oauth2",
-     "kind": "gitea", "nested": False,
+     "kind": "gitea", "nested": False, "registry": "{host}",
      "token": None, "hint": "a Gitea access token",
      # Measured on Gitea 1.24: creating under an organization needs
      # write:organization, and under the account itself write:user, which
@@ -109,7 +113,7 @@ FORGES = (
      "vetted": "2026-10-13: lab-forge.mjs against the lab's Forgejo 16.0.6 (beside its Gitea, BB_LAB_FORGE=forgejo), "
                "and act_runner v5.0.0 registered from bb-dev-sandbox",
      "user": "oauth2",
-     "kind": "gitea", "nested": False,
+     "kind": "gitea", "nested": False, "registry": "{host}",
      "token": None, "hint": "a Forgejo access token",
      "about": "Your own server. Forgejo answers Gitea's API, so this is the "
               "same conversation with a different name on it: a token with the "
@@ -118,7 +122,7 @@ FORGES = (
     {"id": "codeberg", "name": "Codeberg", "host": "codeberg.org", "fixed": True,
      "vetted": "",
      "user": "oauth2",
-     "kind": "gitea", "nested": False,
+     "kind": "gitea", "nested": False, "registry": "{host}",
      "token": None, "hint": "a Codeberg access token",
      "about": "Codeberg runs Forgejo, so it answers the same API."},
     {"id": "gitlab", "name": "GitLab", "host": "gitlab.com", "fixed": False,
@@ -156,6 +160,18 @@ OTHER = BY_ID["git"]
 
 def get(fid):
     return BY_ID.get(fid or "")
+
+
+def image_of(url):
+    """Where a repository's images go on its git host, from its remote:
+    (registry host, image name) such as ("ghcr.io", "ghcr.io/ada/shop"), or
+    ("", "") where the host keeps none this knows of."""
+    got = parse(url)
+    if not got:
+        return "", ""
+    host = got["host"].lower()
+    reg = (forge_of(host).get("registry") or "").replace("{host}", host)
+    return (reg, f"{reg}/{got['path'].lower()}") if reg else ("", "")
 
 
 def catalog():

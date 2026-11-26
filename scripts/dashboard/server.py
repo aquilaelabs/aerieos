@@ -840,6 +840,7 @@ def log_sweep_loop():
             r = logs.sweep()
             r["job_logs"] = nodes.prune_job_logs()
             r["job_rows"] = nodes.prune_jobs()
+            r["job_secrets"] = nodes.forget_secrets()
             r["audit"] = db.prune_audit()
             unlocks.sweep()
             if any(r.values()):
@@ -5109,6 +5110,18 @@ k3s.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=sign
               nginx_on=lambda nid: bool(nginxproxy.deployed(devapp, nid)), run_wait=nodes.run_wait, clusters=clusters)
 kube.configure(state=STATE, write_json=write_json, clusters=clusters, space_id=registry.pid,
                space_of_id=lambda sid: registry.resolve(sid) if re.fullmatch(r"P\d+", str(sid or "")) else "")
+# A repository's build sent to one of those environments (R281 step 4): an
+# exec job on a node of its own that runs Docker, its tokens in secret_env.
+import deploys                                                   # noqa: E402
+deploys.configure(remote_url=lambda repo: gitview.remote_url(WORKSPACE / repo), key_of=repos.key_of,
+                  nodes_of=devapp.nodes_of, node=nodes.node, host_only=nodes.host_only, own_machine=nodes.own_machine,
+                  k3s_node_of=k3s.node_of_cluster, k3s_container=k3s.container_name, access=clusters.access,
+                  snapshot_at=workspace.snapshot_at, snapshot_path=workspace.path_for,
+                  token_line=lambda repo, uid: gitcreds.read_line(repo, uid, why="deploy") or "",
+                  job_add=nodes.job_add, job=nodes.job, tree=lambda repo: WORKSPACE / repo,
+                  compose_of=lambda repo: devapp.compose_file(repo))
+workspace.own_git = gitview._own
+nodes.on_done("exec:deploy", deploys.done)
 connections.kind("cluster", "Kubernetes cluster", "shared",
                  lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
                            "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
@@ -13559,7 +13572,12 @@ class Handler(BaseHTTPRequestHandler):
         why = users.may(who, "settings", name) or users.may(who, "write", name) \
             or (projects.locked_out(name, users.whose(who)) or {}).get("error", "") \
             or ("picking a cluster is Clusters Read" if pick and not kube.envs(key) else "")
-        return self._json({"envs": kube.envs(key), "kept": len(kept), "may": not why, "why": why,
+        envs = [dict(e, deploys=deploys.history(key, e["name"])) for e in kube.envs(key)]
+        # What each repository of the space deploys, and whether this
+        # account may draft a chart into its tree (step 4).
+        rows = [deploys.repo_facts(r) | {"may_draft": not users.may(who, "write", r)}
+                for r in (repos.members(key) or [name])]
+        return self._json({"envs": envs, "kept": len(kept), "may": not why, "why": why, "repos": rows,
                            "clusters": [{"id": c["id"], "name": c["name"]} for c in readable]})
 
     def _deploy(self, req):
@@ -13568,11 +13586,29 @@ class Handler(BaseHTTPRequestHandler):
         once its namespace is ready on its cluster, or taken off the space's
         list (its namespace stays on the cluster). Space settings Write on
         the space, and Clusters Read to name a cluster; a session never
-        reaches it."""
+        reaches it. {project, action: deploy, env, ref} | {project, action:
+        rollback, env} (step 4): the repository at that branch, tag or commit
+        built and deployed there, or the last deploy that succeeded before
+        the newest deployed again; Deploy Write on the space. {project,
+        action: draft}: Draft from the compose, a Helm chart written into the
+        repository's tree at deploy/chart, uncommitted; its Write."""
+        act = field(req, "action")
+        if act in ("deploy", "rollback"):
+            return self._deploy_run(req, act)
+        if act == "draft":
+            # A chart into the repository's tree, uncommitted: a write to
+            # its tree, so its Write.
+            repo = self._space_write("write", req)
+            if not repo:
+                return None
+            r = deploys.draft(repo, registry.label(repo) or repo)
+            if r.get("ok"):
+                db.audit(self._principal(), "deploy-draft", repos.key_of(repo), {"repo": repo, "paths": r["paths"]})
+            return self._json(r, 200 if r.get("ok") else 400)
         name = self._space_write("settings", req)
         if not name:
             return None
-        key, act, by = repos.key_of(name), field(req, "action"), self._principal()
+        key, by = repos.key_of(name), self._principal()
         if act == "save":
             env = req.get("env") if isinstance(req.get("env"), dict) else {}
             # The cluster named is one this account reads (cluster by cluster).
@@ -13592,7 +13628,22 @@ class Handler(BaseHTTPRequestHandler):
             if r.get("ok"):
                 db.audit(by, "deploy-env-remove", key, {"env": field(req, "name")})
             return self._json(r, 200 if r.get("ok") else 404)
-        return self._json({"error": "action is save or remove"}, 400)
+        return self._json({"error": "action is save, remove, deploy or rollback"}, 400)
+
+    def _deploy_run(self, req, act):
+        """A deploy or a rollback (_deploy): queued as the asker's job, its
+        tokens made for it alone, audited."""
+        name = self._space_write("deploy", req)
+        if not name:
+            return None
+        who, by = self._who(), self._principal()
+        env, uid, said = field(req, "env"), users.uid_of(who) or "", (who or {}).get("name") or by
+        r = (deploys.start(name, env, field(req, "ref"), by, uid, said) if act == "deploy"
+             else deploys.rollback(name, env, by, uid, said))
+        if r.get("ok"):
+            db.audit(by, f"deploy-{act}", repos.key_of(name), {"repo": name, "env": env, "ref": field(req, "ref"),
+                                                               "commit": r.get("commit"), "job": r.get("job")})
+        return self._json(r, 200 if r.get("ok") else 400)
 
     def _get_connections(self):
         """GET /api/connections (R294 step 9): Connected services, every

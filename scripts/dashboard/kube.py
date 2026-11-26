@@ -41,6 +41,7 @@ REGISTRY_RE = re.compile(r"^[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[a-z0-9._-]+)*$")
 BRANCH_RE = re.compile(r"^(?!.*\.\.)(?!/)(?!.*//)[A-Za-z0-9._/-]{1,100}(?<!/)(?<!\.lock)$")
 WHEN = ("hand", "push", "release")
 DEPLOYER = "aerie-deployer"
+KEEP_DEPLOYS = 20        # the deploys an environment keeps, newest first: its history and what a rollback picks from
 LABEL_SPACE, LABEL_INSTALL, LABEL_ENV = "aerieos.io/space", "aerieos.io/install", "aerieos.io/env"
 # What the deployer may do in its namespace and nowhere else: the workloads,
 # their services, configuration and secrets (Helm keeps its releases in
@@ -119,7 +120,7 @@ def _clean(env):
         return None, f"{ns} is the cluster's own namespace: pick one for this space"
     reg = str(e.get("registry") or "").strip().rstrip("/")
     if reg and (not REGISTRY_RE.match(reg) or "." not in reg.split("/")[0] and ":" not in reg.split("/")[0] and reg.split("/")[0] != "localhost"):
-        return None, "its registry is a host and a path, such as ghcr.io/owner/name"
+        return None, "its registry is a host and a path, such as ghcr.io/owner: each repository's image goes under it by its name"
     when = str(e.get("when") or "hand")
     if when not in WHEN:
         return None, "it deploys by hand, on a push to a branch, or on a release"
@@ -203,6 +204,8 @@ def save(space, env, was="", by=""):
     else:
         e["ready_at"] = old.get("ready_at", 0)
     e.update(by=str(old.get("by") or by)[:80], at=old.get("at") or int(time.time()))
+    if old.get("deploys"):
+        e["deploys"] = old["deploys"]
     with _lock:
         d = _load()
         rows = list(d["spaces"].get(space, []))
@@ -230,6 +233,60 @@ def remove(space, name):
             d["spaces"].pop(space)
         _store.save(d)
     return {"ok": True, "envs": envs(space)}
+
+
+def env_of(space, name):
+    """One of a space's environments as kept, or None."""
+    return next((e for e in _load()["spaces"].get(str(space), []) if e.get("name") == str(name)), None)
+
+
+def mint(space, name, seconds=600):
+    """A token for the environment's deployer, made by its cluster for this
+    one use (TokenRequest) and never kept: {token, expires} or {error}. A
+    deploy asks for long enough to build, push and roll out."""
+    e = env_of(space, name)
+    if not e:
+        return {"error": f"{space} has no environment called {name}"}
+    client = clusters.client_of(e["cluster"]) if clusters else None
+    if not client:
+        return {"error": f"{name}'s cluster is no longer kept"}
+    seconds = max(600, min(int(seconds), 3600))
+    try:
+        r = client.call("POST", f"/api/v1/namespaces/{e['namespace']}/serviceaccounts/{DEPLOYER}/token",
+                        {"apiVersion": "authentication.k8s.io/v1", "kind": "TokenRequest", "spec": {"expirationSeconds": seconds}})
+    except kubeclient.KubeError as x:
+        return {"error": f"{name}'s cluster made no token for its deployer: {x}"}
+    tok = str((r.get("status") or {}).get("token") or "")
+    if not tok:
+        return {"error": f"{name}'s cluster made no token for its deployer"}
+    return {"token": tok, "expires": str((r.get("status") or {}).get("expirationTimestamp") or "")}
+
+
+def note_deploy(space, name, rec):
+    """A deploy started (deploys.py), kept first on its environment's list
+    of the newest KEEP_DEPLOYS: {job, at, by, ref, commit, tag, state}.
+    False where the environment is gone."""
+    with _lock:
+        d = _load()
+        e = next((x for x in d["spaces"].get(str(space), []) if x.get("name") == str(name)), None)
+        if e is None:
+            return False
+        e["deploys"] = ([dict(rec)] + [r for r in e.get("deploys") or [] if r.get("job") != rec.get("job")])[:KEEP_DEPLOYS]
+        _store.save(d)
+    return True
+
+
+def deploy_ended(space, name, job, state):
+    """A deploy's job ended: its row on the environment says how."""
+    with _lock:
+        d = _load()
+        e = next((x for x in d["spaces"].get(str(space), []) if x.get("name") == str(name)), None)
+        r = next((r for r in (e or {}).get("deploys") or [] if r.get("job") == job), None)
+        if r is None:
+            return False
+        r.update(state=str(state), ended=int(time.time()))
+        _store.save(d)
+    return True
 
 
 def owner_of(labels):

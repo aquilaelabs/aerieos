@@ -122,6 +122,11 @@ def record(nid):
     return dict(_load().get(str(nid)) or {})
 
 
+def node_of_cluster(cid):
+    """The node whose k3s is that cluster on the Clusters page, or ""."""
+    return next((nid for nid, r in _load().items() if cid and isinstance(r, dict) and r.get("cluster") == cid), "")
+
+
 def container_name(nid):
     return syscontainer.container_name("k3s", node_name(nid) or nid)
 

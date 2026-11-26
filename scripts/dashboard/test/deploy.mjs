@@ -4,9 +4,13 @@
 // the space's id and this install's mark, a deployer with a Role and a
 // RoleBinding confined to it), a namespace somebody else made is refused
 // with the record left open as typed, Edit changes one without asking the
-// cluster again, and Remove leaves the cluster as it was. Against the stub
-// API server lib.mjs runs (kubeApi).
-import { launch, newPage, ok, done, ready, URL, section, until, kubeApi } from './lib.mjs';
+// cluster again, and Remove leaves the cluster as it was. What each
+// repository deploys, Draft from the compose writing a chart into its tree
+// uncommitted, and a deploy refused where it has nowhere to build (step 4).
+// Against the stub API server lib.mjs runs (kubeApi).
+import { launch, newPage, ok, done, ready, URL, DIR, section, until, kubeApi } from './lib.mjs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const api = await kubeApi({ namespaces: [{ metadata: { name: 'web', labels: {} } }] });
 const browser = await launch();
@@ -102,6 +106,31 @@ await section("Edit and Remove", async () => {
   ok(gone && page.dialogs.some(d => /Remove staging\?/.test(d)) && api.objs.has('/api/v1/namespaces/alpha-staging'),
      'Remove asks first, then the row is gone and its namespace stays on the cluster');
   ok(page.errors.length === 0, `no console error through any of it (${page.errors.slice(0, 2).join(' | ')})`);
+});
+
+await section("what each repository deploys, Draft from the compose, and a deploy with nowhere to build", async () => {
+  // Step 4: alpha has a compose file and neither a chart nor manifests.
+  writeFileSync(`${DIR}/ws/alpha/docker-compose.yml`, 'services:\n  web:\n    build: .\n    ports: ["8080:80"]\n');
+  await open();
+  await page.waitForSelector('#rnShipField:not([hidden])', { timeout: 10000 });
+  const line = () => page.$eval('#rnShipRows', e => e.textContent.replace(/\s+/g, ' ').trim());
+  const was = await line();
+  ok(/alpha/.test(was) && /drafted from its compose file/.test(was) && !!await page.$('[data-shipdraft="alpha"]'),
+     `What deploys names the repository, says it has nothing yet, and offers Draft from the compose (${was})`);
+  await page.click('[data-shipdraft="alpha"]');
+  const drew = await until(async () => /Helm chart in deploy\/chart/.test(await line()), 10000, 200);
+  const web = existsSync(`${DIR}/ws/alpha/deploy/chart/templates/web.yaml`) ? readFileSync(`${DIR}/ws/alpha/deploy/chart/templates/web.yaml`, 'utf8') : '';
+  const st = execFileSync('git', ['-C', `${DIR}/ws/alpha`, 'status', '--porcelain', '--', 'deploy']).toString();
+  ok(drew && /\.Values\.image\.repository/.test(web) && /^\?\? deploy\//m.test(st) && !await page.$('[data-shipdraft]'),
+     `the press writes the chart into the tree, uncommitted, its built service on the deploy's image, and the line says so (${await line()} | ${st.trim()})`);
+  await page.click('#rnCancel');
+  const cl = await page.evaluate(async () => ((await getJSON('/api/clusters')).clusters || [])[0]?.id);
+  await page.evaluate(c => postJSON('/api/deploy', { project: 'alpha', action: 'save', was: '',
+    env: { name: 'qa', cluster: c, namespace: 'alpha-qa', registry: '', when: 'hand' } }), cl);
+  const r = await page.evaluate(() => postJSON('/api/deploy', { project: 'alpha', action: 'deploy', env: 'qa', ref: 'HEAD' }));
+  ok(/alpha has no node to build on/.test(r.error || '') && !r.job, `a deploy with no node to build on is refused, saying so (${r.error})`);
+  const rb = await page.evaluate(() => postJSON('/api/deploy', { project: 'alpha', action: 'rollback', env: 'qa' }));
+  ok(/no earlier deploy/.test(rb.error || ''), `Roll back with nothing deployed before says so (${rb.error})`);
 });
 
 api.close();

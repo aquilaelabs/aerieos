@@ -343,6 +343,37 @@ and leaves its namespace and what runs in it on the cluster. Changing them
 is Space settings Write on the space with Clusters Read on the cluster
 picked; seeing them is Deploy Read.
 
+**A deploy.** What a repository sends to an environment is its own: a Helm
+chart in `deploy/chart` or manifests in `deploy/k8s`, as committed at the
+branch, tag or commit picked (never a working tree's edits), with the image
+built from the `Dockerfile` at its root and tagged with the tag or the
+commit's first twelve characters. The Deploy section says, for each
+repository of the space, which it has; one with neither but a compose file
+offers **Draft from the compose**, which writes a chart into its tree,
+uncommitted, to read and commit: each service a Deployment, a Service named
+as the service where it has ports, a claim for each named volume, the one
+built from the root on the deploy's image, and what has no counterpart in a
+cluster (another build context, a bind of a host folder) said in a comment
+where it stands. A deploy is one job on a node the repository builds on
+that runs Docker: the image built and pushed to the environment's registry,
+or, where none is named, to the git host's own (GitHub's `ghcr.io`, a
+Gitea's or a Forgejo's address) with the deploying person's own token for
+it; on a k3s cluster this install runs on a node the repository builds on,
+with no registry named, the image is imported straight into the cluster.
+Then `helm upgrade --install` with the image set as `image.repository` and
+`image.tag` and `--wait`, or the manifests applied with the image they name
+by the repository's name swapped for the one built, each rollout waited on.
+The cluster's token is made for that one deploy, confined to the
+environment's namespace, and travels with the registry's password beside
+the job, never in what a reader of the job sees, and gone from the job's
+record when it ends; on the node they are a file only the job reads. A
+deploy is refused on a node whose sessions run as its jobs' account, on a
+hosting-only node and on the controller's own machine. Each deploy is kept
+on its environment (who, the ref, the commit, the tag, how it ended), and
+Roll back deploys the last one that succeeded before the newest again.
+Deploying is Deploy Write on the space; drafting a chart is the
+repository's Write.
+
 ## Storage
 
 **Storage**, under Machines, is what a node's disks hold, and whose. It shows

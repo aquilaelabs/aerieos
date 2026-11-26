@@ -19,6 +19,8 @@ let rnEnvEdit = null;             // {i, form}: the row open, i -1 for a new one
 
 const ENV_COLS = [{label: "Environment"}, {label: "Where", w: "minmax(0,1fr)"}, {label: "Deploys"}, {act: true, w: "5rem"}];
 const ENV_WHEN = [["hand", "By hand"], ["push", "On a push to a branch"], ["release", "On a release"]];
+const SHIP_COLS = [{label: "Repository"}, {label: "Deploys", w: "minmax(0,1fr)"}, {act: true, w: "auto"}];
+const SHIP_SAID = {chart: "its Helm chart in <code>deploy/chart</code>", k8s: "its manifests in <code>deploy/k8s</code>"};
 
 function envWhenSaid(e){
   return e.when === "push" ? `on a push to ${e.branch}` : e.when === "release" ? "on a release" : "by hand";
@@ -118,7 +120,41 @@ function rnDrawDeploy(focus){
   box.querySelectorAll("[data-envsave]").forEach(b => b.onclick = () => { keep(); rnEnvSave(b); });
   box.querySelectorAll("[data-envdel]").forEach(b => b.onclick = () => rnEnvRemove(b));
   if (focus) box.querySelector(".rnenv.open [data-envf]")?.focus();
+  rnDrawShips();
   rnSpaceRelock();
+}
+
+// What each repository deploys (step 4): a line each, with Draft from the
+// compose where it has neither a chart nor manifests and has a compose file,
+// for an account that may write its tree.
+function rnDrawShips(){
+  const rs = rnDeploy?.repos || [], field = $("rnShipField");
+  field.hidden = !rs.length;
+  if (!rs.length) return;
+  drawHTML($("rnShipRows"), tblWrap(SHIP_COLS, rs.map(r => tblLine(SHIP_COLS, [
+    esc(projLabel(r.name)),
+    SHIP_SAID[r.ships] || (r.compose ? "nothing yet: a chart can be drafted from its compose file"
+      : "nothing yet: add a Helm chart in <code>deploy/chart</code> or manifests in <code>deploy/k8s</code>"),
+    !r.ships && r.compose && r.may_draft ? `<button type="button" data-shipdraft="${esc(r.name)}">Draft from the compose</button>` : ""])).join(""),
+    "rnships"));
+  $("rnShipRows").querySelectorAll("[data-shipdraft]").forEach(b => b.onclick = () => rnShipDraft(b));
+}
+
+// Draft from the compose: the chart written into the repository's tree,
+// uncommitted, and the line says what it now deploys.
+async function rnShipDraft(btn){
+  const repo = btn.dataset.shipdraft;
+  busy(btn, "Drafting");
+  const j = await postJSON("/api/deploy", {project: repo, action: "draft"});
+  if (j.error){
+    notify(j.error, true);
+    if (btn.isConnected) unbusy(btn, "Draft from the compose");
+    return;
+  }
+  const r = (rnDeploy?.repos || []).find(x => x.name === repo);
+  if (r) r.ships = "chart";
+  rnDrawShips();
+  notify(`A chart is in ${projLabel(repo)}'s deploy/chart, uncommitted: read it and commit it`);
 }
 
 // Add environment: the same form at the table's top, the first cluster

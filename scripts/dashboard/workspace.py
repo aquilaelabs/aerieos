@@ -18,6 +18,8 @@ What this module owns:
     (owner and mode normalized, mtimes kept), so the node's by-digest cache
     means an unchanged tree transfers nothing. The last few per project are
     kept; a snapshot is a job's input and not a backup.
+  - snapshot_at(project, ref): the tree as committed at a branch, tag or
+    commit, by git archive, kept the same way: what a deploy ships.
   - path_for(digest): what the agent's `source` verb serves.
   - artifact_put(job, name, body): a file a job uploaded, into dist/ under a
     name the node chose and this side sanitized, plus dist/.provenance/ with
@@ -67,6 +69,11 @@ toolchains_json = None
 # ...and the packs made on the controller, each a git bundle carried as
 # config/toolpacks/NAME.bundle (toolpacks.hosted_files): [(arcname, path)].
 packs_files = None
+# The controller's own git dir for reading a tree (git._own, B153), set by
+# the server: a deploy's tree is read through it, so a filter driver or a
+# hook the tree's config names is never this process's to run. None in a
+# module test, where the tree is read as it is.
+own_git = None
 
 
 def configure(*, workspace, state):
@@ -164,6 +171,77 @@ def snapshot(project):
     with _lock:
         os.replace(tmp, final)
         meta = {"project": project, "at": int(time.time()), "files": n,
+                "bytes": size, "tar": final.stat().st_size}
+        (snaps / f"{hexd}.json").write_text(json.dumps(meta))
+        _prune(project)
+    return {"digest": "sha256:" + hexd} | meta
+
+
+def snapshot_at(project, ref):
+    """The tree as committed at `ref` (a branch, a tag or a commit), as one
+    tar kept as snapshot() keeps one: what a deploy ships (R281 step 4) is
+    what was committed, never a working tree's edits. Read through the
+    controller's own git dir (own_git). git archive's own tar,
+    whose bytes are the commit's alone (its time on every file, root its
+    owner), so the same commit is the same digest and the node's cache
+    holds it. dist/ is left out as snapshot() leaves it.
+    {digest, commit, tag, files, bytes, tar} or {error}, `tag` the ref
+    where it is a tag of that commit."""
+    root = WORKSPACE / project
+    ref = str(ref or "").strip()
+    if not (root / ".git").exists():
+        return {"error": f"{project} is not a git repository"}
+    if not ref or ref.startswith("-") or not re.fullmatch(r"[\w./@^~+-]{1,200}", ref):
+        return {"error": "pick a branch, a tag or a commit"}
+    own = own_git(root) if own_git else None
+    if own_git and not own:
+        return {"error": f"{project}'s repository could not be read safely"}
+    git = ["git", f"--git-dir={own}"] if own else ["git", "-C", str(root)]
+
+    def commit_of(name):
+        try:
+            got = subprocess.run([*git, "rev-parse", "--verify", "--quiet", f"{name}^{{commit}}"],
+                                 capture_output=True, text=True, timeout=30, check=False)
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        out = got.stdout.strip()
+        return out if got.returncode == 0 and re.fullmatch(r"[0-9a-f]{40,64}", out) else ""
+    commit = commit_of(ref)
+    if not commit:
+        return {"error": f"{ref} is no commit in {project}"}
+    # A release's tag names its image: the ref itself where it is a tag of
+    # this commit.
+    tag = ref if re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", ref) and commit_of(f"refs/tags/{ref}") == commit else ""
+    snaps = _snaps()
+    snaps.mkdir(parents=True, exist_ok=True)
+    tmp = snaps / f".{project}.{os.getpid()}.{threading.get_ident()}.tar"
+    try:
+        with open(tmp, "wb") as fh:
+            p = subprocess.run([*git, "-c", "tar.umask=022", "archive", "--format=tar", commit,
+                                "--", ".", ":(exclude)dist"], stdout=fh, stderr=subprocess.PIPE, timeout=300, check=False)
+    except (OSError, subprocess.SubprocessError) as e:
+        tmp.unlink(missing_ok=True)
+        return {"error": f"git archive: {e}"}
+    if p.returncode:
+        tmp.unlink(missing_ok=True)
+        return {"error": "git archive: " + (p.stderr.decode(errors="replace").strip().splitlines() or ["failed"])[-1]}
+    n = size = 0
+    with tarfile.open(tmp) as tar:
+        for ti in tar:
+            if ti.isfile():
+                n += 1
+                size += ti.size
+            elif ti.issym():
+                n += 1
+    h = hashlib.sha256()
+    with open(tmp, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    hexd = h.hexdigest()
+    final = snaps / f"{hexd}.tar"
+    with _lock:
+        os.replace(tmp, final)
+        meta = {"project": project, "at": int(time.time()), "commit": commit, "tag": tag, "files": n,
                 "bytes": size, "tar": final.stat().st_size}
         (snaps / f"{hexd}.json").write_text(json.dumps(meta))
         _prune(project)

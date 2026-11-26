@@ -148,6 +148,22 @@ def _last_frame(line):
     frames = [f for f in line.rstrip("\n").split("\r") if f.strip()]
     return (frames[-1].rstrip() if frames else "") + end
 
+def spec_env(spec, by_root=False):
+    """What a job's spec adds to its environment: its `env`, and its
+    `secret_env` (R281: a deploy's cluster token and registry password),
+    which the controller keeps from every reader of the job and drops from
+    its row when the job ends, and which nothing here says. A job run by the
+    root agent takes neither PATH nor a loader variable from either."""
+    out = {}
+    for part in ("env", "secret_env"):
+        got = spec.get(part) if isinstance(spec, dict) else None
+        for k, v in (got if isinstance(got, dict) else {}).items():
+            if by_root and (str(k) == "PATH" or str(k).startswith("LD_")):
+                continue
+            out[str(k)] = str(v)
+    return out
+
+
 class Job(threading.Thread):
     """One job, on its own thread, reporting as it goes.
 
@@ -733,10 +749,7 @@ class Job(threading.Thread):
             return "failed", 64
         if not os.path.isdir(cwd):
             cwd = "/tmp"
-        for k, v in (spec.get("env") or {}).items():
-            if by_root and (str(k) == "PATH" or str(k).startswith("LD_")):
-                continue
-            env[str(k)] = str(v)
+        env.update(spec_env(spec, by_root))
         # Inputs: files from the project's dist/, fetched into the working
         # directory by name: an APK for the emulator to install.
         for f in (spec.get("files") or [])[:8]:

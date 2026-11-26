@@ -6635,6 +6635,15 @@ def on_done(job_type, fn):
     ON_DONE[job_type] = fn
 
 
+def _done_fn(j):
+    """The hook for a job that ended: its type's, or for an exec job whose
+    spec names a `done` (a deploy's, R281 step 4), TYPE:DONE's, so a module
+    finishes its own exec jobs without claiming every exec."""
+    j = j or {}
+    named = str((j.get("spec") or {}).get("done") or "")
+    return ON_DONE.get(f"{j.get('type') or ''}:{named}") if named else ON_DONE.get(j.get("type") or "")
+
+
 def jobs_rev():
     """Bumped on every job mutation and every log chunk; /api/revs carries
     it so the Jobs page and the rows that watch a job refetch on change."""
@@ -7957,6 +7966,26 @@ def prune_job_logs(project=None):
     return gone
 
 
+def forget_secrets(job_id=None):
+    """A finished job's `secret_env` taken off its row (R281): what a node
+    was handed for one job (a deploy's cluster token, its registry password)
+    is kept no longer than the job runs. One job's, or every finished job
+    still carrying one (the sweep, for a row ended by a loss or a restart).
+    How many rows changed."""
+    q = ("SELECT id, spec FROM jobs WHERE state IN ('succeeded', 'failed', 'canceled') AND spec LIKE '%\"secret_env\"%'"
+         + (" AND id = ?" if job_id else ""))
+    n = 0
+    for r in _rows(q, (job_id,) if job_id else ()):
+        try:
+            spec = json.loads(r["spec"] or "{}")
+        except ValueError:
+            continue
+        if isinstance(spec, dict) and spec.pop("secret_env", None) is not None:
+            _exec("UPDATE jobs SET spec = ? WHERE id = ?", (json.dumps(spec), r["id"]))
+            n += 1
+    return n
+
+
 def prune_jobs():
     """Drop finished job rows past JOB_ROWS_KEEP per project and older than
     JOB_ROWS_DAYS, with whatever log they still have. How many went."""
@@ -8180,6 +8209,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
         keep = [o for o in outputs[:64] if isinstance(o, dict)]
         _exec("UPDATE jobs SET outputs = ? WHERE id = ?", (json.dumps(keep), job_id))
     audit(f"node:{node_id}", "job-result", job_id, {"state": state, "exit": code})
+    forget_secrets(job_id)
     # Swept here rather than on a timer: a job ending is exactly when a
     # project gains a log, so it is when one of its old ones can go, and the
     # work is bounded by that project's own history.
@@ -8231,7 +8261,8 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
     # action run by the agent still has records to write here (what was
     # built, from which commit, on which daemon), and this is where they
     # land, once, whichever runner served it.
-    fn = ON_DONE.get(got[0]["type"] if "type" in got[0].keys() else "")
+    ended = job(job_id, with_log=False)
+    fn = _done_fn(ended)
     if fn:
         try:
             # A hook may also REWORD the failure. All a node can honestly say
@@ -8241,7 +8272,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
             # the controller ran compose itself; this is how it keeps it now
             # the node does (roadmap #24).
             with timing.timed(f"result:hook:{got[0]['type']}"):
-                better = fn(job(job_id, with_log=False), state)
+                better = fn(ended, state)
             if state != "succeeded" and isinstance(better, str) and better.strip():
                 _exec("UPDATE jobs SET error = ? WHERE id = ?",
                       (better.strip()[:500], job_id))
@@ -8323,6 +8354,8 @@ def job_cancel(principal, job_id):
                      else "canceled before it started", job_id))
         if cur.rowcount == 0:
             _exec("UPDATE jobs SET cancel = 1 WHERE id = ?", (job_id,))
+        else:
+            forget_secrets(job_id)
     elif not got[0]["cancel"]:
         _exec("UPDATE jobs SET cancel = 1 WHERE id = ?", (job_id,))
     if not _quiet(job_id):
@@ -8398,7 +8431,7 @@ def _lost_done(jid):
     result: a compose rebuild failed as lost left the Docker row saying
     building, since only job_result ran the hook (B287)."""
     j = job(jid, with_log=False)
-    fn = ON_DONE.get((j or {}).get("type") or "")
+    fn = _done_fn(j)
     if not fn or not j:
         return
     try:

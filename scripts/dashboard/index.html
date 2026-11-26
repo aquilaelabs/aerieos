@@ -1082,10 +1082,14 @@
          once a cluster is kept or the space has an environment. -->
     <details class="sect rngroup" data-sect="rn:deploy" hidden><summary><span class="t">Deploy</span></summary><div class="body">
     <div class="field" id="rnEnvField">
-      <label id="rnEnvLabel">Environments<span class="help" data-help="where this space's software goes: each a cluster from the Clusters page, a namespace on it this space alone deploys to, the registry its images are pushed to (left empty, its git host's own, through the space's token), and when it deploys. Saving one makes its namespace ready, with a deployer that reaches that namespace and nothing else; removing one leaves the namespace on the cluster" tabindex="0">?</span></label>
+      <label id="rnEnvLabel">Environments<span class="help" data-help="where this space's software goes: each a cluster from the Clusters page, a namespace on it this space alone deploys to, the registry its images are pushed to (left empty, its git host's own, with the deploying person's own token for it; none at all on a k3s cluster this install runs on a node the repository builds on), and when it deploys. Saving one makes its namespace ready, with a deployer that reaches that namespace and nothing else; removing one leaves the namespace on the cluster" tabindex="0">?</span></label>
       <div id="rnEnvRows" role="group" aria-labelledby="rnEnvLabel"></div>
       <div class="rnreachadd"><button type="button" id="rnEnvAdd">Add environment</button></div>
       <div class="hint" id="rnEnvHint"></div>
+    </div>
+    <div class="field" id="rnShipField" hidden>
+      <label id="rnShipLabel">What deploys<span class="help" data-help="what each repository of the space sends to an environment: a Helm chart in deploy/chart, or manifests in deploy/k8s, as committed at the branch, tag or commit a deploy picks, with the image built from the Dockerfile at its root. Draft from the compose writes a chart from the repository's compose file into its tree, uncommitted, to read and commit" tabindex="0">?</span></label>
+      <div id="rnShipRows" role="group" aria-labelledby="rnShipLabel"></div>
     </div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:sees"><summary><span class="t">What sessions reach</span></summary><div class="body">

@@ -370,6 +370,20 @@ const stateDot = c => c
   ? `<span class="st ${c.state}" title="${c.state === "working" ? "working"
       : c.state === "asking" ? "asking you to approve something in its terminal" : "waiting for you"}"></span>` : "";
 
+// ---- who did something ---------------------------------------------------
+
+// Who a record says did it, from the principal it stores: an account by its
+// name, without its "user:" prefix; AerieOS's own work as "automatic" or in
+// words ("system:auto-update" is automatic too). One word or two, so a By
+// column holds it whole.
+const PRINCIPAL_SYSTEM = {"auto-update": "automatic"};
+function principalWords(by){
+  by = String(by || "");
+  return by.startsWith("user:") ? by.slice(5)
+    : by.startsWith("system:") ? PRINCIPAL_SYSTEM[by.slice(7)] || by.slice(7).replace(/-/g, " ")
+    : by === "system" ? "automatic" : by;
+}
+
 // ---- times and sizes ----------------------------------------------------
 
 // The time zone times are shown in. A person's own, set on their Profile,

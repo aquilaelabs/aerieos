@@ -198,19 +198,11 @@ function jobsShowSet(v){
 }
 
 // Who asked: every job has an asker, so it is a column and not a line
-// under each row; an account is named without its "user:" prefix.
-// A job AerieOS asked for itself is "system:WHAT", said in words, or
-// a bare "system" (a toolchain's daily check), said as automatic as well.
-// One word, which the By column holds whole at a desk beside the Job
-// column's room ("automatic update" was cut to "automatic …"); the Kind
-// column beside it says what it updated.
-const JOB_BY_SYSTEM = {"auto-update": "automatic"};
-function jobBy(j){
-  const by = j.requested_by || "";
-  return esc(by.startsWith("user:") ? by.slice(5)
-    : by.startsWith("system:") ? JOB_BY_SYSTEM[by.slice(7)] || by.slice(7).replace(/-/g, " ")
-    : by === "system" ? "automatic" : by);
-}
+// under each row, said as principalWords says one. One word, which the By
+// column holds whole at a desk beside the Job column's room ("automatic
+// update" was cut to "automatic …"); the Kind column beside it says what
+// it updated.
+const jobBy = j => esc(principalWords(j.requested_by));
 // The Job column has the room (B112): a title wraps at a word only when
 // its column holds the longest word, so it takes most of the shares; Node
 // and By keep a floor that holds a node's and an account's name whole, and
