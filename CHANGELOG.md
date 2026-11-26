@@ -48,6 +48,7 @@
 - A Library entry's page stops reading when it is left, where each visit while something installed added another read every three seconds (1dbdbee)
 - A new space's progress is read once a second, where Abort could set two reads going (1dbdbee)
 - The Windows companion takes a later dev build, where it stayed on the one it had (05cbf12)
+- A space's own git token, kept for its background work, is no longer moved into its owner's key store at a restart (84e4929)
 
 ### Security
 
