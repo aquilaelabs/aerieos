@@ -41,7 +41,10 @@ function clBody(c){
   const f = c.facts || {}, may = !!c.may;
   const ns = (f.namespaces || []).filter(n => !/^kube-/.test(n.name));
   const facts = factGrid([["API server", c.server], ["Signs in with", c.auth === "token" ? "a token" : "a client certificate"],
-    ["Added", c.added_at ? `${ago(c.added_at)}${c.added_by ? ` by ${esc(principalWords(c.added_by))}` : ""}` : ""],
+    ["Added", c.added_at ? `${ago(c.added_at)}${c.added_by ? ` by ${principalWords(c.added_by)}` : ""}` : ""],
+    // What its nodes hold, and what is in use where it runs metrics-server.
+    ["CPU", f.cpu ? `${f.cpu_used !== undefined ? `${f.cpu_used} of ` : ""}${f.cpu} core${f.cpu === 1 ? "" : "s"}${f.cpu_used !== undefined ? " in use" : ""}` : ""],
+    ["Memory", f.mem ? `${f.mem_used !== undefined ? `${humanBytes(f.mem_used)} of ` : ""}${humanBytes(f.mem)}${f.mem_used !== undefined ? " in use" : ""}` : ""],
     ["Asked", f.at ? ago(f.at) : "never"]].filter(([, v]) => v), "clfacts");
   const nsList = ns.length
     ? `<div class="field"><label>Namespaces</label><div class="sub">${ns.map(n => `${esc(n.name)}${n.space ? ` <span class="dim">(${esc(projLabel(n.space))})</span>` : ""}`).join(", ")}</div></div>`

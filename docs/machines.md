@@ -307,10 +307,13 @@ plugin or an `auth-provider`: EKS, GKE, AKS, kubelogin) is refused, saying
 how to make a token-based one; a path where data belongs is refused,
 `kubectl config view --raw --flatten --minify` writing the files in. A
 cluster is added only once its API answers. Each is a section that opens on
-its facts as its API last said (the version, nodes ready of all), its
-namespaces with the space that owns each, and Test, Rename and Forget;
-Forget changes nothing on the cluster. Each is a connection too, on
-Controller settings' Connected services.
+its facts as its API last said (the version, nodes ready of all, the CPU
+and memory its nodes hold and, where it runs metrics-server as k3s does,
+how much of each is in use), its namespaces with the space that owns each,
+and Test, Rename and Forget; Forget changes nothing on the cluster. Each is
+a connection too, on Controller settings' Connected services. The Doctor
+asks each cluster again when it runs and warns of one that does not answer
+or whose client certificate ends within two weeks.
 
 **k3s on a node.** The Library's **k3s** card installs a one-node cluster on
 the node picked, as a System container (the rancher/k3s image its entry

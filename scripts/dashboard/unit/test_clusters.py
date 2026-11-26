@@ -149,6 +149,22 @@ class Kept(unittest.TestCase):
         self.assertIn("401", t["cluster"]["facts"]["error"])
         self.assertEqual(t["cluster"]["facts"]["version"], "v1.37.3+k3s1", "what it said before is kept beside why it does not now")
 
+    def test_the_doctors_lines(self):
+        self.assertEqual(clusters.doctor(), [], "nothing when none is kept")
+        r = clusters.add(kubeconfig(self.url, "    token: good\n"), "lab", "ada")
+        (line,) = clusters.doctor()
+        self.assertEqual((line["level"], line["text"]), ("ok", "cluster lab answers: 1 of 2 nodes ready"))
+        Stub.token = "rotated"
+        self.addCleanup(setattr, Stub, "token", "good")
+        (line,) = clusters.doctor()
+        self.assertEqual(line["level"], "warn")
+        self.assertIn("cluster lab does not answer", line["text"])
+        self.assertTrue(r["ok"])
+
+    def test_a_certificate_near_its_end(self):
+        self.assertEqual(clusters.cert_ends(""), 0)
+        self.assertEqual(clusters.cert_ends("not a certificate"), 0)
+
     def test_nothing_answering_is_said(self):
         with self.assertRaises(kubeclient.KubeError) as e:
             kubeclient.Client("http://127.0.0.1:9", token="t").get("/version")

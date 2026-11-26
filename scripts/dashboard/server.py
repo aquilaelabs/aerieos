@@ -5961,6 +5961,9 @@ def _container_age():
 
 # ---- aerie doctor, cached for the Doctor card: doctor.py ----------------------
 import doctor                                                    # noqa: E402
+# The Doctor asks each Kubernetes cluster kept again, and says one that does
+# not answer or whose certificate ends soon (R281 step 2).
+doctor.extra = clusters.doctor
 
 doctor.configure(run=run, wait_for_boot=lambda: (wait_for_boot(), wait_for_nodes()),
                  runner_named=lambda nid, slot: (

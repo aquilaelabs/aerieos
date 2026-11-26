@@ -37,6 +37,8 @@ await section("a cluster added from a kubeconfig", async () => {
   const body = await page.$eval('.clusterstab details[data-sect^="clusters:c:"]', d => d.textContent.replace(/\s+/g, ' '));
   ok(/default, alpha-staging/.test(body) && !/\(alpha\)/.test(body) && /a token/.test(body),
      `opened, it says its namespaces, one this install did not make nobody's, and how it signs in (${body.slice(0, 160)})`);
+  ok(/CPU ?0\.75 of 8 cores in use/.test(body) && /Memory ?[0-9.]+ ?[A-Za-z]+ of [0-9.]+ ?[A-Za-z]+ in use/.test(body),
+     `and what its nodes hold and use, as metrics-server says (${(body.match(/CPU.{0,60}/) || [''])[0]})`);
 });
 
 await section("a cloud CLI's sign-in is refused, with the way out", async () => {

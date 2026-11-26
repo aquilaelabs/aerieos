@@ -246,6 +246,48 @@ def test(cid):
     return {"ok": not facts["error"], "cluster": _row(cid, d[cid]), **({"error": facts["error"]} if facts["error"] else {})}
 
 
+def cert_ends(pem):
+    """When a client certificate stops being good, as seconds since the
+    epoch, or 0 where it is not one this can read."""
+    import ssl
+    import tempfile
+    if not pem:
+        return 0
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".pem", delete=True) as f:
+            f.write(pem)
+            f.flush()
+            got = ssl._ssl._test_decode_cert(f.name)            # noqa: SLF001 - the stdlib's own reader
+        return int(ssl.cert_time_to_seconds(got["notAfter"]))
+    except (OSError, ValueError, KeyError, ssl.SSLError):
+        return 0
+
+
+def doctor(now=None, soon_days=14):
+    """The Doctor's lines about the clusters kept (R281 step 2): each asked
+    again now, a warn for one that does not answer or whose client
+    certificate ends within `soon_days`, an ok otherwise; nothing when none
+    is kept. [{level, text, detail}]."""
+    now = now or time.time()
+    out = []
+    for cid, c in sorted(_load().items(), key=lambda kv: kv[1].get("name", kv[0])):
+        name = c.get("name", cid)
+        r = test(cid)
+        if r.get("error"):
+            out.append({"level": "warn", "text": f"cluster {name} does not answer: {r['error']}",
+                        "detail": "Test on the Clusters page asks again; Forget it there where it is gone for good"})
+            continue
+        ends = cert_ends(c.get("cert", ""))
+        if ends and ends - now < soon_days * 86400:
+            out.append({"level": "warn", "text": f"cluster {name}'s client certificate ends "
+                                                 f"{'in ' + str(max(0, int((ends - now) // 86400))) + ' days' if ends > now else 'has ended'}",
+                        "detail": "add it again from a kubeconfig with a new certificate, then Forget this one"})
+            continue
+        f = (r.get("cluster") or {}).get("facts") or {}
+        out.append({"level": "ok", "text": f"cluster {name} answers: {f.get('ready', 0)} of {f.get('nodes', 0)} nodes ready", "detail": ""})
+    return out
+
+
 def rename(cid, name):
     name = str(name or "").strip()
     if not NAME_RE.match(name):

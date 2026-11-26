@@ -1159,8 +1159,10 @@ export async function kubeApi({ token = 'good', namespaces = [] } = {}){
       }
       if (req.method === 'GET'){
         if (req.url === '/version') return send(200, { gitVersion: 'v1.37.3+k3s1' });
-        if (req.url === '/api/v1/nodes') return send(200, { items: [{ status: { conditions: [{ type: 'Ready', status: 'True' }] } },
-                                                                    { status: { conditions: [{ type: 'Ready', status: 'False' }] } }] });
+        if (req.url === '/api/v1/nodes') return send(200, { items: [{ status: { conditions: [{ type: 'Ready', status: 'True' }], allocatable: { cpu: '4', memory: '8Gi' } } },
+                                                                    { status: { conditions: [{ type: 'Ready', status: 'False' }], allocatable: { cpu: '4', memory: '8Gi' } } }] });
+        // metrics-server's answer, as k3s carries it: what each node uses now.
+        if (req.url === '/apis/metrics.k8s.io/v1beta1/nodes') return send(200, { items: [{ usage: { cpu: '500m', memory: '1Gi' } }, { usage: { cpu: '250m', memory: '512Mi' } }] });
         if (req.url === '/api/v1/namespaces')
           return send(200, { items: [{ metadata: { name: 'default' } }, ...[...api.objs].filter(([p]) => /^\/api\/v1\/namespaces\/[^/]+$/.test(p)).map(([, o]) => o)] });
         const o = api.objs.get(req.url);

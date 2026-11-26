@@ -11,6 +11,7 @@ keeps anything.
 """
 import contextlib
 import json
+import re
 import os
 import ssl
 import tempfile
@@ -107,6 +108,23 @@ def _said(e):
     return f"{e.code}{': ' + msg if msg else ''}"
 
 
+_UNITS = {"n": 1e-9, "u": 1e-6, "m": 1e-3, "": 1, "k": 1e3, "M": 1e6, "G": 1e9, "T": 1e12, "P": 1e15, "E": 1e18,
+          "Ki": 1024, "Mi": 1024 ** 2, "Gi": 1024 ** 3, "Ti": 1024 ** 4, "Pi": 1024 ** 5, "Ei": 1024 ** 6}
+
+
+def quantity(q):
+    """A Kubernetes quantity as a number: cores for CPU ("250m" 0.25,
+    "2" 2, "1500000n" 0.0015), bytes for memory ("8Gi", "512Mi",
+    "1024k"); 0 for what is not one."""
+    m = re.fullmatch(r"\s*([0-9.]+(?:[eE][-+]?[0-9]+)?)\s*([a-zA-Z]*)\s*", str(q or ""))
+    if not m or m.group(2) not in _UNITS:
+        return 0
+    try:
+        return float(m.group(1)) * _UNITS[m.group(2)]
+    except ValueError:
+        return 0
+
+
 def facts(client):
     """What a cluster is, as its own API says: {version, nodes, ready,
     namespaces: [{name, labels}]}, each namespace's AerieOS labels alone
@@ -116,7 +134,20 @@ def facts(client):
     ready = sum(1 for n in nodes if any(c.get("type") == "Ready" and c.get("status") == "True"
                                        for c in (n.get("status") or {}).get("conditions") or []))
     ns = client.get("/api/v1/namespaces").get("items") or []
+    # What its nodes hold and, where the cluster runs metrics-server (k3s
+    # does), what is in use now; a cluster without one says nothing of use.
+    cap = {"cpu": sum(quantity((n.get("status") or {}).get("allocatable", {}).get("cpu")) for n in nodes),
+           "mem": sum(quantity((n.get("status") or {}).get("allocatable", {}).get("memory")) for n in nodes)}
+    use = None
+    try:
+        items = client.get("/apis/metrics.k8s.io/v1beta1/nodes").get("items") or []
+        use = {"cpu": sum(quantity((m.get("usage") or {}).get("cpu")) for m in items),
+               "mem": sum(quantity((m.get("usage") or {}).get("memory")) for m in items)}
+    except KubeError:
+        pass
     return {"version": str(v.get("gitVersion") or ""), "nodes": len(nodes), "ready": ready,
+            "cpu": round(cap["cpu"], 2), "mem": int(cap["mem"]),
+            **({"cpu_used": round(use["cpu"], 2), "mem_used": int(use["mem"])} if use else {}),
             "namespaces": [{"name": (x.get("metadata") or {}).get("name", ""),
                             "labels": {k: str(v)[:80] for k, v in ((x.get("metadata") or {}).get("labels") or {}).items()
                                        if str(k).startswith("aerieos.io/")}}

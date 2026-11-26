@@ -71,6 +71,13 @@ class Watch(unittest.TestCase):
         self.assertEqual([(r["space"], r["env"], r["repo"], r["active"]) for r in rows], [("shop", "staging", "shop-api", True)])
 
 
+class Quantities(unittest.TestCase):
+    def test_cores_and_bytes(self):
+        import kubeclient
+        self.assertEqual([kubeclient.quantity(q) for q in ("250m", "2", "1500000n", "8Gi", "512Mi", "1024k", "x", "")],
+                         [0.25, 2.0, 0.0015, 8 * 1024 ** 3, 512 * 1024 ** 2, 1024000.0, 0, 0])
+
+
 class Exec(unittest.TestCase):
     """A pod's shell (kubeexec.py): a client's frames masked, as the API
     requires, and read back whole by the reader the server's frames go

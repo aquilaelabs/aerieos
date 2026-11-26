@@ -15,6 +15,10 @@ import time
 run = None
 wait_for_boot = None
 runner_named = None
+# () -> [{level, text, detail}]: checks the controller answers itself, which
+# aerie doctor cannot see from a shell (the clusters kept, R281). Set by the
+# server; each failing check is a warn, never the run's failure.
+extra = None
 
 # Half an hour, a constant (R29): the card's own button re-runs it on demand,
 # which is the control anybody actually reached for.
@@ -120,6 +124,11 @@ def _run_once():
         elif checks and line.strip() and not line.startswith("=="):
             checks[-1]["detail"] = (checks[-1]["detail"] + "\n" + line.strip()).strip()
     checks = [_doc_line(_runner_line(c)) for c in checks]
+    if extra:
+        try:
+            checks += list(extra() or [])
+        except Exception as e:                                                    # noqa: BLE001
+            checks.append({"level": "warn", "text": f"a check of the controller's own did not run: {type(e).__name__}", "detail": str(e)[:200]})
     with _lock:
         _verdict.update(when=int(time.time()), checks=checks, failed=r["code"] != 0)
 
