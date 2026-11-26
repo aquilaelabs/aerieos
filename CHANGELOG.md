@@ -33,6 +33,7 @@
 - Starting an agent takes one press fewer: the model and effort sit under the agent in Start agent's menu, kept as you change them, and New and Resume start at once (2147c56)
 - New space asks for its first repository straight away, named for the space; Cancel leaves a space without one (ae01009)
 - A hosting-only node's Library offers only the services and apps it runs, and says where toolchains, coding agents and tool packs go instead (4321767)
+- The container template's secrets folder, where the first start makes the install key, defaults to the system share instead of appdata, so a backup of appdata no longer carries the key beside what it seals; an existing install keeps its folder (44f56aa)
 
 ### Fixed
 
