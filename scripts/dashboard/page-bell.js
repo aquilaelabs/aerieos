@@ -817,6 +817,11 @@ function drawBell(){
   }
   bellRedSeen = red;
   setHidden(dot, !(pendingOn || att.length || ciRed.length || syncC.length || unread));
+  // ...and its name says as much as the dot shows, for a screen reader
+  // (R286 step 2): a dot is a picture of a number.
+  const waitingN = pendingOn + att.length + ciRed.length + syncC.length + unread;
+  const bellName = waitingN ? `notifications, ${waitingN} waiting` : "notifications";
+  if (bell.getAttribute("aria-label") !== bellName) bell.setAttribute("aria-label", bellName);
   // An ask outranks every level of record: one is a thing that happened, the
   // other is a thing that has not happened yet because it is waiting on you.
   // A node alert sits between: red when work is stopped, amber when an
