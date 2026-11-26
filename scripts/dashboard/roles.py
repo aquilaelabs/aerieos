@@ -191,37 +191,13 @@ def _perms(p):
     return {a: p[a] for a in AREA_KEYS if p.get(a) in LEVELS}
 
 
-def _from_grants(gs):
-    """A role from before R152, its grants on today's actions, as a scope and
-    areas: a grant on everything or on every project is Global, anything
-    narrower the user's projects (a role is now given per project)."""
-    perms, scope = {}, "projects"
-    for g in gs if isinstance(gs, list) else []:
-        if not isinstance(g, dict):
-            continue
-        cap = str(g.get("cap") or "")
-        pairs = list(_ALL.items()) if cap == "*" else [CAP_AREA[cap]] if cap in CAP_AREA else []
-        for area, lvl in pairs:
-            if perms.get(area) != "write":
-                perms[area] = lvl
-        if g.get("scope") == "all":
-            scope = "global"
-    if scope == "projects" and any(a not in PROJECT_AREAS for a in perms):
-        scope = "global"
-    return {"scope": scope, "perms": perms}
-
-
-def _only(raw, perms, nodes=()):
+def _only(raw, perms):
     """A role's instance map, cleaned: {area: {instance: level}} for the
-    INSTANCE_AREAS alone. A role from before it carries `nodes`, one list
-    for all of its node areas at the area's level, which is read as that.
-    An area whose map is empty is held nowhere and leaves `perms`; one that
-    is held is in `perms` at the best level of its map, so every question
-    asked without an instance (the rail, the summary) keeps its answer."""
+    INSTANCE_AREAS alone. An area whose map is empty is held nowhere and
+    leaves `perms`; one that is held is in `perms` at the best level of its
+    map, so every question asked without an instance (the rail, the
+    summary) keeps its answer."""
     raw = raw if isinstance(raw, dict) else {}
-    nodes = sorted({str(n)[:40] for n in nodes or () if str(n).strip()})[:64]
-    if not raw and nodes:
-        raw = {a: {n: perms[a] for n in nodes} for a in NODE_AREAS if perms.get(a)}
     out = {}
     for a in INSTANCE_AREAS:
         m = raw.get(a)
@@ -238,12 +214,9 @@ def _only(raw, perms, nodes=()):
 
 def _clean(r):
     r = r if isinstance(r, dict) else {}
-    if "grants" in r and "perms" not in r:
-        r = dict(r, **_from_grants(r.get("grants")))
     scope = r.get("scope") if r.get("scope") in ROLE_SCOPES else "projects"
     perms = _perms(r.get("perms"))
-    only = _only(r.get("only"), perms, r.get("nodes") if isinstance(r.get("nodes"), list) else ()) \
-        if scope == "global" else {}
+    only = _only(r.get("only"), perms) if scope == "global" else {}
     return {"scope": scope, "perms": perms, "builtin": False,
             "note": str(r.get("note") or "")[:200], "only": only}
 

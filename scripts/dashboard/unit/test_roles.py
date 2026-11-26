@@ -243,20 +243,6 @@ class Model(unittest.TestCase):
         self.assertFalse(self.g(u, "version", "alpha"), "given on beta, not alpha")
         self.assertTrue(self.g(u, "version"), "at all")
 
-    def test_a_role_from_before_r152_is_read_as_areas(self):
-        with open(os.path.join(self.tmp, "roles.json"), "w") as f:
-            json.dump({"roles": {"deployer": {"grants": [{"cap": "version", "scope": ["alpha"]},
-                                                         {"cap": "jobs", "scope": "all"}], "note": "old"}}}, f)
-        d = roles.get("deployer")
-        self.assertEqual((d["scope"], d["perms"]), ("global", {"releases": "write", "jobs": "write"}))
-        self.assertEqual(d["note"], "old")
-
-    def test_a_kept_role_with_one_list_of_nodes_holds_each_node_area_there(self):
-        with open(os.path.join(self.tmp, "roles.json"), "w") as f:
-            json.dump({"roles": {"creator": {"scope": "global", "nodes": ["n1"],
-                                               "perms": {"newprojects": "write", "jobs": "read", "controller": "read"}}}}, f)
-        self.assertEqual(roles.get("creator")["only"], {"newprojects": {"n1": "write"}, "jobs": {"n1": "read"}})
-
     def test_an_unknown_role_on_an_account_grants_nothing(self):
         ghost = {"name": "g", "role": "gone", "roles": ["gone"], "projects": ["alpha"]}
         self.assertFalse(self.g(ghost, "work", "alpha"))
