@@ -30,7 +30,7 @@
 - A space's settings say which nodes' model routers it may use, each opening the router's page where it is granted (6336f51)
 - A space's color is each person's alone: the color a space's settings held becomes the own color of every account that had picked none, so no card changes (6336f51)
 - Starting an agent takes one press fewer: the model and effort sit under the agent in Start agent's menu, kept as you change them, and New and Resume start at once (2147c56)
-- New space asks for its first repository straight away, named for the space; Cancel leaves a space without one (5cd48f2)
+- New space asks for its first repository straight away, named for the space; Cancel leaves a space without one (ae01009)
 - A hosting-only node's Library offers only the services and apps it runs, and says where toolchains, coding agents and tool packs go instead (4321767)
 
 ### Fixed
