@@ -7,7 +7,7 @@
 // device, a read-only person's change is refused, and a device waiting on
 // the project wakes when another changes it. The Profile page lists the
 // devices and Disconnect signs one out. No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section, REPO, aerie } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section, REPO, aerie, call } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'node:fs';
 
@@ -140,6 +140,21 @@ await section("and one written on the controller some other way", async () => {
 // The agent's sync, shared, on the device door: signed in, a project picked
 // into a folder, the first copy made; then a change made in the folder goes
 // up and one made elsewhere comes down, with nothing but the app running.
+// The phone app's token (R290): the password traded once at sign-in, then
+// that person on the dashboard's own routes as the password was, and ended
+// by Profile's sign-out of the device. A PC's speaks only to its own door.
+await section("a phone's token is its person on the dashboard, until it is signed out", async () => {
+  const phone = await dev('', 'signin', { username: 'dv.rw', password: people['dv.rw'], name: 'PIXEL', kind: 'phone' });
+  const st = tok => fetch(`${base}/api/status`, { headers: { Authorization: `Bearer ${tok}` } });
+  const asPhone = await st(phone.token);
+  const seen = asPhone.status === 200 ? await asPhone.json() : {};
+  ok(phone.status === 200 && asPhone.status === 200 && (seen.projects || []).some(p => p.name === 'alpha'),
+     `the phone's token reads the status as dv.rw, alpha among its spaces (${phone.status} ${asPhone.status})`);
+  ok((await st(a.token)).status === 401, "a PC's token is no sign-in on the dashboard's own routes");
+  const out = await call('/api/profile', { action: 'device-signout', device: phone.device.id }, asUser('dv.rw', people['dv.rw']));
+  ok(out.status === 200 && (await st(phone.token)).status === 401, `signed out from Profile, the phone's token is nobody's (${JSON.stringify(out.body)})`);
+});
+
 await section("the app itself", async () => {
   const appEnv = { ...process.env, APPDATA: `${DIR}/appdata`, PYTHONPATH: `${REPO}/apps/windows:${REPO}/scripts/agent`,
                    BB_COMPANION_PASSWORD: people['dv.rw'] };

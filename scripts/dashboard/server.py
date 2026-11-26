@@ -7513,6 +7513,16 @@ class Handler(BaseHTTPRequestHandler):
         """
         self._basic_2fa = False
         hdr = self.headers.get("Authorization", "")
+        if hdr.startswith("Bearer ") and hdr[7:].strip().startswith(devices.PREFIX):
+            # The phone app's device token (R290): what it traded the
+            # password for once, at sign-in, its second factor with it. It
+            # is that person, as the password was, and Profile's Disconnect
+            # ends it. A PC's or an editor's speaks only to its own door.
+            d = devices.authenticate(hdr[7:].strip())
+            if d.get("error") or d.get("kind") != "phone":
+                return None
+            u = users.get((d.get("account") or {}).get("name") or "")
+            return dict(u, device=d["device"]) if u else None
         if hdr.startswith("Bearer "):
             # A session's scoped token: one project, user rights, an expiry.
             # Never a person, so it can do what a user can do on that project
