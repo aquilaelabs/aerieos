@@ -305,6 +305,24 @@ class Gate(unittest.TestCase):
         self.assertIn('newer "$cur" "$ver"', run)
         self.assertIn("left there", run)
 
+    def test_no_job_on_a_self_hosted_runner_holds_key_material(self):
+        # R290 step 7: a machine of the operator's runs some jobs; none of
+        # them reads a secret, an environment's or the repository's, or may
+        # mint an identity token, so a runner taken over gives nothing that
+        # signs a release.
+        import glob
+        import json
+        import re as re_
+        for path in sorted(glob.glob(os.path.join(WF, "*.yml"))):
+            for name, job in (load(os.path.basename(path)).get("jobs") or {}).items():
+                ro = str(job.get("runs-on"))
+                if "self-hosted" not in ro and "${{" not in ro:
+                    continue
+                text = json.dumps(job)
+                self.assertEqual(re_.findall(r"secrets\.(?!GITHUB_TOKEN)[A-Za-z_]+", text), [], f"{os.path.basename(path)} {name}")
+                self.assertNotIn("environment", job, f"{os.path.basename(path)} {name}")
+                self.assertNotEqual((job.get("permissions") or {}).get("id-token"), "write", f"{os.path.basename(path)} {name}")
+
     def test_a_release_s_image_is_signed_keyless_by_the_tag_s_identity_and_rehearsed(self):
         # R290 step 3 (the operator, 26 Nov).
         jobs = load("build-image.yml")["jobs"]
