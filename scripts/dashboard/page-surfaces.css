@@ -1173,6 +1173,9 @@ body.firstrun #panes{display:none}
 .tbl.rnreaches>.row.rnreach{align-items:stretch}
 .rnreaches>.rnreach.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
 .rnreaches>.rnreach.open>.tline{display:none}
+/* What deploys (R281 step 4): a sentence a repository, its press at the right. */
+.rnship+.rnship{margin-top:var(--label-gap)}
+.rnship>.grow{overflow-wrap:anywhere}
 .rnreachform>.setrow.col{margin:0;max-width:none}
 .rnreachform .rnreachnodes{display:flex;gap:10px;flex-wrap:wrap}
 /* Also works on as records: the add band over the table, a node a row. */

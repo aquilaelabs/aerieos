@@ -19,8 +19,7 @@ let rnEnvEdit = null;             // {i, form}: the row open, i -1 for a new one
 
 const ENV_COLS = [{label: "Environment"}, {label: "Where", w: "minmax(0,1fr)"}, {label: "Deploys"}, {act: true, w: "5rem"}];
 const ENV_WHEN = [["hand", "By hand"], ["push", "On a push to a branch"], ["release", "On a release"]];
-const SHIP_COLS = [{label: "Repository"}, {label: "Deploys", w: "minmax(0,1fr)"}, {act: true, w: "auto"}];
-const SHIP_SAID = {chart: "its Helm chart in <code>deploy/chart</code>", k8s: "its manifests in <code>deploy/k8s</code>"};
+const SHIP_SAID = {chart: "deploys its Helm chart in <code>deploy/chart</code>", k8s: "deploys its manifests in <code>deploy/k8s</code>"};
 
 function envWhenSaid(e){
   return e.when === "push" ? `on a push to ${e.branch}` : e.when === "release" ? "on a release" : "by hand";
@@ -124,19 +123,18 @@ function rnDrawDeploy(focus){
   rnSpaceRelock();
 }
 
-// What each repository deploys (step 4): a line each, with Draft from the
-// compose where it has neither a chart nor manifests and has a compose file,
+// What each repository deploys (step 4): a sentence each, not a table's
+// data, which wraps where it needs to, with Draft from the compose at its
+// right where it has neither a chart nor manifests and has a compose file,
 // for an account that may write its tree.
 function rnDrawShips(){
   const rs = rnDeploy?.repos || [], field = $("rnShipField");
   field.hidden = !rs.length;
   if (!rs.length) return;
-  drawHTML($("rnShipRows"), tblWrap(SHIP_COLS, rs.map(r => tblLine(SHIP_COLS, [
-    esc(projLabel(r.name)),
-    SHIP_SAID[r.ships] || (r.compose ? "nothing yet: a chart can be drafted from its compose file"
-      : "nothing yet: add a Helm chart in <code>deploy/chart</code> or manifests in <code>deploy/k8s</code>"),
-    !r.ships && r.compose && r.may_draft ? `<button type="button" data-shipdraft="${esc(r.name)}">Draft from the compose</button>` : ""])).join(""),
-    "rnships"));
+  drawHTML($("rnShipRows"), rs.map(r => `<div class="setrow ctlrow rnship"><span class="grow"><b>${esc(projLabel(r.name))}</b> ${
+    SHIP_SAID[r.ships] || (r.compose ? "deploys nothing yet: a chart can be drafted from its compose file"
+      : "deploys nothing yet: add a Helm chart in <code>deploy/chart</code> or manifests in <code>deploy/k8s</code>")}</span>${
+    !r.ships && r.compose && r.may_draft ? `<button type="button" data-shipdraft="${esc(r.name)}">Draft from the compose</button>` : ""}</div>`).join(""));
   $("rnShipRows").querySelectorAll("[data-shipdraft]").forEach(b => b.onclick = () => rnShipDraft(b));
 }
 

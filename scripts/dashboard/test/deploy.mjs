@@ -115,7 +115,7 @@ await section("what each repository deploys, Draft from the compose, and a deplo
   await page.waitForSelector('#rnShipField:not([hidden])', { timeout: 10000 });
   const line = () => page.$eval('#rnShipRows', e => e.textContent.replace(/\s+/g, ' ').trim());
   const was = await line();
-  ok(/alpha/.test(was) && /drafted from its compose file/.test(was) && !!await page.$('[data-shipdraft="alpha"]'),
+  ok(/alpha/.test(was) && /alpha deploys nothing yet: a chart can be drafted from its compose file/.test(was) && !!await page.$('[data-shipdraft="alpha"]'),
      `What deploys names the repository, says it has nothing yet, and offers Draft from the compose (${was})`);
   await page.click('[data-shipdraft="alpha"]');
   const drew = await until(async () => /Helm chart in deploy\/chart/.test(await line()), 10000, 200);
