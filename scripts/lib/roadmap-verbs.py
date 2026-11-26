@@ -382,7 +382,13 @@ elif op == "done":
     if not rest:
         print("usage: aerie roadmap done <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None); fresh()
-    r = roadmap.tick(proj, n, by="claude", who=_who); need(r)
+    r = roadmap.tick(proj, n, by="claude", who=_who)
+    # Its last step done finished it already: that is the end asked for, not
+    # a failure, and it says so (R289: eleven runs exited 1 here).
+    if r.get("error") and "is done already" in r["error"]:
+        print(f"{R(n)} was finished already, by its last step; aerie roadmap info {R(n)} still adds to it")
+        sys.exit(0)
+    need(r)
     print(f"done {R(n)}: {r['item']['text']}")
 elif op in ("rm", "remove"):
     # For work that is abandoned. A finished plan is ticked, not dropped.

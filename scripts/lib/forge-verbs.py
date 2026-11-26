@@ -32,8 +32,10 @@ if not words or words[0] in ("-h", "--help", "help"):
 verb = words.pop(0)
 if verb in GROUPS:
     if not words:
-        die(f"aerie forge {verb} needs an action: list, view ...")
-    verb = f"{verb} {words.pop(0)}"
+        die(f"aerie forge {verb} needs an action: aerie forge -h lists each group's")
+    # show is view, as the notebook's verbs say it (R289).
+    act = words.pop(0)
+    verb = f"{verb} {'view' if act == 'show' else act}"
 pos, flags = [], {}
 while words:
     w = words.pop(0)
@@ -75,7 +77,15 @@ as_json = bool(flags.pop("json", False))
 r = bbapi.call("/api/forge", {"project": proj, "verb": verb, "args": {"pos": pos, "flags": flags}},
                timeout=120)
 if isinstance(r, dict) and r.get("error"):
-    die(r["error"])
+    # The host's own refusal, with the next thing to do (R289): a 403 is the
+    # token's scopes, which whoami measures, and a 404 on runs is a host
+    # whose Actions are off for the repository.
+    e = str(r["error"])
+    if " 403" in e or e.startswith("403"):
+        e += "; aerie forge whoami says what this space's token may do there and what to ask for"
+    elif (" 404" in e or e.startswith("404")) and verb.startswith("run "):
+        e += "; the host may have Actions off for this repository, or the run is not there"
+    die(e)
 if as_json:
     print(json.dumps(r, indent=1))
 elif verb == "whoami":

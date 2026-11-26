@@ -3661,8 +3661,15 @@ EOT
             # project's Run its container setting.
             local verb="$sub" name="" why=""
             shift || true
-            [ $# -ge 1 ] || die "usage: aerie devapp $verb NAME [--why \"...\"]"
-            name="$1"; shift
+            # The container by its own name, or the one --container or
+            # --instance named, as every other devapp verb takes it (R289).
+            if [ $# -ge 1 ] && [ "${1#-}" = "$1" ]; then
+                name="$1"; shift
+            elif [ -n "${ctr:-}${inst:-}" ]; then
+                name="${ctr:-$inst}"
+            else
+                die "usage: aerie devapp $verb NAME [--why \"...\"]"
+            fi
             while [ $# -gt 0 ]; do
                 case "$1" in
                     --why) [ $# -ge 2 ] || die "--why needs the sentence after it"; why="$2"; shift 2 ;;
@@ -4385,6 +4392,8 @@ cmd_jobs() {
                 echo "nodes' own jobs too (toolchain installs, system changes), redacted."
                 return 0 ;;
             j_*) jid="$1"; shift ;;
+            # show ID and log ID are one job's log, as the notebook's verbs say it (R289).
+            show|log|view) shift ;;
             *) die "aerie jobs [-n N] [--node NAME] [--type T] | ID [--all]: an id looks like j_1a2b3c4d" ;;
         esac
     done
@@ -6700,7 +6709,16 @@ fi
 # Help is the same text on a node as on the controller, so it is never
 # relayed. A verb the reference does not name falls through to its own.
 case "${2:-}" in
-    -h|--help) [ -n "${1:-}" ] && verb_help "$1" && exit 0 ;;
+    -h|--help|help) [ -n "${1:-}" ] && verb_help "$1" && exit 0 ;;
+esac
+# ...and anywhere after a subcommand of a verb whose words are never free
+# text: `aerie forge pr create --help` answered "--help needs a value", and
+# `aerie design show --help` looked for a page called that (R289).
+case "${1:-}" in
+    forge|design|tests|k8s|devapp|jobs|map|capture|vm|container|node|sign|ci-log)
+        for _a in "${@:2}"; do
+            case "$_a" in -h|--help) verb_help "$1" && exit 0 ;; esac
+        done ;;
 esac
 # ...and `aerie bug add -h` for a notebook verb, whose words after the
 # subcommand are a title: it filed a bug called "-h" (MediaReducer, 7 Oct).

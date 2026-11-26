@@ -63,7 +63,10 @@ class MapFirst(unittest.TestCase):
         for pat, want in [("def claudeRestart", ["claudeRestart"]), ("^def _clean\\b", ["_clean"]),
                           ("function startClaude", ["startClaude"]), ("claudeLiveOn\\(", ["claudeLiveOn"]),
                           ("class Foo|def bar_baz", ["Foo", "bar_baz"]),
-                          ("TODO", []), ("apt install", []), ("resumePick", [])]:
+                          ("TODO", []), ("apt install", []), ("resumePick", []),
+                          # A definition word inside English is text (R289).
+                          ("does not let run", []), ("the type field", []), ("a class name", []),
+                          ("export function toastWhy", ["toastWhy"]), ("  async def worker", ["worker"])]:
             self.assertEqual(rulehook.symbols(pat), want, pat)
 
     def test_the_searches_a_shell_line_runs(self):

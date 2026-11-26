@@ -258,7 +258,8 @@ def main():
     why = ""
     if not controller_answers(project):
         why = ("AerieOS is not answering: it is restarting after an update, or down. "
-               "Nothing that needs it runs until it is back: wait a minute, then try again. "
+               "No call runs until it is back, a local read included, but writing your memory or "
+               "notes: wait a minute, then try again. "
                "If it stays down, write where you are and what is next to your memory or "
                "your notes (that is allowed), then end the turn: the operator checks the "
                "container, and you pick up from your note.")

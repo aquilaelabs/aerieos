@@ -2466,6 +2466,20 @@ def value_decls(idx, root, name, limit=20):
 SHOW_LINES = 400
 
 
+def named(idx, name):
+    """The definitions called `name`, or, for a dotted one, the module's or
+    the class's own: `users.may` is may in users.py, `Handler._who` the
+    method in Handler, `nb.drawView` a property set on nb (R289: a session
+    reads code as module.name, and each of those said nothing defines it)."""
+    rows = [d for d in idx["defs"] if d["name"] == name]
+    if rows or "." not in name:
+        return rows
+    owner, _, leaf = name.rpartition(".")
+    last = owner.rpartition(".")[2]
+    return [d for d in idx["defs"] if d["name"] == leaf
+            and (Path(d["file"]).stem == last or d.get("parent") == last or d.get("parent", "").endswith("." + last))]
+
+
 def q_show(idx, name, root, first=False):
     """`aerie map show`: each definition called NAME printed whole, or with
     FILE:LINE the innermost definition holding that line; each headed by
@@ -2480,7 +2494,7 @@ def q_show(idx, name, root, first=False):
                     f"aerie map sections {f} reads the file by its parts"]
         rows = [min(held, key=lambda d: max(d["end"], d["line"]) - d["line"])]
     else:
-        rows = [d for d in idx["defs"] if d["name"] == name]
+        rows = named(idx, name)
     if not rows:
         found = q_find(idx, name, root)
         if found and not found[0].startswith("nothing "):
@@ -2520,7 +2534,7 @@ def q_show(idx, name, root, first=False):
 
 
 def q_find(idx, name, root=None):
-    rows = [d for d in idx["defs"] if d["name"] == name]
+    rows = named(idx, name)
     if not rows:
         found = page_bindings(idx, root, name) if root else []
         if not found:

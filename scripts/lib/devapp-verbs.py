@@ -14,6 +14,7 @@ BB_DEV_REF the branch a new container builds from, BB_DEV_COMPOSE which of the
 project's compose files it is made from, BB_DEV_NAME the container
 a ctl verb acts on.
 """
+import re
 import os
 import sys
 import time
@@ -54,6 +55,21 @@ def status():
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
                                    "action": "state"},
                    auth=_auth())
+    # Asked bare where the space has several instances and none is its
+    # main: each one's state, as aerie devapp ls lists them, where the bare
+    # verb refused and was asked again with --instance every time (R289).
+    m = re.search(r"--instance names one of (.+)$", str(d.get("error") or ""))
+    if m and not os.environ.get("BB_DEV_INSTANCE") and not os.environ.get("BB_DEV_CONTAINER"):
+        for i, name in enumerate(x.strip() for x in m.group(1).split(",")):
+            if i:
+                print()
+            os.environ["BB_DEV_INSTANCE"] = name
+            try:
+                status()
+            except SystemExit:
+                pass
+        os.environ["BB_DEV_INSTANCE"] = ""
+        raise SystemExit(0)
     need(d)
     st = d.get("state") if isinstance(d.get("state"), dict) else d
     if not st.get("compose"):

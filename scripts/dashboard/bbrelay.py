@@ -355,13 +355,22 @@ def run(me, req, project):
             # node's bb waits on the ask the way aerie root run does, and the
             # push runs here when they approve, its apply handed back then.
             a = phone.ask_push(project, str(cwd), argv[2:], r["held"],
-                               asker_uid=users.whose(me), asker_name=me.get("name") or "",
+                               # The person, by their account's name: a session's own
+                               # reads session:SPACE, which told the session nothing.
+                               asker_uid=users.whose(me), asker_name=(users.account_of(me) or {}).get("name") or me.get("name") or "",
                                asker_admin=users.is_admin(me))
             if a.get("error"):
                 return {"error": a["error"]}, 400
+            # Where each is, never what it says, so the session can tell the
+            # person which lines and not push again meanwhile (R289: a
+            # session pushed three more times over a wait it was not told of).
+            at = sorted({f"{f['path']}:{f['line']}" for f in r["held"] if f.get("path")})
             return {"held": a["id"], "code": 1, "out": "",
-                    "err": f"[builderbot] held: {pushscan.summary(r['held'])}. The flagged lines wait on the bell "
-                           f"for {a.get('to') or 'a person'} to approve or deny; waiting up to 15 minutes\n"}, 200
+                    "err": f"[builderbot] held: {pushscan.summary(r['held'])}"
+                           + (f" ({', '.join(at[:8])}{', ...' if len(at) > 8 else ''})" if at else "")
+                           + f". They wait on the bell for {a.get('to') or 'a person'} to approve "
+                             "or deny; waiting up to 15 minutes. Tell the person in your reply which lines, and do "
+                             "not push again meanwhile: the held push is the one that goes\n"}, 200
         return {"code": r["code"], **_cut(r["out"], r["err"]),
                 **({"apply": r["apply"]} if r.get("apply") else {})}, 200
     # A few at a time: every relayed verb is a process of its own here, and

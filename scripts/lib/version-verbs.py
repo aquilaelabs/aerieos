@@ -67,6 +67,11 @@ USAGE = ("aerie version [--for DIR] "
 
 
 def fail(msg):
+    # The page says this one in a person's words; a session is told the verbs
+    # that settle it (R289: it ran aerie changelog --help twice to find them).
+    if "no Fixed line" in str(msg):
+        msg = (f"{msg}\n[builderbot] aerie changelog missing lists them; aerie changelog add \"...\" --cat Fixed "
+               "--bug N gives one its line, aerie changelog skip N \"why\" says it needs none")
     print(msg, file=sys.stderr)
     raise SystemExit(1)
 

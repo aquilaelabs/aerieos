@@ -157,11 +157,15 @@ def refused(guards, command, background=False):
 
 
 def refusal(g, command):
-    """What a refused Bash call is told, in place of running."""
+    """What a refused Bash call is told, in place of running. `command` is
+    the line as the session wrote it: the part refused() hands back is
+    cmdmatch's words joined again, which read `2>&1` as `2 >` and dropped
+    quotes, so a session could not see what to change (R289)."""
     whose = {"builderbot": "AerieOS's briefing", "claude": "a note a session left"}.get(
         g.get("by"), "the operator's house rule")
-    return (f"Refused by {whose} [{g.get('name', '')}]: `{command[:160]}` is a command it does not "
-            f"let run.\n{g.get('text', '')}\n"
+    line = " ".join(str(command).split())
+    return (f"Refused by {whose} [{g.get('name', '')}], and nothing in this call ran: `{line[:200]}"
+            f"{'…' if len(line) > 200 else ''}` is a line it does not let run.\n{g.get('text', '')}\n"
             "Do it the way the rule says. If the rule is wrong for what you are doing, say so in "
             "your reply and leave it to the person; do not run it another way.")
 
@@ -174,7 +178,10 @@ def refusal(g, command):
 # saved are not spent. The search still runs: this adds, never refuses.
 
 _DEF_WORDS = r"(?:async\s+function|function|def|class|fn|func|fun|interface|struct|enum|const|let|var|type)"
-_DEF = re.compile(_DEF_WORDS + r"\s+([A-Za-z_][A-Za-z0-9_]{2,})")
+# At the pattern's start, after its modifiers: "does not let run" and "the
+# type field" are text, never a lookup of run or field (R289).
+_DEF = re.compile(r"^\^?\s*(?:(?:export|pub|public|private|static|async|default)\s+)*" + _DEF_WORDS
+                  + r"\s+([A-Za-z_][A-Za-z0-9_]{2,})")
 _CALL = re.compile(r"^([A-Za-z_][A-Za-z0-9_]{3,})\($")
 MAP_NAMES = 2
 MAP_LINES = 6
@@ -214,7 +221,7 @@ def symbols(pattern):
     out = []
     for alt in re.split(r"\\?\|", str(pattern or "")):
         p = _plain(alt)
-        m = _DEF.search(p) or _CALL.match(p.replace(" ", ""))
+        m = _DEF.match(p) or _CALL.match(p.replace(" ", ""))
         if m and m.group(1) not in out:
             out.append(m.group(1))
     return out[:MAP_NAMES]

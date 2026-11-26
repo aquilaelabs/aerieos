@@ -171,6 +171,11 @@ await section("Dead code by measurement", async () => {
   execFileSync('rm', ['-f', dead]);
 });
 
+// A name as code reads it, module.name or Class.method, is that module's or
+// that class's own (R289: users.may and the like said nothing defines it).
+ok(/^scripts\/dashboard\/users\.py:\d+/.test(map('find', 'users.may')) && /server\.py:\d+ .* in Handler/.test(map('find', 'Handler._who')),
+   `a dotted name is found in its module or its class (${map('find', 'users.may').split('\n')[0]})`);
+
 // ...and in python (B227): devactions.py hands its compose job runner to the
 // jobs module by name, which read as nothing passing it.
 ok(/devactions\.py:\d+  passed by name in configure  \| .*runner\.register\("compose", run_compose_job\)/.test(map('who-calls', 'run_compose_job')),
