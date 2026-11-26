@@ -5,7 +5,7 @@
 // off; and the Enroll dialog's tick puts nginx on a node the moment it
 // enrolls. The harness's sandbox node is the node, and its stub docker reads
 // the generated compose file the way a daemon would.
-import { URL, launch, newPage, ok, done, ready, DIR, api, section, jobEnd, patience } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, api, section, jobEnd, patience, holdPoll, freePoll } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 // Poll fn until it answers something other than null, or give up.
@@ -64,8 +64,13 @@ await section("a failed read says so with Try again, which reads again", async (
   await page.waitForSelector('.nginxtab .readfail [data-readagain]', { timeout: 10000 });
   const said = await page.$eval('.nginxtab .readfail', e => e.textContent.replace(/\s+/g, ' ').trim());
   await page.unroute('**/api/nginx');
-  await page.click('.nginxtab .readfail [data-readagain]');
+  // Pressed where it is: a read of the page's own landing first under a
+  // gate's load drew the section in its place, and a click waiting for the
+  // button gave up a minute later (B1173). Either way the page comes back.
+  await holdPoll(page);
+  await page.evaluate(() => document.querySelector('.nginxtab .readfail [data-readagain]')?.click());
   await page.waitForSelector(sect, { timeout: 10000 });
+  await freePoll(page);
   ok(/^the controller answered 502.*Try again$/.test(said) && !await page.$('.nginxtab .readfail'),
      `the failure is one line with Try again, and the press brings the page back (${said})`);
 });

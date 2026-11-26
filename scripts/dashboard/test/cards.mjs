@@ -2496,7 +2496,10 @@ await section("A card that moves slides there, the rest closing up, and the page
     if (!window.__slideCounted){ const was = Element.prototype.animate;
       Element.prototype.animate = function(k, o){ try { if (this.classList?.contains('pcard') && /translate/.test(JSON.stringify(k))) window.__slid++; } catch {} return was.call(this, k, o); };
       window.__slideCounted = true; } });
-  // Its name made to sort first, as the answer to a rename pressed on it.
+  // Its name made to sort first, as the answer to a rename pressed on it,
+  // the status poll held meanwhile: a read landing under a gate's load put
+  // the server's name back and the card where it was (B1032, seen false).
+  await holdPoll(page);
   await page.evaluate(k => { pjFollow = { key: k, until: Date.now() + 8000 }; const r = state.repos[k]; r.__was = r.name; r.name = '0 first'; drawProjects(state.projects); }, last);
   const r = await page.waitForFunction(s => {
     const c = document.querySelector(s); if (!c) return null;
@@ -2511,6 +2514,7 @@ await section("A card that moves slides there, the rest closing up, and the page
   const seen = await page.$eval(sel, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; });
   ok(r?.first && r?.slid && seen, `a card whose name comes to sort first slides up, the others with it, and the page follows it there (${JSON.stringify({ ...r, seen })})`);
   await page.evaluate(k => { const x = state.repos[k]; x.name = x.__was; delete x.__was; drawProjects(state.projects); }, last);
+  await freePoll(page);
   // Back in its place, and no card still sliding back.
   await page.waitForFunction(() => ![...document.querySelectorAll('.doc .projtab .pcard')]
       .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))), null, { timeout: 10000 }).catch(() => {});
@@ -3077,9 +3081,17 @@ await section("a project on several nodes", async () => {
   // 26 Nov: the step of its own was a fourth press for two picks already
   // kept): Model and Effort, this account's for the space, with the last
   // session's model named on the default; New starts at once.
-  await page.evaluate(() => { resumeModelNow = { project: '', model: '' }; placeResumeMenu(); });
+  const pre = await page.evaluate(() => { const before = { resumeFor, host: !!resumeHostNow(), btn: !!resumeButton('alpha'),
+    pick: JSON.stringify(resumePick || null) };
+    resumeModelNow = { project: '', model: '' }; placeResumeMenu(); return before; });
+  console.log('DIAG-PRE', JSON.stringify(pre));
   await page.waitForFunction(() => /last session: Fable/.test(document.querySelector('#resumemenu #rmStartModel option[value=""]')?.textContent || ''),
-                             null, { timeout: 8000 });
+                             null, { timeout: 8000 }).catch(async e => {
+    // TEMP-DIAG
+    console.log('DIAG', JSON.stringify(await page.evaluate(async () => ({ now: resumeModelNow, api: await (await fetch('/api/claude-now?project=alpha')).text(),
+      opt: document.querySelector('#resumemenu #rmStartModel option[value=""]')?.textContent, sel: !!document.querySelector('#rmStartModel'),
+      html: (document.querySelector('#resumemenu')?.innerHTML || '').replace(/\s+/g, ' ').slice(0, 1500) }))));
+    throw e; });
   const step = await page.$eval('#resumemenu', m => ({
     models: [...m.querySelectorAll('#rmStartModel option')].map(o => o.value), efforts: [...m.querySelectorAll('#rmStartEffort option')].map(o => o.value),
     labels: [...m.querySelectorAll('.rmstarton label')].map(l => l.textContent.trim()), steps: !!m.querySelector('#rmModel, [data-start]') }));
