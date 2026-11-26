@@ -2,16 +2,32 @@
 
 ## Unreleased
 
+### Added
+
+- Connected services in Controller settings: every credential this install holds for an outside service (a space's own git token, a model router's provider keys, the tunnel's and the mail server's), whose it is, who added it and when, when it was last used and when it expires, each opening where it is set, with Forget for an administrator (6336f51)
+- Your coding agents on Profile: each agent's sign-in on each node you may sign in on, with Sign in run right there and Sign out (6336f51)
+- A node's own room on its page, under Sessions: the disk it keeps free, its memory warning and a container's default memory, blank for the install's values in Controller settings (6336f51)
+- Your time zone on Profile: the hours of your quiet windows on the bell and the times every browser of yours shows, unless a browser picks its own in the gear's menu (6336f51)
+- Every node's page says how many updates wait for its system's own packages, the security ones among them and a restart asked for, and the bell says so for every node, where it did for the controller's own machine alone (6336f51)
+- Gradle builds into, under a repository's Build and test: the node's own disk (the default) or the repository's tree (6336f51)
+
 ### Changed
 
 - Every theme has more presence: the dark halves are lighter, the light halves darker so cards stand off the page, and accents and the status colors are more saturated, each still readable at 4.5:1 or better (f392d26)
 - Pushing and On the git host on a repository's Permissions view are that repository's own when set there, the space's settings holding the default for the rest; a change on one repository of a space no longer changes the others (19a792a)
+- The rail's Settings group is named You, holding your Profile, and the CI runner page is under Machines; its old address still opens it (f384f53)
+- A node's Repositories section lists Spaces, and Settings there opens the space's own settings at its Nodes (6336f51)
+- On an install with a machine of its own, Updates and the update window are on This controller beside the older versions kept, and Controller settings says where they went (6336f51)
+- A space's settings say which nodes' model routers it may use, each opening the router's page where it is granted (6336f51)
+- A space's color is each person's alone: the color a space's settings held becomes the own color of every account that had picked none, so no card changes (6336f51)
 
 ### Fixed
 
 - A GitHub App's installation token, a longer token with dots in it since GitHub changed its shape in October, is taken out of diagnostics and the controller's log whole, where everything after its first dot stayed in them, and a push holding one is held (2e98d75)
 - A controller installed on its own machine updates to a dev build from the dashboard, where its node's agent refused every dev build's tag (bcb63df)
 - Just for you saved from a space's settings (model, effort, replies, questions, commit name and email) reaches every repository of the space, where it reached its first repository alone and sessions on the others started on the defaults (660d861)
+- Times on Schedules, Audit, Storage, the Keys page, nginx's certificates, the charts and several settings ignored the time zone picked in the gear's menu, and follow it now (6336f51)
+- Open on the Keys page's rows for a model router's keys and the dashboard's certificate did nothing; they open the router's page and the Network page (6336f51)
 
 ### Security
 
