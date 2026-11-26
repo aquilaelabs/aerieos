@@ -349,44 +349,6 @@ class Own(unittest.TestCase):
         self.assertFalse(tls._answers(("*.example.com",), "a.bb.example.com"))
         self.assertFalse(tls._answers(("*.example.com",), "example.com"))
 
-    def test_an_install_that_kept_the_names_pair_in_cert_pem_has_it_carried(self):
-        # As a build before this kept it: one pair, of the kind in force.
-        # The numbered migration moves it to the name's own files, and the
-        # start after it makes the install's own pair beside it.
-        import importlib
-        cert, key = tls.self_signed(["bb.example.com"])
-        d = os.path.join(self.tmp, "tls")
-        os.makedirs(d, mode=0o700)
-        with open(os.path.join(d, "cert.pem"), "w") as f:
-            f.write(cert)
-        with open(os.path.join(d, "key.pem"), "w") as f:
-            f.write("bbseal:" + base64.b64encode(signing.seal(key.encode())).decode() + "\n")
-        with open(os.path.join(d, "meta.json"), "w") as f:
-            json.dump({"kind": "acme", "names": ["bb.example.com"], "made": 5}, f)
-        mig = importlib.import_module("statemigrations.0028_a_pair_for_the_name")
-        mig.run({"state": self.tmp})
-        with open(os.path.join(d, "meta.json")) as f:
-            self.assertEqual(json.load(f), {"kind": "self", "names": [], "made": 0, "acme": {"names": ["bb.example.com"], "made": 5}})
-        self.assertFalse(os.path.exists(os.path.join(d, "cert.pem")) or os.path.exists(os.path.join(d, "key.pem")))
-        mig.run({"state": self.tmp})   # run again: as it left it
-        st = tls.apply({"tls_mode": "acme", "tls_host": "bb.example.com"}.get, names=["192.168.1.10"])
-        self.assertEqual(self.kept("acme-cert.pem"), cert)
-        self.assertEqual(tls._key_text(tls.ACME).strip(), key.strip())
-        self.assertEqual((st["kind"], st["on"]), ("acme", True))
-        self.assertEqual(tls.key_pin_of(tls.certificate_pem()), tls.key_pin_of(cert))
-        self.assertNotEqual(st["pin"], tls.key_pin_of(cert), "the install's own pair is made beside it, with a key of its own")
-        self.assertEqual(json.loads(self.kept("meta.json"))["acme"], {"names": ["bb.example.com"], "made": 5})
-        # An install's own pair of before (the self mode) is kept as it is: certificate, key and all.
-        tls._ctx = None
-        shutil.rmtree(d)
-        cert, key = tls.self_signed(["bb.example.com", "192.168.1.10"])
-        tls._keep(cert, key, "self", ["bb.example.com", "192.168.1.10"])
-        before = self.kept("meta.json")
-        mig.run({"state": self.tmp})
-        self.assertEqual(self.kept("meta.json"), before, "the install's own pair is not the migration's to move")
-        st = tls.apply({"tls_mode": "self", "tls_host": "bb.example.com"}.get, names=["192.168.1.10"])
-        self.assertEqual((self.kept("cert.pem"), st["pin"]), (cert, tls.key_pin_of(cert)))
-
     def test_the_key_is_sealed_again_when_the_install_key_changes(self):
         pin = tls.apply({"tls_mode": "http"}.get)["pin"]
         self.named_pair("bb.example.com")

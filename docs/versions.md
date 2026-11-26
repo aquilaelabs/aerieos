@@ -253,9 +253,10 @@ repository cannot open them.
 Each release says how far back it reaches, in two numbers.
 
 - **The state floor** is the oldest `/config` it reads (`SUPPORTED_FROM` in
-  `scripts/dashboard/stateversion.py`). Nothing updates from
-  `0.9.0-dev.5641` or earlier: such a `/config` is refused at start, and
-  the way on is a fresh install.
+  `scripts/dashboard/stateversion.py`). An install updates from the
+  released dev builds 0.9.0-dev.6054, 6094 and 6168 and anything later;
+  nothing older updates: such a `/config` is refused at start, and the way
+  on is a fresh install.
 - **The agent's window** is the minor of `AGENT_VERSION`. A node whose agent is
   from another window takes nothing but its own update, and its spaces'
   sessions wait until it has it. The controller keeps what an older agent

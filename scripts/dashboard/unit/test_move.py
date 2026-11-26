@@ -47,7 +47,7 @@ class Move(unittest.TestCase):
     def configure(self, state, bare, url="https://old.example/"):
         self.audits = []
         move.configure(state=state, workspace=self.ws, secrets_dir=str(self.secrets), write_json_fn=write_json,
-                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 27, build_version_fn=lambda: "0.9.0",
+                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 29, build_version_fn=lambda: "0.9.0",
                        install_key_fn=lambda: b"k" * 32, store_paths_fn=lambda: {"gitrelay": str(self.store), "logs": str(self.tmp / "logs")},
                        page_url_fn=lambda: url, node_ids_fn=lambda: ["n_1", "n_2"], bare_metal_fn=lambda: bare,
                        node_name_fn=lambda nid: {"n_1": "alpha", "n_2": "beta"}.get(nid, nid),
@@ -55,7 +55,7 @@ class Move(unittest.TestCase):
 
     def _land(self, path, token):
         return move.restore(str(path), token, state_dir=self.tmp / "new-config", workspace_dir=self.tmp / "new-ws",
-                            secrets_dir=self.tmp / "new-secrets", build_state_version=27, here_bare_metal=False)
+                            secrets_dir=self.tmp / "new-secrets", build_state_version=29, here_bare_metal=False)
 
     def _pieces(self, path):
         """The bundle's head (its two lines) and its pieces, each with its
@@ -166,7 +166,7 @@ class Move(unittest.TestCase):
         r = move.prepare("user:ann", "https://new.example")
         token = r["token"]
         raw, counts = move.pack()
-        m = {"format": 1, "version": "0.9.0", "state_version": 27, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
+        m = {"format": 1, "version": "0.9.0", "state_version": 29, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
              "to": "https://new.example", "repos": False, "carries_key": False, "nodes": ["n_1"], "bare_metal": False, "counts": counts,
              "token_hash": move.token_hash(token)}
         old = self.tmp / "old.aeriemove"
@@ -509,7 +509,7 @@ class Move(unittest.TestCase):
         os.chmod(parent, 0o555)
         self.addCleanup(os.chmod, parent, 0o755)
         got = move.restore(path, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets",
-                           build_state_version=27, here_bare_metal=False)
+                           build_state_version=29, here_bare_metal=False)
         self.assertTrue(got.get("ok"), got)
         self.assertTrue((new_state / "users.json").is_file())
         self.assertTrue((Path(got["moved_aside"]) / "fresh.json").is_file(), "set aside, never deleted")
@@ -524,7 +524,7 @@ class Move(unittest.TestCase):
         blocker.write_text("not a folder")
         with mock.patch.object(move, "store_paths", lambda: {"gitrelay": str(blocker / "gitrelay")}):
             got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws",
-                               secrets_dir=self.tmp / "new-secrets", build_state_version=27, here_bare_metal=False)
+                               secrets_dir=self.tmp / "new-secrets", build_state_version=29, here_bare_metal=False)
         self.assertTrue(got.get("ok"), got)
         self.assertTrue((new_state / "gitrelay" / "alpha.git" / "HEAD").is_file())
         self.assertNotIn("gitrelay", json.loads((new_state / "paths.json").read_text()))

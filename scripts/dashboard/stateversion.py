@@ -58,7 +58,7 @@ KEEP = 3
 # The oldest state this build reads, and the state the first migration in
 # the tree runs from: a /config under it is refused, and one at it runs every
 # migration there is. A move from a controller at this state lands.
-SUPPORTED_FROM = 27
+SUPPORTED_FROM = 29
 
 # What the copy before a migration leaves out: what grows and is not state
 # (each kind paths.py lets the Settings page move: logs, the trees jobs ran
