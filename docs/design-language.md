@@ -1041,7 +1041,7 @@ reader off (the operator, 23 Sep, after R28 swept them). A hint, a state
 line or an empty state is a line, about 25 words. The why goes in a code
 comment, the README or Help, never inline. A stacked row
 is `flex-wrap: nowrap`; a long token in it wraps or scrolls inside its own
-box, and nothing scrolls the page or the pane sideways on a phone.
+box, and nothing scrolls the page or the pane sideways on a phone. One name for each thing (the words pass, R287, 26 Nov): a person reads space and repository, never project or repo, which stay the code's and the API's names; a toast is one sentence, a colon or a semicolon joining what a second one would say; a refusal every module meets is said once, in refusals.py (not a space, not an account). unit/test_words.py and unit/test_refusals.py hold these.
 
 ### badges
 
