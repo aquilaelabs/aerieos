@@ -1407,6 +1407,157 @@
       "rev": 2
     },
     {
+      "name": "kubernetes",
+      "label": "Kubernetes tools (kubectl, Helm, kind)",
+      "probe": "kubernetes",
+      "layout": {
+        "bin": [
+          "bin"
+        ],
+        "env": {},
+        "tool": "bin/kubectl",
+        "reports": "kubectl"
+      },
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "about": "kubectl and Helm, to reach a Kubernetes cluster and install a chart on it, and kind, a throwaway cluster in Docker where the node's Docker is yours.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "kubectl",
+          "maker": "the Kubernetes project"
+        },
+        {
+          "name": "Helm",
+          "maker": "the Helm project"
+        },
+        {
+          "name": "kind",
+          "maker": "the Kubernetes project"
+        }
+      ],
+      "source": {
+        "kind": "script",
+        "fresh_only": true,
+        "url": {
+          "linux/amd64": "https://dl.k8s.io/release/{version}/bin/linux/amd64/kubectl",
+          "linux/arm64": "https://dl.k8s.io/release/{version}/bin/linux/arm64/kubectl"
+        },
+        "run": [
+          "sh",
+          "-ec",
+          "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/kubectl\"; tar -xzf \"$dl/helm.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name helm -type f | head -1)\" \"$dst/\"; mv \"$dl/kind\" \"$dst/kind\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
+          "--",
+          "{script}",
+          "{dir}"
+        ],
+        "verify": [
+          "{dir}/bin/kubectl",
+          "version",
+          "--client"
+        ],
+        "download": {
+          "resolver": "approximate",
+          "bytes": 110000000
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "v1.37.3",
+          "sha256": {
+            "linux/amd64": "9a1b55af2795b25dd288dbef62387db9b5530087ab918d28c6ad067f2e3cb07c",
+            "linux/arm64": "da160b41491cc5c5e575d78bb665810fb900f70fad666d834094b24ec56d304f"
+          },
+          "found": {
+            "from": "file",
+            "url": "{url}.sha256"
+          }
+        },
+        "version": {
+          "resolver": "text",
+          "url": "https://dl.k8s.io/release/stable.txt",
+          "expect_prefix": "v"
+        },
+        "fetch": [
+          {
+            "url": "https://get.helm.sh/helm-{version}-linux-amd64.tar.gz",
+            "version": "v4.3.2",
+            "to": "dl/helm.tar.gz",
+            "platform": "linux/amd64",
+            "sha256": "d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983",
+            "track": {
+              "resolver": "github-release",
+              "repo": "helm/helm"
+            },
+            "found": {
+              "from": "file",
+              "url": "{url}.sha256sum"
+            }
+          },
+          {
+            "url": "https://get.helm.sh/helm-{version}-linux-arm64.tar.gz",
+            "version": "v4.3.2",
+            "to": "dl/helm.tar.gz",
+            "platform": "linux/arm64",
+            "sha256": "df31cb61680ef728f82c770e5280dd565617bee6b039d37e85c677288be4bbb0",
+            "track": {
+              "resolver": "github-release",
+              "repo": "helm/helm"
+            },
+            "found": {
+              "from": "file",
+              "url": "{url}.sha256sum"
+            }
+          },
+          {
+            "url": "https://github.com/kubernetes-sigs/kind/releases/download/{version}/kind-linux-amd64",
+            "version": "v0.33.0",
+            "to": "dl/kind",
+            "platform": "linux/amd64",
+            "sha256": "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d",
+            "track": {
+              "resolver": "github-release",
+              "repo": "kubernetes-sigs/kind"
+            },
+            "found": {
+              "from": "file",
+              "url": "{url}.sha256sum"
+            }
+          },
+          {
+            "url": "https://github.com/kubernetes-sigs/kind/releases/download/{version}/kind-linux-arm64",
+            "version": "v0.33.0",
+            "to": "dl/kind",
+            "platform": "linux/arm64",
+            "sha256": "20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2",
+            "track": {
+              "resolver": "github-release",
+              "repo": "kubernetes-sigs/kind"
+            },
+            "found": {
+              "from": "file",
+              "url": "{url}.sha256sum"
+            }
+          }
+        ]
+      },
+      "terms": [
+        {
+          "label": "Kubernetes (Apache 2.0)",
+          "url": "https://github.com/kubernetes/kubernetes/blob/master/LICENSE"
+        },
+        {
+          "label": "Helm (Apache 2.0)",
+          "url": "https://github.com/helm/helm/blob/main/LICENSE"
+        },
+        {
+          "label": "kind (Apache 2.0)",
+          "url": "https://github.com/kubernetes-sigs/kind/blob/main/LICENSE"
+        }
+      ]
+    },
+    {
       "name": "ffmpeg",
       "label": "FFmpeg (video and audio)",
       "probe": "ffmpeg",

@@ -114,7 +114,8 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
 
 - A catalog of toolchains installed per node from the Library: JDK,
   the Android SDK, Flutter, Go, .NET, Node.js, Python, Rust, Swift, Zig,
-  Playwright, ffmpeg, language servers, lint tools, document, graphics,
+  Playwright, ffmpeg, language servers, lint tools, Kubernetes tools
+  (kubectl, Helm, kind), document, graphics,
   diagram and speech tools, LibreOffice, and PyTorch with CUDA.
 - Kept on a store outside the node's system, so a rebuilt machine keeps them.
 - Updates checked and offered; anything under an agreement (Google's Android

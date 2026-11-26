@@ -313,6 +313,7 @@ anywhere else.
 | `go` | ~250MB | Windows, macOS, Linux and ARM binaries from here: `GOOS=windows go build`, no target to install |
 | `rust` | ~700MB | rustup, cargo and the stable toolchain in one directory |
 | `zig` | ~300MB | A C/C++ cross-compiler: `zig cc -target x86_64-windows-gnu` makes this box a Windows toolchain |
+| `kubernetes` | ~110MB | kubectl and Helm, to reach a Kubernetes cluster and install a chart on it, and kind, a throwaway cluster in Docker where the node's Docker is yours (a session has none of its own) |
 | Android packages | 800MB emulator, 3GB NDK | Platforms, build-tools, emulator, NDK, CMake |
 | Android system images | 1–2GB each | One per API level per flavor; see [below](#the-toolchain-store-lives-outside-the-image) |
 | `playwright` | ~1.3GB | Chromium, Firefox and WebKit: fetched on a fresh share, since `aerie capture shot` and the dashboard's tests need them; removing it stays removed |
