@@ -134,6 +134,10 @@ await section("A file no browser suite reaches but a unit file runs", async () =
   const both = pre('config/toolchains.json');
   ok(/suites:.*\btoolchains\b/.test(both) && /suites:.*\bplugins\b/.test(both),
      `a file a unit test names is planned with the suites that name it too (${both.match(/suites:.*/)?.[0]})`);
+  // ...and a state migration, which no suite names, is the upgrade suite's
+  // (B1155: a new migration planned design alone).
+  const mig = pre('scripts/dashboard/statemigrations/0033_owners_deploy.py');
+  ok(/suites:.*\bupgrade\b/.test(mig), `a state migration is planned with the upgrade suite (${mig.match(/suites:.*/)?.[0]})`);
 });
 
 // The other C-shaped languages: the companion app's Kotlin. `fun` opens a

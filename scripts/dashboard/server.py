@@ -12122,13 +12122,19 @@ class Handler(BaseHTTPRequestHandler):
         # also have loosened that policy; a plain account may ask a session
         # to bump and no more.
         who = self._who() or {}
-        if who.get("session") and act == "release":
+        if act == "release" and (who.get("session") or req.get("dry") is True):
             # aerie version release (R138): its own project only, under its
             # dial. The tag and the forge's release are made here, with the
             # project's own credentials, which the session never holds.
             if self._session_elsewhere(name, "a session releases its own space and no other"):
                 return None
-            mode = self._dialed(name, "release", "; a person cuts it with Release on the Artifacts view")
+            if not who.get("session") and self._refused("version", name):
+                return None
+            # dry (aerie version rehearse, B1156): every refusal the release
+            # would meet, asked before a rehearsal is spent on it; it does
+            # nothing, so it is under no dial.
+            dry = req.get("dry") is True
+            mode = "dry" if dry else self._dialed(name, "release", "; a person cuts it with Release on the Artifacts view")
             if not mode:
                 return None
             comp = field(req, "component") or ""
@@ -12141,7 +12147,7 @@ class Handler(BaseHTTPRequestHandler):
             # Said before the tag, not after it (R134 step 4): 0.7.0 was
             # tagged with no sideload key and its APK never attached.
             rs = releasesign.readiness(name, fresh=True)
-            if rs["wanted"] and rs["why"] and not req.get("unsigned"):
+            if rs["wanted"] and rs["why"] and not req.get("unsigned") and not dry:
                 return self._json({"error": f"{plan['tag']}'s Android APK could not be signed: {rs['why']}. "
                                             "Put that right first (aerie sign status says when it is), or release "
                                             "with --without-apk and have it signed after with aerie sign release "
@@ -12152,6 +12158,10 @@ class Handler(BaseHTTPRequestHandler):
             # is asked to allow one (auto meets it there).
             if mode != "auto" and (why := releasesign.unstartable(name)):
                 return self._json({"error": f"{plan['tag']} would stay a draft: {why}, so put it there first"}, 409)
+            if dry:
+                # The APK's signing is said, not refused: a release may go
+                # without it (--without-apk) and be signed after.
+                return self._json({"ok": True, **plan, **({"unsigned": rs["why"]} if rs["wanted"] and rs["why"] else {})})
             if mode == "auto":
                 got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev,
                                       pre=plan.get("pre") or "")

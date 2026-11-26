@@ -1284,6 +1284,11 @@ def _plan_in_tree(project, comp, dev, stable, label):
     # stable release keeps.
     if why := no_upgrade_snapshot(project, comp, base):
         return {"error": why}
+    # ...and what the git host owes the tag's workflows, which release()
+    # meets last: asked here, a rehearsal and a person's Allow are never
+    # spent on a release the host would refuse (B1156).
+    if why := host_owed(project, comp):
+        return {"error": why}
     return {"tag": name, "sha": sha, "target": tgt, "dev": dev, "pre": label, "channel": channel,
             **({"section": True} if ahead or (not dev and _owes_stable_section(project, comp, tgt)) else {})}
 

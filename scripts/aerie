@@ -6597,6 +6597,10 @@ cmd_version() {
     # finds nothing left to roll and tags the very commit rehearsed.
     if [ "$*" = rehearse ]; then
         local rolled
+        # Everything the release would refuse, asked first (B1156): a green
+        # rehearsal the tag then refuses is three quarters of an hour spent.
+        DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" BB_WORKSPACE="$WORKSPACE" \
+            api_py version-verbs.py "$py" "$proj" rehearse-check || return 1
         rolled="$(DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" BB_WORKSPACE="$WORKSPACE" \
             python3 "$BB_LIB/version-verbs.py" "$py" "$proj" rehearse-roll)" || return 1
         if [ -n "$rolled" ]; then

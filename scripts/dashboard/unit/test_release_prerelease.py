@@ -169,6 +169,22 @@ class PreRelease(unittest.TestCase):
         self.assertEqual(releasegaps.gaps("app")["owed"], [])
         self.assertNotIn("error", version.release_plan("app", pre="rc"))
 
+    def test_the_plan_asks_what_the_git_host_owes(self):
+        """What the host owes a tag's workflows is asked by the plan, which
+        aerie version rehearse and a person's Allow both stand on, not met
+        only at the tag (B1156)."""
+        wf = self.app / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        (wf / "build.yml").write_text("on:\n  push:\n    tags: ['v*']\njobs:\n  b:\n    runs-on: x\n")
+        self.commit("a tag's build")
+        owed = [{"state": "owed", "what": "tag rule", "why": "no rule holds v* tags"}]
+        p = mock.patch.object(version, "owes", lambda project, wants: owed if wants["tags"] else [])
+        p.start()
+        self.addCleanup(p.stop)
+        self.assertIn("no rule holds v* tags", version.release_plan("app", dev=True).get("error", ""))
+        owed = []
+        self.assertNotIn("error", version.release_plan("app", dev=True))
+
     def test_an_answer_or_a_test_only_fix_owes_nothing(self):
         n = self.file_bug("The total is off by one")
         self.release(pre="rc")

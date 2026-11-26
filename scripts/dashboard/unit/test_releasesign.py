@@ -710,6 +710,39 @@ class Own(Base):
         self.assertIn("no run of v0.7.0's own handed over an unsigned APK within 12 hours: run 41 did and was "
                       "refused, since it ran on main, not on the tag v0.7.0", bad[0]["why"])
 
+    def test_a_tag_whose_push_started_no_run_says_withdraw_and_release_again(self):
+        """B1158: v0.8.0's push started nothing (GitHub dropped the event);
+        a run by hand is never its own, so twenty minutes on the bell says
+        the way out, and a run of its own that starts after all still signs
+        it and takes the row away."""
+        releasesign.expect("app", "v0.8.0")
+        d = json.loads((self.tmp / "release-signing.json").read_text())
+        d["app"]["expect"]["v0.8.0"] = int(time.time()) - releasesign.NO_RUN_S - 5
+        (self.tmp / "release-signing.json").write_text(json.dumps(d))
+        self.other(tag="v0.8.0", event="workflow_dispatch")
+        self.assertEqual(releasesign.check("app")["failed"], ["v0.8.0"])
+        bad = [a for a in releasesign.attention(["app"]) if a["bad"]]
+        self.assertEqual([a["tag"] for a in bad], ["v0.8.0"])
+        self.assertEqual(bad[0]["why"], "v0.8.0's push started no build on GitHub, so its APK can never be signed: "
+                                        "withdraw it and release again")
+        self.assertIn("withdraw the release and cut it again", self.rows("v0.8.0")[0]["why"])
+        self.assertFalse(releasesign.due("app"), "nothing is waited for")
+        # Said once, then a run of its own after all: signed, the row gone.
+        self.assertEqual(releasesign.check("app")["failed"], [])
+        REL["v0.8.0"] = {"id": 8, "html_url": "https://github.com/o/app/releases/tag/v0.8.0", "body": "notes", "assets": []}
+        self.other(rid=42, tag="v0.8.0")
+        self.assertEqual(releasesign.check("app")["signed"], ["v0.8.0"])
+        self.assertFalse([a for a in releasesign.attention(["app"]) if a["bad"]])
+
+    def test_a_tag_whose_own_run_failed_was_started_one(self):
+        releasesign.expect("app", "v0.7.0")
+        d = json.loads((self.tmp / "release-signing.json").read_text())
+        d["app"]["expect"]["v0.7.0"] = int(time.time()) - releasesign.NO_RUN_S - 5
+        (self.tmp / "release-signing.json").write_text(json.dumps(d))
+        self.other(conclusion="failure")
+        releasesign.check("app")
+        self.assertFalse([a for a in releasesign.attention(["app"]) if a["bad"]], "its build ran and failed: no row yet")
+
 
 class OneRun(Base):
     """The tag's own run hands the APK over and makes the release as its

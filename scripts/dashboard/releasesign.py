@@ -124,6 +124,9 @@ EXPECT_S = 12 * 3600
 SCAN_S = 3600
 TICK_S = int(os.environ.get("BB_RELEASESIGN_TICK", "120"))
 RUN_AGE_S = 3 * 86400
+# A release whose tag's push has started no run of its own by then never
+# will: GitHub drops a push's event in an outage (B1158).
+NO_RUN_S = 20 * 60
 MAX_ZIP = 400 << 20
 NOTE = "Signed by AerieOS:"
 _lock = threading.Lock()
@@ -419,9 +422,19 @@ def _waiting(project, repo, token, seen=None):
     j = cilogs._get(f"/repos/{repo}/actions/runs?per_page=50", token)
     out = []
     seen = seen if seen is not None else {}
-    seen.update(asked=0, known_bare=0)
+    seen.update(asked=0, known_bare=0, started=set(), since=0)
     for r in (j.get("workflow_runs") or [])[:50]:
         rid = int(r.get("id") or 0)
+        # Every tag a push or a release started a run for, whatever became
+        # of it, and how far back the list reaches: a tag the list reaches
+        # past with no run of its own was started none.
+        if str(r.get("event") or "") in EVENTS and r.get("head_branch"):
+            seen["started"].add(str(r["head_branch"]))
+        try:
+            made = calendar.timegm(time.strptime(str(r.get("created_at") or "")[:19], "%Y-%m-%dT%H:%M:%S"))
+            seen["since"] = min(seen["since"] or made, made)
+        except ValueError:
+            pass
         # A run that ended any way but passed hands over nothing to sign.
         going = str(r.get("status") or "completed") != "completed"
         if not going and str(r.get("conclusion") or "success") != "success":
@@ -510,7 +523,8 @@ def _own(r, repo, tag, flows, commit_of):
                "it was started by hand" if event == "workflow_dispatch" else
                f"{event} started it" if event else "GitHub does not say what started it")
         return (f"{how}, and an APK is signed only from the run the tag {tag} itself started, by its push or "
-                "its release: run that one again from its page on GitHub (Re-run all jobs)")
+                "its release: run that one again from its page on GitHub (Re-run all jobs), or, where its push "
+                "started none, withdraw the release and cut it again")
     ran_on = str(r.get("head_branch") or "")
     if ran_on != tag:
         return f"it ran on {ran_on or 'no branch or tag GitHub names'}, not on the tag {tag} its artifact is named for"
@@ -785,6 +799,19 @@ def check(project, force=False, again=""):
                 and (rec["failed"].get(tag) or {}).get("why") != said):
             rec["failed"][tag] = {"why": said, "at": now, "run": rid}
             done["failed"].append(tag)
+    # ...and one whose tag's push started no run at all, the list reaching
+    # back past the release: no run will hand its APK over, and a run
+    # started by hand is never its own, so the way out is to withdraw it and
+    # release again (B1158). Said once; a run that starts after all still
+    # signs it and takes the row away.
+    for tag, at in list(rec["expect"].items()):
+        if (not done["error"] and now - int(at or 0) > NO_RUN_S and tag not in seen.get("started", ())
+                and tag not in own and tag not in rec["signed"] and 0 < seen.get("since", 0) <= int(at or 0)):
+            rec["expect"].pop(tag)
+            rec["failed"][tag] = {"why": f"{tag}'s push started no build on GitHub, so its APK can never be signed: "
+                                         "withdraw it and release again", "at": now, "run": 0}
+            if tag not in done["failed"]:
+                done["failed"].append(tag)
     # A release that is gone (deleted on GitHub, a draft included) has
     # nothing left to sign or seal: its red row goes with it. v0.9.0-dev.4885's
     # stayed on the bell for 17 days after the release was deleted.

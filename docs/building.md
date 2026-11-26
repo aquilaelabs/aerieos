@@ -540,7 +540,12 @@ from, a session's release is the dev build's (`--dev`, a pre-release on
 the dev channel) unless `--stable` says otherwise, and its first line
 names the channel it lands on (R190).
 
-**Rehearsing one.** `aerie version rehearse` first commits the changelog's
+**Rehearsing one.** `aerie version rehearse` first asks every question the
+release would ask of the tree and the git host (a Fixed line owed, the
+catalog's floor, the upgrade snapshot's state, what the host owes the tag's
+workflows) and refuses on the first that fails, saying it, so no rehearsal
+goes green on a commit the release then refuses; an Android APK that could
+not be signed yet is said and does not stop it. It then commits the changelog's
 section for the dev build and pushes it, so what is rehearsed is the commit
 the release will tag. It then runs every step a release's tag runs on the
 pushed branch, publishing nothing, with the checks a tag is held to and
@@ -628,9 +633,16 @@ the file itself stays in the package registry.
 A release made by mistake is taken back with `aerie version release --withdraw
 TAG --why "..."`: the forge's release and its tag deleted together, and the
 tag taken out of the controller's copy, so the number can be cut again from
-a fixed commit (R190). It is always the space owner's answer on the bell,
-whatever the dial (deny refuses), since nothing undoes it; a tag whose
-release is already gone is withdrawn alone.
+a fixed commit (R190). On GitHub the container image its build pushed goes
+too, the package version tagged with the release's version, unless it also
+carries a tag people follow (dev, latest), which is said and kept, as it is
+where the space's token lacks `delete:packages`; on GitLab
+its builds leave the package registry. It is always the space owner's answer
+on the bell, whatever the dial (deny refuses), since nothing undoes it; a tag
+whose release is already gone is withdrawn alone. A tag whose push started
+no build on GitHub (an outage can drop the event) is said on the bell twenty
+minutes on, since a run started by hand is never its own and its APK could
+never be signed: withdraw it and release again.
 
 **What is signed says so.** The node reports what `apksigner verify` (or
 `jarsigner -verify` for a bundle) found: the certificate's SHA-256 and the

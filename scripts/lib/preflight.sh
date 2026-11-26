@@ -157,6 +157,15 @@ cmd_tests_preflight() {
                 case " ${suites[*]:-} " in *" $named "*) ;; *) suites+=("$named") ;; esac
             done < <(grep -lF -- "$(basename "$f")" "${BB_REPO:-$PWD}"/scripts/dashboard/test/*.mjs 2>/dev/null || true)
         done
+        # A state migration, or what runs them, is the upgrade suite's: it
+        # starts every release's /config snapshot on this build, and a new
+        # migration's file is named by no suite (B1155).
+        for f in "${files[@]}"; do
+            case "$f" in
+                scripts/dashboard/statemigrations/*|scripts/dashboard/stateversion.py|scripts/dashboard/statefile.py)
+                    case " ${suites[*]:-} " in *" upgrade "*) ;; *) suites+=(upgrade) ;; esac ;;
+            esac
+        done
     fi
     # Only what the harness has a file for: the map counts a python unit
     # file (test_x.py) as a test, rightly for other projects, and named

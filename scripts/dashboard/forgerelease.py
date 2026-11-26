@@ -345,11 +345,59 @@ def _send(opener, req, name, kind, upload, reasons, gone=None):
         raise Refused(f"could not reach {name}: {e}") from e
 
 
+# The container packages of a repository's owner, an organization's or the
+# signed-in account's: what a withdrawn release's build pushed (B1159).
+_PACKAGES = re.compile(re.escape(API) + r"/(?:(?:orgs|users)/[A-Za-z0-9-]+|user)/packages(?:[/?].*)?")
+# Tags an image keeps beside its release's version and is still that
+# release's alone: the commit's, as docker/metadata-action writes it.
+_OWN_IMAGE_TAG = re.compile(r"sha-[0-9a-f]{7,40}")
+
+
+def _gh_images_drop(repo, token, tag):
+    """The container images the build of `tag` pushed, deleted with its
+    release (B1159): the version of each container package GitHub links to
+    `repo` whose tags are the release's version (the tag, or the tag without
+    its v) and nothing but commit tags beside it. One that also carries a
+    tag people follow (dev, latest, main) is left, said. {images: [the
+    image:version deleted], images_left: why} with only what applies."""
+    owner = repo.split("/", 1)[0]
+    version = tag[1:] if tag[:1] == "v" and tag[1:2].isdigit() else tag
+    out, left = [], []
+    try:
+        base = f"{API}/orgs/{owner}"
+        pkgs = _req("GET", f"{base}/packages?package_type=container&per_page=100", token)
+        if pkgs is None:
+            base = f"{API}/users/{owner}"
+            pkgs = _req("GET", f"{base}/packages?package_type=container&per_page=100", token)
+        for pkg in pkgs if isinstance(pkgs, list) else []:
+            if str((pkg.get("repository") or {}).get("full_name") or "").lower() != repo.lower():
+                continue
+            name = str(pkg.get("name") or "")
+            at = f"{base}/packages/container/{urllib.parse.quote(name, safe='')}"
+            vers = _req("GET", f"{at}/versions?per_page=100", token)
+            for v in vers if isinstance(vers, list) else []:
+                tags = list(((v.get("metadata") or {}).get("container") or {}).get("tags") or [])
+                if version not in tags and tag not in tags:
+                    continue
+                more = [t for t in tags if t not in (version, tag) and not _OWN_IMAGE_TAG.fullmatch(t)]
+                if more:
+                    left.append(f"{name} is also tagged {', '.join(more)}")
+                    continue
+                # An owner that is a person deletes through its own path.
+                gone = at if base.startswith(f"{API}/orgs/") else \
+                    f"{API}/user/packages/container/{urllib.parse.quote(name, safe='')}"
+                _req("DELETE", f"{gone}/versions/{int(v['id'])}", token)
+                out.append(f"ghcr.io/{owner.lower()}/{name}:{version}")
+    except Refused:
+        left.append("the token may not delete packages")
+    return {**({"images": out} if out else {}), **({"images_left": "; ".join(left)} if left else {})}
+
+
 def _req(method, url, token, body=None, data=None, ctype="application/json"):
     """One call to GitHub, at its API or its upload host and nowhere else.
     The token goes in a header a redirect does not carry on, since an
     asset's download is answered with one to another host."""
-    if not (url.startswith(API + "/repos/") or url.startswith(UPLOADS + "/repos/")):
+    if not (url.startswith(API + "/repos/") or url.startswith(UPLOADS + "/repos/") or _PACKAGES.fullmatch(url)):
         raise Refused("not an address this asks GitHub at")
     req = _request(method, url, "application/vnd.github+json", {}, body, data, ctype)
     req.add_unredirected_header("Authorization", f"Bearer {token}")
@@ -544,6 +592,11 @@ class _GitHub(_Driver):
         """The file `name` off the release for `tag`: `got` is what
         files_on() said of it."""
         _req("DELETE", f"{API}/repos/{self.repo}/releases/assets/{got[0]}", self.token)
+
+    def swept(self, project, tag):
+        # The image the tag's build pushed, which deleting the release left
+        # pullable by its version (B1159).
+        return _gh_images_drop(self.repo, self.token, tag)
 
     def paths(self, tag):
         """The addresses call() takes for `tag`: {rel: the release by tag,
@@ -1310,9 +1363,12 @@ def withdraw(project, tag):
 
 
 def withdraw_said(r):
-    went = [w for w, on in (("its release", r.get("release")), ("its tag", r.get("tagged"))) if on]
+    imgs = r.get("images") or []
+    went = [w for w, on in (("its release", r.get("release")), ("its tag", r.get("tagged")),
+                            ("its image" if len(imgs) == 1 else f"its {len(imgs)} images", imgs)) if on]
     if r.get("error"):
         return (f"{r.get('tag') or 'the release'} not withdrawn" + (" (" + " and ".join(went) + " already deleted)" if went else "")
                 + f": {r['error']}")
-    return (f"{r.get('tag')} withdrawn from {r.get('forge')}: " + " and ".join(went) + " deleted") if went \
-        else f"{r.get('tag')} had nothing left on {r.get('forge')} to withdraw"
+    kept = f", its image kept since {r['images_left']}" if r.get("images_left") else ""
+    return ((f"{r.get('tag')} withdrawn from {r.get('forge')}: " + ", ".join(went[:-1]) + (" and " if went[1:] else "")
+             + went[-1] + " deleted") if went else f"{r.get('tag')} had nothing left on {r.get('forge')} to withdraw") + kept

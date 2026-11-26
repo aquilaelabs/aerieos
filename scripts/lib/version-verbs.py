@@ -246,6 +246,21 @@ if argv and argv[0] == "release":
               "and aerie version follow --check says what is still owed")
     raise SystemExit(0)
 
+if argv and argv[0] == "rehearse-check":
+    # Before a rehearsal is spent (B1156): the controller asks every question
+    # the release would ask of the tree and the git host (a Fixed line owed,
+    # the catalog floor, the upgrade snapshot's state, what the host owes the
+    # tag's workflows, the APK's signing) and says the first it would refuse.
+    import bbapi
+    r = bbapi.call("/api/version", {"project": proj, "action": "release", "dev": True, "dry": True}, timeout=120)
+    if not isinstance(r, dict) or r.get("error"):
+        why = r.get("error") if isinstance(r, dict) else "the controller did not answer"
+        fail(f"[builderbot] ERROR: nothing is rehearsed, since the release would be refused: {why}")
+    if r.get("unsigned"):
+        print(f"[builderbot] WARN: {r.get('tag') or 'the release'}'s Android APK could not be signed now ({r['unsigned']}): "
+              "put that right before the release, or release with --without-apk and sign it after", file=sys.stderr)
+    raise SystemExit(0)
+
 if argv and argv[0] == "rehearse-roll":
     # The changelog rolled before a rehearsal (R190 step 2), run by aerie
     # version rehearse before it pushes and starts the run: stdout is the
