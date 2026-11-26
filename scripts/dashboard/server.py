@@ -9788,6 +9788,8 @@ class Handler(BaseHTTPRequestHandler):
         (R95, the operator 22 Oct): whoever may install toolchains there."""
         if self._refused_on_node("toolchains-write", field(req, "node")):
             return
+        if req.get("action") in ("install", "update") and (why := nodes.builds_elsewhere(field(req, "node"))):
+            return self._json({"error": why}, 409)
         return self._json(*agentcode.verb(self._principal(), req))
 
     def _get_emulator(self):
@@ -13314,6 +13316,10 @@ class Handler(BaseHTTPRequestHandler):
         # everywhere, a role of your own where it says.
         if self._refused_on_node("toolchains-write", field(req, "node")):
             return
+        # A hosting-only node is offered none, and one asked for is refused
+        # in a sentence rather than queued for its agent to refuse (R291).
+        if req.get("action") in ("install", "update") and (why := nodes.builds_elsewhere(field(req, "node"))):
+            return self._json({"error": why}, 409)
         # An agreement (Google's Android SDK terms, NVIDIA's CUDA license) is
         # a person's to accept, by name, before anything installs under it;
         # the page asks, and the acceptance is on the record.
@@ -14065,6 +14071,11 @@ class Handler(BaseHTTPRequestHandler):
         pack_mine = {name: packconfig.get_mine(nid, name, fields, users.uid_of(who)) for name, fields in toolpacks.configs().items()
                      if packconfig.person_fields(fields)} if yours_ok else {}
         rows = library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), own, pack_values, pack_mine)
+        # A hosting-only node runs services and apps alone (R291): what a
+        # space builds with is not offered there, its counts and chips with it.
+        host = bool(n) and nodes.host_only(n)
+        if host:
+            rows = [r for r in rows if r.get("kind") in nodes.HOST_KINDS]
         # The page asks for one look at it (R256): the rows narrowed, counted
         # and paged here, so it never holds the whole catalog; an entry's
         # page asks for its one row by kind:name. Asked with neither, the
@@ -14081,13 +14092,13 @@ class Handler(BaseHTTPRequestHandler):
                 offset, limit = 0, 30
             look = library.browse(rows, q=arg("q"), kind=arg("kind"), topic=arg("topic"), tier=arg("tier"),
                                   here=arg("all") != "1", sort=arg("sort"), offset=offset, limit=limit,
-                                  kinds=("agent", "toolchain", "pack", "service", "app", "companion"))
+                                  kinds=nodes.HOST_KINDS if host else ("agent", "toolchain", "pack", "service", "app", "companion"))
             rows = look.pop("rows", [])
             look["topics"] = [[k, v] for k, v in packformat.TOPICS.items()]
             if (cat.get("index") or {}).get("past"):
                 look["catalog_past"] = cat["index"]["past"]
         return self._json({"node": nid, "name": tc.get("name") or (n or {}).get("name") or "", "live": bool(tc.get("live", (n or {}).get("live"))),
-                           "rows": rows, **look,
+                           "rows": rows, **look, **({"host_only": True} if host else {}),
                            "job": tc.get("job") or {"running": False}, "catalog_error": cat.get("error", ""),
                            # With no app kept and no index read, the Apps say so in a line (R238).
                            "apps_note": library.apps_note(napps, cat.get("index")) if may_apps else "",

@@ -482,6 +482,12 @@ function libPackNote(may){
   return (lib.catalog_error ? `<div class="hint warn">${esc(lib.catalog_error)}</div>` : "") + past + submit;
 }
 
+// A hosting-only node (R291, the operator, 25 Nov): its Library offers the
+// services and apps it runs, and says once where the rest goes.
+function libHostNote(){
+  return lib.host_only ? `<div class="hint libhost">${esc(lib.name || "This node")} hosts containers only, so it is offered services and apps: toolchains, coding agents and tool packs go on the nodes where spaces build (<a href="#/machines/nodes">Nodes</a>).</div>` : "";
+}
+
 function libCards(rows, may){
   return `<div class="lgrid${libViewNow() === "list" ? " lrows" : ""}">${rows.map(r => libRow(r, may)).join("")}</div>`;
 }
@@ -508,7 +514,7 @@ function libShelves(may){
   // install that read no catalog and keeps none says so in a line.
   const appsSaid = !(lib.shelves || []).some(sh => sh.kind === "app") && lib.apps_note
     ? `<div class="libgroup" data-libgroup="app"><h3 class="libgname">Apps</h3><div class="hint warn">${esc(lib.apps_note)}</div></div>` : "";
-  return mine + kinds + packsSaid + appsSaid || `<div class="empty">Nothing here yet.</div>`;
+  return libHostNote() + (mine + kinds + packsSaid + appsSaid || `<div class="empty">Nothing here yet.</div>`);
 }
 
 // A card in the page's placeholder, as a card is laid out.
@@ -532,7 +538,7 @@ function libList(may){
   const note = libKind === "pack" ? libPackNote(may) : libKind === "app" && lib.apps_note ? `<div class="hint warn">${esc(lib.apps_note)}</div>` : "";
   const body = rows.length ? libCards(rows, may)
     : `<div class="empty">${libQ.trim() ? `Nothing ${kindWord ? kindWord + " " : ""}matches ${esc(libQ.trim())}.` : "Nothing here matches."}</div>`;
-  return `<div class="libgroup libone" data-libgroup="list">${note}${hidden}${body}</div>`;
+  return `${libHostNote()}<div class="libgroup libone" data-libgroup="list">${note}${hidden}${body}</div>`;
 }
 
 function renderLibraryInto(i){

@@ -322,7 +322,8 @@ function renderInstalledInto(i){
     if (!here.length) return "";
     const body = `<div class="rows">${here.map(r => instRow(r, may)).join("")}</div>`;
     return docSection("installed", k, title, k === "agent" ? `${here.filter(r => r.installed).length} of ${here.length}` : String(here.length), body);
-  }).join("") || `<div class="empty">Nothing installed on ${esc(inst.name || "this node")} yet: the Library installs toolchains, coding agents and packs there.</div>`;
+  }).join("") || `<div class="empty">Nothing installed on ${esc(inst.name || "this node")} yet: ${inst.host_only
+      ? "it hosts containers only, and the Library deploys its services there" : "the Library installs toolchains, coding agents and packs there"}.</div>`;
   // Rows the redraw puts elsewhere (one arriving on top, one whose state
   // sorts it anew) slide there, and a new one fades in (reflow).
   reflow(d.list, ".irow[data-irow]", e => e.dataset.irow, () => patch(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}${where}</div>`));

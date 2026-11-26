@@ -637,6 +637,36 @@ await section("a row still installing is read again as the jobs revision moves, 
   await toLibrary();
 });
 
+// A hosting-only node (R291, the operator, 25 Nov: spaces build on a node of
+// their own and deploy to a hosting one): its Library offers services and
+// apps alone, its kind chips with them, says once where the rest goes, and
+// an install of a build tool there is refused in a sentence, never queued.
+await section("a hosting-only node offers only what it runs", async () => {
+  const vps = await page.evaluate(() => postJSON('/api/v1/nodes', { action: 'enroll', name: 'vps-lib', host_only: true }));
+  try {
+    const got = await page.evaluate(async id => {
+      const all = await getJSON('/api/library?node=' + encodeURIComponent(id));
+      const look = await getJSON('/api/library?node=' + encodeURIComponent(id) + '&view=browse&all=1');
+      const tc = await postJSON('/api/toolchains', { action: 'install', node: id, names: ['rust'] });
+      const ag = await postJSON('/api/agents', { action: 'install', node: id, agent: 'codex' });
+      return { host: all.host_only, kinds: [...new Set((all.rows || []).map(r => r.kind))], counted: Object.entries(look.counts?.kind || {}).filter(([, n]) => n).map(([k]) => k),
+               tc: tc.error || '', ag: ag.error || '' };
+    }, vps.id);
+    ok(got.host === true && got.kinds.every(k => ['service', 'app'].includes(k)) && got.counted.every(k => ['service', 'app', 'installed', 'update'].includes(k)),
+       `its Library lists services and apps alone, and counts no other kind (${JSON.stringify(got)})`);
+    ok(/^vps-lib hosts containers only: toolchains, coding agents and tool packs go on a node where spaces build$/.test(got.tc) && got.tc === got.ag,
+       `...and a toolchain or a coding agent asked for there is refused in that sentence (${got.tc})`);
+    const said = await page.evaluate(lib0 => { const was = lib; lib = { ...lib0, name: 'vps-lib', shelves: [], here: [] };
+      const d = document.createElement('div'); d.innerHTML = libShelves({});
+      const out = { line: d.querySelector('.libhost')?.textContent.trim() || '', nodes: d.querySelector('.libhost a')?.getAttribute('href') || '' };
+      lib = was; return out; }, { host_only: true });
+    ok(/^vps-lib hosts containers only, so it is offered services and apps: toolchains, coding agents and tool packs go on the nodes where spaces build/.test(said.line)
+       && said.nodes === '#/machines/nodes', `...and its page says so once over the shelves, with the way to the Nodes page (${said.line})`);
+  } finally {
+    await page.evaluate(id => postJSON('/api/v1/nodes', { action: 'retire', id }), vps.id);
+  }
+});
+
 // ---- no node ---------------------------------------------------------------
 // A read of the nodes in flight (the poll's) lands after the list is
 // emptied and fills it again, so it is emptied again until the page says

@@ -7296,6 +7296,21 @@ def host_only(n):
     return bool(((n or {}).get("config") or {}).get("host_only"))
 
 
+# What a hosting-only node runs, of the Library's kinds (R291, the operator,
+# 25 Nov: spaces build on a node of their own and deploy to a hosting one).
+HOST_KINDS = ("service", "app")
+
+
+def builds_elsewhere(nid):
+    """Why a toolchain, a tool pack or a coding agent is not installed on
+    `nid`, or "": a hosting-only node runs services and apps, and what a
+    space builds with goes on the nodes where spaces build (R291)."""
+    if not host_only(nid):
+        return ""
+    return (f"{(node(nid) or {}).get('name') or 'this node'} hosts containers only: toolchains, coding agents "
+            "and tool packs go on a node where spaces build")
+
+
 def host_refuses(nid, verb, what=""):
     """Why this node's agent may not use `verb`, or "": only a hosting-only
     node's are narrowed. `what` is a download's: the agent itself may come,

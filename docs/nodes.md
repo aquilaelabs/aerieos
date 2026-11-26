@@ -1173,7 +1173,10 @@ the pieces stack:
    fetch an image shipped to it and carry a container's data in a copy or a
    move, and nothing else (refusals audited, once an hour a verb). Only
    container, storage and network, self-update and cache-clearing jobs are
-   placed on it. A node a space still lists is refused until it is taken
+   placed on it. Its Library offers the services and apps it runs and says
+   that toolchains, coding agents and tool packs go on the nodes where
+   spaces build; an install of one there is refused in that sentence, never
+   queued (R291). A node a space still lists is refused until it is taken
    off; the node's own Spaces section lists them, each with Remove
    (`nodeProjectsSection`), which saves that space's settings without it.
 3. *Move the containers over* with Copy or move: each comes with its
