@@ -63,6 +63,7 @@
 - The Windows companion keeps the controller's key (or its name's certificate) from sign-in and refuses another after (2bb02ee)
 - A release's container image is signed with cosign by the release's own build, and the container edition checks once a day that the registry serves the image its signed release names, saying a difference on the bell (858004a)
 - An install that ships the catalog's freshness key holds the vetted catalog's index to the catalog's weekly statement that it is current, and the Doctor says one a mirror or the network keeps answering after it was replaced (1ee8258)
+- The compose folder is mounted into the controller read-only, so the controller can never rewrite the compose file or the .env the next docker compose up reads (8831f48)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
