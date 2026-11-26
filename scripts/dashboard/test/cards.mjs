@@ -3081,17 +3081,9 @@ await section("a project on several nodes", async () => {
   // 26 Nov: the step of its own was a fourth press for two picks already
   // kept): Model and Effort, this account's for the space, with the last
   // session's model named on the default; New starts at once.
-  const pre = await page.evaluate(() => { const before = { resumeFor, host: !!resumeHostNow(), btn: !!resumeButton('alpha'),
-    pick: JSON.stringify(resumePick || null) };
-    resumeModelNow = { project: '', model: '' }; placeResumeMenu(); return before; });
-  console.log('DIAG-PRE', JSON.stringify(pre));
+  await page.evaluate(() => { resumeModelNow = { project: '', model: '' }; placeResumeMenu(); });
   await page.waitForFunction(() => /last session: Fable/.test(document.querySelector('#resumemenu #rmStartModel option[value=""]')?.textContent || ''),
-                             null, { timeout: 8000 }).catch(async e => {
-    // TEMP-DIAG
-    console.log('DIAG', JSON.stringify(await page.evaluate(async () => ({ now: resumeModelNow, api: await (await fetch('/api/claude-now?project=alpha')).text(),
-      opt: document.querySelector('#resumemenu #rmStartModel option[value=""]')?.textContent, sel: !!document.querySelector('#rmStartModel'),
-      html: (document.querySelector('#resumemenu')?.innerHTML || '').replace(/\s+/g, ' ').slice(0, 1500) }))));
-    throw e; });
+                             null, { timeout: 8000 });
   const step = await page.$eval('#resumemenu', m => ({
     models: [...m.querySelectorAll('#rmStartModel option')].map(o => o.value), efforts: [...m.querySelectorAll('#rmStartEffort option')].map(o => o.value),
     labels: [...m.querySelectorAll('.rmstarton label')].map(l => l.textContent.trim()), steps: !!m.querySelector('#rmModel, [data-start]') }));

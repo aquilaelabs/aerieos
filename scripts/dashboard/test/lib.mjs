@@ -807,10 +807,14 @@ export async function closeFold(page, sel){
   throw last;
 }
 
+// The Doctor's first verdict, which under a whole gate's load comes late:
+// its budget is an option, the third argument. Passed as the second it was
+// the function's argument, and every suite's first wait gave up at
+// Playwright's own thirty seconds, "before its first check" (B1178, B1133).
 export const ready = page => page.waitForFunction(() => {
   const d = document.getElementById('docDot');
   return d && !d.hidden && d.className.includes('ok');
-}, { timeout: 40000 });
+}, null, { timeout: patience(60000) });
 
 // A real touch gesture through Chromium's gesture recognizer (not synthetic
 // pointer events): down at (x,y), optional hold, glide to (x2,y2), lift.

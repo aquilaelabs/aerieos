@@ -271,6 +271,7 @@ function openClaude(name, ev){
   void ns;
   resumeFor = resumeFor === name ? null : name;
   rmSize = {project: "", w: 0, h: 0};          // opened afresh: its own size
+  resumeModelNow = {project: "", model: ""};    // ...and the last session's model read again
   resumePick = null;
   if (resumeFor) loadRmConvs(name);
   drawProjects(state.projects);
@@ -822,6 +823,10 @@ function placeResumeMenu(){
   // pointer and its entrance played again, so a press that began on one
   // button ended on another and did nothing, and it blinked.
   const was = dlg.querySelector(":scope > .resumemenu");
+  // What the last session answered on, read for this space whatever is
+  // drawn: a menu left as it was returned before the read below, and a
+  // space's model read again (a new session since) was never asked for.
+  rmLastModel(p);
   if (was && was.dataset.for === p.name && !was.dataset.pick && was.dataset.sig === html) return;
   // ...and one drawn again with something new (your conversations landing,
   // another node or agent picked, Back from the second step) takes the old
@@ -895,6 +900,5 @@ function placeResumeMenu(){
     drawProjects(state.projects);
     openNodeClaude(b.dataset.nid, b.dataset.asignin);
   });
-  rmLastModel(p);
   rmHold(m, p.name);
 }
