@@ -15,6 +15,7 @@
 - A Deploy section in each space's settings once a Kubernetes cluster is kept: its environments, each a cluster, a namespace AerieOS makes ready there with a deployer that reaches that namespace alone, the registry its images go to and when it deploys (dd10fda)
 - A Deploy area on the Roles page for who sees a space's environments and who deploys to them; every space owner holds it, and Clusters can be given cluster by cluster as Nodes is node by node (dd10fda)
 - k3s in the Library: a one-node Kubernetes cluster on a node, kept out of nginx's way on 80 and 443, and added on the Clusters page with one press (ad49655)
+- A space's Deploy section says what each of its repositories deploys (a Helm chart in deploy/chart or manifests in deploy/k8s), and Draft from the compose writes a chart from a repository's compose file into its tree for you to read and commit. A deploy builds the image from the commit picked, sends it to the environment's registry, your git host's, or straight into a k3s cluster this install runs, and rolls it out with a token made for that deploy alone (91f3126)
 
 ### Changed
 
