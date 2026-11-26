@@ -394,6 +394,10 @@ await section("a bare-metal install's first run", async () => {
       return r.fallback();
     });
     await page.route('**/api/v1/jobs?id=j_y', r => r.fulfill({ json: { id: 'j_y', state: 'succeeded' } }));
+    // The status poll held while the walk below plants its own state: it
+    // waits on calls in between, and a status read landing there redrew the
+    // setup panel from the server's (B1152).
+    await holdPoll(page);
     const fresh = await page.evaluate(async () => {
       const keepFb = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported, keepD = setupDisks.own;
       // What is drawn here is said here: no read from the server lands under it.
@@ -431,6 +435,7 @@ await section("a bare-metal install's first run", async () => {
       return out;
       async function until_(f){ for (const end = Date.now() + 15000; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50)); }
     });
+    await freePoll(page);
     await page.unroute('**/api/v1/nodes'); await page.unroute('**/api/v1/jobs?id=j_y');
     ok(fresh.titles.includes('Where the spaces and containers go') && fresh.projectDead === true && /Once the spaces have a place/.test(fresh.why),
        `a new start on a stick has a step for where the spaces go, and a space waits for it (B666) (${fresh.titles.join(' | ')})`);
@@ -448,6 +453,9 @@ await section("a bare-metal install's first run", async () => {
   // steps in the order they have to happen, each done in place with This
   // machine's and Controller settings' own controls, read from the machine.
   {
+    // The status poll held while the walk plants its own state and waits
+    // between draws: a read landing there redrew it from the server's (B1152).
+    await holdPoll(page);
     const walk = await page.evaluate(async () => {
       const keep = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported;
       const panel = () => document.getElementById('setupPanel');
@@ -581,6 +589,7 @@ await section("a bare-metal install's first run", async () => {
       }
       return out;
     });
+    await freePoll(page);
     if (process.env.BB_SHOTS){
       await page.setViewportSize({ width: 1440, height: 2100 }); await atWidth(1440);
       await page.screenshot({ path: `${process.env.BB_SHOTS}/walk-desk.png`, fullPage: true });
