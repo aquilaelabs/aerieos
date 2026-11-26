@@ -64,6 +64,7 @@
 - A release's container image is signed with cosign by the release's own build, and the container edition checks once a day that the registry serves the image its signed release names, saying a difference on the bell (858004a)
 - An install that ships the catalog's freshness key holds the vetted catalog's index to the catalog's weekly statement that it is current, and the Doctor says one a mirror or the network keeps answering after it was replaced (1ee8258)
 - The compose folder is mounted into the controller read-only, so the controller can never rewrite the compose file or the .env the next docker compose up reads (8831f48)
+- The Android app trades your password for a token of its own at sign-in (asking your authenticator's code where you have one) and keeps only the token, which Profile can sign out; at an https address it holds the dashboard to the key it met at sign-in, its terminal included (412aad1)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
