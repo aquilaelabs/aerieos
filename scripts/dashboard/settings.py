@@ -66,11 +66,13 @@ KEYS = {
     # The machine's own logs (the agent's journal, the runner's, the
     # terminal server's) are root's on that box and are not offered at all.
     #
-    # On, a node's row gains Debug settings, where each node is granted the
-    # nodes whose machine logs its sessions may read. Nothing is granted by
-    # this switch: it only puts the question on the screen. A node is not
-    # implicitly granted ITSELF, because its own journal is as much system
-    # level as any other machine's.
+    # On (DEBUG_MODE=1 where the controller starts; set here it is refused),
+    # Controller's Debug page appears for an account with the debug grant,
+    # where each space is granted the controller's diagnostics and the nodes
+    # whose machine logs its sessions may read (prefs diag, log_from).
+    # Nothing is granted by the mode itself: it only puts the question on
+    # the screen. A node is not implicitly granted its own logs, because its
+    # own journal is as much system level as any other machine's.
     "debug_mode": {"default": False, "kind": "bool", "applied": "now"},
     # First run (R199, the operator, 12 Oct): False from the moment the
     # owner is made until Finish on the setup page, which needs a node

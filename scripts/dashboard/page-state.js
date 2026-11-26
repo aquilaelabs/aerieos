@@ -372,17 +372,27 @@ const stateDot = c => c
 
 // ---- times and sizes ----------------------------------------------------
 
-// The time zone this browser shows times in, chosen on the Profile tab and
-// kept in a cookie: it is where this device is, not who the account is, so a
-// phone abroad and the desk at home each keep their own. "" is the device's
-// own zone, which is what the browser does unasked. A zone the browser does
-// not know is ignored rather than trusted.
+// The time zone times are shown in. A person's own, set on their Profile,
+// is every browser's (R294 step 8), the same zone their quiet windows on the
+// bell keep; a browser may pick its own in the gear's menu, kept in a cookie
+// because it is where this device is, not who the account is (a phone
+// abroad): a zone, or "device", this device's own. With neither, the
+// device's own, which is what the browser does unasked. A zone the browser
+// does not know is ignored rather than trusted.
 const TZ_COOKIE = "bb_tz";
-function userTZ(){
+const tzKnown = z => { try{ new Intl.DateTimeFormat([], {timeZone: z}); return true; }catch(e){ return false; } };
+// What this browser picked: "" for nothing (the person's own), "device", or a zone.
+function browserTZ(){
   const m = document.cookie.match(/(?:^|;\s*)bb_tz=([^;]*)/);
   const z = m ? decodeURIComponent(m[1]) : "";
-  if (!z) return "";
-  try{ new Intl.DateTimeFormat([], {timeZone: z}); return z; }catch(e){ return ""; }
+  return z === "device" || (z && tzKnown(z)) ? z : "";
+}
+// ...and the zone that comes to: "" for the device's own.
+function userTZ(){
+  const b = browserTZ();
+  if (b) return b === "device" ? "" : b;
+  const mine = state?.tz || "";
+  return mine && tzKnown(mine) ? mine : "";
 }
 function setUserTZ(z){
   document.cookie = `${TZ_COOKIE}=${encodeURIComponent(z || "")}; path=/; SameSite=Lax; `

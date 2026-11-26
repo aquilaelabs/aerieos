@@ -136,6 +136,16 @@ class TheController(unittest.TestCase):
         with mock.patch.object(nodes, "node_list", return_value=[own]):
             self.assertEqual([(r["what"], r["bad"]) for r in nodes.power_attention()], [("low", True)])
 
+    def test_any_node_s_packages_are_on_the_bell_its_ups_the_own_machine_s_alone(self):
+        # R294 step 13: a node whose agent counts its packages is on the bell
+        # with them, where only the controller's own machine was.
+        import nodes
+        other = {"id": "n2", "name": "box", "kind": "agent", "live": True, "config": {},
+                 "reported": {"ups": {"answers": True, "status": "OB"}, "host_updates": {"pending": 2, "security": 1, "reboot": False, "checked": 1}}}
+        with mock.patch.object(nodes, "node_list", return_value=[other]):
+            got = nodes.power_attention()
+        self.assertEqual([(r["kind"], r["what"], r["key"]) for r in got], [("host", "security", "host:security:n2:1")])
+
     def test_the_verb_is_the_own_machines_and_never_the_images(self):
         import nodes
         nodes.configure(state=tempfile.mkdtemp())

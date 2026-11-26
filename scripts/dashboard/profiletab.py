@@ -24,6 +24,13 @@ smtp_set = None          # () -> whether a mail server is set, for the email des
 mfa = None               # mfa.py: the account's second factors (R127)
 audit = None             # db.audit
 two_factor_required = None   # account -> whether a role of it requires a second factor
+# Each coding agent's sign-in on each node (R294 step 6), the person's own
+# connections, so listed on their Profile:
+agent_rows = None        # () -> every coding agent (agents.rows)
+node_list = None         # () -> the registry's nodes
+agent_version = None     # (node, agent id) -> the version it reports there, or ""
+signed_on = None         # (uid, agent id) -> {node id: {email, plan}}
+signin_cannot = None     # (node, agent id) -> why a sign-in cannot run there now, or ""
 
 
 smb_shares = None
@@ -33,8 +40,42 @@ def configure(**deps):
     globals().update(deps)
 
 
-def view(me):
-    """The tab's read. (payload, status)."""
+def agent_signins(uid, scope):
+    """Every coding agent with a sign-in of its own on every node this
+    account may sign in on (`scope` its node ids, None for every one), where
+    it is installed or this account is signed in to it: who it is signed in
+    as, and why a press could not run there now, the server's own test
+    (R294 step 6). A hosting-only node runs no sessions and is left out."""
+    if not (agent_rows and node_list and signed_on):
+        return []
+    try:
+        nodes = [n for n in node_list() if n.get("kind") == "agent" and n.get("state") != "retired"
+                 and (scope is None or n.get("id") in scope)]
+    except Exception:  # noqa: BLE001 (a registry that cannot be read lists none, as the nodes' own read says)
+        return []
+    out = []
+    for a in agent_rows():
+        if not a.login_job:
+            continue
+        signed = signed_on(uid, a.id) or {}
+        for n in nodes:
+            had = signed.get(n["id"])
+            here = agent_version(n, a.id) if agent_version else ""
+            if not here and not had:
+                continue
+            if (n.get("config") or {}).get("host_only") and not had:     # nodes.host_only
+                continue
+            out.append({"node": n["id"], "node_name": n.get("name") or n["id"], "agent": a.id, "agent_name": a.name,
+                        "provider": a.provider or "", "version": here,
+                        "email": (had or {}).get("email", ""), "plan": (had or {}).get("plan", ""),
+                        "cannot": signin_cannot(n, a.id) if signin_cannot else ""})
+    out.sort(key=lambda r: (r["node_name"].lower(), r["agent"] != "claude", r["agent_name"].lower()))
+    return out
+
+
+def view(me, scope=None):
+    """The tab's read. (payload, status). `scope` is the node ids this
+    account may sign in on, None for every one (server._node_scope)."""
     uid = users.uid_of(me)
     rec = users.get(me["name"]) or {}
     # Each part timed by name (timing.py), for the trace to say which is slow.
@@ -59,6 +100,9 @@ def view(me):
             "claude": claude,
             # ...and every agent's, by its id (B296).
             "agents": agent_emails(uid) if agent_emails else {},
+            # ...and each one on each node, with Sign in and Sign out there
+            # (R294 step 6): a person's own connection, on their Profile.
+            "agent_signins": agent_signins(uid, scope),
             # The Claude plugins this account installed, per
             # node, as the nodes last said (plugins.py).
             "plugins": plugs,

@@ -452,17 +452,13 @@ await section("global rules", async () => {
     body: JSON.stringify({ project: 'alpha', action: 'save', rules: (await (await fetch(URL.replace(/\/$/, '') + '/api/rules?project=alpha', { headers: auth })).json()).rules, globals_off: [] }) });
 });
 
-// ---- the time zone is this browser's (the gear, R218 step 31) ------------
+// ---- a browser's own time zone (the gear, R218 step 31) -------------------
 // A cookie, not the account: a phone abroad and the desk at home each keep
 // their own. Every time the page shows goes through fmtTime, so picking a
-// zone moves them all, and "This device's own" takes the cookie away again.
-// It sits in the gear beside the scheme, the other choice that is this
-// browser's, and Profile no longer lists it.
-await section("the time zone is this browser's", async () => {
-  await page.evaluate(() => openProfileTab());
-  await page.waitForSelector('.profiletab .snav [data-spick]', { timeout: 15000 });
-  ok(await page.$('.profiletab .snav [data-spick="browser"]') === null && await page.$('.profiletab #pfTZ') === null,
-     'Profile no longer carries the time zone');
+// zone moves them all, and nothing picked takes the cookie away again. It
+// sits in the gear beside the scheme, the other choice that is this
+// browser's; the person's own zone is their Profile's (below).
+await section("a browser's own time zone", async () => {
   await page.evaluate(() => toggleUiMenu(true));
   await page.waitForSelector('#uiMenu #uiTZ', { timeout: 15000 });
   const zone = 'Pacific/Chatham';          // +12:45: no browser's own zone by accident
@@ -489,6 +485,36 @@ await section("the time zone is this browser's", async () => {
   await page.evaluate(() => { document.cookie = 'bb_tz=Not%2FAZone; path=/'; });
   ok(await page.evaluate(() => userTZ() === ''), 'a zone this browser does not know is ignored, not trusted');
   await page.evaluate(() => { setUserTZ(''); toggleUiMenu(false); });
+});
+
+// ---- a person's own time zone (R294 step 8) --------------------------------
+// On their Profile, kept with their account: their quiet windows on the bell
+// and the times every browser of theirs shows that picked none of its own;
+// the gear then offers it first, and this device's own beside it.
+await section("a person's own time zone", async () => {
+  const zone = 'Pacific/Chatham';
+  await page.evaluate(() => openProfileTab());
+  await page.waitForSelector('.profiletab #pf_tz', { timeout: 15000 });
+  const none = await page.$eval('.profiletab #pf_tz', s => ({ v: s.value, first: s.options[0]?.textContent }));
+  await page.selectOption('.profiletab #pf_tz', zone);
+  await page.click('.profiletab #pfSave');
+  const kept = await refreshUntil(page, () => state?.tz === 'Pacific/Chatham', { timeout: 15000 }).then(() => true, () => false);
+  const shown = await page.evaluate(z => ({ tz: userTZ(), cookie: document.cookie.includes('bb_tz='),
+    same: fmtTime(0, { hour: '2-digit', minute: '2-digit' }) === new Date(0).toLocaleString([], { hour: '2-digit', minute: '2-digit', timeZone: z }) }), zone);
+  ok(none.v === '' && /controller's clock/.test(none.first || '') && kept && shown.tz === zone && !shown.cookie && shown.same,
+     `Profile's time zone is the person's own, kept with the account, and a browser that picked none shows times in it (${JSON.stringify({ none, kept, shown })})`);
+  await page.evaluate(() => toggleUiMenu(true));
+  await page.waitForSelector('#uiMenu #uiTZ', { timeout: 15000 });
+  const offered = await page.$$eval('#uiMenu #uiTZ option', os => os.slice(0, 2).map(o => [o.value, o.textContent]));
+  await page.selectOption('#uiTZ', 'device');
+  await page.click('#uiTZApply');
+  const device = await page.evaluate(() => ({ tz: userTZ(), b: browserTZ() }));
+  ok(offered[0][0] === '' && /Your own, from your Profile \(Pacific\/Chatham\)/.test(offered[0][1]) && offered[1][0] === 'device'
+     && device.tz === '' && device.b === 'device',
+     `the gear offers the person's own first and this device's own beside it, which this browser may keep instead (${JSON.stringify({ offered, device })})`);
+  const bad = await page.evaluate(() => postJSON('/api/users', { action: 'prefs', prefs: { tz: 'Mars/Base' } }));
+  ok(/not a time zone/.test(bad.error || ''), `a zone the controller does not know is refused in words (${bad.error})`);
+  await page.evaluate(async () => { setUserTZ(''); toggleUiMenu(false); await postJSON('/api/users', { action: 'prefs', prefs: { tz: '' } }); await refresh(); });
 });
 
 // ---- a project's settings live in its notebook (R119 step 3) ---------------
@@ -641,9 +667,10 @@ await section("a project's settings live in its notebook", async () => {
     });
     await page.evaluate(() => { refresh(); });
     await until(() => read, 30000, 100);
-    // Elsewhere, after this window opened: the color (another section) and
-    // the build command (this one), as a session or another window would.
-    await post('/api/prefs', { project: 'alpha', color: 'teal', build: 'make theirs' });
+    // Elsewhere, after this window opened: a release setting (another
+    // section) and the build command (this one), as a session or another
+    // window would.
+    await post('/api/prefs', { project: 'alpha', release_gate: 'warn', build: 'make theirs' });
     await rnSect(page, 'build');
     await page.fill('#rnBuildCmd', 'make mine');
     // The delay is the case: the read out since before the other save lands after Save is pressed.
@@ -657,9 +684,9 @@ await section("a project's settings live in its notebook", async () => {
     const second = await sectSave(page, 'build');
     await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.build === 'make mine', { timeout: 20000 });
     const now = await page.evaluate(() => (state?.projects || []).find(p => p.name === 'alpha')?.prefs || {});
-    ok(!second && now.build === 'make mine' && now.color === 'teal',
-       `...Save again writes this one's, and leaves the color another section saved alone (${JSON.stringify({ build: now.build, color: now.color })})`);
-    await post('/api/prefs', { project: 'alpha', build: '', color: '' });
+    ok(!second && now.build === 'make mine' && now.release_gate === 'warn',
+       `...Save again writes this one's, and leaves what another section saved alone (${JSON.stringify({ build: now.build, release_gate: now.release_gate })})`);
+    await post('/api/prefs', { project: 'alpha', build: '', release_gate: 'refuse' });
   }
   // Also works on is drawn from what is saved until a draw has had nodes to
   // draw: one made before the node list arrived marked itself drawn, and the
@@ -897,6 +924,31 @@ await section("a split page's head on a phone", async () => {
   }
   ok(at.every(x => !x), `on a phone the chain opens Repository, not the list (${at.filter(Boolean).join(', ') || 'both ways'})`);
   await phone.close();
+});
+
+// ---- Connected services (R294 step 9) --------------------------------------
+// Every credential the install holds for an outside service, on Controller
+// settings, with who added it; Open goes where it lives, and Forget, an
+// administrator's, takes it away at once.
+await section("Connected services", async () => {
+  const set = await post('/api/settings', { set: { smtp_password: 'hunter2-not-real' } });
+  await page.evaluate(() => { connData = null; connAsked = false; openSettingsTab(); });
+  await page.waitForSelector('.settingstab .snav [data-spick="connections"]', { timeout: 15000 });
+  await page.click('.settingstab .snav [data-spick="connections"]');
+  const R = 'details[data-sect="settings:connections"] .conntbl .row';
+  await page.waitForFunction(sel => [...document.querySelectorAll(sel)].some(r => /Mail server password/.test(r.textContent)), R, { timeout: 15000 });
+  const row = await page.$$eval(R, rs => rs.map(r => ({ text: r.textContent.replace(/\s+/g, ' '), forget: !!r.querySelector('[data-connforget]'), open: !!r.querySelector('[data-conngo]') }))
+    .find(r => /Mail server password/.test(r.text)));
+  const hidden = !/hunter2/.test(await page.$eval('details[data-sect="settings:connections"]', e => e.innerHTML));
+  ok(!set.error && row && /this install's/.test(row.text) && /by /.test(row.text) && row.open && row.forget && hidden,
+     `a mail password set is listed as this install's, with who added it, Open and Forget, and never its value (${JSON.stringify(row)})`);
+  page.dialogs.length = 0;
+  await page.$$eval(R, rs => rs.find(r => /Mail server password/.test(r.textContent))?.querySelector('[data-connforget]')?.click());
+  const gone = await until(async () => !(await page.evaluate(async () => (await (await fetch('/api/connections')).json()).rows || []))
+    .some(r => r.kind === 'setting' && r.ref === 'smtp_password'), 10000, 200);
+  const cleared = await page.evaluate(async () => !(await (await fetch('/api/status')).json()).settings?.smtp_password?.set);
+  ok(page.dialogs.some(d => /Forget Mail server password\?/.test(d)) && gone && cleared,
+     `Forget asks, then takes it away where it was kept (${JSON.stringify({ asked: page.dialogs.slice(-1), gone, cleared })})`);
 });
 
 await done(browser);

@@ -986,18 +986,38 @@ function nodeProjects(id){
   return (state?.projects || []).filter(p => (p.prefs?.nodes || []).includes(id) || p.prefs?.node === id)
     .sort((a, b) => projLabel(a.name).localeCompare(projLabel(b.name), undefined, {sensitivity: "base"}));
 }
-// One line each, as a table (the tables rule): the repository, whether this
-// node is its primary or one it also works on, its copy here, and Settings.
-const NODE_PROJ_COLS = [{label: "Repository"}, {label: "This node is", w: "minmax(0,.8fr)"},
-  {label: "Its copy here", w: "minmax(0,1fr)"}, {act: true, w: "7rem"}];
+// One line a space, as a table (the tables rule): the space, whether this
+// node is its primary or one it also works on, each repository's copy here,
+// and Settings. A node is the space's setting, not a repository's (R294 step
+// 12), so the list is of spaces and Settings opens the space's own dialog at
+// its Nodes in one hop, where a node is taken off.
+const NODE_PROJ_COLS = [{label: "Space"}, {label: "This node is", w: "minmax(0,.8fr)"},
+  {label: "Copies here", w: "minmax(0,1fr)"}, {act: true, w: "7rem"}];
+function nodeSpaces(id){
+  const by = new Map();
+  for (const p of nodeProjects(id)){
+    const key = p.project || p.name;
+    if (!by.has(key)) by.set(key, {key, label: state?.repos?.[key]?.name || projLabel(p.name), repos: [], mine: false, primary: false});
+    const s = by.get(key);
+    s.repos.push(p);
+    s.mine ||= !!p.mine;
+    s.primary ||= p.prefs?.node === id;
+  }
+  return [...by.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, {sensitivity: "base"}));
+}
 function nodeProjectsSection(n){
-  const list = nodeProjects(n.id);
-  const rows = list.map(p => `<div class="row ndproj">${tblLine(NODE_PROJ_COLS, [
-    `<button type="button" class="namelink" data-ndopen="${esc(p.name)}" title="open its notebook">${esc(projLabel(p.name))}</button>`,
-    p.prefs?.node === n.id ? "its primary" : "one it also works on",
-    nodeSyncSaid(n, p.name) || (n.kind === "agent" ? `<span class="dim">not reported</span>` : ""),
-    p.mine ? `<button type="button" data-ndproj="${esc(p.name)}" title="its nodes are set in its settings, under where it builds, tests and runs">Settings</button>`
-      : `<span class="dim">not yours</span>${helpIcon("Add yourself to its space to change which nodes it uses.")}`])}</div>`).join("");
+  const list = nodeSpaces(n.id);
+  const rows = list.map(s => {
+    const first = s.repos[0].name, many = s.repos.length > 1;
+    const copy = p => nodeSyncSaid(n, p.name) || (n.kind === "agent" ? `<span class="dim">not reported</span>` : "");
+    const copies = many ? s.repos.map(p => `<div>${esc(projLabel(p.name))}: ${copy(p)}</div>`).join("") : copy(s.repos[0]);
+    return `<div class="row ndproj" data-ndspace="${esc(s.key)}">${tblLine(NODE_PROJ_COLS, [
+      `<button type="button" class="namelink" data-ndopen="${esc(first)}" title="open its notebook">${esc(s.label)}</button>`,
+      s.primary ? "its primary" : "one it also works on",
+      copies,
+      s.mine ? `<button type="button" data-ndproj="${esc(first)}" title="a space's nodes are set in its settings, under Nodes">Settings</button>`
+        : `<span class="dim">not yours</span>${helpIcon("Add yourself to the space to change which nodes it uses.")}`])}</div>`;
+  }).join("");
   // Stop syncing, where the copies it stops are listed (R164).
   const conf = n.config || {};
   const stop = n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
@@ -1005,7 +1025,7 @@ function nodeProjectsSection(n){
   // The sentence and the button on one line: copies you cannot see may still
   // be here, so the button stands whether or not any row does.
   const body = rows ? `${tblWrap(NODE_PROJ_COLS, rows, "ndprojs")}${stop ? `<div class="field"><div class="actbar"><span class="sp"></span>${stop}</div></div>` : ""}`
-    : `<div class="field"><div class="actbar"><span class="grow sub">No repository you can see is on this node. A space's settings add one.</span>${stop}</div></div>`;
+    : `<div class="field"><div class="actbar"><span class="grow sub">No space you can see works on this node. A space's settings add one, under Nodes.</span>${stop}</div></div>`;
   return docSection("nodes", "projects", ndTitle("projects"), list.length ? `${list.length}` : "none", body);
 }
 
@@ -1082,9 +1102,9 @@ function nodeSessionsSection(n){
 // Save, which sends what changed and nothing else.
 function nodeSessSettings(n){
   const host = !!n.config?.host_only;
-  const rows = host ? nodeHostRootRow(n) + nodePortsLocalRow(n)
+  const rows = (host ? nodeHostRootRow(n) + nodePortsLocalRow(n)
     : nodeSessFacts(n) + `<div class="fgroup ndsetgroup"><div class="fgrouphead">Set here<span class="sub">Each a draft until Save below.</span></div>`
-      + nodeRootAsksRow(n) + nodePortsLocalRow(n) + nodeTurnsRow(n) + `</div>`;
+      + nodeRootAsksRow(n) + nodePortsLocalRow(n) + nodeTurnsRow(n) + `</div>`) + nodeRoomRow(n);
   const t = n.turns || {};
   // Sessions, said so: under the test workers' field it read as them (B394).
   const now = host ? "" : `${t.working || 0} session${(t.working || 0) === 1 ? "" : "s"} working now${t.limit ? ` of ${t.limit}` : ""}${t.waiting ? `, ${t.waiting} waiting for a turn` : ""}`;
@@ -1103,7 +1123,41 @@ function nodeSessDirty(n){
   return (c.rootAsks !== undefined && c.rootAsks !== !conf.no_root)
     || (c.portsLocal !== undefined && c.portsLocal !== portsOn)
     || (c.turnsText !== undefined && String(Number(c.turnsText) || 0) !== String((n.turns || {}).limit || 0))
-    || (c.workersText !== undefined && String(Number(c.workersText) || 0) !== String(conf.test_workers || 0));
+    || (c.workersText !== undefined && String(Number(c.workersText) || 0) !== String(conf.test_workers || 0))
+    || ND_ROOM.some(([k]) => c[`room.${k}`] !== undefined && c[`room.${k}`].trim() !== nodeRoomHas(n, k));
+}
+
+// Room on this node (R294 step 7): the disk it keeps free, when its memory
+// warns and a container's default memory, each this node's own where set
+// and blank for the install's (Controller settings, Room), so a small board
+// and a big server are not held to one number. Saved with the section.
+const ND_ROOM = [["room_floor_gb", "Disk kept free (GB)", "a build or a test does not start here with less free than this, the bell says so, and under twice it the hourly prune clears old build caches and images", 1, 1000],
+  ["room_mem_pct", "Memory warning (% in use)", "the bell says so when this node's memory has stayed at this share or more for ten minutes", 50, 99],
+  ["container_mem_gb", "Container memory (GB, 0 for none)", "the memory a container started here gets when its compose file sets none", 0, 1024]];
+const nodeRoomHas = (n, k) => n.config?.[k] == null ? "" : String(n.config[k]);
+function nodeRoomRow(n){
+  const c = nodeDraft(n).draft;
+  const inst = k => state?.settings?.[k]?.value ?? {room_floor_gb: 10, room_mem_pct: 92, container_mem_gb: 0}[k];
+  return `<div class="fgroup ndsetgroup"><div class="fgrouphead">Room<span class="sub">Blank is this install's, set in Controller settings.</span></div>
+    <div class="ndnums">${ND_ROOM.map(([k, label, help, lo, hi]) => {
+      const id = `ndRoom-${n.id}-${k}`, v = c[`room.${k}`] ?? nodeRoomHas(n, k);
+      return `<div class="logdays setrow col ctlrow">${lbl(id, `${label}: blank for ${inst(k)}`, help)}
+        <input id="${esc(id)}" data-room="${esc(k)}" type="number" min="${lo}" max="${hi}" step="1" inputmode="numeric"
+          placeholder="${esc(String(inst(k)))}" value="${esc(v)}"></div>`;
+    }).join("")}</div></div>`;
+}
+
+// Its system's own packages (R294 step 13), as its agent counts them once an
+// hour where it can (a Debian-family system, the agent as root): what waits,
+// the security updates among them, and a restart the last update asked for.
+// Updated by the machine's own package manager; said on every node's page,
+// where it was the controller's own machine's alone, on the bell.
+function nodeHostUpdates(n){
+  const hu = n.reported?.host_updates || {};
+  if (!hu.checked) return "";
+  const p = hu.pending || 0, s = hu.security || 0;
+  const said = p ? `${p} update${p === 1 ? "" : "s"} to its system's packages wait${p === 1 ? "s" : ""}${s ? `, ${s} for security` : ""}` : "its system's packages are up to date";
+  return `<div class="sub ndhost${s || hu.reboot ? " warn" : ""}">${esc(said)}${hu.reboot ? "; a restart runs the new kernel or libraries" : ""} <span class="dim">(checked ${esc(ago(hu.checked))})</span></div>`;
 }
 
 // The coding agents installed on this node, each with its version as the
@@ -1935,7 +1989,7 @@ function nodeCharts(n){
 // template written beside the page fell behind it), so a change to either
 // is a change to both; given null, each draws the placeholder's.
 // A node's sections, in their order, by the titles they are drawn under.
-const ND_SECTS = [["health", "Health"], ["report", "Reporting"], ["machine", "Name and time"], ["power", "Power"], ["projects", "Repositories"], ["sessions", "Sessions"], ["gpu", "GPU"], ["usb", "USB"],
+const ND_SECTS = [["health", "Health"], ["report", "Reporting"], ["machine", "Name and time"], ["power", "Power"], ["projects", "Spaces"], ["sessions", "Sessions"], ["gpu", "GPU"], ["usb", "USB"],
                   ["features", "Features"], ["storage", "Storage"], ["network", "Network"], ["advanced", "Advanced"]];
 function ndTitle(k){ return (ND_SECTS.find(s => s[0] === k) || [k, k])[1]; }
 // Why New VM and Enroll node are dead, when this install switched
@@ -2146,6 +2200,7 @@ function ndRowHtml(n, lead = ""){
         ${nodeGpu(n)}
         ${nodeSound(n)}
         ${nodeInternet(n)}
+        ${nodeHostUpdates(n)}
         ${labels ? `<div class="sub ndlabels">${labels}</div>` : ""}</div>`,
       {cls: n.kind === "agent" && n.live ? "ok" : "", open: true});
     // Every live agent node gets the plane: the runner needs no stamp. What
@@ -2618,7 +2673,7 @@ function ndDialogs(){
           helpIcon(`It ${r.reach === "wireguard" ? `brings the tunnel up as ${r.tunnel_addr}, checks the controller answers through it, `
             : r.reach === "public" ? "checks the controller answers at its hostname, " : ""}provisions the machine and enrolls it.`)}</div>
         <pre class="ndcmd">sudo bash ${esc(r.filename)}</pre>
-        <div class="hint">It holds a token good once, until ${esc(new Date(r.expires * 1000).toLocaleString())}${
+        <div class="hint">It holds a token good once, until ${esc(fmtTime(r.expires * 1000))}${
           r.reach === "wireguard" ? helpIcon("It also holds the machine's WireGuard private key until it has run: once the node has enrolled it takes the WireGuard config out of itself and keeps the rest, to change and run again.") : ""}</div>
       </div>${r.home ? `
       <div class="field ndtoken">
@@ -2899,7 +2954,7 @@ function wireNodesTab(root){
   wireSignin(root);
   wireCharts(root);
   root.querySelectorAll("[data-ndopen]").forEach(b => b.onclick = () => openNotebook(b.dataset.ndopen));
-  root.querySelectorAll("[data-ndproj]").forEach(b => b.onclick = () => openProjectSettings(b.dataset.ndproj, "runs"));
+  root.querySelectorAll("[data-ndproj]").forEach(b => b.onclick = () => openSpaceSettings(b.dataset.ndproj, "runs"));
   // The root asks answer through the phone's endpoint, which holds the one
   // list of asks; phFetch redraws this tab when the answer comes back.
   root.querySelectorAll("[data-rallow]").forEach(b => b.onclick = () => {
@@ -2977,7 +3032,10 @@ function wireNodesTab(root){
       }
       if (act === "sess-revert"){
         const c = nodesConf[id];
-        if (c && c.draft) for (const k of ["rootAsks", "portsLocal", "turnsText", "workersText"]) c.draft[k] = undefined;
+        if (c && c.draft){
+          for (const k of ["rootAsks", "portsLocal", "turnsText", "workersText"]) c.draft[k] = undefined;
+          for (const [k] of ND_ROOM) c.draft[`room.${k}`] = undefined;
+        }
         readMoved("nodes"); drawPanes();
         return;
       }
@@ -3005,8 +3063,20 @@ function wireNodesTab(root){
                         v => v ? "a session here may ask for a root command" : "a session here asking for a root command is refused")
           && await step(val("portslocal"), "ports_local" in conf ? !!conf.ports_local : !!conf.host_only, v => ({action: "ports-local", on: v}),
                         v => v ? "published ports here bind to 127.0.0.1 from the next hello; docker restarts once" : "published ports here bind to every address from the next hello; docker restarts once");
+        // ...and its Room, one action for the three: blank for the install's.
+        const room = {};
+        box.querySelectorAll("[data-room]").forEach(el => { if (el.value.trim() !== nodeRoomHas(n0, el.dataset.room)) room[el.dataset.room] = el.value.trim(); });
+        let roomOk = true;
+        if (ok && Object.keys(room).length){
+          const k = await nodeAct({action: "room", id, ...room});
+          roomOk = !k.error;
+          if (roomOk) said.push("its room is set here: " + ND_ROOM.filter(([r]) => r in room).map(([r, label]) => `${label.toLowerCase()} ${room[r] === "" ? "this install's" : room[r]}`).join(", "));
+        }
         const c = nodesConf[id];
-        if (ok && c && c.draft) for (const k of ["rootAsks", "portsLocal", "turnsText", "workersText"]) c.draft[k] = undefined;
+        if (ok && roomOk && c && c.draft){
+          for (const k of ["rootAsks", "portsLocal", "turnsText", "workersText"]) c.draft[k] = undefined;
+          for (const [k] of ND_ROOM) c.draft[`room.${k}`] = undefined;
+        }
         if (said.length) notify(said.join("; "));
         await loadNodes();
         return;
@@ -3117,6 +3187,9 @@ function wireNodesTab(root){
     if (wi){
       wi.oninput = () => { const c = nodeDraft(nodeOf(id)); c.draft.workersText = wi.value; sessWake(); };
     }
+    box.querySelectorAll("[data-room]").forEach(el => el.oninput = () => {
+      const c = nodeDraft(nodeOf(id)); c.draft[`room.${el.dataset.room}`] = el.value; sessWake();
+    });
   });
 }
 // The path mapping's records: one open at a time, its form kept across a

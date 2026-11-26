@@ -117,11 +117,12 @@ GPU = ("on", "off")
 # project IS AerieOS, whose sessions file those in its own tracker (the
 # operator, 24 Sep). Two of the gates' words, since there is nothing to ask.
 REPORT_MODES = ("auto", "deny")
-# A color for the project, worn by its notebook tab and its row so that
-# eight open notebooks can be told apart at a glance. Names, not hex: the
-# page maps each to a tone that sits on its palette, and a name survives a
-# theme change where a hex value picked against one background does not.
-# "" is no color, which is the default and leaves nothing on the file.
+# The colors a person gives a space, worn by its card, its notebook tab and
+# its row so that eight open notebooks can be told apart at a glance: each
+# person's own (projects.set_mark), no longer kept in a space's settings
+# (statemigrations 0032). Names, not hex: the page maps each to a tone that
+# sits on its palette, and a name survives a theme change where a hex value
+# picked against one background does not.
 COLORS = ("red", "orange", "yellow", "green", "teal", "blue", "violet", "pink")
 
 import statefile  # noqa: E402
@@ -160,7 +161,7 @@ def configure(*, write_json, state):
 # outputs, its captures and snapshots, its tests' place, its gate on what a
 # session enters into its notebook) stays the repository's.
 GROUP_FIELDS = ("node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "test_node",
-                "agents_off", "agent_default", "agent_slots", "gitpol", "forgepol", "color", "devbuild", "makevms", "vm_caps", "installpacks",
+                "agents_off", "agent_default", "agent_slots", "gitpol", "forgepol", "devbuild", "makevms", "vm_caps", "installpacks",
                 "test_change", "gpu", "report", "sign", "keys", "release", "pc", "log_from", "diag")
 # The dials a repository may set apart from its project (R208 step 6, the
 # operator, 3 Nov): the project's Agents may holds the defaults, and a
@@ -573,7 +574,6 @@ def _clean(rec):
             # The dials this repository sets apart from its project (R208
             # step 6); every other reads the project's.
             "overrides": _overrides_of(rec),
-            "color": rec.get("color") if rec.get("color") in COLORS else "",
             # Whether a SESSION may rebuild this project's dev instance,
             # and it is a real grant rather than a nicety: a rebuild runs the
             # project's own Dockerfile and brings the container up, on the
@@ -1052,7 +1052,7 @@ def _no_inherit(kw):
 
 def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=None,
               outputs=None, gate=None, gitpol=None, forgepol=None,
-              devbuild=None, tests_in=None, test_node=None, report=None, color=None, workspace=None, sign=None, keys=None,
+              devbuild=None, tests_in=None, test_node=None, report=None, workspace=None, sign=None, keys=None,
               test_change=None, capture_days=None, reads=None, sees=None, gpu=None, dev_keep=None,
               snapshot_days=None, release_gate=None, files_table=None, files=None,
               release=None, log_from=None, diag=None, build_local=None, reaches=None, hosts=None,
@@ -1085,10 +1085,6 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
                     else:
                         cur[k] = DIAL_DEFAULTS[k]
             cur["overrides"] = sorted(have)
-        if color is not None:
-            if color not in COLORS and color != "":
-                return {"error": f"color is one of {', '.join(COLORS)}, or none: not {color}"}
-            cur["color"] = color
         if nodes is not None:
             got = nodes if isinstance(nodes, list) else str(nodes).split(",")
             cur["nodes"] = [str(n).strip()[:40] for n in got if str(n).strip()][:16]
@@ -1310,7 +1306,7 @@ def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=
         # An empty pair is removed rather than stored: the file then says only
         # what somebody chose, and a project left alone leaves no trace to read
         # past when its directory is renamed or deleted.
-        if (cur["node"] or cur["hosts"] or cur["hosts_off"] or cur["color"] or cur["reads"] or cur["sees"] or cur["reaches"]
+        if (cur["node"] or cur["hosts"] or cur["hosts_off"] or cur["reads"] or cur["sees"] or cur["reaches"]
                 or cur["tc_off"] or cur["packs_on"] or cur["agents_off"] or cur["agent_default"] != "claude"
                 or cur["agent_slots"] != AGENT_SLOTS
                 or cur["log_from"] or cur["diag"]
@@ -1538,7 +1534,7 @@ def dialog_save(name, req, uid):
                   files=req.get("files"),
                   dev_keep=req.get("dev_keep"), sign=req.get("sign"), keys=req.get("keys"),
                   release=req.get("release"), pc=req.get("pc"),
-                  color=req.get("color"), reads=req.get("reads"), sees=req.get("sees"),
+                  reads=req.get("reads"), sees=req.get("sees"),
                   reaches=req.get("reaches"), hosts=req.get("hosts"), hosts_off=req.get("hosts_off"),
                   tc_off=req.get("tc_off"), packs_on=req.get("packs_on"),
                   agents_off=req.get("agents_off"), agent_default=req.get("agent_default"),

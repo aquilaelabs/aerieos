@@ -19,13 +19,20 @@ let profile = null;
 // Settings; nothing takes effect until Save).
 const profileDraft = {};
 // This browser's zone and every zone it knows, alphabetically after it. UTC
-// by that name, which some browsers leave out of their own list.
-function tzOptions(cur){
+// by that name, which some browsers leave out of their own list. `browser`:
+// the gear's pick, where nothing is the person's own zone when they set one
+// and "device" this device's; `person`: Profile's, where nothing is the
+// controller's clock (R294 step 8).
+function tzOptions(cur, {browser = false, person = false} = {}){
   const own = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   let zones = [];
   try{ zones = Intl.supportedValuesOf("timeZone"); }catch(e){ zones = own ? [own] : []; }
   if (!zones.includes("UTC")) zones = [...zones, "UTC"];
-  return optionList([["", `This device's own${own ? ` (${own})` : ""}`], ...[...zones].sort()], cur || "");
+  const device = `This device's own${own ? ` (${own})` : ""}`, mine = state?.tz || "";
+  const first = person ? [["", `None: the controller's clock${state?.clock_tz ? ` (${state.clock_tz})` : ""}`]]
+    : browser && mine ? [["", `Your own, from your Profile (${mine})`], ["device", device]]
+    : [["", device]];
+  return optionList([...first, ...[...zones].sort()], cur || "");
 }
 
 function openProfileTab(){
@@ -53,11 +60,12 @@ const PROFILE_FIELDS = [
 
 // Each section's line on the list beside it.
 const PROFILE_SAYS = {
-  you: "your name, email and commit author", may: "what your roles let you do",
+  you: "your name, email, commit author and time zone", may: "what your roles let you do",
   password: "change it, signing out everywhere",
   twofactor: "an authenticator app, passkeys and recovery codes",
   mykey: "your key, who holds it, the tokens you gave repositories, Unlock and Lock",
   uses: "each time a token of yours was opened, and for what",
+  agents: "each coding agent's sign-in on each node you work on, to sign in or out",
   terminal: "the size, cursor and colors of your terminals",
   shares: "the shares on this machine you may reach, the address of each, and your SMB password",
   devices: "your browsers and apps, to sign out",
@@ -106,14 +114,14 @@ function renderProfileInto(i){
     // Your shares, a machine install's alone, comes with its answer.
     drawHTML(d.list, skTpl(skSplit([["Who you are", PROFILE_SAYS.you], ["What you may do", PROFILE_SAYS.may],
       ["Password", PROFILE_SAYS.password], ["Two-factor sign-in", PROFILE_SAYS.twofactor], ["Your key store", PROFILE_SAYS.mykey],
-      ["Uses of your tokens", PROFILE_SAYS.uses], ["Your terminal", PROFILE_SAYS.terminal],
-      ["Where the bell reaches you", PROFILE_SAYS.reach], ["Signed in as you", PROFILE_SAYS.devices]], "Who you are", PROFILE_FIELDS.map(([, label]) => fld(label)).join(""),
+      ["Uses of your tokens", PROFILE_SAYS.uses], ["Your coding agents", PROFILE_SAYS.agents], ["Your terminal", PROFILE_SAYS.terminal],
+      ["Where the bell reaches you", PROFILE_SAYS.reach], ["Signed in as you", PROFILE_SAYS.devices]], "Who you are", PROFILE_FIELDS.map(([, label]) => fld(label)).join("") + fld("Your time zone"),
       pageHead({title: GHOST, line: [{value: GHOST, label: ""}]}))));
     return;
   }
-  const p = {...(profile.profile || {}), account: profile.name}, g = profile.git || {};
+  const p = {...(profile.profile || {}), account: profile.name, tz: state?.tz || ""}, g = profile.git || {};
   const val = k => profileDraft[k] ?? p[k] ?? "";
-  const dirty = PROFILE_FIELDS.some(([k]) => (profileDraft[k] ?? p[k] ?? "") !== (p[k] ?? ""));
+  const dirty = [...PROFILE_FIELDS.map(([k]) => k), "tz"].some(k => (profileDraft[k] ?? p[k] ?? "") !== (p[k] ?? ""));
   const wm = profile.what_may || {roles: [], may: []};
   // Who this is, as a node's head says what it is (the operator, 25 Oct:
   // a run-on mono line could not be read): the name, the roles as facts,
@@ -141,6 +149,10 @@ function renderProfileInto(i){
               <input id="pf_${k}" type="${type}" data-pf="${k}" value="${esc(val(k))}"
                      spellcheck="false" autocomplete="off">
             </div>`).join("")}
+          <div class="logdays setrow col ctlrow">
+            ${lbl("pf_tz", "Your time zone", "the hours of your quiet windows on the bell, and the times every browser of yours shows unless it picks its own in the gear's menu")}
+            <select id="pf_tz" data-pf="tz">${tzOptions(val("tz"), {person: true})}</select>
+          </div>
           <div class="actbar">
             <span class="state${profile.git_ready === false ? " warn" : ""}">${
               profile.git_ready === false
@@ -176,6 +188,7 @@ function renderProfileInto(i){
         </div>`)}
     ${sec("twofactor", "Two-factor sign-in", profileTwoFactor(profile.two_factor || {}, !!profile.two_factor_required))}
     ${keyMineSection()}
+    ${profileAgentsSection()}
     ${sec("terminal", "Your terminal", profileTerminal())}
     ${profile.smb ? docSection("profile", "shares", "Your shares", profile.smb.rows?.length ? String(profile.smb.rows.length) : "", profileShares(profile.smb)) : ""}
     ${docSection("profile", "reach", "Where the bell reaches you", (pfReach?.dest || []).length ? String(pfReach.dest.length) : "", profileReach())}
@@ -189,6 +202,53 @@ function renderProfileInto(i){
   wireKeyMine(d.el);
   wireTerminalLook(d.el);
   wireShares(d.el);
+  wireProfileAgents(d.el);
+}
+
+// Your coding agents (R294 step 6): each agent with a sign-in of its own on
+// each node this person may sign in on, a person's own connection and so on
+// their Profile (the connections rule), where the Installed page has it one
+// node at a time. Which rows there are is the profile read's (scoped as a
+// sign-in is); whether each is signed in is the status's, so a sign-in
+// finishing shows here at once. Sign in runs the flow on this page, its link
+// and its code under the table while it runs.
+const PF_AGENT_COLS = [{label: "Agent"}, {label: "Node", w: "minmax(0,.8fr)"}, {label: "Signed in as", w: "minmax(0,1.3fr)"}, {act: true, w: "8rem"}];
+// A row's node as the sign-in's own block reads one: answering, since the
+// block is drawn only for a flow the server started there.
+const pfAgentNode = r => ({id: r.node, name: r.node_name, state: "online", live: true, reported: {session: {up: true}}});
+function profileAgentsSection(){
+  const rows = profile?.agent_signins || [];
+  const on = rows.filter(r => agentOn(r.agent, r.node)).length;
+  const lg = state?.signin || {};
+  const flow = lg.running ? rows.find(r => r.node === lg.node && r.agent === (lg.agent || "claude")) : null;
+  const body = !rows.length
+    ? `<div class="empty">No node your spaces work on has a coding agent with a sign-in of its own yet: the Library installs one on a node.</div>`
+    : tblWrap(PF_AGENT_COLS, rows.map(r => {
+        const me = agentOn(r.agent, r.node), busyOn = me ? signinBusy({id: r.node}, r.agent) : [];
+        const why = r.cannot || (busyOn.length ? `end your ${r.agent_name} session${busyOn.length === 1 ? "" : "s"} on ${busyOn.join(", ")} first` : "");
+        const running = flow === r;
+        const who = me ? `${esc(me.email)}${me.plan ? ` <span class="dim">· ${esc(me.plan)}</span>` : ""}`
+          : `<span class="warn">not signed in</span>`;
+        const btn = running ? `<button type="button" disabled>Signing in</button>`
+          : me ? `<button type="button" class="caution" data-pfagent="out" data-node="${esc(r.node)}" data-agent="${esc(r.agent)}" data-nname="${esc(r.node_name)}"${why ? " disabled" : ""}>Sign out</button>`
+          : `<button type="button" data-pfagent="in" data-node="${esc(r.node)}" data-agent="${esc(r.agent)}"${why || lg.running ? " disabled" : ""}>Sign in</button>`;
+        return `<div class="row" data-pfagentrow="${esc(r.node)}:${esc(r.agent)}">${tblLine(PF_AGENT_COLS, [
+          esc(r.agent_name), esc(r.node_name), who + (why ? `<div class="sub">${esc(why)}</div>` : ""), btn])}</div>`;
+      }).join(""), "pfagents")
+      + (flow ? `<div class="pfagentflow">${signinBlock(pfAgentNode(flow), flow.agent)}</div>` : "");
+  return docSection("profile", "agents", "Your coding agents", rows.length ? `${on} of ${rows.length} signed in` : "",
+    `<div class="row stack2"><div class="grow">${body}
+      <div class="hint">A sign-in is one node's alone: each node you work on is signed in on its own row.</div></div></div>`);
+}
+function wireProfileAgents(root){
+  const flow = root.querySelector(".pfagentflow");
+  if (flow) wireSignin(flow);
+  root.querySelectorAll("[data-pfagent]").forEach(b => b.onclick = async () => {
+    const {node, agent, nname} = b.dataset;
+    if (b.dataset.pfagent === "in") await signIn(node, b, agent);
+    else await signOut(node, b, agent, nname);
+    readMoved("profile"); drawPanes();
+  });
 }
 
 // Your shares (R164 step 1): the SMB shares on the controller's own machine
@@ -495,7 +555,7 @@ async function openConversation(project, id){
   body.scrollTop = body.scrollHeight;
 }
 function wireProfile(root){
-  const p = {...(profile?.profile || {}), account: profile?.name};
+  const p = {...(profile?.profile || {}), account: profile?.name, tz: state?.tz || ""};
   root.querySelectorAll("[data-pf]").forEach(inp => inp.oninput = () => {
     const k = inp.dataset.pf;
     if (inp.value === (p[k] ?? "")) delete profileDraft[k];
@@ -525,8 +585,16 @@ function wireProfile(root){
       const el = root.querySelector("#" + id);
       if (el && el.value && !el.checkValidity()) return notify(`${el.value} is not an email address`, true);
     }
+    // The time zone is the account's own preference, kept with its theme.
+    const tz = body.tz;
+    delete body.tz;
     busy(save, "Saving");
     try{
+      if (tz !== undefined && tz !== (state?.tz || "")){
+        const t = await postJSON("/api/users", {action: "prefs", prefs: {tz}});
+        if (t.error) return notify(t.error, true);
+        if (state) state.tz = tz;
+      }
       const j = await postJSON("/api/profile", {action: "save", profile: body, account});
       if (j.error) return notify(j.error, true);
       for (const k of Object.keys(profileDraft)) delete profileDraft[k];

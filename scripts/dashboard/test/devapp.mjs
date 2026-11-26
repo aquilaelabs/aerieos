@@ -4991,7 +4991,7 @@ await section("the project a container belongs to", async () => {
   const teal = await page.waitForFunction(tealBar, false, { timeout: patience(10000) })
     .then(h => h.jsonValue(), () => page.evaluate(tealBar, true));
   ok(/57, 181, 176/.test(teal || ''), `...in the space's own color once it has one (${teal})`);
-  await api('/api/prefs', { project: 'ep.silon', color: '' });
+  await api('/api/project-color', { name: 'ep.silon', color: '' });
   const under = h => (g.find(x => x.head === h) || { rows: [] }).rows;
   ok(under('ep.silon').includes('ep.silon|main') && under('ep.silon').includes('helper-for-eps|main')
      && under('No space').includes('ep.silon|loose') && under('No space').includes('someone-elses'),

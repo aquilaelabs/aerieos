@@ -237,11 +237,15 @@ back; the page already ghosts it until the code has actually moved.
 ## Your profile
 
 The gear in the header keeps what belongs to this **browser**: the color
-scheme (Dark, Light or System, and the schemes) and the time zone, and one
-entry, **Profile**, which is also **Settings** on the rail: the signed-in
+scheme (Dark, Light or System, and the schemes) and a time zone of its own
+(the person's own, this device's, or any, for a phone abroad), and one
+entry, **Profile**, which is also **You** on the rail: the signed-in
 account's own page, in sections. **Who you are** holds the account name,
-their name and email, and the name and email their commits carry (blank means
-the ones above); **What you may do** is what their roles add up to;
+their name and email, the name and email their commits carry (blank means
+the ones above) and their time zone, the hours of their quiet windows on the
+bell and the times every browser of theirs shows unless it picks its own
+(none is the controller's clock); **What you may do** is what their roles
+add up to;
 **Password** is a change that asks for the current one first;
 **Two-factor sign-in** is described below; **Your key store** is the key
 the person's agent sign-ins and tokens are sealed under, who holds it (this
@@ -250,7 +254,10 @@ moves it, *Give the key back* moves it back), the tokens they gave
 repositories with the spaces that use them, *Unlock for* with the window
 a token stays opened (a quarter of an hour, an hour, eight hours, or while
 signed in), *Lock*, and *Purge*; **Uses of your tokens** lists each time
-one was opened and for what; **Where the bell reaches you** is the places
+one was opened and for what; **Your coding agents** is each agent with a
+sign-in of its own on each node they may sign in on, who it is signed in as
+there, with *Sign in*, its link and code drawn under the list while it runs,
+and *Sign out*; **Where the bell reaches you** is the places
 the bell's rows are sent as well as shown (R149): one block per kind
 (R173), email (through the server under Controller settings, Mail), a
 webhook, ntfy, Gotify, Pushover, Telegram, Discord and Slack, each with

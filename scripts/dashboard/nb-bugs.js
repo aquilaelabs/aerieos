@@ -470,7 +470,7 @@ function nbBugsView({$, nb, project}){
         dropBox(body, {q: "Why does it need no line?", sub: ": kept in its notes, which the release check reads",
                        placeholder: "no release had it; nobody using it meets it", verb: "Needs no line",
                        cancel: () => drawBugs(true), go: why => postBug({action: "noline", id, why}, {now: why.trim() ? bugNow(id, {bug: x => {
-                         const day = new Date().toLocaleDateString("en-GB", {day: "2-digit", month: "short"});
+                         const z = userTZ(), day = new Date().toLocaleDateString("en-GB", {day: "2-digit", month: "short", ...(z ? {timeZone: z} : {})});
                          x.notes = (String(x.notes || "") + `\n\n[${day}] Changelog: needs no line: ${why.trim().replace(/\s+/g, " ")}`).trim();
                        }}) : null})});
       });

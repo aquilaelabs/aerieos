@@ -681,9 +681,11 @@ that runs now with the start held: the dashboard and the shares come up
 and nothing else starts (no container, VM or session) until Start is
 pressed on This controller.
 
-**Update window.** By default nothing is applied by itself. Under
-Controller settings, *Update window* names a day (daily, or one weekday)
-and an hour; in that hour a newer release is applied the way Update does
+**Update window.** By default nothing is applied by itself. On This
+controller, beside Updates and the older versions (everything about
+updating the machine is there, and not in Controller settings), *Update
+window* names a day (daily, or one weekday) and an hour on the controller's
+clock; in that hour a newer release is applied the way Update does
 it, once per release, and the restart still waits for you.
 
 ## What is not here yet

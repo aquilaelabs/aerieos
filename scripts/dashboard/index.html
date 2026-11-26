@@ -1032,6 +1032,11 @@
            node and the dev instance were two pickers in another section. -->
       <div class="setrow col ctlrow" id="rnTestsF"><label for="rnTests">Tests run<span class="help" data-help="where aerie tests run, aerie dashboard test and the gate run its suites: a node of the space's, or its dev instance where its image carries the tests" tabindex="0">?</span></label>
         <select id="rnTests"></select></div>
+      <!-- Where a Gradle build's folders go (B439): on the node's own disk
+           under the account's cache unless this repository says the tree;
+           a setting with no control until R294 step 14. -->
+      <div class="setrow col ctlrow"><label for="rnBuildLocal">Gradle builds into<span class="help" data-help="a Gradle build in a session puts each module's build folder on the node's own disk, linked from its usual place, so build output is not carried in the synced copy or the snapshots; The repository's tree leaves it where Gradle puts it, beside the code" tabindex="0">?</span></label>
+        <select id="rnBuildLocal"><option value="on">The node's own disk</option><option value="off">The repository's tree</option></select></div>
       <!-- What a session looks with lands in dist/ too (a reel's sheet, an
            emulator shot), under the Artifacts tab's Captures fold, and goes
            by age rather than by need: nothing can tell whether another
@@ -1095,6 +1100,13 @@
       <div id="rnReachRows" role="group" aria-labelledby="rnReachLabel"></div>
       <div class="rnreachadd"><button type="button" id="rnReachAdd">Add an address</button></div>
       <div class="hint" id="rnReachHint"></div>
+    </div>
+    <!-- The model routers this space may use (R294 step 10): granted where
+         the router lives, on its node's page, or on Roles; said here, so a
+         space says everything it may reach, and changed there. -->
+    <div class="field" id="rnRouterField">
+      <label id="rnRouterLabel">Model router<span class="help" data-help="the router its Any model sessions call providers through, and the models it offers them; granted where the router lives, on its node's page, never here" tabindex="0">?</span></label>
+      <div id="rnRouterSaid" class="sub"></div>
     </div>
     </div></details>
     <!-- Which toolchains a session here may use (R77): every one installed

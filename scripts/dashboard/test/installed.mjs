@@ -4,7 +4,8 @@
 // path and system packages, a service's Configure from its config block
 // (the model router's providers, endpoints, Ollama and projects, saved to
 // the router's own record), and Remove.
-import { launch, newPage, ok, done, ready, URL, section, until, libraryShow } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, until, libraryShow, refreshUntil } from './lib.mjs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -77,6 +78,29 @@ await section("the model router's page", async () => {
      '...the field empties with "type to replace" in its place, and Install comes live');
   const st = await page.evaluate(async () => (await (await fetch('/api/router?node=' + encodeURIComponent(instNode))).json()));
   ok(st.providers?.anthropic === true && st.custom?.[0]?.name === 'groq', 'what the row saved is the router\'s own record');
+  // Connected services (R294 step 9): the key saved is listed, shared by
+  // spaces, with who added it, and never its value.
+  {
+    const conn = await page.evaluate(async () => (await (await fetch('/api/connections')).json()));
+    const node = await page.evaluate(() => instNode);
+    const row = (conn.rows || []).find(r => r.kind === 'router' && r.ref === `${node}/anthropic`);
+    ok(row && row.whose === 'shared' && row.by && row.at && !/sk-|ant-/.test(JSON.stringify(conn)),
+       `Connected services lists the router's key as shared by spaces, with who added it and never its value (${JSON.stringify(row)})`);
+    // ...and a space the router allows says so in its settings (step 10),
+    // read-only, the router's node a link to its page.
+    // Allow needs a deployed router answering its API, which this world has
+    // none of: the grant it leaves on the router's record is written here.
+    const rf = `${DIR}/state/router.json`, was = readFileSync(rf, 'utf8');
+    const rec = JSON.parse(was);
+    rec[node] = { ...(rec[node] || {}), projects: { ...(rec[node]?.projects || {}), alpha: { key: '', made: 1 } } };
+    writeFileSync(rf, JSON.stringify(rec));
+    await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.router_on?.length > 0, { timeout: 20000 });
+    await page.evaluate(() => openProjectSettings('alpha', 'sees'));
+    await page.waitForSelector('#rnRouterSaid [data-rnrouter]', { timeout: 20000 });
+    const said = await page.$eval('#rnRouterSaid', e => e.textContent.replace(/\s+/g, ' '));
+    ok(/may use the router on .+: granted on its page/.test(said), `a space the router allows says so in its settings, read-only (${said})`);
+    writeFileSync(rf, was);
+  }
   // ...and the Library's card for it says Install is live now, its Details the entry alone.
   await page.evaluate(() => { libNode = instNode; lib = null; openLibrary(); });
   await page.waitForFunction(() => lib && Array.isArray(lib.rows), null, { timeout: 20000 });

@@ -42,8 +42,14 @@ ships a newer one, busy until the node comes back on it), then
 the headings and opens one, the small jump chips over them: Health (the
 meters: cpu, memory, the card's load and its own memory where an NVIDIA
 driver answers, and each store's room; the toolchains its census found,
-which is what a space bound to it can build), Repositories (the
-spaces bound to it), Sessions (whether it runs them, which are open, and
+which is what a space bound to it can build; and, where its agent can count
+them, how many updates wait for its system's own packages, the security
+ones among them and a restart asked for, which its own administrator
+applies), Spaces (the spaces that work on it, each with its repositories'
+copies there and Settings opening the space's own settings at Nodes),
+Sessions (whether it runs them, which are open, its Room: the disk it keeps
+free, its memory warning and a container's default memory, blank for the
+install's, and
 one line saying which coding agents are installed there and which you are
 signed in to: the Library installs them and the **Installed** page signs
 in), GPU (where it has a card), USB (on a VM host: each USB device with
@@ -663,7 +669,9 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   the copies listed with Download for those under the state; a fresh
   install's first page restores one ([image.md](image.md)).
 - **Update window**: a newer release applied by itself at an hour, daily or
-  one weekday, the way Update does it; off by default.
+  one weekday, the way Update does it; off by default. On an install with a
+  machine of its own, it and Updates are on This controller instead, with
+  the older versions kept, drawn there alone.
 - **Update checks** (R176): how often AerieOS asks by itself for what is
   newer, each check daily, weekly (the default), monthly or off, with when it
   last ran and **Check for updates** beside it: a newer AerieOS (a bare-metal
@@ -684,7 +692,16 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
 - **Room on the nodes**: the disk a node keeps free (a build, a test or a
   container rebuild is refused under it, and the bell says so), the memory
   level past which the bell warns, and a memory limit for every container
-  whose compose file sets none ([nodes.md](nodes.md#room-a-node-keeps-for-itself)).
+  whose compose file sets none, every node's unless its own page sets its
+  own ([nodes.md](nodes.md#room-a-node-keeps-for-itself)).
+- **Connected services**: every credential the install holds for an outside
+  service (a space's own git token, a model router's provider keys, the
+  tunnel's and the mail server's), whose it is, who added it and when, when
+  it was last used and when it expires where its service says, each opening
+  where it is added and changed. *Forget*, an administrator's, takes one away
+  at once, for a leak or a person gone. A person's own connections (their
+  coding agents' sign-ins, their git tokens, the bell's destinations) are
+  theirs alone, on their Profile, and only counted here.
 - **Vetted catalog**: the address the Library reads the vetted catalog's
   signed index from, and the import of a mirror of it made by
   `tools/catalog-mirror.py` for a controller without the network

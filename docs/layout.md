@@ -189,6 +189,7 @@ scripts/
     extmounts.py                 the other disks and shares the controller's own machine mounts (R162 step 4): the record, a share's password sealed, what the hello hands the agent
     storebackups.py              the backups the controller's own machine copies (R162 step 5): the record, what the hello hands the agent, the summary Home and the bell read
     roothooks.py                 the root startup hooks for Controller settings, read and approved through the root-hook helper (B1166)
+    connections.py               Connected services (R294 step 9): every credential the install holds for an outside service but a person's own, each kind's lister and Forget, and the ledger of who added each, its last use and its expiry
     poolkeys.py                  the passphrases of the own machine's encrypted pools (R162 step 3): kept sealed, or asked after every boot and offered once; what the hello hands the agent, nothing in Safe mode
     nasapps.py                   the Docker apps New container offers (R164 step 2, R238): none shipped, each kept from the vetted catalog at the commit its signed index pins or added by a person; a compose file with every image held by its digest (pack format 5) or pinned to a tag, the fields its panel asks for filled into its environment by render_with, and a kept app's newer definition taken when the index pins another commit
     schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words and its timer

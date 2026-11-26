@@ -41,6 +41,9 @@ write_json = None
 target_of = None
 # prefs.get, for the project's override.
 prefs_of = None
+# Told a measure's expiry (project, expires), for Connected services (R294
+# step 9); set by the server.
+on_measured = None
 
 
 def configure(*, state, write_json, target, prefs_get):     # noqa: A002 - injected
@@ -337,6 +340,8 @@ def measure(project, t=None):
 
 
 def _keep(project, rec):
+    if on_measured and not rec.get("error"):
+        on_measured(project, rec.get("expires") or "")
     p = _keep_path(project)
     p.parent.mkdir(parents=True, exist_ok=True)
     write_json(p, rec)

@@ -1500,7 +1500,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await page.waitForSelector(`${ROW} [data-nd="sync-stop"]`, { timeout: 10000 });
     ok(!/a copy kept in step/.test(await page.$eval(ROW, r => r.textContent))
        && !!await page.$(`${ROW} [data-sect="nodes:projects"] [data-nd="sync-stop"]`),
-       '...and Stop syncing is under its Repositories, with no line of its own saying what that list says (the operator, 26 Oct)');
+       '...and Stop syncing is under its Spaces, with no line of its own saying what that list says (the operator, 26 Oct)');
     const again = await napi('/api/v1/nodes', { action: 'to-sync', id: minted.id });
     ok(/already/.test(again.error || ''), `Move to a synced copy is refused in words while it holds one (${again.error})`);
     // ...and off it again (R164): Stop syncing holds sessions while what is
@@ -1576,26 +1576,35 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const held = await napi('/api/v1/nodes', { action: 'host-only', id: minted.id });
     ok(/gamma lists this node/.test(held.error || ''),
        `a node a space lists cannot be made hosting only until it is moved off (${held.error})`);
-    // The node's Repositories section lists the ones that have it, each name
-    // opening its notebook and Settings opening its project's settings at
-    // where it runs, which is where a node is taken off (the operator, 26
-    // Oct: not removed from the node's page).
+    // The node's Spaces section lists the spaces that have it (R294 step 12:
+    // a node is the space's setting), each name opening its notebook and
+    // Settings opening the space's own settings at its Nodes, which is where
+    // a node is taken off (the operator, 26 Oct: not removed from the node's
+    // page).
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
     const projBtn = `${ROW} .ndproj [data-ndproj="gamma"]`;
     await page.waitForSelector(projBtn, { timeout: 10000 });
     const repoRow = await page.$eval(`${ROW} .ndproj`, r => ({ text: r.textContent, link: !!r.querySelector('[data-ndopen="gamma"]'),
       btn: r.querySelector('[data-ndproj]')?.textContent.trim(), head: r.closest('details.sect')?.querySelector('summary .t')?.textContent }));
-    ok(/primary/.test(repoRow.text) && repoRow.link && repoRow.btn === 'Settings' && repoRow.head === 'Repositories',
-       `the node's Repositories section lists gamma as its primary, its name a link, with Settings and no Remove (${JSON.stringify(repoRow)})`);
+    ok(/primary/.test(repoRow.text) && repoRow.link && repoRow.btn === 'Settings' && repoRow.head === 'Spaces',
+       `the node's Spaces section lists gamma as its primary, its name a link, with Settings and no Remove (${JSON.stringify(repoRow)})`);
     await page.click(projBtn);
-    await page.waitForFunction(() => document.querySelector('#pane0 .nbview[data-view="settings"] .snav .rrow.on')?.dataset.spick === 'runs', null, { timeout: 15000 }).catch(() => {});
-    ok(await page.evaluate(() => document.querySelector('#pane0 .nbview[data-view="settings"] .snav .rrow.on')?.dataset.spick) === 'runs',
-       '...and Settings opens gamma\'s settings at where it builds, tests and runs');
+    // The dialog shows its sections open under a jump bar: at Nodes is that
+    // section open and scrolled to the top of the box, as its jump does.
+    const onNodes = () => {
+      const d = document.querySelector('#rnmodal:not([hidden]) details[data-sect="rn:runs"]'), box = d?.closest('.box');
+      if (!d?.open || !box) return false;
+      const top = d.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      return top >= -2 && top < box.clientHeight / 2;
+    };
+    await page.waitForFunction(onNodes, null, { timeout: 15000 }).catch(() => {});
+    ok(await page.evaluate(onNodes), '...and Settings opens the space\'s own settings at its Nodes, in one press');
+    await page.evaluate(() => closeRename());
     await napi('/api/prefs', { project: 'gamma', node: '', nodes: [] });
     await page.evaluate(() => openNodesTab());
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
     await page.waitForSelector(projBtn, { state: 'detached', timeout: 10000 }).catch(() => {});
-    ok(!(await page.$(projBtn)), '...and gamma taken off the node in its settings is gone from the node\'s Repositories');
+    ok(!(await page.$(projBtn)), '...and gamma taken off the node in its settings is gone from the node\'s Spaces');
     await page.waitForSelector(`${ROW} [data-nd="host-only"]`, { timeout: 10000 });
     await page.waitForSelector(`${ROW} [data-nd="host-only"]`, { timeout: 10000 });
     page.dialogs.length = 0;
@@ -1644,6 +1653,39 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const off = await rootAsk();
     ok(/root/.test(off.error || '') && !off.ok, `...and off, the ask is refused and told so (${off.error})`);
     await napi('/api/v1/nodes', { action: 'root-asks', id: minted.id, on: true });
+    // Its own room (R294 step 7): blank is the install's, a number its own,
+    // saved with the section; blank again gives the install's back.
+    {
+      const F = `${ROW} [data-room="room_floor_gb"]`;
+      await page.waitForSelector(F, { timeout: 10000 });
+      const was = await page.$eval(F, el => ({ v: el.value, ph: el.placeholder, said: el.closest('.setrow')?.textContent || '' }));
+      await page.fill(F, '25');
+      await page.click(`${ROW} [data-nd="sess-save"]`);
+      const own = await until(async () => (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config?.room_floor_gb === 25, 10000, 200);
+      const bad = await napi('/api/v1/nodes', { action: 'room', id: minted.id, room_mem_pct: 120 });
+      ok(was.v === '' && was.ph === '10' && /blank for 10/.test(was.said) && own && /room_mem_pct|memory warning/.test(bad.error || '') && /50 to 99/.test(bad.error || ''),
+         `a node's Room starts blank, the install's 10 said, a number saved is its own, and one out of range is refused in words (${JSON.stringify(was)}; ${bad.error})`);
+      // The first save settled on the page: the node's own 25 drawn and Save asleep.
+      await page.waitForFunction(([f, row, id]) => document.querySelector(f)?.value === '25'
+        && document.querySelector(row + ' [data-nd="sess-save"]')?.disabled && nodeOf(id)?.config?.room_floor_gb === 25,
+        [F, ROW, minted.id], { timeout: 15000 }).catch(() => {});
+      await page.fill(F, '');
+      await page.click(`${ROW} [data-nd="sess-save"]`);
+      const back = await until(async () => !('room_floor_gb' in ((await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config || {})), 10000, 200);
+      ok(back, '...and blank saved gives the install\'s back');
+    }
+    // Its system's packages on its own page (R294 step 13), as its agent
+    // counts them, where they were the controller's own machine's alone.
+    {
+      await agent('hello', { census: { ...CENSUS, host_updates: { pending: 3, security: 1, reboot: true, checked: Math.floor(Date.now() / 1000) } },
+                             version: shipped.version, digest: shipped.digest });
+      await page.evaluate(() => loadNodes());
+      const pk = await page.waitForFunction(sel => {
+        const e = document.querySelector(sel + ' .ndhost');
+        return e && /3 updates to its system's packages wait, 1 for security/.test(e.textContent) && /restart/.test(e.textContent) && e.classList.contains('warn') && e.textContent;
+      }, ROW, { timeout: 15000 }).then(h => h.jsonValue(), () => page.$eval(`${ROW} .ndhost`, e => e.textContent).catch(() => 'none'));
+      ok(/3 updates/.test(pk || ''), `a node's page says what waits for its system's packages, in the warn voice for security and a restart (${pk})`);
+    }
     // The machine's own console switched root commands off (R227 step 2):
     // its census says so, the ask is refused before anybody is asked, and
     // the row says where it is switched back on, under the box.

@@ -21,6 +21,20 @@ class Room(unittest.TestCase):
              mock.patch.object(nodes, "samples", lambda nid: (rings or {}).get(nid, [])):
             return nodes.room_attention(10, 92, label=lambda r: {"root": "root"}.get(r, r))
 
+    def test_a_node_s_own_room_over_the_install_s(self):
+        # R294 step 7: a node's page sets its own floor and memory warning,
+        # the install's values the default for the rest.
+        smp = {"disks": {"root": [15 * 1024, 500 * 1024]}}
+        big = node("big", smp)
+        big["config"] = {"room_floor_gb": 20}
+        small = node("small", smp)
+        [r] = self.rows([big, small])
+        self.assertEqual((r["id"], r["floor_gb"]), ("big", 20), "15 GB free is short of its own 20, not of the install's 10")
+        self.assertEqual(nodes.room_of(small, "room_floor_gb", 10), 10)
+        for bad in (0, 1001, "20", True, None):
+            self.assertEqual(nodes.room_of({"config": {"room_floor_gb": bad}}, "room_floor_gb", 10), 10, bad)
+        self.assertEqual(nodes.room_of({"config": {"container_mem_gb": 0}}, "container_mem_gb", 4), 0, "0 is a setting there: no limit")
+
     def test_a_disk_under_the_floor_and_a_store_on_it_said_once(self):
         smp = {"disks": {"root": [4 * 1024, 100 * 1024], "docker": [4 * 1024, 100 * 1024]},
                "stores": {"data": 4 * 1024, "toolchains": 300 * 1024},

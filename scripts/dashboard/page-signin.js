@@ -210,10 +210,10 @@ async function sendCode(){
 
 // Sign this account out on one node. The login is that machine's, so the
 // machine is asked to let go of it; another node's is untouched.
-async function signOut(nodeId, btn, id = "claude"){
+async function signOut(nodeId, btn, id = "claude", name = ""){
   const n = (nodesList || []).find(x => x.id === nodeId);
   const a = agentById(id) || AGENTS[0];
-  if (!await askYes(`Sign out of ${a.name} on ${n?.name || "this node"}?\n\nYour ${a.name} sessions stop working there until you sign in again. Your sign-in on any other node stays.`)) return;
+  if (!await askYes(`Sign out of ${a.name} on ${n?.name || name || "this node"}?\n\nYour ${a.name} sessions stop working there until you sign in again. Your sign-in on any other node stays.`)) return;
   busy(btn, "Signing out");
   let j = {};
   try{

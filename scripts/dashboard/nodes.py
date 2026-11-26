@@ -3785,6 +3785,61 @@ def homes_full(nid, pct=90):
 # to, 0 for none (Controller settings, Room).
 room_floor_gb = lambda: 0  # noqa: E731
 
+# Room on a node (R110), each node's own where its page sets one (R294 step
+# 7): Controller settings' values are every node's default, so a small board
+# and a big server are not held to one number, and Nodes Write on a node
+# reaches its own. Each a whole number in its range; none is the default.
+ROOM_KEYS = {"room_floor_gb": (1, 1000), "room_mem_pct": (50, 99), "container_mem_gb": (0, 1024)}
+ROOM_WORDS = {"room_floor_gb": "disk kept free (GB)", "room_mem_pct": "the memory warning (% in use)",
+              "container_mem_gb": "a container's default memory (GB, 0 for none)"}
+
+
+def room_of(n, key, default):
+    """A node's own room setting (`n` its row or its id), or `default`, the
+    install's, where it sets none."""
+    n = node(n) if isinstance(n, str) and n else n
+    v = ((n or {}).get("config") or {}).get(key)
+    lo, hi = ROOM_KEYS[key]
+    return v if isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi else default
+
+
+def room_floor_for(n):
+    """The disk a node keeps free, in GB: its own, or the install's."""
+    return room_of(n, "room_floor_gb", room_floor_gb())
+
+
+def node_room(principal, node_id, req):
+    """A node's own room (R294 step 7): each of ROOM_KEYS that `req` names, a
+    whole number in its range, or "" or null for the install's again."""
+    node_ = node(node_id)
+    if not node_:
+        return {"error": "no such node"}
+    if node_["kind"] != "agent":
+        return {"error": "only an agent node has room of its own to set"}
+    conf = dict(node_.get("config") or {})
+    said = {}
+    for k, (lo, hi) in ROOM_KEYS.items():
+        if k not in req:
+            continue
+        v = req.get(k)
+        if v is None or v == "":
+            conf.pop(k, None)
+            said[k] = None
+            continue
+        try:
+            want = None if isinstance(v, bool) else int(str(v).strip())
+        except ValueError:
+            want = None
+        if want is None or not lo <= want <= hi:
+            return {"error": f"{ROOM_WORDS[k]} is a whole number from {lo} to {hi}, or none for this install's"}
+        conf[k] = want
+        said[k] = want
+    if not said:
+        return {"error": f"room names one of {', '.join(ROOM_KEYS)}"}
+    _exec("UPDATE nodes SET config = ? WHERE id = ?", (json.dumps(conf), node_id))
+    _touch(node_id, principal, "node-room", said)
+    return {"ok": True, "room": {k: conf.get(k) for k in ROOM_KEYS}}
+
 
 def last_took(project):
     """What the project's last build or test took on its node (R110 step 7):
@@ -3808,7 +3863,8 @@ def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
     """The bell's rows for a node short of room (R110, the operator, 22
     Oct): a live agent node whose root filesystem, Docker's or a store has
     less free than `floor_gb`, or whose memory has stayed at `mem_pct` or
-    more over its last ten minutes of samples. One row per node, naming
+    more over its last ten minutes of samples, each the install's where the
+    node sets none of its own (room_of). One row per node, naming
     what is short, keyed by that so a dismissal holds until it changes.
     `label` names a store's role for a person."""
     out = []
@@ -3817,12 +3873,13 @@ def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
             continue
         smp = (n.get("reported") or {}).get("sample") or {}
         short, seen = [], set()
+        fg, mp = room_of(n, "room_floor_gb", floor_gb), room_of(n, "room_mem_pct", mem_pct)
         now = time.time()
         recent_all = [x for x in samples(n["id"]) if (x.get("at") or 0) >= now - 600]
         places = [(r, f, t) for r, (f, t) in (smp.get("disks") or {}).items()]
         places += [(r, f, (smp.get("store_totals") or {}).get(r)) for r, f in (smp.get("stores") or {}).items()]
         for role, free, total in places:
-            if free is None or not total or free >= floor_mb(floor_gb, total):
+            if free is None or not total or free >= floor_mb(fg, total):
                 continue
             # A store on the root filesystem reads the same numbers: said once.
             if (free, total) in seen:
@@ -3849,7 +3906,7 @@ def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
                 if avail:
                     vm_mem.setdefault(d, []).append(100 - usable * 100 / avail)
         for d, pcts in sorted(vm_mem.items()):
-            if len(pcts) >= 3 and sum(pcts) / len(pcts) >= mem_pct:
+            if len(pcts) >= 3 and sum(pcts) / len(pcts) >= mp:
                 short.append({"what": f"the VM {d.removeprefix('bbvm-')}'s memory", "used_pct": round(sum(pcts) / len(pcts))})
         pool = rep.get("vm_pool") or {}
         if pool.get("total_mb") and pool.get("free_mb", 0) < pool_keep_gb * 1024 and (pool["free_mb"], pool["total_mb"]) not in seen:
@@ -3859,11 +3916,11 @@ def room_attention(floor_gb, mem_pct, label=None, vm_pct=90, pool_keep_gb=10):
         mem = None
         if len(recent) >= 3:
             pct = sum(x.get("mem_used_mb", 0) / x["mem_mb"] for x in recent) / len(recent) * 100
-            if pct >= mem_pct:
+            if pct >= mp:
                 mem = round(pct)
         if short or mem is not None:
             out.append({"kind": "room", "node": n["name"], "id": n["id"], "short": short, "mem": mem,
-                        "floor_gb": floor_gb, "key": "room:" + n["id"] + ":" + ",".join(sorted(x["what"] for x in short))
+                        "floor_gb": fg, "key": "room:" + n["id"] + ":" + ",".join(sorted(x["what"] for x in short))
                         + (":mem" if mem is not None else "")})
     return out
 
@@ -5055,14 +5112,19 @@ def power_attention():
     """The bell's rows (kind power) for the controller's own machine (R164
     step 3): on battery (bad, with the minutes left), a low battery (bad),
     a battery to replace, a UPS that does not answer while its feature is
-    installed; and its own packages (kind host): security updates waiting,
-    and a restart the last update asked for. Keyed on the state, so a
-    dismissal holds until it changes."""
+    installed; and, for every node whose agent counts them, its system's
+    own packages (kind host, R294 step 13): security updates waiting, and a
+    restart the last update asked for. Keyed on the state, so a dismissal
+    holds until it changes."""
     out = []
     for n in node_list():
-        if n.get("kind") != "agent" or not own_machine(n):
+        if n.get("kind") != "agent":
             continue
         rep = n.get("reported") or {}
+        host = _host_rows(n, rep)
+        if not own_machine(n):
+            out += host
+            continue
         up = rep.get("ups") or {}
         fe = (rep.get("features") or {}).get("ups") or {}
         if fe.get("installed") and up and not up.get("answers"):
@@ -5081,13 +5143,21 @@ def power_attention():
             elif "RB" in st:
                 out.append({"kind": "power", "id": n["id"], "node": n["name"], "what": "replace", "bad": False, "key": f"ups:replace:{n['id']}",
                             "said": "the UPS says its battery needs replacing"})
-        hu = rep.get("host_updates") or {}
-        if hu.get("security"):
-            out.append({"kind": "host", "id": n["id"], "node": n["name"], "what": "security", "bad": False, "key": f"host:security:{n['id']}:{hu['security']}",
-                        "said": f"{hu['security']} security update{'s' if hu['security'] != 1 else ''} to the system's own packages wait{'s' if hu['security'] == 1 else ''} ({hu.get('pending', 0)} in all)"})
-        if hu.get("reboot"):
-            out.append({"kind": "host", "id": n["id"], "node": n["name"], "what": "reboot", "bad": False, "key": f"host:reboot:{n['id']}",
-                        "said": "the last update of the system's packages needs a restart to run the new kernel or libraries"})
+        out += host
+    return out
+
+
+def _host_rows(n, rep):
+    """A node's system packages on the bell (kind host): security updates
+    waiting, and a restart the last update asked for."""
+    out = []
+    hu = rep.get("host_updates") or {}
+    if hu.get("security"):
+        out.append({"kind": "host", "id": n["id"], "node": n["name"], "what": "security", "bad": False, "key": f"host:security:{n['id']}:{hu['security']}",
+                    "said": f"{hu['security']} security update{'s' if hu['security'] != 1 else ''} to the system's own packages wait{'s' if hu['security'] == 1 else ''} ({hu.get('pending', 0)} in all)"})
+    if hu.get("reboot"):
+        out.append({"kind": "host", "id": n["id"], "node": n["name"], "what": "reboot", "bad": False, "key": f"host:reboot:{n['id']}",
+                    "said": "the last update of the system's packages needs a restart to run the new kernel or libraries"})
     return out
 
 
@@ -8774,6 +8844,7 @@ def verb(principal, req):
              "gpu-compute": gpu_compute,
              "config": config, "turns": turns,
              "test-workers": test_workers, "ports-local": ports_local,
+             "room": lambda: node_room(principal, nid, req),
              "root-asks": root_asks, "apply": apply, "to-sync": to_sync, "sync-stop": sync_stop,
              "host-only": host_on, "host-off": host_off,
              "door": lambda: node_door(principal, nid, req.get("on")),
@@ -8887,9 +8958,10 @@ def run_job(name, req, principal):
     # A build or a test held to the node's room (R110 step 7): it writes its
     # outputs and caches to the data store, and one started under the floor
     # fills the disk partway. aerie run is left alone: it is how room is made.
-    if room_floor_gb() and field(req, "role") in ("build", "test"):
+    floor = room_floor_for(nid)
+    if floor and field(req, "role") in ("build", "test"):
         took = last_took(name).get("workspace") or 0
-        why = room_short(nid, room_floor_gb(), roles=("data", "cache", "root"), need_mb=took >> 20)
+        why = room_short(nid, floor, roles=("data", "cache", "root"), need_mb=took >> 20)
         if why:
             return {"error": why}, 400
     snap = workspace.snapshot(name)

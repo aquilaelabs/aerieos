@@ -1626,6 +1626,14 @@ def own_prefs(name, want):
         keep["tour_seen"] = sorted({str(k) for k in want["tour_seen"][:64] if re.fullmatch(r"[a-z][a-z0-9-]{0,30}", str(k))})
     if isinstance(want.get("tour_off"), bool):
         keep["tour_off"] = want["tour_off"]
+    # A person's time zone (R294 step 8): their quiet windows and their
+    # dates. "" is none, the controller's clock; anything else a zone this
+    # machine knows, said when it is not.
+    if "tz" in want:
+        tz = str(want.get("tz") or "")
+        if tz and not zone_ok(tz):
+            return {"error": f"not a time zone this machine knows: {tz[:64]}"}, 400
+        keep["tz"] = tz
     # A terminal's look, this person's in every tab of AerieOS's own
     # terminal (R133 step 10): its text size, cursor and colors. Named and
     # bounded, as everything here is.
@@ -1657,6 +1665,18 @@ def own_prefs(name, want):
     if not keep:
         return {"error": "nothing here is a setting"}, 400
     return prefs_set(name, keep), 200
+
+
+def zone_ok(tz):
+    """Whether `tz` names a time zone this machine knows, by its IANA name."""
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_+-]*(?:/[A-Za-z0-9_+-]+){0,2}", tz or "") or len(tz) > 64:
+        return False
+    try:
+        from zoneinfo import ZoneInfo
+        ZoneInfo(tz)
+        return True
+    except (KeyError, ValueError, OSError, ImportError):     # ZoneInfoNotFoundError is a KeyError
+        return False
 
 
 # The colors a terminal's scheme is made of, as xterm.js names them: its

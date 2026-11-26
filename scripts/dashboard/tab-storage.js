@@ -490,7 +490,7 @@ function storageSnapshots(n){
   const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [], snaps = n.snapshots || {}, scheds = storageScheds(n);
-  const when = at => at ? new Date(at * 1000).toLocaleString() : "";
+  const when = at => at ? fmtTime(at * 1000) : "";
   const rows = pools.map(p => {
     const v = snaps[p.name] || {count: 0, used_mb: 0, kinds: {}, newest: []};
     const mine = scheds.filter(x => x.pool === p.name);

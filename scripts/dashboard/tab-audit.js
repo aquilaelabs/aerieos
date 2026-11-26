@@ -43,7 +43,7 @@ const AUDIT_COLS = [{label: "When", w: "7rem"}, {label: "Who", w: "minmax(0,.7fr
 // target as recorded (a project, an account, a container).
 function auditRows(rows){
   if (!rows.length) return `<div class="empty">nothing recorded${auditPerson || auditMachine ? " for this pick" : " yet"}</div>`;
-  return tblWrap(AUDIT_COLS, rows.map(r => `<div class="row auditrow" title="${esc(new Date(r.at * 1000).toLocaleString())}">${tblLine(AUDIT_COLS, [
+  return tblWrap(AUDIT_COLS, rows.map(r => `<div class="row auditrow" title="${esc(fmtTime(r.at * 1000))}">${tblLine(AUDIT_COLS, [
     esc(ago(r.at)), esc(r.who), esc(r.action), esc(r.machine || r.target || "")])}</div>`).join(""), "audittbl");
 }
 
@@ -67,7 +67,7 @@ function renderAuditInto(i){
   const rows = data.rows || [];
   // One line (R274): what is shown of what is recorded, and since when.
   patch(d.list, pageHead({line: [{text: `${rows.length} of ${data.total || 0} recorded${
-      rows.length ? `, since ${new Date(rows[rows.length - 1].at * 1000).toLocaleDateString()}` : ""}`}],
+      rows.length ? `, since ${fmtTime(rows[rows.length - 1].at * 1000, {year: "numeric", month: "numeric", day: "numeric"})}` : ""}`}],
       actions: pick("auditPerson", "Person", (data.people || []).map(p => [p, p]), auditPerson)
         + pick("auditMachine", "Machine", (data.machines || []).map(m => [m.id, m.name]), auditMachine)})
     + (auditErr ? `<div class="notice bad">${esc(auditErr)}</div>` : "")

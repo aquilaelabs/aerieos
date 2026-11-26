@@ -71,15 +71,34 @@ function renderMachineInto(i){
     drawHTML(d.list, `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`);
     return;
   }
+  // Everything about updating this machine, drawn here and nowhere else
+  // (R294 step 13): the release and its channel, the update window (from
+  // Controller settings' table, as the Network page draws its groups) and
+  // the older versions kept.
+  const groups = settingsSections().filter(g => MACHINE_GROUPS.includes(g.key));
   patch(d.list, machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
+    + groups.map(g => docSection("nodes", g.key, g.title, g.status, withRevert(g.html, g.key).replace(/<h4>[^<]*<\/h4>\s*/, ""), {cls: g.cls})).join("")
     + olderVersionsSection(n));
+  d.el.querySelectorAll("[data-srevert]").forEach(b => b.onclick = () => {
+    b.closest("details.sect")?.querySelectorAll("input, select").forEach(i => { if (i.id) delete settingsDraft[i.id]; });
+    readMoved("settings");
+    drawPanes();
+  });
+  wireSettingsSections(d.el);
+  settingsKeep(d.el);
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
   wireUpdates(d.el);
   wireOlderVersions(d.el);
   wireHeld(d.el);
 }
+
+// The settings groups about updating this machine, drawn on This controller
+// where a bare-metal install has its own machine, and in Controller settings
+// otherwise, never both (R294 step 13).
+const MACHINE_GROUPS = ["updwin"];
+const updatesOnMachine = () => !!(state?.bare_metal && state?.own_node);
 
 // What only the controller's own machine carries, among its sections on the
 // Nodes page: where it keeps things, its screen, what its stick prepared and

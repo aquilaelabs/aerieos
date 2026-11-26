@@ -269,7 +269,7 @@ function nginxCertLines(n, d){
   if (!own.length) return `<div class="hint">none yet: every route answers on 80 only</div>`;
   const routes = d?.routes || n.routes || [];
   return tblWrap(NG_CERT_COLS, own.map(([k, c]) => {
-    const when = c?.expires ? new Date(c.expires * 1000).toLocaleDateString() : "";
+    const when = c?.expires ? fmtTime(c.expires * 1000, {year: "numeric", month: "numeric", day: "numeric"}) : "";
     const used = routes.filter(r => r.tls !== false && (r.cert === k || (!r.cert && nginxResolve(n, r.host) === k))).length;
     return `<div class="row ngcert">${tblLine(NG_CERT_COLS, [
       `<span class="name">${esc(k)}</span>${c.acme ? ` <span class="pill note" title="${esc(`by ${c.acme.method}, renewed thirty days before it ends`)}">Let's Encrypt</span>` : ""}`,

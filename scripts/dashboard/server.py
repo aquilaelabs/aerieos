@@ -1302,7 +1302,7 @@ def _project_cards(who, ps):
     archived = set(projects.load_archived(users.uid_of(who)))
     pins = projects.load_project_pins(users.uid_of(who), users.starts_unpinned(who))
     groups = projects.load_project_groups(users.uid_of(who))
-    colors = projects.load_marks("color", users.uid_of(who), start=_legacy_colors(prefs.all_projects(WORKSPACE)))
+    colors = projects.load_marks("color", users.uid_of(who))
     seen = {p["name"] for p in ps}
     out = {}
     for k, ms in repos.all_members().items():
@@ -1364,7 +1364,7 @@ def _project_columns(who, facts):
     # The color this account gives each project (the operator, 18 Oct: a
     # person's own, not the project's), starting from what the projects
     # wore before that, for an account that has not picked one yet.
-    colors = projects.load_marks("color", users.uid_of(who), start=_legacy_colors(project_prefs))
+    colors = projects.load_marks("color", users.uid_of(who))
     # ...and, in one read each, what the ACCOUNT ASKING chose per project and
     # the author its commits carry with nothing overridden. The model, the
     # effort and the commit identity are the person's, not the directory's
@@ -1517,6 +1517,9 @@ def _project_columns(who, facts):
                     # router allows this project, with their context and
                     # price, and what the project has spent through it.
                     "router": _tpart("projects:router", _router_row, d.name),
+                    # ...and which nodes' routers allow it (R294 step 10), so
+                    # its settings say what it may reach: [{node, name}].
+                    "router_on": _tpart("projects:router_on", _router_on, d.name),
                     # Whether a commit here would carry an author, asked WITH
                     # the override: somebody whose Profile has no email can
                     # still set one for this project, and then a session may
@@ -1615,12 +1618,6 @@ def _project_columns(who, facts):
                     or _tpart("projects:mapping", mapping.held, d.name),
                     "issues": issues})
     return out
-
-
-def _legacy_colors(project_prefs):
-    """The colors projects wore while a color was the project's, {name:
-    color}: where an account that has picked none starts."""
-    return {n: (pr or {}).get("color") or "" for n, pr in (project_prefs or {}).items()}
 
 
 def _projects_seen_by(who, rows):
@@ -1896,7 +1893,8 @@ def _reach_loop():
         try:
             people = {u.get("uid") for u in users.all_users() if u.get("uid")}
             by_uid = {u.get("uid"): u for u in users.all_users() if u.get("uid")}
-            reach.tick(lambda uid, m=by_uid: _bell_rows_for(m.get(uid)), people, _page_url())
+            reach.tick(lambda uid, m=by_uid: _bell_rows_for(m.get(uid)), people, _page_url(),
+                       zone_of=lambda uid, m=by_uid: users.prefs(m.get(uid)).get("tz", ""))
         except Exception as e:                                  # noqa: BLE001 (the loop outlives one bad pass)
             print(f"[dashboard] reach: {type(e).__name__}: {e}", flush=True)
 
@@ -2047,7 +2045,7 @@ def _room_loop():
             for n in nodes.node_list():
                 if n["kind"] != "agent" or not n.get("live"):
                     continue
-                if nodes.room_short(n["id"], room_floor_gb() * 2, ("cache",)):
+                if nodes.room_short(n["id"], nodes.room_floor_for(n) * 2, ("cache",)):
                     r = nodes.job_add("operator", {"node": n["id"]}, "cache-clear",
                                       {"older_days": CACHE_KEEP_DAYS})
                     print(f"[room] {n.get('name') or n['id']}: build caches unused for "
@@ -2060,7 +2058,7 @@ def _room_loop():
                                       {"older_days": PHONE_SNAPSHOT_DAYS})
                     print(f"[room] {n.get('name') or n['id']}: idle phones' quick-boot snapshots: "
                           f"{r.get('error') or 'removing'}", flush=True)
-                why = nodes.room_short(n["id"], room_floor_gb() * 2)
+                why = nodes.room_short(n["id"], nodes.room_floor_for(n) * 2)
                 if not why:
                     continue
                 with devapp.on_node(n["id"]):
@@ -2143,6 +2141,14 @@ def _briefing_tokens(name):
             n = 0
         _BRIEF_TOKENS[name] = (time.time(), n)
     return n
+
+
+def _router_on(name):
+    """The nodes whose model router allows this space, deployed or not:
+    granted where the router lives (its page) or on Roles, said in the
+    space's settings read-only."""
+    return [{"node": nid, "name": (nodes.node(nid) or {}).get("name") or nid, "deployed": bool(rec.get("deployed"))}
+            for nid, rec in router._load().items() if str(name) in (rec.get("projects") or {})]
 
 
 def _router_row(name):
@@ -4967,9 +4973,21 @@ logins.configure(state=STATE, days=SESSION_DAYS,
 import reach                                                     # noqa: E402
 reach.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
                 sealing=lambda: signing.MASTER is not None,
-                smtp_settings=lambda: {"host": settings.get("smtp_host"), "port": settings.get("smtp_port"),
-                                       "security": settings.get("smtp_security") or "starttls", "user": settings.get("smtp_user"),
-                                       "password": settings.secret("smtp_password"), "from": settings.get("smtp_from")})
+                smtp_settings=lambda: _smtp_settings())
+
+
+def _smtp_settings():
+    """The mail server, read as the bell sends: its password's use is a
+    use of a connection (Connected services, R294 step 9)."""
+    pw = settings.secret("smtp_password")
+    if pw:
+        connections.used("setting", "smtp_password")
+    return {"host": settings.get("smtp_host"), "port": settings.get("smtp_port"),
+            "security": settings.get("smtp_security") or "starttls", "user": settings.get("smtp_user"),
+            "password": pw, "from": settings.get("smtp_from")}
+
+
+
 # A model router on a node (R144 step 1, router.py): LiteLLM with the
 # provider keys, Ollama beside it, a key per allowed project.
 import router                                                    # noqa: E402
@@ -4981,6 +4999,105 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
                  job_get=lambda jid: nodes.job(jid, with_log=True),
                  node_gpu=lambda nid: bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card")),
                  container_gone=lambda name: not devapp.is_file_source(name))
+# Connected services (R294 step 9, the connections rule): every credential
+# the install holds for an outside service but a person's own, each kind
+# saying what it holds and how one is forgotten, the ledger beside them who
+# added each and when, its last use and its expiry.
+import connections                                               # noqa: E402
+connections.configure(state=STATE, write_json_fn=write_json, audit_fn=lambda by, verb, target, detail: db.audit(by, verb, target, detail))
+# The install's own: the services Controller settings holds a token for.
+CONNECTED_SETTINGS = {"tunnel_token": ("Cloudflare tunnel token", "the tunnel that serves this controller"),
+                      "cf_api_token": ("Cloudflare API token", "the tunnel's hostnames and DNS records"),
+                      "smtp_password": ("Mail server password", "the bell's email, through Controller settings' Mail"),
+                      "release_token": ("Release check token", "reading the newest release from the git host")}
+
+
+def _conn_settings():
+    d = settings.load()
+    go = {"tunnel_token": ["network", ""], "cf_api_token": ["network", ""], "smtp_password": ["controller", "mail"],
+          "release_token": ["controller", "drafts"]}
+    return [{"ref": k, "name": name, "uses": uses, "sealed": str(d[k]).startswith(settings.SEALED), "go": go[k]}
+            for k, (name, uses) in CONNECTED_SETTINGS.items() if d.get(k)]
+
+
+def _conn_git():
+    """A space's own token: kept for the space, not given by a person (whose
+    own is on their Profile)."""
+    base = STATE / "gitcreds"
+    out = []
+    for f in sorted(base.iterdir()) if base.is_dir() else []:
+        if f.is_file() and gitcreds.own_line(f.name):
+            out.append({"ref": f.name, "name": registry.label(f.name) or f.name, "sealed": f.read_text(errors="replace").startswith(gitcreds.SEALED),
+                        "uses": "git push and pull for the space's repositories", "go": ["project", f.name]})
+    return out
+
+
+def _conn_router():
+    """A node's model router's provider keys, shared by the spaces it allows."""
+    out = []
+    for nid, rec in router._load().items():
+        where = (nodes.node(nid) or {}).get("name") or nid
+        for pid, v in (rec.get("providers") or {}).items():
+            out.append({"ref": f"{nid}/{pid}", "name": f"{router.PROVIDERS.get(pid, {}).get('label', pid)} key on {where}",
+                        "sealed": str(v).startswith(router.SEALED), "uses": "the model router's calls to the provider", "go": ["router", nid]})
+        for c in rec.get("custom") or []:
+            if c.get("key"):
+                out.append({"ref": f"{nid}/custom/{c['name']}", "name": f"{c['name']}'s key on {where}",
+                            "sealed": str(c["key"]).startswith(router.SEALED), "uses": "the model router's calls to that endpoint", "go": ["router", nid]})
+    return out
+
+
+def _router_keys_said(nid, providers, custom, by):
+    """Each router key a save gave or cleared, for Connected services (R294
+    step 9): the router's page and its node's Configure both save them."""
+    for pid, v in providers.items() if isinstance(providers, dict) else ():
+        if str(v or "").strip() == "clear":
+            connections.gone("router", f"{nid}/{pid}")
+        elif str(v or "").strip():
+            connections.added("router", f"{nid}/{pid}", by=by)
+    for c in custom if isinstance(custom, list) else []:
+        if isinstance(c, dict) and str(c.get("key") or "").strip():
+            connections.added("router", f"{nid}/custom/{str(c.get('name') or '').strip().lower()}", by=by)
+
+
+def _conn_router_forget(ref, by):
+    nid, _, rest = ref.partition("/")
+    if rest.startswith("custom/"):
+        name = rest[len("custom/"):]
+        keep = [{"name": c["name"], "base": c["base"], "key": ""} for c in router.record(nid).get("custom") or [] if c.get("name") != name]
+        got = router.set_keys(nid, {"custom": keep})
+    else:
+        got = router.set_keys(nid, {"providers": {rest: "clear"}})
+    if not got.get("error") and router.record(nid).get("deployed"):
+        gpu = bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card"))
+        got = router.apply(nid, containers, devactions, devapp, gpu)
+    return got
+
+
+def _conn_setting_forget(ref, by):
+    return settings.set_many({ref: ""})
+
+
+def _conn_git_forget(ref, by):
+    projects.forget_token(ref)
+    return {"ok": True}
+
+
+connections.kind("setting", "Controller setting", "install", _conn_settings, _conn_setting_forget)
+connections.kind("git", "Space's git token", "space", _conn_git, _conn_git_forget)
+connections.kind("router", "Model router key", "shared", _conn_router, _conn_router_forget)
+gitcreds.on_added = lambda p: connections.added("git", p, by=_acting_name())
+gitcreds.on_gone = lambda p: connections.gone("git", p)
+gitcreds.on_used = lambda p: connections.used("git", p)
+
+
+def _acting_name():
+    """The account whose request this is, by name, for the ledger: the git
+    work's acting account (gitcreds.ACTING), or nobody's."""
+    uid = gitcreds.acting()
+    return next((u.get("name") or "" for u in users.all_users() if uid and u.get("uid") == uid), "")
+
+
 # Every module that seals under the install key: one left out kept its
 # secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
@@ -5019,7 +5136,12 @@ profiletab.configure(users=users,
                      node_names=lambda: {n["id"]: n["name"]
                                          for n in ([] if NODES_OK else nodes.node_list())},
                      logs_of=lambda me: transcripts.mine(
-                         users.uid_of(me), project_names(me)))
+                         users.uid_of(me), project_names(me)),
+                     agent_rows=agents.rows,
+                     node_list=lambda: [] if NODES_OK else nodes.node_list(),
+                     agent_version=lambda n, aid: agentcode.installed(n, aid),
+                     signed_on=lambda uid, aid: claudegrant.nodes_of(home_for(uid), aid),
+                     signin_cannot=lambda n, aid: signin.cannot(n, aid))
 devapp.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
                  log_dir=logs.log_dir, field=field,
                  node_for=nodes.node_for if not NODES_OK else None,
@@ -5043,9 +5165,10 @@ devactions.configure(runner=jobs if not NODES_OK else None)
 home.configure(nodes_mod=nodes, devapp_mod=devapp)
 home.backups_summary = lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or ""))
 devapp.gpu_why = gpu_container_why
-devapp.room_why = lambda nid: nodes.room_short(nid, room_floor_gb()) if nid else ""
+devapp.room_why = lambda nid: nodes.room_short(nid, nodes.room_floor_for(nid)) if nid else ""
 nodes.room_floor_gb = room_floor_gb
-devapp.container_mem_gb = lambda: settings.get("container_mem_gb")
+# ...each node's own where its page sets one (R294 step 7).
+devapp.container_mem_gb = lambda nid="": nodes.room_of(nid, "container_mem_gb", settings.get("container_mem_gb"))
 # ...and what its request() needs about who is asking, and who hears.
 devactions.users = users
 devactions.ask_rebuild = phone.ask_rebuild
@@ -5514,6 +5637,8 @@ devapp.reads_of = prefs.reads_trees
 # token to a node.
 import forgeaccess                                               # noqa: E402
 forgeaccess.configure(state=STATE, write_json=write_json, target=projects.forge_target, prefs_get=prefs.get)
+# A space's own token's expiry, as its host says when measured (R294 step 9).
+forgeaccess.on_measured = lambda p, when: connections.expires("git", p, when) if gitcreds.own_line(p) else None
 forgeaccess.wants_of = version.host_wants
 preamble.forge_line = forgeaccess.briefing
 projects.token_changed = forgeaccess.token_changed
@@ -6343,6 +6468,11 @@ def _snapshot(who):
     return {
         "host": os.uname().nodename,
         "uptime": uptime(),
+        # The zone this controller's clock keeps (TZ, its environment's): the
+        # hours a schedule's timetable and the update window are read in,
+        # named where they are set, while every time shown is the person's
+        # own (R294 step 8).
+        "clock_tz": os.environ.get("TZ") or time.strftime("%Z"),
         # How many phone requests are waiting on the operator. A count and not
         # the requests themselves: this rides on every poll, and it exists so
         # the Phone tab knows when to go and fetch the real thing. Reading it
@@ -6568,6 +6698,9 @@ def _snapshot(who):
         # This account's color scheme, for a browser that has none stored.
         # index.html's adoptTheme says why localStorage still outranks it.
         "theme": users.prefs(who).get("theme", ""),
+        # ...and its time zone (R294 step 8): its dates on every browser that
+        # picked none of its own, and its quiet windows on the bell.
+        "tz": users.prefs(who).get("tz", ""),
         "mode": users.prefs(who).get("mode", ""),
         "motion": users.prefs(who).get("motion", ""),
         # ...and its terminals' look (R133 step 10), which the page applies.
@@ -6749,6 +6882,7 @@ ROUTES = (
     Route("GET", "prefix", "/api/pack-icon", "_get_pack_icon", "handler"),
     Route("GET", "exact", "/api/storebackups", "_get_storebackups", ("admin", "the machine's backups are an administrator's")),
     Route("GET", "exact", "/api/root-hooks", "_get_root_hooks", "handler"),
+    Route("GET", "exact", "/api/connections", "_get_connections", "handler"),
     Route("GET", "exact", "/api/old-compose", "_get_old_compose", "handler"),
     Route("GET", "prefix", "/api/v1/nodes", "_get_nodes", "handler", session=True),
     Route("GET", "prefix", "/api/v1/jobs", "_get_jobs", "handler", session=True),
@@ -6850,6 +6984,7 @@ ROUTES = (
     Route("POST", "exact", "/api/nasapps", "_nasapps", "handler"),
     Route("POST", "exact", "/api/storebackups", "_storebackups", ("admin", "the machine's backups are an administrator's")),
     Route("POST", "exact", "/api/root-hooks", "_root_hooks", "handler"),
+    Route("POST", "exact", "/api/connections", "_connections", "handler"),
     Route("POST", "prefix", "/api/pin", "_pin", "handler"),
     Route("POST", "exact", "/api/reset", "_reset", "handler"),
     Route("POST", "exact", "/api/move", "_move", ("owner", "moving the controller is its owner's")),
@@ -10522,6 +10657,11 @@ class Handler(BaseHTTPRequestHandler):
         r = settings.set_many(req.get("set") or {})
         if r.get("error"):
             return self._json(r, 400)
+        # A service's token given or cleared, for Connected services (R294 step 9).
+        for k in CONNECTED_SETTINGS:
+            if isinstance(req.get("set"), dict) and k in req["set"]:
+                (connections.added("setting", k, by=self._principal()) if req["set"][k]
+                 else connections.gone("setting", k))
         if finishing:
             # Finished once is finished for a landing (B720): the setting
             # may be turned back, the mark of the Finish is not.
@@ -12521,7 +12661,8 @@ class Handler(BaseHTTPRequestHandler):
         if not me:
             return None
         if req is None:
-            return self._json(*profiletab.view(me))
+            # The nodes a sign-in may be made on, as _signin_node holds it.
+            return self._json(*profiletab.view(me, self._node_scope(("nodes", "install", "configure"))))
         payload, status, renamed = profiletab.verb(me, field(req, "action"), req, origin=self._origin())
         return self._json(payload, status, cookie=make_token(renamed, (self._who() or {}).get("lid", "")) if renamed else None)
 
@@ -13289,6 +13430,30 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return self._json(roothooks.listing())
 
+    def _get_connections(self):
+        """GET /api/connections (R294 step 9): Connected services, every
+        credential the install holds for an outside service with who added
+        it, its last use and its expiry, and how many people keep connections
+        of their own, which are theirs alone. Read on Controller Read."""
+        if self._refused("controller-read"):
+            return None
+        mine = {r.get("uid") for r in reach.at_rest() if r.get("uid")}
+        mine |= {uid for uid in accountkeys._load() if accountkeys.forges_of(uid)}
+        for n in nodes.node_list(all=True) if not NODES_OK else []:
+            mine |= set((((n.get("reported") or {}).get("tokseal") or {}).get("sealed") or {}))
+        return self._json(connections.listing() | {"people": len(mine)})
+
+    def _connections(self, req):
+        """POST /api/connections {action: forget, kind, ref} (R294 step 9):
+        a credential forgotten at once (a leak, a person gone), where its kind
+        keeps it. An administrator's alone, as the connections rule says;
+        adding one and changing one happen where it lives."""
+        if self._refused("admin"):
+            return None
+        if field(req, "action") != "forget":
+            return self._json({"error": "action is forget"}, 400)
+        return self._json(*connections.forget(field(req, "kind"), field(req, "ref"), self._principal()))
+
     def _root_hooks(self, req):
         """POST /api/root-hooks {action: approve, name, sha} or {action:
         revoke, name} (B1166): a root hook approved as it was shown, or its
@@ -13484,6 +13649,8 @@ class Handler(BaseHTTPRequestHandler):
                 r = router.set_keys(nid, {"providers": {pid: v.get(pid) for pid in router.PROVIDERS if pid in v},
                                           **({"custom": v["custom"]} if isinstance(v.get("custom"), list) else {}),
                                           **({"ollama": v.get("ollama") is True} if "ollama" in v else {})})
+                if not r.get("error"):
+                    _router_keys_said(nid, {pid: v.get(pid) for pid in router.PROVIDERS if pid in v}, v.get("custom"), by)
                 if not r.get("error") and isinstance(v.get("projects"), list):
                     have = set(router.status(nid).get("projects") or [])
                     want = {str(p) for p in v["projects"]}
@@ -13780,6 +13947,8 @@ class Handler(BaseHTTPRequestHandler):
         gpu = bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card"))
         if act == "set":
             r = router.set_keys(nid, req)
+            if not r.get("error"):
+                _router_keys_said(nid, req.get("providers"), req.get("custom"), by)
             if not r.get("error") and router.record(nid).get("deployed"):
                 r = router.apply(nid, containers, devactions, devapp, gpu) | {"saved": True}
         elif act == "deploy":
@@ -14423,8 +14592,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if color and color not in prefs.COLORS:
             return self._json({"error": f"color is one of {', '.join(prefs.COLORS)}, or none: not {color}"}, 400)
-        return self._json(*projects.set_mark("color", users.uid_of(me), name, color,
-                                             start=_legacy_colors(prefs.all_projects(WORKSPACE))))
+        return self._json(*projects.set_mark("color", users.uid_of(me), name, color))
 
     def _session(self, req):
         """Kill a session, or say whether one asked to end has. Closing a tab

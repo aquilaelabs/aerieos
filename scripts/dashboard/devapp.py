@@ -99,7 +99,7 @@ field = None                     # server.py's one-string-field reader, for act(
 # setting and what the node's Installed page holds (R102).
 gpu_why = None
 room_why = None         # set by server.py: (node id) -> why a build there would run out of disk, or "" (R110)
-container_mem_gb = None  # set by server.py: () -> the memory limit in GB a container with none gets, 0 for none (R110)
+container_mem_gb = None  # set by server.py: (node id) -> the memory limit in GB a container with none gets there, 0 for none (R110, R294 step 7)
 
 # docker, or the harness's stub in the source tree alone (seams.py).
 DOCKER = seams.get("BB_DOCKER_BIN", "docker")

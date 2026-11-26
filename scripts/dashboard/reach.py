@@ -18,6 +18,7 @@ address, the SMTP password) is sealed under the install key.
                       fields}], "sent": {dest id: {row key: at}}}}
 """
 import base64
+import datetime
 import email.message
 import json
 import secrets
@@ -321,12 +322,24 @@ def _why(e):
 
 # ---- the loop: what is new, held while unchanged, after the quiet window ----------
 
-def _in_quiet(q, now=None):
-    """Whether local time is inside the window (from may be past to: a
-    window over midnight)."""
+def _clock(now=None, tz=""):
+    """The time as a person reads it: in their own zone where their Profile
+    names one (R294 step 8), else the controller's."""
+    if tz:
+        try:
+            from zoneinfo import ZoneInfo
+            return datetime.datetime.fromtimestamp(time.time() if now is None else now, ZoneInfo(tz)).timetuple()
+        except (KeyError, ValueError, OSError, ImportError):     # ZoneInfoNotFoundError is a KeyError
+            pass
+    return time.localtime(now)
+
+
+def _in_quiet(q, now=None, tz=""):
+    """Whether the person's time is inside the window (from may be past to:
+    a window over midnight), in `tz`, their zone, else the controller's."""
     if not q:
         return False
-    t = time.localtime(now)
+    t = _clock(now, tz)
     cur = t.tm_hour * 60 + t.tm_min
     try:
         fh, fm = (int(x) for x in str(q["from"]).split(":"))
@@ -337,12 +350,13 @@ def _in_quiet(q, now=None):
     return (a <= cur < b) if a <= b else (cur >= a or cur < b)
 
 
-def tick(rows_for, people, base_url="", now=None):
+def tick(rows_for, people, base_url="", now=None, zone_of=None):
     """One pass: for each person with a destination, their bell's rows
     (rows_for(uid) -> [{key, kind, title, text, url}]), and to each
     destination that is on the rows of its kinds not sent to it yet,
-    outside its quiet window, one message; the keys sent are kept until
-    their rows leave. Returns how many messages went."""
+    outside its quiet window in their own zone (zone_of(uid)), one message;
+    the keys sent are kept until their rows leave. Returns how many
+    messages went."""
     d = _load()
     sent_n = 0
     for uid in list(d):
@@ -363,7 +377,7 @@ def tick(rows_for, people, base_url="", now=None):
             _save(d)
         for dest in dests:
             due = [r for r in rows if r.get("kind") in (dest.get("kinds") or KINDS) and r["key"] not in (sent.get(dest["id"]) or {})]
-            if not due or _in_quiet(dest.get("quiet"), now):
+            if not due or _in_quiet(dest.get("quiet"), now, (zone_of(uid) if zone_of else "") or ""):
                 continue
             due = due[:MAX_ROWS]
             title = due[0]["title"] if len(due) == 1 else f"AerieOS: {len(due)} things for you"

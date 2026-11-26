@@ -375,7 +375,7 @@ const TABKINDS = {
               icon: TOOL_ICONS.machine,
               // ...and on the held start and the stick's report, which ride the
               // status poll: Start and the hold-next box show what they did.
-              render: (i) => renderMachineInto(i), live: () => `${readRev("nodes")}/${JSON.stringify(state?.held || {})}/${state?.firstboot?.at || 0}`,
+              render: (i) => renderMachineInto(i), live: () => `${readRev("nodes")}/${JSON.stringify(state?.held || {})}/${state?.firstboot?.at || 0}/${settingsLive()}`,
               open: () => loadNodes() },
   settings: { multi: false, label: () => "Controller settings",
               render: (i) => renderSettingsInto(i), live: settingsLive,
@@ -389,7 +389,7 @@ const TABKINDS = {
               render: (i) => renderRolesInto(i), live: () => readRev("roles"),
               open: () => loadRoles() },
   profile:  { multi: false, label: () => "Profile",
-              render: (i) => renderProfileInto(i), live: () => `${readRev("profile")}/${readRev("keymine")}`,
+              render: (i) => renderProfileInto(i), live: () => `${readRev("profile")}/${readRev("keymine")}/${signinRev()}`,
               open: () => loadProfile() },
   findings: { multi: false, label: () => "Analysis",
               icon: TOOL_ICONS.findings,

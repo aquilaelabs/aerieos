@@ -1442,8 +1442,8 @@ function wireCharts(root, fmtOf = () => v => `${Math.round(v)}%`){
       tip.classList.toggle("flip", x > 70);
       tip.textContent = "";
       const b = document.createElement("b"); b.textContent = fmt(pts[i][1]);
-      tip.append(b, " ", span > 86400 ? new Date(pts[i][0] * 1000).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit"})
-                       : new Date(pts[i][0] * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}));
+      tip.append(b, " ", span > 86400 ? fmtTime(pts[i][0] * 1000, {weekday: "short", hour: "2-digit", minute: "2-digit"})
+                       : fmtTime(pts[i][0] * 1000, {hour: "2-digit", minute: "2-digit"}));
       hair.hidden = tip.hidden = false;
       chartHover = {id, i};
     };

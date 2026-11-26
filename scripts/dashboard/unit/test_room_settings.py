@@ -60,12 +60,12 @@ class Limit(unittest.TestCase):
         return [s["name"] for s in devactions._plan("alpha", "web-a", action)]
 
     def test_none_set_adds_nothing(self):
-        devapp.container_mem_gb = lambda: 0
+        devapp.container_mem_gb = lambda nid="": 0
         self.assertEqual(self.names("up"), ["starting"])
         self.assertNotIn("limiting memory", self.names("rebuild"))
 
     def test_a_default_follows_every_up(self):
-        devapp.container_mem_gb = lambda: 4
+        devapp.container_mem_gb = lambda nid="": 4
         self.assertEqual(self.names("up"), ["starting", "limiting memory"])
         self.assertEqual(self.names("rebuild")[-2:], ["starting", "limiting memory"])
         self.assertEqual(self.names("update")[-1], "limiting memory")

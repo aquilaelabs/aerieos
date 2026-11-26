@@ -854,7 +854,10 @@ goes wrong with caches is a full disk, and at fleet scale the second thing is
 
 A node is a machine somebody also needs to keep running, so AerieOS's
 work on it is held short of the whole of it. Controller settings, *Room on
-the nodes*, sets the numbers:
+the nodes*, sets the numbers every node goes by, and a node's own page sets
+its own under Sessions, *Room*, for a small board or a big server the
+install's numbers do not fit; a field left blank there is the install's.
+Nodes Write on that node is what changes them:
 
 - **Disk kept free** (10 GB by default, or a tenth of a disk smaller than
   ten times that). Under it, on the root filesystem, Docker's or a store,

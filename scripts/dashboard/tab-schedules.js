@@ -31,12 +31,12 @@ function loadSchedules(){
 function postSchedule(body){ return poster("/api/schedules")(body); }
 
 // When a run was or will be, as a person reads it: a weekday and a time,
-// the date where it is not this week.
+// the date where it is not this week, in their zone (fmtTime).
 function schedWhen(s){
   if (!s) return "";
-  const d = new Date(s * 1000), soon = Math.abs(d - Date.now()) < 6 * 86400000;
-  return d.toLocaleString(undefined, soon ? {weekday: "short", hour: "numeric", minute: "2-digit"}
-                                          : {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
+  const soon = Math.abs(s * 1000 - Date.now()) < 6 * 86400000;
+  return fmtTime(s * 1000, soon ? {weekday: "short", hour: "numeric", minute: "2-digit"}
+                                : {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
 }
 
 const SCHED_STATE = {succeeded: ["ok", "succeeded"], failed: ["bad", "failed"], canceled: ["warn", "canceled"],
@@ -89,7 +89,7 @@ function schedForm(s){
           <select id="schNode" data-schedf="node">${s?.node || schedDraft.node ? "" : `<option value="">pick where</option>`}${
             optionList(nodes.map(n => [n.id, n.name]), schedDraft.node ?? s?.node)}</select></div>
       </div></div>
-      <div class="field" id="schCronF"${custom ? "" : " hidden"}>${lbl("schCron", "Timetable", "cron's five fields: minute, hour, day of the month, month, weekday")}
+      <div class="field" id="schCronF"${custom ? "" : " hidden"}>${lbl("schCron", "Timetable", `cron's five fields: minute, hour, day of the month, month, weekday, on this controller's clock (${state?.clock_tz || "UTC"}); the times shown are in your own zone`)}
         <input id="schCron" data-schedf="cron" type="text" value="${esc(cron)}" spellcheck="false" autocomplete="off"
           placeholder="0 4 * * 0">
         <div class="hint" id="schCronSaid">${esc(s?.words || "0 4 * * 0 is Sundays at 4:00")}</div></div>

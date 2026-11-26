@@ -279,10 +279,10 @@ def _plan(project, instance, action, extra=None):
     # ref's files by git archive, which writes nothing into the repository
     # (a worktree's records would sync back up to the controller's .git).
     # A memory limit for every container its compose file gives none
-    # (Controller settings, Room; R110 step 5), right after up: a limit the
+    # (its node's Room, else Controller settings'; R110 step 5), right after up: a limit the
     # file sets is the file's, and Docker's own is 0 for none. A fixed
     # script with its values as arguments, as the checkout below is.
-    gb = devapp.container_mem_gb() if devapp.container_mem_gb else 0
+    gb = devapp.container_mem_gb(devapp._instance_node(project, instance)) if devapp.container_mem_gb else 0
     if gb:
         up = [up, {"name": "limiting memory", "timeout": 120, "env": {}, "argv": [
             "sh", "-c", 'for c in $("$1" ps -q --filter "label=com.docker.compose.project=$2"); do '

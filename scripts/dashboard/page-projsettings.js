@@ -37,7 +37,7 @@ const EFFORTS = [["", "Claude's default"], ["low", "low"], ["medium", "medium"],
 // a menu.
 let rnPrefWas = {git_name: "", git_email: "",
                  node: "", nodes: "", hosts: "", hosts_off: "", reads: "", tc_off: "", packs_on: "", sees: "", reaches: "", build: "", test: "", outputs: "",
-                 capture_days: "7", snapshot_days: "14", dev_keep: "3", gate: "", release_gate: "refuse", files_table: "on"};
+                 capture_days: "7", snapshot_days: "14", dev_keep: "3", gate: "", release_gate: "refuse", files_table: "on", build_local: "on"};
 // The colors a project can be, by the names prefs.py stores (COLORS there)
 // and the tone each is drawn in. Named at the store and mapped here so the
 // tone can be retuned for a scheme without touching what anybody saved.
@@ -669,7 +669,21 @@ function rnFillTests(canDev){
     dev.dispatchEvent(new Event("change", {bubbles: true}));
   };
 }
+// The model routers that allow this space (R294 step 10), read-only: each
+// a link to the router's page on its node, where it is granted.
+function rnFillRouter(p){
+  const el = $("rnRouterSaid");
+  if (!el) return;
+  const on = p?.router_on || [];
+  drawHTML(el, on.length
+    ? `may use the router on ${on.map(r => `<button type="button" class="namelink" data-rnrouter="${esc(r.node)}">${esc(r.name)}</button>${r.deployed ? "" : " (not deployed)"}`).join(", ")}${
+        p?.router?.models?.length ? `, ${p.router.models.length} model${p.router.models.length === 1 ? "" : "s"}` : ""}: granted on its page`
+    : "no model router allows this space: one is granted on the router's page, on its node");
+  el.querySelectorAll("[data-rnrouter]").forEach(b => b.onclick = () => { if (!$("rnmodal").hidden) closeRename(); openThing(b.dataset.rnrouter, "service:model-router"); });
+}
+
 function rnFillPrefsRest(p){
+  rnFillRouter(p);
   // Offered only where there is a container to run in: the Docker tab knows
   // which projects have one, and `has_compose` on the project row is the
   // same answer without asking it.
@@ -902,6 +916,20 @@ function openProjectSettings(name, sect = ""){
   if (sect){ SPLIT["rn:" + name] = {pick: sect, open: true}; rnOpenAsked = name; }
   openNotebook(name, "settings");
 }
+// ...and the space's own settings, the dialog its card's Settings opens, at
+// one of its sections (a node's Spaces opens Nodes: R294 step 12), which
+// the dialog shows open under its jump bar as a jump does. `name` is any
+// repository of the space, or the space's own key.
+function openSpaceSettings(name, sect = ""){
+  renameProject(name, "project");
+  if (!sect) return;
+  requestAnimationFrame(() => {
+    const d = document.querySelector(`#rnmodal:not([hidden]) details[data-sect="rn:${CSS.escape(sect)}"]`);
+    if (!d) return;
+    if (!d.open){ d.open = true; sectOpen[d.dataset.sect] = true; }
+    d.scrollIntoView({block: "start"});
+  });
+}
 
 // The Agents may section, lent to a notebook's Permissions view
 // (nb-permissions.js), goes back to its place in the form, marked by this
@@ -1041,7 +1069,7 @@ let rnVmCapsShown = () => {};
 // The space's fields (prefs.GROUP_FIELDS less the overridable dials), which a
 // repository's view never sends.
 const RN_GROUP = new Set(["node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "agents_off", "agent_default",
-                          "agent_slots", "gpu", "vm_caps", "color"]);
+                          "agent_slots", "gpu", "vm_caps"]);
 // The space's hosting nodes, each a tick: unticked keeps this repository's
 // containers off it (R223). Drawn on a repository's view alone.
 function rnFillHostsOwn(p){
@@ -1264,7 +1292,7 @@ function rnDrawFtp(){
     <div class="fgrid"${on ? "" : " hidden"}>
     <div class="setrow col ctlrow"><label for="rnFtpFor">Keep it on</label>
       <select id="rnFtpFor" aria-label="how long FTP stays on">${optionList([
-        ...(v.on && v.until ? [["", `until ${new Date(v.until * 1000).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
+        ...(v.on && v.until ? [["", `until ${fmtTime(v.until * 1000, {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
         ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select></div>
     <div class="setrow col ctlrow"><label for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
       <input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}" aria-label="the port its FTP server listens on">
@@ -1358,7 +1386,7 @@ function rnDrawSnapshots(){
   $("rnSnapField").hidden = false;
   const days = rnSnap.days || [];
   if (!days.some(d => d.day === rnSnapOpen)) rnSnapOpen = "";
-  const when = d => d.at ? new Date(d.at * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : d.day;
+  const when = d => d.at ? fmtTime(d.at * 1000, {dateStyle: "medium", timeStyle: "short"}) : d.day;
   const form = d => `<div class="snapform">
       <label class="setrow col ctlrow snapfile"><span class="lbl">A file, from the tree's top</span>
         <input type="text" data-snapfile placeholder="src/app.js" spellcheck="false" autocomplete="off"></label>
@@ -1521,7 +1549,7 @@ function rnDrawStore(name){
   // never the one this space already uses (B1122: it was offered again, the two
   // rows reading the same).
   const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="logdays setrow ctlrow"><span class="grow">Your ${me ? "other " : ""}${
-    esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}${f.at ? `, saved ${esc(new Date(f.at * 1000).toLocaleDateString([], {day: "numeric", month: "short"}))}` : ""}</span>
+    esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}${f.at ? `, saved ${esc(fmtTime(f.at * 1000, {day: "numeric", month: "short"}))}` : ""}</span>
     <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this space"}</button></div>`).join("");
   drawHTML(box, off + said + who + rows);
   box.hidden = !(said || who || rows);
@@ -1796,6 +1824,10 @@ const RN_FIELDS = [
    of: p => p?.prefs?.build || "", read: el => el.value.trim()},
   {k: "test", id: "rnTestCmd", sect: "build", label: "Test",
    of: p => p?.prefs?.test || "", read: el => el.value.trim()},
+  // Stored as a yes or no (B439), picked as where the build folders go: a
+  // setting that had no control until R294 step 14.
+  {k: "build_local", id: "rnBuildLocal", sect: "build", label: "Gradle builds into",
+   of: p => p?.prefs?.build_local === false ? "off" : "on", read: el => el.value || "on", out: v => v !== "off"},
   // Typed as one line, stored as a list.
   {k: "outputs", id: "rnOutputs", sect: "build", label: "Outputs",
    of: p => (p?.prefs?.outputs || []).join(", "), read: el => el.value.trim(),

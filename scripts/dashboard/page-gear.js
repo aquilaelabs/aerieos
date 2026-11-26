@@ -200,8 +200,8 @@ function drawUiMenu(){
       </button>`).join("")}</div></div>
     <h4>Time zone</h4><div class="popbody">
     <div class="tzrow">
-      <select id="uiTZ" aria-label="this browser's time zone">${tzOptions(tzDraft ?? userTZ())}</select>
-      <button type="button" id="uiTZApply"${tzDraft === null || tzDraft === userTZ() ? " disabled" : ""}>Apply</button>
+      <select id="uiTZ" aria-label="this browser's time zone">${tzOptions(tzDraft ?? browserTZ(), {browser: true})}</select>
+      <button type="button" id="uiTZApply"${tzDraft === null || tzDraft === browserTZ() ? " disabled" : ""}>Apply</button>
     </div>
     <div class="tzsaid">times here read ${esc(fmtTime(Date.now(), {hour: "2-digit", minute: "2-digit", timeZoneName: "short"}))}</div></div>
     <h4>Account</h4><div class="popbody">
@@ -224,7 +224,7 @@ function drawUiMenu(){
   // pick, then Apply, as any setting (the settings rule's one exception is
   // the scheme, which is looked at rather than decided).
   const tz = el.querySelector("#uiTZ"), tzApply = el.querySelector("#uiTZApply");
-  tz.onchange = () => { tzDraft = tz.value; tzApply.disabled = tzDraft === userTZ(); };
+  tz.onchange = () => { tzDraft = tz.value; tzApply.disabled = tzDraft === browserTZ(); };
   // Said in place, not by drawing the menu again: a redraw took the pressed
   // button out of the menu before the press reached the page's listener,
   // which read it as a press elsewhere and shut the menu.
@@ -234,7 +234,10 @@ function drawUiMenu(){
     tzApply.disabled = true;
     const said = el.querySelector(".tzsaid");
     if (said) said.textContent = `times here read ${fmtTime(Date.now(), {hour: "2-digit", minute: "2-digit", timeZoneName: "short"})}`;
-    notify(userTZ() ? `times on this browser are in ${userTZ()} now` : "times on this browser follow this device again");
+    const b = browserTZ();
+    notify(b === "device" ? "times on this browser follow this device"
+      : b ? `times on this browser are in ${b} now`
+      : state?.tz ? `times on this browser follow your own zone again (${state.tz})` : "times on this browser follow this device again");
     drawPanes();
   };
   el.querySelector("#uiProfile").onclick = () => { toggleUiMenu(false);

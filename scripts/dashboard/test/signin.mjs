@@ -356,6 +356,40 @@ await section("the Claude Code versions it is sent are those nodes", async () =>
   await up.context().close();
 });
 
+// Your coding agents (R294 step 6): a person's sign-ins, every node theirs to
+// sign in on, listed on their Profile, Sign in run there with its code field,
+// and the nodes their spaces are not on left out.
+await section("a person's agents' sign-ins on their Profile", async () => {
+  const auth = 'Basic ' + Buffer.from('s.user:s.user-pass-1').toString('base64');
+  const up = await newPage(browser, { viewport: { width: 1280, height: 1000 },
+    httpCredentials: { username: 's.user', password: 's.user-pass-1' }, extraHTTPHeaders: { Authorization: auth } });
+  await up.goto(URL);
+  await ready(up);
+  await up.waitForSelector('#aboutModal:not([hidden])', { timeout: 5000 }).then(() => up.evaluate(() => closeAbout()), () => {});
+  await up.evaluate(() => openProfileTab());
+  await up.waitForSelector('.profiletab .snav [data-spick="agents"]', { timeout: 20000 });
+  await up.click('.profiletab .snav [data-spick="agents"]');
+  const S = '.profiletab details[data-sect="profile:agents"]';
+  await up.waitForSelector(`${S} [data-pfagentrow]`, { timeout: 20000 });
+  const rows = await up.$$eval(`${S} [data-pfagentrow]`, rs => rs.map(r => r.dataset.pfagentrow));
+  ok(rows.length && rows.every(r => r.startsWith(box.id + ':')) && rows.includes(`${box.id}:claude`) && rows.includes(`${box.id}:codex`),
+     `Profile lists each agent's sign-in on the nodes its spaces are on, and no other node (${rows.join()})`);
+  await up.click(`${S} [data-pfagentrow="${box.id}:claude"] [data-pfagent="in"]`);
+  await up.waitForFunction(id => state?.signin?.running && state.signin.node === id, box.id, { timeout: 20000 });
+  const uj = await beat();
+  ok(uj.type === 'claude-login' && uj.spec?.uid === uidOf('s.user'), `its Sign in starts the flow on that node for that account (${uj.type || uj.error})`);
+  await up.waitForSelector(`${S} .pfagentflow [data-signin="${box.id}"] [data-si="cancel"]`, { timeout: 20000 });
+  const pressed = await up.$eval(`${S} [data-pfagentrow="${box.id}:claude"] button`, b => ({ dead: b.disabled, said: b.textContent.trim() }));
+  ok(pressed.dead && pressed.said === 'Signing in', `...the flow under the table while it runs, its row saying so (${JSON.stringify(pressed)})`);
+  await up.click(`${S} .pfagentflow [data-si="cancel"]`);
+  await up.waitForFunction(() => !state?.signin?.running, null, { timeout: 20000 });
+  await call('/api/v1/agent/result', { job: uj.id, state: 'canceled', exit: 130 }, asNode);
+  await up.waitForSelector(`${S} [data-pfagentrow="${box.id}:claude"] [data-pfagent="in"]:not([disabled])`, { timeout: 20000 });
+  ok(!(await up.$(`${S} .pfagentflow`)), 'Cancel puts the row back, with no flow left under the table');
+  ok(up.errors.length === 0, `Profile's coding agents logged no error (${up.errors.slice(0, 2).join(' | ')})`);
+  await up.context().close();
+});
+
 await call('/api/prefs', { project: 'beta', node: '' });
 await call('/api/v1/nodes', { action: 'retire', id: box.id });
 ok(page.errors.length === 0, `the administrator's page logged no error through any of it (${page.errors.slice(0, 2).join(' | ')})`);

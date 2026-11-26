@@ -1510,7 +1510,7 @@ await section("an administrator's new project is theirs to work on", async () =>
   await call('/api/users', { action: 'edit', name: 'w.maker', projects: [] }, H);
   const madeBy = await call('/api/create', { name: 'maker-made', mode: 'init' }, MAKER);
   const listed = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.maker'].projects || [];
-  const worked = await call('/api/prefs', { project: 'maker-made', color: 'teal' }, MAKER);
+  const worked = await call('/api/prefs', { project: 'maker-made', build: 'make' }, MAKER);
   // Kept by its project (R138): the key of the project made around it, given
   // as the project list places the new repository.
   await fetch(URL.replace(/\/$/, '') + '/api/status', { headers: MAKER }).catch(() => {});

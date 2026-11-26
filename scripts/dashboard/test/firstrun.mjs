@@ -678,6 +678,15 @@ await section("a bare-metal install's first run", async () => {
     own: ownMachine()?.id }));
   ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.updates && !mp.row && mp.link === `#/machines/nodes/${mp.own}`,
      `This controller draws the head and the Updates section, no node row, and links to the machine's row on the Nodes page (${mp.link})`);
+  // Everything about updating the machine drawn once (R294 step 13): the
+  // update window here beside Updates, and neither in Controller settings.
+  const win = await page.waitForSelector('.machinetab details[data-sect="nodes:updwin"] #set_update_window, .machinetab details[data-sect="nodes:updwin"] select', { timeout: 15000 }).then(() => true, () => false);
+  await page.evaluate(() => openSettingsTab());
+  await page.waitForSelector('.settingstab details[data-sect="settings:controller"]', { timeout: 15000 });
+  const inSettings = await page.evaluate(() => ({ win: !!document.querySelector('.settingstab details[data-sect="settings:updwin"]'),
+    channel: !!document.querySelector('.settingstab #relChannel'), pointer: !!document.querySelector('.settingstab details[data-sect="settings:updates"] [data-goupdates]') }));
+  ok(win && !inSettings.win && !inSettings.channel && inSettings.pointer,
+     `This controller holds the update window beside Updates, and Controller settings draws neither, saying where they went (${JSON.stringify({ win, inSettings })})`);
   await page.evaluate(() => { openNodesTab(ownMachine().id); readMoved('nodes'); drawPanes(); });
   await page.waitForSelector('.nodestab .ndrow[data-node]', { timeout: 15000 });
   const np = await page.evaluate(() => ({

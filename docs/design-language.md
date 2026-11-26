@@ -1150,6 +1150,21 @@ Controller settings also holds the one list of every connection, **Connected ser
 
 Every kind shares one mechanism underneath: the credential sealed and never shown again or handed to a session, Test and Forget, the Doctor's warning near expiry or on failure, a session reaching it only through relayed aerie verbs under a dial with anything destructive asked on the bell, and an audit row a call. A new kind of connection is a new row in the table above and a new place where its owner already looks, never a new page of settings.
 
+### placement
+
+Applies to: scripts/dashboard/tab-settings.js, scripts/dashboard/page-projsettings.js, scripts/dashboard/tab-profile.js, scripts/dashboard/tab-nodes.js, scripts/dashboard/tab-machine.js, scripts/dashboard/settings.py, scripts/dashboard/prefs.py; setting, settings, scope, scoped, default, override, placement
+
+Where a setting lives (R294, the operator, 25 Nov: what is controller scoped, node scoped and space scoped each where it should be). A setting is placed by whose it is and what it is for, stored at that one scope and drawn on that one page, as a connection is (the connections rule):
+
+- **The install's**: Controller settings, but for how the install is reached (the Network page) and, on an install with a machine of its own, everything about updating that machine (This controller: Updates, the update window, the older versions kept).
+- **A node's**: its own Nodes page, each section's settings saved with that section; where the install sets a default every node goes by (Room), the node's own field is blank for the install's and says the install's value.
+- **A space's**: the space's settings dialog, from its card; what every repository of the space shares is the space's, drawn on a repository's view dead with Open the space's settings.
+- **A repository's**: its notebook's Settings and Permissions views; a dial (Agents may, Pushing, On the git host) is the space's default with "as the space (word)" first, and a repository's own where set.
+- **A person's**: their Profile (You on the rail): who they are, their time zone, their terminal, their coding agents' sign-ins, where the bell reaches them; what is one browser's alone (its scheme, its own time zone) is the gear's.
+- **A role's**: the Roles page.
+
+A list of a scope's things on another page (a node's Spaces, a space's model router, Connected services) reads them and opens where each is set, and never sets it there. A setting moved to its place leaves a line where it was for one release saying where it went, and the changelog's Upgrading note says the same; a stored value whose scope changes is carried by a numbered migration. unit/test_one_place.py holds an install setting to one page and a space's settings apart from a repository's own.
+
 ## Pages
 
 Each page is a layout of labeled blocks on a frame, named for what it is for, on the platform it is built for.

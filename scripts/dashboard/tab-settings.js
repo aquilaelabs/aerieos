@@ -149,6 +149,7 @@ const SETTINGS_SAYS = {
   mail: "the SMTP server the bell goes out through",
   move: "to another home, its nodes following",
   updates: "the release running, the newest, and Update",
+  connections: "every outside service this install holds a credential for: who added it, its last use, its expiry, Forget",
   power: "restart the machine, or shut it down",
   updwin: "when a newer release is applied by itself",
   backup: "the password the copies are sealed under",
@@ -184,6 +185,7 @@ function renderSettingsInto(i){
   // state and then the rest. Drawn whole again when the settings arrive.
   if (!state?.settings){
     const titles = [["controller", "Controller"], ["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
+      ...(state?.can?.["controller-read"] === false ? [] : [["connections", "Connected services"]]),
       ...SETTING_GROUPS.filter(g => !g.debug && !g.bare && !NETWORK_GROUPS.includes(g.key)).map(g => [g.key, g.title]),
       ["copies", "Backup copies"], ["move", "Move this controller"], ["reset", "Reset AerieOS"]];
     drawHTML(d.list, `${head}<div class="sectjump" data-sects></div>
@@ -193,7 +195,7 @@ function renderSettingsInto(i){
   }
   // Reach from outside and Connection are the Network page's now (R165
   // step 4, tab-network.js), drawn from the same table.
-  const groups = settingsSections().filter(g => !NETWORK_GROUPS.includes(g.key));
+  const groups = settingsSections().filter(g => !NETWORK_GROUPS.includes(g.key) && !(updatesOnMachine() && MACHINE_GROUPS.includes(g.key)));
   // The logs are an administrator's: a poll that has landed without them
   // means this account has no Logs section, not one still on its way (B38).
   const logs = logSection();
@@ -208,7 +210,11 @@ function renderSettingsInto(i){
     ${pathsSection() ? sect("paths", "Storage on this controller", `${paths.length} path${paths.length === 1 ? "" : "s"}`, withRevert(pathsSection(), "paths")) : ""}
     ${rootHooksSection() && rootHooks?.hooks?.length ? sect("roothooks", "Startup hooks", rootHooksWaiting() ? `${rootHooksWaiting()} waiting` : `${rootHooks.hooks.length} approved`,
         rootHooksSection(), {cls: rootHooksWaiting() ? "warn" : "", loud: !!rootHooksWaiting()}) : ""}
-    ${state?.release?.running !== undefined ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : ""}
+    ${connSection() !== null ? sect("connections", "Connected services", connStatus(), connSection(), {cls: connData?.rows?.some(connDue) ? "warn" : ""}) : ""}
+    ${state?.release?.running !== undefined && !updatesOnMachine() ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection())
+      // Moved (R294 step 13): said where they were for this release, then gone.
+      : updatesOnMachine() ? sect("updates", "Updates", "on This controller", `<div class="field"><div class="actbar"><span class="state">The release, its channel, the update window and the older versions kept are on This controller now.</span>
+          <button type="button" data-goupdates>Open This controller</button></div></div>`) : ""}
     ${groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})
         // The copies made go right under the Backup group that makes them.
         + (g.key === "backup" ? sect("copies", "Backup copies", backupData?.made_at ? `last ${ago(backupData.made_at)}` : backupData?.on === false ? "off" : "", backupSection()) : "")).join("")}
@@ -223,6 +229,8 @@ function renderSettingsInto(i){
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
   wireRootHooks(d.el);
+  wireConnections(d.el);
+  d.el.querySelectorAll("[data-goupdates]").forEach(b => b.onclick = () => openMachineTab());
   const run = d.el.querySelector("#setDocRun");
   if (run) run.onclick = () => runDoctor();
   // A page of settings (page-docs.js splitSects): the sections a list beside
@@ -371,6 +379,77 @@ function wireRootHooks(root){
     rootHooks = j;
     readMoved("settings");
     drawPanes();
+  });
+}
+
+// Connected services (R294 step 9, the connections rule): every credential
+// this install holds for an outside service, the install's, a space's or
+// shared by spaces, with who added it, when it was last used and when it
+// expires, each row opening where it lives, which is where it is added and
+// changed. Forget, an administrator's, is for one that must go at once (a
+// leak, a person gone). A person's own (their agents' sign-ins, their git
+// tokens, the bell's destinations) are theirs alone: counted, not listed.
+let connData = null, connAsked = false;
+const CONN_WHOSE = {install: "this install's", space: "a space's", shared: "shared by spaces"};
+const CONN_COLS = [{label: "Service"}, {label: "Whose", w: "minmax(0,.6fr)"}, {label: "Added", w: "minmax(0,.8fr)"},
+  {label: "Last used", w: "minmax(0,.6fr)"}, {label: "Expires", w: "minmax(0,.6fr)"}, {act: true, w: "10rem"}];
+function loadConnections(){
+  connAsked = true;
+  return reading("settings.connections", async () => {
+    const j = await getJSON("/api/connections");
+    connData = j.error ? {error: j.error, rows: []} : j;
+    readMoved("settings");
+  });
+}
+// Expiring within two weeks, or gone past: said in the warn voice.
+function connDue(r){
+  const t = r.expires ? Date.parse(r.expires) : NaN;
+  return !isNaN(t) && t - Date.now() < 14 * 86400000;
+}
+function connStatus(){
+  const n = connData?.rows?.length || 0, due = (connData?.rows || []).filter(connDue).length;
+  return due ? `${due} expiring` : n ? String(n) : "none";
+}
+// null while there is nothing to draw: an account without Controller Read.
+function connSection(){
+  if (state?.can?.["controller-read"] === false) return null;
+  if (connData === null){ if (!connAsked) loadConnections(); return `<div class="field">${skRows(2)}</div>`; }
+  if (connData.error) return `<div class="field"><div class="hint bad">${esc(connData.error)}</div></div>`;
+  const admin = !!state?.can?.admin, rows = connData.rows || [];
+  const list = rows.length ? tblWrap(CONN_COLS, rows.map((r, i) => `<div class="row" data-conn="${i}">${tblLine(CONN_COLS, [
+    `${esc(r.name)}<div class="sub">${esc(r.label)}${r.uses ? `: ${esc(r.uses)}` : ""}${r.sealed ? "" : ` · <span class="warn">not sealed</span>`}</div>`,
+    esc(CONN_WHOSE[r.whose] || r.whose),
+    r.at ? `${esc(ago(r.at))}${r.by ? `<div class="sub">by ${esc(r.by)}</div>` : ""}` : `<span class="dim">before this list</span>`,
+    r.used ? esc(ago(r.used)) : `<span class="dim">not since</span>`,
+    r.expires ? `<span class="${connDue(r) ? "warn" : ""}">${esc(fmtTime(Date.parse(r.expires) || 0, {day: "numeric", month: "short", year: "numeric"}) || r.expires)}</span>` : `<span class="dim">not said</span>`,
+    `<button type="button" data-conngo="${i}" title="where it is added and changed">Open</button>${r.forget && admin
+      ? `<button type="button" class="caution" data-connforget="${i}">Forget</button>` : ""}`])}</div>`).join(""), "conntbl")
+    : `<div class="empty">This install holds no credential for an outside service yet.</div>`;
+  const people = connData.people ? `<div class="field"><div class="hint">${connData.people} ${connData.people === 1 ? "person keeps" : "people keep"} connections of their own (their coding agents' sign-ins, their git tokens, the bell's destinations): theirs alone, each on their own Profile.</div></div>` : "";
+  return `<div class="field"><div class="hint">Each is added and changed where it lives; Open goes there. Forget takes one away at once, for a leak or a person gone.</div></div>${list}${people}`;
+}
+function connGo(r){
+  const [where, arg] = r.go || [];
+  if (where === "project") return openProjectSettings(arg, "repo");
+  if (where === "router") return openThing(arg, "service:model-router");
+  if (where === "network") return openNetworkTab();
+  if (where === "controller"){
+    if (arg){ SPLIT.settings = {pick: arg, open: true}; readMoved("settings"); }
+    return openSettingsTab();
+  }
+}
+function wireConnections(root){
+  root.querySelectorAll("[data-conngo]").forEach(b => b.onclick = () => connGo((connData?.rows || [])[+b.dataset.conngo] || {}));
+  root.querySelectorAll("[data-connforget]").forEach(b => b.onclick = async () => {
+    const r = (connData?.rows || [])[+b.dataset.connforget];
+    if (!r) return;
+    if (!await askYes(`Forget ${r.name}? It is taken away at once, and ${r.uses || "what uses it"} stops working until somebody adds one again where it lives.`)) return;
+    busy(b, "Forgetting");
+    const j = await postJSON("/api/connections", {action: "forget", kind: r.kind, ref: r.ref});
+    if (j.error){ notify(j.error, true); await loadConnections(); return drawPanes(); }
+    connData = {...connData, rows: j.rows};
+    notify(`${r.name} forgotten`);
+    readMoved("settings"); drawPanes();
   });
 }
 
@@ -534,7 +613,7 @@ async function moveBundleAge(file){
     const head = (await file.slice(0, 16384).text()).split("\n");
     const m = JSON.parse(head[1] || "{}");
     const at = Number(m.packed_at || m.made_at || 0);
-    return at ? `${ago(at)} (${new Date(at * 1000).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"})})` : "";
+    return at ? `${ago(at)} (${fmtTime(at * 1000, {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"})})` : "";
   }catch(e){ return ""; }
 }
 function wireMove(root){
@@ -871,8 +950,9 @@ const SETTING_GROUPS = [
      hint: "The address the mail is from; the sign-in name when empty."}]},
   // The room a node keeps for itself (R110): the numbers the bell, the
   // build gate, a rebuild's check and the hourly prune go by, and a memory
-  // limit for a container whose compose file sets none.
-  {key: "room", title: "Room on the nodes", status: () => "applies at once; a container's limit at its next start",
+  // limit for a container whose compose file sets none. Every node's
+  // default, a node's own Sessions section setting its own (R294 step 7).
+  {key: "room", title: "Room on the nodes", status: () => "every node's unless its own page sets one; at once, a container's limit at its next start",
    heading: s => `${s?.settings?.room_floor_gb?.value ?? 10} GB kept`,
    fields: [
     {key: "room_floor_gb", label: "Disk kept free (GB)", type: "number",
@@ -913,7 +993,8 @@ const SETTING_GROUPS = [
      options: [["", "never by itself: Update under Updates is the press"], ["daily", "daily, at the hour below"],
                ["mon", "Mondays"], ["tue", "Tuesdays"], ["wed", "Wednesdays"], ["thu", "Thursdays"], ["fri", "Fridays"], ["sat", "Saturdays"], ["sun", "Sundays"]],
      hint: "In the window the newest release is applied the way Update does it: the image into the other slot on AerieOS (a restart still waits for you), the installer's bundle elsewhere. One window applies one release once."},
-    {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"},
+    {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number",
+     get hint(){ return `on this controller's clock, ${state?.clock_tz || "UTC"}, which TZ in its environment sets; the times this page shows are in your own zone`; }},
     {key: "os_keep", label: "Older versions kept on the boot menu", type: "number", when: () => !!state?.release?.os?.version,
      hint: "AerieOS: each version an update replaces stays on the machine, about 2 GB each, bootable from the menu's Older versions. 0 keeps none."}]},
   {key: "maint", title: "Maintenance", can: "maintenance",
@@ -943,7 +1024,7 @@ async function maintAsk(rows){
 function connectionIntro(s){
   const t = s?.tls || {};
   if (!t.on) return `<div class="hint">Served over http: what the page carries crosses the network in the clear. https is recommended wherever this is reached beyond one machine; behind the home tunnel, Cloudflare's edge is https already.</div>`;
-  const when = t.expires ? new Date(t.expires * 1000).toLocaleDateString() : "";
+  const when = t.expires ? fmtTime(t.expires * 1000, {year: "numeric", month: "numeric", day: "numeric"}) : "";
   const p = t.pending || {};
   return `<div class="hint">https with ${t.kind === "acme" ? "a Let's Encrypt certificate" : "the install's own certificate"} for ${esc((t.names || []).join(", ") || "this install")}${when ? `, until ${esc(when)}` : ""}${
       t.kind === "self" ? "; a browser warns once until it is pinned, and the phone and the companion pin it by its fingerprint" : ""}.</div>

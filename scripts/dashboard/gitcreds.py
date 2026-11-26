@@ -46,6 +46,12 @@ unseal = None             # bytes -> bytes, or raises
 sealing = None            # () -> whether an install key is loaded now
 SEALED = "bbseal:"
 LINKED = "account:"
+# The space's own token as a connection (R294 step 9, connections.py): told
+# when one is written or forgotten, and when git work is handed it. Set by
+# the server; None in a process with no ledger.
+on_added = None           # (project) -> None
+on_gone = None            # (project) -> None
+on_used = None            # (project) -> None
 HELPER = Path(__file__).resolve().with_name("git-credential-bb")
 
 
@@ -158,9 +164,12 @@ def read_line(project, uid=None, live_only=True, why="read"):
                 if line:
                     return line
     try:
-        return open_text(path(project).read_text())
+        line = open_text(path(project).read_text())
     except OSError:
         return ""
+    if line and on_used and why != "read":
+        on_used(project)
+    return line
 
 
 def own_line(project):
@@ -435,6 +444,10 @@ def helpers(project, uid=None, why="git"):
         h = helper(project)
         if h:
             out.append(h)
+            # Handed to git work that reaches the remote: a use of the
+            # space's own token (connections.py's last used).
+            if on_used:
+                on_used(project)
     return out
 
 
@@ -462,6 +475,8 @@ def write_line(project, line):
     fd = os.open(path(project), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as fh:
         fh.write(_kept(line) + "\n")
+    if on_added:
+        on_added(project)
 
 
 def helper(project):
@@ -491,6 +506,8 @@ def names_helper(value, project):
 def forget(project):
     with contextlib.suppress(OSError):
         path(project).unlink()
+    if on_gone:
+        on_gone(project)
 
 
 def seal_all(again=False):
