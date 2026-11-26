@@ -29,6 +29,8 @@
 - On an install with a machine of its own, Updates and the update window are on This controller beside the older versions kept, and Controller settings says where they went (6336f51)
 - A space's settings say which nodes' model routers it may use, each opening the router's page where it is granted (6336f51)
 - A space's color is each person's alone: the color a space's settings held becomes the own color of every account that had picked none, so no card changes (6336f51)
+- Starting an agent takes one press fewer: the model and effort sit under the agent in Start agent's menu, kept as you change them, and New and Resume start at once (2147c56)
+- New space asks for its first repository straight away, named for the space; Cancel leaves a space without one (5cd48f2)
 
 ### Fixed
 
