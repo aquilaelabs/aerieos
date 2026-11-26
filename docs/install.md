@@ -396,6 +396,16 @@ curl -fLO "$REL/aerieos-image-${TAG#v}.digest" && sha256sum --ignore-missing -c 
 docker pull "$(cat aerieos-image-${TAG#v}.digest)"   # by digest, never by tag
 ```
 
+The image is also signed keylessly with cosign by the tag's own build, and
+the signature is in the public transparency log, so with
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
+
+```bash
+cosign verify "$(cat aerieos-image-${TAG#v}.digest)" \
+  --certificate-identity "https://github.com/aquilaelabs/aerieos/.github/workflows/build-image.yml@refs/tags/$TAG" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 The controller bundle, the OS image, the stick and the Windows companion also
 carry a build attestation, which says which workflow built them from which
 commit; with the GitHub CLI:

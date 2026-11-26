@@ -306,6 +306,28 @@ jobs:
   # (tools/release-branches); a stable release or a release candidate only
   # when it is on main. Said, never failed: a rehearsal runs on the branch a
   # release is being made ready on.
+  # The image's keyless signature (R290 step 3), rehearsed on a throwaway
+  # file since nothing is pushed here: cosign installed by the tag's pin,
+  # this run's identity asked for, the signature made, logged and verified
+  # with the same identity flags a downloader's check of the image uses.
+  cosign:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532   # v4.1.3, pinned by commit (R206)
+      - name: Sign and verify as the tag's run does
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'rehearsal %s\n' "$GITHUB_SHA" > rehearsal.txt
+          cosign sign-blob --yes --bundle rehearsal.bundle rehearsal.txt
+          cosign verify-blob --bundle rehearsal.bundle \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release-rehearsal.yml@${GITHUB_REF}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com rehearsal.txt
+          echo "cosign signed and verified a file under this run's identity" | tee -a "$GITHUB_STEP_SUMMARY"
+
   place:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

@@ -75,7 +75,7 @@ class Gate(unittest.TestCase):
         # started the apps' workflows by name.
         jobs = load("build-image.yml")["jobs"]
         last = jobs["release"]
-        self.assertEqual(needs(last), GATE | {"signature", "build", "upgrade", "bundle", "apps", "android", "appliance"},
+        self.assertEqual(needs(last), GATE | {"signature", "build", "upgrade", "sign-image", "bundle", "apps", "android", "appliance"},
                          "the release waits for everything it carries, the image started on every release's /config among it")
         self.assertEqual(jobs["apps"]["uses"], "./.github/workflows/companion-app.yml")
         self.assertEqual(jobs["apps"]["with"], {"tag": "${{ github.ref_name }}", "hand-on": True})
@@ -304,6 +304,21 @@ class Gate(unittest.TestCase):
         run = next(s for s in follow["steps"] if s.get("name") == "Move the tags people follow")["run"]
         self.assertIn('newer "$cur" "$ver"', run)
         self.assertIn("left there", run)
+
+    def test_a_release_s_image_is_signed_keyless_by_the_tag_s_identity_and_rehearsed(self):
+        # R290 step 3 (the operator, 26 Nov).
+        jobs = load("build-image.yml")["jobs"]
+        sign = jobs["sign-image"]
+        self.assertEqual(set(sign["needs"]), {"build", "upgrade"})
+        self.assertEqual(sign["if"], "startsWith(github.ref, 'refs/tags/v')")
+        self.assertEqual(sign["permissions"].get("id-token"), "write")
+        run = next(s for s in sign["steps"] if s.get("run"))["run"]
+        self.assertIn('cosign sign --yes "$img@$DIGEST"', run)
+        self.assertIn(".github/workflows/build-image.yml@${GITHUB_REF}", run)
+        pin = next(s["uses"] for s in sign["steps"] if str(s.get("uses", "")).startswith("sigstore/cosign-installer@"))
+        rehearsal = load("release-rehearsal.yml")["jobs"]["cosign"]
+        self.assertIn(pin, [s.get("uses") for s in rehearsal["steps"]], "the rehearsal installs the tag's very cosign")
+        self.assertIn("cosign verify-blob", next(s for s in rehearsal["steps"] if s.get("run"))["run"])
 
     def test_a_release_tag_s_image_is_built_with_no_cache(self):
         # B1169: :main's cache is any merge's to write, and a release's image
