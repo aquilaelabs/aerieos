@@ -125,8 +125,26 @@ def _rows(sql, args=()):
 # ---------------------------------------------------------------------------
 # migrations
 
+def script(text):
+    """A numbered migration's SQL (statemigrations/NNNN_*.sql, run by
+    stateversion in the one sequence, R295): its statements in one
+    transaction, all or none."""
+    with _lock:
+        try:
+            for stmt in _statements(text):
+                _db.execute(stmt)
+            _db.commit()
+        except sqlite3.Error:
+            _db.rollback()
+            raise
+
+
 def migrate():
-    """Apply every migrations/NNNN_*.sql not yet applied, in order.
+    """Apply every migrations/NNNN_*.sql not yet applied, in order: the
+    schema every supported install has (0001 to 0010, which 0.9.0's first
+    releases carry), for a database made new. migrations/ takes no new file
+    (aerie lint): a later change to the schema is a numbered migration in
+    statemigrations/, run with /config's in one sequence (R295).
 
     Numbered files, run inside one transaction each, recorded in a table of
     their own: the same shape at both tiers, and the discipline door 6 hangs

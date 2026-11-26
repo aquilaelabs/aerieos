@@ -16152,7 +16152,8 @@ def main():
     # The JSON stores' numbered migrations past /config's stamp (R79), here,
     # once every module is configured: one needs project_list to answer,
     # which at import it could not (B496). The gate at the top took the copy.
-    stateversion.migrate(STATE, {"state": STATE, "workspace": WORKSPACE, "project_names": lambda: project_names(users.ALL)})
+    stateversion.migrate(STATE, {"state": STATE, "workspace": WORKSPACE, "project_names": lambda: project_names(users.ALL),
+                                 "sql": db.script})
     # ...and, on every start, the owner roles of projects that are gone for
     # good or never were (a clone that failed before B95, a folder purged by
     # hand), once the migrations have given the ones they give.

@@ -215,6 +215,27 @@ class Migrate(unittest.TestCase):
         self.assertEqual(ctx["ran"], [1, 2, 3])
         self.assertEqual(sv.read(self.state), (3, "0.6.0"))
 
+    def test_a_schema_change_runs_in_the_one_sequence_and_on_a_fresh_install_alone_of_the_two_kinds(self):
+        # R295: statemigrations/ holds the database's changes too, numbered
+        # with /config's; a fresh /config runs the schema files and no .py.
+        (self.mig / "0004_add_t.sql").write_text("CREATE TABLE t (x INTEGER);\n")
+        (self.mig / "0005_m.py").write_text("def run(ctx):\n    ctx['ran'].append(5)\n")
+        ctx = {"ran": [], "sql": lambda text: ctx["ran"].append(text.split()[2])}
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(sv.migrate(self.state, ctx, "0.6.0"), [1, 2, 3, 4, 5])
+        self.assertEqual(ctx["ran"], [1, 2, 3, "t", 5])
+        self.assertEqual(sv.read(self.state), (5, "0.6.0"))
+        fresh = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, fresh, True)
+        ctx2 = {"ran": [], "sql": lambda text: ctx2["ran"].append(text.split()[2])}
+        sv._COPY.pop("fresh", None)
+        with redirect_stdout(io.StringIO()):
+            sv.gate(fresh, "0.6.0")
+            self.assertEqual(sv.migrate(fresh, ctx2, "0.6.0"), [4])
+        sv._COPY.pop("fresh", None)
+        self.assertEqual(ctx2["ran"], ["t"], "the schema made, and nothing of /config's moved")
+        self.assertEqual(sv.read(fresh), (5, "0.6.0"), "the stamp stays where the fresh install put it")
+
     def listing(self):
         """Everything in the state but what a copy leaves where it is."""
         return {str(p.relative_to(self.state)): p.read_bytes() for p in sorted(self.state.rglob("*"))

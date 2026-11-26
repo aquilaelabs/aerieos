@@ -27,8 +27,14 @@ a briefed session reads:
     modules are configured, and stamps the last one that ran.
 
 A migration is statemigrations/NNNN_name.py with run(ctx): idempotent, so a
-start cut short runs it again safely, and never edited once a release has
-shipped it (`aerie lint` holds every one above SUPPORTED_FROM that the
+start cut short runs it again safely, or NNNN_name.sql, a change to the
+database's schema, its statements apart by blank lines (migrations/0001's
+contract) and run in one transaction (R295: one place
+and one numbered sequence for every migration; migrations/ beside db.py is
+the schema every supported install already has, and takes no new file). A
+fresh /config runs no .py, there being nothing in it to move, and every
+.sql past the floor, since its database starts at that schema. Neither is
+edited once a release has shipped it (`aerie lint` holds every one above SUPPORTED_FROM that the
 newest v* tag carries, byte-for-byte). Adding one moves CURRENT, since
 CURRENT is the newest file.
 Stdlib only, and importable on its own: the entrypoint runs it as a script.
@@ -123,8 +129,11 @@ RECORDS = ("users.json", "builderbot.db", "settings.json", "projects.json",
 
 
 def migrations():
-    """[(number, path)] of statemigrations/NNNN_*.py, in order."""
-    return sorted((int(p.name[:4]), p) for p in MIGRATIONS.glob("[0-9][0-9][0-9][0-9]_*.py"))
+    """[(number, path)] of statemigrations/NNNN_*.py and NNNN_*.sql, in
+    order: one numbered sequence for /config's files and the database's
+    schema (R295)."""
+    return sorted((int(p.name[:4]), p) for p in MIGRATIONS.iterdir()
+                  if re.fullmatch(r"\d{4}_[A-Za-z0-9_]+\.(?:py|sql)", p.name))
 
 
 def current():
@@ -232,6 +241,9 @@ def gate(state, version=None):
     if n is None and not used(state):
         with contextlib.suppress(OSError):
             stamp(state, current(), version)
+        # Its database starts at the floor's schema: migrate() runs the
+        # schema files past it, and nothing else.
+        _COPY["fresh"] = True
         return current()
     n = n or 0
     if n < current():
@@ -346,16 +358,22 @@ def migrate(state, ctx, version=None):
         return []
     n, _ = read(state)
     n = n or 0
+    fresh = bool(_COPY.get("fresh"))
     ran = []
     for num, path in migrations():
-        if num <= n:
+        sql = path.suffix == ".sql"
+        if num <= n and not (fresh and sql and num > SUPPORTED_FROM):
             continue
         try:
-            _load(path).run(ctx)
+            if sql:
+                ctx["sql"](path.read_text(encoding="utf-8"))
+            else:
+                _load(path).run(ctx)
         except Exception as e:                                 # noqa: BLE001 (whatever a migration raises)
             _did_not_land(state, version or _COPY["version"] or build_version(), path.name, e, ran)
             break                                              # only where nothing could be put back
-        stamp(state, num, version)
+        if num > n:
+            stamp(state, num, version)      # a fresh one's schema files run under the stamp it has
         ran.append(num)
     if ran:
         print(f"dashboard: /config migrated to state {ran[-1]} ({', '.join(f'{x:04d}' for x in ran)})",

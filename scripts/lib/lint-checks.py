@@ -361,6 +361,13 @@ def shipped():
         print("  [ok]   no release tag yet, so no migration has shipped")
         sys.exit(0)
     bad = []
+    # migrations/ is the schema every supported install has (R295): a later
+    # change to it is a numbered migration in statemigrations/, in the one
+    # sequence with /config's.
+    for f in sorted(pathlib.Path("scripts/dashboard/migrations").glob("*.sql")):
+        if f.name[:4].isdigit() and int(f.name[:4]) > 10:
+            bad.append(f"{f} is a new schema file: a change to the database is statemigrations/NNNN_name.sql, "
+                       "numbered with the others")
     names = git("ls-tree", "-r", "--name-only", tag, "--", *SHIPPED).stdout.decode().split("\n")
     for path in filter(None, names):
         then = git("show", f"{tag}:{path}").stdout
