@@ -56,6 +56,7 @@
 - A bare-metal controller's update never moves back to an older release (05cbf12)
 - An Android APK is signed only for a release's own tag, and, where the release's workflows ask for an approval, only from a run a person approved (52a7707)
 - The Windows companion checks an update against the release's signed list of files with keys it carries, not on the controller's word (189cb11)
+- A request to a node's terminal, files or a VM's screen is signed with a key derived from the node's token and held only in the controller's memory, so a copy of the controller's data opens nothing on a node (5e837d6)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
