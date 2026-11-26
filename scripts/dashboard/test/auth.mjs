@@ -102,6 +102,21 @@ r = await bare('/login', { method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: 'username=test&password=test&next=//evil.example/' });
 ok(r.headers.get('location') === '/', 'a protocol-relative next is not followed');
+// ...nor one a browser reads as another host (a backslash is a slash to it),
+// nor one carrying a line break, which was a header of its own (R288).
+for (const bad of ['/%5Cevil.example/', '/%0D%0ASet-Cookie:%20x=1']){
+  r = await bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `username=test&password=test&next=${bad}` });
+  ok(r.headers.get('location') === '/' && !/x=1/.test(r.headers.get('set-cookie') || ''),
+     `a next of ${decodeURIComponent(bad).replace(/[\r\n]/g, '\\n')} is not followed (${r.status} ${r.headers.get('location')})`);
+}
+// Another site's page neither signs a visitor in (to its own account here)
+// nor out (R288).
+r = await bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Sec-Fetch-Site': 'cross-site' },
+  body: 'username=test&password=test&next=/' });
+ok(r.status === 403 && !r.headers.get('set-cookie'), `a sign-in posted from another site is refused (${r.status})`);
+r = await bare('/logout', { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'cross-site' } });
+ok(!/Max-Age=0/.test(r.headers.get('set-cookie') || '') && r.headers.get('location') === '/', `...and a sign-out another site links to signs nobody out (${r.status})`);
 r = await bare('/logout', { headers: { Cookie: cookie } });
 ok(/Max-Age=0/.test(r.headers.get('set-cookie') || ''), 'logout clears the cookie');
 

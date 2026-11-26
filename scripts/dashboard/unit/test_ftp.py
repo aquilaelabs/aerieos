@@ -147,6 +147,18 @@ class Ftp(unittest.TestCase):
             def totp_check(cls, uid, code):
                 cls.used.append((uid, code))
                 return code == "123456"
+
+            # The account's hold on wrong codes, the web sign-in's (R288).
+            missed_by = []
+
+            @classmethod
+            def held(cls, *keys):
+                return 60 if cls.missed_by.count(keys) >= 3 else 0
+
+            @classmethod
+            def missed(cls, *keys):
+                cls.missed_by.append(keys)
+                return 0
         saved = ftp.mfa
         self.addCleanup(setattr, ftp, "mfa", saved)
         ftp.mfa = Mfa
@@ -161,6 +173,15 @@ class Ftp(unittest.TestCase):
         self.assertEqual(ftp.login("n1", "alpha", "adm", "password1", "10.0.0.5"), {"access": "rw"})
         self.assertEqual(ftp.login("n1", "alpha", "adm", "password1123456", "10.0.0.5")["access"], "")
         self.assertNotIn(("u_2", "123456"), Mfa.used, "a code is asked of an account that has a second factor, and no other")
+        # A wrong code counts against the account's hold, and a held account
+        # is refused before its code is read (R288).
+        self.assertEqual(Mfa.missed_by, [("acct:u_3",)])
+        for _ in range(2):
+            ftp.login("n1", "alpha", "ann", "password1000000", "10.0.0.6")
+        n = len(Mfa.used)
+        got = ftp.login("n1", "alpha", "ann", "password1123456", "10.0.0.7")
+        self.assertIn("Too many wrong codes", got["why"])
+        self.assertEqual(len(Mfa.used), n, "its code is not read while it is held")
 
     def test_failed_logins_are_throttled_per_address(self):
         ftp.save("alpha", {"on": True, "access": {"u_3": "r"}}, "boss")

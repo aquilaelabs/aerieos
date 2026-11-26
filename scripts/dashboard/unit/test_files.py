@@ -59,7 +59,7 @@ class Files(unittest.TestCase):
                      "reported": {"pools": [{"name": "fast", "mount": self.pool}], "files": {"port": port},
                                   # A certificate reported, as every node's relay has one: the
                                   # dial itself is plain here, with no connect function set.
-                                  "relay": {"tls": "sha256:" + "0" * 64},
+                                  "relay": {"tls": "sha256:" + "0" * 64, "once": True},
                                   "shares": [{"name": "media", "path": os.path.join(self.pool, "media")}]}}
         # The node's own list, from the census it sent.
         self.files = self.agent.module("files")
@@ -72,7 +72,9 @@ class Files(unittest.TestCase):
         # holds that one to the certificate).
         fileexplorer.configure(node=lambda nid: self.node if nid == "n_1" else None, host=lambda nid: "127.0.0.1",
                                key=lambda nid: self.key, audit=lambda *a: self.audits.append(a),
-                               connect=lambda host, port, pin, timeout=15: socket.create_connection((host, port), timeout=timeout))
+                               connect=lambda host, port, pin, timeout=15: socket.create_connection((host, port), timeout=timeout),
+                               # Every request carries a value of its own, as the node asks (R288).
+                               subject=lambda what, nonce: f"{what}.{nonce}" if nonce else str(what))
 
     def act(self, op, **kw):
         return fileexplorer.act("user:ann", True, "n_1", self.pool, op, **kw)

@@ -70,12 +70,23 @@ class Reports(unittest.TestCase):
         self.assertEqual(len(r), 1)
         self.assertEqual((r[0]["who"], r[0]["blocked"], r[0]["directive"], r[0]["line"]), ("ann", "inline", "script-src 'self'", 12))
         for i in range(csp.KEEP + 5):
+            csp._recent.clear()          # a minute apart, as far as the share goes
             csp.report(json.dumps({"csp-report": {"blocked-uri": f"x{i}"}}).encode())
         r = csp.reports()
         self.assertEqual(len(r), csp.KEEP)
         self.assertEqual(r[0]["blocked"], f"x{csp.KEEP + 4}")
         csp.clear()
         self.assertEqual(csp.reports(), [])
+
+    def test_at_most_a_share_a_minute_is_written(self):
+        # Taken from anyone, so a flood writes no more than a page's own
+        # refusals would (R288).
+        csp._recent.clear()
+        body = json.dumps({"csp-report": {"blocked-uri": "inline"}}).encode()
+        kept = [csp.report(body) for _ in range(csp.PER_MINUTE + 10)]
+        self.assertEqual(kept.count(True), csp.PER_MINUTE)
+        self.assertFalse(kept[-1])
+        csp._recent.clear()
 
 
 if __name__ == "__main__":

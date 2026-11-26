@@ -131,7 +131,12 @@ def serve_term(conn, key, hdr, q, kinds):
     blob, nonce, sig = (q.get("a") or [""])[0], (q.get("n") or [""])[0], (q.get("s") or [""])[0]
     if not term.signed(key, relaytls.subject(blob, nonce), (q.get("t") or [""])[0], sig):
         return _refuse(conn, 403, "not signed by this node's controller")
-    if nonce and not relaytls.once(sig):
+    # A value of the controller's own on every request (R288): without one a
+    # signed request could be sent again for its two minutes, and every
+    # controller this agent takes work from sends one.
+    if not nonce:
+        return _refuse(conn, 403, "this request carries no value of its own, so it could be a replay")
+    if not relaytls.once(sig):
         return _refuse(conn, 403, "this request was used already")
     spec = term.unpack(blob)
     if spec is None:
@@ -177,7 +182,12 @@ def serve_one(conn, key, kinds=None):
     nonce, sig = (q.get("n") or [""])[0], (q.get("s") or [""])[0]
     if not signed(key, relaytls.subject(domain, nonce), (q.get("t") or [""])[0], sig):
         return _refuse(conn, 403, "not signed by this node's controller")
-    if nonce and not relaytls.once(sig):
+    # A value of the controller's own on every request (R288): without one a
+    # signed request could be sent again for its two minutes, and every
+    # controller this agent takes work from sends one.
+    if not nonce:
+        return _refuse(conn, 403, "this request carries no value of its own, so it could be a replay")
+    if not relaytls.once(sig):
         return _refuse(conn, 403, "this request was used already")
     port = vnc_port(domain)
     if not port:

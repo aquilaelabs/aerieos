@@ -376,8 +376,19 @@ def login(node, project, name, password, addr):
                                      "six-digit code right after it."}
     if not u and mfa is not None and len(password) > 6 and password[-6:].isdigit():
         cand = users.authenticate(str(name or ""), password[:-6], where=f"node:{node}")
-        if cand and mfa.enabled(cand.get("uid", "")) and mfa.totp_check(cand["uid"], password[-6:]):
-            u = cand
+        if cand and mfa.enabled(cand.get("uid", "")):
+            # The account's hold on wrong codes is the web sign-in's too: an
+            # FTP client guessing codes was held by nothing but the node's
+            # password count (R288).
+            keys = (f"acct:{cand['uid']}",)
+            if mfa.held(*keys):
+                _failed(addr)
+                return {"access": "", "why": "Too many wrong codes for this account; try again in a few minutes."}
+            if mfa.totp_check(cand["uid"], password[-6:]):
+                u = cand
+            else:
+                mfa.missed(*keys)
+                audit(cand["name"], "2fa-wrong", project, {"addr": addr, "door": "ftp"})
     if not u:
         _failed(addr)
         audit(f"ftp:{addr}", "ftp-login-failed", project, {"name": str(name or "")[:60]})

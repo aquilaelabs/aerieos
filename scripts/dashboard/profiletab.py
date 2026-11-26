@@ -5,6 +5,8 @@ behind the admin gate the Users page wears. Out of server.py (R77): the
 server holds the door and writes the reply, with a fresh sign-in cookie when
 the account's name changes, since that is what the cookie is signed over.
 """
+import time
+
 from fields import field
 from timing import timed
 
@@ -139,15 +141,34 @@ def _fresh(uid, req, origin):
                                           pk.get("auth"), pk.get("sig"))
 
 
+# Who proved a factor to add another, until when (R288).
+_adding = {}
+ADD_S = 600
+
+
 def two_factor(me, act, req, origin):
     """Profile's Two-factor section (R127). (payload, status)."""
     uid, name = users.uid_of(me), me["name"]
     who = f"user:{name}"
     first = not mfa.enabled(uid)
+    # Adding to a sign-in that has a factor already takes one of those now,
+    # as a removal does (R288): a browser left signed in swapped its own
+    # authenticator in. Asked at the begin, held for the add that follows.
+    if act in ("2fa-totp-begin", "2fa-passkey-begin"):
+        if not first and not _fresh(uid, req, origin):
+            return {"error": "that needs your second factor now: a code from your app, a recovery code, or your passkey",
+                    "fresh": True}, 403
+        if not first:
+            _adding[uid] = time.time() + ADD_S
+    if act in ("2fa-totp-confirm", "2fa-passkey-add") and not first and _adding.get(uid, 0) < time.time():
+        return {"error": "that needs your second factor now: begin again", "fresh": True}, 403
     if act == "2fa-totp-begin":
+        if (mfa.summary(uid).get("totp") or {}).get("on"):
+            return {"error": "the authenticator app is on already: remove it first to set up another"}, 409
         return mfa.totp_begin(uid, name), 200
     if act == "2fa-totp-confirm":
         r = mfa.totp_confirm(uid, req.get("code"))
+        _adding.pop(uid, None)
         if r.get("error"):
             return r, 400
         audit(who, "2fa-add", name, {"what": "authenticator"})
@@ -158,6 +179,7 @@ def two_factor(me, act, req, origin):
                 "exclude": mfa.passkey_ids(uid)}, 200
     if act == "2fa-passkey-add":
         r = mfa.passkey_add(uid, origin, req.get("name"), req.get("client"), req.get("att"), prf=req.get("prf") is True)
+        _adding.pop(uid, None)
         if r.get("error"):
             return r, 400
         audit(who, "2fa-add", name, {"what": "passkey", "name": r.get("name")})
@@ -203,7 +225,11 @@ def verb(me, act, req, origin=""):
         return r, (400 if r.get("error") else 200), None
     if act == "smb-password":
         # Set or cleared (R164 step 1); the own machine's agent takes it up
-        # at its next hello, a minute at most.
+        # at its next hello, a minute at most. Setting one takes the sign-in
+        # password, as a password change does: a separate share password
+        # outlives the browser that set it (R288).
+        if str(req.get("password") or "") and not users.authenticate(me["name"], str(req.get("current") or "")):
+            return {"error": "your sign-in password is not right"}, 400, None
         r = users.set_smb_password(me["name"], str(req.get("password") or ""))
         if r.get("ok") and audit:
             audit(me["name"], "smb-password", me["name"], {"set": r["set"]})

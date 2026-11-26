@@ -249,7 +249,12 @@ def serve(conn, key, hdr, q, rest):
     blob, nonce, sig = (q.get("a") or [""])[0], (q.get("n") or [""])[0], (q.get("s") or [""])[0]
     if not signed(key, relaytls.subject(blob, nonce), (q.get("t") or [""])[0], sig):
         return _err(conn, 403, "not signed by this node's controller")
-    if nonce and not relaytls.once(sig):
+    # A value of the controller's own on every request (R288): without one a
+    # signed request could be sent again for its two minutes, and every
+    # controller this agent takes work from sends one.
+    if not nonce:
+        return _err(conn, 403, "this request carries no value of its own, so it could be a replay")
+    if not relaytls.once(sig):
         return _err(conn, 403, "this request was used already")
     spec = unpack(blob)
     if spec is None:

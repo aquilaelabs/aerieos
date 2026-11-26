@@ -35,11 +35,13 @@ class Client:
         a, b = socket.socketpair()
         self.sock, self.frames = a, screen._Frames()
         when = int(time.time()) if when is None else when
-        sig = term.sign(KEY, blob, when) if sig is None else sig
+        # A value of its own on every open, as the controller sends one (R288).
+        nonce = os.urandom(6).hex()
+        sig = term.sign(KEY, f"{blob}.{nonce}", when) if sig is None else sig
         self.t = threading.Thread(target=self._serve, args=(b, kinds), daemon=True)
         self.t.start()
         key = base64.b64encode(os.urandom(16)).decode()
-        a.sendall(f"GET /term?a={blob}&t={when}&s={sig} HTTP/1.1\r\nHost: n\r\nUpgrade: websocket\r\n"
+        a.sendall(f"GET /term?a={blob}&t={when}&s={sig}&n={nonce} HTTP/1.1\r\nHost: n\r\nUpgrade: websocket\r\n"
                   f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n\r\n".encode())
         self.head = b""
         a.settimeout(10)

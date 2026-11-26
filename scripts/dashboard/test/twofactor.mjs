@@ -134,8 +134,15 @@ else {
     protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
   await page.evaluate(() => openProfileTwoFactor());
   await page.waitForSelector('.doc [data-tf="passkey-add"]', { timeout: 20000 });
+  // With a factor on, adding another takes one of it first, as a removal
+  // does (R288): a bare begin is refused, and the press asks for a code.
+  const bare = await page.evaluate(() => postJSON('/api/profile', { action: '2fa-passkey-begin' }));
+  ok(bare.fresh === true && /second factor now/.test(bare.error || ''), `adding a factor beside one asks for one of it first (${bare.error})`);
   await page.click('.doc [data-tf="passkey-add"]');
-  await page.waitForSelector('.modal:not([hidden]) input', { timeout: 15000 });
+  await page.waitForFunction(() => /code your authenticator app shows/.test(document.querySelector('.modal:not([hidden])')?.textContent || ''), null, { timeout: 15000 });
+  await page.fill('.modal:not([hidden]) input', codes[3]);
+  await page.click('.modal:not([hidden]) button:has-text("Confirm")');
+  await page.waitForFunction(() => /A name for this passkey/.test(document.querySelector('.modal:not([hidden])')?.textContent || ''), null, { timeout: 15000 });
   await page.fill('.modal:not([hidden]) input', 'suite key');
   await page.click('.modal:not([hidden]) button:has-text("Save")');
   await page.waitForFunction(() => (profile?.two_factor?.passkeys || []).some(k => k.name === 'suite key'), null, { timeout: 15000 });

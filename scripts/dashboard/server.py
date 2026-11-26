@@ -559,7 +559,7 @@ LOGIN_HTML = """<!doctype html>
 <script data-cfasync="false">
   const n = new URLSearchParams(location.search).get("next");
   const f = document.querySelector('[name=next]');
-  if (f && n && n.startsWith("/") && !n.startsWith("//")) f.value = n;
+  if (f && n && /^\\/(?![\\/\\\\])[^\\x00-\\x1f\\x7f\\\\]*$/.test(n)) f.value = n;
   if (document.getElementById("u")?.value) document.getElementById("p")?.focus();
 </script>
 </body></html>
@@ -7300,6 +7300,18 @@ _landing_lock = threading.Lock()
 KEEP_IDLE_S = 30
 
 
+# Where a sign-in goes on to: a path on this dashboard and nothing else. A
+# backslash reads as a slash to a browser (/\\evil.example is //evil.example),
+# and a control character in a Location header is a header of its own, so
+# only a plain local path is taken (R288: the review of 26 Nov).
+_NEXT = re.compile(r"/(?![/\\])[^\x00-\x1f\x7f\\]*")
+
+
+def _local_next(nxt):
+    nxt = str(nxt or "/")
+    return nxt if _NEXT.fullmatch(nxt) else "/"
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "builderbot-dashboard"
     # Kept connections (R228 step 9): every poll and every file was a new
@@ -7337,6 +7349,10 @@ class Handler(BaseHTTPRequestHandler):
         super().send_response(code, message)
 
     def send_header(self, keyword, value):
+        # A line break in a header is a header of the caller's making: none
+        # is ever meant, so none is sent (R288).
+        if any(c in str(value) for c in "\r\n") or any(c in str(keyword) for c in "\r\n:"):
+            raise ValueError(f"a header with a line break: {keyword}")
         sent = getattr(self, "_sent", None)
         if sent is not None:
             k = keyword.lower()
@@ -7958,8 +7974,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(MAINTENANCE_SAID, name=form.get("username", [""])[0][:200],
                                     nxt=form.get("next", ["/"])[0][:2000])
         nxt = form.get("next", ["/"])[0]
-        if not nxt.startswith("/") or nxt.startswith("//"):
-            nxt = "/"
+        nxt = _local_next(nxt)
         # A second factor where the account has one (R127), unless this
         # browser was remembered for it; the password alone opens nothing.
         if mfa.enabled(u["uid"]) and not self._trusted_browser(u):
@@ -8072,8 +8087,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _mfa_keys(self, u):
-        """What wrong codes are counted against: the account and the address."""
-        return (f"acct:{u['uid']}", f"addr:{self.client_address[0]}")
+        """What wrong codes are counted against: the account and the address,
+        the one a trusted proxy passes on as wrong passwords are counted
+        (_peer): behind a tunnel every visitor shared one socket address, so
+        ten wrong codes on any account held everyone's second step (R288)."""
+        return (f"acct:{u['uid']}", f"addr:{self._peer()}")
 
     def _mfa_post(self):
         """POST /login/2fa: a code or a recovery code for the account the
@@ -8083,8 +8101,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         u, _ = purpose_user(self._cookie("bb_mfa"), "mfa")
         nxt = form.get("next", ["/"])[0]
-        if not nxt.startswith("/") or nxt.startswith("//"):
-            nxt = "/"
+        nxt = _local_next(nxt)
         if not u:
             return self._login_page("That sign-in ran out: sign in again.", nxt=nxt)
         if (left := mfa.held(*self._mfa_keys(u))):
@@ -8115,8 +8132,7 @@ class Handler(BaseHTTPRequestHandler):
         if req.get("action") == "challenge":
             return self._json({"challenge": mfa.challenge(u["uid"], "get"), "ids": mfa.passkey_ids(u["uid"])})
         nxt = str(req.get("next") or "/")
-        if not nxt.startswith("/") or nxt.startswith("//"):
-            nxt = "/"
+        nxt = _local_next(nxt)
         if not mfa.passkey_check(u["uid"], self._origin(), str(req.get("id") or ""), req.get("client"),
                                  req.get("auth"), req.get("sig")):
             mfa.missed(*self._mfa_keys(u))
@@ -8172,7 +8188,9 @@ class Handler(BaseHTTPRequestHandler):
         to the Host; where it is not sent, the Origin is held to the Host as
         a terminal's socket is. A client with a token of its own (an
         Authorization header) is not a page."""
-        if self.headers.get("Authorization"):
+        # ...one the header itself signs in, that is: any other scheme falls
+        # through to the cookie, and is a page's request like any (R288).
+        if self.headers.get("Authorization", "").startswith(("Bearer ", "Basic ")):
             return ""
         site = self.headers.get("Sec-Fetch-Site", "")
         if site in ("cross-site", "same-site"):
@@ -8188,7 +8206,9 @@ class Handler(BaseHTTPRequestHandler):
         could have a signed-in browser ask for one. A page of this origin
         says same-origin, an address typed or a bookmark says none, and a
         client with its own token is not a page."""
-        if self.headers.get("Authorization"):
+        # ...one the header itself signs in, that is: any other scheme falls
+        # through to the cookie, and is a page's request like any (R288).
+        if self.headers.get("Authorization", "").startswith(("Bearer ", "Basic ")):
             return ""
         if self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
             return "this is read by this dashboard's own page, not by another site's"
@@ -8657,6 +8677,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "max-age=3600")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        # Framed by the dashboard alone, and its client's socket to this
+        # dashboard alone: a link naming another host showed somebody's VNC
+        # server inside this origin (R288).
+        if target.suffix == ".html":
+            self.send_header("Content-Security-Policy", "frame-ancestors 'self'; connect-src 'self'; base-uri 'self'; "
+                                                        "form-action 'self'; object-src 'none'")
         self.end_headers()
         self.wfile.write(body)
         return None
@@ -9303,6 +9330,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/login/setup" and self._authed():
             return self._setup_2fa_page()
         if path == "/logout":
+            # Asked by a page of another site or origin, it signs nobody out:
+            # any page could link a visitor here (R288). Typed, bookmarked or
+            # pressed on this dashboard's own page, it does.
+            if self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
+                self.send_response(302)
+                self.send_header("Location", "/")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return None
             return self._logout()
         if path.startswith("/api/v1/device/"):
             return self._device()
@@ -10706,6 +10742,12 @@ class Handler(BaseHTTPRequestHandler):
                 and self.path.split("?")[0] not in ("/api/move", "/api/profile"):
             return self._json({"error": f"this controller moved to {move.moved_to()}: it is read-only now; should the new home be lost, "
                                         "its bundle still downloads from Controller settings and lands on a fresh install", "moved": True}, 409)
+        # A sign-in posted by another site's page would sign this browser
+        # into that site's own account here, where what the visitor then
+        # saves lands with it (R288): only this dashboard's own pages post one.
+        if self.path.split("?")[0] in ("/login", "/login/2fa", "/login/passkey") \
+                and self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
+            return self._json({"error": "a sign-in is made on this dashboard's own page"}, 403)
         if self.path.split("?")[0] == "/login":
             return self._login_post()
         if self.path.split("?")[0] == "/login/2fa":

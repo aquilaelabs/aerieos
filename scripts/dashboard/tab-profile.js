@@ -275,6 +275,10 @@ function profileShares(sm){
         ${lbl("pfSmb2", "The same again")}
         <input id="pfSmb2" type="password" autocomplete="new-password">
       </div>
+      <div class="logdays setrow col ctlrow">
+        ${lbl("pfSmbCur", "Your sign-in password", "so a browser left signed in cannot give somebody your files")}
+        <input id="pfSmbCur" type="password" autocomplete="current-password">
+      </div>
       <div class="actbar">
         <span class="state">${when}${sm.set ? ` · sign in to a share as <code>${esc(profile.name)}</code>` : ""}</span>
         ${sm.set ? `<button type="button" id="pfSmbClear">Clear</button>` : ""}
@@ -283,14 +287,16 @@ function profileShares(sm){
     </div></div></div>`;
 }
 function wireShares(root){
-  const a = root.querySelector("#pfSmb"), b = root.querySelector("#pfSmb2"), set = root.querySelector("#pfSmbSet"), clear = root.querySelector("#pfSmbClear");
+  const a = root.querySelector("#pfSmb"), b = root.querySelector("#pfSmb2"), cur = root.querySelector("#pfSmbCur"),
+        set = root.querySelector("#pfSmbSet"), clear = root.querySelector("#pfSmbClear");
   if (!a || !b || !set) return;
-  const check = () => { set.disabled = !(a.value.length >= 8 && a.value === b.value); };
+  const check = () => { set.disabled = !(a.value.length >= 8 && a.value === b.value && cur?.value); };
   a.oninput = b.oninput = check;
+  if (cur) cur.oninput = check;
   const post = async (btn, password, word) => {
     busy(btn, word);
     try{
-      const j = await postJSON("/api/profile", {action: "smb-password", password});
+      const j = await postJSON("/api/profile", {action: "smb-password", password, current: password ? cur?.value || "" : ""});
       if (j.error){ notify(j.error, true); return; }
       notify(password ? "your separate share password is set: the machine takes it up within a minute" : "cleared: sign in again and your shares follow your password");
       await loadProfile();
@@ -700,7 +706,16 @@ function wireTwoFactor(root){
   const redraw = async () => { await loadProfile(); readMoved("profile"); drawPanes(); };
   root.querySelectorAll("[data-tf]").forEach(b => b.onclick = async () => {
     const what = b.dataset.tf;
-    if (what === "totp-add"){ pfTotp = await pfTf({action: "2fa-totp-begin"}); readMoved("profile"); drawPanes(); return; }
+    // Adding to a sign-in that has a factor already takes it first, as a
+    // removal does (R288): a browser left signed in adds none of its own.
+    const proof = async () => profile?.two_factor?.on ? await pfFresh() : {};
+    if (what === "totp-add"){
+      const fresh = await proof();
+      if (!fresh) return;
+      const r = await pfTf({action: "2fa-totp-begin", ...fresh});
+      if (r.error){ notify(r.error, true); return; }
+      pfTotp = r; readMoved("profile"); drawPanes(); return;
+    }
     if (what === "totp-cancel"){ pfTotp = null; readMoved("profile"); drawPanes(); return; }
     if (what === "codes-done"){ pfCodes = null; readMoved("profile"); drawPanes(); return; }
     if (what === "totp-confirm"){
@@ -712,7 +727,10 @@ function wireTwoFactor(root){
     }
     if (what === "passkey-add"){
       try{
-        const o = await pfTf({action: "2fa-passkey-begin"});
+        const fresh = await proof();
+        if (!fresh) return;
+        const o = await pfTf({action: "2fa-passkey-begin", ...fresh});
+        if (o.error){ notify(o.error, true); return; }
         // The PRF extension asked for at creation (R157): an authenticator
         // that answers it can hold a key of the person's own.
         const c = await navigator.credentials.create({publicKey: {challenge: pfU8(o.challenge), rp: {name: "AerieOS", id: location.hostname},

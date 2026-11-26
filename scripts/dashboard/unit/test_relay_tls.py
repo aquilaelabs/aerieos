@@ -117,6 +117,8 @@ class Relay(unittest.TestCase):
         self.assertIn("this request was used already", said)
         # Another request is its own.
         self.assertIn("this node's terminals are not up", self.ask(self.term_request(nonce="bb22")))
+        # One with no value of its own could be sent again for its time: refused (R288).
+        self.assertIn("could be a replay", self.ask(self.term_request()))
         # Not signed by the node's controller: no, whatever value it carries.
         self.assertIn("not signed by this node's controller", self.ask(self.term_request(nonce="cc33", key=screen.screen_key("another"))))
         # The value is part of what is signed: taking it off, or changing it, is no signature.
@@ -136,8 +138,9 @@ class Relay(unittest.TestCase):
             self.assertIn("426", said.split("\r\n")[0])
             self.assertTrue(said.endswith(screen.PLAIN_REFUSED), said)
             self.assertNotIn("terminals are not up", said)
-        # ...and a request with no value is still taken over TLS, as before.
-        self.assertIn("this node's terminals are not up", self.ask(self.term_request()))
+        # ...and over TLS one with no value of its own is refused as a
+        # possible replay (R288), where it was taken.
+        self.assertIn("could be a replay", self.ask(self.term_request()))
 
     def test_the_controller_opens_nothing_on_a_node_with_no_certificate(self):
         # A node that reported none: refused before a byte is sent, in one

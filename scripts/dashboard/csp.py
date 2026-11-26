@@ -81,9 +81,23 @@ def _load():
         return []
 
 
+# Reports are taken from anyone (the login page sends them too), so at most
+# this many a minute are written: a flood of them rewrote the file on every
+# post (R288). A real page's refusals come a few at a time.
+PER_MINUTE = 30
+_recent = []
+
+
 def report(body, who=""):
     """One report the browser sent, kept with the last KEEP: what was
-    blocked, where, and by which directive; nothing of the page itself."""
+    blocked, where, and by which directive; nothing of the page itself.
+    False where it was not kept: not a report, or past this minute's share."""
+    now = time.time()
+    with _lock:
+        _recent[:] = [t for t in _recent if now - t < 60]
+        if len(_recent) >= PER_MINUTE:
+            return False
+        _recent.append(now)
     try:
         d = json.loads(body or b"{}")
     except ValueError:

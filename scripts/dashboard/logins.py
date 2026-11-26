@@ -163,8 +163,12 @@ def seen(uid, lid, ua=None, ip=""):
         r = (d.get(uid) or {}).get(lid)
         if not isinstance(r, dict):
             return False
-        # A request with no User-Agent at all (a socket, a script) names no
-        # browser: nothing to hold it to, and nothing to bind to.
+        # A request with no User-Agent at all names no browser: a sign-in
+        # already bound to one is not given to it, or a stolen cookie sent
+        # bare passed the check (R288); one not bound yet has nothing to
+        # hold it to. Every browser sends one, its sockets included.
+        if not ua and r.get("ua"):
+            return False
         if ua:
             if r.get("ua") and r["ua"] != _ua_digest(ua):
                 return False
