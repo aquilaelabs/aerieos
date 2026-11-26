@@ -433,7 +433,10 @@ which is not a failure. Only the release's own run is signed from: the one
 the tag itself started (its push, or its release published), on that tag and
 on the commit the tag names on GitHub, a run of a workflow in the space's
 tree that uploads the artifact or calls the one that does, with its commit
-from the repository itself. A pull request's run, a fork's, a branch's, a run
+from the repository itself. The tag is a release's, as `aerie version release`
+names one (vX.Y.Z, a component's COMP-vX.Y.Z, a pre-release's -LABEL.N after
+it), and where those workflows gate a job on an environment, a person
+approved the run's deployment there on GitHub. A pull request's run, a fork's, a branch's, a run
 started by hand, one of another workflow and one on another commit are each
 refused with the reason, which `aerie sign release` says run by run, and a
 release the controller waits for whose only APK came from such a run is a

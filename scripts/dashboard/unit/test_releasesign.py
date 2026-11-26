@@ -49,6 +49,8 @@ MORE = []
 # The artifacts each run handed over, by run; the commit each tag names, and
 # the tags that are annotated (their ref names a tag object, which names it).
 ARTS = {}
+# A run's environment approvals, by run id (B1167).
+APPROVALS = {}
 TAGS = {}
 ANNOTATED = set()
 # The workflow files on the default branch, by name: GitHub starts a
@@ -139,6 +141,8 @@ class GitHub(BaseHTTPRequestHandler):
                 run(9, "v0.1.0", event="release", path=BUILDS, created_at="2020-01-01T00:00:00Z")]})
         if m := re.match(r"/repos/o/app/actions/runs/(\d+)/artifacts", p):
             return self.answer({"artifacts": ARTS.get(int(m.group(1)), [])})
+        if m := re.match(r"/repos/o/app/actions/runs/(\d+)/approvals", p):
+            return self.answer(APPROVALS.get(int(m.group(1)), []))
         # A tag's ref: the commit, or for an annotated tag the tag object
         # that names it.
         if p.startswith("/repos/o/app/git/ref/tags/"):
@@ -203,7 +207,7 @@ class GitHub(BaseHTTPRequestHandler):
 
 class Base(unittest.TestCase):
     def setUp(self):
-        SEEN.clear(); REL.clear(); MORE.clear(); ARTS.clear(); TAGS.clear(); ANNOTATED.clear(); MAIN.clear()
+        SEEN.clear(); REL.clear(); MORE.clear(); ARTS.clear(); TAGS.clear(); ANNOTATED.clear(); MAIN.clear(); APPROVALS.clear()
         releasesign._bare.clear()
         TAGS.update({"v0.7.0": C7, "v0.8.0": C8, "v0.1.0": "1" * 40})
         ARTS.update({19: handed("v0.6.0"), 31: handed("v0.8.0"),
@@ -589,6 +593,24 @@ class Own(Base):
         self.other(path=".github/workflows/lint.yml")
         self.refused("it is a run of .github/workflows/lint.yml",
                      ".github/workflows/android.yml, .github/workflows/release.yml")
+
+    def test_a_tag_that_is_not_a_releases_is_refused(self):
+        # B1167: a branch's workflow could upload for any tag a person pushed,
+        # one no ruleset covers; only a release's tag is signed for.
+        TAGS["nightly"] = C7
+        self.other(tag="nightly")
+        self.refused("nightly is not a release's tag", tag="nightly")
+
+    def test_a_gated_run_is_signed_only_once_a_person_approved_it(self):
+        # B1167: where the handing workflows gate a job on an environment,
+        # the run's own approval is asked of GitHub.
+        flow = self.tmp / "ws" / "app" / ".github" / "workflows" / "android.yml"
+        flow.write_text(flow.read_text().replace("    runs-on: ubuntu-24.04\n", "    runs-on: ubuntu-24.04\n    environment: release\n", 1))
+        self.other()
+        self.refused("no release approval was given on this run")
+        APPROVALS[41] = [{"state": "approved", "environments": [{"name": "release"}]}]
+        r = releasesign.check("app", force=True)
+        self.assertEqual(r["signed"], ["v0.7.0"], r)
 
     def test_a_run_by_hand_is_refused_and_says_what_to_run(self):
         self.other(event="workflow_dispatch")

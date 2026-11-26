@@ -110,6 +110,13 @@ MARK = "bb-release-apk-"
 SEAL = "bb-release-seal-"
 BY_HAND = re.compile(r"^\s*workflow_dispatch\s*:", re.M)
 TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,79}")
+# A release's tag as aerie version release names one, and the only kind
+# signed from (B1167: any tag name a branch's workflow could upload for was):
+# vX.Y.Z or a component's COMP-vX.Y.Z, a pre-release's -LABEL.N after it.
+RELEASE_TAG = re.compile(r"(?:[a-z0-9][a-z0-9-]{0,40}-)?v\d{1,4}\.\d{1,5}\.\d{1,6}(?:-[a-z][a-z0-9]{0,15}\.\d{1,9})?")
+# A job of a handing workflow gated by an environment: its run is signed from
+# only once a person approved that environment's deployment there.
+GATED = re.compile(r"^\s+environment\s*:", re.M)
 # What starts a release's own run: the push of its tag, or its release
 # published (a workflow `on: release`). Neither can be started from a fork,
 # and a run by hand, a pull request's and a schedule's are nobody's release.
@@ -501,7 +508,14 @@ def _tag_commit(repo, token, tag):
     return "", f"the tag {tag} names no commit on GitHub, so no run is its own"
 
 
-def _own(r, repo, tag, flows, commit_of):
+def gated(project):
+    """Whether the workflows that hand over an APK gate a job on an
+    environment, whose approval a run must then have been given."""
+    flows = _workflows(project)
+    return any(GATED.search(flows.get(p, "")) for p in handing(project))
+
+
+def _own(r, repo, tag, flows, commit_of, approved_of=None):
     """Why the run `r`, as GitHub lists it, is not the own run of the
     release `tag`, or "" when it is. Read from the run alone, in this order:
     where its commit came from (head_repository against the run's own
@@ -525,6 +539,9 @@ def _own(r, repo, tag, flows, commit_of):
         return (f"{how}, and an APK is signed only from the run the tag {tag} itself started, by its push or "
                 "its release: run that one again from its page on GitHub (Re-run all jobs), or, where its push "
                 "started none, withdraw the release and cut it again")
+    if not RELEASE_TAG.fullmatch(tag):
+        return (f"{tag} is not a release's tag (vX.Y.Z, as aerie version release names one), and an APK is "
+                "signed only for a release")
     ran_on = str(r.get("head_branch") or "")
     if ran_on != tag:
         return f"it ran on {ran_on or 'no branch or tag GitHub names'}, not on the tag {tag} its artifact is named for"
@@ -541,6 +558,13 @@ def _own(r, repo, tag, flows, commit_of):
     if sha != commit:
         return (f"it ran on commit {sha[:12] or 'GitHub does not name'}, and the tag {tag} names {commit[:12]}: "
                 "the tag moved after the run started, or the run is not the tag's")
+    # Where the workflows gate a job on an environment, a person approved
+    # this run's deployment there (B1167): a run nobody approved, or one the
+    # approval could not be read for, is not signed from.
+    if approved_of is not None:
+        ok, why = approved_of(int(r.get("id") or 0))
+        if not ok:
+            return why or "no release approval was given on this run, and an APK is signed only from an approved one"
     return ""
 
 
@@ -699,11 +723,28 @@ def check(project, force=False, again=""):
     last = {"at": now, "error": done["error"], "asked": seen.get("asked", 0),
             "known_bare": seen.get("known_bare", 0), "runs": []}
     flows, commits = handing(project), {}
+    needs_ok = gated(project)
 
     def commit_of(tag):
         if tag not in commits:
             commits[tag] = _tag_commit(repo, token, tag)
         return commits[tag]
+    # The run's approval, where the handing workflows gate a job on an
+    # environment (B1167): read from GitHub per run, once a look.
+    approvals = {}
+
+    def approved_of(rid):
+        if rid not in approvals:
+            try:
+                got = cilogs._get(f"/repos/{repo}/actions/runs/{rid}/approvals", token)
+            except cilogs.Refused as e:
+                approvals[rid] = (False, f"whether a person approved this run could not be read ({e})")
+            else:
+                rows = got if isinstance(got, list) else []
+                ok = any(str(a.get("state") or "") == "approved" for a in rows if isinstance(a, dict))
+                approvals[rid] = (ok, "" if ok else "no release approval was given on this run, and an APK is signed "
+                                                    "only from a run a person approved")
+        return approvals[rid]
     # By tag: the newest run that handed an APK over and was refused, the
     # tags a run of their own was found for, and the ones whose release
     # was found to carry its signed APK already.
@@ -718,7 +759,7 @@ def check(project, force=False, again=""):
             continue
         # Whose run it is, before anything of it is fetched: said, and
         # asked again at the next look, since a tag can be pushed after.
-        if why := _own(run, repo, tag, flows, commit_of):
+        if why := _own(run, repo, tag, flows, commit_of, approved_of if needs_ok else None):
             last["runs"].append({"run": rid, "tag": tag, "state": "refused", "why": why})
             refused.setdefault(tag, (rid, why))
             continue
