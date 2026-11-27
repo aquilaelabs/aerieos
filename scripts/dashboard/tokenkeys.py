@@ -166,14 +166,14 @@ def wrapped_for(node, uid, tokseal):
 
 def under_previous(node, tokseal):
     """How many of this node's seals were made under a key other than the
-    account's own today: each moves to it when its person next opens a
-    terminal there."""
+    account's own today, a seal naming no key among them: each moves to it
+    when its person next opens a terminal there."""
     if not isinstance(tokseal, dict) or not keys():
         return 0
     n = 0
     for uid, agents in (tokseal.get("sealed") or {}).items():
         want = ts().rid(public(node, uid)) if public(node, uid) else ""
-        n += sum(1 for v in (agents or {}).values() if (v or {}).get("K") and v["K"] != want)
+        n += sum(1 for v in (agents or {}).values() if (v or {}).get("K", "") != want)
     return n
 
 

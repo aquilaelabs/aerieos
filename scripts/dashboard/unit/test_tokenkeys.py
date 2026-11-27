@@ -126,6 +126,9 @@ class TokenKeys(unittest.TestCase):
         self.assertEqual(tokenkeys.under_previous("n_1", census), 0)
         census["sealed"]["u_00000001"]["claude"]["K"] = self.ts.rid(self.ts.public(self.ts.secret(NEW, "n_1", "u_00000001")))
         self.assertEqual(tokenkeys.under_previous("n_1", census), 1)
+        # A seal naming no key is from before seals named one: older too.
+        del census["sealed"]["u_00000001"]["claude"]["K"]
+        self.assertEqual(tokenkeys.under_previous("n_1", census), 1)
 
     def test_the_signed_open_fits_the_agents_request(self):
         signing.MASTER = OLD
