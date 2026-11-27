@@ -2423,63 +2423,51 @@ function ndDialogs(){
     const dev = !!state?.settings?.settings?.offer_unvetted?.value;
     document.getElementById("ndTitle").textContent = again ? `Enroll ${again.name} again` : "Enroll a node";
     boxWidth(false);
-    drawHTML(body, `<div class="field">
-        <div class="prefrow ctlrow">
-          <div class="setrow col ctlrow">${lbl("ndEnName", "Name")}
-            <input id="ndEnName" maxlength="60" autocomplete="off" placeholder="buildbox"></div>
-          <div class="setrow col ctlrow">${lbl("ndEnUser", "Jobs run as",
-            "the account the provisioner makes and every job runs as. bb unless that name is taken on the machine")}
-            <input id="ndEnUser" maxlength="32" autocomplete="off" spellcheck="false"
-              value="bb"></div>
-          <div class="setrow col ctlrow">${lbl("ndEnSystem", "System",
-            "what the machine runs. The script is built for it and refuses another machine by name. A system tagged dev is untested, and is offered only with Offer dev features on")}
-            <select id="ndEnSystem">${optionList((nodesSystems.length ? nodesSystems : [{id: "ubuntu", name: "Ubuntu 24.04 or later", vetted: true}])
-              .map(s => [s.id, s.vetted ? s.name : devOpt(s.name)]))}</select></div>
-        </div>
-        <div class="hint" id="ndEnSysWhy" hidden></div>
-        <label class="ndcap"><input type="checkbox" id="ndEnSess" checked> Sessions run on it</label>
-        <label class="ndcap"><input type="checkbox" id="ndEnHost"> Hosting only: it runs containers sent to it, and nothing of it comes back</label>
-        <div class="hint" id="ndEnHostHint" hidden>No space's code, no sessions and no aerie go to it; its agent may ask the controller for its own jobs and nothing else. For a public box such as a cloud VPS.</div>
-        <label class="ndcap" id="ndEnFwRow" hidden><input type="checkbox" id="ndEnFw" checked> Take in only 80 and 443</label>
-        <div class="hint" id="ndEnFwHint" hidden>A firewall on the machine drops everything else coming in, a port a container publishes included, so nginx is the way to a container. Port 22 stays open unless the SSH door closes it. Going out is left alone.</div>
-        <div class="setrow col ctlrow">${lbl("ndEnDoor", "SSH door",
-          "a way in for ssh, switched on and off from the node's row. cloudflared publishes the machine's port 22 at a hostname of its own, with a tunnel token from Zero Trust" + (dev ? "; Tailscale joins the machine to your tailnet with an auth key and answers ssh there, with no public name" : ""))}
-          <select id="ndEnDoor">
+    // One form (R301): the machine and what runs on it; its SSH door; what
+    // is put on it once it enrolls; how it reaches the controller. Each row a
+    // choice shows or hides keeps its id (ndEn...Row).
+    drawHTML(body, `<div class="field">${formBox({groups: [
+      {fields: [
+        formField("ndEnName", "Name", `<input id="ndEnName" maxlength="60" autocomplete="off" placeholder="buildbox">`),
+        formField("ndEnUser", "Jobs run as", `<input id="ndEnUser" maxlength="32" autocomplete="off" spellcheck="false" value="bb">`,
+          {help: "the account the provisioner makes and every job runs as. bb unless that name is taken on the machine"}),
+        formField("ndEnSystem", "System", `<select id="ndEnSystem">${optionList((nodesSystems.length ? nodesSystems : [{id: "ubuntu", name: "Ubuntu 24.04 or later", vetted: true}])
+            .map(s => [s.id, s.vetted ? s.name : devOpt(s.name)]))}</select><div class="hint" id="ndEnSysWhy" hidden></div>`,
+          {wide: true, help: "what the machine runs. The script is built for it and refuses another machine by name. A system tagged dev is untested, and is offered only with Offer dev features on"}),
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="ndEnSess" checked> Sessions run on it</label></div>`,
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="ndEnHost"> Hosting only: it runs containers sent to it, and nothing of it comes back</label>
+          <div class="hint" id="ndEnHostHint" hidden>No space's code, no sessions and no aerie go to it; its agent may ask the controller for its own jobs and nothing else. For a public box such as a cloud VPS.</div></div>`,
+        `<div class="fcell fwide" id="ndEnFwRow" hidden><label class="ndcap"><input type="checkbox" id="ndEnFw" checked> Take in only 80 and 443</label>
+          <div class="hint" id="ndEnFwHint" hidden>A firewall on the machine drops everything else coming in, a port a container publishes included, so nginx is the way to a container. Port 22 stays open unless the SSH door closes it. Going out is left alone.</div></div>`]},
+      {head: "SSH door", fields: [
+        formField("ndEnDoor", "Door", `<select id="ndEnDoor">
             <option value="">none</option>
             <option value="cloudflared">cloudflared: port 22 at a hostname</option>${dev ? `
             <option value="tailscale">${devOpt("Tailscale: ssh on the tailnet")}</option>` : ""}
-          </select></div>
-        <div class="setrow col ctlrow" id="ndEnDoorHostRow" hidden>${lbl("ndEnDoorHost", "The door's hostname",
-          "a public hostname of its own on the tunnel (not the controller's), set in Zero Trust to go to ssh://localhost:22")}
-          <input id="ndEnDoorHost" autocomplete="off" spellcheck="false" placeholder="ssh-vps.example.com"></div>
-        <div class="setrow col ctlrow" id="ndEnDoorSecretRow" hidden>${lbl("ndEnDoorSecret", "The door's secret",
-          (dev ? "cloudflared's tunnel token, or a Tailscale auth key." : "cloudflared's tunnel token.") + " It rides in the script until the script has run, then leaves it; the node keeps it")}
-          <input id="ndEnDoorSecret" type="password" autocomplete="off" spellcheck="false"></div>
-        <label class="ndcap" id="ndEnDoorCloseRow" hidden><input type="checkbox" id="ndEnDoorClose"> Close port 22 to the internet once the door is up</label>
-        <div class="hint" id="ndEnDoorHint" hidden>Who gets to the door is the tunnel's own say (Cloudflare Access${dev ? ", or the tailnet's ACLs" : ""}); the machine's keys decide after that. Leave port 22 open until you have come in through the door once.</div>
-        <label class="ndcap"><input type="checkbox" id="ndEnVm"> VM host: run virtual machines on it</label>
-        <div class="hint" id="ndEnVmHint" hidden>KVM through libvirt, installed once it has enrolled. It needs /dev/kvm: on a VM, its host passes virtualization through (CPU mode host-passthrough). Its Features section on this page installs and removes it later too.</div>
-        <label class="ndcap"><input type="checkbox" id="ndEnNginx"> Put nginx on it once it is enrolled</label>
-        <div class="hint" id="ndEnNginxHint" hidden>AerieOS's own reverse proxy, deployed the moment the node enrolls, with the routes and certificate the nginx page holds for it (set them there first or after).</div>
-      </div>
-      <div class="field">
-        <div class="setrow col ctlrow">${lbl("ndEnReach", "Reaches the controller",
-          "how the machine dials in. " + (dev ? "Through WireGuard, the config your router made for it goes inside the script, and only the controller is routed through the tunnel. " : "") + "Through a public hostname, a tunnel at home (Cloudflare Tunnel, Tailscale Funnel, ngrok, frp) publishes the controller at a name and the machine dials that: nothing on your router changes and it never learns your address")}
-          <select id="ndEnReach">
+          </select>`, {wide: true, help: "a way in for ssh, switched on and off from the node's row. cloudflared publishes the machine's port 22 at a hostname of its own, with a tunnel token from Zero Trust" + (dev ? "; Tailscale joins the machine to your tailnet with an auth key and answers ssh there, with no public name" : "")}),
+        formField("ndEnDoorHost", "The door's hostname", `<input id="ndEnDoorHost" autocomplete="off" spellcheck="false" placeholder="ssh-vps.example.com">`,
+          {hidden: true, attrs: `id="ndEnDoorHostRow"`, help: "a public hostname of its own on the tunnel (not the controller's), set in Zero Trust to go to ssh://localhost:22"}),
+        formField("ndEnDoorSecret", "The door's secret", `<input id="ndEnDoorSecret" type="password" autocomplete="off" spellcheck="false">`,
+          {hidden: true, attrs: `id="ndEnDoorSecretRow"`, help: (dev ? "cloudflared's tunnel token, or a Tailscale auth key." : "cloudflared's tunnel token.") + " It rides in the script until the script has run, then leaves it; the node keeps it"}),
+        `<div class="fcell fwide" id="ndEnDoorCloseRow" hidden><label class="ndcap"><input type="checkbox" id="ndEnDoorClose"> Close port 22 to the internet once the door is up</label>
+          <div class="hint" id="ndEnDoorHint" hidden>Who gets to the door is the tunnel's own say (Cloudflare Access${dev ? ", or the tailnet's ACLs" : ""}); the machine's keys decide after that. Leave port 22 open until you have come in through the door once.</div></div>`]},
+      {head: "Once it enrolls", fields: [
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="ndEnVm"> VM host: run virtual machines on it</label>
+          <div class="hint" id="ndEnVmHint" hidden>KVM through libvirt, installed once it has enrolled. It needs /dev/kvm: on a VM, its host passes virtualization through (CPU mode host-passthrough). Its Features section on this page installs and removes it later too.</div></div>`,
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="ndEnNginx"> Put nginx on it once it is enrolled</label>
+          <div class="hint" id="ndEnNginxHint" hidden>AerieOS's own reverse proxy, deployed the moment the node enrolls, with the routes and certificate the nginx page holds for it (set them there first or after).</div></div>`]},
+      {head: "Reaches the controller", fields: [
+        formField("ndEnReach", "Through", `<select id="ndEnReach">
             <option value="lan">on this network</option>${dev ? `
             <option value="wireguard">${devOpt("WireGuard")}</option>` : ""}
             <option value="public">a public hostname (a tunnel from home)</option>
-          </select></div>
-        <div class="setrow col ctlrow">${lbl("ndEnCtl", "Controller's address",
-          "the URL the machine dials. " + (dev ? "Behind WireGuard, the controller's address on your network, which the tunnel routes to. " : "") + "Through a public hostname, the name the tunnel publishes, as https://bb.example.com")}
-          <input id="ndEnCtl" autocomplete="off" spellcheck="false" value="${esc(location.origin)}"></div>
-        <div class="hint" id="ndEnCfHint" hidden>Hosting only, and no sessions: the controller cannot reach back through the tunnel. The machine verifies the hostname's public certificate and never sees your home address.</div>
-        <div class="setrow col ctlrow" id="ndEnWgRow" hidden>${lbl("ndEnWgText", "WireGuard config",
-            "the .conf your router made for this machine: choose the file, or paste what is in it. Only the controller's address is routed through it on the machine")}
-          <input type="file" id="ndEnWg" accept=".conf,text/plain" aria-label="choose the WireGuard config file">
-          <textarea id="ndEnWgText" rows="7" spellcheck="false" autocomplete="off"
-            placeholder="[Interface]&#10;PrivateKey = …&#10;Address = 10.6.0.5/32&#10;&#10;[Peer]&#10;PublicKey = …&#10;Endpoint = home.example.net:51820"></textarea></div>
-      </div>
+          </select>`, {wide: true, help: "how the machine dials in. " + (dev ? "Through WireGuard, the config your router made for it goes inside the script, and only the controller is routed through the tunnel. " : "") + "Through a public hostname, a tunnel at home (Cloudflare Tunnel, Tailscale Funnel, ngrok, frp) publishes the controller at a name and the machine dials that: nothing on your router changes and it never learns your address"}),
+        formField("ndEnCtl", "Controller's address", `<input id="ndEnCtl" autocomplete="off" spellcheck="false" value="${esc(location.origin)}">`,
+          {wide: true, help: "the URL the machine dials. " + (dev ? "Behind WireGuard, the controller's address on your network, which the tunnel routes to. " : "") + "Through a public hostname, the name the tunnel publishes, as https://bb.example.com"}),
+        `<div class="fcell fwide" id="ndEnCfHint" hidden><div class="hint">Hosting only, and no sessions: the controller cannot reach back through the tunnel. The machine verifies the hostname's public certificate and never sees your home address.</div></div>`,
+        formField("ndEnWgText", "WireGuard config", `<input type="file" id="ndEnWg" accept=".conf,text/plain" aria-label="choose the WireGuard config file">
+          <textarea id="ndEnWgText" rows="7" spellcheck="false" autocomplete="off" placeholder="[Interface]&#10;PrivateKey = …&#10;Address = 10.6.0.5/32&#10;&#10;[Peer]&#10;PublicKey = …&#10;Endpoint = home.example.net:51820"></textarea>`,
+          {wide: true, hidden: true, attrs: `id="ndEnWgRow"`, help: "the .conf your router made for this machine: choose the file, or paste what is in it. Only the controller's address is routed through it on the machine"})]}]})}</div>
       <div class="field"><div class="hint">${enrolled
         ? "A new script for this node: run it again on the same machine, as root, to set it up afresh or change what it reaches the controller through. It carries no secret (the node keeps its WireGuard config and its door's); a secret pasted here replaces the node's. It refuses to run on another machine, and so does the controller."
         : "The script carries a token good once, for a day, and runs as root on a Linux machine."}</div></div>

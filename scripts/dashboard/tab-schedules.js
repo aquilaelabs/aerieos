@@ -79,26 +79,23 @@ function schedForm(s){
   const nodes = (schedData.nodes || []);
   const cron = schedDraft.cron ?? s?.cron ?? SCHED_WHEN[1][0];
   const custom = schedDraft.custom ?? !SCHED_WHEN.some(([c]) => c === cron);
-  return `<div data-schedform="${esc(s?.id || "new")}">
-      <div class="field">${lbl("schName", "Name")}
-        <input id="schName" data-schedf="name" type="text" value="${v("name")}" autocomplete="off"></div>
-      <div class="field"><div class="fgrid">
-        <div class="setrow col ctlrow">${lbl("schWhen", "When")}
-          <select id="schWhen">${optionList([...SCHED_WHEN, ["", "Custom"]], custom ? "" : cron)}</select></div>
-        <div class="setrow col ctlrow">${lbl("schNode", "Runs on")}
-          <select id="schNode" data-schedf="node">${s?.node || schedDraft.node ? "" : `<option value="">pick where</option>`}${
-            optionList(nodes.map(n => [n.id, n.name]), schedDraft.node ?? s?.node)}</select></div>
-      </div></div>
-      <div class="field" id="schCronF"${custom ? "" : " hidden"}>${lbl("schCron", "Timetable", `cron's five fields: minute, hour, day of the month, month, weekday, on this controller's clock (${state?.clock_tz || "UTC"}); the times shown are in your own zone`)}
-        <input id="schCron" data-schedf="cron" type="text" value="${esc(cron)}" spellcheck="false" autocomplete="off"
-          placeholder="0 4 * * 0">
-        <div class="hint" id="schCronSaid">${esc(s?.words || "0 4 * * 0 is Sundays at 4:00")}</div></div>
-      ${s?.system ? `<div class="field">${lbl("schDoes", "Does")}
-        <div class="hint" id="schDoes">${esc(s.does || s.system.apply)}: one of the machine's own jobs, made on the Storage page, which is where its keep count is set.</div></div>`
-      : `<div class="field" id="schAsRow">${schedAs(s)}</div>
-      <div class="field">${lbl("schScript", "Script")}
-        <textarea id="schScript" data-schedf="script" rows="8" spellcheck="false">${v("script")}</textarea>
-        <div class="hint">Run by bash where it runs: on the controller, as the controller's account, with all it holds; on a node, as its jobs account. Its output is the job's log on the Jobs page.</div></div>`}
+  // One form (R301) over the dialog's own foot; Runs as is a cell of its
+  // own, drawn again when the node changes, and not drawn where there is
+  // nothing to ask.
+  const as = s?.system ? "" : schedAs(s);
+  return `<div class="field" data-schedform="${esc(s?.id || "new")}">${formBox({fields: [
+      formField("schName", "Name", `<input id="schName" data-schedf="name" type="text" value="${v("name")}" autocomplete="off">`, {wide: true}),
+      formField("schWhen", "When", `<select id="schWhen">${optionList([...SCHED_WHEN, ["", "Custom"]], custom ? "" : cron)}</select>`),
+      formField("schNode", "Runs on", `<select id="schNode" data-schedf="node">${s?.node || schedDraft.node ? "" : `<option value="">pick where</option>`}${
+          optionList(nodes.map(n => [n.id, n.name]), schedDraft.node ?? s?.node)}</select>`),
+      formField("schCron", "Timetable", `<input id="schCron" data-schedf="cron" type="text" value="${esc(cron)}" spellcheck="false" autocomplete="off" placeholder="0 4 * * 0">
+        <div class="hint" id="schCronSaid">${esc(s?.words || "0 4 * * 0 is Sundays at 4:00")}</div>`,
+        {wide: true, hidden: !custom, attrs: `id="schCronF"`,
+         help: `cron's five fields: minute, hour, day of the month, month, weekday, on this controller's clock (${state?.clock_tz || "UTC"}); the times shown are in your own zone`}),
+      ...(s?.system ? [formField("schDoes", "Does", `<div class="hint" id="schDoes">${esc(s.does || s.system.apply)}: one of the machine's own jobs, made on the Storage page, which is where its keep count is set.</div>`, {wide: true})]
+        : [`<div class="fcell fwide" id="schAsRow"${as ? "" : " hidden"}>${as}</div>`,
+           formField("schScript", "Script", `<textarea id="schScript" data-schedf="script" rows="8" spellcheck="false">${v("script")}</textarea>`,
+             {wide: true, hint: "Run by bash where it runs: on the controller, as the controller's account, with all it holds; on a node, as its jobs account. Its output is the job's log on the Jobs page."})])]})}
     </div>`;
 }
 
@@ -161,7 +158,9 @@ function wireSchedForm(m, s){
       // Off a sandbox, the jobs account: root is not this node's to give.
       if (!n?.sandbox && (schedDraft.as ?? s?.as) === "root") schedDraft.as = "job";
       if (!row) return;             // a system schedule has no Runs as
-      drawHTML(row, schedAs(s));
+      const html = schedAs(s);
+      row.hidden = !html;
+      drawHTML(row, html);
       const as = row.querySelector("[data-schedf]");
       if (as) wireField(as);
     }

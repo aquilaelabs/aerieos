@@ -200,23 +200,25 @@ function instConfigurable(r){
 function instConfigField(f, v, key){
   const id = `ic-${key}-${f.name}`.replace(/[^A-Za-z0-9_-]/g, "_");
   const at = `data-icf="${esc(f.name)}"`;
-  const label = lbl(id, f.label, f.help || "");
+  const help = f.help || "";
+  // Each a cell of the form (R301): its label over it, a list's rows and a
+  // space's ticks across it.
   switch (f.kind){
-    case "secret": return `<div class="field setrow col ctlrow">${label}<input id="${id}" type="password" ${at} autocomplete="off" spellcheck="false" placeholder="${v ? "set: type to replace, or 'clear'" : f.required ? "required" : ""}"></div>`;
-    case "text": return `<div class="field setrow col ctlrow">${label}<input id="${id}" type="text" ${at} autocomplete="off" spellcheck="false" value="${esc(v || "")}"></div>`;
-    case "switch": return `<div class="field"><label class="ndcap"><input id="${id}" type="checkbox" ${at}${v ? " checked" : ""}> ${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</label></div>`;
-    case "choice": return `<div class="field setrow col ctlrow">${label}<select id="${id}" ${at}>${(f.choices || []).map(c => `<option value="${esc(c.value)}"${c.value === v ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select></div>`;
+    case "secret": return formField(id, f.label, `<input id="${id}" type="password" ${at} autocomplete="off" spellcheck="false" placeholder="${v ? "set: type to replace, or 'clear'" : f.required ? "required" : ""}">`, {help});
+    case "text": return formField(id, f.label, `<input id="${id}" type="text" ${at} autocomplete="off" spellcheck="false" value="${esc(v || "")}">`, {help});
+    case "switch": return `<div class="fcell fwide"><label class="ndcap"><input id="${id}" type="checkbox" ${at}${v ? " checked" : ""}> ${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</label></div>`;
+    case "choice": return formField(id, f.label, `<select id="${id}" ${at}>${(f.choices || []).map(c => `<option value="${esc(c.value)}"${c.value === v ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select>`, {help});
     case "projects": {
       const all = (inst?.rows || []).find(x => x.kind === "service" && x.service === "router")?.all_projects || [];
-      return `<div class="field"><div class="fsub">${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</div><div class="chips">${all.length ? all.map(p => `<label class="chip"><input type="checkbox" data-icproj="${esc(f.name)}" value="${esc(p)}"${(v || []).includes(p) ? " checked" : ""}> ${esc(p)}</label>`).join("") : `<span class="dim">no spaces yet</span>`}</div></div>`;
+      return formField(id, f.label, `<div class="fticks" id="${id}">${all.length ? all.map(p => `<label class="ndcap"><input type="checkbox" data-icproj="${esc(f.name)}" value="${esc(p)}"${(v || []).includes(p) ? " checked" : ""}> ${esc(p)}</label>`).join("") : `<span class="dim">no spaces yet</span>`}</div>`, {help, wide: true});
     }
     case "list": {
-      const rows = (v || []).map((row, j) => `<div class="field ctlrow icrow" data-iclist="${esc(f.name)}" data-icrow="${j}">${
+      const rows = (v || []).map((row, j) => `<div class="ctlrow icrow" data-iclist="${esc(f.name)}" data-icrow="${j}">${
         (f.fields || []).map(sf => sf.kind === "secret"
           ? `<input type="password" data-icsub="${esc(sf.name)}" placeholder="${row[sf.name] ? "set: type to replace" : esc(sf.label)}" autocomplete="off" spellcheck="false" aria-label="${esc(sf.label)}">`
           : `<input type="text" data-icsub="${esc(sf.name)}" placeholder="${esc(sf.help || sf.label)}" value="${esc(row[sf.name] || "")}" autocomplete="off" spellcheck="false" aria-label="${esc(sf.label)}">`).join("")}
         <button type="button" data-icrm="${esc(f.name)}" data-icrow="${j}">Remove</button></div>`).join("");
-      return `<div class="field"><div class="fsub">${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</div></div>${rows}<div class="field"><div class="addbar ctlrow"><button type="button" data-icadd="${esc(f.name)}">Add a row</button></div></div>`;
+      return formField(id, f.label, `<div class="iclist" id="${id}">${rows}<div class="addbar ctlrow"><button type="button" data-icadd="${esc(f.name)}">Add a row</button></div></div>`, {help, wide: true});
     }
     default: return "";
   }
@@ -232,8 +234,9 @@ function instConfigForm(r, scope = "node"){
   const title = scope === "person" ? `Yours on ${inst?.name || "this node"}` : both ? `This node: ${inst?.name || ""}` : `Configure on ${inst?.name || "this node"}`;
   return `<div class="field agpart icform" data-icform="${esc(key)}" data-icscope="${scope}"><div class="fsub">${esc(title)}</div>
     ${scope === "person" ? `<div class="hint">Yours alone: your sessions' verbs here read these over the node's.</div>` : ""}
-    ${fields.map(f => instConfigField(f, v[f.name], `${key}-${scope}`)).join("")}
-    <div class="actbar"><span class="state">${r.kind === "service" && r.installed ? "saving rebuilds it with the change" : ""}</span><button type="button" class="primary" data-icsave="${esc(key)}">Save</button></div></div>`;
+    ${formBox({fields: fields.map(f => instConfigField(f, v[f.name], `${key}-${scope}`)),
+      state: `<span class="state">${r.kind === "service" && r.installed ? "saving rebuilds it with the change" : ""}</span>`,
+      foot: [`<button type="button" class="primary" data-icsave="${esc(key)}">Save</button>`]})}</div>`;
 }
 function instConfigRead(form, r, scope = "node"){
   const v = {};

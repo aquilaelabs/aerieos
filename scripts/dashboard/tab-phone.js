@@ -206,17 +206,13 @@ function phonePanel(n){
     // what a network flags as port scanning (the operator, 9 Oct).
     `<div class="row">
        <div class="grow name phstep">Connect</div>
-       <div class="grow prefrow ctlrow">
-         <div class="grow setrow col ctlrow">${lbl("phIp", "Phone IP address", "from its wireless debugging screen, before the colon")}
-         <input id="phIp" maxlength="15" autocomplete="off"
-         placeholder="192.168.0.10" value="${esc(phIp)}"${off ? " disabled" : ""}></div>
-         <div class="setrow col ctlrow">${lbl("phConnPort", "Port", "after the colon on the wireless debugging screen; it changes each time that is turned on")}
-         <input id="phConnPort" maxlength="5" inputmode="numeric" autocomplete="off"
-         placeholder="41235" value="${esc(phConnPort)}"${off ? " disabled" : ""}></div>
-       </div>
-       <span class="acts"><button type="button" id="phConnect" class="primary"${off ? ' data-off="1"' : ""}${
-         off || !phIp.trim() || !phConnPort.trim() ? " disabled" : ""} title="${offWhy}"
-         >${dev ? "Reconnect" : "Connect"}</button></span>
+       <div class="grow">${formBox({fields: [
+         formField("phIp", "Phone IP address", `<input id="phIp" maxlength="15" autocomplete="off" placeholder="192.168.0.10" value="${esc(phIp)}"${off ? " disabled" : ""}>`,
+           {help: "from its wireless debugging screen, before the colon"}),
+         formField("phConnPort", "Port", `<input id="phConnPort" maxlength="5" inputmode="numeric" autocomplete="off" placeholder="41235" value="${esc(phConnPort)}"${off ? " disabled" : ""}>`,
+           {help: "after the colon on the wireless debugging screen; it changes each time that is turned on"})],
+         foot: [`<button type="button" id="phConnect" class="primary"${off ? ' data-off="1"' : ""}${
+           off || !phIp.trim() || !phConnPort.trim() ? " disabled" : ""} title="${offWhy}">${dev ? "Reconnect" : "Connect"}</button>`]})}</div>
        ${phWhyLine("connect", offWhy)}
        ${ph.you && phIp === ph.you ? `<div class="hint">This device: you are reading this on it.</div>` : ""}
      </div>`,
@@ -224,16 +220,12 @@ function phonePanel(n){
     // fold over two fields is a click that buys nothing.
     `<div class="row">
        <div class="grow name phstep">Pair a new phone</div>
-       <div class="grow prefrow ctlrow">
-         <div class="setrow col ctlrow">${lbl("phPairPort", "Pairing port", "from the pairing dialog, not the main screen")}
-         <input id="phPairPort" maxlength="5" autocomplete="off" placeholder="37123"
-           value="${esc(phPort)}"${off ? " disabled" : ""}></div>
-         <div class="setrow col ctlrow">${lbl("phPairCode", "Pairing code")}
-         <input id="phPairCode" maxlength="6" autocomplete="off" placeholder="123456"
-           value="${esc(phCode)}"${off ? " disabled" : ""}></div>
-       </div>
-       <span class="acts"><button type="button" id="phPair"${off ? ' data-off="1"' : ""}${
-         off || !phIp.trim() || !phPort.trim() || !phCode.trim() ? " disabled" : ""} title="${offWhy}">Pair</button></span>
+       <div class="grow">${formBox({fields: [
+         formField("phPairPort", "Pairing port", `<input id="phPairPort" maxlength="5" autocomplete="off" placeholder="37123" value="${esc(phPort)}"${off ? " disabled" : ""}>`,
+           {help: "from the pairing dialog, not the main screen"}),
+         formField("phPairCode", "Pairing code", `<input id="phPairCode" maxlength="6" autocomplete="off" placeholder="123456" value="${esc(phCode)}"${off ? " disabled" : ""}>`)],
+         foot: [`<button type="button" id="phPair"${off ? ' data-off="1"' : ""}${
+           off || !phIp.trim() || !phPort.trim() || !phCode.trim() ? " disabled" : ""} title="${offWhy}">Pair</button>`]})}</div>
        ${phWhyLine("pair", offWhy)}
        <div class="hint">${ph.you && phIp === ph.you
          ? `<b class="warn">You are reading this on the phone you are pairing.</b>
@@ -283,16 +275,11 @@ function phonePanel(n){
     rows.push(`<div class="row phlend">
        <div class="grow">
          <div class="name">Lend to a space</div>
-         <div class="prefrow ctlrow">
-           <label class="pick">Space <select id="phLendTo" aria-label="the space to lend the phone to"${ps.length ? "" : " disabled"}>${
-             optionList(ps.map(p => [p, projLabel(p)]), phLendTo)}</select></label>
-           <label class="pick">For <select id="phLendFor" aria-label="how long">
-             <option value="1"${phLendFor === "1" ? " selected" : ""}>1 hour</option>
-             <option value="4"${phLendFor === "4" ? " selected" : ""}>4 hours</option>
-             <option value="0"${phLendFor === "0" ? " selected" : ""}>until taken back</option></select></label>
-         </div>
-         <div class="actbar"><span class="state">its sessions then install, run, see and touch its own app here without asking; anything else still asks you</span>
-           <button type="button" id="phLend"${ps.length ? "" : " disabled"}>Lend</button></div>
+         ${formBox({fields: [
+           formField("phLendTo", "Space", `<select id="phLendTo"${ps.length ? "" : " disabled"}>${optionList(ps.map(p => [p, projLabel(p)]), phLendTo)}</select>`),
+           formField("phLendFor", "For", `<select id="phLendFor">${optionList([["1", "1 hour"], ["4", "4 hours"], ["0", "until taken back"]], phLendFor)}</select>`)],
+           state: `<span class="state">its sessions then install, run, see and touch its own app here without asking; anything else still asks you</span>`,
+           foot: [`<button type="button" id="phLend"${ps.length ? "" : " disabled"}>Lend</button>`]})}
          ${ps.length ? "" : `<div class="sub bad">No space of yours runs on ${esc(n.name)}, so there is none to lend it to.</div>`}
        </div></div>`);
   }

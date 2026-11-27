@@ -1080,6 +1080,11 @@ body.firstrun #panes{display:none}
 :is(.thingtab,.entrytab) .idetail,.entrytab .ldetail{display:flex;flex-direction:column;gap:6px}
 :is(.thingtab,.entrytab) .pghead .name .lcicon{margin-right:4px}
 .installedtab .irow .idetail .agpart{margin-top:6px}
+/* A list setting's rows in its cell: each row's fields side by side and
+   its Remove after them, wrapping on a phone. */
+.iclist{display:flex;flex-direction:column;gap:6px}
+.iclist .icrow{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end}
+.iclist .icrow>input{flex:1 1 9em;width:auto;min-width:0}
 /* What it is, a sentence: the note voice, as the Library's card says it,
    not the row's mono data line (the voices rule). */
 .installedtab .irow .iabout{font:var(--f-note)}
@@ -2546,9 +2551,12 @@ body.firstrun #panes{display:none}
 .ndsettings>.fbox{padding:6px var(--row-x) 0}
 /* A switch is one line of the grid, its words beside its tick. */
 .fcell>.ndcap{display:flex;min-height:var(--tap)}
-/* A VM's CPU threads, a tick for each core's pair, wrapped with room
-   between them. */
-.vmcpus{display:flex;flex-wrap:wrap;gap:0 18px}
+/* A field that is a set of ticks (a VM's CPU threads, what a way of
+   reaching you takes, the spaces a service serves): wrapped with room
+   between them, never a row that scrolls as a filter's chips do. */
+.fticks{display:flex;flex-wrap:wrap;gap:0 18px}
+/* A form after the lines that introduce it keeps room from them. */
+.grow>*+.fbox{margin-top:12px}
 /* A tick that qualifies the field above it (a shared folder's read-only)
    sits in its cell, under it. */
 .fcell>:is(input,select,textarea)+.ndcap{margin-top:8px}

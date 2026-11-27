@@ -543,7 +543,7 @@ function vmHwFields(host, hw, admin){
       mine ? `<span class="sub dim">this machine's: Features on its node marks it for a VM</span>` : ""}</label>`; })] : [];
   return `<div class="field">${formBox({fields: [
       `<div class="fcell fwide">${lbl("vmHwCpus", "CPU threads", "pin its vCPUs to these host threads, each core's pair together; none ticked leaves the host to schedule it")}
-        <div class="vmcpus" id="vmHwCpus">${cpus || `<span class="sub">the node has not said its CPUs yet</span>`}</div>
+        <div class="fticks" id="vmHwCpus">${cpus || `<span class="sub">the node has not said its CPUs yet</span>`}</div>
         <label class="ndcap"><input type="checkbox" id="vmHwShareCpus"> Share them with another VM pinned there</label></div>`,
       // The network's fields on one line with the hint they share under
       // them, then memory and the shared folder side by side.

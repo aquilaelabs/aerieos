@@ -291,14 +291,11 @@ function machineConsoleSection(n){
   return docSection("nodes", "console", "Console", c.set ? "password set" : "no password", `<div class="field">
       <div class="hint">At this machine's screen or a KVM, log in as <code>admin</code> with this password; <code>sudo</code> gives root${
         helpIcon("It is not your dashboard password, and it is kept on the machine, not here. When nothing else answers, the boot menu's Rescue entry opens a root shell at the screen.")}</div>
-      ${consolePwFields()}
-      <div class="actbar">${c.set ? `<button type="button" class="danger" data-console="clear">Take it away</button>` : ""}<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button></div></div>`);
-}
-
-// The two fields, here and on the first-run page's step.
-function consolePwFields(cls = ""){
-  return `<div class="fgrid${cls ? ` ${cls}` : ""}"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" data-ph-short="10 or more" aria-label="the console password"></label>
-        <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>`;
+      ${formBox({fields: [
+        formField("conPw", "Password", `<input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" data-ph-short="10 or more">`),
+        formField("conPw2", "Again", `<input type="password" id="conPw2" autocomplete="new-password">`)],
+        foot: [c.set ? `<button type="button" class="danger lead" data-console="clear">Take it away</button>` : "",
+          `<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button>`]})}</div>`);
 }
 
 function wireMachineConsole(root){
@@ -617,12 +614,13 @@ function adoptTakeField(){
   if (adoptMoverCron === null) adoptMoverCron = old || MOVER_TIMES[0][0];
   // Each share a group at the field's margin, then when the mover runs,
   // then the takeover's own two presses under what they act on.
-  const moves = list.length ? `${lbl("adoptMoves", "Where each share's files go", "set as the old system had them: where new files land, and what the mover does with them, from what to what. Each share's Edit on the Storage page changes it later")}
-    ${list.map((m, i) => `<div class="fgroup admove" data-admove="${esc(m.share)}"><div class="fgrouphead">${esc(m.share)}</div>
-      <div class="fgrid">${moveFields(`adMove${i}`, pools, m)}</div></div>`).join("")}
-    <div class="fgroup"><div class="fgrid"><div class="setrow col ctlrow">${lbl("adoptMoverWhen", "The mover runs")}<select id="adoptMoverWhen">${optionList(times, adoptMoverCron)}</select></div></div></div>` : "";
-  return `<div class="field" id="adoptTake">${moves}
-    <div class="actbar"><button type="button" data-adopttake="dry">Check the takeover</button><button type="button" class="danger" data-adopttake="go">Take the array over</button></div></div>`;
+  // One form (R301): a group a share, then when the mover runs.
+  const moves = list.length ? [
+    ...list.map((m, i) => ({head: m.share, attrs: `data-admove="${esc(m.share)}"`, fields: [moveFields(`adMove${i}`, pools, m)]})),
+    {fields: [formField("adoptMoverWhen", "The mover runs", `<select id="adoptMoverWhen">${optionList(times, adoptMoverCron)}</select>`)]}] : [];
+  return `<div class="field" id="adoptTake">${list.length ? `${lbl("adoptMoves", "Where each share's files go", "set as the old system had them: where new files land, and what the mover does with them, from what to what. Each share's Edit on the Storage page changes it later")}` : ""}${
+    moves.length ? formBox({groups: moves, foot: [`<button type="button" data-adopttake="dry">Check the takeover</button>`, `<button type="button" class="danger" data-adopttake="go">Take the array over</button>`]})
+      : `<div class="actbar"><button type="button" data-adopttake="dry">Check the takeover</button><button type="button" class="danger" data-adopttake="go">Take the array over</button></div>`}</div>`;
 }
 
 function wireAdopt(root){

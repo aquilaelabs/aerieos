@@ -125,8 +125,8 @@ function drawSetup(){
     ${card(next++, "Your name and email", s.git, false, s.git
       ? `<p>Your commits carry them. Your profile, in the gear, changes them.</p>`
       : `<p>Every commit carries an author, and no Claude session starts without one.</p>
-         <div class="fgrid setfields"><div class="setrow col ctlrow">${lbl("setName", "Your name")}<input id="setName" type="text" autocomplete="name" placeholder="Ada Lovelace"></div>
-           <div class="setrow col ctlrow">${lbl("setEmail", "Your email")}<input id="setEmail" type="email" autocomplete="email" placeholder="ada@example.com"></div></div>`,
+         <div class="fgrid setfields">${formField("setName", "Your name", `<input id="setName" type="text" autocomplete="name" placeholder="Ada Lovelace">`)}${
+           formField("setEmail", "Your email", `<input id="setEmail" type="email" autocomplete="email" placeholder="ada@example.com">`)}</div>`,
       s.git ? "" : `<button type="button" class="primary" data-setgit disabled>Save</button>`)}
     ${card(next++, "Claude Code on your node", !!s.claude, false, s.claude
       ? `<p>${esc(s.claude)} on ${nodeName}. A space's Start agent signs you in there the first time.</p>`
@@ -615,8 +615,8 @@ function setupDisksCard(num){
     <p>Where your files and AerieOS's own data will live. Nothing is written until you press Make it, which names every disk it erases first.${
       theirs.length ? " The old system's disks are adopted in the walk, not made into anything here." : ""}</p>
     <div class="rows">${theirs.map(theirRow).join("")}${free.map(row).join("")}</div>
-    <div class="fgrid setfields"><div class="setrow col ctlrow">${lbl("setLose", "How safe")}<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select></div>
-      ${setupDisks.adv ? `<div class="setrow col ctlrow">${lbl("setLayout", "Layout")}<select id="setLayout">${optionList(lays, setupDisks.layout)}</select></div>` : ""}</div>
+    <div class="fgrid setfields">${formField("setLose", "How safe", `<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select>`)}${
+      setupDisks.adv ? formField("setLayout", "Layout", `<select id="setLayout">${optionList(lays, setupDisks.layout)}</select>`) : ""}</div>
     ${says(plan.main)}${plan.fast ? says(plan.fast).replace("<b>A ZFS mirror</b>", "<b>A fast ZFS mirror</b>").replace("<b>One pool</b>", "<b>A fast pool</b>") : ""}
     ${plan.notes.map(t => `<div class="sub warn">${esc(t)}</div>`).join("")}
     <p class="dim">Encryption, snapshots and moving writes between pools are on the Storage page, after Finish.</p></div>
