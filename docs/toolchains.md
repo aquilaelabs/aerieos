@@ -799,10 +799,7 @@ turns, `aerie emu start` decides whether the node has room for another: not
 while the node is saturated, and only with the phone's memory, the
 emulator's own and 2 GB for builds free, waiting up to five minutes for
 room and then refusing with the numbers; a card short of a few hundred MB
-free renders that phone in software. Phones made before AVDs were kept per
-space are one space's to keep (`aerie emu adopt`, or automatically for the space named
-in the old folder's `.heir`), and a `bb-scrub.txt` beside an adopted phone
-names packages another space left there, removed on its first boot.
+free renders that phone in software.
 
 ## Playwright, Android, plugins, publishing
 
