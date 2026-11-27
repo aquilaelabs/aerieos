@@ -28,7 +28,7 @@
  "page-tabs.js": 2,
  "page-toolchains.js": 7,
  "tab-audit.js": 1,
- "tab-docker.js": 19,
+ "tab-docker.js": 10,
  "tab-emulator.js": 1,
  "tab-findings.js": 3,
  "tab-installed.js": 6,

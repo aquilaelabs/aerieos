@@ -1682,24 +1682,23 @@ const cAppFolders = (f, as = cAppUnder()) => [...new Set(cAppRoots.map(r => {
 function cAppFieldHtml(f, v, i){
   const id = `cAppF${i}`, at = `data-avar="${esc(f.var)}"`;
   const plain = `autocomplete="off" spellcheck="false"`;
-  if (f.kind === "switch") return `<div class="setrow col ctlrow fwide"><label class="ndcap"><input type="checkbox" id="${id}" ${at}${
+  if (f.kind === "switch") return `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="${id}" ${at}${
     String(v) === "true" ? " checked" : ""}> ${esc(f.label)}${helpIcon(f.help)}</label></div>`;
   // A model router (R238 step 7): the node whose router it uses, a key of
   // the container's own made there; dead, with why, where none is deployed.
   if (f.kind === "router"){
     const none = !cAppRouters.length;
-    return `<div class="setrow col ctlrow">${lbl(id, f.label, f.help)}<select id="${id}" ${at}${none ? " disabled" : ""}>${optionList(
-      [...(f.required && !none ? [] : [["", "none"]]), ...cAppRouters.map(r => [r.node, `the router on ${r.name}`])], String(v))}</select>${
-      none ? `<div class="hint">No model router is deployed: deploy one from a node's Installed page, and this app gets a key of its own there.</div>` : ""}</div>`;
+    return formField(id, f.label, `<select id="${id}" ${at}${none ? " disabled" : ""}>${optionList(
+      [...(f.required && !none ? [] : [["", "none"]]), ...cAppRouters.map(r => [r.node, `the router on ${r.name}`])], String(v))}</select>`,
+      {help: f.help, hint: none ? "No model router is deployed: deploy one from a node's Installed page, and this app gets a key of its own there." : ""});
   }
-  const ctl = f.kind === "folder"
-    ? `<input id="${id}" ${at} ${plain} list="${id}L" value="${esc(v)}" placeholder="${esc(f.example || "/mnt/…/" + (f.default || ""))}"><datalist id="${id}L">${
-        cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`
-    : f.kind === "port" ? `<input id="${id}" ${at} type="number" min="1" max="65535" value="${esc(v)}">`
-    : f.kind === "choice" ? `<select id="${id}" ${at}>${optionList((f.choices || []).map(c => [c.value, c.label]), String(v))}</select>`
-    : f.kind === "secret" ? `<input id="${id}" ${at} type="password" autocomplete="new-password" value="${esc(v)}" placeholder="made for it when left empty" data-ph-short="made if empty">`
-    : `<input id="${id}" ${at} ${plain} value="${esc(v)}" placeholder="${esc(f.example || "")}">`;
-  return `<div class="setrow col ctlrow${f.kind === "port" ? " fshort" : ""}">${lbl(id, f.label, f.help)}${ctl}</div>`;
+  const o = {help: f.help, short: f.kind === "port"};
+  return f.kind === "folder" ? formField(id, f.label, `<input id="${id}" ${at} ${plain} list="${id}L" value="${esc(v)}" placeholder="${esc(f.example || "/mnt/…/" + (f.default || ""))}"><datalist id="${id}L">${
+        cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`, o)
+    : f.kind === "port" ? formField(id, f.label, `<input id="${id}" ${at} type="number" min="1" max="65535" value="${esc(v)}">`, o)
+    : f.kind === "choice" ? formField(id, f.label, `<select id="${id}" ${at}>${optionList((f.choices || []).map(c => [c.value, c.label]), String(v))}</select>`, o)
+    : f.kind === "secret" ? formField(id, f.label, `<input id="${id}" ${at} type="password" autocomplete="new-password" value="${esc(v)}" placeholder="made for it when left empty" data-ph-short="made if empty">`, o)
+    : formField(id, f.label, `<input id="${id}" ${at} ${plain} value="${esc(v)}" placeholder="${esc(f.example || "")}">`, o);
 }
 
 // The panel for app `a`: its head as its Library card's, its own fields in
@@ -1729,9 +1728,11 @@ function cAppDraw(a, vals = null){
   const ids = v.PUID !== undefined ? `${v.PUID}:${v.PGID ?? v.PUID}` : "1000:1000";
   const tz = v.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   drawHTML($("cAppFields"), (a.fields || []).map((f, i) => cAppFieldHtml(f, start(f), i)).join("")
-    + (own.includes("PUID") || own.includes("PGID") ? `<div class="setrow col ctlrow">${lbl("cAppIds", "Runs as", "uid:gid, the user that owns its folders: a share's files are written as it")}<input id="cAppIds" value="${esc(ids)}" autocomplete="off" spellcheck="false"></div>` : "")
-    + (own.includes("TZ") ? `<div class="setrow col ctlrow">${lbl("cAppTz", "Time zone")}<select id="cAppTz">${tzOptions(tz)}</select></div>` : "")
-    + (own.includes("PORT") ? `<div class="setrow col ctlrow fshort">${lbl("cAppPort", "Its port", "what it answers on, on the node; a hostname and a certificate for it are the node's nginx page")}<input id="cAppPort" type="number" min="1" max="65535" value="${esc(v.PORT || (fresh ? cAppFreePort(a.port, given) : a.port))}"></div>` : ""));
+    + (own.includes("PUID") || own.includes("PGID") ? formField("cAppIds", "Runs as", `<input id="cAppIds" value="${esc(ids)}" autocomplete="off" spellcheck="false">`,
+      {help: "uid:gid, the user that owns its folders: a share's files are written as it"}) : "")
+    + (own.includes("TZ") ? formField("cAppTz", "Time zone", `<select id="cAppTz">${tzOptions(tz)}</select>`) : "")
+    + (own.includes("PORT") ? formField("cAppPort", "Its port", `<input id="cAppPort" type="number" min="1" max="65535" value="${esc(v.PORT || (fresh ? cAppFreePort(a.port, given) : a.port))}">`,
+      {help: "what it answers on, on the node; a hostname and a certificate for it are the node's nginx page", short: true}) : ""));
   // What a new one was offered, so a node or a name picked after moves
   // only what the person has not changed.
   if (fresh) $("cAppFields").querySelectorAll('input[data-avar], #cAppPort').forEach(e => { e.dataset.auto = e.value; });
