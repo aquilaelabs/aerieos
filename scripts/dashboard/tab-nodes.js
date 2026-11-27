@@ -1256,14 +1256,14 @@ function nodeSessFacts(n){
     : !sealed ? pill("note", "nothing signed in yet")
     : pill("ok", "in force") + why(`${sealed} sealed${n.tokseal_stale ? `, ${n.tokseal_stale} under an older key until its person opens a terminal here` : ""}`);
   const rl = n.reported?.relay;
-  const relay = !rl ? pill("warn", "not yet") + why("this node's agent is from before it, and takes it up with its next update")
+  const relay = !rl ? ""
     : rl.tls ? pill("ok", "in force")
     : pill("bad", "not in force") + why("its terminals, files and screens stay shut until it has Python's cryptography library or openssl");
   return `<div class="field">${factGrid([
     ["Its own network", net && net + help(`Each session here reaches the internet, the controller and its own space's containers, and nothing else${own ? "; it is also what keeps a session off the controller's own ports" : ""}.`), {html: true}],
     ["Its own user", acct && acct + help("Each account here is a Unix user of its own: its home, its sign-ins and its terminals are its alone, and only root reaches them."), {html: true}],
     ["Sign-ins sealed", seal && seal + help("The coding agents' sign-ins are kept sealed here, opened only while their person has a terminal open, so a copy of the disk signs in to nothing."), {html: true}],
-    ["Encrypted", relay + help("Terminals, files and VMs' screens reach this node from the controller alone, over TLS to the certificate the node made for itself; a request to it is good once."), {html: true}],
+    ["Encrypted", relay && relay + help("Terminals, files and VMs' screens reach this node from the controller alone, over TLS to the certificate the node made for itself; a request to it is good once."), {html: true}],
   ], "ndprot")}</div>`;
 }
 // Whether a session here may ask for a root command at all: a draft, saved
