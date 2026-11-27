@@ -2535,18 +2535,15 @@ def q_show(idx, name, root, first=False):
 
 def q_find(idx, name, root=None):
     rows = named(idx, name)
-    if not rows:
-        found = page_bindings(idx, root, name) if root else []
-        if not found:
-            more = value_decls(idx, root, name)
-            if more:
-                return [f"{f}:{ln}  declared as a value" for f, ln, _ in more]
-            return [f"nothing defines {name}"]
-        out = []
-        for f, ln, kind in found:
-            out.append(f"{f}:{ln}  page-level {kind}"
-                       + ("" if kind == "const" else f"; aerie map state {Path(f).name} says where it is assigned"))
-        return out
+    # A page script's top-level let beside a definition of the same name is
+    # listed too: with a python def called active, the def alone was the
+    # answer and the page variable's place was missed (B1148).
+    found = page_bindings(idx, root, name) if root and "." not in name else []
+    if not rows and not found:
+        more = value_decls(idx, root, name)
+        if more:
+            return [f"{f}:{ln}  declared as a value" for f, ln, _ in more]
+        return [f"nothing defines {name}"]
     out = []
     for d in rows:
         where = f"{d['file']}:{d['line']}"
@@ -2556,6 +2553,9 @@ def q_find(idx, name, root=None):
         said = said_by(root, d)
         if said:
             out.append(f"    says: {said}")
+    for f, ln, kind in found:
+        out.append(f"{f}:{ln}  page-level {kind}"
+                   + ("" if kind == "const" else f"; aerie map state {Path(f).name} says where it is assigned"))
     return out
 
 

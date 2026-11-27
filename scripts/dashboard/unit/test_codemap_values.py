@@ -64,6 +64,23 @@ class ABundleIsNotRead(unittest.TestCase):
         self.assertEqual(codemap.page_bindings(idx, root, "lost"), [])
 
 
+class ADefAndALetOfOneName(unittest.TestCase):
+    """B1148: a python def and a page script's let of the same name, and find
+    answered the def alone, leaving out where the page variable lives."""
+
+    def test_both_are_listed(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "web").mkdir()
+        (root / "web" / "page-state.js").write_text('"use strict";\nlet active = null;\n')
+        (root / "bell.py").write_text("def active(r):\n    return r\n")
+        idx = {"defs": [{"name": "active", "file": "bell.py", "line": 1, "end": 2, "kind": "def", "parent": ""}],
+               "files": {"web/page-state.js": {"lang": "js"}, "bell.py": {"lang": "py"}}}
+        got = codemap.q_find(idx, "active", root=root)
+        self.assertEqual([g.split("  ")[0] for g in got if not g.startswith("    ")], ["bell.py:1 to 2", "web/page-state.js:2"], got)
+        self.assertIn("page-level let", got[-1])
+
+
 class TheSummary(unittest.TestCase):
     """B806: the summary counted every file the brace scanner reads as js,
     so a Kotlin tree read as 44 js, and named a file it could not write."""
