@@ -55,6 +55,30 @@ class Wait(unittest.TestCase):
         self.say(pending=2, error="alpha/a.txt: ConnectionRefusedError")
         self.assertFalse(syncwait.up("alpha"))
 
+    def test_up_goes_on_waiting_while_the_copy_is_moving(self):
+        # B1182: a minute's wait failed a push with thousands of changes
+        # still going up; each fall in what is left buys another UP_S.
+        syncwait.UP_S, syncwait.MOVING_S = 1, 10
+        self.addCleanup(setattr, syncwait, "MOVING_S", 600)
+        self.say(pending=30, started=time.time() - 5)
+        ts = [self.later(0.6, pending=20, started=time.time() - 5), self.later(1.4, pending=10, started=time.time() - 5),
+              self.later(2.2, pending=0)]
+        began = time.time()
+        self.assertTrue(syncwait.up("alpha"), "it was still moving, so the wait went past UP_S and saw it finish")
+        self.assertGreater(time.time() - began, 2.0)
+        for t in ts:
+            t.join()
+
+    def test_up_gives_up_once_the_copy_stops_moving(self):
+        syncwait.UP_S, syncwait.MOVING_S = 1, 10
+        self.addCleanup(setattr, syncwait, "MOVING_S", 600)
+        self.say(pending=30, started=time.time() - 5)
+        t = self.later(0.5, pending=25, started=time.time() - 5)
+        began = time.time()
+        self.assertFalse(syncwait.up("alpha"))
+        self.assertLess(time.time() - began, 3, "one fall bought one more UP_S, and then it stood still")
+        t.join()
+
     def test_down_waits_for_the_revision(self):
         self.say(rev=3)
         t = self.later(0.5, rev=5)

@@ -15,6 +15,11 @@ import time
 
 UP_S = 60
 DOWN_S = 60
+# How long up() goes on waiting while the copy is moving: each fall in what
+# is left to send buys another UP_S, up to this (B1182: a node with
+# thousands of changes on their way failed a push after a minute while they
+# were still going, and the session tried again blindly four times).
+MOVING_S = 600
 
 
 def state_file(project):
@@ -42,15 +47,21 @@ def up(project, why="the controller acts on this space's tree"):
         return True
     asked = time.time()
     end = asked + UP_S
-    st = None
+    st, least = None, None
     while time.time() < end:
         st = _read(f)
         if st and float(st.get("started") or 0) > asked and not int(st.get("pending") or 0):
             return True
+        # Moving: fewer left than ever seen buys another UP_S, within MOVING_S.
+        left = int((st or {}).get("pending") or 0)
+        if st and (least is None or left < least):
+            if least is not None:
+                end = min(max(end, time.time() + UP_S), asked + MOVING_S)
+            least = left
         time.sleep(0.2)
     pending = int((st or {}).get("pending") or 0)
     print(f"[builderbot] WARN: {pending or 'some'} change(s) here have not reached the controller in "
-          f"{UP_S}s{': ' + st['error'] if st and st.get('error') else ''}, and {why}", file=sys.stderr)
+          f"{round(time.time() - asked)}s{': ' + st['error'] if st and st.get('error') else ''}, and {why}", file=sys.stderr)
     return False
 
 

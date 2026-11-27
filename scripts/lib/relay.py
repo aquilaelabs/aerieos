@@ -36,9 +36,9 @@ tree = bool(project) and bool(argv) and (argv[0] in TREE or argv[:2] in (["bug",
 if tree:
     import syncwait
     if not syncwait.up(project) and argv[0] == "git":
-        sys.exit("[builderbot] ERROR: not sent: the controller's copy of this space is behind this one, "
-                 "and git there would act on the older tree. Try again once the node is in step "
-                 "(the Nodes page's Sessions section says each space's state)")
+        sys.exit("[builderbot] ERROR: not sent: the changes above have not reached the controller's copy "
+                 "of this space, and git there would act on the older tree. Nothing was sent; the copy "
+                 "goes on catching up by itself, so run the same command again in a few minutes")
 # The tree a tree verb is about: where the caller stands, or, standing in the
 # project's own directory, the tree BB_REPO names, as preflight and the test
 # runner read it (B233, B274).
@@ -163,5 +163,5 @@ if tree and code == 0 and pos is not None and len(pos) <= 1:
             ["git", "merge-base", "--is-ancestor", head, pushed], capture_output=True, check=False).returncode == 0:
         sys.exit(f"[builderbot] ERROR: the controller pushed {pushed[:9]}, and this tree is at {head[:9]}: "
                  "what was committed here since had not reached the controller's copy. "
-                 "aerie git push again once this space is in step (the Nodes page's Sessions section says its state)")
+                 "The copy goes on catching up by itself: run aerie git push again in a few minutes")
 sys.exit(code)
