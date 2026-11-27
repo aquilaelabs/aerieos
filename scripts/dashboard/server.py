@@ -614,7 +614,7 @@ write_json = statefile.write_json
 _state_lock = threading.Lock()
 
 # ---- what the page keeps here ---------------------------------------------------
-# Each account's tab strip and panes, and the sidebar's cards: layout.py.
+# Each account's tab strip and panes: layout.py.
 import layout                                                    # noqa: E402
 
 layout.configure(state=STATE, write_json=write_json, lock=_state_lock)
@@ -5780,7 +5780,7 @@ preamble.forge_line = forgeaccess.briefing
 projects.token_changed = forgeaccess.token_changed
 devapp.hosts_of = lambda p: (prefs.get(p) or {}).get("hosts") or []
 devapp.reaches_of = prefs.reaches_on
-# ...and what the create dialog's follow-ups and the sidebar's pins need.
+# ...and what the create dialog's follow-ups and a space's pin need.
 projects.lock = _state_lock
 projects.take_on = users.take_on
 projects.held = nodes.workspace_held
@@ -6769,7 +6769,7 @@ def _snapshot(who):
                  # The CI runner tab, a job run and a project's node, by
                  # grant (R137 step 3): the Tools card hides CI runner on it.
                  "runner", "runner-read", "jobs", "node",
-                 # ...and what the sidebar and the dialogs offer (step 4):
+                 # ...and what a space's card and the dialogs offer (step 4):
                  # drawn from the same grants the server refuses on.
                  "lock", "rename", "trash", "version", "create", "command-pin",
                  # ...and the debug options, which a page without the grant
@@ -7087,7 +7087,7 @@ ROUTES = (
     # path it prefixes, and both handlers were called _pin, so the later
     # definition quietly replaced the earlier one in the class body too.
     Route("POST", "prefix", "/api/project-pin", "_project_pin",
-          ("person", "a session has no sidebar: the pins are a person's own")),
+          ("person", "a session pins no spaces: the pins are a person's own")),
     Route("POST", "prefix", "/api/project-group", "_project_group",
           ("person", "a session has no Spaces page: the groups are a person's own")),
     Route("POST", "prefix", "/api/apps", "_apps", "handler"),

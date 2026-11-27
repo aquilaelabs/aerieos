@@ -1446,8 +1446,8 @@ await section("the Profile tab", async () => {
       ok(r.status === 403 && why.test(r.error), `a plain account cannot ${path} ${body.action || ''} (${r.status}: ${r.error.slice(0, 50)})`);
     }
     // The project pins are a person's own (the operator, 27 Sep): a plain
-    // account unpins alpha from its sidebar and the owner's card still shows
-    // it; a session, which has no sidebar, pins for nobody.
+    // account unpins alpha for itself and the owner's card still shows
+    // it; a session pins for nobody.
     {
       const rows = async h => ((await (await fetch(URL.replace(/\/$/, '') + '/api/status', { headers: h })).json()).projects || []);
       // A new account starts with nothing pinned and pins what it wants (the
@@ -1463,7 +1463,7 @@ await section("the Profile tab", async () => {
       ok(un.status === 200 && plain && plain.pinned === false && owner && owner.pinned === true,
          `a plain account's unpin is its own: alpha off its sidebar and still on the owner's (${un.status}; ${plain?.pinned}/${owner?.pinned})`);
       const sess = await act(sessAuth, '/api/project-pin', { name: 'alpha', pinned: true });
-      ok(sess.status === 403 && /a session has no sidebar|a session's token does not reach this/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
+      ok(sess.status === 403 && /a session pins no spaces|a session's token does not reach this/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
       await act(plainAuth, '/api/project-pin', { name: 'alpha', pinned: true });
       // An archive is each person's own too: anybody signed in folds a space
       // away for themselves, nobody else's page changes, and a session
