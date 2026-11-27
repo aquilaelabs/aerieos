@@ -1790,16 +1790,13 @@ body.firstrun #panes{display:none}
 .mem .mtype.project{color:var(--green2);border-color:var(--green2-edge)}
 .mem .mtype.reference{color:var(--purple);border-color:var(--purple-edge)}
 .mem .mdesc{color:var(--dim);font:var(--f-ui);margin-bottom:8px}
-/* The memory's line in the index, on the memory it belongs to. Two fields
-   rather than one: the title is what the line is filed under and the hook is
-   what it says, and they are read at different widths. Stacked below 560px:
-   side by side, the hook gets a dozen characters and reads as broken. */
-.mem .ix{display:flex;gap:6px;margin-bottom:4px}
-.mem .ix .ixt{flex:0 0 33%}
-.mem .ix .ixh{flex:1;min-width:0}
-@media(max-width:600px){ .mem .ix{display:block}
-  .mem .ix .ixt{margin-bottom:6px}
-}
+/* The memory's line in the index, on the memory it belongs to: a form of
+   two fields (its title, what the line is filed under, and its hook, what it
+   says), side by side at a desk and stacked on a phone, as a form's are. */
+.mem .ix{margin-bottom:8px}
+/* A memory being written has room for the memory itself: the form's own
+   field height is a line. */
+.memadd .fgrid textarea:not(.proseline){min-height:120px}
 .mem .ixnote{color:var(--dim);font:var(--f-note);margin-bottom:8px}
 .mem .ixnote.bad{color:var(--gold)}
 /* Dashed, because it is the one thing here that is not a memory yet. */

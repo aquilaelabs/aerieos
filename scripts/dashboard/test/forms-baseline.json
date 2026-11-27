@@ -6,7 +6,7 @@
  "nb-design.js": 34,
  "nb-discord.js": 2,
  "nb-git.js": 2,
- "nb-memory.js": 8,
+ "nb-memory.js": 1,
  "nb-permissions.js": 1,
  "nb-roadmap.js": 6,
  "nb-sessions.js": 2,
@@ -25,7 +25,6 @@
  "page-shell.js": 1,
  "page-signin.js": 1,
  "page-tabs.js": 2,
- "page-toolchains.js": 7,
  "tab-audit.js": 1,
  "tab-docker.js": 5,
  "tab-emulator.js": 1,
@@ -36,11 +35,9 @@
  "tab-machine.js": 2,
  "tab-nginx.js": 4,
  "tab-nodes.js": 9,
- "tab-profile.js": 8,
  "tab-projects.js": 1,
  "tab-roles.js": 2,
  "tab-scanners.js": 2,
  "tab-schedules.js": 1,
- "tab-settings.js": 7,
  "tab-storage.js": 1
 }

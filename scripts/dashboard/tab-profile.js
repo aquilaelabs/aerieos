@@ -240,25 +240,15 @@ function profileShares(sm){
     : sm.named ? "none yet: sign in again and your shares use your sign-in password" : "nothing is kept for shares while none names you";
   return `<div class="row stack2"><div class="grow">
     ${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share names you yet. An administrator names you on one from the Storage page.</div>`}
-    <div class="logset">
-      <div class="logdays setrow col ctlrow">
-        ${lbl("pfSmb", "A separate password for shares", "only if you want one: a share asks for your name and, unless you set this, your sign-in password. At least 8 characters")}
-        <input id="pfSmb" type="password" autocomplete="new-password">
-      </div>
-      <div class="logdays setrow col ctlrow">
-        ${lbl("pfSmb2", "The same again")}
-        <input id="pfSmb2" type="password" autocomplete="new-password">
-      </div>
-      <div class="logdays setrow col ctlrow">
-        ${lbl("pfSmbCur", "Your sign-in password", "so a browser left signed in cannot give somebody your files")}
-        <input id="pfSmbCur" type="password" autocomplete="current-password">
-      </div>
-      <div class="actbar">
-        <span class="state">${when}${sm.set ? ` · sign in to a share as <code>${esc(profile.name)}</code>` : ""}</span>
-        ${sm.set ? `<button type="button" id="pfSmbClear">Clear</button>` : ""}
-        <button type="button" id="pfSmbSet" class="primary" disabled>${sm.set ? "Change" : "Set"}</button>
-      </div>
-    </div></div></div>`;
+    ${formBox({fields: [
+      formField("pfSmb", "A separate password for shares", `<input id="pfSmb" type="password" autocomplete="new-password">`,
+        {help: "only if you want one: a share asks for your name and, unless you set this, your sign-in password. At least 8 characters"}),
+      formField("pfSmb2", "The same again", `<input id="pfSmb2" type="password" autocomplete="new-password">`),
+      formField("pfSmbCur", "Your sign-in password", `<input id="pfSmbCur" type="password" autocomplete="current-password">`,
+        {help: "so a browser left signed in cannot give somebody your files"})],
+      state: `<span class="state">${when}${sm.set ? ` · sign in to a share as <code>${esc(profile.name)}</code>` : ""}</span>`,
+      foot: [sm.set ? `<button type="button" id="pfSmbClear">Clear</button>` : "", `<button type="button" id="pfSmbSet" class="primary" disabled>${sm.set ? "Change" : "Set"}</button>`]})}
+    </div></div>`;
 }
 function wireShares(root){
   const a = root.querySelector("#pfSmb"), b = root.querySelector("#pfSmb2"), cur = root.querySelector("#pfSmbCur"),
@@ -404,20 +394,18 @@ function profileReach(){
 function profileReachForm(f, ch, kinds){
   const c = ch[f.kind] || {label: f.kind, fields: []};
   const was = (pfReach?.dest || []).find(d => d.id === f.id) || {};
-  return `<div class="reachform" data-reachform="${esc(f.kind)}">
-    <div class="field"><div class="hint">${esc(c.label)}${f.kind === "email" && !pfReach?.mail ? ": no mail server is set yet (Controller settings, Mail), so nothing is sent until one is" : ""}</div></div>
-    <div class="field">${lbl("pfReachName", "Name")}<input id="pfReachName" type="text" value="${esc(was.name || c.label)}" autocomplete="off"></div>
-    ${c.fields.map(([n, label, secret]) => `<div class="field">${lbl("pfReachF_" + n, label)}
-      <input id="pfReachF_${esc(n)}" data-reachf="${esc(n)}" type="${secret ? "password" : "text"}" value="${esc(secret ? "" : (was.fields || {})[n] || "")}" placeholder="${secret && (was.fields || {})[n] ? "set: type to replace" : ""}" autocomplete="off" spellcheck="false"></div>`).join("")}
-    <div class="field">${lbl("pfReachKinds", "Takes")}<div class="chips">${kinds.map(([k, w]) => `<label class="chip"><input type="checkbox" data-reachk="${esc(k)}" ${!was.kinds || was.kinds.includes(k) ? "checked" : ""}> ${esc(w)}</label>`).join("")}</div></div>
-    <div class="prefrow ctlrow">
-      <div class="setrow col ctlrow">${lbl("pfReachQf", "Quiet from")}<input id="pfReachQf" type="time" value="${esc(was.quiet?.from || "")}"></div>
-      <div class="setrow col ctlrow">${lbl("pfReachQt", "until")}<input id="pfReachQt" type="time" value="${esc(was.quiet?.to || "")}"></div>
-    </div>
-    <div class="field"><div class="hint">Nothing is sent inside the quiet window; what came up then is sent once it ends.</div></div>
-    <div class="actbar"><span class="state" id="pfReachSaid"></span><span class="sp"></span>
-      <button type="button" data-reachcancel>Cancel</button><button type="button" class="primary" data-reachsave>Save</button></div>
-  </div>`;
+  // One form (R301): what it is, its name and the channel's own fields, what
+  // it takes, and the quiet window, Cancel and Save at the foot.
+  return `<div class="reachform" data-reachform="${esc(f.kind)}">${formBox({fields: [
+    `<div class="fcell fwide"><div class="hint">${esc(c.label)}${f.kind === "email" && !pfReach?.mail ? ": no mail server is set yet (Controller settings, Mail), so nothing is sent until one is" : ""}</div></div>`,
+    formField("pfReachName", "Name", `<input id="pfReachName" type="text" value="${esc(was.name || c.label)}" autocomplete="off">`),
+    ...c.fields.map(([n, label, secret]) => formField("pfReachF_" + n, label, `<input id="pfReachF_${esc(n)}" data-reachf="${esc(n)}" type="${secret ? "password" : "text"}" value="${esc(secret ? "" : (was.fields || {})[n] || "")}" placeholder="${secret && (was.fields || {})[n] ? "set: type to replace" : ""}" autocomplete="off" spellcheck="false">`)),
+    formField("pfReachKinds", "Takes", `<div class="fticks" id="pfReachKinds">${kinds.map(([k, w]) => `<label class="ndcap"><input type="checkbox" data-reachk="${esc(k)}" ${!was.kinds || was.kinds.includes(k) ? "checked" : ""}> ${esc(w)}</label>`).join("")}</div>`, {wide: true}),
+    formField("pfReachQf", "Quiet from", `<input id="pfReachQf" type="time" value="${esc(was.quiet?.from || "")}">`),
+    formField("pfReachQt", "until", `<input id="pfReachQt" type="time" value="${esc(was.quiet?.to || "")}">`),
+    `<div class="fcell fwide"><div class="hint">Nothing is sent inside the quiet window; what came up then is sent once it ends.</div></div>`],
+    state: `<span class="state" id="pfReachSaid"></span>`,
+    foot: [`<button type="button" data-reachcancel>Cancel</button>`, `<button type="button" class="primary" data-reachsave>Save</button>`]})}</div>`;
 }
 
 function wireReach(root){
@@ -639,10 +627,9 @@ function profileTwoFactor(tf, required){
       t.on ? `<button type="button" data-tf="totp-remove">Remove</button>` : pfTotp ? "" : `<button type="button" data-tf="totp-add">Add</button>`)}
     ${pfTotp ? `<div class="tfadd"><div class="tfqr">${pfTotp.qr}</div>
       <div class="hint">Scan it with the app, or type the secret: <code>${esc(pfTotp.secret)}</code></div>
-      <div class="logdays setrow col ctlrow">${lbl("pfTfCode", "The code the app shows")}
-        <input id="pfTfCode" autocomplete="one-time-code" inputmode="numeric" spellcheck="false"></div>
-      <div class="actbar"><span class="state" id="pfTfSaid"></span>
-        <button type="button" data-tf="totp-cancel">Cancel</button><button type="button" class="primary" data-tf="totp-confirm">Turn it on</button></div></div>` : ""}
+      ${formBox({fields: [formField("pfTfCode", "The code the app shows", `<input id="pfTfCode" autocomplete="one-time-code" inputmode="numeric" spellcheck="false">`)],
+        state: `<span class="state" id="pfTfSaid"></span>`,
+        foot: [`<button type="button" data-tf="totp-cancel">Cancel</button>`, `<button type="button" class="primary" data-tf="totp-confirm">Turn it on</button>`]})}</div>` : ""}
     ${keys.map(k => line(`Passkey: ${esc(k.name || "a passkey")}`, `added ${esc(ago(k.added))}${k.used ? `, last used ${esc(ago(k.used))}` : ""}`,
       `<button type="button" data-tf="passkey-remove" data-id="${esc(k.id)}">Remove</button>`)).join("")}
     ${window.PublicKeyCredential ? line("Add a passkey", "this device's own, or a security key", `<button type="button" data-tf="passkey-add">Add a passkey</button>`) : ""}

@@ -363,19 +363,18 @@ function tpSeen(seen, was, offer = true){
 // is and its port; Look checks it the way the catalog's apps are held (every
 // image pinned, no blank but the known ones) and says what it would run;
 // Add keeps it at tier sideloaded, and it is offered as any app is.
-function tpAppHtml(f){
+function tpAppCells(f){
   const a = f.app, ed = !!a.editing;
-  return `<div class="field setrow col ctlrow">${lbl("tpAppName", "Name", "what the card says")}
-      <input id="tpAppName" value="${esc(a.name)}" maxlength="60" autocomplete="off" placeholder="Notes"></div>
-    <div class="field setrow col ctlrow">${lbl("tpAppId", "Id", "its name as a container and in the address: lower-case letters, digits and dashes")}
-      <input id="tpAppId" value="${esc(a.id)}" maxlength="32" autocomplete="off" spellcheck="false" placeholder="notes"${ed ? " disabled" : ""}></div>
-    <div class="field setrow col ctlrow">${lbl("tpAppWhat", "What it is", "one line, as the card says it")}
-      <input id="tpAppWhat" value="${esc(a.what)}" maxlength="200" autocomplete="off" placeholder="a notebook with a web page" data-ph-short="one line"></div>
-    <div class="field setrow col ctlrow">${lbl("tpAppPort", "Port", "the port it answers on; New container offers it, and a person can pick another")}
-      <input id="tpAppPort" type="number" min="1" max="65535" value="${esc(String(a.port || ""))}" placeholder="8080"></div>
-    <div class="field">${lbl("tpAppCompose", "Its compose file", "images pinned to a tag, never latest; ${PORT}, ${DATA}, ${MEDIA}, ${PUID}, ${PGID} and ${TZ} are the blanks New container fills")}
-      <textarea id="tpAppCompose" class="mono" rows="12" spellcheck="false" autocomplete="off"
-        placeholder='services:\n  notes:\n    image: ghcr.io/owner/notes:1.2.3\n    ports:\n      - "\${PORT}:8080"\n    volumes:\n      - \${DATA}/notes:/data'>${esc(a.compose)}</textarea></div>`;
+  return [
+    formField("tpAppName", "Name", `<input id="tpAppName" value="${esc(a.name)}" maxlength="60" autocomplete="off" placeholder="Notes">`, {help: "what the card says"}),
+    formField("tpAppId", "Id", `<input id="tpAppId" value="${esc(a.id)}" maxlength="32" autocomplete="off" spellcheck="false" placeholder="notes"${ed ? " disabled" : ""}>`,
+      {help: "its name as a container and in the address: lower-case letters, digits and dashes"}),
+    formField("tpAppWhat", "What it is", `<input id="tpAppWhat" value="${esc(a.what)}" maxlength="200" autocomplete="off" placeholder="a notebook with a web page" data-ph-short="one line">`,
+      {help: "one line, as the card says it"}),
+    formField("tpAppPort", "Port", `<input id="tpAppPort" type="number" min="1" max="65535" value="${esc(String(a.port || ""))}" placeholder="8080">`,
+      {help: "the port it answers on; New container offers it, and a person can pick another", short: true}),
+    formField("tpAppCompose", "Its compose file", `<textarea id="tpAppCompose" class="mono" rows="12" spellcheck="false" autocomplete="off" placeholder='services:\n  notes:\n    image: ghcr.io/owner/notes:1.2.3\n    ports:\n      - "\${PORT}:8080"\n    volumes:\n      - \${DATA}/notes:/data'>${esc(a.compose)}</textarea>`,
+      {help: "images pinned to a tag, never latest; ${PORT}, ${DATA}, ${MEDIA}, ${PUID}, ${PGID} and ${TZ} are the blanks New container fills", wide: true})];
 }
 function tpAppSeen(seen){
   return `<div class="tpseen">
@@ -413,31 +412,31 @@ async function tpOpenApp(id){
 // What is being added: a tool pack (a toolchain of the person's choosing,
 // giving sessions aerie tool verbs) or an app (a container the Containers page
 // runs). An agent pack is a tool pack with an agent block, so it is the first.
-function tpWhatHtml(f){
-  return `<div class="field"><label id="tpWhatLabel">What</label>
+function tpWhatCell(f){
+  return `<div class="fcell fwide"><span class="lbl" id="tpWhatLabel">What</span>
     <div class="pseg" role="group" aria-labelledby="tpWhatLabel">${[["pack", "A tool pack"], ["app", "An app"]]
       .map(([k, t]) => `<button type="button" data-tpwhat="${k}" class="${f.what === k ? "on" : ""}" aria-pressed="${f.what === k}">${t}</button>`).join("")}</div>
     <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the catalog's, kept as sideloaded."
       : `A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's <a href="#/help/tool-packs">Tool packs</a> says how to write one.`}
       One meant for everybody goes to the vetted catalog: <a href="#/help/submitting">Submitting to the catalog</a> says how.</div></div>`;
 }
-function tpFromHtml(f, here){
-  const seg = here ? "" : `<div class="field"><label id="tpFromLabel">From</label>
+// Where it comes from: a vetted catalog's entry says so in a line; any other
+// is cells of the form, the choice of where and then the repository, the
+// text or the files.
+const tpCatalogLine = f => `<div class="field"><div class="sub">From the vetted catalog: <b>${esc(f.catalog.name)}</b> at <code>${esc(f.catalog.url)}</code>, commit ${esc(f.catalog.commit.slice(0, 12))}, its archive checked against the catalog's sha256 on the way in.</div></div>`;
+function tpFromCells(f, here){
+  const seg = here ? "" : `<div class="fcell fwide"><span class="lbl" id="tpFromLabel">From</span>
     <div class="pseg" role="group" aria-labelledby="tpFromLabel">${[["repo", "A repository"], ["paste", "Paste bbtool.json"], ["upload", "Upload files"]]
       .map(([k, t]) => `<button type="button" data-tpfrom="${k}" class="${f.from === k ? "on" : ""}" aria-pressed="${f.from === k}">${t}</button>`).join("")}</div></div>`;
-  if (f.catalog) return `<div class="field"><div class="sub">From the vetted catalog: <b>${esc(f.catalog.name)}</b> at <code>${esc(f.catalog.url)}</code>, commit ${esc(f.catalog.commit.slice(0, 12))}, its archive checked against the catalog's sha256 on the way in.</div></div>`;
-  if (f.from === "repo") return seg + `<div class="field">${lbl("tpUrl", "Repository", "a git repository with a bbtool.json at its root: https, ssh, or http for a git host on your network")}
-      <input id="tpUrl" value="${esc(f.url)}" placeholder="https://github.com/owner/repo" data-ph-short="repository URL" autocomplete="off" spellcheck="false"></div>`;
-  const text = `<div class="field">${lbl("tpText", here ? "Its bbtool.json" : "bbtool.json",
-      "the whole pack when its install steps fetch the tool itself; Help's Tool packs says what each field is")}
-      <textarea id="tpText" class="mono" rows="12" spellcheck="false" autocomplete="off"
-        placeholder='{"name": "mytool", "platforms": ["linux/amd64"], "install": {...}, "verbs": {...}}'>${esc(f.text)}</textarea></div>`;
-  const file = `<div class="field">${lbl("tpFile", here ? "Or upload a new version" : "The pack's files",
-      "a zip or tar with bbtool.json at its top and the scripts it runs; a single top-level folder is dropped; up to 8 MB")}
-      <input id="tpFile" type="file" hidden accept=".zip,.tar,.tgz,.tar.gz,.tbz2,.tar.bz2,.txz,.tar.xz,application/zip,application/gzip,application/x-tar">
+  if (f.from === "repo") return [seg, formField("tpUrl", "Repository", `<input id="tpUrl" value="${esc(f.url)}" placeholder="https://github.com/owner/repo" data-ph-short="repository URL" autocomplete="off" spellcheck="false">`,
+      {help: "a git repository with a bbtool.json at its root: https, ssh, or http for a git host on your network", wide: true})];
+  const text = formField("tpText", here ? "Its bbtool.json" : "bbtool.json", `<textarea id="tpText" class="mono" rows="12" spellcheck="false" autocomplete="off" placeholder='{"name": "mytool", "platforms": ["linux/amd64"], "install": {...}, "verbs": {...}}'>${esc(f.text)}</textarea>`,
+      {help: "the whole pack when its install steps fetch the tool itself; Help's Tool packs says what each field is", wide: true});
+  const file = formField("tpFile", here ? "Or upload a new version" : "The pack's files", `<input id="tpFile" type="file" hidden accept=".zip,.tar,.tgz,.tar.gz,.tbz2,.tar.bz2,.txz,.tar.xz,application/zip,application/gzip,application/x-tar">
       <div class="filepick ctlline"><button type="button" data-tpfile>Choose an archive</button>
-        <span class="dim">${f.file ? esc(f.file.name) : "none picked"}</span></div></div>`;
-  return seg + (here ? text + file : f.from === "paste" ? text : file);
+        <span class="dim">${f.file ? esc(f.file.name) : "none picked"}</span></div>`,
+      {help: "a zip or tar with bbtool.json at its top and the scripts it runs; a single top-level folder is dropped; up to 8 MB", wide: true});
+  return [seg, ...(here ? [text, file] : f.from === "paste" ? [text] : [file])];
 }
 
 function tpModalHtml(){
@@ -450,8 +449,7 @@ function tpModalHtml(){
     const add = seen ? `<button type="button" class="primary" data-tpadd${f.busy && f.busy !== "add" ? " disabled" : ""}${runAttr(f.busy === "add", ed ? "Saving" : "Adding")}>${ed ? "Save" : "Add"}</button>` : "";
     const rm = ed ? `<button type="button" class="danger" data-tprmapp="${esc(f.app.editing)}">Remove</button>` : "";
     return `<div class="box wide"><h3>${ed ? `${esc(f.app.name || f.app.editing)}, an app you added` : "Add your own"}</h3>
-      ${ed ? "" : tpWhatHtml(f)}
-      ${tpAppHtml(f)}
+      <div class="field">${formBox({fields: [ed ? "" : tpWhatCell(f), ...tpAppCells(f)]})}</div>
       ${seen ? `<div class="field">${tpAppSeen(seen)}</div>` : ""}
       ${f.error ? `<div class="field"><div class="hint bad">${esc(f.error)}</div></div>` : ""}
       ${dlgFoot(`<button type="button" data-tpcancel>Cancel</button>`, `${look}${add}`, rm)}</div>`;
@@ -470,8 +468,8 @@ function tpModalHtml(){
   return `<div class="box wide"><h3>${fresh ? (f.catalog ? `Install ${esc(f.catalog.name)} from the catalog` : "Add your own") : `${esc(p.label)}, a tool pack`}</h3>
     ${p ? `<div class="field"><div class="sub">${here ? "Made here" : `From <code>${esc(p.pack.url)}</code>`} at ${esc(p.pack.commit.slice(0, 12))}, added by ${
           esc(p.pack.by || "an administrator")}${p.pack.at ? ` ${ago(p.pack.at)}` : ""}.${(p.pack.verbs || []).length ? ` Verbs: ${esc(p.pack.verbs.join(", "))}.` : ""}</div></div>` : ""}
-    ${fresh && !f.catalog ? tpWhatHtml(f) : ""}
-    ${fresh || here ? tpFromHtml(f, here) : ""}
+    ${f.catalog && (fresh || here) ? tpCatalogLine(f) : ""}
+    ${(fresh || here) && !f.catalog ? `<div class="field">${formBox({fields: [fresh ? tpWhatCell(f) : "", ...tpFromCells(f, here)]})}</div>` : ""}
     ${seen ? `<div class="field">${tpSeen(seen, p ? p.pack : null, offer)}</div>` : ""}
     ${f.error ? `<div class="field"><div class="hint bad">${esc(f.error)}</div></div>` : ""}
     ${p && !here && f.busy === "look" ? `<div class="field"><div class="hint">Looking for a newer commit…</div></div>` : ""}

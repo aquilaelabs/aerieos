@@ -310,33 +310,32 @@ function updatesSection(){
   // them, and Apply updates, with a restart after when ticked.
   const h = r.host && typeof r.host.pending === "number" ? r.host : null;
   const host = !h ? "" : `<div class="sub">The system's own packages: ${h.pending ? `${h.pending} update${h.pending === 1 ? "" : "s"} waiting${h.security ? `, ${h.security} of them security` : ""}` : "up to date"}${h.checked ? ` (checked ${esc(ago(h.checked))})` : ""}${h.reboot ? `; <span class="warn">a restart is needed</span> to run the new kernel or libraries` : ""}.</div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="hostReboot"> restart after, if the update asks for it</label></div>
-      <div class="actbar"><span class="sp"></span>
-        ${h.reboot ? `<button type="button" data-hostreboot="${esc(r.node || "")}">Restart now</button>` : ""}
-        <button type="button" data-hostupdate="${esc(r.node || "")}"${r.node && h.pending ? "" : " disabled"}>Apply updates</button></div>`;
+      ${formBox({fields: [`<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="hostReboot"> restart after, if the update asks for it</label></div>`],
+        foot: [h.reboot ? `<button type="button" data-hostreboot="${esc(r.node || "")}">Restart now</button>` : "",
+          `<button type="button" data-hostupdate="${esc(r.node || "")}"${r.node && h.pending ? "" : " disabled"}>Apply updates</button>`]})}`;
   // The release channel, on any install (the operator, 2 Nov).
-  const channel = `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
-        <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
-      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes every pre-release CI publishes${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? " (a draft, seen with this controller's token)" : ""}` : ""}${
+  // A form (R301): the channel, the version to install (debug mode), and a
+  // folder of an update file on an AerieOS machine, its verbs at the foot.
+  const channel = formField("relChannel", "Channel", `<select id="relChannel" data-relchannel>
+        <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select>
+      <div class="hint">${r.channel === "dev" ? `The dev channel takes every pre-release CI publishes${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? " (a draft, seen with this controller's token)" : ""}` : ""}${
         r.draft_fetch?.tag ? `. ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; Update runs from them` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files`}` : ""}${
         helpIcon("A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back. A draft not published yet is seen with this controller's token for AerieOS's repository, under Unpublished builds.")}`
-        : `Published releases alone${helpIcon("The dev channel takes every dev build as it is published, which may not come up.")}`}</div></div>`;
+        : `Published releases alone${helpIcon("The dev channel takes every dev build as it is published, which may not come up.")}`}</div>`, {wide: true});
   // Debug mode alone: any version, the unpublished ones with the token
   // (the operator, 2 Nov), older ones too, since a test goes both ways.
-  const pick = r.pick?.length ? `<div class="field"><label class="pick"><span class="pickw">Version</span><select id="relPick" aria-label="the version to install">${
-      r.pick.map(v => `<option value="${esc(v.tag)}">${esc(v.tag)}${v.draft ? " (not published)" : ""}</option>`).join("")}</select></label>
-      <div class="actbar"><span class="sp"></span><button type="button" data-relpick="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.node ? "" : " disabled"}>Install this version</button></div></div>` : "";
+  const pick = r.pick?.length ? formField("relPick", "Version", `<select id="relPick">${
+      r.pick.map(v => `<option value="${esc(v.tag)}">${esc(v.tag)}${v.draft ? " (not published)" : ""}</option>`).join("")}</select>`)
+    + `<div class="fcell fcellbtn"><button type="button" data-relpick="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.node ? "" : " disabled"}>Install this version</button></div>` : "";
   return `<div class="row stack2" data-group="Updates"><div class="grow">
       <div class="sub">This install runs ${runs}; the newest ${r.channel === "dev" ? "on the dev channel" : "release"} is ${(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) ? esc(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) : "not known yet"} (${when}${r.error ? `; ${esc(r.error)}` : ""}).</div>
       <div class="sub dim">${how}</div>
-      ${channel}
-      ${pick}
+      ${formBox({fields: [channel, pick,
+        os ? formField("osFrom", "From a folder here", `<input type="text" id="osFrom" placeholder="/mnt/stick/aerieos-os" autocomplete="off" spellcheck="false">`, {wide: true}) : ""],
+        foot: [`<button type="button" data-relcheck>Check for updates</button>`,
+          os ? `<button type="button" data-osfrom="${esc(r.node || "")}"${r.node ? "" : " disabled"}>Update from the folder</button>` : "",
+          `<button type="button" class="primary" data-relupdate="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.newer && r.node ? "" : " disabled"}>${r.newer ? `Update to ${esc(r.newer)}` : "Update"}</button>`]})}
       ${host}
-      ${os ? `<div class="field"><label class="pick"><span class="pickw">From a folder here</span><input type="text" id="osFrom" placeholder="/mnt/stick/aerieos-os" autocomplete="off" spellcheck="false"></label></div>` : ""}
-      <div class="actbar"><span class="sp"></span>
-        <button type="button" data-relcheck>Check for updates</button>
-        ${os ? `<button type="button" data-osfrom="${esc(r.node || "")}"${r.node ? "" : " disabled"}>Update from the folder</button>` : ""}
-        <button type="button" class="primary" data-relupdate="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.newer && r.node ? "" : " disabled"}>${r.newer ? `Update to ${esc(r.newer)}` : "Update"}</button></div>
     </div></div>`;
 }
 // ---- the copies kept (R161 step 4) ----
@@ -547,7 +546,7 @@ function moveSection(){
   // Each piece: its name on the tick's line, its size and what it holds
   // under it (the operator, 3 Nov: the name wrapped into a narrow column
   // beside the words).
-  const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)}</label>
+  const pieces = (m.pieces || []).map(pc => `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)}</label>
       <div class="sub">${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `: ${esc(pc.about)}` : ""}</div></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
   // A move landed here instead (the operator, 1 Nov): on a fresh controller,
@@ -573,11 +572,11 @@ function moveSection(){
       ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once; Download a backup packs what is ticked under a token of its own and arms nothing${
         helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
-      ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://aerieos.new.example" data-ph-short="new address" autocomplete="off" spellcheck="false"></label></div>
-      ${pieces}`}
-      <div class="actbar"><span class="sp"></span>
-        ${m.prepared ? `<button type="button" data-movebundle>Download the bundle</button>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button>`
-                     : `<button type="button" data-movebackup title="a copy of what is ticked, under a token of its own; no move is armed and no node told">Download a backup</button><button type="button" class="primary" data-moveprep>Prepare to move</button>`}</div>
+      ${m.prepared ? `<div class="actbar"><span class="sp"></span><button type="button" data-movebundle>Download the bundle</button>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button></div>`
+        // Where it goes and what goes with it, one form (R301).
+        : formBox({fields: [formField("moveTo", "New home", `<input type="text" id="moveTo" placeholder="https://aerieos.new.example" data-ph-short="new address" autocomplete="off" spellcheck="false">`, {wide: true}), pieces],
+            foot: [`<button type="button" data-movebackup title="a copy of what is ticked, under a token of its own; no move is armed and no node told">Download a backup</button>`,
+              `<button type="button" class="primary" data-moveprep>Prepare to move</button>`]})}
     </div></div>`;
 }
 // The form that lands a move here: Controller settings' on a fresh controller,
@@ -589,9 +588,9 @@ function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
   // The token given on the first page is kept for this (the operator, 10 Nov:
   // asked twice), and where the old controller ran on this machine its
   // address cannot answer, so the bundle is the one way.
-  const tok = ld.token_kept ? "" : `<label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${off}></label>`;
-  const from = bundleOnly ? "" : `<label class="pick"><span class="pickw">${ld.token_kept ? "Old controller, while it runs" : "Old controller"}</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" data-ph-short="old address" autocomplete="off" spellcheck="false"${off}></label>`;
-  const file = `<label class="pick fwide"><span class="pickw">${bundleOnly ? "The bundle" : "Or the bundle"}</span><input type="file" id="landFile" accept=".aeriemove"${off}></label>`;
+  const tok = ld.token_kept ? "" : formField("landTok", "Move token", `<input type="text" id="landTok" autocomplete="off" spellcheck="false"${off}>`);
+  const from = bundleOnly ? "" : formField("landFrom", ld.token_kept ? "Old controller, while it runs" : "Old controller", `<input type="text" id="landFrom" placeholder="https://aerieos.old.example" data-ph-short="old address" autocomplete="off" spellcheck="false"${off}>`);
+  const file = formField("landFile", bundleOnly ? "The bundle" : "Or the bundle", `<input type="file" id="landFile" accept=".aeriemove"${off}>`, {wide: true});
   return `<div class="field" data-movelandbox${ld.token_kept ? " data-tokkept" : ""}>
       ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
@@ -599,8 +598,7 @@ function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
 `}
       ${ld.held && !heldSaid ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       ${ld.token_kept ? `<div class="sub dim">The move token is the one you gave on the first page.</div>` : ""}
-      <div class="fgrid">${tok}${from}${file}</div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${off}>Land it here</button></div></div>`;
+      ${formBox({fields: [tok, from, file], foot: [`<button type="button" class="primary" data-moveland${off}>Land it here</button>`]})}</div>`;
 }
 // When a bundle was packed, in words ("3 hours ago, 18 Nov 14:02"), from its
 // plain header line; "" for a file that is not one.
@@ -1213,11 +1211,8 @@ async function askReset(){
           busy ? `<div class="hint bad">${esc(busy)}: end and bring them down first, or it stays enrolled</div>` : ""}</label>`; }).join("")}
       <label class="ndcap"><input type="checkbox" id="resetStores"> Also delete the stores on their disks: the toolchains, the caches, the artifacts</label>
     </div>` : ""}
-    <div class="field">
-      <label class="lbl" for="resetWord">Type reset to confirm</label>
-      <input id="resetWord" autocomplete="off" placeholder="reset">
-      <div class="hint bad" id="resetWhy" hidden></div>
-    </div>
+    <div class="field">${formBox({fields: [formField("resetWord", "Type reset to confirm", `<input id="resetWord" autocomplete="off" placeholder="reset">
+      <div class="hint bad" id="resetWhy" hidden></div>`)]})}</div>
     <div class="foot"><span class="sp"></span>
       <button type="button" id="resetKeep" data-way-out>Keep it</button>
       <button type="button" class="danger" id="resetGo" disabled>Reset</button></div>`);

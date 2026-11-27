@@ -135,14 +135,10 @@ function nbMemoryView({$, nb}){
             title="delete this memory and take its line out of the index"
             >Remove</button>
         </div>`}` : `
-        <div class="ix" data-file="${esc(m.file)}">
-          ${lbl("", "Title")}
-          <input class="ixt" maxlength="80" autocomplete="off" spellcheck="false"
-            value="${esc(m.title)}">
-          ${lbl("", "Hook", "one line, what it says. Recall matches on it")}
-          <textarea class="ixh proseline" rows="1" maxlength="240"
-            >${esc(m.hook)}</textarea>
-        </div>
+        <div class="ix" data-file="${esc(m.file)}">${formBox({fields: [
+          formField("", "Title", `<input class="ixt" maxlength="80" autocomplete="off" spellcheck="false" aria-label="title" value="${esc(m.title)}">`),
+          formField("", "Hook", `<textarea class="ixh proseline" rows="1" maxlength="240" aria-label="hook">${esc(m.hook)}</textarea>`,
+            {help: "one line, what it says. Recall matches on it"})]})}</div>
         <div class="ixnote${m.listed ? "" : " bad"}">${m.listed
             ? "Its line in the index: the one part loaded into every session started here."
             : "Not in the index: a session reads it only when it searches memories. Save adds the line."}</div>
@@ -357,27 +353,18 @@ function nbMemoryView({$, nb}){
   }
 
   function paintMemAdd(box){
-    drawHTML(box, `<div class="memadd ctlrow">
-    <label for="naTitle">Title<span class="help" data-help="how it reads in the index" tabindex="0">?</span></label>
-    <input id="naTitle" maxlength="80" autocomplete="off" placeholder="No parsed progress">
-    <div class="two">
-      <div><label for="naName">File</label>
-        <input id="naName" maxlength="60" autocomplete="off" spellcheck="false"
-          placeholder="no-parsed-progress"></div>
-      <div><label for="naType">Kind</label>
-        <select id="naType">${optionList(nb.memTypes)}</select></div>
-    </div>
-    <div class="hint" id="naWhat"></div>
-    <label for="naHook">Hook (required)<span class="help" data-help="one line saying what this memory is about; the index lists it, and a memory needs one" tabindex="0">?</span></label>
-    <textarea id="naHook" class="proseline" rows="1" maxlength="240"
-      placeholder="a word and an animated ellipsis, never a bar or a percentage"></textarea>
-    <label for="naBody">The memory itself</label>
-    <textarea id="naBody" spellcheck="false"
-      placeholder="The fact, in a line or two. For a kind that is guidance, follow it with why it is the rule and how to apply it."></textarea>
-    <div class="actbar">
-      <button type="button" class="stop" id="naCancel">Cancel</button>
-      <button type="button" class="primary" id="naGo">Write it</button></div>
-  </div>`);
+    // One form (R301), as a bug's report is: its title, the file and kind it
+    // is written as, its hook and the memory itself, Cancel and Write it at
+    // the foot.
+    drawHTML(box, `<div class="memadd">${formBox({fields: [
+      formField("naTitle", "Title", `<input id="naTitle" maxlength="80" autocomplete="off" placeholder="No parsed progress">`, {help: "how it reads in the index", wide: true}),
+      formField("naName", "File", `<input id="naName" maxlength="60" autocomplete="off" spellcheck="false" placeholder="no-parsed-progress">`),
+      formField("naType", "Kind", `<select id="naType">${optionList(nb.memTypes)}</select>`),
+      `<div class="fcell fwide"><div class="hint" id="naWhat"></div></div>`,
+      formField("naHook", "Hook (required)", `<textarea id="naHook" class="proseline" rows="1" maxlength="240" placeholder="a word and an animated ellipsis, never a bar or a percentage"></textarea>`,
+        {help: "one line saying what this memory is about; the index lists it, and a memory needs one", wide: true}),
+      formField("naBody", "The memory itself", `<textarea id="naBody" spellcheck="false" placeholder="The fact, in a line or two. For a kind that is guidance, follow it with why it is the rule and how to apply it."></textarea>`, {wide: true})],
+      foot: [`<button type="button" class="stop" id="naCancel">Cancel</button>`, `<button type="button" class="primary" id="naGo">Write it</button>`]})}</div>`);
     // The file name follows the title until it is typed in, and then stops:
     // renaming a memory is a thing people do deliberately, once.
     const t = $("naTitle"), n = $("naName");

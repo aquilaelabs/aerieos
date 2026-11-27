@@ -753,7 +753,7 @@ async function unwrapped(){
 // row kinds in the stylesheet drifted apart. Field rows, add rows, filter
 // rows and picker rows are the kinds the page draws.
 function rowsWearTheClass(){
-  return page.evaluate(() => [...document.querySelectorAll('.doc.on :is(.setrow, .addbar, .prefrow, .histbar, .logdays, .imgadd, .memadd, .uadd, .ndpaths, .ndname)')]
+  return page.evaluate(() => [...document.querySelectorAll('.doc.on :is(.setrow, .addbar, .prefrow, .histbar, .logdays, .imgadd, .uadd, .ndpaths, .ndname)')]
     .filter(e => !e.classList.contains('ctlrow')).map(e => e.className.split(' ').slice(0, 3).join('.')));
 }
 // An add band whose button stands alone sits at the right of what it is in,
