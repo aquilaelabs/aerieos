@@ -568,6 +568,92 @@ function groupNodeOptions(sel, own, whose, skip){
   if ([...sel.options].some(o => o.value === picked)) sel.value = picked;
 }
 
+// ---- its three dialogs' forms -----------------------------------------------
+// New container, Send to Docker and Copy or move, each one form over its
+// dialog's own foot (R301), drawn with the page's markup (bootMarkup).
+function dockerDrawForms(){
+  const c = document.querySelector('#cmodal [data-dlgform="container"]');
+  // New container's: its name, where it runs and whose it is, side by side at
+  // a desk; editing hides the last two, and the name then runs across. Which
+  // space it belongs to (a dev radarr for a media space is that space's,
+  // listed in its notebook and reachable by its sessions) is changed later on
+  // the row. Then its definition, three ways: the form that writes the
+  // compose file for the ordinary case (an image, some ports, some volumes),
+  // whose output is the Compose tab beside it so nothing is hidden (R68 step
+  // 3); the compose file itself, imported from disk if wanted (the operator,
+  // 10 Nov: the old system's containers come as a zip of them) or an app's
+  // as the catalog wrote it, read-only and left by one press that asks first
+  // (R238 step 3); and the .env it reads.
+  if (c) c.innerHTML = formBox({fields: [
+    `<div class="fcell fwide"><div class="fgrid pair">${
+      formField("cName", "Name", `<input id="cName" maxlength="60" autocomplete="off" spellcheck="false" placeholder="e.g. radarr"><div class="hint" id="cNameHint"></div>`)}${
+      formField("cNode", "Node", `<select id="cNode"></select><div class="hint" id="cNodeHint" hidden></div>`,
+        {help: "which docker host it runs on", hidden: true, attrs: `id="cNodeField"`})}${
+      formField("cUnder", "Space", `<select id="cUnder"></select>`,
+        {help: "the space it belongs to: its sessions can see it and work on it. No space keeps it from every session", attrs: `id="cUnderField"`})}</div></div>`,
+    `<div class="fcell fwide"><span class="lbl" id="cSegLabel">Definition</span>
+      <div class="pseg" role="group" aria-labelledby="cSegLabel">
+        <button id="cTabForm" class="on" type="button">From an image</button>
+        <button id="cTabYml" type="button">Compose</button>
+        <button id="cTabEnv" type="button">Environment</button></div></div>`,
+    `<div class="fcell fwide" id="cFormField"><div class="fgrid">${[
+      formField("cImage", "Image", `<input id="cImage" autocomplete="off" spellcheck="false" placeholder="lscr.io/linuxserver/radarr:latest" data-ph-short="image">`, {wide: true}),
+      formField("cPorts", "Ports", `<textarea id="cPorts" class="csmall cone" rows="1" spellcheck="false" placeholder="7878:7878"></textarea>`, {help: "host:container, one per line"}),
+      // Its four answers short enough for a phone's pulldown, what each does
+      // behind the ?.
+      formField("cRestart", "Restart", `<select id="cRestart">${optionList([["unless-stopped", "Unless stopped"],
+        ["always", "Always"], ["on-failure", "On failure"], ["no", "Never"]], "unless-stopped")}</select>`,
+        {help: "unless stopped: back after a reboot, unless you stopped it; always: back even if you stopped it; on failure: only when it exits badly; never: never on its own"}),
+      formField("cVols", "Volumes", `<textarea id="cVols" class="csmall" spellcheck="false" placeholder="./config:/config&#10;/mnt/user/media:/media"></textarea>`,
+        {help: "host:container, one per line; a relative host path is inside this container's data directory", wide: true}),
+      formField("cEnvLines", "Environment", `<textarea id="cEnvLines" class="csmall" spellcheck="false" placeholder="PUID=99&#10;PGID=100&#10;TZ=Etc/UTC"></textarea>`,
+        {help: "KEY=VALUE, one per line, written into the compose file", wide: true,
+         hint: "Writes the Compose tab as you type; edit that directly, or import a compose file there, for anything more."})].join("")}</div></div>`,
+    formField("cYml", "docker-compose.yml", `<textarea id="cYml" spellcheck="false" placeholder="services:&#10;  app:&#10;    image: lscr.io/linuxserver/radarr:latest&#10;    restart: unless-stopped&#10;    environment:&#10;      - PUID=\${PUID}&#10;      - PGID=\${PGID}&#10;      - TZ=\${TZ}&#10;    ports:&#10;      - &quot;7878:7878&quot;&#10;    volumes:&#10;      - ./config:/config"></textarea>
+      <div class="actbar cimport"><span class="grow hint">Checked by compose before it is saved; relative bind sources are inside this container's data directory.</span>
+        <button type="button" id="cImport">Import a compose file…</button></div>
+      <div class="actbar" id="cByHandBar" hidden><span class="grow hint" id="cByHandSaid"></span>
+        <button type="button" id="cByHand">Edit the definition by hand…</button></div>
+      <input id="cImportFile" type="file" hidden accept=".yml,.yaml,.json,.txt">`, {wide: true, attrs: `id="cYmlField"`}),
+    formField("cEnv", ".env", `<textarea id="cEnv" spellcheck="false" placeholder="NAME=value, one a line: what the compose file reads as \${NAME}"></textarea>
+      <div class="hint">The .env file the compose file reads as \${VAR}.</div><div class="hint" id="cEnvHint" hidden></div>`, {wide: true, hidden: true, attrs: `id="cEnvField"`})]});
+  const dn = document.querySelector('#dnmodal [data-dlgform="send"]');
+  // Which branch it builds from is offered here as well as on the row: this
+  // is the gesture that makes a second instance, and a second instance is
+  // usually a second branch, a pull request beside the one that is up. The
+  // env, seeded from the space's .env.example, is here rather than after
+  // the first build, which would stop at the gate for want of a value and ask
+  // for the same thing one screen later.
+  if (dn) dn.innerHTML = formBox({fields: [
+    formField("dnName", "Container name", `<input id="dnName" maxlength="60" autocomplete="off" spellcheck="false" placeholder="e.g. staging">
+      <div class="hint" id="dnHint"></div><div class="hint" id="dnPreview" hidden></div>`),
+    formField("dnUnder", "Space", `<select id="dnUnder"></select>`,
+      {help: "the space it belongs to, its own by default: its sessions can see it and work on it. No space keeps it from every session"}),
+    formField("dnNode", "Node", `<select id="dnNode"></select>
+      <div class="hint" id="dnNodeHint">The space's node unless picked; an instance stays where it was made.</div>`,
+      {help: "which docker host it runs on", hidden: true, attrs: `id="dnNodeField"`}),
+    formField("dnRef", "Build from", `<select id="dnRef"></select>`, {help: "built from a worktree of that branch", hidden: true, attrs: `id="dnRefField"`}),
+    formField("dnEnv", "Environment", `<textarea id="dnEnv" spellcheck="false"></textarea><div class="hint" id="dnEnvHint"></div>`,
+      {wide: true, hidden: true, attrs: `id="dnEnvField"`})]});
+  const rl = document.querySelector('#rlmodal [data-dlgform="relocate"]');
+  if (rl) rl.innerHTML = formBox({fields: [
+    `<div class="fcell fwide" role="radiogroup" aria-label="copy it or move it">
+      <label class="ndcap"><input type="radio" name="rlMode" value="copy" checked> Copy: a new container beside this one, its data copied</label>
+      <label class="ndcap"><input type="radio" name="rlMode" value="move"> Move: this container, its data with it</label>
+      <div class="hint" id="rlModeHint"></div></div>`,
+    formField("rlName", "Name of the copy", `<input id="rlName" maxlength="60" autocomplete="off" spellcheck="false">`, {attrs: `id="rlNameField"`}),
+    formField("rlNode", "Node", `<select id="rlNode"></select><div class="hint" id="rlNodeHint"></div>`,
+      {help: "where it goes: the space's own nodes first; any other gets its image shipped, never the codebase", attrs: `id="rlNodeField"`}),
+    `<div class="fcell fwide" id="rlDataField" role="radiogroup" aria-labelledby="rlDataLabel"><span class="lbl" id="rlDataLabel">Its data${
+      helpIcon("its named volumes and data directory: unpacked into its volumes there, carried as an archive, or left here")}</span>
+      <label class="ndcap"><input type="radio" name="rlData" value="unpack" checked> Unpack it into its volumes there</label>
+      <label class="ndcap"><input type="radio" name="rlData" value="archive"> Carry it as an archive, not unpacked</label>
+      <label class="ndcap"><input type="radio" name="rlData" value="none"> Leave it here: the container alone goes</label>
+      <div class="hint" id="rlDataHint"></div></div>`,
+    formField("rlEnv", "Environment", `<textarea id="rlEnv" spellcheck="false"></textarea>
+      <div class="hint" id="rlEnvHint">Its env as it is now: change what the new node needs (a port, an address) before it starts there.</div>`, {wide: true})]});
+}
+
 // ---- copy or move a container to another node ------------------------------
 // Its data with it (relocate.py): a copy beside it under a new name, or the
 // same container moved. Send to Docker is the fresh one. Its env is shown on

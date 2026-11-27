@@ -1039,81 +1039,8 @@
       <!-- ...folded to a line once the definition is edited by hand. -->
       <div class="notice note" id="cAppLeft" hidden></div>
     </div>
-    <!-- Its name, where it runs and whose it is, side by side at a desk
-         (the forms rule's grid, R273); editing hides the last two, and the
-         name then runs across. -->
-    <div class="field"><div class="fgrid pair">
-    <div class="field">
-      <label for="cName">Name</label>
-      <input id="cName" maxlength="60" autocomplete="off" spellcheck="false"
-             placeholder="e.g. radarr">
-      <div class="hint" id="cNameHint"></div>
-    </div>
-    <div class="field" id="cNodeField" hidden>
-      <label for="cNode">Node<span class="help" data-help="which docker host it runs on" tabindex="0">?</span></label>
-      <select id="cNode"></select>
-      <div class="hint" id="cNodeHint" hidden></div>
-    </div>
-    <!-- Which project it belongs to: a dev radarr for a media project is
-         that project's, listed in its notebook and reachable by its
-         sessions. Changed later on the row, so not shown when editing. -->
-    <div class="field" id="cUnderField">
-      <label for="cUnder">Space<span class="help" data-help="the space it belongs to: its sessions can see it and work on it. No space keeps it from every session" tabindex="0">?</span></label>
-      <select id="cUnder"></select>
-    </div>
-    </div></div>
-    <div class="field">
-      <label id="cSegLabel">Definition</label>
-      <div class="pseg" role="group" aria-labelledby="cSegLabel">
-        <button id="cTabForm" class="on" type="button">From an image</button>
-        <button id="cTabYml" type="button">Compose</button>
-        <button id="cTabEnv" type="button">Environment</button>
-      </div>
-    </div>
-    <!-- The form that writes the compose file for you, for the ordinary case:
-         an image, some ports, some volumes. What it produces is the Compose
-         tab beside it, so nothing is hidden and anything the form cannot say
-         is said by editing that (R68 step 3). -->
-    <div class="field" id="cFormField">
-      <label for="cImage">Image</label>
-      <input id="cImage" autocomplete="off" spellcheck="false"
-             placeholder="lscr.io/linuxserver/radarr:latest" data-ph-short="image">
-      <label for="cPorts">Ports<span class="help" data-help="host:container, one per line" tabindex="0">?</span></label>
-      <textarea id="cPorts" class="csmall cone" rows="1" spellcheck="false" placeholder="7878:7878"></textarea>
-      <label for="cVols">Volumes<span class="help" data-help="host:container, one per line; a relative host path is inside this container's data directory" tabindex="0">?</span></label>
-      <textarea id="cVols" class="csmall" spellcheck="false" placeholder="./config:/config&#10;/mnt/user/media:/media"></textarea>
-      <label for="cEnvLines">Environment<span class="help" data-help="KEY=VALUE, one per line, written into the compose file" tabindex="0">?</span></label>
-      <textarea id="cEnvLines" class="csmall" spellcheck="false" placeholder="PUID=99&#10;PGID=100&#10;TZ=Etc/UTC"></textarea>
-      <label for="cRestart">Restart</label>
-      <select id="cRestart">
-        <option value="unless-stopped">unless stopped: back after a reboot, unless you stopped it</option>
-        <option value="always">always: back even if you stopped it</option>
-        <option value="on-failure">on failure: only when it exits badly</option>
-        <option value="no">no: never on its own</option>
-      </select>
-      <div class="hint">Writes the Compose tab as you type; edit that directly, or import a compose file there, for anything more.</div>
-    </div>
-    <div class="field" id="cYmlField">
-      <label for="cYml">docker-compose.yml</label>
-      <textarea id="cYml" spellcheck="false"
-                placeholder="services:&#10;  app:&#10;    image: lscr.io/linuxserver/radarr:latest&#10;    restart: unless-stopped&#10;    environment:&#10;      - PUID=${PUID}&#10;      - PGID=${PGID}&#10;      - TZ=${TZ}&#10;    ports:&#10;      - &quot;7878:7878&quot;&#10;    volumes:&#10;      - ./config:/config"></textarea>
-      <!-- A compose file from the person's disk (the operator, 10 Nov: the
-           old system's containers come as a zip of them, one each). -->
-      <div class="actbar cimport"><span class="grow hint">Checked by compose before it is saved; relative bind sources are inside this container's data directory.</span>
-        <button type="button" id="cImport">Import a compose file…</button></div>
-      <!-- An app's file as the catalog wrote it (R238 step 3): read-only,
-           and left by one press that asks first. -->
-      <div class="actbar" id="cByHandBar" hidden><span class="grow hint" id="cByHandSaid"></span>
-        <button type="button" id="cByHand">Edit the definition by hand…</button></div>
-      <input id="cImportFile" type="file" hidden accept=".yml,.yaml,.json,.txt">
-    </div>
-    <div class="field" id="cEnvField" hidden>
-      <label for="cEnv">.env</label>
-      <textarea id="cEnv" spellcheck="false"
-                placeholder="NAME=value, one a line: what the compose file reads as ${NAME}"></textarea>
-      <div class="hint">The .env file the compose file reads as ${VAR}.</div>
-      <div class="hint" id="cEnvHint" hidden></div>
-    </div>
+    <!-- Its fields are one form, drawn by dockerDrawForms (tab-docker.js). -->
+    <div class="field" data-dlgform="container"></div>
     <div class="field" id="cErrWrap" hidden><div class="hint bad" id="cErr"></div></div>
     <div class="foot">
       <span class="sp"></span>
@@ -1126,38 +1053,8 @@
 <div id="dnmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="dnTitle">
   <div class="box wide">
     <h3 id="dnTitle">Send to Docker manager</h3>
-    <div class="field">
-      <label for="dnName">Container name</label>
-      <input id="dnName" maxlength="60" autocomplete="off" spellcheck="false"
-             placeholder="e.g. staging">
-      <div class="hint" id="dnHint"></div>
-      <div class="hint" id="dnPreview" hidden></div>
-    </div>
-    <div class="field">
-      <label for="dnUnder">Space<span class="help" data-help="the space it belongs to, its own by default: its sessions can see it and work on it. No space keeps it from every session" tabindex="0">?</span></label>
-      <select id="dnUnder"></select>
-    </div>
-    <div class="field" id="dnNodeField" hidden>
-      <label for="dnNode">Node<span class="help" data-help="which docker host it runs on" tabindex="0">?</span></label>
-      <select id="dnNode"></select>
-      <div class="hint" id="dnNodeHint">The space's node unless picked; an instance stays where it was made.</div>
-    </div>
-    <!-- Which branch it builds from. Offered here as well as on the row
-         because this is the gesture that makes a SECOND instance, and a
-         second instance is usually a second branch: a pull request beside
-         the one that is up. -->
-    <div class="field" id="dnRefField" hidden>
-      <label for="dnRef">Build from<span class="help" data-help="built from a worktree of that branch" tabindex="0">?</span></label>
-      <select id="dnRef"></select>
-    </div>
-    <!-- The env, seeded from the project's .env.example. Here rather than
-         after the first build: without it the build runs, stops at the gate
-         for want of a value, and asks for the same thing one screen later. -->
-    <div class="field" id="dnEnvField" hidden>
-      <label for="dnEnv">Environment</label>
-      <textarea id="dnEnv" spellcheck="false"></textarea>
-      <div class="hint" id="dnEnvHint"></div>
-    </div>
+    <!-- Its fields are one form, drawn by dockerDrawForms (tab-docker.js). -->
+    <div class="field" data-dlgform="send"></div>
     <div class="field" id="dnErrWrap" hidden><div class="hint bad" id="dnErr"></div></div>
     <div class="foot">
       <span class="sp"></span>
@@ -1173,32 +1070,8 @@
 <div id="rlmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="rlTitle">
   <div class="box wide">
     <h3 id="rlTitle">Copy or move</h3>
-    <div class="field">
-      <label class="ndcap"><input type="radio" name="rlMode" value="copy" checked> Copy: a new container beside this one, its data copied</label>
-      <label class="ndcap"><input type="radio" name="rlMode" value="move"> Move: this container, its data with it</label>
-      <div class="hint" id="rlModeHint"></div>
-    </div>
-    <div class="field" id="rlNameField">
-      <label for="rlName">Name of the copy</label>
-      <input id="rlName" maxlength="60" autocomplete="off" spellcheck="false">
-    </div>
-    <div class="field" id="rlNodeField">
-      <label for="rlNode">Node<span class="help" data-help="where it goes: the space's own nodes first; any other gets its image shipped, never the codebase" tabindex="0">?</span></label>
-      <select id="rlNode"></select>
-      <div class="hint" id="rlNodeHint"></div>
-    </div>
-    <div class="field" id="rlDataField">
-      <label>Its data<span class="help" data-help="its named volumes and data directory: unpacked into its volumes there, carried as an archive, or left here" tabindex="0">?</span></label>
-      <label class="ndcap"><input type="radio" name="rlData" value="unpack" checked> Unpack it into its volumes there</label>
-      <label class="ndcap"><input type="radio" name="rlData" value="archive"> Carry it as an archive, not unpacked</label>
-      <label class="ndcap"><input type="radio" name="rlData" value="none"> Leave it here: the container alone goes</label>
-      <div class="hint" id="rlDataHint"></div>
-    </div>
-    <div class="field">
-      <label for="rlEnv">Environment</label>
-      <textarea id="rlEnv" spellcheck="false"></textarea>
-      <div class="hint" id="rlEnvHint">Its env as it is now: change what the new node needs (a port, an address) before it starts there.</div>
-    </div>
+    <!-- Its fields are one form, drawn by dockerDrawForms (tab-docker.js). -->
+    <div class="field" data-dlgform="relocate"></div>
     <div class="field" id="rlErrWrap" hidden><div class="hint bad" id="rlErr"></div></div>
     <div class="foot">
       <span class="sp"></span>
@@ -1307,34 +1180,8 @@
 <div id="reportModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="reportTitle">
   <div class="box">
     <h3 id="reportTitle">Report a bug</h3>
-    <!-- Which repository beside what kind of thing, where a space has
-         several (the forms rule's grid, R273); with one, Category runs across. -->
-    <div class="field"><div class="fgrid pair">
-    <div class="field" id="reportRepoField" hidden>
-      <label for="reportRepo">Repository</label>
-      <select id="reportRepo"></select>
-    </div>
-    <div class="field">
-      <label for="reportCat">Category</label>
-      <select id="reportCat"></select>
-    </div>
-    </div></div>
-    <div class="field">
-      <label for="reportText">What happened</label>
-      <textarea id="reportText" maxlength="2000" placeholder="what you did, what you expected, and what happened instead"></textarea>
-    </div>
-    <div class="field">
-      <label for="reportRepro">How to make it happen <span class="dim">(optional)</span></label>
-      <textarea id="reportRepro" maxlength="2000" placeholder="the steps, if you know them"></textarea>
-      <div class="hint" id="reportHint">It goes to the diagnostics with this space, its node and the build it was seen on, where whoever maintains AerieOS reads it.</div>
-    </div>
-    <!-- A project's report can carry the reporter's latest conversation on
-         it (the operator, 2 Oct): what Claude was doing is usually the
-         bug. Off unless ticked; the line under says which one it is. -->
-    <div class="field" id="reportConvField" hidden>
-      <label class="ndcap"><input type="checkbox" id="reportConv"> Include my latest conversation on this space</label>
-      <div class="sub" id="reportConvWhich"></div>
-    </div>
+    <!-- Its fields are one form, drawn by reportDrawForm (page-report.js). -->
+    <div class="field" data-dlgform="report"></div>
     <div class="field" id="reportErrWrap" hidden><div class="hint bad" id="reportErr"></div></div>
     <div class="foot"><span class="sp"></span>
       <button id="reportSend" class="primary">Send</button>
@@ -1348,20 +1195,8 @@
 <div id="briefModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="briefTitle">
   <div class="box">
     <h3 id="briefTitle">First session</h3>
-    <div class="field">
-      <label for="briefText">Brief</label>
-      <textarea id="briefText" spellcheck="false" aria-describedby="briefHint"></textarea>
-      <div class="hint" id="briefHint">Build it starts the session on this. The brief then leaves the space, and its notebook keeps it.</div>
-    </div>
-    <div class="field">
-      <label id="briefMineLabel">Yours on this space</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="briefMineLabel">
-        <label class="pick">Model <select id="briefModel"
-          aria-label="model your sessions here start on"></select></label>
-        <label class="pick">Effort <select id="briefEffort"
-          aria-label="effort your sessions here start on"></select></label>
-      </div>
-    </div>
+    <!-- Its fields are one form, drawn by briefDrawForm (page-claude.js). -->
+    <div class="field" data-dlgform="brief"></div>
     <div class="field" id="briefErrWrap" hidden><div class="hint bad" id="briefErr"></div></div>
     <div class="foot">
       <span class="sp"></span>

@@ -423,6 +423,18 @@ function launchClaude(name, sessionId, node, slot = 1){
 // notebook keeps it. Whichever agent the session is (R95): Codex's and
 // Copilot's first prompt is the brief as Claude's is, with their own models.
 let briefFor = null;
+// Its form (R301): the brief over the model and effort this account's
+// sessions here start on.
+function briefDrawForm(){
+  const at = document.querySelector('#briefModal [data-dlgform="brief"]');
+  if (!at) return;
+  at.innerHTML = formBox({groups: [
+    {fields: [formField("briefText", "Brief", `<textarea id="briefText" spellcheck="false" aria-describedby="briefHint"></textarea>
+      <div class="hint" id="briefHint">Build it starts the session on this. The brief then leaves the space, and its notebook keeps it.</div>`, {wide: true})]},
+    {head: "Yours on this space", says: "What your sessions here start on.", fields: [
+      formField("briefModel", "Model", `<select id="briefModel"></select>`),
+      formField("briefEffort", "Effort", `<select id="briefEffort"></select>`)]}]});
+}
 
 async function openBrief(name, node, agent = "claude"){
   resumeFor = null;

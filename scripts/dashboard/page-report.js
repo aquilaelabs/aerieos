@@ -17,6 +17,27 @@ const REPORT_CATS = [
 ];
 let reportProject = "";
 
+// ---- its form ----
+// One form over the dialog's own foot (R301): which repository beside what
+// kind of thing, where a space has several (with one, Category runs across);
+// what happened and how to make it happen; and the latest conversation on the
+// space, which is usually the bug (the operator, 2 Oct), off unless ticked
+// with the line under it saying which one it is.
+function reportDrawForm(){
+  const at = document.querySelector('#reportModal [data-dlgform="report"]');
+  if (!at) return;
+  at.innerHTML = formBox({fields: [
+    `<div class="fcell fwide"><div class="fgrid pair">${
+      formField("reportRepo", "Repository", `<select id="reportRepo"></select>`, {hidden: true, attrs: `id="reportRepoField"`})}${
+      formField("reportCat", "Category", `<select id="reportCat"></select>`)}</div></div>`,
+    formField("reportText", "What happened", `<textarea id="reportText" maxlength="2000" placeholder="what you did, what you expected, and what happened instead"></textarea>`, {wide: true}),
+    formField("reportRepro", "How to make it happen", `<textarea id="reportRepro" maxlength="2000" placeholder="the steps, if you know them"></textarea>
+      <div class="hint" id="reportHint">It goes to the diagnostics with this space, its node and the build it was seen on, where whoever maintains AerieOS reads it.</div>`,
+      {wide: true, tail: `<span class="dim">(optional)</span>`}),
+    `<div class="fcell fwide" id="reportConvField" hidden><label class="ndcap"><input type="checkbox" id="reportConv"> Include my latest conversation on this space</label>
+      <div class="sub" id="reportConvWhich"></div></div>`]});
+}
+
 // From a project's card, which of its repositories (R138: the first unless
 // another is picked), each sending its own node and conversation.
 function openReport(project, repos = []){
