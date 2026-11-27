@@ -423,7 +423,9 @@ function tpWhatCell(f){
 // Where it comes from: a vetted catalog's entry says so in a line; any other
 // is cells of the form, the choice of where and then the repository, the
 // text or the files.
-const tpCatalogLine = f => `<div class="field"><div class="sub">From the vetted catalog: <b>${esc(f.catalog.name)}</b> at <code>${esc(f.catalog.url)}</code>, commit ${esc(f.catalog.commit.slice(0, 12))}, its archive checked against the catalog's sha256 on the way in.</div></div>`;
+function tpCatalogLine(f){
+  return `<div class="field"><div class="sub">From the vetted catalog: <b>${esc(f.catalog.name)}</b> at <code>${esc(f.catalog.url)}</code>, commit ${esc(f.catalog.commit.slice(0, 12))}, its archive checked against the catalog's sha256 on the way in.</div></div>`;
+}
 function tpFromCells(f, here){
   const seg = here ? "" : `<div class="fcell fwide"><span class="lbl" id="tpFromLabel">From</span>
     <div class="pseg" role="group" aria-labelledby="tpFromLabel">${[["repo", "A repository"], ["paste", "Paste bbtool.json"], ["upload", "Upload files"]]

@@ -2433,14 +2433,16 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .fbox>.ffoot{margin:0}
 .fcell{display:flex;flex-direction:column;gap:var(--label-gap);min-width:0}
 .fcell>.hint{margin:0}
-.modal .fbox{max-width:none}
+/* A dialog's form fills its band; a modal drawn inline on a page (a space's
+   settings, the dials lent to Permissions) is a page, capped as one. */
+.modal:not(.inline) .fbox{max-width:none}
 /* A form of one field is that field's width, its foot ending under it: in
    two columns a lone number's Apply hung half the box past it. A wide field
    keeps the box, and a dialog's form still fills its band. */
-.fbox:has(>.fgrid):not(:has(>.fgrid>:not([hidden]) ~ :not([hidden]))):not(:has(>.fgrid>.fwide)):not(.modal *){max-width:min(var(--ctl-w),88%)}
+.fbox:has(>.fgrid):not(:has(>.fgrid>:not([hidden]) ~ :not([hidden]))):not(:has(>.fgrid>.fwide)):not(.modal:not(.inline) *){max-width:min(var(--ctl-w),88%)}
 .fbox>.fgrid:not(:has(>:not([hidden]) ~ :not([hidden])))>*{grid-column:1 / -1}
 @media(max-width:600px){ .fbox{max-width:min(var(--ctl-w),88%)}
-  .modal .fbox{max-width:none}
+  .modal:not(.inline) .fbox{max-width:none}
 }
 /* A dialog's form is on the same grid (R273, the operator 23 Nov): the
    fields that pair sit side by side at a desk, each a .field of its own in
