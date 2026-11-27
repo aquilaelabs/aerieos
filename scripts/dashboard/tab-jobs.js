@@ -131,14 +131,17 @@ function jobSessionWords(name){
   return b;
 }
 
+// Where it stands, in a word: its pill's, and its row's name for a screen reader.
+function jobWord(j){
+  return j.state === "running" && j.cancel ? "stopping"
+       : j.state === "running" && j.step ? j.step : j.state;
+}
 function jobStatePill(j){
   const cls = {succeeded: "ok", failed: "bad", running: "note",
                assigned: "note", canceled: "warn"}[j.state] || "";
-  const word = j.state === "running" && j.cancel ? "stopping"
-             : j.state === "running" && j.step ? j.step : j.state;
   // A running job is live, and glows (R218 step 7).
   const live = j.state === "running" || j.state === "assigned" ? " live" : "";
-  return `<span class="pill ${cls}${live} jbstate">${esc(word)}</span>`;
+  return `<span class="pill ${cls}${live} jbstate">${esc(jobWord(j))}</span>`;
 }
 
 // Where and when: the node by name, and the timings that are known: a
@@ -269,8 +272,11 @@ function renderJobsInto(i){
                      : "stop it where it is: the row moves when the runner reports that it did"}">Cancel</button>
         </div>`], "div", "jbopen",
         // The row's line opens it to what the job wrote (rows-you-open,
-        // R218 step 25): pressed, or Enter and Space from the keyboard.
-        `role="button" tabindex="0" aria-expanded="${open}" aria-label="${esc(open ? "fold the log away" : "open the log: what it wrote, the last 4000 characters")}"`)}
+        // R218 step 25): pressed, or Enter and Space from the keyboard. Named
+        // as the job and where it stands, then what the press does: a label
+        // of the press alone was all a screen reader said of every row, the
+        // line under it being the button's (R286).
+        `role="button" tabindex="0" aria-expanded="${open}" aria-label="${jobTitle(j)}, ${esc(jobWord(j))}: ${open ? "fold its log away" : "open its log"}"`)}
       ${j.error ? `<div class="sub jberr warn">${esc(j.error)}</div>` : ""}
       ${jobOutputs(j)}
       ${open ? `<pre class="dmlog jblog" data-tail="1">${
