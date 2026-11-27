@@ -19,10 +19,8 @@ token, while they hold a live sign-in anywhere (logins.live); signed out
 everywhere, their sessions' aerie git waits for them. Work that is nobody's
 in the moment (watching CI) takes the token of any giver signed in now and
 pauses while none is. A project keeps no token of its own; a line kept as
-the project's from before (an install with no key to seal a store with)
-is read as it was until a person gives theirs. Tokens kept as a project's
-before 0.8.0 go to the project owner's store at the first start that can
-seal them (adopt).
+the project's (an install with no key to seal a store with) is read as it
+is until a person gives theirs.
 """
 import base64
 import contextlib

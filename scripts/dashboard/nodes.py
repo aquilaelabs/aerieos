@@ -2544,10 +2544,6 @@ def _c_session(c, out):
             # false from a node that could not set it up, with why.
             "ctr": bool(se.get("ctr")),
             "ctr_why": str(se.get("ctr_why") or "")[:120],
-            # Whether its agent serves AerieOS's own terminal (R133): one
-            # that does not (an agent before 0.8) opens no terminal until
-            # it is updated.
-            "term": bool(se.get("term")),
             "user": re.sub(r"[^A-Za-z0-9._-]", "", str(se.get("user") or ""))[:32],
             "workspace": bool(se.get("workspace")),
             # None is "not probed", read as unknown rather than read-only:
@@ -3035,9 +3031,7 @@ def node_root_asks(principal, node_id, on):
 
 def account_users_on(nid):
     """Each account a Unix user of its own on this node (R125): on wherever
-    sessions run, which is every node but a hosting-only one. The config's
-    switch, a dev feature in 0.8.x, is gone (R125 step 11) and a key an
-    older build left is read as on."""
+    sessions run, which is every node but a hosting-only one."""
     return not host_only(nid)
 
 
@@ -3045,8 +3039,7 @@ def token_seal_on(nid):
     """The coding agents' sign-ins sealed on this node (R126): on wherever
     sessions run, as long as this controller has an install key to make
     each account's sealing key from (a fresh install makes one at its first
-    start). The config's switch, a dev feature in 0.8.x, is gone (R126
-    step 6) and a key an older build left is read as on."""
+    start)."""
     return account_users_on(nid) and bool(can_seal and can_seal())
 
 
@@ -3097,16 +3090,6 @@ def root_refused(n):
     return ""
 
 
-def container_net_on(node_id):
-    """Whether each project's containers on this node are kept to their own
-    network (R178): on, on every node (the operator, 26 Oct: which projects
-    reach each other is their Reads, not a node's choice). The config's
-    switch, deprecated in 0.8.0, is gone (R146) and a key an older build
-    left is read as on."""
-    del node_id
-    return True
-
-
 def ports_local_on(node_id):
     """Whether published ports on this node bind to 127.0.0.1 by default
     (R190): the config says, and a hosting-only node has it unless switched
@@ -3141,9 +3124,7 @@ def node_ports_local(principal, node_id, on):
 
 def session_net_on(node_id):
     """Whether each session on a node is kept to its own project's network
-    (R79): on wherever sessions run; a hosting-only node runs none. The
-    config's switch, deprecated in 0.8.0, is gone (R146) and a key an older
-    build left is read as on."""
+    (R79): on wherever sessions run; a hosting-only node runs none."""
     n = node(node_id) or {}
     return not host_only(n)
 
@@ -3153,9 +3134,9 @@ def session_net_nudge():
     so what the controller says each project owns there reaches it within a
     poll: after a container changes hands, or an instance comes or goes."""
     for n in node_list():
-        # ...and one keeping its containers apart (R178), whose map moves
+        # ...and every one keeps its containers apart (R178), whose map moves
         # with the same changes.
-        if n.get("kind") == "agent" and (session_net_on(n["id"]) or container_net_on(n["id"])):
+        if n.get("kind") == "agent":
             ask_hello(n["id"])
 
 

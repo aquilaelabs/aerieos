@@ -238,18 +238,6 @@ def forget(name):
             write_json(_file(), d)
 
 
-def _project_of(name, v):
-    """The project a checked container is one of: as the check recorded it,
-    or, for an answer from before it did, found by the container's name."""
-    if (v or {}).get("project"):
-        return v["project"]
-    for project, insts in devapp._load().items():
-        for inst in insts:
-            if devapp._pname(project, inst) == name:
-                return devapp.owner_of(project, inst) or project
-    return ""
-
-
 def attention(node_name, allowed=None, entries=()):
     """The bell's rows: one per node with a container behind, kind image,
     keyed by bellseen on the digests it would move to. `allowed(project)`
@@ -263,7 +251,7 @@ def attention(node_name, allowed=None, entries=()):
     for name, v in _load().items():
         if name.startswith("_") or not (v or {}).get("behind"):
             continue
-        if allowed is not None and not allowed(_project_of(name, v)):
+        if allowed is not None and not allowed((v or {}).get("project") or ""):
             continue
         by.setdefault(v.get("node") or "", []).append((name, v["behind"]))
     for name, nid, project, images in entries:

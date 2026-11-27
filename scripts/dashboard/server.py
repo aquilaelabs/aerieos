@@ -2447,7 +2447,7 @@ def vm_target(project, name):
     else:
         return {"where": "node", "id": nid, "name": nm, "host": nodes.route_host(nid),
                 "screen": int(se.get("screen") or SCREEN_PORT),
-                "boot": str(se.get("boot") or ""), "domain": rec["domain"], "term": bool(se.get("term"))}
+                "boot": str(se.get("boot") or ""), "domain": rec["domain"], "term": True}
     return {"where": "refused", "name": nm, "why": why}
 
 
@@ -2637,7 +2637,7 @@ def session_target(project, claude=False, node="", uid=""):
     else:
         return {"where": "node", "id": nid, "name": name, "host": nodes.route_host(nid),
                 "screen": int(se.get("screen") or SCREEN_PORT),
-                "boot": str(se.get("boot") or ""), "term": bool(se.get("term"))}
+                "boot": str(se.get("boot") or ""), "term": True}
     return {"where": "refused", "name": name, "waiting": waiting,
             "why": why + ("." if passing else
                           ". Sessions run on a node and nowhere else (this container "
@@ -2699,7 +2699,7 @@ def ctr_target(name, instance):
         # terminal has no read-only kind.
         return {"where": "node", "id": nid, "name": nm, "host": nodes.route_host(nid),
                 "screen": int(se.get("screen") or SCREEN_PORT),
-                "boot": str(se.get("boot") or ""), "term": bool(se.get("term"))}
+                "boot": str(se.get("boot") or ""), "term": True}
     return {"where": "refused", "name": nm, "why": why}
 
 
@@ -4852,8 +4852,9 @@ try:
     # switch says.
     nodes.session_net_for = lambda nid: (({"on": True, "own": router.with_peers(_with_vmnets(nid, devapp.session_net_own(nid)))}
                                           if nodes.session_net_on(nid) else {"on": False, "own": {}})
-                                         | {"ctr_on": nodes.container_net_on(nid),
-                                            "ctr": devapp.container_net_own(nid) if nodes.container_net_on(nid) else {},
+                                         # Containers kept apart on every node (R178); the agents
+                                         # read ctr_on, so it is still said.
+                                         | {"ctr_on": True, "ctr": devapp.container_net_own(nid),
                                             # Whether this node's VMs may reach its LAN (R91 step 8).
                                             "vm_lan": bool(((nodes.node(nid) or {}).get("config") or {}).get("vm_lan"))})
     NODES_OK = ""
@@ -6561,20 +6562,6 @@ _polls = {}
 _seen_written = {}
 SEEN_WRITE_S = 600
 
-def _findings_counts(who, ps):
-    """Per-project finding counts for the poll, scoped the way the tab is.
-
-    counts() is already narrowed to the projects the caller may see, but it
-    buckets a path it could not place under "", and for a session that bucket
-    holds every row the attribution refused: the rest of the box. So a session
-    gets its own project's number and nothing beside it, and the unplaceable
-    `heads` that go with it are dropped at the call site for the same reason.
-    """
-    c = findings.counts(ps)
-    mine = (who or {}).get("session")
-    return {k: v for k, v in c.items() if k == mine} if mine else c
-
-
 def snapshot(who):
     """The status read: every node row it asks for read once (nodes.held)."""
     with nodes.held():
@@ -6705,15 +6692,15 @@ def _snapshot(who):
         "node_runners": _tpart("status:node_runners", lambda: _runners_for(who)),
         "reports": _tpart("status:reports", lambda: findings.mounted()),
         "reports_mtime": _tpart("status:reports_mtime", lambda: findings.reports_mtime()),
-        "findings_counts": _tpart("status:findings_counts", lambda: _findings_counts(who, ps)),
-        # ...and, for the row they land on, what those paths actually look
-        # like. Order matters: this reads what the call above computed. Empty
-        # for a session: a head is a fragment of a path from outside its
-        # project, which is the one thing it must not be shown.
-        "findings_heads": _tpart("status:findings_heads", lambda: [] if (who or {}).get("session") else findings.heads()),
+        # Where the findings no space could be given came from: each a
+        # fragment of a path, so empty for a session, which must never see
+        # one from outside its space. Read after counts(), which fills it
+        # (the parse is cached, so asking twice costs the filter alone).
+        "findings_heads": _tpart("status:findings_heads",
+                                 lambda: [] if (who or {}).get("session") else (findings.counts(ps), findings.heads())[1]),
         # ...and whether there is a readable report at all, which is what the
         # Static analysis button and the Analysis tab ghost on.
-        "reports_ok": _tpart("status:reports_ok", lambda: findings.reports_ok()),
+        "reports_ok": _tpart("status:reports_ok", lambda: (findings.counts(ps), findings.reports_ok())[1]),
         # ...and when each report was written, so one left behind by a failed
         # scanner is visible rather than silently counted as current.
         "reports_ages": _tpart("status:reports_ages", lambda: findings.reports_ages()),
@@ -8886,9 +8873,6 @@ class Handler(BaseHTTPRequestHandler):
         down = self.connection
         if no:
             return termws.close(down, no[0])
-        if target["where"] == "node" and not target.get("term"):
-            return termws.close(down, f"{target['name']}'s agent is from before AerieOS's own terminal: "
-                                      "update it on its Nodes row, and this opens")
         if target["where"] == "node" and not nodes.screen_key(target["id"]):
             return termws.close(down, nodes.relay_unheard(target["name"]))
         node = target["where"] == "node"

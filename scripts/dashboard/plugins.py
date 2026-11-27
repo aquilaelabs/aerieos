@@ -83,9 +83,7 @@ def report(node_id, rows):
             if not uid.startswith("u_") or len(uid) > 16:
                 continue
             got = _clean(r.get("plugins"))
-            # An agent too old to say leaves the MCP servers as they were.
-            was = (d.get(uid) or {}).get(node_id) or {}
-            mcp = _clean_mcp(r.get("mcp")) if "mcp" in r else (was.get("mcp") or {})
+            mcp = _clean_mcp(r.get("mcp"))
             mine = d.setdefault(uid, {})
             if not got and not mcp:
                 if node_id in mine:

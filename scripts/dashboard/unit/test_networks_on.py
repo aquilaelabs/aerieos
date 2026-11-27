@@ -38,10 +38,10 @@ class ReadsAsOn(unittest.TestCase):
         self.addCleanup(setattr, nodes, "node", saved)
         conf = {"a": {}, "h": {"host_only": True}, "x": {"session_net": False, "container_net": False}}
         nodes.node = lambda nid: {"id": nid, "kind": "agent", "config": conf[nid]}
-        self.assertEqual((nodes.session_net_on("a"), nodes.container_net_on("a")), (True, True))
-        self.assertEqual((nodes.session_net_on("h"), nodes.container_net_on("h")), (False, True))
+        self.assertEqual(nodes.session_net_on("a"), True)
+        self.assertEqual(nodes.session_net_on("h"), False)
         # The switches went in 0.9.0 (R146): a key an older build left reads as on.
-        self.assertEqual((nodes.session_net_on("x"), nodes.container_net_on("x")), (True, True))
+        self.assertEqual(nodes.session_net_on("x"), True)
 
 
 if __name__ == "__main__":

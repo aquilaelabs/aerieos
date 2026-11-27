@@ -169,18 +169,10 @@ def seen(uid, lid, ua=None, ip=""):
         # hold it to. Every browser sends one, its sockets included.
         if not ua and r.get("ua"):
             return False
-        if ua:
-            if r.get("ua") and r["ua"] != _ua_digest(ua):
-                return False
-            if "ua" not in r:
-                # A row from before binding: bound to the first browser seen.
-                # One made with no User-Agent (a script, the editor's
-                # extension) says "" and stays bound to nothing, or the first
-                # request of its with one would bind it and refuse the rest.
-                r["ua"], r["agent"] = _ua_digest(ua), browser_words(ua)
-                r["last"], r["ip"] = now, str(ip or "")[:45]
-                _save(d)
-                return True
+        # One made with no User-Agent (a script, the editor's extension) says
+        # "" and stays bound to nothing.
+        if ua and r.get("ua") and r["ua"] != _ua_digest(ua):
+            return False
         if now - int(r.get("last") or 0) < TOUCH_EVERY:
             return True
         r["last"] = now
