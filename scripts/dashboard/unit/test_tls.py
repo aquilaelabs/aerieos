@@ -524,5 +524,28 @@ class Own(unittest.TestCase):
         self.assertEqual(curl(st["pin"]).returncode, 0)
 
 
+class DroppedConnection(unittest.TestCase):
+    """A connection its peer dropped writes nothing to the log (B1191);
+    anything else is still socketserver's traceback."""
+
+    def test_only_a_dropped_connection_is_quiet(self):
+        said = []
+
+        class Base:
+            def handle_error(self, request, client_address):
+                del request, client_address
+                said.append(sys.exc_info()[0])
+
+        class Q(tls.WrapOnItsThread, Base):
+            pass
+
+        for exc in (ConnectionResetError, BrokenPipeError, ConnectionAbortedError, ValueError):
+            try:
+                raise exc
+            except exc:
+                Q().handle_error(None, ("192.0.2.1", 1))
+        self.assertEqual(said, [ValueError])
+
+
 if __name__ == "__main__":
     unittest.main()

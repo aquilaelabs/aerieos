@@ -51,6 +51,7 @@ import os
 import selectors
 import socket
 import ssl
+import sys
 import threading
 import time
 from pathlib import Path
@@ -697,6 +698,15 @@ class WrapOnItsThread:
 
     def process_request_thread(self, request, client_address):
         super().process_request_thread(wrap(request), client_address)
+
+    def handle_error(self, request, client_address):
+        """A connection its peer dropped (a tab closed or reloaded, a browser
+        retrying across a restart) is not the server's error and says
+        nothing: each wrote a whole traceback, burying a start's own lines
+        (B1191). Anything else is socketserver's traceback as before."""
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
 
 
 def over_tls(connection):
