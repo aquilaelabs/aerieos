@@ -294,6 +294,13 @@ await section("a toolchain card to open", async () => {
   await page.click('.pane .bar [data-shellback]');
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'library', null, { timeout: 10000 });
   ok(true, '...and Back returns to the Library');
+  // An entry's address with no entry named lands on the Library, not on
+  // whatever page was on show (B1175: the CI runner's stayed).
+  await page.evaluate(() => { location.hash = '#/machines/runner'; });
+  await page.waitForFunction(() => tabOf(panes[0])?.kind === 'runner', null, { timeout: 10000 });
+  await page.evaluate(() => { location.hash = '#/build/entry'; });
+  ok(await page.waitForFunction(() => tabOf(panes[0])?.kind === 'library', null, { timeout: 10000 }).then(() => true, () => false),
+     `...and #/build/entry, naming no entry, opens the Library (${await page.evaluate(() => tabOf(panes[0])?.kind)})`);
 });
 
 // ---- the whole description (step 2) -----------------------------------------

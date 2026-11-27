@@ -426,7 +426,10 @@ function openRoute(hash){
   // A group of one tool names its node second (#/group/NODE), as routeOf
   // writes it.
   const named = (g.tools || []).some(([k]) => k === a);
-  const kind = railTool(g, named ? a : "");
+  let kind = railTool(g, named ? a : "");
+  // A page a press opens, named without what it opens (#/build/entry): it
+  // has no opener of its own, so the page it is pressed from opens.
+  if (!OPENERS[kind] && PRESSED_HOME[kind]) kind = railTool(g, PRESSED_HOME[kind]);
   if (!kind) return false;
   railWant = g.key;
   // The node the address names, set before the page draws (R256 step 3).
