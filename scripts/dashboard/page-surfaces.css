@@ -815,7 +815,9 @@ body.firstrun #panes{display:none}
    line of text you can press as in a dialog. */
 .rnsign{padding:6px 0;border-top:var(--hair) solid var(--line)}
 .rnsign:first-child{border-top:0}
-.rnsignform{display:grid;gap:6px;margin:6px 0}
+/* A key's form (its upload, a backup's password, the backup password
+   itself) keeps room from the lines over it. */
+.rnsign>.fbox{margin-top:12px}
 .sgview .link{--sheen:none;color:var(--warn);padding:2px 0;
   font:var(--f-ui);min-height:var(--tap);text-align:left;
   text-decoration:underline;cursor:pointer}

@@ -79,6 +79,8 @@ function nbSigningView({$, nb, project}){
 
   function slot(key, route, word, about){
     const k = (keys[key] || {})[route], d = draft[`${key}:${route}`] || {};
+    // Its fields' ids, one set per key and slot.
+    const at = `sg-${key.replace(/[^a-z0-9_-]/gi, "_")}-${route}`;
     const now = d.remove ? `${word}: removed when you Save`
       : d.file ? `${word}: ${esc(d.file.name)}, kept when you Save`
       : k ? `${word}: ${esc(k.alias)} <span class="dim">${esc(signFp(k.sha256))}${k.generated ? ", generated" : ""}</span>`
@@ -109,15 +111,15 @@ function nbSigningView({$, nb, project}){
         : "an administrator on this space downloads a copy to keep offline"}, since losing it is final.</div>` : ""}
       ${retired ? `<div class="sub">Retired: rotated to ${esc(k.retired_for)}. Kept, since the proof and every device before Android 9 still need it.</div>` : ""}
       ${rotated ? `<div class="sub">Rotated from ${esc(k.rotated_from)}: Android 9 and newer see this key, older devices still see ${esc(k.rotated_from)}.</div>` : ""}
-      ${k && !d.remove && pw[`${key}:${route}`] ? `<div class="rnsignbar actbar">
-        <input type="password" data-signbackuppass autocomplete="current-password" placeholder="the backup password" aria-label="the backup password">
-        <button type="button" class="link" data-signbackupgo>Download</button></div>` : ""}
-      ${d.open ? `<div class="rnsignform">
-        <input type="file" data-signfile accept=".jks,.p12,.pfx,.keystore" aria-label="${esc(word)} keystore">
-        <input type="password" data-signpass autocomplete="new-password" placeholder="keystore password" aria-label="keystore password">
-        <input data-signalias autocomplete="off" spellcheck="false" placeholder="alias, when it holds several" data-ph-short="alias" aria-label="key alias">
-        <input type="password" data-signkeypass autocomplete="new-password" placeholder="key password, if not the same" data-ph-short="key password" aria-label="key password">
-      </div>` : ""}
+      ${k && !d.remove && pw[`${key}:${route}`] ? formBox({fields: [
+        formField(`${at}-bpw`, "Backup password", `<input type="password" id="${at}-bpw" data-signbackuppass autocomplete="current-password">`)],
+        foot: [`<button type="button" class="primary" data-signbackupgo>Download</button>`]}) : ""}
+      ${d.open ? formBox({fields: [
+        formField(`${at}-file`, "Keystore", `<input type="file" id="${at}-file" data-signfile accept=".jks,.p12,.pfx,.keystore">`,
+          {wide: true, help: `the ${word.toLowerCase()} as a .jks, .p12 or .pfx file`}),
+        formField(`${at}-pass`, "Keystore password", `<input type="password" id="${at}-pass" data-signpass autocomplete="new-password">`),
+        formField(`${at}-kpass`, "Key password", `<input type="password" id="${at}-kpass" data-signkeypass autocomplete="new-password" placeholder="if not the same" data-ph-short="optional">`),
+        formField(`${at}-alias`, "Alias", `<input id="${at}-alias" data-signalias autocomplete="off" spellcheck="false" placeholder="when it holds several" data-ph-short="optional">`)]}) : ""}
       ${acts.trim() ? `<div class="rnsignbar actbar">${acts}</div>` : ""}
     </div>`;
   }
@@ -144,23 +146,22 @@ function nbSigningView({$, nb, project}){
     patch($("sgActs"), why ? "" : `<button type="button" id="sgImp" data-add="import" aria-expanded="${adding === "import"}"${
         locked ? "" : ` disabled title="no key can be added until the backups have a password"`}><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="${adding === "key"}">New key</button>`);
     patch($("sgAdd"), why ? ""
-      : adding === "key" ? `<div class="field"><div class="addbar actbar ctlrow">
-          <input id="sgNewName" autocomplete="off" spellcheck="false" placeholder="name, e.g. watch" aria-label="a new key's name">
-          <button type="button" id="sgNewGo">Add it</button><button type="button" id="sgAddCancel">Cancel</button></div></div>`
+      : adding === "key" ? `<div class="field">${formBox({fields: [
+          formField("sgNewName", "The new key's name", `<input id="sgNewName" autocomplete="off" spellcheck="false" placeholder="watch">`)],
+          foot: [`<button type="button" id="sgAddCancel">Cancel</button>`, `<button type="button" class="primary" id="sgNewGo">Add it</button>`]})}</div>`
       // A backup brought back (R103, the operator 22 Oct): Download
       // backup's zip carries its alias, and its password unless it was
       // wrapped under a project's backup password (R111), which is then
       // typed here, as a bare keystore's is; the key and the slot default
       // to the backup's.
-      : adding === "import" ? `<div class="field"><div class="rnsignform">
-          <input type="file" id="sgImpFile" accept=".zip,.jks,.p12,.pfx,.keystore" aria-label="the backup">
-          <input id="sgImpKey" autocomplete="off" spellcheck="false" placeholder="key name, or the backup's" data-ph-short="key name" aria-label="the key it becomes">
-          <select id="sgImpRoute" aria-label="the slot it goes in"><option value="">the slot the backup names</option>${
-            SIGN_ROUTES.map(([r, w]) => `<option value="${r}">${w}</option>`).join("")}</select>
-          <input type="password" id="sgImpPass" autocomplete="off" placeholder="the backup password it was made under, or a keystore's own" data-ph-short="its password" aria-label="the backup's or the keystore's password">
-          <div class="sub dim">A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with.</div>
-          <div class="actbar"><button type="button" id="sgAddCancel">Cancel</button><button type="button" class="primary" id="sgImpGo" disabled>Import</button></div>
-        </div></div>`
+      : adding === "import" ? `<div class="field">${formBox({fields: [
+          formField("sgImpFile", "The backup", `<input type="file" id="sgImpFile" accept=".zip,.jks,.p12,.pfx,.keystore">`, {wide: true, help: "a key backup downloaded here, or a keystore on its own"}),
+          formField("sgImpKey", "The key it becomes", `<input id="sgImpKey" autocomplete="off" spellcheck="false" placeholder="the backup's" data-ph-short="the backup's">`),
+          formField("sgImpRoute", "Its slot", `<select id="sgImpRoute"><option value="">the slot the backup names</option>${
+            SIGN_ROUTES.map(([r, w]) => `<option value="${r}">${w}</option>`).join("")}</select>`),
+          formField("sgImpPass", "Its password", `<input type="password" id="sgImpPass" autocomplete="off">`,
+            {wide: true, hint: "A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with."})],
+          foot: [`<button type="button" id="sgAddCancel">Cancel</button>`, `<button type="button" class="primary" id="sgImpGo" disabled>Import</button>`]})}</div>`
       : "");
     // The backup password (the operator, 1 Oct): the project's owner's to
     // set, and every download's to give, AerieOS's owner's included.
@@ -169,14 +170,15 @@ function nbSigningView({$, nb, project}){
       <div class="sub dim">${locked ? "Every key backup asks for it, whoever downloads it."
         : "Every key backup will ask for it, whoever downloads it."}${mayLock ? "" : " The space's owner sets it."}</div>
       ${locked ? "" : `<div class="notice warn">No key can be added or made until it has one${mayLock ? ": set it first" : ""}.</div>`}
-      ${mayLock && lockOpen ? `<div class="rnsignform">
-        ${locked ? `<input type="password" id="sgLockCur" autocomplete="current-password" placeholder="the backup password now" data-ph-short="password" aria-label="the backup password now">` : ""}
-        <input type="password" id="sgLockNew" autocomplete="new-password" placeholder="${locked ? "a new one, or empty to remove it" : "at least ten characters"}" data-ph-short="${locked ? "new, or empty" : "10 or more"}" aria-label="the new backup password">
-        <input type="password" id="sgLockAgain" autocomplete="new-password" placeholder="the new one again" aria-label="the new backup password again">
-        <div class="rnsignbar actbar"><button type="button" class="link" id="sgLockGo" disabled>${locked ? "Change it" : "Set it"}</button></div>
-      </div>` : ""}
-      ${mayLock ? `<div class="rnsignbar actbar"><button type="button" class="link" id="sgLockOpen">${
-        lockOpen ? "Never mind" : locked ? "Change or remove" : "Set a backup password"}</button></div>` : ""}
+      ${mayLock && lockOpen ? formBox({fields: [
+        locked ? formField("sgLockCur", "The backup password now", `<input type="password" id="sgLockCur" autocomplete="current-password">`, {wide: true}) : "",
+        formField("sgLockNew", locked ? "A new one" : "The backup password", `<input type="password" id="sgLockNew" autocomplete="new-password" placeholder="${
+          locked ? "empty removes it" : "at least ten characters"}" data-ph-short="${locked ? "empty removes it" : "10 or more"}">`),
+        formField("sgLockAgain", "Again", `<input type="password" id="sgLockAgain" autocomplete="new-password">`)],
+        // Never mind at its foot, beside what it puts away.
+        foot: [`<button type="button" id="sgLockOpen">Never mind</button>`, `<button type="button" class="primary" id="sgLockGo" disabled>${locked ? "Change it" : "Set it"}</button>`]}) : ""}
+      ${mayLock && !lockOpen ? `<div class="rnsignbar actbar"><button type="button" class="link" id="sgLockOpen">${
+        locked ? "Change or remove" : "Set a backup password"}</button></div>` : ""}
     </div></div>`;
     // Each key a section with its own Save and Revert, and the apps one.
     names.forEach(key => nb.stage(`signing:key:${key}`, {
@@ -197,10 +199,10 @@ function nbSigningView({$, nb, project}){
       ${mapped.map(([pkg, k]) => `<div class="rninvite" data-pkg="${esc(pkg)}">
         <code>${esc(pkg)}</code> <span class="dim">signs with</span> <b>${esc(k)}</b>
         ${why ? "" : `<button type="button" class="link" data-unmap>Remove</button>`}</div>`).join("")}
-      ${why ? "" : `<div class="rninvitebar"><input id="sgMapPkg" autocomplete="off" spellcheck="false" placeholder="com.example.app"
-          aria-label="an app's package"><select id="sgMapKey" aria-label="the key it signs with">${
-          names.map(k => `<option>${esc(k)}</option>`).join("")}</select>
-        <button type="button" class="link" id="sgMapGo">Map it</button></div>`}</div>`;
+      ${why ? "" : formBox({fields: [
+        formField("sgMapPkg", "An app's package", `<input id="sgMapPkg" autocomplete="off" spellcheck="false" placeholder="com.example.app">`),
+        formField("sgMapKey", "Signs with", `<select id="sgMapKey">${names.map(k => `<option>${esc(k)}</option>`).join("")}</select>`)],
+        foot: [`<button type="button" id="sgMapGo">Map it</button>`]})}</div>`;
     // Releases (R106): a release's APK is built unsigned in CI and signed
     // on the project's node with the sideload key its app maps to; which key that is, what
     // would stop it, and how the newest went.
