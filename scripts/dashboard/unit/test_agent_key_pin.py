@@ -473,31 +473,6 @@ class TheMove(Case):
         self.assertEqual((a.ctl.url, self.kept()["controller"]), (url, url))
         self.assertEqual(self.channel(a)["why"], "its controller answered 401 over TLS")
 
-    def test_session_tools_from_before_a_key_pin_hold_the_move(self):
-        srv = self.serve()
-        url = f"http://127.0.0.1:{srv.server_port}"
-        a = self.node(url)
-        lib = os.path.join(self.store, "n_0a1b2c3d", ".bb", "current", "scripts", "lib")
-        os.makedirs(lib)
-        with open(os.path.join(lib, "bbapi.py"), "w") as f:
-            f.write("# a client from before: it takes any pin for a certificate's digest\n")
-        self.assertFalse(a.channel_move({"pin": self.pin}))
-        self.assertEqual((a.ctl.url, srv.asked), (url, []))
-        self.assertEqual(self.channel(a)["why"], "its session tools are from before a pinned channel")
-        # The controller's bundle arrives, root's copy and bb-session with it: it moves.
-        shutil.copy(os.path.join(REPO, "scripts", "lib", "bbapi.py"), lib)
-        os.makedirs(os.path.join(self.tmp, "root-bundle", "current", "scripts", "lib"))
-        shutil.copy(os.path.join(REPO, "scripts", "lib", "bbapi.py"), os.path.join(self.tmp, "root-bundle", "current", "scripts", "lib"))
-        shutil.copy(os.path.join(REPO, "nodes", "bb-session"), os.path.join(self.tmp, "bb-session"))
-        self.assertEqual(a.channel_reads_key(), "")
-        self.assertTrue(a.channel_move({"pin": self.pin}))
-        # ...and a bb-session from before holds it the same way.
-        a = self.node(url)
-        with open(os.path.join(self.tmp, "bb-session"), "w") as f:
-            f.write("#!/usr/bin/python3\n")
-        self.assertFalse(a.channel_move({"pin": self.pin}))
-        self.assertEqual(a.channel_reads_key(), os.path.join(self.tmp, "bb-session"))
-
     def test_a_node_that_pinned_the_certificate_pins_the_key_it_is_over(self):
         srv = self.serve()
         url = f"https://127.0.0.1:{srv.server_port}"

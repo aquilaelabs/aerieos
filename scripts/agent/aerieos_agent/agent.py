@@ -13,11 +13,11 @@ import time
 import traceback
 from . import AGENT_VERSION, files
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
+from .base import BEAT_S, CHANNEL, REFUSED, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S
 from .base import FS_REFUSED, NotHeld, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import CA_PIN, KEY_PIN, Controller, address_ok
-from .stores import STATE_LOCK, console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
+from .stores import STATE_LOCK, console_said, load_state, pin_release, pin_spare, save_state, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -1235,27 +1235,6 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         j.start()
 
     # -- the channel over TLS, under the controller's key ----------------------
-    def channel_reads_key(self):
-        """Whether every copy here of what dials the controller for a
-        session reads a key's pin: the bundle's client the terminals run
-        (bbapi.py), root's copy of it, and the installed bb-session. Each
-        says so in a line of its own (KEY_PIN = ...). A copy from before
-        this does not, and would refuse the controller under a pin it
-        takes for a certificate's digest; one that is not on this node
-        dials nothing. The name of the first that does not, or ""."""
-        store = tc_root(self.state)
-        files = [os.path.join(store, ".bb", "current", "scripts", "lib", "bbapi.py")] if store else []
-        files += [os.path.join(ROOT_BUNDLE_DIR, "current", "scripts", "lib", "bbapi.py"), SESSION_BIN]
-        mark = f'KEY_PIN = "{KEY_PIN}"'.encode()
-        for path in files:
-            try:
-                with open(path, "rb") as f:
-                    if mark not in f.read():
-                        return path
-            except OSError:
-                continue
-        return ""
-
     def channel_move(self, named):
         """This node's channel taken to TLS under the controller's key, by
         itself: `named` is what the controller's hello says of its TLS,
@@ -1271,20 +1250,13 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         not pass TLS), the node stays as it is and says why in its census.
         Nothing moves for a node reached through a public hostname, whose
         certificate is the name's and is checked by the system's
-        authorities, nor while a copy of the session tools here is from
-        before a key's pin. Whether it moved."""
+        authorities. Whether it moved."""
         pin = named.get("pin") if isinstance(named, dict) else ""
         if not isinstance(pin, str) or not re.fullmatch(re.escape(KEY_PIN) + r"[A-Za-z0-9+/]{43}=", pin):
             CHANNEL.clear()
             return False
         if self.ctl.pin == Controller.CA or self.state.get("reach") == "public" or self.ctl.pin == pin:
             CHANNEL.clear()
-            return False
-        old = self.channel_reads_key()
-        if old:
-            CHANNEL.update(why="its session tools are from before a pinned channel")
-            log_once("channel", f"the channel stays as it is for now: {old} is from before a key's pin; "
-                                "it moves once the controller's bundle is the one here")
             return False
         if self.ctl.scheme == "https":
             CHANNEL.clear()
