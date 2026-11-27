@@ -1962,9 +1962,10 @@ await section("good, warning and error are one trio on every scheme, and a warni
     const { fileURLToPath } = await import('node:url');
     const doc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'design-language.md'), 'utf8');
     const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
-    const [, warn, err] = ([...seen.dark][0] || '').split(' ');
+    // Each half's pair: a theme's light half is listed under it with its own.
+    const [, warnD, errD] = ([...seen.dark][0] || '').split(' '), [, warnL, errL] = ([...seen.light][0] || '').split(' ');
     const said = [...doc.matchAll(/\| `--(warn|bad)` \| `(#[0-9a-fA-F]{6})` \|/g)].map(m => [m[1], m[2], rgb(m[2])]);
-    const off = said.filter(([k, , v]) => v !== (k === 'warn' ? warn : err));
+    const off = said.filter(([k, , v]) => !(k === 'warn' ? [warnD, warnL] : [errD, errL]).includes(v));
     if (!said.length) bad.push('the design language names no --warn or --bad');
     if (off.length) bad.push(`the design language names a ${[...new Set(off.map(([k, h]) => `${k} ${h}`))].join(', ')} the page does not draw`);
   }

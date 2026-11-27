@@ -32,8 +32,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#4c596d` |
 | `--line` | `#adbfd9` |
 | `--accent` | `#005ed2` |
-| `--warn` | `#996200` |
-| `--bad` | `#c3131b` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#0065be` |
 
 ### Abyss (dark)
@@ -60,8 +60,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#4e5b5c` |
 | `--line` | `#abc3c8` |
 | `--accent` | `#00717c` |
-| `--warn` | `#906700` |
-| `--bad` | `#b53433` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#b804a7` |
 
 ### Carbon (dark)
@@ -88,8 +88,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#57575c` |
 | `--line` | `#bdbcc7` |
 | `--accent` | `#ca002b` |
-| `--warn` | `#905e00` |
-| `--bad` | `#bb2933` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#007368` |
 
 ### Ember (dark)
@@ -116,8 +116,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#60564d` |
 | `--line` | `#cabbab` |
 | `--accent` | `#ab4500` |
-| `--warn` | `#8b6100` |
-| `--bad` | `#ba2c25` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#007177` |
 
 ### Ice (dark)
@@ -144,8 +144,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#515a5d` |
 | `--line` | `#b1c0cd` |
 | `--accent` | `#006e8c` |
-| `--warn` | `#886200` |
-| `--bad` | `#b43439` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#6538e5` |
 
 ### Moss (dark)
@@ -172,8 +172,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#525b54` |
 | `--line` | `#b2c3b6` |
 | `--accent` | `#00743d` |
-| `--warn` | `#8e6800` |
-| `--bad` | `#b33833` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#7137e4` |
 
 ### Nocturne (dark)
@@ -200,8 +200,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#575669` |
 | `--line` | `#babbd8` |
 | `--accent` | `#7339e0` |
-| `--warn` | `#916600` |
-| `--bad` | `#b72b4c` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#007253` |
 
 ### Nostromo (dark)
@@ -228,8 +228,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#54595c` |
 | `--line` | `#bbbfb5` |
 | `--accent` | `#ba3900` |
-| `--warn` | `#8b6100` |
-| `--bad` | `#a8002a` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#327500` |
 
 Nostromo differs from the default in:
@@ -282,8 +282,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#5e5364` |
 | `--line` | `#c8b6d2` |
 | `--accent` | `#9f31b2` |
-| `--warn` | `#936500` |
-| `--bad` | `#b62b55` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#007439` |
 
 ### Rust (dark)
@@ -310,8 +310,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#5f5653` |
 | `--line` | `#cdb8b5` |
 | `--accent` | `#b53806` |
-| `--warn` | `#905e00` |
-| `--bad` | `#bc2825` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#007256` |
 
 ### Sepia (dark)
@@ -338,8 +338,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#5f574a` |
 | `--line` | `#c6bdac` |
 | `--accent` | `#865e00` |
-| `--warn` | `#8a6900` |
-| `--bad` | `#ac4133` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#007064` |
 
 ### Slate (dark)
@@ -366,8 +366,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#54595d` |
 | `--line` | `#b6bfc9` |
 | `--accent` | `#1461c7` |
-| `--warn` | `#905e00` |
-| `--bad` | `#b2373a` |
+| `--warn` | `#796200` |
+| `--bad` | `#cb0017` |
 | `--note` | `#467200` |
 
 ## Type
