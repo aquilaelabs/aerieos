@@ -129,11 +129,15 @@ const open = async (opts, view) => {
   for (let i = 0; i < 3; i++){ const c = await page.$('.modal:not([hidden]) button:has-text("Close")'); if (!c) break; await c.click(); await page.waitForTimeout(300); }
   // A phone has one page area and the dock under it: Home is what it opens
   // on, and a terminal is the dock pulled up.
-  if (view === 'terminal') await page.evaluate(() => {
-    if (!tabs.some(t => t.kind === 'term')) newShell('');
+  // A shell this run opens is its own to end (B1149): the layout is never
+  // saved, so one left running was another found the next run.
+  const opened = view === 'terminal' && await page.evaluate(() => {
+    const none = !tabs.some(t => t.kind === 'term');
+    if (none) newShell('');
     dockToggle(true);
+    return none;
   });
-  return { ctx, page };
+  return { ctx, page, opened };
 };
 // The shell tab in front, its scrollback cleared and one plain command run,
 // so the picture is a terminal at work and not a page of old prompts.
@@ -206,6 +210,8 @@ if (process.env.README_SHOT_SCREEN){
 }
 { const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, 'dash');
   await page.waitForTimeout(1200); await shoot(page, 'phone-dashboard.png'); await ctx.close(); }
-{ const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true }, 'terminal');
-  await shell(page, 'ls /workspace/droid'); await shoot(page, 'phone-terminal.png'); await ctx.close(); }
+{ const { ctx, page, opened } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true }, 'terminal');
+  await shell(page, 'ls /workspace/droid'); await shoot(page, 'phone-terminal.png');
+  if (opened) await page.evaluate(async () => { const t = tabs.find(x => x.kind === 'term'); if (t) await endSession(sessionOf(t.arg)); });
+  await ctx.close(); }
 await browser.close();
