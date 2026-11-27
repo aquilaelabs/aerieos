@@ -683,8 +683,11 @@ class JSScanner:
 
     def inherit(self, sub):
         """A nested pass over a template's or a string's expression takes
-        the function it sits in."""
-        sub.stack = [(n, dp, None) for n, dp, _ in self.stack]
+        the function it sits in, at a depth no brace of the expression's
+        closes: its own count starts at nothing, so with the outer pass's
+        depths, `{h: 1}` in `${box({f: [field(`...`, {h: 1})]})}` ended
+        the function it sits in (B1193)."""
+        sub.stack = [(n, -1, None) for n, _, _ in self.stack]
         if self.pending is not None and self.parens > self.paren_at_pending:
             # in a default parameter, `function f(fmt = v => `${g(v)}`)`:
             # the call is f's, as one outside a template there is (B761)
@@ -732,17 +735,7 @@ class JSScanner:
                 self.saw_string("".join(chunk), start_line, cls)
                 chunk = []
                 # the expression inside, scanned as code by a nested pass
-                k, depth = j + 2, 1
-                while k < n and depth:
-                    if s[k] == "{":
-                        depth += 1
-                    elif s[k] == "}":
-                        depth -= 1
-                    elif s[k] == "`":
-                        # a nested template: skip it whole (simple form)
-                        k2 = s.find("`", k + 1)
-                        k = n if k2 < 0 else k2
-                    k += 1
+                k = self.expr_end(j + 2)
                 inner = s[j + 2:k - 1]
                 sub = JSScanner(inner, self.sink, self.line, self.enclosing(), self.shape_methods,
                                 self.base + j + 2, self.fn_words, self.words, self.ts, self.jsx)
@@ -760,6 +753,43 @@ class JSScanner:
         self.saw_string("".join(chunk), start_line, cls)
         self.i = min(j + 1, n)
         self.last_sig = "'s'"
+
+    def expr_end(self, k):
+        """Past the brace that closes a template's ${ whose expression starts
+        at k, a template inside it taken whole however deep its own ${} nest:
+        skipped to the next backtick, a deeper template's, the braces were
+        miscounted and every call after it given the wrong caller (B1193)."""
+        s, n, depth = self.s, len(self.s), 1
+        while k < n:
+            c = s[k]
+            if c == "`":
+                k = self.template_end(k)
+                continue
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return k + 1
+            k += 1
+        return n
+
+    def template_end(self, k):
+        """Past the backtick that closes the template opening at k."""
+        s, n = self.s, len(self.s)
+        k += 1
+        while k < n:
+            c = s[k]
+            if c == "\\":
+                k += 2
+                continue
+            if c == "`":
+                return k + 1
+            if s.startswith("${", k):
+                k = self.expr_end(k + 2)
+                continue
+            k += 1
+        return n
 
     def saw_string(self, body, line, cls=False):
         fn = self.enclosing()

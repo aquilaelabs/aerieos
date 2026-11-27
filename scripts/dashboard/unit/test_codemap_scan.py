@@ -363,6 +363,21 @@ class FourthPass(unittest.TestCase):
         self.assertIn(("String", "inner"), got)
         self.assertNotIn(("round", "(top level)"), got)
 
+    def test_a_template_in_a_template_s_expression_is_taken_whole(self):
+        # B1193: a ${} holding a template whose own ${} holds templates was
+        # skipped to the next backtick, a deeper template's; the braces after
+        # it were miscounted and the calls below given the function outside.
+        s = scan("function outer(){\n  function rows(xs){\n"
+                 "    return `<ul>${xs.map(x => `<li${x.on ? ` class=\"${pick(x)}\"` : \"\"}>\n"
+                 "      ${x.edit ? box({f: [\n"
+                 "        field(`<i v=\"${esc(x.n)}\">`, {h: 1}),\n"
+                 "        field(`<t>${esc(x.t)}</t>`, {w: 1})]}) : `<b>${esc(x.v)}</b>`}</li>`).join(\"\")}</ul>`;\n"
+                 "  }\n  return rows([]);\n}\n", "a.js")
+        got = calls(s)
+        for name, line in (("pick", 3), ("box", 4), ("field", 5), ("field", 6), ("esc", 6), ("join", 6)):
+            self.assertIn((name, line, "rows"), got)
+        self.assertIn(("rows", 8, "outer"), got)
+
     def test_a_suite_naming_a_directory_reaches_the_files_in_it(self):
         with tempfile.TemporaryDirectory() as d:
             Path(d, "scripts/inner").mkdir(parents=True)
