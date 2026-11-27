@@ -71,6 +71,37 @@ class Clients(unittest.TestCase):
         return subprocess.run([sys.executable, os.path.join(LIB, "sign-verbs.py"), *argv],
                               capture_output=True, text=True, timeout=30, env=self.env())
 
+    def test_a_build_here_and_not_yet_on_the_controllers_copy_is_waited_for(self):
+        # B1183: refused with "aerie build puts a build there" while the
+        # build sat in this tree's dist/, on its way to the controller.
+        import shutil
+        ws = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, ws, True)
+        os.makedirs(os.path.join(ws, "app", "dist"))
+        open(os.path.join(ws, "app", "dist", "app.apk"), "w").close()
+        calls = []
+
+        def sign():
+            calls.append(1)
+            return ((404, {"error": "no app.apk in app's dist/: aerie build puts a build there"}) if len(calls) < 3
+                    else (403, {"error": "app's Sign a build is deny"}))
+        ANSWER["sign"] = sign
+        r = subprocess.run([sys.executable, os.path.join(LIB, "sign-verbs.py"), "app.apk", "sideload", "why"],
+                           capture_output=True, text=True, timeout=30,
+                           env={**self.env(), "WORKSPACE": ws, "BB_SIGN_POLL_S": "0.1"}, cwd=ws)
+        self.assertEqual(len(calls), 3, r.stderr)
+        self.assertIn("not yet on the controller's copy: waiting for it to land", r.stderr)
+        self.assertIn("Sign a build is deny", r.stderr + r.stdout)
+        self.assertNotEqual(r.returncode, 0)
+        calls.clear()
+        os.remove(os.path.join(ws, "app", "dist", "app.apk"))
+        ANSWER["sign"] = (404, {"error": "no app.apk in app's dist/: aerie build puts a build there"})
+        r = subprocess.run([sys.executable, os.path.join(LIB, "sign-verbs.py"), "app.apk", "sideload", "why"],
+                           capture_output=True, text=True, timeout=30,
+                           env={**self.env(), "WORKSPACE": ws, "BB_SIGN_POLL_S": "0.1"}, cwd=ws)
+        self.assertIn("aerie build puts a build there", r.stderr + r.stdout, "a build that is not here either is refused at once")
+        self.assertNotIn("waiting for it to land", r.stderr)
+
     def test_status_says_the_key_the_node_and_each_result(self):
         ANSWER["release"] = (200, status())
         r = self.sign("--status", "", "")

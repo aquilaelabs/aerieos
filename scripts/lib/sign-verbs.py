@@ -165,8 +165,23 @@ file, route, why = sys.argv[1], sys.argv[2], sys.argv[3]
 import syncwait  # noqa: E402
 if not syncwait.up(project, "the controller signs the build in its copy of dist/"):
     sys.exit("[builderbot] ERROR: not asked: the build here has not reached the controller yet; try again in a moment")
-r = bbapi.call("/api/signing", {"action": "sign", "project": project, "file": file, "route": route,
-                                "key": os.environ.get("BB_SIGN_KEY", ""), "why": why}, timeout=60)
+def ask():
+    return bbapi.call("/api/signing", {"action": "sign", "project": project, "file": file, "route": route,
+                                       "key": os.environ.get("BB_SIGN_KEY", ""), "why": why}, timeout=60)
+
+
+r = ask()
+# ...and where the controller's copy still has no such build while this
+# tree does, it is on its way: asked again until it lands rather than
+# refused with "aerie build puts a build there" (B1183).
+here = [os.path.join(d, "dist", file.removeprefix("dist/")) for d in (os.getcwd(), os.path.join(os.environ.get("WORKSPACE") or "/workspace", project))]
+until = time.time() + 300
+missing = f"no {file.removeprefix('dist/')} in "
+if str(r.get("error") or "").startswith(missing) and any(os.path.isfile(p) for p in here):
+    print(f"[builderbot] {file} is here and not yet on the controller's copy: waiting for it to land", file=sys.stderr)
+    while str(r.get("error") or "").startswith(missing) and time.time() < until:
+        time.sleep(float(os.environ.get("BB_SIGN_POLL_S") or 5))
+        r = ask()
 need(r)
 job = r.get("job") or ""
 if not job and r.get("id"):
