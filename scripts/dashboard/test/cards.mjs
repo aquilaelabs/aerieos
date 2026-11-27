@@ -2370,7 +2370,7 @@ await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnTitle', e => e.textContent.trim()) === 'alpha',
    'the dialog is the space\'s settings, not a rename form wearing its name');
 ok(await page.$$eval('.rnbar', bs => bs.length >= 5 && bs.every(b => b.querySelector('[data-rnsave]') && b.querySelector('[data-rnrevert]')
-     && [...b.querySelectorAll('button')].every(x => x.disabled))),
+     && [...b.querySelectorAll('[data-rnsave],[data-rnkeep],[data-rnrevert],[data-rnend]')].every(x => x.disabled))),
    '...each section with its own Save and Revert, dead while nothing in it has changed');
 // The bin is here too, at the foot of the gear's door: on the All projects
 // tab it sits behind the row's fold on a phone, which is where it was not

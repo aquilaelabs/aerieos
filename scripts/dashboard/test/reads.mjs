@@ -214,7 +214,7 @@ await section("the places on its node a project is shown", async () => {
   // ...and the GPU setting with the other Claude settings, a pulldown read
   // at Save like the rest.
   ok(await page.$eval('#rnGpu', e => e.value === 'on' && [...e.options].map(o => o.value).join() === 'on,off'
-                        && /The node's GPU/.test(e.closest('label').textContent)),
+                        && /The node's GPU/.test(document.querySelector('label[for=rnGpu]').textContent)),
      "the dialog carries The node's GPU, on by default");
   ok(await page.$eval('#rnGpu', e => e.closest('.rngroup')?.querySelector('summary .t')?.textContent) === 'Nodes',
      "...under Nodes, with the node it is about");

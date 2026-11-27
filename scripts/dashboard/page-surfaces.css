@@ -1582,7 +1582,7 @@ body.firstrun #panes{display:none}
    dial, test-run pick or commit identity that needs code. */
 #rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:releases"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
 #rnmodal .box.rnwork details.rngroup:is([data-sect="rn:releases"],[data-sect="rn:deploy"]){display:none}
-#rnmodal .box.rnwork [data-rncode]{display:none}
+#rnmodal .box.rnwork .rncode,#rnmodal .box.rnwork [data-rncode]{display:none}
 /* ...and General holds nothing to save on that door (its name is the
    card's back's), so its bar is not drawn. */
 #rnmodal .box.rnproject details[data-sect="rn:project"] .rnbar{display:none}

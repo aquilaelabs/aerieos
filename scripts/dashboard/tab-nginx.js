@@ -199,7 +199,7 @@ function nginxTls(n, r){
   return auto ? `443, ${esc(auto)}'s pair` : `<span class="warn">443, no pair covers it yet</span>`;
 }
 function nginxRouteForm(n, r, i){
-  return formBox({cls: "ngform recform", attrs: `data-i="${i}"`, fields: [
+  return formBox({cls: "ngform ngroute recform", attrs: `data-i="${i}"`, fields: [
     formField("ngRtHost", "Hostname", nginxHostPick(r)),
     formField("ngRtPath", "Path", `<input id="ngRtPath" data-ng="path" value="${esc(r.path || "/")}" placeholder="/" aria-label="path" autocomplete="off" spellcheck="false">`),
     formField("ngRtPort", "Port", `<input id="ngRtPort" data-ng="port" value="${esc(String(r.port ?? ""))}" placeholder="8080" aria-label="port on the node" inputmode="numeric" autocomplete="off">`, {short: true}),

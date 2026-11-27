@@ -2418,6 +2418,9 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .fgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .fgrid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;max-width:100%;box-sizing:border-box;min-height:var(--ctl)}
 .fgrid>.setrow,.fgrid>label.pick{max-width:none;margin:0}
+/* ...and a row of controls in a cell runs the cell's width: the grid holds
+   the cap, so its verbs end where the form's fields end. */
+.fgrid .ctlrow{max-width:none}
 @media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)}
 }
 /* A form (formBox, R301): the box is capped and never a field alone, so its

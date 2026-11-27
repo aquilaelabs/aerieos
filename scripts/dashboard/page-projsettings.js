@@ -835,7 +835,7 @@ function rnDrawForms(){
     // Save: the remote and its stored token go, the commits stay.
     repo: formBox({state: RN_STATE, foot: [`<button type="button" id="rnUnlink" class="danger lead" hidden>Unlink</button>`], fields: [
       // What its remote is, and Link to a git host where it has none (B813).
-      `<div class="fcell fwide" id="rnRepoSum" hidden><div class="setrow"><span class="hint grow" id="rnRepoSay"></span>
+      `<div class="fcell fwide" id="rnRepoSum" hidden><div class="setrow ctlrow"><span class="hint grow" id="rnRepoSay"></span>
         <button type="button" id="rnRepoGo"></button></div></div>`,
       `<div class="fcell fwide" id="rnGitNone" hidden><div class="hint"></div></div>`,
       // A stored token is not shown and not typed over: Clear is the way in,
@@ -851,7 +851,7 @@ function rnDrawForms(){
       // at the press, the private half to the root-only helper and never shown
       // again, the public half shown to add on the host.
       formField("rnKeyPaste", "Deploy key", `<div id="rnKeyPub" tabindex="0" aria-label="the deploy key's public half" hidden></div><textarea id="rnKeyPaste" rows="4" autocomplete="off" spellcheck="false" data-bwignore hidden placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
-        <div class="logdays setrow"><span class="hint grow" id="rnKeyHint"></span>
+        <div class="logdays setrow ctlrow"><span class="hint grow" id="rnKeyHint"></span>
           <button type="button" id="rnKeyMake">Make a key</button>
           <button type="button" id="rnKeyPasteBtn">Paste a key</button>
           <button type="button" id="rnKeyCopy" hidden>Copy public key</button>
@@ -868,7 +868,7 @@ function rnDrawForms(){
         <div class="hint" id="rnAuthHint"></div></div>`,
       // Test (the operator, 7 Oct): whether it can read and push, what it is
       // missing said under the button; a token typed and not saved is tested.
-      `<div class="fcell fwide" id="rnTestField" hidden><div class="logdays setrow"><span class="hint grow" id="rnTestHint">Test tries a read and a dry-run push with this, which sends nothing.</span>
+      `<div class="fcell fwide" id="rnTestField" hidden><div class="logdays setrow ctlrow"><span class="hint grow" id="rnTestHint">Test tries a read and a dry-run push with this, which sends nothing.</span>
         <button type="button" id="rnTest">Test</button></div><div class="hint" id="rnTestOut" hidden></div></div>`,
       // The same repository at a new address, an owner renamed on the host
       // (projects.set_address).

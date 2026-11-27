@@ -648,6 +648,9 @@ export const faded = page => page.waitForFunction(() => !document.querySelector(
   null, { timeout: 5000 });
 export const rnSect = splitPick;
 
+// A section bar's own verbs: a form's foot holds others beside them (the
+// Repository section's Unlink), as the page's RN_VERBS says.
+const RN_VERBS = '[data-rnsave],[data-rnkeep],[data-rnrevert],[data-rnend]';
 export async function sectSave(page, sect, { end = false, timeout = 15000 } = {}){
   timeout = patience(timeout);
   await rnSect(page, sect);
@@ -655,9 +658,9 @@ export async function sectSave(page, sect, { end = false, timeout = 15000 } = {}
   const which = await page.$eval(bar, (b, end) => b.querySelector('[data-rnkeep]').hidden ? 'data-rnsave'
                                                    : end ? 'data-rnend' : 'data-rnkeep', end);
   await page.click(`${bar} [${which}]`);
-  await page.waitForFunction(sel => { const b = document.querySelector(sel);
-    return !b || (!b.dataset.busy && (b.querySelector('.state.bad') || [...b.querySelectorAll('button')].every(x => x.disabled))); },
-  bar, { timeout });
+  await page.waitForFunction(([sel, verbs]) => { const b = document.querySelector(sel);
+    return !b || (!b.dataset.busy && (b.querySelector('.state.bad') || [...b.querySelectorAll(verbs)].every(x => x.disabled))); },
+  [bar, RN_VERBS], { timeout });
   return page.$eval(bar, b => b.querySelector('.state.bad')?.textContent || '').catch(() => '');
 }
 
@@ -673,7 +676,7 @@ export async function saveDialog(page, { end = false, timeout = 15000 } = {}){
   await page.evaluate(() => new Promise(r => setTimeout(r, 0)));
   for (let i = 0; i < 12; i++){
     const sect = await page.evaluate(() => [...document.querySelectorAll('.rnbar')]
-      .find(b => !b.dataset.busy && [...b.querySelectorAll('button:not([data-rnrevert])')].some(x => !x.hidden && !x.disabled))
+      .find(b => !b.dataset.busy && [...b.querySelectorAll('[data-rnsave],[data-rnkeep],[data-rnend]')].some(x => !x.hidden && !x.disabled))
       ?.dataset.rnbar || '');
     if (!sect) break;
     const err = await sectSave(page, sect, { end, timeout });

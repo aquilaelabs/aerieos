@@ -2950,8 +2950,9 @@ async function dialogShape(pg = page){
       // A section's heading is a heading, as the h3 is: a long dialog's
       // groups are sections (the project settings, 7 Oct).
       // ...and so is a fold's that shows more (.chev), which carries its own
-      // inset as a section's does.
-      if (e.offsetHeight === 0 || e.closest('h3, .field, .foot, details.sect > summary, details.chev > summary')) return false;
+      // inset as a section's does. A form (formBox) is a band of its own:
+      // its fields in cells, its verbs in its foot.
+      if (e.offsetHeight === 0 || e.closest('h3, .field, .fbox, .foot, details.sect > summary, details.chev > summary')) return false;
       return [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     }).map(e => `${e.tagName.toLowerCase()} "${e.textContent.trim().slice(0, 24)}"`);
     // One scroller, not two: a box that scrolls around a part that scrolls
