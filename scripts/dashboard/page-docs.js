@@ -528,17 +528,18 @@ function docSurface(i, kind){
 // primary at the right. The box is what is capped, never a field alone, so the
 // foot ends where the fields end at every width. A page hands it fields
 // (formField) and verbs, never layout; lint refuses a field written outside it.
-//   fields: formField strings, or groups: [{head, says, fields}], each a .fgroup
-//   foot: the verbs' button strings, the primary last; state: a .state before them
+//   fields: formField strings, or groups: [{head, says, fields, attrs}], each a .fgroup
+//   foot: the verbs' button strings, the primary last, a .lead one at the left;
+//   state: a .state on a line of its own over them
 function formBox({fields = [], groups = null, foot = [], state = "", cls = "", attrs = ""} = {}){
   const grid = fs => `<div class="fgrid">${fs.filter(Boolean).join("")}</div>`;
   const body = groups
-    ? groups.map(g => `<div class="fgroup">${g.head ? `<div class="fgrouphead">${esc(g.head)}${
+    ? groups.map(g => `<div class="fgroup"${g.attrs ? ` ${g.attrs}` : ""}>${g.head ? `<div class="fgrouphead">${esc(g.head)}${
         g.says ? `<span class="sub dim">${esc(g.says)}</span>` : ""}</div>` : ""}${grid(g.fields || [])}</div>`).join("")
     : grid(fields);
   const verbs = foot.filter(Boolean);
   return `<div class="fbox${cls ? ` ${cls}` : ""}"${attrs ? ` ${attrs}` : ""}>${body}${verbs.length || state
-    ? `<div class="actbar ffoot">${state}<span class="sp"></span>${verbs.join("")}</div>` : ""}</div>`;
+    ? `<div class="actbar ffoot">${state}${verbs.join("")}</div>` : ""}</div>`;
 }
 // One field of a form: its label over it, a hint under it. `wide` spans the
 // grid's two columns (a path, an address, a file's text), `short` is a
@@ -702,7 +703,7 @@ function splitDraw(root){
   // ...and not one with nothing in it to show: a settings group none of
   // whose fields is on show is drawn as nothing (.rngroup's own rule), and
   // listed it opened on an empty pane (B813).
-  const empty = d => d.matches(".rngroup") && !d.querySelector(":scope > .body > .field:not([hidden]):not(.rnbarf)");
+  const empty = d => d.matches(".rngroup") && !d.querySelector(RN_SHOWN);
   const all = [...root.querySelectorAll(o.sel)].filter(d => !d.classList.contains("fghost")), shown = all.filter(d => !d.hidden && !empty(d));
   // The one picked, or the first shown while it is hidden (its list being
   // read again), without forgetting it: it comes back when it shows.

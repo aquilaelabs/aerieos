@@ -726,17 +726,10 @@
          the project is and who it belongs to, where it runs, what a
          session sees, how it builds, what an agent may
          do, what is yours, and who is in it now (the operator, 1 Oct). -->
-    <!-- A repository's name; a space's door has no General, its name being
-         the card's back's (.rngroup's own rule draws a group with nothing
-         shown as nothing). -->
-    <details class="sect rngroup" data-sect="rn:project"><summary><span class="t">General</span></summary><div class="body">
-    <div class="field" id="rnNameField">
-      <label for="rnName">Name</label>
-      <input id="rnName" maxlength="100" autocomplete="off" spellcheck="false">
-      <div class="hint" id="rnHint"></div>
-      <div class="hint" id="rnPreview" hidden></div>
-    </div>
-    </div></details>
+    <!-- General, Just for you, Repository, Nodes and Releases are forms,
+         each drawn into its body at load by rnDrawForms (page-projsettings.js)
+         so its Save is the form's foot. -->
+    <details class="sect rngroup" data-sect="rn:project"><summary><span class="t">General</span></summary><div class="body" data-rnform="project"></div></details>
     <!-- People, a section of its own (R255 step 7): who the project is for
          is not what it is called, and the dialog reads People (who) apart
          from Agents may (what its sessions do). -->
@@ -886,176 +879,9 @@
       <details class="guards chev" data-sect="rn:guards"><summary>How each agent is guarded</summary><div class="hint" id="rnAgentGuards"></div></details>
     </div>
 </div></details>
-    <details class="sect rngroup" data-sect="rn:yours"><summary><span class="t">Just for you</span></summary><div class="body">
-    <!-- YOURS, not the project's, and last so that is legible from the
-         shape of the dialog rather than only from the words. Everything
-         above changes what the project does for everybody; nothing here
-         reaches anybody else's sessions or anybody else's commits. Kept per
-         uid in claude-prefs.json, applied as launch flags by bb-tty for the
-         model and as git's environment for the author. -->
-    <div class="field" id="rnMineField">
-      <label id="rnMineLabel">Your sessions and commits<span class="help" data-help="yours alone: your sessions and your commits here" tabindex="0">?</span></label>
-      <div class="hint">Yours alone; the other sections are the space's, for everybody on it.</div>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnMineLabel">
-        <label class="pick">Replies <select id="rnReply"
-          aria-label="how wordy Claude's replies to you are here">
-          <option value="">Claude's default</option>
-          <option value="minimal">minimal: the answer and what is left</option>
-        </select></label>
-        <label class="pick">Questions <select id="rnAsks"
-          aria-label="how often Claude asks you questions here">
-          <option value="more">more: checked with you before a judgment call</option>
-          <option value="">Claude's default</option>
-          <option value="fewer">fewer: routine calls made, not asked</option>
-          <option value="rarely">rarely: only when going on would be unsafe or useless</option>
-        </select></label>
-      </div>
-      <div class="hint" id="rnPrefHint"></div>
-      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnMineLabel">
-        <label class="pick">Commit name <input id="rnGitName" type="text"
-          autocomplete="off" spellcheck="false" maxlength="120"
-          aria-label="name your commits here carry"></label>
-        <label class="pick">Commit email <input id="rnGitEmail" type="text"
-          autocomplete="off" spellcheck="false" maxlength="120"
-          aria-label="email your commits here carry"></label>
-      </div>
-      <div class="hint rncode" id="rnGitHint"></div>
-    </div>
-    </div></details>
-    <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body">
-    <!-- What this repository pushes with, and where its remote is. The chain
-         on its card opens this section. -->
-    <!-- What its remote is, and Link to a git host where it has none (B813). -->
-    <div class="field" id="rnRepoSum" hidden><div class="setrow ctlrow"><span class="hint grow" id="rnRepoSay"></span>
-      <button type="button" id="rnRepoGo"></button></div></div>
-    <div class="field" id="rnGitNone" hidden><div class="hint"></div></div>
-    <div class="field" id="rnTokenField" hidden>
-      <label for="rnToken">Your access token<span class="help" data-help="yours alone: your pushes and pulls here use it; leave it empty to keep the one you gave" tabindex="0">?</span></label>
-      <input id="rnToken" type="password" autocomplete="off" spellcheck="false"
-             placeholder="ghp_… or github_pat_…">
-      <!-- What to give the token for what an agent should do there (R188):
-           the git hosts page, in a tab of its own so this dialog stays. -->
-      <a class="link whichperms" href="/#/help/git-hosts" target="_blank" rel="noopener">Which permissions?</a>
-      <!-- A stored token is not shown and not typed over: the field is closed
-           and this is the way in. Clearing is staged like everything else in
-           this dialog: pressing it changes what the dialog says, and Rename
-           is what changes the project. -->
-      <button type="button" id="rnTokenClear" class="link" hidden></button>
-      <div class="hint" id="rnTokenHint"></div>
-      <!-- What the person's own key store keeps for this remote's host
-           (R154), each with Use for this project, which acts at the press as
-           the deploy key's buttons do; and whose account it is linked to. -->
-      <div id="rnStore" hidden></div>
-    </div>
-    <!-- Its own deploy key, made or pasted here rather than only dropped into
-         /secrets/ssh by hand (the operator, 12 Oct). Acts at the press, like
-         Test: the private half goes to the root-only helper and is never
-         shown again; the public half is shown to add on the host. -->
-    <div class="field" id="rnKeyField" hidden>
-      <label id="rnKeyLabel">Deploy key<span class="help" data-help="made or pasted here, kept where sessions can push with it and never read it" tabindex="0">?</span></label>
-      <div id="rnKeyPub" tabindex="0" aria-label="the deploy key's public half" hidden></div>
-      <textarea id="rnKeyPaste" rows="4" autocomplete="off" spellcheck="false" data-bwignore hidden
-                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
-      <div class="logdays setrow ctlrow"><span class="hint grow" id="rnKeyHint"></span>
-        <button type="button" id="rnKeyMake">Make a key</button>
-        <button type="button" id="rnKeyPasteBtn">Paste a key</button>
-        <button type="button" id="rnKeyCopy" hidden>Copy public key</button>
-        <button type="button" id="rnKeyForget" class="danger" hidden>Forget</button></div>
-      <div class="hint" id="rnKeyOut" hidden></div>
-    </div>
-    <!-- Which of the two credentials git actually reaches for. A project can
-         hold both (a deploy key in the agent and a token in /config) and
-         until this existed, storing the token was all you could do: git never
-         asks a credential helper about an ssh remote, so the key went on
-         winning and the only way to change that was `git remote set-url` by
-         hand. Switching here removes neither, so it is a switch and not a
-         migration. -->
-    <div class="field" id="rnAuthField" hidden>
-      <label id="rnAuthLabel">Authentication</label>
-      <div class="pseg" role="group" aria-labelledby="rnAuthLabel">
-        <button id="rnAuthNone" type="button">Off</button>
-        <button id="rnAuthKey" type="button">Deploy key</button>
-        <button id="rnAuthToken" type="button">Each person's token</button>
-      </div>
-      <div class="hint" id="rnAuthHint"></div>
-    </div>
-    <!-- Test (the operator, 7 Oct): whether what it authenticates with can
-         read and push, and what it is missing when it cannot, said under the
-         button in red, never only in a tooltip (projects.auth_test). A token
-         typed and not saved is what is tested, so it can be checked first. -->
-    <div class="field" id="rnTestField" hidden>
-      <div class="logdays setrow ctlrow"><span class="hint grow" id="rnTestHint">Test tries a read and a dry-run push with this, which sends nothing.</span>
-        <button type="button" id="rnTest">Test</button></div>
-      <div class="hint" id="rnTestOut" hidden></div>
-    </div>
-    <!-- Where the remote points, for the same repository at a new address:
-         an owner or an organization renamed on the host. Before this the
-         way to move was Unlink, which takes the token and the push rights
-         with it (projects.set_address). -->
-    <div class="field" id="rnAddrField" hidden>
-      <label for="rnAddr">Repository address<span class="help" data-help="the same repository's new address after its owner was renamed on the host; its token, key and push rights move with it" tabindex="0">?</span></label>
-      <input id="rnAddr" type="text" autocomplete="off" spellcheck="false" inputmode="url">
-      <div class="hint" id="rnAddrHint">Change it after renaming your account or organization on the host. Saving checks it is this repository: another one is refused.</div>
-    </div>
-    <!-- Unlink, under the section's Save and apart from it (rnBars puts it
-         there): the remote and its stored token go, the commits stay. -->
-    <div class="field rnunlinkf" id="rnUnlinkF" hidden><div class="actbar"><span class="sp"></span>
-      <button type="button" id="rnUnlink" class="danger">Unlink</button></div></div>
-    </div></details>
-    <details class="sect rngroup" data-sect="rn:runs"><summary><span class="t">Nodes</span></summary><div class="body">
-    <!-- The project's node: where everything it does on a node goes:
-         containers, builds, tests, CI, emulation. One setting, by decision
-         (docs/nodes.md §13): per-role pickers were more control than anybody
-         wanted. Send-to-Docker preselects it, and an instance still remembers
-         the node it was actually created on. -->
-    <div class="field" id="rnNodeField" hidden>
-      <div id="rnNodeSpace">
-      <label for="rnNode">Node<span class="help" data-help="where this space's work runs: builds, tests, CI, the emulator" tabindex="0">?</span></label>
-      <select id="rnNode"></select>
-      <div class="hint" id="rnNodeHint">Builds, tests, CI, containers and the emulator run here.</div>
-      <!-- One list for the rest of the set and the hosting-only nodes (the
-           operator, 13 Oct): a node marked Hosting only is prefs.hosts (its
-           containers alone, built on the project's node and shipped there),
-           the rest prefs.nodes. Drawn by rnFillNodesMore. -->
-      <label id="rnNodesLabel" hidden>Also works on</label>
-      <div class="rnmorebox" id="rnNodesMore" role="group" aria-labelledby="rnNodesLabel" hidden></div>
-      <div class="hint" id="rnNodesMoreHint" hidden>A session can start on any of these and its containers live on any of them; one marked Hosting only takes containers alone, built on the space's node and sent there.</div>
-      <!-- What the project may use there (R102): the card, and where its
-           tests run when it has a dev instance. -->
-      <div class="prefrow ctlrow">
-        <label class="pick wide">The node's GPU <select id="rnGpu"
-          aria-label="whether this space's sessions, builds and tests may compute on its node's NVIDIA card">
-          <option value="on">may be computed on, where the node has one and allows it</option>
-          <option value="off">is not for this space: it runs as if the machine had none</option>
-        </select></label>
-      </div>
-      </div>
-      <!-- A repository's narrowing of its space's hosting nodes (R223). -->
-      <div id="rnHostsOwn" hidden>
-        <label id="rnHostsOwnLabel">Its containers may go to</label>
-        <div class="lbox" id="rnHostsOwnBox" role="group" aria-labelledby="rnHostsOwnLabel"></div>
-        <div class="hint">The space's hosting nodes: untick one to keep this repository's containers off it.</div>
-      </div>
-      <!-- Where the tests run, which is this project's business and used to
-           be set on the Docker tab, a machine surface it has no other reason
-           to visit (R68 step 6). Only for a project that HAS a container to
-           run in: rnFill hides it otherwise. -->
-      <div id="rnTestWhere" hidden data-holder="1">
-        <label for="rnDevTest">Tests run<span class="help" data-help="inside the dev instance only when its image carries the tests" tabindex="0">?</span></label>
-        <select id="rnDevTest">
-          <option value="node">on the node, never in its dev instance</option>
-          <option value="up">in its dev instance when it is up, else on the node</option>
-          <option value="only">only in its dev instance, never on the node</option>
-        </select>
-      </div>
-      <!-- The node its suites run on (R151): one of the project's, or the
-           session's own, which is the default and was the only way. -->
-      <div id="rnTestNodeF" data-holder="1">
-        <label for="rnTestNode">Test node<span class="help" data-help="where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the space's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain" tabindex="0">?</span></label>
-        <select id="rnTestNode"><option value="">the session's own node</option></select>
-      </div>
-    </div>
-    </div></details>
+    <details class="sect rngroup" data-sect="rn:yours"><summary><span class="t">Just for you</span></summary><div class="body" data-rnform="yours"></div></details>
+    <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body" data-rnform="repo"></div></details>
+    <details class="sect rngroup" data-sect="rn:runs"><summary><span class="t">Nodes</span></summary><div class="body" data-rnform="runs"></div></details>
     <details class="sect rngroup" data-sect="rn:build"><summary><span class="t">Build and test</span></summary><div class="body">
     <div class="field" id="rnBuildField">
       <label for="rnBuildCmd">Commands<span class="help" data-help="what aerie build and aerie test run, and the outputs a build leaves. A test run finds BB_TEST_WORKERS in its environment: how many workers this node lets it use" tabindex="0">?</span></label>
@@ -1099,21 +925,7 @@
     </div></details>
     <!-- Releases (R255): what a release waits for, and what each of its
          files is for, put over its notes. The repository's own. -->
-    <details class="sect rngroup" data-sect="rn:releases"><summary><span class="t">Releases</span></summary><div class="body">
-    <div class="field" id="rnRelGateF">
-      <div class="setrow col ctlrow"><label for="rnRelGate">A fixed bug with no changelog line<span class="help" data-help="a bug fixed since the last release that it had, with no line tied to it and no reason it needs none: the release check lists them on the changelog editor and on each bug's row, and the release waits until each has a line or a reason, or goes ahead saying which it lacked" tabindex="0">?</span></label>
-        <select id="rnRelGate"><option value="refuse">Holds the release</option><option value="warn">Is said; the release goes ahead</option></select></div>
-    </div>
-    <div class="field" id="rnRelTableF">
-      <div class="setrow col ctlrow"><label for="rnRelTable">The notes start with what each file is for<span class="help" data-help="a table over a release's notes: each file the release holds, with what it is for from the list below; checksums and attestations fold into one row, and a file nobody described is listed by its name" tabindex="0">?</span></label>
-        <select id="rnRelTable"><option value="on">Yes</option><option value="off">No</option></select></div>
-    </div>
-    <div class="field" id="rnRelFilesF">
-      <label>What each file is for</label>
-      <div id="rnRelFiles"></div>
-      <div class="hint">A name may hold @VER@ for the version and * for anything. A repository holding docs/release-notes/downloads.md uses that file in place of this list.</div>
-    </div>
-    </div></details>
+    <details class="sect rngroup" data-sect="rn:releases"><summary><span class="t">Releases</span></summary><div class="body" data-rnform="releases"></div></details>
     <!-- Where the space's software goes (R281 step 3, page-deploy.js): its
          Kubernetes environments as records, each saved on its own press,
          its namespace made ready on its cluster first. The space's; drawn

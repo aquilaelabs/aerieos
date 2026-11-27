@@ -1582,7 +1582,7 @@ body.firstrun #panes{display:none}
    dial, test-run pick or commit identity that needs code. */
 #rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:releases"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
 #rnmodal .box.rnwork details.rngroup:is([data-sect="rn:releases"],[data-sect="rn:deploy"]){display:none}
-#rnmodal .box.rnwork .rncode{display:none}
+#rnmodal .box.rnwork [data-rncode]{display:none}
 /* ...and General holds nothing to save on that door (its name is the
    card's back's), so its bar is not drawn. */
 #rnmodal .box.rnproject details[data-sect="rn:project"] .rnbar{display:none}
@@ -2304,10 +2304,6 @@ body.firstrun #panes{display:none}
 }
 /* A node's list that is empty says so in the words' own voice, not mono. */
 .ndrunnone{font:var(--f-ui)}
-/* The repository's Save and Revert in the git door's foot, beside Unlink. */
-#rnmodal .foot>.rnbarf{display:contents}
-#rnmodal .foot>.rnbarf>.rnbar{display:contents}
-#rnmodal .foot>.rnbarf>.rnbar>.state,#rnmodal .foot>.rnbarf>.rnbar>.sp{display:none}
 /* The Phone page's two steps, each a heading over its fields, the fields'
    one line of help in the hint voice under them (the operator, 29 Oct:
    four notes saying the same thing in the code face). */
@@ -2412,7 +2408,10 @@ body.firstrun #panes{display:none}
    foot stands the box's 16px under the last field. (:last-of-type counted
    the foot's div, and a hairline stood over every grouped form's foot.) */
 .fbox>.fgroup{padding:0 0 16px}
-.fbox>.fgroup:not(:has(~ .fgroup)){padding-bottom:0;border-bottom:0}
+.fbox>.fgroup:not(:has(~ .fgroup:not([hidden]))){padding-bottom:0;border-bottom:0}
+/* The band that says a part is the space's (rnSpaceMarks) sits in a form's
+   group as one of its lines, inset as the fields are rather than again. */
+.fbox>.fgroup>.rnspaceband{padding:0 0 14px}
 /* The bar after the last group has the same room under the hairline as a
    group does, never its buttons flush against it. */
 .fgroup + .actbar{margin-top:16px}

@@ -1,5 +1,5 @@
 {
- "index.html": 104,
+ "index.html": 90,
  "nb-analysis.js": 2,
  "nb-artifacts.js": 9,
  "nb-bugs.js": 1,
@@ -20,7 +20,7 @@
  "page-docs.js": 3,
  "page-gear.js": 1,
  "page-panes.js": 1,
- "page-projsettings.js": 11,
+ "page-projsettings.js": 9,
  "page-prose.js": 1,
  "page-setup.js": 4,
  "page-shell.js": 1,

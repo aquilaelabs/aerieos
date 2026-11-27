@@ -202,7 +202,7 @@ function rnLockSettings(p){
     });
     // Only over something to read: in a section with no field on show (a
     // space's door has no General) the note alone would bring it back.
-    if (locked && body.querySelector(":scope > .field:not([hidden]):not(.rnbarf)"))
+    if (locked && d.querySelector(RN_SHOWN))
       body.insertAdjacentHTML("afterbegin", `<div class="field rnlocked"><div class="hint">${esc(RN_LOCKED_SAID)}</div></div>`);
   });
 }
@@ -405,7 +405,7 @@ function rnFillNodesMore(){
   const others = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired" && n.state !== "disabled" && n.id !== primary
                                             && (primary || n.config?.host_only));
   const ids = rnMoreIds();
-  box.hidden = hint.hidden = label.hidden = !(others.length || ids.length);
+  box.parentElement.hidden = box.hidden = hint.hidden = label.hidden = !(others.length || ids.length);
   // Without the `node` grant the list is read alone (R137 step 4); a
   // repository's view draws it dead (rnSpaceRelock, at the end).
   const ro = state?.can?.node === false;
@@ -468,14 +468,12 @@ function rnDrawRelFiles(){
   const box = $("rnRelFiles");
   if (!box) return;
   const ro = rnFor && (state?.projects || []).find(x => x.name === rnFor)?.may_settings === false;
-  const edit = (r, i) => `<div class="row rnrelf editing" data-relf="${i}">
-      <div class="two"><div><label>File</label><input data-relname maxlength="160" spellcheck="false" autocomplete="off"
-        value="${esc(r.name)}" placeholder="myapp-@VER@.apk"></div>
-      <div><label>What it is for</label><input data-relwhat maxlength="400" autocomplete="off"
-        value="${esc(r.what)}" placeholder="The Android app"></div></div>
-      <div class="actbar">${i >= 0 ? `<button type="button" class="danger" data-relrm="${i}">Delete</button>` : ""}<span class="sp"></span>
-        <button type="button" class="stop" data-relstop>Cancel</button>
-        <button type="button" class="primary" data-relsave>Save</button></div></div>`;
+  // A row's Edit opens its form in place, as every record's does.
+  const edit = (r, i) => `<div class="row rnrelf open" data-relf="${i}">${formBox({cls: "recform", fields: [
+      formField(`rnRelName${i}`, "File", `<input id="rnRelName${i}" data-relname maxlength="160" spellcheck="false" autocomplete="off" value="${esc(r.name)}" placeholder="myapp-@VER@.apk">`),
+      formField(`rnRelWhat${i}`, "What it is for", `<input id="rnRelWhat${i}" data-relwhat maxlength="400" autocomplete="off" value="${esc(r.what)}" placeholder="The Android app">`)],
+    foot: [i >= 0 ? `<button type="button" class="danger lead" data-relrm="${i}">Delete</button>` : "",
+      `<button type="button" class="stop" data-relstop>Cancel</button>`, `<button type="button" class="primary" data-relsave>Save</button>`]})}</div>`;
   const rows = (rnRelEdit === -1 ? edit({name: "", what: ""}, -1) : "")
     + rnRelFiles.map((r, i) => rnRelEdit === i ? edit(r, i)
     : `<div class="row rnrelf" data-relf="${i}">${tblLine(REL_COLS, [
@@ -796,6 +794,133 @@ function rnDrawPrefs(){
     : "Applied the next time Claude starts here. The model and effort are picked each time a session starts, in the Claude button's menu.";
 }
 
+// ---- the dialog's forms, drawn at load ----------------------------------
+
+// Five sections of the dialog are forms (R301), written here rather than in
+// index.html so each is formBox: its Save bar is the form's foot (rnBars puts
+// its verbs there) and ends where its fields end, as a row of a field's own
+// buttons does (no .ctlrow cap in a form). Drawn once by bootMarkup, before
+// boot wires the dialog, with every id the dialog fills and reads.
+const RN_STATE = `<span class="state"></span>`;
+// What a section has on show, from its <details>: a field, or a form's field;
+// its own Save bar does not count. The stylesheet's .rngroup rule is the same.
+const RN_SHOWN = ":scope > .body > .field:not([hidden]):not(.rnbarf), :scope > .body > .fbox:not([hidden]) > .fgrid > :not([hidden]), "
+  + ":scope > .body > .fbox:not([hidden]) > .fgroup:not([hidden]) > .fgrid > :not([hidden])";
+function rnDrawForms(){
+  const forms = {
+    // A repository's name; a space's door has no General, its name being the
+    // card's back's (.rngroup's own rule draws a group with nothing shown as
+    // nothing).
+    project: formBox({state: RN_STATE, fields: [
+      formField("rnName", "Name", `<input id="rnName" maxlength="100" autocomplete="off" spellcheck="false"><div class="hint" id="rnHint"></div><div class="hint" id="rnPreview" hidden></div>`,
+        {attrs: `id="rnNameField"`})]}),
+    // Yours, not the space's, and last so that is legible from the shape of
+    // the dialog: nothing here reaches anybody else's sessions or commits.
+    // Kept per uid in claude-prefs.json, applied as launch flags by bb-tty
+    // and as git's environment for the author. A code-less door has no
+    // commit identity (data-rncode).
+    yours: formBox({state: RN_STATE, fields: [
+      `<div class="fcell fwide"><div class="hint">Yours alone; the other sections are the space's, for everybody on it.</div></div>`,
+      formField("rnReply", "Replies", `<select id="rnReply" aria-label="how wordy Claude's replies to you are here">
+        <option value="">Claude's default</option><option value="minimal">minimal: the answer and what is left</option></select>`),
+      formField("rnAsks", "Questions", `<select id="rnAsks" aria-label="how often Claude asks you questions here">
+        <option value="more">more: checked with you before a judgment call</option><option value="">Claude's default</option>
+        <option value="fewer">fewer: routine calls made, not asked</option><option value="rarely">rarely: only when going on would be unsafe or useless</option></select>`),
+      `<div class="fcell fwide"><div class="hint" id="rnPrefHint"></div></div>`,
+      formField("rnGitName", "Commit name", `<input id="rnGitName" type="text" autocomplete="off" spellcheck="false" maxlength="120" aria-label="name your commits here carry">`, {attrs: "data-rncode"}),
+      formField("rnGitEmail", "Commit email", `<input id="rnGitEmail" type="text" autocomplete="off" spellcheck="false" maxlength="120" aria-label="email your commits here carry">`, {attrs: "data-rncode"}),
+      `<div class="fcell fwide" data-rncode><div class="hint" id="rnGitHint"></div></div>`]}),
+    // What this repository pushes with and where its remote is; the chain on
+    // its card opens this section. Unlink is at the foot's left, apart from
+    // Save: the remote and its stored token go, the commits stay.
+    repo: formBox({state: RN_STATE, foot: [`<button type="button" id="rnUnlink" class="danger lead" hidden>Unlink</button>`], fields: [
+      // What its remote is, and Link to a git host where it has none (B813).
+      `<div class="fcell fwide" id="rnRepoSum" hidden><div class="setrow"><span class="hint grow" id="rnRepoSay"></span>
+        <button type="button" id="rnRepoGo"></button></div></div>`,
+      `<div class="fcell fwide" id="rnGitNone" hidden><div class="hint"></div></div>`,
+      // A stored token is not shown and not typed over: Clear is the way in,
+      // staged like the rest. What to give it for is the git hosts page, in a
+      // tab of its own (R188); the person's own key store's entries for this
+      // host are under it (R154).
+      formField("rnToken", "Your access token", `<input id="rnToken" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_… or github_pat_…">
+        <a class="link whichperms" href="/#/help/git-hosts" target="_blank" rel="noopener">Which permissions?</a>
+        <button type="button" id="rnTokenClear" class="link" hidden></button>
+        <div class="hint" id="rnTokenHint"></div><div id="rnStore" hidden></div>`,
+        {help: "yours alone: your pushes and pulls here use it; leave it empty to keep the one you gave", wide: true, hidden: true, attrs: `id="rnTokenField"`}),
+      // Its own deploy key, made or pasted here (the operator, 12 Oct): acts
+      // at the press, the private half to the root-only helper and never shown
+      // again, the public half shown to add on the host.
+      formField("rnKeyPaste", "Deploy key", `<div id="rnKeyPub" tabindex="0" aria-label="the deploy key's public half" hidden></div><textarea id="rnKeyPaste" rows="4" autocomplete="off" spellcheck="false" data-bwignore hidden placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+        <div class="logdays setrow"><span class="hint grow" id="rnKeyHint"></span>
+          <button type="button" id="rnKeyMake">Make a key</button>
+          <button type="button" id="rnKeyPasteBtn">Paste a key</button>
+          <button type="button" id="rnKeyCopy" hidden>Copy public key</button>
+          <button type="button" id="rnKeyForget" class="danger" hidden>Forget</button></div>
+        <div class="hint" id="rnKeyOut" hidden></div>`,
+        {help: "made or pasted here, kept where sessions can push with it and never read it", wide: true, hidden: true, attrs: `id="rnKeyField"`}),
+      // Which of the two credentials git reaches for, where it holds both:
+      // switching removes neither, so it is a switch and not a migration.
+      `<div class="fcell fwide" id="rnAuthField" hidden><label class="lbl" id="rnAuthLabel">Authentication</label>
+        <div class="pseg" role="group" aria-labelledby="rnAuthLabel">
+          <button id="rnAuthNone" type="button">Off</button>
+          <button id="rnAuthKey" type="button">Deploy key</button>
+          <button id="rnAuthToken" type="button">Each person's token</button></div>
+        <div class="hint" id="rnAuthHint"></div></div>`,
+      // Test (the operator, 7 Oct): whether it can read and push, what it is
+      // missing said under the button; a token typed and not saved is tested.
+      `<div class="fcell fwide" id="rnTestField" hidden><div class="logdays setrow"><span class="hint grow" id="rnTestHint">Test tries a read and a dry-run push with this, which sends nothing.</span>
+        <button type="button" id="rnTest">Test</button></div><div class="hint" id="rnTestOut" hidden></div></div>`,
+      // The same repository at a new address, an owner renamed on the host
+      // (projects.set_address).
+      formField("rnAddr", "Repository address", `<input id="rnAddr" type="text" autocomplete="off" spellcheck="false" inputmode="url">
+        <div class="hint" id="rnAddrHint">Change it after renaming your account or organization on the host. Saving checks it is this repository: another one is refused.</div>`,
+        {help: "the same repository's new address after its owner was renamed on the host; its token, key and push rights move with it", wide: true, hidden: true, attrs: `id="rnAddrField"`})]}),
+    // Where everything the space does on a node goes: one node by decision
+    // (docs/nodes.md §13), the rest of the set and the hosting-only nodes in
+    // one list (rnFillNodesMore), and the card. Its first group is the space's
+    // own, lent dead to a repository's view (RN_SPACE_PARTS); the second is
+    // the repository's: its hosting nodes narrowed (R223), where its tests
+    // run in its dev instance (R68 step 6) and its test node (R151).
+    runs: formBox({state: RN_STATE, attrs: `id="rnNodeField" hidden`, groups: [
+      {attrs: `id="rnNodeSpace"`, fields: [
+        formField("rnNode", "Node", `<select id="rnNode"></select><div class="hint" id="rnNodeHint">Builds, tests, CI, containers and the emulator run here.</div>`,
+          {help: "where this space's work runs: builds, tests, CI, the emulator"}),
+        `<div class="fcell fwide" hidden><label class="lbl" id="rnNodesLabel" hidden>Also works on</label>
+          <div class="rnmorebox" id="rnNodesMore" role="group" aria-labelledby="rnNodesLabel" hidden></div>
+          <div class="hint" id="rnNodesMoreHint" hidden>A session can start on any of these and its containers live on any of them; one marked Hosting only takes containers alone, built on the space's node and sent there.</div></div>`,
+        formField("rnGpu", "The node's GPU", `<select id="rnGpu" aria-label="whether this space's sessions, builds and tests may compute on its node's NVIDIA card">
+          <option value="on">may be computed on, where the node has one and allows it</option>
+          <option value="off">is not for this space: it runs as if the machine had none</option></select>`, {wide: true})]},
+      {fields: [
+        `<div class="fcell fwide" id="rnHostsOwn" hidden><label class="lbl" id="rnHostsOwnLabel">Its containers may go to</label>
+          <div class="lbox" id="rnHostsOwnBox" role="group" aria-labelledby="rnHostsOwnLabel"></div>
+          <div class="hint">The space's hosting nodes: untick one to keep this repository's containers off it.</div></div>`,
+        formField("rnDevTest", "Tests run", `<select id="rnDevTest">
+          <option value="node">on the node, never in its dev instance</option>
+          <option value="up">in its dev instance when it is up, else on the node</option>
+          <option value="only">only in its dev instance, never on the node</option></select>`,
+          {help: "inside the dev instance only when its image carries the tests", hidden: true, attrs: `id="rnTestWhere"`}),
+        formField("rnTestNode", "Test node", `<select id="rnTestNode"><option value="">the session's own node</option></select>`,
+          {help: "where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the space's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain",
+           attrs: `id="rnTestNodeF"`})]}]}),
+    // How a release is checked and what its notes open with; the files'
+    // descriptions are records under the form, each saved on its own press.
+    releases: formBox({state: RN_STATE, fields: [
+      formField("rnRelGate", "A fixed bug with no changelog line", `<select id="rnRelGate"><option value="refuse">Holds the release</option><option value="warn">Is said; the release goes ahead</option></select>`,
+        {help: "a bug fixed since the last release that it had, with no line tied to it and no reason it needs none: the release check lists them on the changelog editor and on each bug's row, and the release waits until each has a line or a reason, or goes ahead saying which it lacked",
+         attrs: `id="rnRelGateF"`}),
+      formField("rnRelTable", "The notes start with what each file is for", `<select id="rnRelTable"><option value="on">Yes</option><option value="off">No</option></select>`,
+        {help: "a table over a release's notes: each file the release holds, with what it is for from the list below; checksums and attestations fold into one row, and a file nobody described is listed by its name",
+         attrs: `id="rnRelTableF"`})]})
+      + `<div class="field" id="rnRelFilesF"><label>What each file is for</label><div id="rnRelFiles"></div>
+        <div class="hint">A name may hold @VER@ for the version and * for anything. A repository holding docs/release-notes/downloads.md uses that file in place of this list.</div></div>`,
+  };
+  for (const [k, html] of Object.entries(forms)){
+    const body = document.querySelector(`details[data-sect="rn:${k}"] > .body[data-rnform]`);
+    if (body) body.innerHTML = html;
+  }
+}
+
 // ---- a project's settings dialog, wired ---------------------------------
 
 // Unlinking asks, and the question lists what goes rather than asking twice:
@@ -1034,7 +1159,7 @@ function renameProject(name, mode = "all"){
   // Unlink is at the Repository section's foot, apart from its Save: it is
   // about the remote, and it is the way a project moves from one host to
   // another, since linking refuses a repo that already has one.
-  $("rnUnlinkF").hidden = !linked || !gitMay;
+  $("rnUnlink").hidden = !linked || !gitMay;
   unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`);
   // The bin, on the repository's settings and not the space's door.
   // Not drawn for a role that does not give it (the operator, 21 Oct).
@@ -1506,7 +1631,7 @@ function rnLoadAuth(name){
       $("rnAddrHint").textContent = mine
         ? "Change it after renaming your account or organization on the host. Saving checks it is this repository: another one is refused."
         : "Where it points, set by its owner.";
-      $("rnUnlinkF").hidden = !mine || $("rnUnlinkF").hidden;
+      $("rnUnlink").hidden = !mine || $("rnUnlink").hidden;
       const say = $("rnRepoSay");
       say.textContent = say.textContent.replace(/ Where it links.*$/, "")
         + (mine ? "" : ` Where it links and how it pushes are ${rnLinkOwner()}'s, its owner, to change; your own token is yours.`);
@@ -1955,6 +2080,8 @@ const rnDirty = () => RN_SECTS.filter(s => rnSectChanges(s).said.length);
 // The bars, put in once and then kept in step with what is typed: dead
 // rather than gone while there is nothing to save, so nothing moves under a
 // thumb (sectBar's rule).
+// A section bar's own verbs: a form's foot holds others beside them (Unlink).
+const RN_VERBS = "[data-rnsave],[data-rnkeep],[data-rnrevert],[data-rnend]";
 function rnBars(){
   if (rnFor === null) return;
   const enc = rnEnc(), running = !!myLiveSession(rnFor);
@@ -1965,22 +2092,33 @@ function rnBars(){
     // the Settings view, so it is looked for in the page, not the dialog.
     let bar = document.querySelector(`.rnbar[data-rnbar="${sect}"]`);
     if (!bar){
-      body.insertAdjacentHTML("beforeend", `<div class="field rnbarf"><div class="actbar sectbar rnbar" data-rnbar="${sect}">
-        <span class="state"></span><span class="sp"></span>
-        <button type="button" data-rnsave="${sect}">Save</button>
+      const verbs = `<button type="button" data-rnsave="${sect}">Save</button>
         <button type="button" data-rnkeep="${sect}" hidden>Save, keep it running</button>
         <button type="button" class="caution" data-rnrevert="${sect}">Revert</button>
-        <button type="button" class="danger" data-rnend="${sect}" hidden>Save and end it</button></div></div>`);
-      bar = body.querySelector(":scope > .rnbarf > .rnbar");
+        <button type="button" class="danger" data-rnend="${sect}" hidden>Save and end it</button>`;
+      // A section that is a form (rnDrawForms) has its bar as the form's foot,
+      // ending where its fields end; the rest keep one under their fields.
+      const foot = body.querySelector(":scope > .fbox > .ffoot");
+      if (foot){
+        foot.classList.add("sectbar", "rnbar");
+        foot.dataset.rnbar = sect;
+        foot.insertAdjacentHTML("beforeend", verbs);
+        bar = foot;
+      } else {
+        body.insertAdjacentHTML("beforeend", `<div class="field rnbarf"><div class="actbar sectbar rnbar" data-rnbar="${sect}">
+          <span class="state"></span><span class="sp"></span>${verbs}</div></div>`);
+        bar = body.querySelector(":scope > .rnbarf > .rnbar");
+      }
     }
     // A remote it can only read has nothing here to save (rnGitNone), nor
     // has one not linked yet, whose one press is Link (rnRepoSum, B813).
-    bar.parentElement.hidden = sect === "repo" && (!$("rnGitNone").hidden
+    const wrap = bar.classList.contains("ffoot") ? bar : bar.parentElement;
+    wrap.hidden = sect === "repo" && (!$("rnGitNone").hidden
       || ["rnTokenField", "rnAuthField", "rnAddrField"].every(id => $(id).hidden));
-    const wrap = bar.parentElement;
-    if (wrap.parentElement !== body) body.appendChild(wrap);
-    // Unlink under the section's Save, apart from it.
-    if (sect === "repo" && $("rnUnlinkF") && wrap.nextElementSibling !== $("rnUnlinkF")) wrap.after($("rnUnlinkF"));
+    if (wrap !== bar && wrap.parentElement !== body) body.appendChild(wrap);
+    // A form's group with nothing on show is not drawn: a repository's own
+    // Nodes group, on a space with no node, was a hairline over nothing.
+    for (const g of body.querySelectorAll(":scope > .fbox > .fgroup")) g.hidden = !g.querySelector(":scope > .fgrid > :not([hidden])");
     if (bar.dataset.busy) continue;
     const {said, start} = rnSectChanges(sect, enc);
     const ask = running && start.length > 0;
@@ -1991,7 +2129,7 @@ function rnBars(){
         : `${said.join(", ")} changed`;
     bar.querySelector("[data-rnsave]").hidden = ask;
     bar.querySelector("[data-rnkeep]").hidden = bar.querySelector("[data-rnend]").hidden = !ask;
-    for (const b of bar.querySelectorAll("button")) b.disabled = !said.length;
+    for (const b of bar.querySelectorAll(RN_VERBS)) b.disabled = !said.length;
   }
 }
 
@@ -2119,7 +2257,7 @@ async function rnSubmit(sect, end = false){
   bar.dataset.busy = "1";
   const pressed = bar.querySelector(end ? "[data-rnend]" : running && start.length ? "[data-rnkeep]" : "[data-rnsave]");
   const word = pressed.textContent;
-  bar.querySelectorAll("button").forEach(b => { b.disabled = true; });
+  bar.querySelectorAll(RN_VERBS).forEach(b => { b.disabled = true; });
   busy(pressed, "Saving");
   const stop = m => { delete bar.dataset.busy; unbusy(pressed, word); rnBars(); return fail(m); };
   try{

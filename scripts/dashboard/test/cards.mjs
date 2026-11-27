@@ -2140,7 +2140,7 @@ await page.waitForFunction(() => /\/settings/.test(location.hash)
   && document.querySelector('.nbsettings #rnAuthField:not([hidden])'), null, { timeout: 15000 }).catch(() => {});
 const chainAt = await page.evaluate(() => ({ at: location.hash, dialog: !document.getElementById('rnmodal').hidden,
   shown: [...document.querySelectorAll('.nbsettings details.rngroup')].filter(d => d.checkVisibility()).map(d => d.dataset.sect).join(),
-  fields: ['rnTokenField', 'rnAuthField', 'rnTestField', 'rnAddrField', 'rnUnlinkF'].filter(id => document.querySelector(`.nbsettings #${id}:not([hidden])`)).length }));
+  fields: ['rnTokenField', 'rnAuthField', 'rnTestField', 'rnAddrField', 'rnUnlink'].filter(id => document.querySelector(`.nbsettings #${id}:not([hidden])`)).length }));
 ok(/alpha\/settings/.test(chainAt.at) && !chainAt.dialog && chainAt.shown === 'rn:repo' && chainAt.fields === 5,
    `the chain opens its notebook's Settings at Repository, with the token, the switch, Test, the address and Unlink there, not a dialog of its own (${JSON.stringify(chainAt)})`);
 // The rest is read in the same form, as a dialog over the Spaces page.
@@ -2180,9 +2180,9 @@ await page.click('#rnCancel');
 // shuts once that is answered: reopened before then, the late close shut it.
 await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 8000 });
 await page.evaluate(() => renameProject('alpha'));
-ok(await page.$eval('#rnUnlinkF', e => !e.hidden && e.closest('details')?.dataset.sect === 'rn:repo'
-     && e.previousElementSibling?.classList.contains('rnbarf')),
-   'Unlink is at the Repository section\'s foot, under its Save and apart from it');
+ok(await page.$eval('#rnUnlink', e => !e.hidden && e.closest('details')?.dataset.sect === 'rn:repo'
+     && !!e.closest('.fbox > .ffoot.rnbar') && e.matches('.lead') && !!e.closest('.rnbar').querySelector('[data-rnsave]')),
+   'Unlink is at the left of the Repository form\'s foot, apart from its Save at the right');
 await page.waitForSelector('#rnAuthField:not([hidden])', { timeout: 8000 });
 ok(await page.$eval('#rnTokenClear', b => b.hidden),
    'a space with no token stored is offered nothing to clear');

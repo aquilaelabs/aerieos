@@ -46,7 +46,9 @@ function bootMarkup(){
   // Wired by the draw that writes one (drawn, page-paint.js), with the fields
   // a password manager leaves alone (B495), every title turned into words and
   // every data-style applied: the markup the page loads with, here, and what a
-  // draw writes later, by that draw.
+  // draw writes later, by that draw. The space dialog's forms are part of
+  // that markup, drawn first.
+  rnDrawForms();
   drawn(document.documentElement);
 }
 

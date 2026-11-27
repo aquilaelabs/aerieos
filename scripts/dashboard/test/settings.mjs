@@ -567,9 +567,9 @@ await section("a project's settings live in its notebook", async () => {
     await rnSect(page, 'repo');
     await page.waitForSelector('.nbsettings #rnAuthField:not([hidden])', { timeout: 10000 }).catch(() => {});
     const repo = await page.evaluate(() => ({ say: $('rnRepoSay').textContent, go: $('rnRepoGo').checkVisibility(),
-      fields: ['rnAuthField', 'rnTestField', 'rnAddrField', 'rnUnlinkF'].filter(id => $(id).checkVisibility()).join(),
-      bar: [...document.querySelectorAll('.nbsettings details[data-sect="rn:repo"] .rnbarf')].some(b => b.checkVisibility()) }));
-    ok(!blank.length && /Linked to GitHub/.test(repo.say) && !repo.go && repo.fields === 'rnAuthField,rnTestField,rnAddrField,rnUnlinkF' && repo.bar,
+      fields: ['rnAuthField', 'rnTestField', 'rnAddrField', 'rnUnlink'].filter(id => $(id).checkVisibility()).join(),
+      bar: [...document.querySelectorAll('.nbsettings details[data-sect="rn:repo"] .rnbar')].some(b => b.checkVisibility()) }));
+    ok(!blank.length && /Linked to GitHub/.test(repo.say) && !repo.go && repo.fields === 'rnAuthField,rnTestField,rnAddrField,rnUnlink' && repo.bar,
        `...every section listed opens on something, Repository saying what its remote is over its credentials, its Save and Unlink (${blank.join(', ') || 'none blank'}; ${JSON.stringify(repo)})`);
   }
   await rnSect(page, 'yours');

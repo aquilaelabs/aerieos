@@ -784,8 +784,10 @@ button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--gro
    open at a time (the operator, 7 Oct), and a section with no field showing
    gone with its heading. Its fields are bands with their own inset, so the
    fold's body adds none of its own. */
-/* A section shows while a setting in it does; its own Save bar does not count. */
-.rngroup:not(:has(> .body > .field:not([hidden]):not(.rnbarf))){display:none}
+/* A section shows while a setting in it does, a form's field among them; its
+   own Save bar does not count (RN_SHOWN says the same to the page's code). */
+.rngroup:not(:has(> .body > .field:not([hidden]):not(.rnbarf), > .body > .fbox:not([hidden]) > .fgrid > :not([hidden]),
+  > .body > .fbox:not([hidden]) > .fgroup:not([hidden]) > .fgrid > :not([hidden]))){display:none}
 /* The jump bar over a long surface (sectJump): its sections' names in a
    line that wraps, each a link to its own. */
 .sectjump{display:flex;flex-wrap:wrap;gap:6px 8px;padding:var(--row-y) var(--row-x);
