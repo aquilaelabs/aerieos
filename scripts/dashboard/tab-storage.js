@@ -217,8 +217,8 @@ function moveSaid(m){
 }
 // One share's two selects, ids made from `key`.
 function moveFields(key, pools, m){
-  return `<div class="setrow col ctlrow">${lbl(`${key}Land`, "New files land on")}<select id="${key}Land" data-moveland>${optionList(moveLandOpts(pools), m?.land || pools[0] || "array")}</select></div>
-    <div class="setrow col ctlrow">${lbl(`${key}Mover`, "The mover")}<select id="${key}Mover" data-movemover>${optionList(moveMoverOpts(pools), m?.from ? `${m.from}>${m.to}` : "")}</select></div>`;
+  return formField(`${key}Land`, "New files land on", `<select id="${key}Land" data-moveland>${optionList(moveLandOpts(pools), m?.land || pools[0] || "array")}</select>`)
+    + formField(`${key}Mover`, "The mover", `<select id="${key}Mover" data-movemover>${optionList(moveMoverOpts(pools), m?.from ? `${m.from}>${m.to}` : "")}</select>`);
 }
 function moveRead(share, land, mover){
   const [from, to] = mover ? mover.split(">") : ["", ""];
@@ -271,36 +271,26 @@ function storageShares(n){
   // password of its own: each person signs in as they do here.
   const people = (n.accounts || []).map(a => `<div class="stwho"><span class="grow">${esc(a)}</span>
       <select data-stwho="${esc(a)}" aria-label="${esc(a)}'s access">${optionList([["", "No access"], ["ro", "Read-only"], ["rw", "Read/write"]], "")}</select></div>`).join("");
-  const form = !admin || why ? "" : `<div class="field stnewshare">
-      <div class="fgroup">
-        <div class="fgrouphead">A new share<span class="sub">A folder on a pool. It stays on this machine until you export it.</span></div>
-        <div class="fgrid">
-          <div class="setrow col ctlrow">${lbl("stShareName", "Name")}<input type="text" id="stShareName" placeholder="media" maxlength="63" autocomplete="off" spellcheck="false"></div>
-          ${places.length ? `<div class="setrow col ctlrow">${lbl("stSharePool", "On")}<select id="stSharePool">${optionList(places, places[0][0])}</select></div>` : ""}
-          <div class="setrow col ctlrow fwide">${lbl("stSharePath", "Folder", "A name is a folder on the place picked, made when it is missing. A whole path is taken as it is.")}<input type="text" id="stSharePath" placeholder="the share's name, or ${esc(places[0] ? places[0][0] + "/media" : "/mnt/tank/media")}" data-ph-short="share or path" autocomplete="off" spellcheck="false"></div>
-        </div>
-      </div>
-      <div class="fgroup">
-        <div class="fgrouphead">Export</div>
-        <div class="fgrid">
-          <div class="setrow col ctlrow">${lbl("stShareExport", "Over the network")}<select id="stShareExport">${optionList([["", "No: internal only"], ["smb", "Yes: over SMB (Windows, a Mac, a phone)"]], "")}</select></div>
-          <div class="setrow col ctlrow" id="stShareSecRow" hidden>${lbl("stShareSecurity", "Security")}<select id="stShareSecurity">${optionList([["private", "Private: only the people below"], ["secure", "Secure: everybody reads, the people below write"], ["public", "Public: everybody reads and writes"]], "private")}</select></div>
-        </div>
-        <div id="stShareOver" hidden>
+  const form = !admin || why ? "" : `<div class="field stnewshare">${formBox({groups: [
+      {head: "A new share", says: "A folder on a pool. It stays on this machine until you export it.", fields: [
+        formField("stShareName", "Name", `<input type="text" id="stShareName" placeholder="media" maxlength="63" autocomplete="off" spellcheck="false">`),
+        places.length ? formField("stSharePool", "On", `<select id="stSharePool">${optionList(places, places[0][0])}</select>`) : "",
+        formField("stSharePath", "Folder", `<input type="text" id="stSharePath" placeholder="the share's name, or ${esc(places[0] ? places[0][0] + "/media" : "/mnt/tank/media")}" data-ph-short="share or path" autocomplete="off" spellcheck="false">`,
+          {help: "A name is a folder on the place picked, made when it is missing. A whole path is taken as it is.", wide: true})]},
+      {head: "Export", fields: [
+        formField("stShareExport", "Over the network", `<select id="stShareExport">${optionList([["", "No: internal only"], ["smb", "Yes: over SMB (Windows, a Mac, a phone)"]], "")}</select>`),
+        formField("stShareSecurity", "Security", `<select id="stShareSecurity">${optionList([["private", "Private: only the people below"], ["secure", "Secure: everybody reads, the people below write"], ["public", "Public: everybody reads and writes"]], "private")}</select>`,
+          {hidden: true, attrs: `id="stShareSecRow"`}),
+        `<div class="fcell fwide" id="stShareOver" hidden>
           <div id="stShareWho" class="stwholist"><div class="sub">Each person signs in with their name and password here.</div>${people || `<div class="hint">No accounts to name yet.</div>`}</div>
-          <label class="ndcap"><input type="checkbox" id="stShareTm"> A Mac's Time Machine target</label>
-        </div>
-      </div>
-      ${moves ? `<div class="fgroup" id="stShareMoveGroup">
-        <div class="fgrouphead">Where its files go<span class="sub">For a share in ${esc(n.array.mount || "/mnt/user")}: the mover runs on the array's schedule.</span></div>
-        <div class="fgrid">${moveFields("stShare", pools, null)}</div>
-      </div>` : ""}
-      <div class="fgroup">
-        <div class="fgrouphead">NFS<span class="sub">For Linux machines and hypervisors. Most people leave this off.</span></div>
-        <label class="ndcap"><input type="checkbox" id="stShareNfs"> Also export over NFS</label>
-        <div class="fgrid" id="stShareNfsRow" hidden><div class="setrow col ctlrow fwide">${lbl("stShareClients", "Clients")}<input type="text" id="stShareClients" placeholder="192.168.1.0/24, or * for any" data-ph-short="addresses, or *" autocomplete="off" spellcheck="false"></div></div>
-      </div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stshare="set">Save the share</button></div></div>`;
+          <label class="ndcap"><input type="checkbox" id="stShareTm"> A Mac's Time Machine target</label></div>`]},
+      moves ? {head: "Where its files go", says: `For a share in ${n.array.mount || "/mnt/user"}: the mover runs on the array's schedule.`, attrs: `id="stShareMoveGroup"`,
+        fields: [moveFields("stShare", pools, null)]} : null,
+      {head: "NFS", says: "For Linux machines and hypervisors. Most people leave this off.", fields: [
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stShareNfs"> Also export over NFS</label></div>`,
+        formField("stShareClients", "Clients", `<input type="text" id="stShareClients" placeholder="192.168.1.0/24, or * for any" data-ph-short="addresses, or *" autocomplete="off" spellcheck="false">`,
+          {wide: true, hidden: true, attrs: `id="stShareNfsRow"`})]}].filter(Boolean),
+    foot: [`<button type="button" class="primary" data-stshare="set">Save the share</button>`]})}</div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share yet${n.smb || n.nfs ? ": the form below makes one" : ""}.</div>`}${form}`;
   return docSection("storage", "shares", "Shares", shares.length ? String(shares.length) : "", body);
 }
@@ -383,8 +373,10 @@ function storagePools(n){
     return `<div class="row stack2 stpool${bad ? " bad" : ""}" data-pool="${esc(p.name)}"><div class="grow">
       <div class="name">${esc(p.name)} <span class="pill${bad ? " bad" : " ok"}">${esc(p.health || "unknown")}</span>${p.mount ? ` <span class="pill">${esc(p.mount)}</span>` : ""}${
         p.locked ? ` <span class="pill warn">locked</span>` : p.encrypted ? ` <span class="pill">encrypted, ${(n.key_modes || {})[p.name] === "kept" ? "key kept here" : "key asked after each boot"}</span>` : ""}</div>
-      ${p.locked && admin && !why ? `<div class="field"><label class="pick"><span class="pickw">Passphrase</span><input type="password" data-stunlock="${esc(p.name)}" autocomplete="off"></label>
-        <span class="acts"><button type="button" data-stkey="unlock" data-name="${esc(p.name)}">Unlock</button></span><div class="hint">Its shares wait until it is unlocked; the passphrase goes to the machine once and is not kept.</div></div>` : ""}
+      ${p.locked && admin && !why ? `<div class="field">${formBox({fields: [
+          formField(`stUnlock-${p.name}`.replace(/[^\w-]/g, "_"), "Passphrase", `<input type="password" id="${`stUnlock-${p.name}`.replace(/[^\w-]/g, "_")}" data-stunlock="${esc(p.name)}" autocomplete="off">`,
+            {hint: "Its shares wait until it is unlocked; the passphrase goes to the machine once and is not kept."})],
+        foot: [`<button type="button" data-stkey="unlock" data-name="${esc(p.name)}">Unlock</button>`]})}</div>` : ""}
       <div class="ndmeters">${meter("used", pct, `${sgb(p.alloc_mb)} / ${sgb(p.size_mb)}`, `${sgb(p.free_mb)} free`)}</div>
       ${(p.vdevs || []).map(v => `<div class="sub">${esc(v.type === "single" ? "disk" : v.type)}: ${v.disks.map(d => `<code>${esc(d.id.replace(/^\/dev\/disk\/by-id\//, ""))}</code>${d.state && d.state !== "online" ? ` <span class="pill bad">${esc(d.state)}</span>` : ""}`).join(", ")}</div>`).join("")}
       ${p.scrub ? `<div class="sub dim">${esc(p.scrub)}</div>` : ""}${p.errors && !/no known data errors/i.test(p.errors) ? `<div class="sub bad">${esc(p.errors)}</div>` : ""}
@@ -394,24 +386,25 @@ function storagePools(n){
         `<button type="button" data-stpool="export" data-name="${esc(p.name)}" title="unmount its datasets and let the disks go, to import elsewhere">Export</button>`,
         `<button type="button" class="danger" data-stpool="destroy" data-name="${esc(p.name)}" title="everything on it is gone">Destroy</button>`])}</span>` : ""}</div>`;
   }).join("");
-  const form = !admin || why ? "" : `<div class="field stnewpool"><div class="hint">A new pool: a name, a layout and its disks, each erased. ${free.length ? `${free.length} disk${free.length === 1 ? " is" : "s are"} free` : "No disk is free"}${used.length ? `; ${used.length} hold${used.length === 1 ? "s" : ""} something and need${used.length === 1 ? "s" : ""} a tick to erase` : ""}.</div>
-      <div class="fgrid"><label class="pick"><span class="pickw">Name</span><input type="text" id="stPoolName" placeholder="tank" maxlength="31" autocomplete="off" spellcheck="false"></label>
-      <label class="pick"><span class="pickw">Layout</span><select id="stPoolLayout">
-        <option value="mirror">mirror: two or more disks, one may fail</option>
-        <option value="raidz2">raidz2: four or more disks, any two may fail</option>
-        <option value="raidz1">raidz1: three or more disks, one may fail</option>
-        <option value="single">single: one disk, nothing protects it</option></select></label></div>
-      <div class="field"><div class="lbox" id="stPoolDisks">${[...free, ...used].map(d => `<label class="ndcap"><input type="checkbox" data-stdiskpick="${esc(d.name)}"${used.includes(d) ? ' data-held="1"' : ""}> ${diskLine(d)}${used.includes(d) ? ` <span class="pill warn">holds ${esc((d.parts || []).find(p => p.holds && p.holds !== "nothing")?.holds || d.holds)}</span>` : ""}</label>`).join("") || `<div class="empty">No disk to make a pool from.</div>`}</div></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stPoolWipe"> wipe disks that hold something (what is on them is gone)</label></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stPoolEncrypt"> encrypt it (ZFS native encryption, a passphrase)</label>
-        <div id="stPoolKeyF" hidden>
-          <label class="pick"><span class="pickw">Passphrase</span><input type="password" id="stPoolPass" autocomplete="new-password"></label>
-          <label class="pick"><span class="pickw">Again</span><input type="password" id="stPoolPass2" autocomplete="new-password"></label>
-          <label class="ndcap"><input type="checkbox" id="stPoolKeepKey" checked> keep the key on this machine, sealed under its install key, so the pool unlocks at every boot</label>
+  const form = !admin || why ? "" : `<div class="field stnewpool">${formBox({groups: [
+      {head: "A new pool", says: `Each of its disks is erased. ${free.length ? `${free.length} disk${free.length === 1 ? " is" : "s are"} free` : "No disk is free"}${used.length ? `; ${used.length} hold${used.length === 1 ? "s" : ""} something and need${used.length === 1 ? "s" : ""} a tick to erase` : ""}.`, fields: [
+        formField("stPoolName", "Name", `<input type="text" id="stPoolName" placeholder="tank" maxlength="31" autocomplete="off" spellcheck="false">`),
+        formField("stPoolLayout", "Layout", `<select id="stPoolLayout">
+          <option value="mirror">mirror: two or more disks, one may fail</option>
+          <option value="raidz2">raidz2: four or more disks, any two may fail</option>
+          <option value="raidz1">raidz1: three or more disks, one may fail</option>
+          <option value="single">single: one disk, nothing protects it</option></select>`),
+        `<div class="fcell fwide">${lbl("stPoolDisks", "Disks")}<div class="lbox" id="stPoolDisks">${[...free, ...used].map(d => `<label class="ndcap"><input type="checkbox" data-stdiskpick="${esc(d.name)}"${used.includes(d) ? ' data-held="1"' : ""}> ${diskLine(d)}${used.includes(d) ? ` <span class="pill warn">holds ${esc((d.parts || []).find(p => p.holds && p.holds !== "nothing")?.holds || d.holds)}</span>` : ""}</label>`).join("") || `<div class="empty">No disk to make a pool from.</div>`}</div></div>`,
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stPoolWipe"> wipe disks that hold something (what is on them is gone)</label></div>`,
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stPoolEncrypt"> encrypt it (ZFS native encryption, a passphrase)</label></div>`]},
+      // Its passphrase slides in under the tick that asks for it.
+      {attrs: `id="stPoolKeyF" hidden`, fields: [
+        formField("stPoolPass", "Passphrase", `<input type="password" id="stPoolPass" autocomplete="new-password">`),
+        formField("stPoolPass2", "Again", `<input type="password" id="stPoolPass2" autocomplete="new-password">`),
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stPoolKeepKey" checked> keep the key on this machine, sealed under its install key, so the pool unlocks at every boot</label>
           <div class="hint">Kept here, the pool opens at boot; not kept, it waits for the passphrase on this page after every boot. Write it down: nothing here recovers a pool without it${
-            helpIcon("Kept here, the disks are unreadable pulled from this machine, but the machine as a whole opens them. Not kept, the pool and its shares wait after every boot until the passphrase is typed here, which also protects against the whole machine taken.")}</div>
-        </div></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stpool="create">Make the pool</button></div></div>`;
+            helpIcon("Kept here, the disks are unreadable pulled from this machine, but the machine as a whole opens them. Not kept, the pool and its shares wait after every boot until the passphrase is typed here, which also protects against the whole machine taken.")}</div></div>`]}],
+    foot: [`<button type="button" class="primary" data-stpool="create">Make the pool</button>`]})}</div>`;
   // Pools another machine made, found on its disks (R163 step 1): each
   // imported as it is, never upgraded, its datasets under /mnt.
   const found = n.pools_importable || [];
@@ -508,13 +501,12 @@ function storageSnapshots(n){
       ${newest ? `<div class="rows">${newest}</div>` : `<div class="empty">No snapshot of ${esc(p.name)} yet.</div>`}
       </div>${admin && !why ? `<span class="acts"><button type="button" data-stsnap="take" data-pool="${esc(p.name)}" title="one of every dataset, kept beside the manual ones">Snapshot now</button></span>` : ""}</div>`;
   }).join("");
-  const form = !admin || why || !pools.length ? "" : `<div class="field stsnapform"><div class="hint">A schedule: the pool, how often, and how many of that kind to keep; the oldest past that goes when the next is taken.</div>
-      <div class="fgrid">
-        <label class="pick"><span class="pickw">Pool</span><select id="stSnapPool">${optionList(pools.map(p => [p.name, p.name]), pools[0].name)}</select></label>
-        <label class="pick"><span class="pickw">How often</span><select id="stSnapKind">${optionList(SNAP_KINDS.map(([k, label]) => [k, label]), "daily")}</select></label>
-        <label class="pick fshort"><span class="pickw">Keep</span><input type="number" id="stSnapKeep" min="1" max="200" value="7"></label>
-      </div>
-      <div class="actbar"><span class="sp"></span>${scheds.length ? actMore(scheds.map(x => `<button type="button" class="danger" data-stsnapsched="${esc(x.id)}">Remove ${esc(x.pool)} ${esc(x.kind)}</button>`), true) : ""}<button type="button" class="primary" data-stsnap="schedule">Save the schedule</button></div></div>`;
+  const form = !admin || why || !pools.length ? "" : `<div class="field stsnapform">${formBox({groups: [{head: "A schedule", says: "How many of that kind to keep: the oldest past that goes when the next is taken.", grid: "three", fields: [
+      formField("stSnapPool", "Pool", `<select id="stSnapPool">${optionList(pools.map(p => [p.name, p.name]), pools[0].name)}</select>`),
+      formField("stSnapKind", "How often", `<select id="stSnapKind">${optionList(SNAP_KINDS.map(([k, label]) => [k, label]), "daily")}</select>`),
+      formField("stSnapKeep", "Keep", `<input type="number" id="stSnapKeep" min="1" max="200" value="7">`)]}],
+    foot: [scheds.length ? actMore(scheds.map(x => `<button type="button" class="danger" data-stsnapsched="${esc(x.id)}">Remove ${esc(x.pool)} ${esc(x.kind)}</button>`), true) : "",
+      `<button type="button" class="primary" data-stsnap="schedule">Save the schedule</button>`]})}</div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet: snapshots are a pool's.</div>`}${form}`;
   const total = pools.reduce((a, p) => a + ((snaps[p.name] || {}).count || 0), 0);
   return docSection("storage", "snapshots", "Snapshots", pools.length ? `${total}${scheds.length ? `, ${scheds.filter(x => x.on).length} scheduled` : ""}` : "", body);
@@ -588,7 +580,7 @@ function storageArray(n){
       ${x.mounted ? `<div class="ndmeters">${meter("used", pct, `${sgb(x.used_mb)} / ${sgb(x.size_mb)}`, `${sgb((x.size_mb || 0) - (x.used_mb || 0))} free`)}</div>` : ""}
       </div>${admin && !why && free.length && !a.adopted ? `<span class="acts">${actMore([`<button type="button" data-starray="replace" data-which="${kind}${x.slot}" title="a new disk takes this slot; ${kind === "d" ? "its files are rebuilt from parity" : "parity is rebuilt on it"}">Replace</button>`], true)}</span>` : ""}</div>`;
   };
-  const pick = (id, held) => `<div class="field"><div class="lbox" id="${id}">${[...free, ...(held ? used : [])].map(d => `<label class="ndcap"><input type="checkbox" data-${id}="${esc(d.name)}"${used.includes(d) ? ' data-held="1"' : ""}> ${diskLine(d)}${used.includes(d) ? ` <span class="pill warn">holds ${esc((d.parts || []).find(p => p.holds && p.holds !== "nothing")?.holds || d.holds)}</span>` : ""}</label>`).join("") || `<div class="empty">No disk free for it.</div>`}</div></div>`;
+  const pick = (id, held) => `<div class="lbox" id="${id}">${[...free, ...(held ? used : [])].map(d => `<label class="ndcap"><input type="checkbox" data-${id}="${esc(d.name)}"${used.includes(d) ? ' data-held="1"' : ""}> ${diskLine(d)}${used.includes(d) ? ` <span class="pill warn">holds ${esc((d.parts || []).find(p => p.holds && p.holds !== "nothing")?.holds || d.holds)}</span>` : ""}</label>`).join("") || `<div class="empty">No disk free for it.</div>`}</div>`;
   let body;
   if (has){
     // An array taken over (R163 step 3) has the mover beside its schedules;
@@ -615,25 +607,23 @@ function storageArray(n){
         `<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`,
         `<button type="button" class="danger" data-starray="destroy" title="unmounted and forgotten; the disks keep their files">Destroy</button>`])}</span>` : ""}</div>
       <div class="rows">${(a.data || []).map(x => slotRow("d", x)).join("")}${(a.parity || []).map(x => slotRow("p", x)).join("")}</div>
-      ${admin && !why ? `${a.adopted ? "" : `<div class="field stnewslot"><div class="hint">Add a data disk: it is wiped, takes the next slot, and the parity is synced after${free.length ? "" : "; no disk here is free"}.</div>
-        ${pick("stArrayAdd", true)}
-        <div class="field"><label class="ndcap"><input type="checkbox" id="stArrayWipe2"> wipe disks that hold something (what is on them is gone)</label></div>
-        <div class="actbar"><span class="sp"></span><button type="button" data-starray="add">Add the disk</button></div></div>`}
-      <div class="field"><div class="hint">A schedule: the parity synced daily and a scrub weekly is the usual pair.</div>
-        <div class="prefrow ctlrow">
-          <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Run</span><select id="stArraySched">${optionList(kindsHere.map(([k, label, , said]) => [k, `${label}, ${said.toLowerCase()}`]), "sync")}</select></label></div>
-        </div>
-        <div class="actbar"><span class="sp"></span>${scheds.length ? actMore(scheds.map(x => `<button type="button" class="danger" data-stsnapsched="${esc(x.id)}">Remove the ${esc(x.array)} schedule</button>`), true) : ""}<button type="button" class="primary" data-starray="schedule">Save the schedule</button></div></div>` : ""}`;
+      ${admin && !why ? `${a.adopted ? "" : `<div class="field stnewslot">${formBox({fields: [
+          `<div class="fcell fwide">${lbl("stArrayAdd", "Add a data disk", "it is wiped, takes the next slot, and the parity is synced after")}${pick("stArrayAdd", true)}</div>`,
+          `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stArrayWipe2"> wipe disks that hold something (what is on them is gone)</label></div>`],
+        foot: [`<button type="button" data-starray="add">Add the disk</button>`]})}</div>`}
+      <div class="field">${formBox({fields: [
+          formField("stArraySched", "Run", `<select id="stArraySched">${optionList(kindsHere.map(([k, label, , said]) => [k, `${label}, ${said.toLowerCase()}`]), "sync")}</select>`,
+            {hint: "A schedule: the parity synced daily and a scrub weekly is the usual pair."})],
+        foot: [scheds.length ? actMore(scheds.map(x => `<button type="button" class="danger" data-stsnapsched="${esc(x.id)}">Remove the ${esc(x.array)} schedule</button>`), true) : "",
+          `<button type="button" class="primary" data-starray="schedule">Save the schedule</button>`]})}</div>` : ""}`;
   } else {
-    const form = !admin || why ? "" : `<div class="field stnewarray"><div class="hint">New array: the data disks (any sizes, each wiped and given its own filesystem), one or two parity disks at least as large as the largest data disk, and where new files land.</div>
-      <div class="field"><div class="hint">Data disks</div>${pick("stArrayData", true)}</div>
-      <div class="field"><div class="hint">Parity disks</div>${pick("stArrayParity", true)}</div>
-      <div class="fgrid">
-        <label class="pick"><span class="pickw">Filesystem</span><select id="stArrayFs"><option value="xfs">xfs: the usual choice</option><option value="btrfs">btrfs: checksums per file</option></select></label>
-        <label class="pick"><span class="pickw">New files land on</span><select id="stArrayPolicy">${optionList(ARRAY_POLICIES, "mfs")}</select></label>
-      </div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stArrayWipe"> wipe disks that hold something (what is on them is gone)</label></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-starray="create">Make the array</button></div></div>`;
+    const form = !admin || why ? "" : `<div class="field stnewarray">${formBox({groups: [{head: "A new array", says: "Data disks of any sizes, each wiped and given its own filesystem, and one or two parity disks.", fields: [
+        `<div class="fcell fwide">${lbl("stArrayData", "Data disks")}${pick("stArrayData", true)}</div>`,
+        `<div class="fcell fwide">${lbl("stArrayParity", "Parity disks", "one or two, each at least as large as the largest data disk")}${pick("stArrayParity", true)}</div>`,
+        formField("stArrayFs", "Filesystem", `<select id="stArrayFs"><option value="xfs">xfs: the usual choice</option><option value="btrfs">btrfs: checksums per file</option></select>`),
+        formField("stArrayPolicy", "New files land on", `<select id="stArrayPolicy">${optionList(ARRAY_POLICIES, "mfs")}</select>`),
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stArrayWipe"> wipe disks that hold something (what is on them is gone)</label></div>`]}],
+      foot: [`<button type="button" class="primary" data-starray="create">Make the array</button>`]})}</div>`;
     body = `<div class="empty">No array yet${n.mergerfs && n.snapraid ? ": the form below makes one" : ""}.</div>${form}`;
   }
   return docSection("storage", "array", "Array", has ? `${(a.data || []).length} data, ${(a.parity || []).length} parity` : "", `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${body}`,
@@ -715,25 +705,23 @@ function storageOther(n){
         `<button type="button" class="danger" data-stother="remove" data-id="${esc(r.id)}" title="unmounted and forgotten; nothing on it is touched">Remove</button>`], true)}</span>` : ""}</div>`;
   }).join("");
   const spare = (n.disks || []).filter(d => !d.system && (d.removable || d.tran === "usb" || (d.parts || []).some(p => /not mounted/.test(p.holds || "")) || /not mounted/.test(d.holds || "")));
-  const form = !admin || why ? "" : `<div class="field stnewother"><div class="hint">Mount another disk or share here, by itself: a backup target, or a source to copy in. Nothing on it is changed; it is never pooled.</div>
-      <div class="prefrow ctlrow">
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">What</span><select id="stOtherKind"><option value="disk">a disk plugged in here (USB, eSATA)</option><option value="smb">an SMB share on another machine</option><option value="nfs">an NFS export on another machine</option></select></label></div>
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Name</span><input type="text" id="stOtherName" placeholder="backup" maxlength="31" autocomplete="off" spellcheck="false"></label></div>
-      </div>
-      <div class="field" data-stotherk="disk"><label class="pick"><span class="pickw">Disk</span><select id="stOtherDisk">${spare.length ? optionList(spare.map(d => [d.name, `${d.name}: ${d.model || "unnamed"}, ${humanBytes((d.size_mb || 0) * 1048576)}, serial ${d.serial || "none"}`]), spare[0].name) : `<option value="">no disk here is spare</option>`}</select></label></div>
-      <div class="field" data-stotherk="smb nfs" hidden><label class="pick"><span class="pickw">Host</span><input type="text" id="stOtherHost" placeholder="nas.local or 192.168.1.20" data-ph-short="host" autocomplete="off" spellcheck="false"></label>
-        <label class="pick"><span class="pickw" data-stotherpath>Share</span><input type="text" id="stOtherPath" placeholder="media" autocomplete="off" spellcheck="false"></label></div>
-      <div class="field" data-stotherk="smb" hidden><label class="pick"><span class="pickw">User</span><input type="text" id="stOtherUser" placeholder="leave empty for a guest" data-ph-short="optional" autocomplete="off" spellcheck="false"></label>
-        <label class="pick"><span class="pickw">Password</span><input type="password" id="stOtherPass" autocomplete="new-password"></label></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stOtherRo"> read-only</label></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stother="set">Mount it</button></div></div>`;
+  const form = !admin || why ? "" : `<div class="field stnewother">${formBox({groups: [{head: "Mount a disk or a share", says: "By itself: a backup target, or a source to copy in. Nothing on it is changed; it is never pooled.", fields: [
+      formField("stOtherKind", "What", `<select id="stOtherKind"><option value="disk">a disk plugged in here (USB, eSATA)</option><option value="smb">an SMB share on another machine</option><option value="nfs">an NFS export on another machine</option></select>`),
+      formField("stOtherName", "Name", `<input type="text" id="stOtherName" placeholder="backup" maxlength="31" autocomplete="off" spellcheck="false">`),
+      formField("stOtherDisk", "Disk", `<select id="stOtherDisk">${spare.length ? optionList(spare.map(d => [d.name, `${d.name}: ${d.model || "unnamed"}, ${humanBytes((d.size_mb || 0) * 1048576)}, serial ${d.serial || "none"}`]), spare[0].name) : `<option value="">no disk here is spare</option>`}</select>`, {wide: true, attrs: `data-stotherk="disk"`}),
+      formField("stOtherHost", "Host", `<input type="text" id="stOtherHost" placeholder="nas.local or 192.168.1.20" data-ph-short="host" autocomplete="off" spellcheck="false">`, {hidden: true, attrs: `data-stotherk="smb nfs"`}),
+      formField("stOtherPath", "Share", `<input type="text" id="stOtherPath" placeholder="media" autocomplete="off" spellcheck="false">`, {hidden: true, attrs: `data-stotherk="smb nfs"`}),
+      formField("stOtherUser", "User", `<input type="text" id="stOtherUser" placeholder="leave empty for a guest" data-ph-short="optional" autocomplete="off" spellcheck="false">`, {hidden: true, attrs: `data-stotherk="smb"`}),
+      formField("stOtherPass", "Password", `<input type="password" id="stOtherPass" autocomplete="new-password">`, {hidden: true, attrs: `data-stotherk="smb"`}),
+      `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="stOtherRo"> read-only</label></div>`]}],
+    foot: [`<button type="button" class="primary" data-stother="set">Mount it</button>`]})}</div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">Nothing else mounted${admin ? ": the form below mounts a disk or a share" : ""}.</div>`}${form}`;
   return docSection("storage", "other", "Other disks and shares", recs.length ? `${recs.length}, ${recs.filter(r => (live.find(x => x.id === r.id) || {}).mounted).length} mounted` : "", body);
 }
 function wireStorageOther(root, n){
   const kind = $("stOtherKind");
   const showKind = (slide = true) => root.querySelectorAll("[data-stotherk]").forEach(f => showBlock(f, f.dataset.stotherk.split(" ").includes(kind.value), slide));
-  if (kind){ kind.onchange = () => { showKind(); const pw = root.querySelector("[data-stotherpath]"); if (pw) pw.textContent = kind.value === "nfs" ? "Path" : "Share"; const p = $("stOtherPath"); if (p) p.placeholder = kind.value === "nfs" ? "/export/media" : "media"; }; showKind(false); }
+  if (kind){ kind.onchange = () => { showKind(); const pw = root.querySelector(`label[for="stOtherPath"]`); if (pw) pw.textContent = kind.value === "nfs" ? "Path" : "Share"; const p = $("stOtherPath"); if (p) p.placeholder = kind.value === "nfs" ? "/export/media" : "media"; }; showKind(false); }
   root.querySelectorAll("[data-stother]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.stother;
     let body;
@@ -796,15 +784,13 @@ function storageBackups(n){
                                         && !recs.some(r => r.source === p.mount));
   const presets = !admin || why || !n.array?.mounted || !lone.length ? "" : `<div class="field"><div class="hint">A pool of one disk has nothing to fall back on: nightly to the array, and a dead disk is restored from last night's run.</div>
       <div class="actbar"><span class="sp"></span>${lone.map(p => `<button type="button" data-stbackup="nightly" data-pool="${esc(p.name)}" data-mount="${esc(p.mount)}">Back up ${esc(p.name)} to the array nightly</button>`).join("")}</div></div>`;
-  const form = !admin || why ? "" : `${presets}<div class="field stnewbackup"><div class="hint">A new backup: a folder for its runs (another pool, the array, a disk or a share) and how many to keep; each run is whole and shares what did not change.</div>
-      <div class="prefrow ctlrow">
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Name</span><input type="text" id="stBackupName" placeholder="media" maxlength="31" autocomplete="off" spellcheck="false"></label></div>
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Keep</span><input type="number" id="stBackupKeep" min="1" max="365" value="7"></label></div>
-      </div>
-      <div class="field"><label class="pick"><span class="pickw">Copy</span><input type="text" id="stBackupSrc" list="stBackupPlaces" placeholder="${esc(places[0]?.[0] || "/mnt/tank/media")}" autocomplete="off" spellcheck="false"></label>
-        <label class="pick"><span class="pickw">To</span><input type="text" id="stBackupDest" list="stBackupPlaces" placeholder="/mnt/other/backup" autocomplete="off" spellcheck="false"></label>
-        <datalist id="stBackupPlaces">${places.map(([v, w]) => `<option value="${esc(v)}">${esc(w)}</option>`).join("")}</datalist></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stbackup="set">Add the backup</button></div></div>`;
+  const form = !admin || why ? "" : `${presets}<div class="field stnewbackup">${formBox({groups: [{head: "A new backup", says: "To a folder on another pool, the array, a disk or a share. Each run is whole and shares what did not change.", fields: [
+      formField("stBackupName", "Name", `<input type="text" id="stBackupName" placeholder="media" maxlength="31" autocomplete="off" spellcheck="false">`),
+      formField("stBackupKeep", "Keep", `<input type="number" id="stBackupKeep" min="1" max="365" value="7">`, {short: true}),
+      formField("stBackupSrc", "Copy", `<input type="text" id="stBackupSrc" list="stBackupPlaces" placeholder="${esc(places[0]?.[0] || "/mnt/tank/media")}" autocomplete="off" spellcheck="false">`),
+      formField("stBackupDest", "To", `<input type="text" id="stBackupDest" list="stBackupPlaces" placeholder="/mnt/other/backup" autocomplete="off" spellcheck="false">
+        <datalist id="stBackupPlaces">${places.map(([v, w]) => `<option value="${esc(v)}">${esc(w)}</option>`).join("")}</datalist>`)]}],
+    foot: [`<button type="button" class="primary" data-stbackup="set">Add the backup</button>`]})}</div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No backup yet${admin ? ": the form below adds one" : ""}.</div>`}${form}`;
   const bad = recs.filter(r => { const st = live.find(x => x.name === r.name) || {}; return st.last_at && !st.ok; }).length;
   return docSection("storage", "backups", "Backups", recs.length ? `${recs.length}${bad ? `, ${bad} failed` : ""}` : "", body, {cls: bad ? "bad" : ""});

@@ -587,7 +587,6 @@ body.firstrun #panes{display:none}
 .setstepbody>.actbar{padding:0;margin-top:8px}
 .setstepbody .setshares{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0}
 .stnewshare{margin-top:12px;border-top:var(--hair) solid var(--line)}
-.stnewshare .stwholist{margin-top:16px}
 .stnewshare .stwho{display:flex;align-items:center;gap:var(--field-gap);padding:8px 0;border-top:var(--hair) solid var(--line)}
 .stnewshare .stwholist>.sub{margin-bottom:8px;font:var(--f-note)}
 .stnewshare .stwho select{flex:0 0 12em;width:12em;min-height:var(--ctl)}
@@ -2400,7 +2399,6 @@ body.firstrun #panes{display:none}
    words do, not a section's inset further in (the operator's phone, 18 Oct). */
 :is(.dmtab,.dkview,.vmtab) .row>details.sect>summary,:is(.dmtab,.dkview,.vmtab) .row>details.sect>.body{padding-left:0;padding-right:0}
 .fgrid>.fshort{max-width:10em}
-.stnewpool>.field,.stnewpool>.fgrid,.stnewarray>.field,.stnewarray>.fgrid,.stsnapform>.fgrid{margin-top:14px}
 .fgroup{padding:16px 0;border-bottom:var(--hair) solid var(--line)}
 .fgroup:last-of-type{border-bottom:0}
 /* In a form's box (R301) the box's 16px gap is the room above each group: a
