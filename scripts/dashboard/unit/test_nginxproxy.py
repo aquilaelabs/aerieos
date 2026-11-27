@@ -3,6 +3,7 @@ nginx's config and a compose file with everything inline; a certificate is
 checked as nginx would load it, kept 0600, and never shown back."""
 import contextlib
 import json
+import importlib
 import os
 import shutil
 import subprocess
@@ -141,7 +142,7 @@ class Certificate(unittest.TestCase):
         """A pair is kept under the domain its names say, so two domains'
         pairs stand side by side and the same names again are a renewal
         (B657: turinglens.com's pair went when another was saved as the
-        default); a default from before R188 is read in as a listed pair."""
+        default); a default from before R188 is made a listed pair (0042)."""
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
                         "-subj", "/CN=*.aquilae.test", "-addext", "subjectAltName=DNS:*.aquilae.test,DNS:aquilae.test",
                         "-keyout", f"{self.tmp}/k2.pem", "-out", f"{self.tmp}/c2.pem"],
@@ -164,6 +165,8 @@ class Certificate(unittest.TestCase):
         d = npx._cert_dir("n1"); d.mkdir(parents=True, exist_ok=True)
         (d / "cert.pem").write_text(self.cert); (d / "key.pem").write_text(self.key)
         npx.drop_cert("n1", host="www.example.com")
+        # ...by migration 0042, once, where a read moved it before.
+        importlib.import_module("statemigrations.0042_nginx_certs_listed").run({"state": str(npx.STATE)})
         rec = npx.record("n1")
         self.assertNotIn("cert", rec)
         self.assertTrue(rec["certs"]["www.example.com"]["set"], "read in under its domain")

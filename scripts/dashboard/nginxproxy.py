@@ -416,35 +416,9 @@ def drop_cert(nid, host=""):
     return {"ok": True}
 
 
-def _migrate(nid):
-    """A node's default pair from before R188 becomes a listed pair under
-    the domain its names say, its files moved under certs/<domain>: read on
-    the way in, once, so nothing a person saved is lost."""
-    with _lock:
-        st = _load()
-        rec = st.get(str(nid)) or {}
-        cur = rec.get("cert")
-        if not isinstance(cur, dict):
-            return
-        if cur.get("set"):
-            key = domain_of(cur.get("names") or cur.get("subject") or "") or "default"
-            src, dst = _cert_dir(nid), _cert_dir(nid, key)
-            dst.mkdir(parents=True, exist_ok=True, mode=0o700)
-            for name in ("cert.pem", "key.pem"):
-                with contextlib.suppress(OSError):
-                    (src / name).replace(dst / name)
-            rec.setdefault("certs", {}).setdefault(key, cur)
-        rec.pop("cert", None)
-        # Written without moving the tab's token: this runs on a READ (the
-        # Docker list reads the record for its rows), and a token moved by
-        # a read had the Docker tab re-reading itself (uniform.mjs, 13 Oct).
-        write_json(_file(), st)
-
-
 # ---- the tab's verbs ----------------------------------------------------------
 
 def record(nid):
-    _migrate(nid)
     return dict(_load().get(str(nid)) or {})
 
 
