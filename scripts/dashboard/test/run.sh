@@ -156,8 +156,9 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
         ( umask 000; mkdir -p "${ALOCK%/*}"; rm -f "$ALOCK"; printf '%s' "$$" > "$ALOCK" ) 2>/dev/null \
             || die "cannot take $ALOCK: $(stat -c %U "$ALOCK" 2>/dev/null || echo somebody)'s, and ${ALOCK%/*} is not world-writable; fix the directory's mode (chmod 0777) and re-run"
         trap '[ "$(cat "$ALOCK" 2>/dev/null)" = "$$" ] && rm -f "$ALOCK"' EXIT
-        # the dashboard's page and scripts, as they are now
-        cp "$HERE"/../*.js "$HERE"/../*.html "$KEEP_HERE/../" 2>/dev/null || true
+        # the dashboard's page, its scripts and its stylesheets, as they are
+        # now: the page-*.css layers too, or a probe saw the keep's old ones
+        cp "$HERE"/../*.js "$HERE"/../*.html "$HERE"/../*.css "$KEEP_HERE/../" 2>/dev/null || true
         cp "$HERE/lib.mjs" "$KEEP_HERE/lib.mjs"
         rc=0
         scrub=(); for v in "${SCRUB[@]}"; do scrub+=(-u "$v"); done
