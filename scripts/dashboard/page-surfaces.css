@@ -438,8 +438,6 @@ body.away #docDot,body.away #docDot.ok,body.away #docDot.warn,body.away #docDot.
 .updatedband[hidden]{display:none}
 .updatedband>.grow{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .newbuild>.grow{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
-.uadd{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
-.uadd .setrow{flex:1 1 12em}
 /* An anchor, because a download is a link and a link is what a browser knows
    how to save. Dressed as a button so the row reads as three controls. */
 .logacts .btnish{display:inline-flex;align-items:center;justify-content:center;
@@ -1138,28 +1136,16 @@ body.firstrun #panes{display:none}
 .ngrecords{border:var(--hair) solid var(--line);border-radius:var(--r-surface);overflow:hidden}
 .ngrecords>.row{padding:var(--label-gap) var(--row-x)}
 .tbl.ngrecords>.row.ngrec{align-items:stretch}   /* over .row:has(.setrow), which ends a row of fields at its right */
-.ngrecords>.ngrec.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
-.ngrecords>.ngrec.open>.tline{display:none}
-.ngform{display:flex;flex-direction:column;gap:var(--field-gap);min-width:0}
+/* A record opened (the record-lists rule): its form in place on the sunk
+   ground, at the row's inset, its line hidden while the form says it. */
+.tbl>.row.open:has(>.recform){background:var(--sunk);padding:var(--row-y) var(--row-x)}
+.tbl>.row.open:has(>.recform)>.tline{display:none}
 /* A snapshot's row opened: its line stays, its restore under it, the file's
    field the width of the row and the day's verbs in the bar's order. */
 .snaprecords>.snaprec.open{background:var(--sunk)}
 .snapform{display:flex;flex-direction:column;gap:var(--field-gap);min-width:0;padding:0 var(--row-x) var(--row-y)}
 .snapform>.snapfile{margin:0;max-width:none}
 .snapform>.actbar{margin:0;padding:0}
-/* The fields sit under the table's own columns, the buttons' column left
-   empty, so a route's form lines up with the line it opened from; the row
-   of them is the record's, so its fields are not capped one by one. */
-.ngfields{display:grid;grid-template-columns:var(--tcols);column-gap:var(--row-x);row-gap:var(--field-gap);min-width:0}
-.ngfields>.setrow.col{margin:0;min-width:0;max-width:none}
-.ngformbar{margin:0;padding:0}
-/* On a phone a route's form stacks: hostname, path and port beside each
-   other, the pair under them (the operator, 18 Oct: the fields ran past
-   the screen's edge). */
-@media(max-width:900px){
-  .ngfields{grid-template-columns:minmax(0,1fr) 5em;column-gap:var(--field-gap)}
-  .ngfields>:first-child,.ngfields>:nth-child(4){grid-column:1 / -1}
-}
 /* A pair's line sits on the band's inset, not a row's inset on top of it,
    its delete at the band's right edge where every other one is. */
 .nginxtab .field>.row.ngcert{padding-left:0;padding-right:0}
@@ -1170,16 +1156,12 @@ body.firstrun #panes{display:none}
 /* A draft release's notes, read and corrected before it is published. */
 .verdraft textarea{width:100%;box-sizing:border-box;min-height:180px;resize:vertical}
 .nginxtab .field>.ndcap{margin-top:var(--label-gap)}
-/* Also reaches as records: a row an address read-only, its open form on the
-   sunk ground with its address, its node ticks and its bar. */
+/* Also reaches as records: a row an address read-only. */
 .tbl.rnreaches>.row.rnreach{align-items:stretch}
-.rnreaches>.rnreach.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
-.rnreaches>.rnreach.open>.tline{display:none}
 /* What deploys (R281 step 4): a sentence a repository, its press at the right. */
 .rnship+.rnship{margin-top:var(--label-gap)}
 .rnship>.grow{overflow-wrap:anywhere}
-.rnreachform>.setrow.col{margin:0;max-width:none}
-.rnreachform .rnreachnodes{display:flex;gap:10px;flex-wrap:wrap}
+.rnreachnodes{display:flex;gap:10px;flex-wrap:wrap}
 /* Also works on as records: the add band over the table, a node a row. */
 .rnmorebox>.rnmoreadd select{flex:1 1 12em;width:auto;min-width:0}
 .rnftprow{display:flex;align-items:center;gap:8px}
@@ -1824,9 +1806,7 @@ body.firstrun #panes{display:none}
    after Edit. It carries the bug row's classes for exactly that reason: one
    shape for a row you open, not two that drift. */
 #rlList{padding-top:0}
-.rulerow .rlName{width:100%;margin-bottom:6px}
-.rulerow .two{align-items:center}
-.rulerow textarea{min-height:96px;white-space:pre-wrap;margin:0 0 6px;width:100%}
+.rulerow textarea,.grule textarea{min-height:96px;white-space:pre-wrap}
 /* Which kind it is, said rather than chosen: a rule is conditional exactly
    when it has a trigger, so this follows the fields instead of being a third
    thing to keep in step with them. */
@@ -2585,30 +2565,17 @@ body.firstrun #panes{display:none}
 }
 .ndactions{display:flex;flex-direction:column;gap:6px;margin-top:8px;border-top:var(--hair) solid var(--line);padding-top:6px}
 /* A node's mounts are records (the record-lists rule): a row read-only in
-   the table's columns, its open form in place on the sunk ground, the form's
-   fields across the row at a desk (source, mountpoint, kind, read-only) and
-   its bar under them, the nginx route form's shape. */
+   the table's columns, Edit opening its form in place. */
 .tbl.ndmounts>.row.ndmount{align-items:stretch}
-.ndmounts>.ndmount.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
-.ndmounts>.ndmount.open>.tline{display:none}
-.ndmfields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr) minmax(0,.7fr) auto;column-gap:var(--row-x);row-gap:var(--field-gap);align-items:end;min-width:0}
-.ndmfields>.setrow.col{margin:0;min-width:0;max-width:none}
-.ndmfields>.ndmro{white-space:nowrap;min-height:var(--ctl);display:flex;align-items:center}
 .ndmounts .ndmstate{white-space:normal}
-/* A runner's record: its notes under its line, its open form the same shape. */
+/* A runner's record: its notes under its line, its open form under them,
+   its line kept, for it says the runner's state. */
 .tbl.ndrunrecs>.row.ndrun{align-items:stretch}
 .ndrunrecs>.ndrun>.ndrunnote{padding:0 var(--row-x) var(--row-y)}
 .ndrunrecs>.ndrun.open{background:var(--sunk)}
 .ndrunform{padding:0 var(--row-x) var(--row-y)}
-.ndrunfields{min-width:0}
-.ndrunfields>.setrow.col{min-width:0}
-/* The path mapping's records, the same shape: two fields across its form. */
+/* The path mapping's records, the same shape. */
 .tbl.ndpaths>.row.ndpath{align-items:stretch}
-.ndpaths>.ndpath.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
-.ndpaths>.ndpath.open>.tline{display:none}
-.ndpfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);column-gap:var(--row-x);row-gap:var(--field-gap);min-width:0}
-.ndpfields>.setrow.col{margin:0;min-width:0;max-width:none}
-@media (max-width:600px){ .ndpfields{grid-template-columns:minmax(0,1fr)} }
 .ndmstate.warn,.ndmwhy.warn{color:var(--warn)} .ndmstate.bad,.ndmwhy.bad{color:var(--bad)}
 .ndconfstate.note{color:var(--note)}
 /* A ROW'S SETTINGS are a grid of labeled cells with ONE Apply at its foot
@@ -2644,12 +2611,6 @@ body.firstrun #panes{display:none}
    specificity otherwise: the first version of this line lost that tie. */
 .row .jbouts code{font:var(--f-note);white-space:normal;overflow-wrap:anywhere}
 .jbouts a{overflow-wrap:anywhere}
-@media (max-width:600px){
-  /* A mount's form on a phone: its source across, then its mountpoint and
-     kind side by side, then read-only. */
-  .ndmfields{grid-template-columns:minmax(0,1fr) 7em}
-  .ndmfields>:first-child,.ndmfields>.ndmro{grid-column:1 / -1}
-}
 /* The Jobs tab: it is narrowed by chips (B74); the reason a job ended
    badly is a warn line; the log is the manager's compose log, same box. */
 .jberr.warn{color:var(--warn)}

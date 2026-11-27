@@ -381,24 +381,23 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
     // labels, Install or Reinstall, Forget token, and Remove at the left.
     const open = c.runEdit?.slot === slot;
     const f = open ? c.runEdit.form : {};
-    const form = !open ? "" : `<div class="ngform ndrunform">
-        <div class="fgrid ndrunfields">
-          <label class="setrow col ctlrow"><span class="lbl">Token</span><input data-rf="token" type="password" value="${esc(f.token || "")}" spellcheck="false" autocomplete="off"
-            placeholder="${stored ? "stored: paste one only to replace it" : "paste a token that may register runners there"}" aria-label="runner token"></label>
-          <label class="setrow col ctlrow"><span class="lbl">Extra labels</span><input data-rf="labels" value="${esc(f.labels || "")}" spellcheck="false" autocomplete="off"
-            placeholder="gpu, android" aria-label="extra labels, comma-separated"></label>
-        </div>
-        <div class="actbar ngformbar">
-          ${rep.installed || want.want ? `<button type="button" class="danger lead" data-nrunner="remove" data-slot="${esc(slot)}" ${busyNow || !stored ? "disabled" : ""}
-            title="${why || (stored ? "deregister it and remove it from this node" : "add a token first")}">${barSaid("Remove runner", "Remove")}</button>` : ""}
-          ${stored ? `<button type="button" class="danger" data-nrunnerforget data-slot="${esc(slot)}" ${busyNow ? "disabled" : ""}
-            title="drop the stored token and this row; a registered runner keeps running">${barSaid("Forget token", "Forget")}</button>` : ""}
-          <span class="sp"></span>
-          <button type="button" data-nruncancel>Cancel</button>
-          <button type="button" class="primary" data-nrunner="install" data-slot="${esc(slot)}" ${busyNow || (!stored && !f.token) ? "disabled" : ""}
-            title="${why || (stored || f.token ? "install the runner here and register it with the token" : "add a token first")}">${
-            rep.installed ? barSaid("Reinstall runner", "Reinstall") : barSaid("Install runner", "Install")}</button>
-        </div></div>`;
+    const rid = `ndRun-${n.id}-${slot}`.replace(/[^\w-]/g, "_");
+    const left = [
+      rep.installed || want.want ? `<button type="button" class="danger" data-nrunner="remove" data-slot="${esc(slot)}" ${busyNow || !stored ? "disabled" : ""}
+        title="${why || (stored ? "deregister it and remove it from this node" : "add a token first")}">${barSaid("Remove runner", "Remove")}</button>` : "",
+      stored ? `<button type="button" class="danger" data-nrunnerforget data-slot="${esc(slot)}" ${busyNow ? "disabled" : ""}
+        title="drop the stored token and this row; a registered runner keeps running">${barSaid("Forget token", "Forget")}</button>` : ""].filter(Boolean);
+    // The last of the buttons at the left holds the rest to the right.
+    if (left.length) left[left.length - 1] = left[left.length - 1].replace('class="danger"', 'class="danger lead"');
+    const form = !open ? "" : formBox({cls: "ndrunform", fields: [
+        formField(`${rid}-token`, "Token", `<input id="${esc(rid)}-token" data-rf="token" type="password" value="${esc(f.token || "")}" spellcheck="false" autocomplete="off"
+          placeholder="${stored ? "stored: paste one only to replace it" : "paste a token that may register runners there"}" aria-label="runner token">`),
+        formField(`${rid}-labels`, "Extra labels", `<input id="${esc(rid)}-labels" data-rf="labels" value="${esc(f.labels || "")}" spellcheck="false" autocomplete="off"
+          placeholder="gpu, android" aria-label="extra labels, comma-separated">`)],
+      foot: [...left, `<button type="button" data-nruncancel>Cancel</button>`,
+        `<button type="button" class="primary" data-nrunner="install" data-slot="${esc(slot)}" ${busyNow || (!stored && !f.token) ? "disabled" : ""}
+          title="${why || (stored || f.token ? "install the runner here and register it with the token" : "add a token first")}">${
+          rep.installed ? barSaid("Reinstall runner", "Reinstall") : barSaid("Install runner", "Install")}</button>`]});
     return `<div class="row ndrun${ro ? " ndrunro" : ""}${open ? " open" : ""}" data-slot="${esc(slot)}">${tblLine(RUN_COLS, [
         `<code>${esc(rep.url || want.url || slot)}</code>${hostOf(want, rep) ? ` <span class="pill">${hostOf(want, rep)}</span>` : ""}`,
         `<span class="pill stat ndrunstate${pcls ? " " + pcls : ""}${rep.busy && !job ? " ndrunbusy" : ""}">${esc(word)}</span>`,
@@ -407,27 +406,23 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
         notes.map(([t, cl]) => `<div class="sub ${cl} ndrunnote">${esc(t)}</div>`).join("")}${form}</div>`;
   }).join("");
   // Adding is a button that unrolls the form in its own band, the shape
-  // every view adds with; the form is four fields that wrap to the width
-  // they have, one per line on a phone, and its own action bar.
-  const addbar = c.addRunner ? `<div class="addbar ndrunadd ctlrow" data-add="runner"><div class="grow">
-        <div class="uadd ctlrow">
-          <div class="setrow col ctlrow">${lbl("", "Repository or organization", "a repository, or an organization for all of its repositories")}
-          <input data-k="runner:url" value="${esc(d.runner.url)}" spellcheck="false" autocomplete="off"
-            placeholder="https://github.com/your-org" data-ph-short="organization URL" aria-label="repository or organization URL"></div>
-          <div class="setrow col ctlrow">${lbl("", "Host", "GitHub, or act_runner for Gitea, Forgejo and Codeberg")}
-          <select data-k="runner:forge" aria-label="host kind">${optionList([["", "from the address"], ["github", "GitHub"], ["gitea", "Gitea or Forgejo"]], d.runner.forge || "")}</select></div>
-          <div class="setrow col ctlrow">${lbl("", "Token", "a token that may register runners there. Stored on the controller only")}
-          <input data-k="runner:token" type="password" value="${esc(d.runner.token || "")}" spellcheck="false" autocomplete="off"
-            placeholder="paste a token" aria-label="runner token"></div>
-          <div class="setrow col ctlrow">${lbl("", "Extra labels", `comma-separated. builderbot, self-hosted, linux, the arch and ${n.name} are always on`)}
-          <input data-k="runner:labels" value="${esc(d.runner.labels)}" spellcheck="false" autocomplete="off"
-            placeholder="gpu, android" aria-label="labels"></div>
-        </div>
-        <div class="actbar"><span class="state">Install on the runner's row registers it</span>
-          <button type="button" class="stop" data-nrunnercancel>Cancel</button>
-          <button type="button" class="primary" data-nrunneradd ${busyNow ? "disabled" : ""}
-            title="save the token and add the runner to this node">Add runner</button></div>
-      </div></div>`
+  // every view adds with: four fields, two a line at a desk and one a line
+  // on a phone, and its foot under them.
+  const aid = `ndRunAdd-${n.id}`;
+  const addbar = c.addRunner ? `<div class="addbar ndrunadd" data-add="runner">${formBox({fields: [
+      formField(`${aid}-url`, "Repository or organization", `<input id="${esc(aid)}-url" data-k="runner:url" value="${esc(d.runner.url)}" spellcheck="false" autocomplete="off"
+        placeholder="https://github.com/your-org" data-ph-short="organization URL" aria-label="repository or organization URL">`,
+        {help: "a repository, or an organization for all of its repositories"}),
+      formField(`${aid}-forge`, "Host", `<select id="${esc(aid)}-forge" data-k="runner:forge" aria-label="host kind">${
+        optionList([["", "from the address"], ["github", "GitHub"], ["gitea", "Gitea or Forgejo"]], d.runner.forge || "")}</select>`,
+        {help: "GitHub, or act_runner for Gitea, Forgejo and Codeberg"}),
+      formField(`${aid}-token`, "Token", `<input id="${esc(aid)}-token" data-k="runner:token" type="password" value="${esc(d.runner.token || "")}" spellcheck="false" autocomplete="off"
+        placeholder="paste a token" aria-label="runner token">`, {help: "a token that may register runners there. Stored on the controller only"}),
+      formField(`${aid}-labels`, "Extra labels", `<input id="${esc(aid)}-labels" data-k="runner:labels" value="${esc(d.runner.labels)}" spellcheck="false" autocomplete="off"
+        placeholder="gpu, android" aria-label="labels">`, {help: `comma-separated. builderbot, self-hosted, linux, the arch and ${n.name} are always on`})],
+    state: `<span class="state">Install on the runner's row registers it</span>`,
+    foot: [`<button type="button" class="stop" data-nrunnercancel>Cancel</button>`,
+      `<button type="button" class="primary" data-nrunneradd ${busyNow ? "disabled" : ""} title="save the token and add the runner to this node">Add runner</button>`]})}</div>`
     : "";
   // No head (the operator, 29 Oct: a head of a state pill and a count over
   // a lone button said again what the header and each runner's row say):
@@ -1617,17 +1612,14 @@ function nodeDrift(n){
 const PATH_COLS = [{label: "Here"}, {label: "On the node"}, {act: true, w: "5rem"}];
 function nodePathsTable(n, c){
   const pairs = Object.entries(n.config?.paths || {}), ed = c.pathEdit;
-  const form = (f, i) => `<div class="ngform ndpform" data-i="${i}">
-    <div class="ndpfields">
-      <label class="setrow col ctlrow"><span class="lbl">Here</span><input data-pf="here" value="${esc(f.here || "")}" spellcheck="false" autocomplete="off"
-        placeholder="/devdata" aria-label="the path as a compose file names it"></label>
-      <label class="setrow col ctlrow"><span class="lbl">On the node</span><input data-pf="there" value="${esc(f.there || "")}" spellcheck="false" autocomplete="off"
-        placeholder="/mnt/user/appdata/bb-dev" data-ph-short="folder" aria-label="where it is on the node"></label>
-    </div>
-    <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-pdel>Delete</button>` : ""}
-      <button type="button" data-pcancel>Cancel</button>
-      <button type="button" class="primary" data-psave>Save</button></div>
-  </div>`;
+  const pid = `ndP-${n.id}`;
+  const form = (f, i) => formBox({cls: "recform", attrs: `data-i="${i}"`, fields: [
+    formField(`${pid}-here`, "Here", `<input id="${esc(pid)}-here" data-pf="here" value="${esc(f.here || "")}" spellcheck="false" autocomplete="off"
+      placeholder="/devdata" aria-label="the path as a compose file names it">`),
+    formField(`${pid}-there`, "On the node", `<input id="${esc(pid)}-there" data-pf="there" value="${esc(f.there || "")}" spellcheck="false" autocomplete="off"
+      placeholder="/mnt/user/appdata/bb-dev" data-ph-short="folder" aria-label="where it is on the node">`)],
+    foot: [i >= 0 ? `<button type="button" class="danger lead" data-pdel>Delete</button>` : "",
+      `<button type="button" data-pcancel>Cancel</button>`, `<button type="button" class="primary" data-psave>Save</button>`]});
   const rows = pairs.map(([here, there], i) => `<div class="row ndpath${ed?.i === i ? " open" : ""}" data-i="${i}">${tblLine(PATH_COLS, [
       `<code>${esc(here)}</code>`, `<code>${esc(there)}</code>`,
       ed?.i === i ? "" : `<button type="button" data-pedit="${i}">Edit</button>`])}${ed?.i === i ? form(ed.form, i) : ""}</div>`).join("");
@@ -1669,28 +1661,25 @@ function nodeMountsTable(n, c){
       `<span class="sub ndmstate ${cls}">${esc(head)}</span>`,
       open ? "" : `<button type="button" data-medit="${i}"${locked ? ` disabled title="${esc(LOCKED_WHY)}"` : ""}>Edit</button>`])}${
       cut ? `<div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}${
-      open ? nodeMountForm(ed.form, i) : ""}</div>`;
+      open ? nodeMountForm(ed.form, i, n.id) : ""}</div>`;
   };
-  const fresh = ed?.i === -1 ? `<div class="row ndmount open" data-i="-1">${nodeMountForm(ed.form, -1)}</div>` : "";
+  const fresh = ed?.i === -1 ? `<div class="row ndmount open" data-i="-1">${nodeMountForm(ed.form, -1, n.id)}</div>` : "";
   if (!d.mounts.length && !fresh) return `<div class="hint">none yet</div>`;
   return tblWrap(MOUNT_COLS, fresh + d.mounts.map(rec).join(""), "ndmounts");
 }
-function nodeMountForm(f, i){
-  return `<div class="ngform ndmform" data-i="${i}">
-    <div class="ndmfields">
-      <label class="setrow col ctlrow"><span class="lbl">Source</span><input data-mf="source" value="${esc(f.source || "")}" spellcheck="false" autocomplete="off"
-        placeholder="${f.type === "virtiofs" ? "appdata" : "nas:/mnt/user/appdata"}" aria-label="${f.type === "virtiofs" ? "the share tag" : "host:/export"}"></label>
-      <label class="setrow col ctlrow"><span class="lbl">Mountpoint</span><input data-mf="path" value="${esc(f.path || "")}" spellcheck="false" autocomplete="off"
-        placeholder="/mnt/appdata" aria-label="mountpoint: blank means /mnt/ and the export's name"></label>
-      <label class="setrow col ctlrow"><span class="lbl">Kind</span><select data-mf="type" aria-label="kind">
-        <option value="nfs"${f.type !== "virtiofs" ? " selected" : ""}>nfs</option>
-        <option value="virtiofs"${f.type === "virtiofs" ? " selected" : ""}>virtiofs</option></select></label>
-      <label class="ndcap ndmro"><input type="checkbox" data-mf="ro"${f.ro ? " checked" : ""}> read-only</label>
-    </div>
-    <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-mdel>Delete</button>` : ""}
-      <button type="button" data-mcancel>Cancel</button>
-      <button type="button" class="primary" data-msave>Save</button></div>
-  </div>`;
+function nodeMountForm(f, i, nid){
+  const mid = `ndM-${nid}`, nfs = f.type !== "virtiofs";
+  return formBox({cls: "recform", attrs: `data-i="${i}"`, fields: [
+    formField(`${mid}-source`, "Source", `<input id="${esc(mid)}-source" data-mf="source" value="${esc(f.source || "")}" spellcheck="false" autocomplete="off"
+      placeholder="${nfs ? "nas:/mnt/user/appdata" : "appdata"}" aria-label="${nfs ? "host:/export" : "the share tag"}">`),
+    formField(`${mid}-path`, "Mountpoint", `<input id="${esc(mid)}-path" data-mf="path" value="${esc(f.path || "")}" spellcheck="false" autocomplete="off"
+      placeholder="/mnt/appdata" aria-label="mountpoint: blank means /mnt/ and the export's name">`),
+    formField(`${mid}-type`, "Kind", `<select id="${esc(mid)}-type" data-mf="type" aria-label="kind">
+      <option value="nfs"${nfs ? " selected" : ""}>nfs</option>
+      <option value="virtiofs"${nfs ? "" : " selected"}>virtiofs</option></select>`, {short: true}),
+    `<div class="fcell fwide"><label class="ndcap ndmro"><input type="checkbox" data-mf="ro"${f.ro ? " checked" : ""}> read-only</label></div>`],
+    foot: [i >= 0 ? `<button type="button" class="danger lead" data-mdel>Delete</button>` : "",
+      `<button type="button" data-mcancel>Cancel</button>`, `<button type="button" class="primary" data-msave>Save</button>`]});
 }
 // Save the mounts as `mounts`, with the rest of the node's configuration as
 // it is saved (a store being typed stays a draft of its own); the draft's

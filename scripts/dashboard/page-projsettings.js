@@ -306,15 +306,13 @@ function rnDrawReach(focus){
   const ns = rnReachNodes(), ro = state?.areas ? state.areas.nodes !== "write" : !state?.admin;
   const named = id => ns.find(n => n.id === id)?.name || (nodesList || []).find(n => n.id === id)?.name || id;
   const ed = rnReachEdit;
-  const form = (f, i) => `<div class="ngform rnreachform" data-i="${i}">
-      <label class="setrow col ctlrow"><span class="lbl">Address</span><input data-reachf="addr" value="${esc(f.addr || "")}" autocomplete="off" spellcheck="false"
-        placeholder="192.168.1.20 or 192.168.1.20:8080" data-ph-short="address" aria-label="an address a session here may reach"></label>
-      ${ns.length > 1 ? `<div class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachfnode value="${esc(n.id)}"${
-        !f.nodes.length || f.nodes.includes(n.id) ? " checked" : ""}> ${esc(n.name)}</label>`).join("")}</div>` : ""}
-      <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-reachdel>Delete</button>` : ""}
-        <button type="button" data-reachcancel>Cancel</button>
-        <button type="button" class="primary" data-reachsave>Save</button></div>
-    </div>`;
+  const form = (f, i) => formBox({cls: "recform", attrs: `data-i="${i}"`, fields: [
+      formField("rnReachAddr", "Address", `<input id="rnReachAddr" data-reachf="addr" value="${esc(f.addr || "")}" autocomplete="off" spellcheck="false"
+        placeholder="192.168.1.20 or 192.168.1.20:8080" data-ph-short="address" aria-label="an address a session here may reach">`, {wide: true}),
+      ns.length > 1 ? `<div class="fcell fwide rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachfnode value="${esc(n.id)}"${
+        !f.nodes.length || f.nodes.includes(n.id) ? " checked" : ""}> ${esc(n.name)}</label>`).join("")}</div>` : ""],
+    foot: [i >= 0 ? `<button type="button" class="danger lead" data-reachdel>Delete</button>` : "",
+      `<button type="button" data-reachcancel>Cancel</button>`, `<button type="button" class="primary" data-reachsave>Save</button>`]});
   const rows = rnReachDraft.map((e, i) => `<div class="row rnreach${ed?.i === i ? " open" : ""}" data-i="${i}">${tblLine(REACH_COLS, [
       `<code>${esc(e.addr)}</code>`, esc(e.nodes.length ? e.nodes.map(named).join(", ") : "every node it works on"),
       ed?.i === i || ro ? "" : `<button type="button" data-reachedit="${i}">Edit</button>`])}${ed?.i === i ? form(ed.form, i) : ""}</div>`).join("");

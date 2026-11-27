@@ -176,42 +176,21 @@ function nbBugsView({$, nb, project}){
   // it lives, how to make it happen, and the gap between should and does.
   function bugForm(b){
     const v = k => esc(b?.[k] || "");
-    return `<div class="memadd bugform ctlrow">
-      <label>Title</label>
-      <textarea class="bfTitle proseline" rows="1" maxlength="1000"
-        placeholder="the picker loses its selection on rotate">${v("title")}</textarea>
-      <div class="two">
-        <div><label>Severity</label>
-          <select class="bfSev">${optionList(SEVS, b?.severity || "medium")}</select></div>
-        <div><label>Where<span class="help" data-help="files, component, screen" tabindex="0">?</span></label>
-          <textarea class="bfArea proseline" rows="1" maxlength="1000"
-            placeholder="scripts/dashboard/index.html, the picker">${v("area")}</textarea></div>
-      </div>
-      <label>How to reproduce</label>
-      <textarea class="bfRepro" spellcheck="false"
-        placeholder="1. open the picker on a phone&#10;2. rotate">${v("repro")}</textarea>
-      <label>Do those steps show it?</label>
-      <div class="pseg bfRepr" role="radiogroup" aria-label="whether the steps reproduce it">${REPRO_ORDER.map(k => `
-        <button type="button" data-repr="${k}" role="radio" class="${(b?.reproduces || "untried") === k ? "on" : ""}"
-          aria-checked="${(b?.reproduces || "untried") === k}">${REPRO_LABELS[k]}</button>`).join("")}</div>
-      <div class="two">
-        <div><label>Expected</label>
-          <textarea class="bfExpected proseline" rows="1" maxlength="1000"
-            >${v("expected")}</textarea></div>
-        <div><label>Actual</label>
-          <textarea class="bfActual proseline" rows="1" maxlength="1000"
-            >${v("actual")}</textarea></div>
-      </div>
-      ${b?.status === "fixed" ? `<label>Fixed in<span class="help" data-help="the commits that fixed it, by their hash; one commit may fix several bugs" tabindex="0">?</span></label>
-      <input class="bfCommits" spellcheck="false" autocomplete="off" value="${esc((b.commits || []).join(", "))}"
-        placeholder="2d591be, 0d90688">` : ""}
-      <label>Notes<span class="help" data-help="cause, analysis, fix plan" tabindex="0">?</span></label>
-      <textarea class="bfNotes" spellcheck="false"
-        placeholder="what is known about why; mostly the agent's half">${v("notes")}</textarea>
-      <div class="actbar">
-        <button type="button" class="stop bfCancel">Cancel</button>
-        <button type="button" class="primary bfGo">${b ? "Save the bug" : "Report it"}</button></div>
-    </div>`;
+    // One form (R301): the report's fields on the grid, the steps and the
+    // notes across it, Cancel and the primary at the foot.
+    const repr = `<div class="pseg bfRepr" role="radiogroup" aria-label="whether the steps reproduce it">${REPRO_ORDER.map(k => `<button type="button" data-repr="${k}" role="radio" class="${(b?.reproduces || "untried") === k ? "on" : ""}" aria-checked="${(b?.reproduces || "untried") === k}">${REPRO_LABELS[k]}</button>`).join("")}</div>`;
+    return `<div class="memadd bugform">${formBox({fields: [
+      formField("", "Title", `<textarea class="bfTitle proseline" rows="1" maxlength="1000" aria-label="title" placeholder="the picker loses its selection on rotate">${v("title")}</textarea>`, {wide: true}),
+      formField("", "Severity", `<select class="bfSev" aria-label="severity">${optionList(SEVS, b?.severity || "medium")}</select>`),
+      formField("", "Where", `<textarea class="bfArea proseline" rows="1" maxlength="1000" aria-label="where" placeholder="scripts/dashboard/index.html, the picker">${v("area")}</textarea>`, {help: "files, component, screen"}),
+      formField("", "How to reproduce", `<textarea class="bfRepro" spellcheck="false" aria-label="how to reproduce" placeholder="1. open the picker on a phone&#10;2. rotate">${v("repro")}</textarea>`, {wide: true}),
+      formField("", "Do those steps show it?", repr, {wide: true}),
+      formField("", "Expected", `<textarea class="bfExpected proseline" rows="1" maxlength="1000" aria-label="expected">${v("expected")}</textarea>`),
+      formField("", "Actual", `<textarea class="bfActual proseline" rows="1" maxlength="1000" aria-label="actual">${v("actual")}</textarea>`),
+      b?.status === "fixed" ? formField("", "Fixed in", `<input class="bfCommits" spellcheck="false" autocomplete="off" aria-label="fixed in" value="${esc((b.commits || []).join(", "))}" placeholder="2d591be, 0d90688">`,
+        {help: "the commits that fixed it, by their hash; one commit may fix several bugs", wide: true}) : "",
+      formField("", "Notes", `<textarea class="bfNotes" spellcheck="false" aria-label="notes" placeholder="what is known about why; mostly the agent's half">${v("notes")}</textarea>`, {help: "cause, analysis, fix plan", wide: true})],
+      foot: [`<button type="button" class="stop bfCancel">Cancel</button>`, `<button type="button" class="primary bfGo">${b ? "Save the bug" : "Report it"}</button>`]})}</div>`;
   }
 
   // The form's one-of-four (R124): a press moves the pick.

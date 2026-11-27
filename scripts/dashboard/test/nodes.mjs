@@ -668,7 +668,7 @@ await section("phase 2: the settings graduation", async () => {
   await page.evaluate(() => toggleUiMenu(false));
   await page.evaluate(() => openSettingsTab());
   await page.waitForSelector('.settingstab .snav [data-spick="logs"]', { timeout: 15000 }); await splitPick(page, 'logs');
-  await page.waitForSelector('.settingstab .logdays #logDays', { timeout: 15000 });
+  await page.waitForSelector('.settingstab .fbox #logDays', { timeout: 15000 });
   ok(true, 'the Settings group opens the controller\'s settings, with the log policy on it');
   ok(await page.$eval('.settingstab', e => !/template|environment|DOCKER_HOST/.test(e.textContent)),
      '...which describes what is on it and nothing about what lives elsewhere');
@@ -1145,20 +1145,22 @@ await section("the configuration plane on the row", async () => {
   ok(await page.$(`${ROW} [data-k="store:artifacts"]`) !== null,
      'the fold carries the artifacts store: this node\'s copy of what spaces built');
   // Its first line keeps room under the heading (the operator, 23 Oct:
-  // "Mounts at boot." sat on it), and a mount's form is one line at a desk:
-  // its source, mountpoint, kind and read-only ending at one height.
+  // "Mounts at boot." sat on it), and a mount's form is a form like every
+  // other (the forms rule, 27 Nov): at a desk its source and mountpoint side
+  // by side, its kind under them, and read-only a line of its own.
   {
     const lay = await page.evaluate(sel => {
       const d = document.querySelector(`${sel} details.sect[data-sect="nodes:storage"]`);
       const head = d?.querySelector(':scope > summary')?.getBoundingClientRect();
       const first = d?.querySelector(':scope > .body > :first-child')?.getBoundingClientRect();
-      const m = d?.querySelector('.ndmount.open');
-      const bottoms = m ? ['[data-mf="source"]', '[data-mf="path"]', '[data-mf="type"]', '.ndmro']
-        .map(q => Math.round(m.querySelector(q).getBoundingClientRect().bottom)) : [];
-      return { gap: head && first ? Math.round(first.top - head.bottom) : null, bottoms };
+      const m = d?.querySelector('.ndmount.open .fbox');
+      const b = q => Math.round(m.querySelector(q).getBoundingClientRect().bottom);
+      return { gap: head && first ? Math.round(first.top - head.bottom) : null,
+               bottoms: m ? ['[data-mf="source"]', '[data-mf="path"]', '[data-mf="type"]', '.ndmro'].map(b) : [] };
     }, ROW);
-    ok(lay.gap >= 6 && lay.bottoms.length === 4 && Math.max(...lay.bottoms) - Math.min(...lay.bottoms) <= 4,
-       `the Storage section's first line has room under its head, and a mount's form is one line at a desk (${JSON.stringify(lay)})`);
+    const [src, mp, kind, ro] = lay.bottoms;
+    ok(lay.gap >= 6 && lay.bottoms.length === 4 && Math.abs(src - mp) <= 4 && kind > mp + 4 && ro > kind + 4,
+       `the Storage section's first line has room under its head, and a mount's form is the form part: source and mountpoint side by side, kind, then read-only on its own line (${JSON.stringify(lay)})`);
     if (process.env.BB_SHOTS){
       await page.locator(`${ROW} details.sect[data-sect="nodes:storage"]`).screenshot({ path: `${process.env.BB_SHOTS}/storage-desk.png` });
       const vp = page.viewportSize();
@@ -1676,7 +1678,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       // read again until it shows what the API set before anything is saved.
       await page.evaluate(() => loadNodes());
       await page.waitForFunction(sel => document.querySelector(sel + ' [data-k="rootasks"]')?.checked === true, ROW, { timeout: 15000 }).catch(() => {});
-      const was = await page.$eval(F, el => ({ v: el.value, ph: el.placeholder, said: el.closest('.setrow')?.textContent || '' }));
+      const was = await page.$eval(F, el => ({ v: el.value, ph: el.placeholder, said: el.closest('.fcell')?.textContent || '' }));
       await page.fill(F, '25');
       await page.click(`${ROW} [data-nd="sess-save"]`);
       const own = await until(async () => (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config?.room_floor_gb === 25, 10000, 200);
@@ -1714,7 +1716,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        `a node whose console switched root commands off refuses the ask, saying where it is switched back on (${atConsole.error})`);
     await page.waitForFunction(sel => !!document.querySelector(sel + ' [data-rootoff]'), ROW, { timeout: 15000 }).catch(() => {});
     const offLine = await page.$eval(`${ROW} [data-rootoff]`, e => ({ text: e.textContent, warn: e.classList.contains('warn'),
-                                                                     under: !!e.closest('.field')?.querySelector('[data-k="rootasks"]') })).catch(() => null);
+                                                                     under: !!e.closest('.fcell')?.querySelector('[data-k="rootasks"]') })).catch(() => null);
     ok(offLine && offLine.warn && offLine.under && /own console/.test(offLine.text) && /which alone switches it back on/.test(offLine.text)
        && /Docker there is still root's/.test(offLine.text),
        `...and its row says so under the box, in the color of a thing switched off, with the limit on a node that runs containers (${JSON.stringify(offLine)})`);

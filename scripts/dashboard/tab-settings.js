@@ -1401,15 +1401,10 @@ function idleSection(){
   return `<h4>Claude sessions</h4>
     <div class="logset">
       <div class="dim">A session idle this long is ended, on every node.</div>
-      <div class="logdays setrow col ctlrow">
-        ${lbl("idleMin", "Minutes idle before a session ends (0: never)", "shells are left alone")}
-        <input id="idleMin" type="number" min="0" max="100000" step="1"
-               value="${sdVal("idleMin", m)}" inputmode="numeric">
-      </div>
-      <div class="actbar">
-        <span class="state">applies at once; a node hears on its next poll</span>
-        <button type="button" id="idleApply" title="save it: a node hears on its next poll">Apply</button>
-      </div>
+      ${formBox({fields: [formField("idleMin", "Minutes idle before a session ends (0: never)", `<input id="idleMin" type="number" min="0" max="100000" step="1" value="${sdVal("idleMin", m)}" inputmode="numeric">`,
+          {help: "shells are left alone"})],
+        state: `<span class="state">applies at once; a node hears on its next poll</span>`,
+        foot: [`<button type="button" id="idleApply" title="save it: a node hears on its next poll">Apply</button>`]})}
     </div>`;
 }
 
@@ -1449,12 +1444,8 @@ function pathsSection(){
       : p.moving?.error ? `<div class="sub bad">moving to ${esc(p.moving.to)} stopped: ${esc(p.moving.error)}</div>`
       : p.moving ? `<div class="dim">moving to ${esc(p.moving.to)}; ${esc(p.path)} is in use until it is done</div>`
       : !p.set ? "" : `<div class="dim">default: ${esc(p.default)}</div>`;
-    return `<div class="logdays setrow col ctlrow">
-        ${lbl(id, p.name, p.what)}
-        <input id="${id}" type="text" data-path="${esc(p.name)}" spellcheck="false" autocomplete="off"
-               value="${esc(sdVal(id, p.path))}"${p.pinned || (p.moving && !p.moving.error) ? " disabled" : ""}>
-        ${note}
-      </div>`;
+    return formField(id, p.name, `<input id="${id}" type="text" data-path="${esc(p.name)}" spellcheck="false" autocomplete="off" value="${esc(sdVal(id, p.path))}"${p.pinned || (p.moving && !p.moving.error) ? " disabled" : ""}>${note}`,
+      {help: p.what, wide: true});
   };
   return `<div class="row stack2" data-group="Storage">
       <div class="grow">
@@ -1462,11 +1453,8 @@ function pathsSection(){
         <div class="logset">
           <div class="dim">Where what grows is kept. A new path must be empty or new; what is there is moved across.
             The records, the database, the signing keys and the git credentials stay in the state directory.</div>
-          ${list.map(line).join("")}
-          <div class="actbar">
-            <span class="state">applies once what is there has moved</span>
-            <button type="button" id="pathsApply" title="move each changed one to its new path">Apply</button>
-          </div>
+          ${formBox({fields: list.map(line), state: `<span class="state">applies once what is there has moved</span>`,
+            foot: [`<button type="button" id="pathsApply" title="move each changed one to its new path">Apply</button>`]})}
         </div>
       </div>
     </div>`;

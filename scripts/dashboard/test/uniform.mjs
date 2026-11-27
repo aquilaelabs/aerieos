@@ -3413,14 +3413,24 @@ if (runs('c')) await section("what opens, shuts or arrives moves, and never snap
 // holding two fields or more) is on the form grid. The forms not yet moved
 // onto formBox are named here, and the list only shrinks: a new form written
 // the old way fails at once, and one moved is taken off.
-const FORMS_TO_MOVE = new Set(['rn:project']);
+// Read on every page of a split one with its sections open (27 Nov), the
+// space dialog's other static sections were met too.
+const FORMS_TO_MOVE = new Set(['rn:project', 'rn:yours', 'rn:repo', 'rn:runs', 'rn:releases']);
 if (runs('c')) await section("a form's buttons stand clear of its fields and end where they end", async () => {
   const bad = [], moved = new Set();
   for (const [w, h, tag] of [[393, 852, 'phone'], [1440, 1000, 'desk']]){
     const p = await newPage(browser, { viewport: { width: w, height: h } });
     await p.goto(URL); await ready(p);
-    for (const hash of ['#/machines/clusters', '#/machines/nodes', '#/spaces/alpha/settings', '#/settings', '#/controller', '#/machines/storage', '#/people/users']){
+    // Every page of a split one and every section opened: Controller
+    // settings' one-field forms sat on its later pages, folded, and their
+    // Apply hung half a box past the field unmeasured.
+    for (const hash of ['#/machines/clusters', '#/machines/nodes', '#/spaces/alpha/settings', '#/settings', '#/controller', '#/machines/storage', '#/people/users', '#/profile']){
       await p.evaluate(x => { location.hash = x; }, hash); await sleep(1600);
+      const picks = await p.evaluate(() => [...document.querySelectorAll('.doc.on .ssplit > .snav [data-spick]')].map(e => e.dataset.spick));
+      for (const pick of picks.length ? picks : [null]){
+      if (pick){ await p.evaluate(s => document.querySelector(`.doc.on .ssplit > .snav [data-spick="${s}"]`)?.click(), pick); await sleep(900); }
+      await p.evaluate(() => document.querySelectorAll('.doc.on details.sect:not([open])').forEach(d => { d.open = true; }));
+      await sleep(900);
       const got = await p.evaluate(() => {
         const out = [];
         const vis = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && e.checkVisibility(); };
@@ -3443,14 +3453,18 @@ if (runs('c')) await section("a form's buttons stand clear of its fields and end
           if (B.right - fr > 8 && gap < 80) out.push([whose(last), `buttons end at ${Math.round(B.right)}, past the fields' ${Math.round(fr)}`]);
         }
         for (const home of [...root.querySelectorAll('details.sect > .body, .modal:not([hidden]) .box')].filter(vis)){
-          const fs = fields.filter(f => home.contains(f) && !f.closest('details.sect details.sect'));
+          // A dialog of sections is judged section by section, so the dialog
+          // counts only what sits outside them.
+          const fs = fields.filter(f => home.contains(f) && !f.closest('details.sect details.sect')
+            && (home.matches('details.sect > .body') || !f.closest('details.sect')));
           if (fs.length >= 2 && !fs.some(f => f.closest('.fgrid'))) out.push([home.closest('details.sect')?.dataset.sect || 'dialog', `${fs.length} fields off the form grid`]);
         }
         return out;
       });
       for (const [k, why] of got){
         if (FORMS_TO_MOVE.has(k)) moved.add(k);
-        else bad.push(`${tag} ${hash} ${k}: ${why}`);
+        else bad.push(`${tag} ${hash}${pick ? ` ${pick}` : ''} ${k}: ${why}`);
+      }
       }
     }
     await p.close();

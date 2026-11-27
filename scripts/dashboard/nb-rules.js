@@ -80,18 +80,13 @@ function nbRulesView({$, nb, project}){
             <span class="rlkind ${cond(g) ? "cond" : ""}">${cond(g) ? "on its triggers" : "every session"}</span>
             <span class="pill">global</span>${
             g.disabled ? `<span class="pill warn">off everywhere</span>` : !here ? `<span class="pill warn">off here</span>` : ""}</summary>
-          <div class="body">${editing ? `
-            ${lbl("", "Name", "a short name the rule is known by")}
-            <input class="grName" maxlength="40" autocomplete="off" spellcheck="false" value="${esc(ed.r.name || "")}" aria-label="global rule name">
-            ${lbl("", "The rule")}
-            <textarea class="grText" spellcheck="false" maxlength="8000">${esc(ed.r.text || "")}</textarea>
-            <div class="two">
-              <div>${lbl("", "Files it covers")}<input class="grPaths" autocomplete="off" spellcheck="false" value="${esc((ed.r.paths || []).join(", "))}" aria-label="paths"></div>
-              <div>${lbl("", "Words that raise it")}<input class="grWords" autocomplete="off" spellcheck="false" value="${esc((ed.r.words || []).join(", "))}" aria-label="words"></div>
-            </div>
-            <div class="actbar macts"><span class="state">Save writes it for every space</span>
-              <button type="button" class="stop grCancel">Cancel</button>
-              <button type="button" class="primary grSave">Save</button></div>` : `
+          <div class="body">${editing ? formBox({fields: [
+            formField("", "Name", `<input class="grName" maxlength="40" autocomplete="off" spellcheck="false" value="${esc(ed.r.name || "")}" aria-label="global rule name">`, {help: "a short name the rule is known by"}),
+            formField("", "The rule", `<textarea class="grText" spellcheck="false" maxlength="8000" aria-label="the rule">${esc(ed.r.text || "")}</textarea>`, {wide: true}),
+            formField("", "Files it covers", `<input class="grPaths" autocomplete="off" spellcheck="false" value="${esc((ed.r.paths || []).join(", "))}" aria-label="paths">`),
+            formField("", "Words that raise it", `<input class="grWords" autocomplete="off" spellcheck="false" value="${esc((ed.r.words || []).join(", "))}" aria-label="words">`)],
+            state: `<span class="state">Save writes it for every space</span>`,
+            foot: [`<button type="button" class="stop grCancel">Cancel</button>`, `<button type="button" class="primary grSave">Save</button>`]}) : `
             <div class="bfield"><label>rule</label><div class="bval">${esc(g.text || "")}</div></div>${
             (g.paths || []).length ? `<div class="bfield rltrig"><label>files</label><div class="bval">${esc(g.paths.join(", "))}</div></div>` : ""}${
             (g.words || []).length ? `<div class="bfield rltrig"><label>words</label><div class="bval">${esc(g.words.join(", "))}</div></div>` : ""}
@@ -189,50 +184,25 @@ function nbRulesView({$, nb, project}){
               r.by === "claude" ? `<span class="pill">a session's</span>` : ""}${
               (r.overlaps || []).length ? `<span class="pill warn">shares ground with a global rule</span>` : ""}
           </summary>
-          <div class="body">${nb.ruleEditing.has(i) ? `
-            ${lbl("", "Name", "a short name the rule is known by")}
-            <input class="rlName" maxlength="40" autocomplete="off" spellcheck="false"
-              placeholder="tests" value="${esc(r.name || "")}"
-              aria-label="rule name">
-            ${lbl("", "The rule")}
-            <textarea class="rlText" spellcheck="false" maxlength="8000">${esc(r.text || "")}</textarea>
-            ${lbl("", "Why", "the reason behind it, kept here and in aerie rules show; a session is sent the rule alone")}
-            <textarea class="rlWhy" spellcheck="false" maxlength="8000" rows="2">${esc(r.why || "")}</textarea>
-            <div class="two">
-              <div>${lbl("", "Files it covers", "paths or globs, comma-separated; the rule arrives when a session edits one")}
-              <input class="rlPaths" autocomplete="off" spellcheck="false"
-                placeholder="scripts/agent, *.kt"
-                value="${esc((r.paths || []).join(", "))}" aria-label="paths"></div>
-              <div>${lbl("", "Words that raise it", "comma-separated. The rule arrives when a session is asked about one")}
-              <input class="rlWords" autocomplete="off" spellcheck="false"
-                placeholder="agent, protocol"
-                value="${esc((r.words || []).join(", "))}" aria-label="words"></div>
-            </div>
-            <div class="two">
-              <div>${lbl("", "Document", "the file in the repo that defines it in full")}
-              <input class="rlDoc" autocomplete="off" spellcheck="false"
-                placeholder="docs/design-language.md" data-ph-short="path"
-                value="${esc(r.doc || "")}" aria-label="document"></div>
-              <div>${lbl("", "Check", "the command that verifies it; aerie rules check runs it")}
-              <input class="rlCheck" autocomplete="off" spellcheck="false"
-                placeholder="bash scripts/test.sh"
-                value="${esc(r.check || "")}" aria-label="check"></div>
-            </div>
-            <div class="two">
-              <div>${lbl("", "Commands it refuses", "comma-separated, each the start of a command as typed; a session's Bash call that runs one is refused with this rule as the reason")}
-              <input class="rlRefuse" autocomplete="off" spellcheck="false"
-                placeholder="./gradlew assemble, npm publish" data-ph-short="commands"
-                value="${esc((r.refuse || []).join(", "))}" aria-label="commands it refuses"></div>
-              <div>${lbl("", "In place of", "a global rule this one replaces here; a session in this space reads only this one")}
-              <select class="rlRepl" aria-label="the global rule it replaces">
-                ${optionList([["", "no global rule"], ...(d.global || []).map(g => g.name)], r.replaces || "")}
-              </select></div>
-            </div>
-            <div class="actbar macts">
-              <span class="state">${ruleWhen(r)} · the section's Save writes it</span>
-              <button type="button" class="stop rlCancel" title="discard what was typed">Cancel</button>
-              <button type="button" class="danger rlRm">Remove</button>
-            </div>` : `
+          <div class="body">${nb.ruleEditing.has(i) ? formBox({fields: [
+            formField("", "Name", `<input class="rlName" maxlength="40" autocomplete="off" spellcheck="false" placeholder="tests" value="${esc(r.name || "")}" aria-label="rule name">`, {help: "a short name the rule is known by"}),
+            formField("", "The rule", `<textarea class="rlText" spellcheck="false" maxlength="8000" aria-label="the rule">${esc(r.text || "")}</textarea>`, {wide: true}),
+            formField("", "Why", `<textarea class="rlWhy" spellcheck="false" maxlength="8000" rows="2" aria-label="why">${esc(r.why || "")}</textarea>`,
+              {help: "the reason behind it, kept here and in aerie rules show; a session is sent the rule alone", wide: true}),
+            formField("", "Files it covers", `<input class="rlPaths" autocomplete="off" spellcheck="false" placeholder="scripts/agent, *.kt" value="${esc((r.paths || []).join(", "))}" aria-label="paths">`,
+              {help: "paths or globs, comma-separated; the rule arrives when a session edits one"}),
+            formField("", "Words that raise it", `<input class="rlWords" autocomplete="off" spellcheck="false" placeholder="agent, protocol" value="${esc((r.words || []).join(", "))}" aria-label="words">`,
+              {help: "comma-separated. The rule arrives when a session is asked about one"}),
+            formField("", "Document", `<input class="rlDoc" autocomplete="off" spellcheck="false" placeholder="docs/design-language.md" data-ph-short="path" value="${esc(r.doc || "")}" aria-label="document">`,
+              {help: "the file in the repo that defines it in full"}),
+            formField("", "Check", `<input class="rlCheck" autocomplete="off" spellcheck="false" placeholder="bash scripts/test.sh" value="${esc(r.check || "")}" aria-label="check">`,
+              {help: "the command that verifies it; aerie rules check runs it"}),
+            formField("", "Commands it refuses", `<input class="rlRefuse" autocomplete="off" spellcheck="false" placeholder="./gradlew assemble, npm publish" data-ph-short="commands" value="${esc((r.refuse || []).join(", "))}" aria-label="commands it refuses">`,
+              {help: "comma-separated, each the start of a command as typed; a session's Bash call that runs one is refused with this rule as the reason"}),
+            formField("", "In place of", `<select class="rlRepl" aria-label="the global rule it replaces">${optionList([["", "no global rule"], ...(d.global || []).map(g => g.name)], r.replaces || "")}</select>`,
+              {help: "a global rule this one replaces here; a session in this space reads only this one"})],
+            state: `<span class="state">${ruleWhen(r)} · the section's Save writes it</span>`,
+            foot: [`<button type="button" class="stop rlCancel" title="discard what was typed">Cancel</button>`, `<button type="button" class="danger rlRm">Remove</button>`]}) : `
             <div class="bfield"><label>rule</label><div class="bval rlBody">${esc(r.text || "")}</div></div>
             ${r.why ? `<div class="bfield"><label>why</label><div class="bval">${esc(r.why)}</div></div>` : ""}
             ${(r.paths || []).length ? `<div class="bfield rltrig"><label>files</label><div class="bval">${esc((r.paths || []).join(", "))}</div></div>` : ""}

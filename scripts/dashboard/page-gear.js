@@ -262,16 +262,10 @@ function logSection(){
         : `${L.files} file${L.files === 1 ? "" : "s"}, ${humanBytes(L.bytes)}`}${
         L.ci ? ` · ${L.ci} CI run${L.ci === 1 ? "" : "s"}` : ""}${
         L.oldest ? ` · reaching back ${back} day${back === 1 ? "" : "s"}` : ""}</div>
-      <div class="logdays setrow col ctlrow">
-        ${lbl("logDays", "Days of logs kept", "older files are deleted when this is applied")}
-        <input id="logDays" type="number" min="1" max="3650" step="1"
-               value="${sdVal("logDays", L.days)}" inputmode="numeric">
-      </div>
-      <div class="actbar">
-        <span class="state">applies at once, and anything already past it is cropped</span>
-        <button type="button" id="logApply"
-          title="save it, and crop anything already past it">Apply</button>
-      </div>
+      ${formBox({fields: [formField("logDays", "Days of logs kept", `<input id="logDays" type="number" min="1" max="3650" step="1" value="${sdVal("logDays", L.days)}" inputmode="numeric">`,
+          {help: "older files are deleted when this is applied"})],
+        state: `<span class="state">applies at once, and anything already past it is cropped</span>`,
+        foot: [`<button type="button" id="logApply" title="save it, and crop anything already past it">Apply</button>`]})}
       <!-- An action bar like every other: what the links are on the left,
            the verbs at the right (R119 step 6). -->
       <div class="actbar logacts">

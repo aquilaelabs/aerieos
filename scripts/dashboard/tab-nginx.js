@@ -123,7 +123,6 @@ function nginxPick(){
   return have.find(n => n.node === nginxNode) || null;
 }
 
-// A route as a row of fields: hostname, path, port, TLS, and Remove.
 // The pair a route serves 443 with (R188): none (80 alone), the one its
 // hostname resolves to (its own, else its domain's: `resolved` from the
 // server, drawn with the pair's key so the automatic pick is seen), or one
@@ -132,7 +131,7 @@ function nginxCertPick(n, r){
   const keys = Object.keys(n.certs || {}).filter(k => n.certs[k]?.set).sort();
   const auto = nginxResolve(n, r.host);
   const pick = r.tls === false ? "none" : (keys.includes(r.cert) ? r.cert : "");
-  return `<select data-ng="cert" aria-label="the certificate this route serves 443 with">
+  return `<select data-ng="cert" aria-label="the certificate this route serves 443 with" id="ngRtTls">
     ${optionList([["none", "80 only"], ["", `443, ${auto ? `whichever pair covers it (now ${auto}'s)` : "no pair covers it yet"}`],
                   ...keys.map(k => [k, `443, ${k}'s pair`])], pick)}
   </select>`;
@@ -161,8 +160,8 @@ function nginxHostPick(r){
   // box, and Save puts the name on the shared list. A row typed into is
   // drawn as the box again (B729): the draft remembers, so a redraw from
   // the poll does not hand the pulldown back mid-word.
-  if (r.typed) return `<input data-ng="host" value="${esc(r.host || "")}" placeholder="app.example.com" aria-label="hostname" autocomplete="off" spellcheck="false">`;
-  return `<select data-ng="host" aria-label="hostname">
+  if (r.typed) return `<input data-ng="host" value="${esc(r.host || "")}" placeholder="app.example.com" aria-label="hostname" autocomplete="off" spellcheck="false" id="ngRtHost">`;
+  return `<select data-ng="host" aria-label="hostname" id="ngRtHost">
     ${r.host ? "" : `<option value="" selected>pick a hostname</option>`}
     ${optionList(names, r.host)}
     <option value="*"${r.host === "*" ? " selected" : ""}>every name (*)</option>
@@ -200,17 +199,13 @@ function nginxTls(n, r){
   return auto ? `443, ${esc(auto)}'s pair` : `<span class="warn">443, no pair covers it yet</span>`;
 }
 function nginxRouteForm(n, r, i){
-  return `<div class="ngform ngroute" data-i="${i}">
-    <div class="ngfields">
-      <label class="setrow col ctlrow"><span class="lbl">Hostname</span>${nginxHostPick(r)}</label>
-      <label class="setrow col ctlrow"><span class="lbl">Path</span><input data-ng="path" value="${esc(r.path || "/")}" placeholder="/" aria-label="path" autocomplete="off" spellcheck="false"></label>
-      <label class="setrow col ctlrow"><span class="lbl">Port</span><input data-ng="port" value="${esc(String(r.port ?? ""))}" placeholder="8080" aria-label="port on the node" inputmode="numeric" autocomplete="off"></label>
-      <label class="setrow col ctlrow"><span class="lbl">TLS</span>${nginxCertPick(n, r)}</label>
-    </div>
-    <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-ngdel>Delete</button>` : ""}
-      <button type="button" data-ngcancel>Cancel</button>
-      <button type="button" class="primary" data-ngsave>Save</button></div>
-  </div>`;
+  return formBox({cls: "ngform recform", attrs: `data-i="${i}"`, fields: [
+    formField("ngRtHost", "Hostname", nginxHostPick(r)),
+    formField("ngRtPath", "Path", `<input id="ngRtPath" data-ng="path" value="${esc(r.path || "/")}" placeholder="/" aria-label="path" autocomplete="off" spellcheck="false">`),
+    formField("ngRtPort", "Port", `<input id="ngRtPort" data-ng="port" value="${esc(String(r.port ?? ""))}" placeholder="8080" aria-label="port on the node" inputmode="numeric" autocomplete="off">`, {short: true}),
+    formField("ngRtTls", "TLS", nginxCertPick(n, r))],
+    foot: [i >= 0 ? `<button type="button" class="danger lead" data-ngdel>Delete</button>` : "",
+      `<button type="button" data-ngcancel>Cancel</button>`, `<button type="button" class="primary" data-ngsave>Save</button>`]});
 }
 // A route's hostname opens the site it serves in a new tab, over https when
 // the route has TLS and http when it is 80 only; every name (*) has no one site.
@@ -376,41 +371,20 @@ function nginxBody(n){
     <div class="ngacmeform"${nginxAcmeOpen ? "" : " hidden"}>
       <div class="field"><div class="hint">A certificate for one public name, from Let's Encrypt, kept here like a pasted pair and renewed thirty days before it ends.${helpIcon(
         "HTTP-01: Let's Encrypt fetches a token from port 80 at the name, so the name must reach this node and 80 be open to the internet; this node's nginx answers it. DNS-01: a TXT record is written through the Cloudflare API token under Controller settings, so the node need not be reachable at all; the domain must be on that Cloudflare account.")}</div></div>
-      <div class="field">
-        ${lbl("ngAcmeHost", "Hostname")}
-        <input id="ngAcmeHost" data-ng="acmehost" placeholder="www.example.com" autocomplete="off" spellcheck="false">
-      </div>
-      <div class="field">
-        ${lbl("ngAcmeMethod", "Challenge")}
-        <select id="ngAcmeMethod" data-ng="acmemethod">
-          <option value="http-01">HTTP-01: port 80 of this node is reachable at the name</option>
-          <option value="dns-01"${n.acme?.cf ? "" : " disabled"}>DNS-01: a record through the Cloudflare API token${n.acme?.cf ? "" : " (none set under Controller settings)"}</option>
-        </select>
-      </div>
-      <div class="field">
-        ${lbl("ngAcmeEmail", "Email", "Where Let's Encrypt writes about this certificate (an expiry it could not renew). Optional, and kept for the renewals.")}
-        <input id="ngAcmeEmail" data-ng="acmeemail" type="email" value="${esc(n.acme?.email || "")}" placeholder="you@example.com" autocomplete="off" spellcheck="false">
-      </div>
-      <div class="field"><div class="actbar"><span class="state"></span><span class="sp"></span>
-        <button type="button" class="primary" data-ngacmego>Request</button>
-        <button type="button" data-ngacmecancel>Cancel</button></div></div>
+      <div class="field">${formBox({fields: [
+        formField("ngAcmeHost", "Hostname", `<input id="ngAcmeHost" data-ng="acmehost" placeholder="www.example.com" autocomplete="off" spellcheck="false">`),
+        formField("ngAcmeMethod", "Challenge", `<select id="ngAcmeMethod" data-ng="acmemethod"><option value="http-01">HTTP-01: port 80 of this node is reachable at the name</option><option value="dns-01"${n.acme?.cf ? "" : " disabled"}>DNS-01: a record through the Cloudflare API token${n.acme?.cf ? "" : " (none set under Controller settings)"}</option></select>`),
+        formField("ngAcmeEmail", "Email", `<input id="ngAcmeEmail" data-ng="acmeemail" type="email" value="${esc(n.acme?.email || "")}" placeholder="you@example.com" autocomplete="off" spellcheck="false">`,
+          {help: "Where Let's Encrypt writes about this certificate (an expiry it could not renew). Optional, and kept for the renewals."})],
+        foot: [`<button type="button" data-ngacmecancel>Cancel</button>`, `<button type="button" class="primary" data-ngacmego>Request</button>`]})}</div>
     </div>
     <div class="ngcertform"${open ? "" : " hidden"}>
-      <div class="field">
-        ${lbl("ngCert", "Certificate")}
-        <textarea id="ngCert" data-ng="cert" rows="4" spellcheck="false" placeholder="-----BEGIN CERTIFICATE-----">${esc(d.cert)}</textarea>
-      </div>
-      <div class="field">
-        ${lbl("ngKey", "Private key")}
-        <textarea id="ngKey" data-ng="key" rows="4" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----">${esc(d.key)}</textarea>
-      </div>
-      <div class="field">
-        ${lbl("ngCertFor", "Filed under", "Left empty, the pair is filed under the domain its own names say (a wildcard's star taken off), and the routes under that domain find it. Name one only for a pair whose names say no domain (an address, localhost), or to file it under another.")}
-        <input id="ngCertFor" data-ng="certfor" value="${esc(d.certFor)}" placeholder="from the certificate's names" data-ph-short="from the certificate" autocomplete="off" spellcheck="false">
-      </div>
-      <div class="field"><div class="actbar ngcertbar"><span class="state"></span><span class="sp"></span>
-        <button type="button" class="primary" data-ngcertsave disabled>Add</button>
-        <button type="button" data-ngcertcancel>Cancel</button></div></div>
+      <div class="field">${formBox({fields: [
+        formField("ngCert", "Certificate", `<textarea id="ngCert" data-ng="cert" rows="4" spellcheck="false" placeholder="-----BEGIN CERTIFICATE-----">${esc(d.cert)}</textarea>`, {wide: true}),
+        formField("ngKey", "Private key", `<textarea id="ngKey" data-ng="key" rows="4" spellcheck="false" placeholder="-----BEGIN PRIVATE KEY-----">${esc(d.key)}</textarea>`, {wide: true}),
+        formField("ngCertFor", "Filed under", `<input id="ngCertFor" data-ng="certfor" value="${esc(d.certFor)}" placeholder="from the certificate's names" data-ph-short="from the certificate" autocomplete="off" spellcheck="false">`,
+          {help: "Left empty, the pair is filed under the domain its own names say (a wildcard's star taken off), and the routes under that domain find it. Name one only for a pair whose names say no domain (an address, localhost), or to file it under another."})],
+        foot: [`<button type="button" data-ngcertcancel>Cancel</button>`, `<button type="button" class="primary" data-ngcertsave disabled>Add</button>`]})}</div>
     </div>
     ${nginxAcmeLines(n)}
     <div class="field ngcertlist">${nginxCertLines(n, d)}</div>`);

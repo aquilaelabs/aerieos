@@ -52,26 +52,22 @@ function rnDrawDeploy(focus){
   sect.hidden = !d || (!d.kept && !(d.envs || []).length);
   if (sect.hidden) return;
   const box = $("rnEnvRows"), ro = !d.may, ed = rnEnvEdit;
-  const form = (f, i) => `<div class="ngform rnreachform rnenvform" data-i="${i}">
-      <div class="fgrid">
-        <label class="setrow col ctlrow"><span class="lbl">Name</span><input data-envf="name" value="${esc(f.name)}" autocomplete="off" spellcheck="false"
-          placeholder="staging" maxlength="24" aria-label="the environment's name"></label>
-        <label class="setrow col ctlrow"><span class="lbl">Cluster</span><select data-envf="cluster" aria-label="the cluster it deploys to">${
-          (d.clusters || []).map(c => `<option value="${esc(c.id)}"${c.id === f.cluster ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
-        <label class="setrow col ctlrow"><span class="lbl">Namespace</span><input data-envf="namespace" value="${esc(f.namespace)}" autocomplete="off" spellcheck="false"
-          maxlength="63" aria-label="its namespace on the cluster"></label>
-        <label class="setrow col ctlrow"><span class="lbl">Registry</span><input data-envf="registry" value="${esc(f.registry)}" autocomplete="off" spellcheck="false"
-          placeholder="its git host's" data-ph-short="git host's" aria-label="the registry its images are pushed to"></label>
-        <label class="setrow col ctlrow"><span class="lbl">Deploys</span><select data-envf="when" aria-label="when it deploys">${
-          ENV_WHEN.map(([v, w]) => `<option value="${v}"${v === f.when ? " selected" : ""}>${w}</option>`).join("")}</select></label>
-        <label class="setrow col ctlrow"${f.when === "push" ? "" : " hidden"} data-envbranch><span class="lbl">Branch</span><input data-envf="branch" value="${esc(f.branch)}"
-          autocomplete="off" spellcheck="false" placeholder="main" aria-label="the branch whose pushes it deploys"></label>
-      </div>
-      <label class="ndcap"><input type="checkbox" data-envf="production"${f.production ? " checked" : ""}> Production: a session's deploy here always asks a person first</label>
-      <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-envdel>Remove</button>` : ""}
-        <button type="button" data-envcancel>Cancel</button>
-        <button type="button" class="primary" data-envsave>Save</button></div>
-    </div>`;
+  const form = (f, i) => formBox({cls: "recform", attrs: `data-i="${i}"`, fields: [
+      formField("envName", "Name", `<input id="envName" data-envf="name" value="${esc(f.name)}" autocomplete="off" spellcheck="false"
+        placeholder="staging" maxlength="24" aria-label="the environment's name">`),
+      formField("envCluster", "Cluster", `<select id="envCluster" data-envf="cluster" aria-label="the cluster it deploys to">${
+        (d.clusters || []).map(c => `<option value="${esc(c.id)}"${c.id === f.cluster ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`),
+      formField("envNs", "Namespace", `<input id="envNs" data-envf="namespace" value="${esc(f.namespace)}" autocomplete="off" spellcheck="false"
+        maxlength="63" aria-label="its namespace on the cluster">`),
+      formField("envReg", "Registry", `<input id="envReg" data-envf="registry" value="${esc(f.registry)}" autocomplete="off" spellcheck="false"
+        placeholder="its git host's" data-ph-short="git host's" aria-label="the registry its images are pushed to">`),
+      formField("envWhen", "Deploys", `<select id="envWhen" data-envf="when" aria-label="when it deploys">${
+        ENV_WHEN.map(([v, w]) => `<option value="${v}"${v === f.when ? " selected" : ""}>${w}</option>`).join("")}</select>`),
+      formField("envBranch", "Branch", `<input id="envBranch" data-envf="branch" value="${esc(f.branch)}"
+        autocomplete="off" spellcheck="false" placeholder="main" aria-label="the branch whose pushes it deploys">`, {hidden: f.when !== "push", attrs: "data-envbranch"}),
+      `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" data-envf="production"${f.production ? " checked" : ""}> Production: a session's deploy here always asks a person first</label></div>`],
+    foot: [i >= 0 ? `<button type="button" class="danger lead" data-envdel>Remove</button>` : "",
+      `<button type="button" data-envcancel>Cancel</button>`, `<button type="button" class="primary" data-envsave>Save</button>`]});
   const rows = (d.envs || []).map((e, i) => `<div class="row rnreach rnenv${ed?.i === i ? " open" : ""}" data-i="${i}">${tblLine(ENV_COLS, [
       `${esc(e.name)}${e.production ? ` <span class="pill warn">production</span>` : ""}`,
       e.cluster_name ? `${esc(e.cluster_name)} <span class="dim">/</span> <code>${esc(e.namespace)}</code>`

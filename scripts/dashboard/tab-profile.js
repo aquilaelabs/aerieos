@@ -301,19 +301,19 @@ function profileTerminal(){
   const swatch = ([k, name]) => `<label class="tcolor${k in mine ? " mine" : ""}">
       <input type="color" data-pftcolor="${k}" value="${esc(pal[k] || "#000000")}" aria-label="${esc(name)}">
       <span>${esc(name)}</span></label>`;
-  return `<div class="logset">${PF_TERM.map(([k, label, opts, dflt]) => `
-      <div class="logdays setrow col ctlrow">
-        ${lbl("pfTerm_" + k, label)}
-        <select id="pfTerm_${k}" data-pfterm="${k}">${opts.map(([v, w]) =>
-          `<option value="${v}"${String(look[k] ?? dflt) === v ? " selected" : ""}>${esc(w)}</option>`).join("")}</select>
-      </div>`).join("")}
-      <div class="logdays setrow ctlrow"><label class="ndcap"><input type="checkbox" data-pfterm="blink"${look.blink === false ? "" : " checked"}> The cursor blinks</label></div>
-    </div>
-    <div class="field">${lbl("pfTermColors", `The colors of ${PF_TERM[2][2].find(([v]) => v === scheme)?.[1] || scheme}`)}
-      <div class="tcolors" id="pfTermColors">${TERM_COLOR_NAMES.map(swatch).join("")}</div>
-      ${Object.keys(mine).length ? `<div class="actbar"><span class="state">${Object.keys(mine).length} of them yours</span>
-        <button type="button" data-pftreset>Reset to the preset</button></div>` : ""}</div>
-    <div class="field">${lbl("pfTermPreview", "How it looks")}<div id="pfTermPreview">${termPreview(pal, look)}</div></div>`;
+  // A form whose fields take effect as they change, as the color scheme
+  // does: a look is looked at, so its foot is Reset alone, there when some
+  // of the colors are this person's own.
+  const n = Object.keys(mine).length;
+  return formBox({groups: [
+      {fields: [...PF_TERM.map(([k, label, opts, dflt]) => formField("pfTerm_" + k, label, `<select id="pfTerm_${k}" data-pfterm="${k}">${opts.map(([v, w]) =>
+          `<option value="${v}"${String(look[k] ?? dflt) === v ? " selected" : ""}>${esc(w)}</option>`).join("")}</select>`)),
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" data-pfterm="blink"${look.blink === false ? "" : " checked"}> The cursor blinks</label></div>`]},
+      {fields: [formField("pfTermColors", `The colors of ${PF_TERM[2][2].find(([v]) => v === scheme)?.[1] || scheme}`,
+          `<div class="tcolors" id="pfTermColors">${TERM_COLOR_NAMES.map(swatch).join("")}</div>`, {wide: true}),
+        formField("pfTermPreview", "How it looks", `<div id="pfTermPreview">${termPreview(pal, look)}</div>`, {wide: true})]}],
+    state: n ? `<span class="state">${n} of them yours</span>` : "",
+    foot: n ? [`<button type="button" data-pftreset>Reset to the preset</button>`] : []});
 }
 // The look as the fields say it now, the colors changed of the scheme picked.
 function termLookPicked(root){

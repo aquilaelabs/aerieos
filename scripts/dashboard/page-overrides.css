@@ -2,7 +2,7 @@
    four layers stand). */
 @layer overrides {
 /* hidden means hidden, whatever display a class gives the element. Without
-   this, any rule that sets display (.uadd's flex, .modal label's block) beats
+   this, any rule that sets display (.addbar's flex, .modal label's block) beats
    the attribute: the Debug settings fold never closed and the approval
    dialog's Select all showed with nothing to select. Everything here that
    animates a fold already treats hidden as display:none. */
