@@ -362,7 +362,21 @@ def seal_all(again=False):
                     n += 1
         if n:
             _save(d)
-    return n
+        # ...and a forge token still in the seal format before (BBSEAL1),
+        # sealed again under its account's own key, which no install key
+        # change reaches.
+        sd, old = _load_secrets(), 0
+        for uid, e in sd.items():
+            k = _open((d.get(uid) or {}).get("key")) if isinstance(e, dict) else None
+            for f in ((e.get("forges") or {}).values() if k else ()):
+                with contextlib.suppress(signing.Locked, ValueError, TypeError, KeyError, AttributeError):
+                    raw = base64.b64decode(f["sealed"])
+                    if signing.old_format(raw):
+                        f["sealed"] = base64.b64encode(signing.seal(signing.open_with(k, raw), k)).decode()
+                        old += 1
+        if old:
+            statefile.write_json(_secrets_file(), sd, mode=0o600)
+    return n + old
 
 
 def forget(uid):

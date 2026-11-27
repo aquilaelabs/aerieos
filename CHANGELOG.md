@@ -41,6 +41,10 @@
 - A session fixes a bug it meets in a file it is already changing, in its own commit, rather than only filing it; and where a space's setting lets a change asked for interrupt a test run, a question or research no longer does (97291e6)
 - aerie roadmap step mv moves a step to a place on its own item in one move, where it was refused and took one move per place (af1c7a5)
 
+### Removed
+
+- aerie emu adopt is gone. Upgrading: an emulator made before each space kept its own phones, still in the account's ~/.android/avd, is no longer picked up; aerie emu start makes the space a new one (3689ac8)
+
 ### Fixed
 
 - A GitHub App's installation token, a longer token with dots in it since GitHub changed its shape in October, is taken out of diagnostics and the controller's log whole, where everything after its first dot stayed in them, and a push holding one is held (2e98d75)

@@ -5244,7 +5244,8 @@ installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_
                              poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
                              clusters.seal_all, k3s.seal_all, discord.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
-                     if signing.PREVIOUS else 0)
+                     if signing.PREVIOUS else 0,
+                     again=STATE / "seal-again")
 installkey.note_made()
 installkey.settle()
 # Every account's own key made at the start that can seal it, a fresh
@@ -16120,6 +16121,10 @@ def main():
     # which at import it could not (B496). The gate at the top took the copy.
     stateversion.migrate(STATE, {"state": STATE, "workspace": WORKSPACE, "project_names": lambda: project_names(users.ALL),
                                  "sql": db.script})
+    # ...and what one of them asked to be sealed once more under today's
+    # install key (a new seal format), sealed now rather than at the next start.
+    if _sealed := installkey.settle(asked_only=True):
+        print(f"dashboard: sealed {_sealed} secret(s) again, as a migration asked", flush=True)
     # ...and, on every start, the owner roles of projects that are gone for
     # good or never were (a clone that failed before B95, a folder purged by
     # hand), once the migrations have given the ones they give.

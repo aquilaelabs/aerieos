@@ -34,10 +34,15 @@ _lock = threading.Lock()
 # the nodes are still sealed under a key before today's (tokenkeys).
 reseal = ()
 on_nodes_previous = None
+# A file in the state that asks the next start for one round of every pass
+# under today's key, written by a migration whose change needs everything
+# sealed again (a new seal format) and gone once the round is clean.
+again_file = None
 
 
-def configure(*, passes, nodes_previous):
-    globals().update(reseal=tuple(passes), on_nodes_previous=nodes_previous)
+def configure(*, passes, nodes_previous, again=None):
+    globals().update(reseal=tuple(passes), on_nodes_previous=nodes_previous,
+                     again_file=Path(again) if again else None)
 
 
 def _dir():
@@ -214,11 +219,15 @@ def landed(key, state_dir=None):
         signing.PREVIOUS = was if was and was != key else None
 
 
-def settle():
-    """At start, while the key before today's is kept: every pass run again
-    under today's key, then the one before let go once nothing on the nodes
-    is sealed under it. Returns how many were sealed again."""
-    if signing.PREVIOUS is None:
+def settle(asked_only=False):
+    """At start, while the key before today's is kept, or a migration asked
+    for it (again_file): every pass run again under today's key, then the
+    one before let go once nothing on the nodes is sealed under it, and the
+    ask dropped. A pass leaves what it cannot open as it is. `asked_only`,
+    after the migrations: only for an ask one of them just wrote. Returns
+    how many were sealed again."""
+    asked = bool(again_file and again_file.exists())
+    if not asked and (asked_only or signing.PREVIOUS is None):
         return 0
     moved, clean = 0, True
     with _lock:
@@ -227,11 +236,14 @@ def settle():
                 moved += p(again=True) or 0
             except Exception:                               # noqa: BLE001 (kept for the next start)
                 clean = False
-        if clean:
+        if clean and signing.PREVIOUS is not None:
             _drop_previous()
             a = _about()
             if a.pop("left", None) is not None:
                 _save_about(a)
+        if clean and asked:
+            with contextlib.suppress(OSError):
+                again_file.unlink()
     return moved
 
 

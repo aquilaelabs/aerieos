@@ -90,7 +90,8 @@ def configure(*, state, project_name, secret_file=None):
 SECRET_FILE = "/run/builderbot-key"
 PREVIOUS_FILE = "/run/builderbot-key-previous"
 MAGIC = b"BBSEAL2\n"
-MAGIC1 = b"BBSEAL1\n"       # the format before, opened for one release
+MAGIC1 = b"BBSEAL1\n"       # the format before 27 Oct: opened until a release after migration 0043,
+                            # which seals everything again in today's, has shipped
 MASTER = None
 PREVIOUS = None
 
