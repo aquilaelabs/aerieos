@@ -37,6 +37,7 @@
 - The install key's name from before 0.8.0, SIGNING_SECRET, is read no more. Upgrading: an install that still sets it rather than INSTALL_KEY stops at start and says so; rename it INSTALL_KEY in the secrets folder (4e2e2e2)
 - Placeholders and the green state pills in light themes read at 4.5:1 or more in every theme (1ef1f0b)
 - The bell, the Doctor and the gear take the keyboard's caret in when opened from it and give it back to their button on Escape (a30bc53)
+- A space's own settings no longer open on a General section that held one line; the space's id is a line under the title (381ebc6)
 
 ### Fixed
 
@@ -52,6 +53,8 @@
 - A new space's progress is read once a second, where Abort could set two reads going (1dbdbee)
 - The Windows companion takes a later dev build, where it stayed on the one it had (05cbf12)
 - A space's own git token, kept for its background work, is no longer moved into its owner's key store at a restart (84e4929)
+- A job's row on Jobs tells a screen reader the job and where it stands, then what pressing it does, instead of only that it opens a log (88e710d)
+- A space of several repositories showed its first repository's id in its settings as the space's; and on a phone a section's chip over the settings opened that section while the one open before stayed open (381ebc6)
 
 ### Security
 
