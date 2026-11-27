@@ -20,7 +20,7 @@
 // (lib.mjs's quiet, a pause that is a check of absence, is quietFor here:
 // the idle block has a page of its own named quiet.)
 import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring, faded,
-         quiet as quietFor, section, ENGINE } from './lib.mjs';
+         quiet as quietFor, section, holdPoll, freePoll, ENGINE } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -3270,7 +3270,7 @@ if (runs('c')) await section("what is drawn over a tint reads 4.5:1 or more in e
 });
 
 // A finger's target (R286 step 3): at a phone's width every press is at least
-// the 24px WCAG asks, or nothing else to press lies within 12px of its centre,
+// the 24px WCAG asks, or nothing else to press lies within 12px of its center,
 // or it carries a press area of its own around its words (an absolutely
 // placed ::after, B1006); a link in a sentence is the sentence's.
 if (runs('c')) await section("every press at a phone's width is a finger's target", async () => {
@@ -3299,6 +3299,85 @@ if (runs('c')) await section("every press at a phone's width is a finger's targe
   }
   ok(small.length === 0, `every press at 393 is 24px or has room or a press area of its own${small.length ? `: ${[...new Set(small)].slice(0, 6).join('; ')}` : ''}`);
   await thumb.close();
+});
+
+// Every kind that opens, shuts or arrives moves (R285): a section's fold, a
+// roadmap row's details, a bug's row, and the bell, the Doctor and a row's
+// More menu. Sampled each frame, one box at a time: a probe that read many
+// boxes a frame slowed the frames it measured and read its own stalls as
+// jumps. A box whose height changes between two frames while nothing of its
+// own animates has snapped (two frames far apart are not judged: a stall of
+// the machine's is not the page's); a pop-out first seen whole and at rest
+// arrived with a cut.
+if (runs('c')) await section("what opens, shuts or arrives moves, and never snaps", async () => {
+  const bad = [];
+  for (const [w, h, tag] of [[1440, 1000, 'desk'], [393, 852, 'phone']]){
+    const p = await newPage(browser, { viewport: { width: w, height: h } });
+    await p.goto(URL); await ready(p);
+    if (tag === 'desk') await p.evaluate(async () => {
+      await postJSON('/api/roadmap', { project: 'alpha', action: 'add', text: 'an item to open' });
+      await postJSON('/api/bugs', { project: 'alpha', action: 'add', title: 'a bug to open', repro: 'press it' });
+    });
+    const go = async hash => { await p.evaluate(x => { location.hash = x; }, hash); await sleep(1500); };
+    const fold = async (name, hash, press, box) => {
+      await go(hash);
+      await holdPoll(p);
+      for (const turn of [1, 2]){
+        const fr = await p.evaluate(([press, box]) => new Promise(done => {
+          // Its own tweens alone: a glow that never ends elsewhere would hide a snap.
+          const mine = el => el.getAnimations({ subtree: true })
+            .filter(a => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity).length;
+          const b = [...document.querySelectorAll(press)].find(e => e.checkVisibility());
+          if (!b) return done(null);
+          const el = b.closest(box) || b, out = [], t0 = performance.now();
+          const tick = () => {
+            out.push([performance.now() - t0, el.getBoundingClientRect().height, mine(el)]);
+            if (performance.now() - t0 < 700) requestAnimationFrame(tick); else done(out);
+          };
+          requestAnimationFrame(tick);
+          setTimeout(() => b.click(), 30);
+        }), [press, box]);
+        if (!fr){ bad.push(`${tag} ${name}: no ${press} on ${hash}`); break; }
+        if (Math.abs(fr[0][1] - fr[fr.length - 1][1]) < 3){ bad.push(`${tag} ${name} press ${turn}: did not open or shut`); continue; }
+        for (let i = 1; i < fr.length; i++){
+          const [t, hh, a] = fr[i], [pt, ph, pa] = fr[i - 1];
+          if (Math.abs(hh - ph) > 2 && !a && !pa && t - pt < 120){
+            bad.push(`${tag} ${name} press ${turn}: snapped ${Math.round(ph)}>${Math.round(hh)} at ${Math.round(t)}ms`); break;
+          }
+        }
+        await sleep(400);
+      }
+      await freePoll(p);
+    };
+    const arrive = async (name, hash, press, panel) => {
+      if (hash) await go(hash);
+      const first = await p.evaluate(([press, panel]) => new Promise(done => {
+        const mine = el => el.getAnimations({ subtree: true })
+          .filter(a => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity).length;
+        const b = [...document.querySelectorAll(press)].find(e => e.checkVisibility());
+        if (!b) return done(`no ${press}`);
+        const t0 = performance.now();
+        const tick = () => {
+          const el = panel === '+' ? b.nextElementSibling : document.querySelector(panel);
+          if (el?.checkVisibility()) return done({ op: +getComputedStyle(el).opacity, moving: mine(el) });
+          if (performance.now() - t0 < 1500) requestAnimationFrame(tick); else done('never shown');
+        };
+        b.click(); requestAnimationFrame(tick);
+      }), [press, panel]);
+      if (typeof first === 'string') bad.push(`${tag} ${name}: ${first}`);
+      else if (first.op >= 0.99 && !first.moving) bad.push(`${tag} ${name}: shown whole at once, with no arrival`);
+      await p.keyboard.press('Escape'); await sleep(500);
+    };
+    if (tag === 'phone') await fold('a section', '#/machines/nodes', 'details.sect > summary', 'details');
+    else await fold('a section', '#/spaces/alpha/settings', 'details.sect > summary', 'details');
+    await fold('a roadmap row', '#/spaces/alpha/roadmap', '.roadmap .dtog', '.roadmap');
+    await fold('a bug row', '#/spaces/alpha/bugs', 'details.bug > summary', 'details.bug');
+    await arrive('the bell', '#/home', '#bBell', '#bellPanel');
+    await arrive('the Doctor', null, '#bDocDot', '#docPanel');
+    await arrive('a More menu', '#/containers', '.more > .moreb', '+');
+    await p.close();
+  }
+  ok(bad.length === 0, `a section, a roadmap row and a bug's row slide each way, and the bell, the Doctor and a More menu arrive, at a desk and on a phone${bad.length ? `: ${bad.slice(0, 6).join('; ')}` : ''}`);
 });
 
 ok(page.errors.length === 0,
