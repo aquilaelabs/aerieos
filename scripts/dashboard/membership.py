@@ -1,7 +1,8 @@
 """Who a project belongs to and who joins it (the operator, 1 Oct).
 
 Every project has an OWNER, an account: whoever made it, and AerieOS's
-owner for a project from before there were owners. The owner, and
+owner for one with no owner of its own (made with no account, or its
+owner's account removed). The owner, and
 AerieOS's owner, may hand it to another account, make it INVITE ONLY,
 and invite people.
 

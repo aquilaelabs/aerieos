@@ -636,8 +636,7 @@ def unroll(d, version):
         return False
     lines = text.splitlines()
     # The section: its heading, and its entry lines up to the next heading.
-    # By the version alone: an older build wrote a dash where this one
-    # writes a colon, and either is the release being taken back.
+    # By the version alone, whatever follows it on the heading line.
     head = re.compile(rf"## {re.escape(version)}(?![\w.])")
     start = next((i for i, ln in enumerate(lines) if head.match(ln)), None)
     if start is None:

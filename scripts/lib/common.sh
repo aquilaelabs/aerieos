@@ -682,10 +682,9 @@ claude_projects_link() {
     # itself is root's there, so the share being writable is enough.
     if ! { [ -d "$share" ] && [ -w "$share" ]; } \
             && ! { [ -d "${share%/*}" ] && [ -w "${share%/*}" ]; }; then
-        # Nowhere to link to. A link left from when there was (a node that
-        # mounted the projects share before R163) points at nothing, and Claude Code then
-        # saves no conversation at all: taken down, so the home keeps its
-        # own folder until the share is there again (B613).
+        # Nowhere to link to. A link left from when there was points at
+        # nothing, and Claude Code then saves no conversation at all: taken
+        # down, so the home keeps its own folder until the share is there again.
         if [ -L "$link" ] && [ ! -e "$link" ]; then
             rm -f "$link"
         fi
