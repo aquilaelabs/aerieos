@@ -66,43 +66,6 @@ class Gone(unittest.TestCase):
         self.assertTrue(roadmap.set_info("alpha", rid, "as built", by="claude").get("ok"))
         self.assertIn(f"R{rid} is done already", roadmap.step_done("alpha", rid, 0, by="claude")["error"])
 
-    def test_one_kept_without_its_row_is_put_back_together_from_the_log(self):
-        # Finished by its last step before B767, an item's done event held the
-        # words alone; its steps come back from the log, and its details can
-        # be written into them.
-        rid = roadmap.add("alpha", "older plan", by="claude", steps=["made with it"])["item"]["id"]
-        roadmap.add_step("alpha", rid, "added after")
-        roadmap.set_info("alpha", rid, "the step's note", step=1)
-        roadmap.step_done("alpha", rid, 0)
-        roadmap.step_done("alpha", rid, 1)
-        d = roadmap.load()
-        for e in d["history"]["alpha"]:
-            if e.get("act") == "done" and e.get("step") is None:
-                e.pop("row", None)            # as an event from before B767 reads
-        roadmap.save(d)
-        done = next(r for r in roadmap.finished("alpha") if r["id"] == rid)
-        self.assertEqual([st["text"] for st in done["steps"]], ["step 1 (its words were not kept)", "added after"])
-        self.assertEqual(done["steps"][1].get("info"), "the step's note")
-        self.assertTrue(all(st.get("done") for st in done["steps"]))
-        self.assertTrue(roadmap.set_info("alpha", rid, "as built", step=1).get("ok"))
-        self.assertEqual(next(r for r in roadmap.finished("alpha") if r["id"] == rid)["steps"][1].get("info"), "as built")
-
-    def test_an_empty_row_an_older_build_saved_gets_its_steps_back(self):
-        # 15 Oct: a note written to such an item by the build before the
-        # rebuild saved a row with no steps into its done event; the steps the
-        # log knows join it, its note stays.
-        rid = roadmap.add("alpha", "plan", by="claude")["item"]["id"]
-        roadmap.add_step("alpha", rid, "only step")
-        roadmap.step_done("alpha", rid, 0)
-        d = roadmap.load()
-        for e in d["history"]["alpha"]:
-            if e.get("act") == "done" and e.get("step") is None:
-                e["row"] = {"id": rid, "text": "plan", "steps": [], "info": "item note"}
-        roadmap.save(d)
-        done = next(r for r in roadmap.finished("alpha") if r["id"] == rid)
-        self.assertEqual(([st["text"] for st in done["steps"]], done.get("info")), (["only step"], "item note"))
-        self.assertTrue(roadmap.set_info("alpha", rid, "step note", step=0).get("ok"))
-
     def test_a_finished_item_reopens_as_it_was(self):
         # More work found on a finished item is its own step, not a new item
         # naming the old one (the operator, 15 Oct).

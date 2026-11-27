@@ -758,61 +758,9 @@ def clash(what, stored, was):
             "conflict": {"current": stored}}
 
 
-def _oldest_first(events):
-    """The log in the order things happened: by time, and in the order they
-    were written within one second (a sort on time alone, reversed, read an
-    item's steps before the item that made room for them)."""
-    return [e for _, e in sorted(enumerate(events), key=lambda p: (p[1].get("at", 0), p[0]))]
-
-
-def _rebuilt_row(events, item_id, text):
-    """A finished item's row put back together from the log, for one kept
-    without it (finished by its last step before B767): its steps from their
-    add-step events, with their edits, details and done marks applied. A step
-    made with the item logged only a count, so it says its words are gone."""
-    row = {"id": item_id, "text": text, "steps": []}
-    steps = row["steps"]
-    for e in events:
-        if _int(e.get("id")) != item_id:
-            continue
-        act, i = e.get("act"), _int(e.get("step"))
-        if act == "add":
-            row["text"] = e.get("text") or row["text"]
-            steps[:] = [{"text": f"step {k + 1} (its words were not kept)", "sent": 0}
-                        for k in range(_int(e.get("steps")) or 0)]
-        elif act == "add-step" and i is not None:
-            while len(steps) < i:
-                steps.append({"text": f"step {len(steps) + 1} (its words were not kept)", "sent": 0})
-            steps[i:i + 1] = [{"text": e.get("text", ""), "sent": 0}]
-        elif i is not None and 0 <= i < len(steps):
-            if act == "edit-step":
-                steps[i]["text"] = e.get("text", steps[i]["text"])
-            elif act == "info-step":
-                steps[i]["info"] = e.get("text", "")
-            elif act == "done-step":
-                steps[i]["done"] = e.get("at", 0)
-            elif act == "undone-step":
-                steps[i].pop("done", None)
-            elif act == "target-step":
-                if e.get("target"):
-                    steps[i]["target"] = e["target"]
-                else:
-                    steps[i].pop("target", None)
-        elif act == "edit" and i is None:
-            row["text"] = e.get("text") or row["text"]
-        elif act == "info" and i is None:
-            row["info"] = e.get("text", "")
-        if act in ("add", "target") and i is None and "target" in e:
-            row["target"] = e["target"]
-    if not row.get("target"):
-        row.pop("target", None)
-    return row
-
-
 def _finished_row(d, project, item_id):
     """A finished item's row as the Finished section shows it: the snapshot
-    in its newest "done" event, made into one for an older event that kept
-    only the words. None when it is not a finished item."""
+    in its newest "done" event. None when it is not a finished item."""
     for e in reversed(_events(d, project)):
         if _int(e.get("id")) != item_id or e.get("step") is not None:
             continue
@@ -821,12 +769,8 @@ def _finished_row(d, project, item_id):
             continue
         if e.get("act") != "done":
             return None
-        if not isinstance(e.get("row"), dict) or not e["row"].get("steps"):
-            # Kept without its row, or with an empty one a build before the
-            # rebuild wrote (15 Oct): the steps the log knows join it, and its
-            # own words and details stay.
-            got = _rebuilt_row(_oldest_first(_events(d, project)), item_id, e.get("text", ""))
-            e["row"] = {**got, **(e["row"] if isinstance(e.get("row"), dict) else {}), "steps": got["steps"]}
+        if not isinstance(e.get("row"), dict):
+            e["row"] = {"id": item_id, "text": e.get("text", ""), "steps": []}
         return e["row"]
     return None
 
@@ -983,13 +927,7 @@ def finished(project, limit=None):
         if i is None or i in seen:
             continue
         seen.add(i)
-        # One kept without its row (finished by its last step before B767) is
-        # put back together from the log, oldest first, rather than shown as
-        # the words alone.
-        row = copy.deepcopy(e["row"]) if isinstance(e.get("row"), dict) else {}
-        if not row.get("steps"):
-            got = _rebuilt_row(_oldest_first(log), i, e.get("text", ""))
-            row = {**got, **row, "steps": got["steps"]}
+        row = copy.deepcopy(e["row"]) if isinstance(e.get("row"), dict) else {"id": i, "text": e.get("text", ""), "steps": []}
         row.update(id=i, done_at=e.get("at", 0), done_by=e.get("by", ""),
                    reopenable=not (rel and e.get("at", 0) < rel[1]))
         out.append(row)

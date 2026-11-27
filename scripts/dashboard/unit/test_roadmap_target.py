@@ -53,14 +53,6 @@ class Target(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.row(rid)["target"], "0.6.0")
 
-    def test_a_rebuilt_row_keeps_it(self):
-        events = [{"act": "add", "id": 4, "text": "a goal", "target": "0.6.0"},
-                  {"act": "target", "id": 4, "text": "a goal", "target": "0.7.0", "was": "0.6.0"}]
-        self.assertEqual(roadmap._rebuilt_row(events, 4, "a goal")["target"], "0.7.0")
-        events.append({"act": "target", "id": 4, "text": "a goal", "target": "", "was": "0.7.0"})
-        self.assertNotIn("target", roadmap._rebuilt_row(events, 4, "a goal"))
-
-
     def test_a_step_carries_its_own_release_and_goes_with_its_item_without_one(self):
         rid = roadmap.add("alpha", "a goal", steps=["first", "second"], target="0.7.0")["item"]["id"]
         self.assertTrue(roadmap.set_step_target("alpha", rid, 1, "v0.8.0").get("ok"))
@@ -83,13 +75,6 @@ class Target(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.row(rid)["steps"][0]["target"], "0.8.0")
         self.assertNotIn("target", self.row(rid))
-
-    def test_a_rebuilt_row_keeps_a_step_s(self):
-        events = [{"act": "add", "id": 4, "text": "a goal", "steps": 0, "at": 1},
-                  {"act": "add-step", "id": 4, "step": 0, "text": "one", "at": 2},
-                  {"act": "target-step", "id": 4, "step": 0, "target": "0.8.0", "at": 3}]
-        self.assertEqual(roadmap._rebuilt_row(events, 4, "a goal")["steps"][0]["target"], "0.8.0")
-
 
 if __name__ == "__main__":
     unittest.main()
