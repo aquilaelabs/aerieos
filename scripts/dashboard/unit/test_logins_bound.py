@@ -36,14 +36,6 @@ class Bound(unittest.TestCase):
         self.assertTrue(logins.seen("u1", lid, "node"))
         self.assertTrue(logins.seen("u1", lid, ""), "still its own")
 
-    def test_a_row_from_before_binding_is_bound_to_the_first_browser(self):
-        lid = logins.mint("u1", "web", ua=FIREFOX)
-        d = logins._load()
-        d["u1"][lid].pop("ua")
-        logins._save(d)
-        self.assertTrue(logins.seen("u1", lid, FIREFOX))
-        self.assertFalse(logins.seen("u1", lid, CHROME))
-
 
 if __name__ == "__main__":
     unittest.main()

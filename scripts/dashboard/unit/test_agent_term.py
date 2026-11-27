@@ -183,13 +183,12 @@ if __name__ == "__main__":
 
 
 class Census(unittest.TestCase):
-    def test_the_controller_keeps_whether_a_node_serves_its_own_terminal(self):
-        # The controller keeps a node's session half field by field; one it
-        # drops reads as a node that serves none, and no terminal opens there
-        # (found walking it on the dev pair).
+    def test_the_controller_keeps_a_nodes_terminal_fields(self):
+        # The controller keeps a node's session half field by field (found
+        # walking it on the dev pair). Whether its agent serves AerieOS's own
+        # terminal is not one: every agent of a listed release does.
         sys.path.insert(0, os.path.join(HERE, ".."))
         import nodes
         got = nodes._census({"session": {"up": True, "term": True, "screen": 17684, "ctr": True}})
-        self.assertIs(got["session"]["term"], True)
         self.assertEqual((got["session"]["screen"], got["session"]["ctr"]), (17684, True))
-        self.assertIs(nodes._census({"session": {"up": True}})["session"]["term"], False)
+        self.assertNotIn("term", got["session"])

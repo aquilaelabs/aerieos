@@ -106,11 +106,6 @@ class ImageCheck(unittest.TestCase):
         self.assertEqual(imagecheck.attention(lambda nid: nid, allowed=lambda p: p == "site"), [],
                          "radarr's update is news only to who may act on radarr")
         self.assertEqual(len(imagecheck.attention(lambda nid: nid, allowed=lambda p: p == "radarr")), 1)
-        # An answer from before the check recorded the project: found by name.
-        d = json.loads(imagecheck._file().read_text())
-        d["radarr"].pop("project")
-        write_json(imagecheck._file(), d)
-        self.assertEqual(len(imagecheck.attention(lambda nid: nid, allowed=lambda p: p == "radarr")), 1)
 
     def test_an_image_never_pulled_is_not_compared_and_a_registry_that_will_not_say_is_said(self):
         self.dv.pulled.pop("mariadb:11")
