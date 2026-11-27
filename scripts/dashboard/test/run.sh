@@ -1685,11 +1685,15 @@ fresh() {
     echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"  # a test that locks must not hand that on
     # ...nor one that archives: delta archived for the test owner once that
     # account is made (an archive is each person's own), nothing before.
+    # ...nor one that unpins: the test owner has every fixture space pinned,
+    # as an account made before 7 Oct had them (migration 0040), since the
+    # suites were written against a Home showing them all.
     python3 -c 'import json, os, sys
 f = sys.argv[1]
 u = (json.load(open(f)).get("users") or {}).get("test", {}).get("uid", "") if os.path.exists(f) else ""
-open(sys.argv[2], "w").write(json.dumps({u: ["delta"]} if u else {}))' "$S/state/users.json" "$S/state/archived-projects.json"
-    rm -f "$S/state/pinned-projects.json"                  # ...nor one that unpins
+open(sys.argv[2], "w").write(json.dumps({u: ["delta"]} if u else {}))
+ws = sorted(n for n in os.listdir(sys.argv[4]) if os.path.isdir(os.path.join(sys.argv[4], n)) and not n.startswith("."))
+open(sys.argv[3], "w").write(json.dumps({u: ws} if u else {}))' "$S/state/users.json" "$S/state/archived-projects.json" "$S/state/pinned-projects.json" "$S/ws"
     # ...nor one that binds a project to a node. nodes.mjs saves alpha's node
     # from the settings dialog; agent.mjs then asserts that a project with no
     # node is refused, and inherited the binding, a deterministic failure of
@@ -1890,6 +1894,8 @@ d["users"]["test"] = {"uid": u.mint_uid(), "role": "owner", "projects": fixtures
 u._save(d)
 # delta archived for this account (an archive is each person's own).
 open(os.path.join(sys.argv[2], "archived-projects.json"), "w").write(json.dumps({d["users"]["test"]["uid"]: ["delta"]}))
+# ...and every fixture space pinned, as the reset between suites keeps them.
+open(os.path.join(sys.argv[2], "pinned-projects.json"), "w").write(json.dumps({d["users"]["test"]["uid"]: fixtures}))
 PY
 
 # ---- the docker-host node --------------------------------------------------

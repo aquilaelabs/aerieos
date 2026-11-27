@@ -1313,7 +1313,7 @@ def _project_cards(who, ps):
     me_admin = bool(me_uid) and users.is_admin(who)
     locked = projects.load_locks()
     archived = set(projects.load_archived(users.uid_of(who)))
-    pins = projects.load_project_pins(users.uid_of(who), users.starts_unpinned(who))
+    pins = projects.load_project_pins(users.uid_of(who))
     groups = projects.load_project_groups(users.uid_of(who))
     colors = projects.load_marks("color", users.uid_of(who))
     seen = {p["name"] for p in ps}
@@ -1332,7 +1332,7 @@ def _project_cards(who, ps):
                   "may_archive": bool(me_uid),
                   "owner_name": membership.owner_name(k) or "",
                   "owner_mine": bool(me_uid) and owner == me_uid,
-                  "pinned": True if pins is None else k in pins,
+                  "pinned": k in pins,
                   "group": groups.get(k, ""), "color": colors.get(k, "")}
     return out
 
@@ -1365,7 +1365,7 @@ def _project_columns(who, facts):
     reg = registry.sync()["projects"]
     # ...and every repository in a project (R138).
     _place({f["name"] for f in facts if f.get("name")})
-    pins = projects.load_project_pins(users.uid_of(who), users.starts_unpinned(who))
+    pins = projects.load_project_pins(users.uid_of(who))
     groups = projects.load_project_groups(users.uid_of(who))
     # One small file for the whole list, read here rather than per row: this
     # runs on the fifteen-second poll and a per-project read would be a dozen
@@ -1495,7 +1495,7 @@ def _project_columns(who, facts):
                     "owner_mine": bool(me_uid) and membership.owner_of(d.name) == me_uid,
                     "may_lock": lock_may(d.name, me_uid, me_admin, locked.get(pk)),
                     "may_archive": bool(me_uid),
-                    "pinned": True if pins is None else pk in pins,
+                    "pinned": pk in pins,
                     # The group this account files it under, or "".
                     "group": groups.get(pk, ""),
                     # ...and the color it gives it, or "".
@@ -15302,8 +15302,7 @@ class Handler(BaseHTTPRequestHandler):
         # A person's own set (the operator, 27 Sep): any signed-in account
         # may pin for itself.
         me = self._who() or {}
-        return self._json(*projects.pin(users.uid_of(me), req.get("name", ""), bool(req.get("pinned")),
-                                        users.starts_unpinned(me)))
+        return self._json(*projects.pin(users.uid_of(me), req.get("name", ""), bool(req.get("pinned"))))
 
     def _project_group(self, req):
         """Put a project in one of this account's groups, take it out, or

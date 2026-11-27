@@ -2211,30 +2211,17 @@ def _rename_in_sets(path, sets, old, new):
 
 
 def _load_pins():
-    """Every account's pinned set, {uid: [names]}, everyone's default under
-    "*" (migration 0035 wrote the flat list from before 27 Sep that way)."""
+    """Every account's pinned set, {uid: [names]}."""
     return _load_user_sets(_pins_file())
 
 
-def load_project_pins(uid, fresh=False):
-    """This account's pinned set, or None when it has never pinned anything
-    and nobody's default stands. `fresh` is an account that starts with
-    nothing pinned (users.starts_unpinned): its no-entry is the empty set,
-    and the old everybody default under "*" is not its.
-
-    None is not the same as empty and the difference decides what a fresh
-    install looks like. No entry means this person has not had this thought
-    yet, so every project is pinned; an empty LIST means they unpinned the
-    last one on purpose, and a Home that quietly refilled itself would be
-    arguing with them. The pins are the person's, not the controller's (the
-    operator, 27 Sep): what is worth looking at from Home is a question each
-    account answers.
-    """
-    d = _load_pins()
-    if fresh and str(uid or "") not in d:
-        return []
-    v = d.get(str(uid or ""), d.get("*"))
-    return None if v is None else sorted({_key(x) for x in v})
+def load_project_pins(uid):
+    """This account's pinned set: what it pinned, nothing until it does (the
+    operator, 7 Oct: a new user starts with nothing pinned and adds what they
+    want; migration 0040 gave each older account the set its Home showed).
+    The pins are the person's, not the controller's (the operator, 27 Sep):
+    what is worth looking at from Home is a question each account answers."""
+    return sorted({_key(x) for x in (_load_pins().get(str(uid or "")) or [])})
 
 
 def save_project_pins(uid, names):
@@ -2243,22 +2230,17 @@ def save_project_pins(uid, names):
     write_json(_pins_file(), d)
 
 
-def pin(uid, name, on, fresh=False):
+def pin(uid, name, on):
     """Pin or unpin a project for one account, once the server has let a
     signed-in person: the pins are theirs. Unpinning something running a
     build leaves it running, and the Projects page still has every button.
-
-    The first unpin has to write the whole current set, not just remove
-    one: until then there is no entry, which means "all of them", and
-    saving a single removal would have read as "only this one is pinned".
     (payload, status)."""
     here = _projects_here()
     name = _key(name)
     if name not in here:
         return {"error": refusals.no_space(name)}, 400
     with lock:
-        pins = load_project_pins(uid, fresh)
-        names = here.copy() if pins is None else set(pins)
+        names = set(load_project_pins(uid))
         names.add(name) if on else names.discard(name)
         try:
             save_project_pins(uid, names)

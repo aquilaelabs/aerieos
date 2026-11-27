@@ -229,15 +229,6 @@ def whose(u):
     return uid_of(u) or seat_of(u)
 
 
-def starts_unpinned(u):
-    """Whether this account's Home starts with no project pinned until it
-    pins one (projects.load_project_pins). Every account made since 7 Oct
-    does (the operator: a new user starts with nothing pinned and adds what
-    they want); one made before keeps "all of them" until it pins, so an
-    update does not empty a Home somebody was using."""
-    return bool((u or {}).get("pins_empty"))
-
-
 def tmux_prefix(u):
     """What this account's shell sessions are named with, or "" for none.
 
@@ -1076,7 +1067,7 @@ def claim(name, password):
                             "projects": [],
                             "password": hash_password(password),
                             "created": int(time.time()), "seen": 0,
-                            "prefs": {}, "pins_empty": True}
+                            "prefs": {}}
         _smb_follow(d["users"][name], password)
         _save(d)
     return {"ok": True, "name": name}
@@ -1101,9 +1092,7 @@ def add(name, password, role="user", projects=None):
                             "projects": list(projects or []),
                             "password": hash_password(password),
                             "created": int(time.time()), "seen": 0,
-                            # Starts with nothing pinned, and pins what it
-                            # wants (the operator, 7 Oct): see starts_unpinned.
-                            "prefs": {}, "pins_empty": True}
+                            "prefs": {}}
         _smb_follow(d["users"][name], password)
         _save(d)
     # Its own key made now, as every account's is at the start (R154).
@@ -1133,7 +1122,7 @@ def adopt(owner, people):
             return {"error": "this controller already has an account"}
         now = int(time.time())
         d["users"][name] = {"uid": mint_uid(), "role": "owner", "projects": [], "password": pw,
-                            "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
+                            "created": now, "seen": 0, "prefs": {}}
         made.append(name)
         _people_into(d, people, now, made, skipped)
         _save(d)
@@ -1170,7 +1159,7 @@ def _people_into(d, people, now, made, skipped):
         if role not in ("admin", "user"):
             role = "user"
         u = {"uid": mint_uid(), "role": role, "roles": [], "projects": [], "password": "",
-             "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
+             "created": now, "seen": 0, "prefs": {}}
         if re.fullmatch(r"[0-9A-F]{32}", nt):
             u["smb_nt"], u["smb_at"] = nt, now
         d["users"][pn] = u
