@@ -207,6 +207,22 @@ def admit(me, req):
     return project, None
 
 
+def tree_of(project, want):
+    """The tree a relayed verb runs in, and whether it is the one asked for:
+    the project directory, or one of its worktrees on the share. Anything
+    else (a path outside the share, a sibling project, a node's own /tmp)
+    runs in the project directory instead of being trusted, and says so."""
+    home = WORKSPACE / project
+    if not want.startswith("/"):
+        return home, True
+    real = Path(want).resolve()
+    mine = home.resolve()
+    trees = (WORKSPACE / ".worktrees" / project).resolve()
+    if real.is_dir() and (real == mine or mine in real.parents or trees in real.parents):
+        return real, True
+    return home, False
+
+
 def run(me, req, project):
     """Run the words for the project admit() named, once the server has
     asked the account's `aerie` right on it: a git verb's own refusals first
@@ -229,18 +245,15 @@ def run(me, req, project):
     if argv[:2] == ["git", "push"] and projects.remote_auth(WORKSPACE / project, project) == "none":
         return {"error": "this space's Authentication is Off, so it pushes nowhere: its owner picks Each person's token "
                          "(or Deploy key) under Repository in its notebook's Settings and saves; nothing needs linking again"}, 403
-    # The tree the session is in: the project directory, or one of its
-    # worktrees. Anything else (a path outside the share, a sibling
-    # project) runs in the project directory instead of being trusted.
-    cwd = WORKSPACE / project
-    want = str(req.get("cwd") or "")
-    if want.startswith("/"):
-        real = Path(want).resolve()
-        mine = (WORKSPACE / project).resolve()
-        trees = (WORKSPACE / ".worktrees" / project).resolve()
-        if real.is_dir() and (real == mine or mine in real.parents
-                              or trees in real.parents):
-            cwd = real
+    cwd, kept = tree_of(project, str(req.get("cwd") or ""))
+    # A verb that writes the tree it is asked from is never answered in
+    # another: asked from a worktree the controller cannot see (one in a
+    # node's /tmp), aerie changelog add wrote its line into the project
+    # directory and said it had logged it (B1131).
+    if not kept and argv[:2] == ["changelog", "add"]:
+        return {"error": f"{req.get('cwd')} is not on the share the controller reads, so its CHANGELOG.md is not "
+                         f"written from here: run it in /workspace/{project} or a worktree under "
+                         f"/workspace/.worktrees/{project}"}, 400
     # ...and under the project's git policy (the Git view, roadmap R36):
     # a session may push its own branch unless told not to, and may not
     # push to main unless told it may. Judged here because here is
