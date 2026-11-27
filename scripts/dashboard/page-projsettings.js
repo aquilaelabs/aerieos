@@ -796,7 +796,7 @@ function rnDrawPrefs(){
 
 // ---- the dialog's forms, drawn at load ----------------------------------
 
-// Five sections of the dialog are forms (R301), written here rather than in
+// Six sections of the dialog are forms (R301), written here rather than in
 // index.html so each is formBox: its Save bar is the form's foot (rnBars puts
 // its verbs there) and ends where its fields end, as a row of a field's own
 // buttons does (no .ctlrow cap in a form). Drawn once by bootMarkup, before
@@ -903,6 +903,29 @@ function rnDrawForms(){
         formField("rnTestNode", "Test node", `<select id="rnTestNode"><option value="">the session's own node</option></select>`,
           {help: "where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the space's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain",
            attrs: `id="rnTestNodeF"`})]}]}),
+    // What aerie build and aerie test run and what a build leaves, each with
+    // its own label; where its tests run (R223, one choice) and where a
+    // Gradle build writes (B439); and how long what a session leaves is kept,
+    // three counts across (R96 captures, R165 snapshots, dev builds).
+    build: formBox({state: RN_STATE, groups: [
+      {fields: [
+        formField("rnBuildCmd", "Build command", `<input id="rnBuildCmd" autocomplete="off" spellcheck="false" placeholder="e.g. ./gradlew assembleDebug">`,
+          {help: "what aerie build runs, from the tree's root on the node", wide: true}),
+        formField("rnTestCmd", "Test command", `<input id="rnTestCmd" autocomplete="off" spellcheck="false" placeholder="e.g. ./gradlew test">`,
+          {help: "what aerie test runs, from the tree's root on the node; a test run finds BB_TEST_WORKERS in its environment: how many workers this node lets it use", wide: true}),
+        formField("rnOutputs", "Outputs", `<input id="rnOutputs" autocomplete="off" spellcheck="false" placeholder="app/build/outputs/apk/**/*.apk">`,
+          {help: "globs from the tree's root: the files a build leaves that match them land in dist/", wide: true}),
+        formField("rnTests", "Tests run", `<select id="rnTests"></select>`,
+          {help: "where aerie tests run, aerie dashboard test and the gate run its suites: a node of the space's, or its dev instance where its image carries the tests", attrs: `id="rnTestsF"`}),
+        formField("rnBuildLocal", "Gradle builds into", `<select id="rnBuildLocal"><option value="on">The node's own disk</option><option value="off">The repository's tree</option></select>`,
+          {help: "a Gradle build in a session puts each module's build folder on the node's own disk, linked from its usual place, so build output is not carried in the synced copy or the snapshots; The repository's tree leaves it where Gradle puts it, beside the code"})]},
+      {grid: "three", fields: [
+        formField("rnCaptureDays", "Days a capture is kept", `<input id="rnCaptureDays" type="number" min="0" max="365" step="1" inputmode="numeric">`,
+          {help: "a session's reels and emulator shots are removed from dist/ this many days after they were taken; 0 keeps them until somebody removes them"}),
+        formField("rnSnapDays", "Days a snapshot is kept", `<input id="rnSnapDays" type="number" min="0" max="3650" step="1" inputmode="numeric">`,
+          {help: "the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none, and the ones already kept stay. Restored from Snapshots below"}),
+        formField("rnDevKeep", "Dev builds kept", `<input id="rnDevKeep" type="number" min="0" max="99" step="1" inputmode="numeric">`,
+          {help: "of each product in dist/, every file of its newest this many builds stays and older builds are removed, a signed build keeping its signed copy alone; a release and anything pinned always stay; 0 keeps everything"})]}]}),
     // How a release is checked and what its notes open with; the files'
     // descriptions are records under the form, each saved on its own press.
     releases: formBox({state: RN_STATE, fields: [

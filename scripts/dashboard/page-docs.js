@@ -528,14 +528,15 @@ function docSurface(i, kind){
 // primary at the right. The box is what is capped, never a field alone, so the
 // foot ends where the fields end at every width. A page hands it fields
 // (formField) and verbs, never layout; lint refuses a field written outside it.
-//   fields: formField strings, or groups: [{head, says, fields, attrs}], each a .fgroup
+//   fields: formField strings, or groups: [{head, says, fields, attrs, grid}], each a
+//     .fgroup, grid "three" for three short numbers across
 //   foot: the verbs' button strings, the primary last, a .lead one at the left;
 //   state: a .state on a line of its own over them
 function formBox({fields = [], groups = null, foot = [], state = "", cls = "", attrs = ""} = {}){
-  const grid = fs => `<div class="fgrid">${fs.filter(Boolean).join("")}</div>`;
+  const grid = (fs, cls = "") => `<div class="fgrid${cls ? ` ${cls}` : ""}">${fs.filter(Boolean).join("")}</div>`;
   const body = groups
     ? groups.map(g => `<div class="fgroup"${g.attrs ? ` ${g.attrs}` : ""}>${g.head ? `<div class="fgrouphead">${esc(g.head)}${
-        g.says ? `<span class="sub dim">${esc(g.says)}</span>` : ""}</div>` : ""}${grid(g.fields || [])}</div>`).join("")
+        g.says ? `<span class="sub dim">${esc(g.says)}</span>` : ""}</div>` : ""}${grid(g.fields || [], g.grid)}</div>`).join("")
     : grid(fields);
   const verbs = foot.filter(Boolean);
   return `<div class="fbox${cls ? ` ${cls}` : ""}"${attrs ? ` ${attrs}` : ""}>${body}${verbs.length || state
