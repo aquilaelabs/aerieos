@@ -1938,6 +1938,13 @@ await section("Sections, every one open by default at every width, with a jump b
     head: $('rnProjectHead').checkVisibility() ? $('rnProjectHead').textContent.trim() : '', want: String(state.repos?.[reposOf('alpha')]?.pid || '') }));
   ok(door.general === 'none' && door.head === `Space P${door.want.replace(/^P?/, '')}.`,
      `a space's own settings have no General, the space's id a line under its title (${JSON.stringify(door)})`);
+  // ...and its bar names the sections that show once their reads land
+  // (People, Nodes): drawn once at the opening, it had none for them (B1188).
+  const chips = await phone.waitForFunction(() => {
+    const said = [...document.querySelectorAll('#rnmodal .sectjump a')].map(a => a.textContent);
+    return said.includes('People') && said.includes('Nodes') ? said : false;
+  }, null, { timeout: 10000 }).then(h => h.jsonValue()).catch(async () => phone.$$eval('#rnmodal .sectjump a', as => as.map(a => a.textContent)));
+  ok(chips.includes('People') && chips.includes('Nodes'), `...and its bar names every section that shows, those whose reads land late too (${chips.join(', ')})`);
   await phone.close();
 });
 ok(await page.evaluate(() => document.activeElement?.tagName) !== 'INPUT',

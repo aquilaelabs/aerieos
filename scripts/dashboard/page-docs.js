@@ -812,6 +812,16 @@ function sectJump(g){
   // chips instead, and is not one to jump to (the operator, 23 Oct: big
   // chips for what changes, small pills for what does not).
   const titleOf = o => o.querySelector(":scope > summary .t")?.textContent || "";
+  // Drawn again when one of its sections shows or goes: a section that
+  // shows once its read lands (a space's People, Nodes, Discord, Running
+  // sessions) had no chip, the bar having been drawn at the door's opening
+  // (B1188). A draw that changes nothing writes nothing, so this is quiet.
+  if (!g._jumpObs && window.MutationObserver){
+    let soon = false;
+    g._jumpObs = new MutationObserver(() => { if (soon) return; soon = true;
+      requestAnimationFrame(() => { soon = false; if (g.isConnected) sectJump(g); }); });
+    g._jumpObs.observe(g, {attributes: true, attributeFilter: ["hidden"], subtree: true});
+  }
   const all = sectsOf(g).filter(o => !o.hasAttribute("data-item")), seen = {};
   all.forEach(o => { seen[titleOf(o)] = (seen[titleOf(o)] || 0) + 1; });
   const mine = all.filter(o => seen[titleOf(o)] === 1);
