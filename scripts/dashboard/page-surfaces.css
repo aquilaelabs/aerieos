@@ -2127,17 +2127,13 @@ body.firstrun #panes{display:none}
 .dmsvctbl .td a{color:var(--note)}
 .dmsvctbl>.tline{border-top:var(--hair) solid var(--line)}
 .dmsvctbl>.thead{background:color-mix(in srgb, var(--sunk) 60%, transparent)}
-.dmsettings .setfoot.dmeditfoot{grid-column:1 / -1;justify-content:flex-end;gap:6px}
-.dmapplyset{display:inline-flex;gap:6px}
-/* Its settings: Apply one cell of the grid, beside the last setting, not a
-   row of its own; Reached at's address beside its label. */
-.dmsettings .setfoot{grid-column:auto;justify-content:flex-start;align-self:end}
+/* Its settings: Reached at's address beside its label. */
 /* A field's own button (a VM's Regenerate MAC) as the grid's next cell,
    level with the field, never a row of its own. */
 .fgrid>.fcellbtn{display:flex;align-items:flex-end;align-self:end;min-width:0}
 .dmsettings .dmboot .ctl{justify-content:space-between;align-items:center}
-.setgrid .dmroute .lbl.dmreach{display:flex;gap:6px;align-items:baseline;min-width:0;white-space:nowrap}
-.setgrid .dmroute .lbl.dmreach a{color:var(--note);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dmsettings .dmroute .lbl.dmreach{display:flex;gap:6px;align-items:baseline;min-width:0;white-space:nowrap}
+.dmsettings .dmroute .lbl.dmreach a{color:var(--note);min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* The list view (R216): a container as one line that opens into its card
    (rows-you-open), each project's group a table (R218 step 8): the name,
    its state pill, whose, its ports as links, where nginx routes it, its
@@ -2425,9 +2421,6 @@ body.firstrun #panes{display:none}
 /* A share's row: its facts at the left and its actions at the right at a desk. */
 @media(min-width:601px){ .row.stack2.stshare{flex-direction:row;align-items:center} .row.stack2.stshare>.acts{flex:0 0 auto;margin-left:auto}
 }
-/* The grid itself is capped as a whole, so its cells share the surface's
-   control width and do not stretch across a wide tab. */
-:is(.doctab,.nb) .setgrid{max-width:min(calc(var(--ctl-w) * 2),100%)}
 /* On a phone a page's bar is one line of its picker and its buttons (the
    operator, 18 Oct: the node pulldown and the buttons fit on one line,
    everywhere). The picker drops its word, which the node's name beside it
@@ -2583,32 +2576,19 @@ body.firstrun #panes{display:none}
 .tbl.ndpaths>.row.ndpath{align-items:stretch}
 .ndmstate.warn,.ndmwhy.warn{color:var(--warn)} .ndmstate.bad,.ndmwhy.bad{color:var(--bad)}
 .ndconfstate.note{color:var(--note)}
-/* A ROW'S SETTINGS are a grid of labeled cells with ONE Apply at its foot
-   (R210; the settings rule: one Apply per group). Each cell is a label
-   above its control, as every field on the page is (`lbl`), in columns
-   where there is room and one column on a phone; a read-only cell (`.ro`)
-   says a setting kept elsewhere, with the way there. A select takes its
-   cell. An action that belongs with a setting (Add route) sits beside its
-   controls in `.ctl` and acts on the press, as actions do. Before this a
-   container row was five settings each with its own Apply or Move, wrapping
-   into a form of their own on a phone (the operator, 13 Oct). */
-.setgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(15em,1fr));
-  gap:8px 16px;align-items:end}
-.setgrid:empty{display:none}
-.setgrid .setcell{display:flex;flex-direction:column;gap:var(--label-gap);min-width:0}
-.setgrid .setcell .val{font:var(--f-ui);color:var(--ink);min-height:var(--ctl);
+/* A setting's cell (formField, or a cell written beside it): a read-only
+   one (.ro) says a setting kept elsewhere, with the way there; an action
+   that belongs with a setting (Add route) sits beside its controls in .ctl
+   and acts on the press, as actions do. A container's settings were five
+   each with its own Apply or Move (the operator, 13 Oct); they are one form
+   with one Apply now (R210). */
+.fcell>.val{font:var(--f-ui);color:var(--ink);min-height:var(--ctl);
   display:flex;align-items:center;overflow-wrap:anywhere}
-.setgrid .setcell .val a{color:var(--note);white-space:nowrap}
-.setgrid .setcell .ctl{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
-.setgrid .setcell .ctl>select{flex:1 1 8em;min-width:0}
-.setgrid .setcell .ctl>button{flex:0 0 auto}
-/* A select takes its cell, short of the control cap (the controls rule: no
-   control spans the screen at any width). */
-.setgrid .setcell>select,.setgrid .setcell .ctl{width:100%;min-width:0;max-width:min(var(--ctl-w),88%)}
-.setgrid .setcell .ndcap{min-height:var(--ctl);display:flex;align-items:center}
-.setgrid .setfoot{grid-column:1 / -1;display:flex;justify-content:flex-end}
-@media(max-width:600px){ .setgrid{grid-template-columns:1fr}
-}
+.fcell>.val a{color:var(--note);white-space:nowrap}
+.fcell>.ctl{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;min-width:0}
+.fcell>.ctl>:is(select,input:not([type=checkbox])){flex:1 1 8em;width:auto;min-width:0}
+.fcell>.ctl>button{flex:0 0 auto}
+.fcell>.ctl>.ndcap{min-height:var(--ctl);display:flex;align-items:center}
 .jbouts a{color:var(--note)}
 /* A kept workspace is a long path, and .row code is nowrap; on a phone it
    wraps here rather than running off the row. Written with the row in the

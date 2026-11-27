@@ -572,7 +572,7 @@ async function spanning(){
     const cap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-w')) * 16 || 480;
     const LIM = Math.min(W * 0.9, cap + 2);
     const CTL = 'input:not([type=checkbox]):not([type=radio]), select, textarea, button';
-    const ROWS = '.actbar, .ctlrow, .setcell .ctl, .setfoot, .tcnode, .chips';
+    const ROWS = '.actbar, .ctlrow, .fcell > .ctl, .tcnode, .chips';
     // A tab strip is navigation, and the phone rule for one is the opposite
     // of a control's: its tabs share the row while they fit, and past that
     // it scrolls under a finger with its edges faded as the dock's line does

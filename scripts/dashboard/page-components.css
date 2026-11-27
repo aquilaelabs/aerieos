@@ -2523,7 +2523,7 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 }
 /* A form's box (.fbox, R301) is capped as a whole and its fields fill it, so
    its foot ends where they do; one field capped alone ended short of it. */
-:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.setgrid,.actmenu,.dsrow,.fbox) *){
+:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.actmenu,.dsrow,.fbox) *){
   max-width:min(var(--ctl-w),88%)}
 /* A row whose text column holds a field is a row of controls, and its
    action cluster belongs on the field's line: the Phone tab's Connect and
@@ -2607,9 +2607,6 @@ button[aria-busy="true"]{opacity:.75}
 /* The name's row is an action bar (its field, then Rename), so it lays out
    like every other bar; the input takes the room before it. */
 .ndname input{flex:1 1 auto;min-width:0}
-/* Its margin sits under a dialog field's own for its children, which
-   outranks it there. */
-.setgrid{margin:6px 0 2px}
 
 /* The wiring fold. Its lines wrap rather than scroll: a host path is long, and
    a row that scrolls sideways on a phone hides the half you were reading. */

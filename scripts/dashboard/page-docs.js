@@ -547,9 +547,9 @@ function formBox({fields = [], groups = null, foot = [], state = "", cls = "", a
 // number's width; `control` is the input, select or textarea itself, and
 // `tail` what the label carries after its words (a pill saying where the
 // value comes from).
-function formField(id, label, control, {help = "", hint = "", wide = false, short = false, hidden = false, attrs = "", tail = ""} = {}){
+function formField(id, label, control, {help = "", hint = "", wide = false, short = false, hidden = false, attrs = "", tail = "", cls = ""} = {}){
   const head = tail ? lbl(id, label, help).replace(/<\/label>$/, ` ${tail}</label>`) : lbl(id, label, help);
-  return `<div class="fcell${wide ? " fwide" : ""}${short ? " fshort" : ""}"${hidden ? " hidden" : ""}${attrs ? ` ${attrs}` : ""}>${
+  return `<div class="fcell${wide ? " fwide" : ""}${short ? " fshort" : ""}${cls ? ` ${cls}` : ""}"${hidden ? " hidden" : ""}${attrs ? ` ${attrs}` : ""}>${
     head}${control}${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
 }
 
@@ -1332,7 +1332,7 @@ const VIEW_ICON_LIST = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hid
 // so it is measured again only when they change; one not on show waits for
 // its turn. A browser without base-select sizes a select by its longest
 // answer itself.
-const PICKERS = ":is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select)";
+const PICKERS = ":is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setrow.col,.prefrow,.phead) select)";
 let pickFitDue = 0;
 let pickInk = null;
 // A group header's node picker is as wide as the name it shows, measured

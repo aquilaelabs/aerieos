@@ -863,12 +863,12 @@ function dmRouteLine(d){
   const modes = [["lan", "lan: the node's address"],
                  ["funnel", r.funnel_ok ? "public link (Tailscale Funnel)" : "public link: needs Tailscale on the node"],
                  ["public", "public (not available yet)"]];
-  // A cell of the row's settings grid (R210): the address it answers at,
+  // A cell of the row's settings form (R210): the address it answers at,
   // then how it is reached and, for a stack, through which port; the
   // grid's one Apply saves it.
   // The address beside the label, not a line of its own over the picker
   // (the operator, 17 Oct: the card read large).
-  return `<div class="setcell dmroute"><span class="lbl dmreach">Reached at ${link}${r.why ? ` <span class="dim">· ${esc(r.why)}</span>` : ""}</span>
+  return `<div class="fcell dmroute"><span class="lbl dmreach">Reached at ${link}${r.why ? ` <span class="dim">· ${esc(r.why)}</span>` : ""}</span>
     <div class="ctl"><select data-route="mode" data-was="${esc(r.mode)}" aria-label="route" title="how this instance is reached">${
       modes.map(([v, l]) => `<option value="${v}"${v === mode ? " selected" : ""}${
         v === "public" || (v === "funnel" && !r.funnel_ok) ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select>${
@@ -917,15 +917,15 @@ function dmNginxLine(d){
   // subdomain under it (the operator, 13 Oct); empty with no certificate
   // means any name on 80. What is typed and picked is drawn from the draft,
   // so a redraw in between leaves it.
-  return `<div class="setcell dmnginxroute">${lbl("dmng-" + key, "Route through nginx",
-      "A route on this node's nginx page to one of this container's published ports, at the hostname typed (a subdomain of the "
-      + "certificate's domain), or at any hostname on 80 alone with no certificate. A port routed already takes another hostname; the rest of a route is changed on the nginx page.")}
-    <div class="ctl"><select id="${esc("dmng-" + key)}" data-dmngcert="${esc(key)}" aria-label="which certificate the route serves under">
+  const ctl = `<div class="ctl"><select id="${esc("dmng-" + key)}" data-dmngcert="${esc(key)}" aria-label="which certificate the route serves under">
       ${optionList([["", "no certificate: any hostname, 80 alone"], ...(ng.certs || [])], dr.cert || "")}</select>
     <input data-dmnghost="${esc(key)}" value="${esc(dr.host || "")}" data-was="${esc(dr.was || "")}" placeholder="app.example.com" aria-label="the hostname the route serves" autocomplete="off" spellcheck="false">
     <select data-dmngport="${esc(key)}" aria-label="which port the route goes to">${
       optionList(ports.map(p => [p, `${p}${routed.includes(p) ? " (routed)" : ""}`]), dr.port)}</select>
-    <button type="button" data-dmngadd="${esc(key)}" title="write the route on the nginx page and apply it">Add route</button></div></div>`;
+    <button type="button" data-dmngadd="${esc(key)}" title="write the route on the nginx page and apply it">Add route</button></div>`;
+  return formField("dmng-" + key, "Route through nginx", ctl, {cls: "dmnginxroute", wide: true,
+    help: "A route on this node's nginx page to one of this container's published ports, at the hostname typed (a subdomain of the "
+      + "certificate's domain), or at any hostname on 80 alone with no certificate. A port routed already takes another hostname; the rest of a route is changed on the nginx page."});
 }
 
 function dmRefLine(d){
@@ -939,10 +939,9 @@ function dmRefLine(d){
   // of the row: a row of controls wraps on a phone, and an icon last wrapped
   // onto a line of its own, where it read as a stray mark belonging to
   // nothing.
-  return `<div class="setcell dmref">${lbl("dmr-" + key, "Branch",
-      "The next build uses that branch. The space's checkout, env and data stay as they are.")}
-    <select id="${esc("dmr-" + key)}" data-dmref="${esc(key)}" aria-label="which branch to build">
-      ${optionList([["", "whatever the space is on"], ...refs], pick || "")}</select></div>`;
+  return formField("dmr-" + key, "Branch", `<select id="${esc("dmr-" + key)}" data-dmref="${esc(key)}">
+      ${optionList([["", "whatever the space is on"], ...refs], pick || "")}</select>`,
+    {cls: "dmref", help: "The next build uses that branch. The space's checkout, env and data stay as they are."});
 }
 
 // The compose file laid over the instance's own (the operator, 17 Oct): any
@@ -956,10 +955,9 @@ function dmOverrideLine(d){
   const saved = d.override || "";
   if (!files.length && !saved) return "";
   const pick = dmOvDraft[key] ?? saved;
-  return `<div class="setcell dmov">${lbl("dmv-" + key, "Override",
-      "Another compose file from the tree, laid over this one for this container alone: its ports, env, volumes or an extra service. The next build takes it.")}
-    <select id="${esc("dmv-" + key)}" data-dmov="${esc(key)}" aria-label="compose file laid over it">
-      ${optionList([["", "none"], ...new Set([...files, ...(saved ? [saved] : [])])], pick || "")}</select></div>`;
+  return formField("dmv-" + key, "Override", `<select id="${esc("dmv-" + key)}" data-dmov="${esc(key)}">
+      ${optionList([["", "none"], ...new Set([...files, ...(saved ? [saved] : [])])], pick || "")}</select>`,
+    {cls: "dmov", help: "Another compose file from the tree, laid over this one for this container alone: its ports, env, volumes or an extra service. The next build takes it."});
 }
 
 // The machine's GPU given to the container (R207 step 4): NVIDIA through
@@ -979,9 +977,8 @@ function dmGpuLine(d){
     ...(r.gpu_card || saved === "nvidia" ? [["nvidia", `NVIDIA card${r.gpu_card ? ` (${r.gpu_card})` : ""}, through the container toolkit`]] : []),
     ...(r.gpu_amd || saved === "amd" ? [["amd", `AMD card or APU${r.gpu_amd ? ` (${r.gpu_amd})` : ""}, its render devices (/dev/dri)`]] : [])];
   const held = node?.reported?.features?.gpuvm?.installed ? `<div class="sub dim">The NVIDIA card is marked for a VM under its node's Features: a container does not get it while it is.</div>` : "";
-  return `<div class="setcell dmgpu">${lbl("dmg-" + key, "GPU",
-      "The machine's card, given to every service of this container from the next build: an NVIDIA card through the container toolkit, an AMD card or APU through /dev/dri, which is how a media server transcodes.")}
-    <select id="${esc("dmg-" + key)}" data-dmgpu="${esc(key)}" aria-label="which GPU the container gets">${optionList(opts, pick || "")}</select>${held}</div>`;
+  return formField("dmg-" + key, "GPU", `<select id="${esc("dmg-" + key)}" data-dmgpu="${esc(key)}">${optionList(opts, pick || "")}</select>${held}`,
+    {cls: "dmgpu", help: "The machine's card, given to every service of this container from the next build: an NVIDIA card through the container toolkit, an AMD card or APU through /dev/dri, which is how a media server transcodes."});
 }
 
 function dmClaudeSaid(d, other = false){
@@ -998,37 +995,17 @@ function dmClaudeSaid(d, other = false){
   return `<a href="#" data-dmtestgo="${esc(d.owner)}" title="the space's settings, where Agents may: Run its container is set">${esc(says[mode] || says.deny)}</a>`;
 }
 
-// The row's settings as one grid with one Apply at its foot (R210, the
-// settings rule): `cells` are the setting lines above, and the foot is
-// drawn only when one of them is a setting rather than a read-only line.
-// `key` names the row for the Apply (`inst:project|instance` or
-// `ctr:name`), and dmRowDirty says whether anything is staged.
-function dmSetGrid(cells, key, {cancel = false, bare = false} = {}){
-  const body = cells.filter(Boolean).join("");
-  if (!body) return "";
-  // ...or the grid alone, for a dialog whose foot carries the buttons.
-  if (bare) return `<div class="setgrid dmsettings">${body.replace("<!--APPLY-->", "")}</div>`;
-  const settable = DM_STAGED.some(s => body.includes(`data-${s.attr}=`));
-  // ...with Cancel before it where Edit settings opened them: it drops what
-  // was staged and puts the fields away (rows-you-open).
-  const apply = `${cancel ? `<button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button>` : ""}<button type="button" class="primary" data-dmapply="${esc(key)}"${
-        dmRowDirty(key) ? "" : " disabled"} title="save what was changed above">Apply</button>`;
-  // Beside the On boot tick where the row has one (its cell marks the
-  // place), so a disabled Apply never takes a line of its own (the operator,
-  // 17 Oct: the card read large); at the grid's foot otherwise.
-  // Opened by Edit settings, Cancel and Apply are the grid's foot, at its
-  // right, where a form's end is looked for.
-  if (settable && body.includes("<!--APPLY-->") && !cancel) return `<div class="setgrid dmsettings">${body.replace("<!--APPLY-->", `<span class="dmapplyset">${apply}</span>`)}</div>`;
-  return `<div class="setgrid dmsettings">${body.replace("<!--APPLY-->", "")}${settable
-    ? `<div class="setfoot${cancel ? " dmeditfoot" : ""}">${apply}</div>` : ""}</div>`;
-}
 // A row's settings in a dialog (the operator, 17 Oct): a native dialog in
 // the page's top layer, drawn inside its row so the row's wiring reaches its
-// controls, shown by dmWireRows after each draw; its title, the settings
-// grid, and the one filled Apply and Cancel at its foot. Escape is Cancel.
+// controls, shown by dmWireRows after each draw; its title, the settings as
+// one form (R210, the settings rule: `cells` are its setting lines), and the
+// one filled Apply and Cancel at the dialog's foot. Escape is Cancel. `key`
+// names the row for the Apply (`inst:project|instance` or `ctr:name`), and
+// dmRowDirty says whether anything is staged.
 function dmSetDialog(name, key, cells){
-  const grid = dmSetGrid(cells, key, {bare: true});
-  if (!grid) return "";
+  const shown = cells.filter(Boolean);
+  if (!shown.length) return "";
+  const grid = formBox({cls: "dmsettings", fields: shown});
   return `<dialog class="modal dmsetdlg" data-dmdlg="${esc(key)}" aria-label="Settings of ${esc(name)}">
     <div class="box wide"><h3>Settings: ${esc(name)}</h3>
       <div class="field">${grid}</div>
@@ -1074,7 +1051,7 @@ function dmOwnerLine(r, key){
   const saved = r.owner || "";
   // System's is the deployment's to set (R180): said, with nothing to pick.
   if (saved === "System")
-    return `<div class="setcell ro dmowner">${lbl("", "Space",
+    return `<div class="fcell ro dmowner">${lbl("", "Space",
       "AerieOS deployed this itself, so it is System's: no space's session sees it, "
       + "and the network lets it reach every container on this node.")}<div class="val">System</div></div>`;
   const pick = dmOwnDraft[key] ?? saved;
@@ -1082,11 +1059,10 @@ function dmOwnerLine(r, key){
   const names = myProjectNames(saved);
   const shown = n => n === saved && r.owner_gone ? `${r.owner_label || n} (deleted)` : dmOwnerSaid(n);
   const id = "dmo-" + key;
-  return `<div class="setcell dmowner">${lbl(id, "Space",
-      "Its space's sessions can see it and, as that space's Run its container setting allows, "
-      + "work on it. No space keeps it from every session.")}
-    <select id="${esc(id)}" data-dmown="${esc(key)}" aria-label="which space it belongs to">
-      ${optionList([["", "no space"], ...names.map(n => [n, shown(n)])], pick || "")}</select></div>`;
+  return formField(id, "Space", `<select id="${esc(id)}" data-dmown="${esc(key)}">
+      ${optionList([["", "no space"], ...names.map(n => [n, shown(n)])], pick || "")}</select>`,
+    {cls: "dmowner", help: "Its space's sessions can see it and, as that space's Run its container setting allows, "
+      + "work on it. No space keeps it from every session."});
 }
 
 // Which project a project's own instance is built from, and Move to put it
@@ -1101,14 +1077,13 @@ function dmMoveLine(d, busy = false){
   const gone = !(state?.projects || []).some(p => p.name === d.project);
   const names = myProjectNames(d.project);
   const id = "dmm-" + key;
-  return `<div class="setcell dmmove">${lbl(id, "Built from",
-      "The repository whose compose file and tree it is built from. Another one, applied, moves it "
-      + "there, keeping its name, env and data; it then builds from that repository's tree.")}
-    <select id="${esc(id)}" data-dmmove="${esc(key)}" aria-label="the space it is built from"${busy ? " disabled" : ""}>${
-      optionList(names.map(n => [n, gone && n === d.project ? `${n} (deleted)` : projLabel(n)]), pick)}</select>${
-      // Refused while a job builds it, since the job names the old space:
-      // dead until it ends, and why said under it.
-      busy ? `<div class="hint">A job is running on it: it moves once that has ended.</div>` : ""}</div>`;
+  // Refused while a job builds it, since the job names the old space: dead
+  // until it ends, and why said under it.
+  return formField(id, "Built from", `<select id="${esc(id)}" data-dmmove="${esc(key)}"${busy ? " disabled" : ""}>${
+      optionList(names.map(n => [n, gone && n === d.project ? `${n} (deleted)` : projLabel(n)]), pick)}</select>`,
+    {cls: "dmmove", hint: busy ? "A job is running on it: it moves once that has ended." : "",
+     help: "The repository whose compose file and tree it is built from. Another one, applied, moves it "
+      + "there, keeping its name, env and data; it then builds from that repository's tree."});
 }
 
 function dmTestSaid(d){
@@ -2915,10 +2890,10 @@ const dmBootDraft = {};
 function dmBootLine(name, on){
   if (!mayDocker()) return "";
   const want = name in dmBootDraft ? dmBootDraft[name] : on;
-  // A cell of the settings grid: the tick is a draft, the grid's Apply
+  // A cell of the settings form: the tick is a draft, the form's Apply
   // writes it (R122).
-  return `<div class="setcell dmboot">${lbl("", "On boot", "")}<div class="ctl"><label class="ndcap"><input type="checkbox" data-dmboot="${esc(name)}"
-      data-was="${on ? "1" : ""}"${want ? " checked" : ""}> Start on boot</label><!--APPLY--></div></div>`;
+  return `<div class="fcell dmboot">${lbl("", "On boot", "")}<div class="ctl"><label class="ndcap"><input type="checkbox" data-dmboot="${esc(name)}"
+      data-was="${on ? "1" : ""}"${want ? " checked" : ""}> Start on boot</label></div></div>`;
 }
 
 // Reaches the LAN (R178): each project's containers are kept off the
@@ -2929,7 +2904,7 @@ const dmLanDraft = {};
 function dmLanLine(name, on){
   if (!state?.can?.admin) return "";
   const want = name in dmLanDraft ? dmLanDraft[name] : on;
-  return `<div class="setcell dmlan">${lbl("", "Network", "")}<div class="ctl"><label class="ndcap"><input type="checkbox" data-dmlan="${esc(name)}"
+  return `<div class="fcell dmlan">${lbl("", "Network", "")}<div class="ctl"><label class="ndcap"><input type="checkbox" data-dmlan="${esc(name)}"
       data-was="${on ? "1" : ""}"${want ? " checked" : ""}> Reaches the LAN</label></div></div>`;
 }
 
@@ -2943,7 +2918,7 @@ const dmInstNamed = ({list, project, instance}) =>
   (list?.instances || []).find(x => x.project === project && x.instance === instance)?.name || project;
 
 // The settings a row stages and its one Apply writes (R210), in the order
-// the Apply writes them. Whether the grid has an Apply (dmSetGrid), what
+// the Apply writes them. What
 // Cancel drops (dmDropDrafts), whether a row is dirty (dmRowDirty), the
 // controls' wiring (dmWireStaged) and the Apply itself (dmApplyStaged) are
 // all read from here, so a new setting is its draft, the line that draws
