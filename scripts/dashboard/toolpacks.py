@@ -1658,16 +1658,11 @@ def remove(name, where=()):
 def _bundle_commit(rec):
     """The commit a node fetches a pack at. One kept from a folder of a
     repository (R170 step 6) is in its repository here under a commit of
-    its own, which is the one its bundle holds: the record's `kept_at`, or,
-    for a record from before it said so, that repository's head. Any other
-    pack's is the commit it is pinned to."""
-    if rec.get("hosted") and rec.get("path"):
-        if rec.get("kept_at"):
-            return rec["kept_at"]
-        if HOSTED and NAME.fullmatch(str(rec.get("name") or "")):
-            r = _git_here(rec["name"], "rev-parse", "-q", "--verify", "refs/heads/main")
-            if r.returncode == 0 and r.stdout.strip():
-                return r.stdout.strip()
+    its own, which is the one its bundle holds: the record's `kept_at`
+    (migration 0041 wrote it into older records). Any other pack's is the
+    commit it is pinned to."""
+    if rec.get("hosted") and rec.get("path") and rec.get("kept_at"):
+        return rec["kept_at"]
     return rec["commit"]
 
 

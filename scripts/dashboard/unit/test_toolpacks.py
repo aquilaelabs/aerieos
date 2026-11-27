@@ -256,10 +256,6 @@ class Repository(unittest.TestCase):
         heads = subprocess.run(["git", "bundle", "list-heads", str(bundle)], capture_output=True, text=True, check=True).stdout.split()
         self.assertNotEqual(row["source"]["commit"], commit)
         self.assertEqual(row["source"]["commit"], heads[0])
-        # A record from before it said where it is kept reads its repository's head.
-        rec = dict(r["pack"])
-        del rec["kept_at"]
-        self.assertEqual(toolpacks.recipe(rec)["source"]["commit"], heads[0])
 
     def test_the_second_fetch_of_a_pin_is_held_to_the_index_as_the_first_is(self):
         # A pack in a folder is fetched twice: for the look add makes, held
