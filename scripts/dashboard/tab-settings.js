@@ -211,10 +211,7 @@ function renderSettingsInto(i){
     ${rootHooksSection() && rootHooks?.hooks?.length ? sect("roothooks", "Startup hooks", rootHooksWaiting() ? `${rootHooksWaiting()} waiting` : `${rootHooks.hooks.length} approved`,
         rootHooksSection(), {cls: rootHooksWaiting() ? "warn" : "", loud: !!rootHooksWaiting()}) : ""}
     ${connSection() !== null ? sect("connections", "Connected services", connStatus(), connSection(), {cls: connData?.rows?.some(connDue) ? "warn" : ""}) : ""}
-    ${state?.release?.running !== undefined && !updatesOnMachine() ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection())
-      // Moved (R294 step 13): said where they were for this release, then gone.
-      : updatesOnMachine() ? sect("updates", "Updates", "on This controller", `<div class="field"><div class="actbar"><span class="state">The release, its channel, the update window and the older versions kept are on This controller now.</span>
-          <button type="button" data-goupdates>Open This controller</button></div></div>`) : ""}
+    ${state?.release?.running !== undefined && !updatesOnMachine() ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : ""}
     ${groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})
         // The copies made go right under the Backup group that makes them.
         + (g.key === "backup" ? sect("copies", "Backup copies", backupData?.made_at ? `last ${ago(backupData.made_at)}` : backupData?.on === false ? "off" : "", backupSection()) : "")).join("")}
@@ -230,7 +227,6 @@ function renderSettingsInto(i){
   wireSections(d.el);
   wireRootHooks(d.el);
   wireConnections(d.el);
-  d.el.querySelectorAll("[data-goupdates]").forEach(b => b.onclick = () => openMachineTab());
   const run = d.el.querySelector("#setDocRun");
   if (run) run.onclick = () => runDoctor();
   // A page of settings (page-docs.js splitSects): the sections a list beside

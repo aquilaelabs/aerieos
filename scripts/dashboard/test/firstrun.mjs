@@ -693,9 +693,9 @@ await section("a bare-metal install's first run", async () => {
   await page.evaluate(() => openSettingsTab());
   await page.waitForSelector('.settingstab details[data-sect="settings:controller"]', { timeout: 15000 });
   const inSettings = await page.evaluate(() => ({ win: !!document.querySelector('.settingstab details[data-sect="settings:updwin"]'),
-    channel: !!document.querySelector('.settingstab #relChannel'), pointer: !!document.querySelector('.settingstab details[data-sect="settings:updates"] [data-goupdates]') }));
-  ok(win && !inSettings.win && !inSettings.channel && inSettings.pointer,
-     `This controller holds the update window beside Updates, and Controller settings draws neither, saying where they went (${JSON.stringify({ win, inSettings })})`);
+    channel: !!document.querySelector('.settingstab #relChannel'), updates: !!document.querySelector('.settingstab details[data-sect="settings:updates"]') }));
+  ok(win && !inSettings.win && !inSettings.channel && !inSettings.updates,
+     `This controller holds the update window beside Updates, and Controller settings draws no Updates of its own (${JSON.stringify({ win, inSettings })})`);
   await page.evaluate(() => { openNodesTab(ownMachine().id); readMoved('nodes'); drawPanes(); });
   await page.waitForSelector('.nodestab .ndrow[data-node]', { timeout: 15000 });
   const np = await page.evaluate(() => ({
