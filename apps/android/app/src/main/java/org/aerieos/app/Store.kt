@@ -37,20 +37,6 @@ class Store(context: Context) {
     }
     private val plain: SharedPreferences = context.getSharedPreferences("aerieos", Context.MODE_PRIVATE)
 
-    init { migrate() }
-
-    // The one pairing the app kept before R132 (server, user, password at
-    // the top level) becomes the first of the list, named by its host.
-    private fun migrate() {
-        if (secret.contains("pairings")) return
-        val server = secret.getString("server", "") ?: ""
-        val user = secret.getString("user", "") ?: ""
-        if (server.isBlank() || user.isBlank()) return
-        val p = Pairing("p1", "", server, user, secret.getString("password", "") ?: "", 1)
-        write(listOf(p))
-        secret.edit().putString("current", p.id).remove("server").remove("user").remove("password").apply()
-    }
-
     private fun write(ps: List<Pairing>) {
         val arr = JSONArray()
         for (p in ps) arr.put(JSONObject().put("id", p.id).put("name", p.name).put("server", p.server)
