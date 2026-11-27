@@ -1953,6 +1953,21 @@ await section("good, warning and error are one trio on every scheme, and a warni
   await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
   if (seen.dark.size !== 1) bad.push(`the dark half's trio differs by scheme: ${[...seen.dark].join(' | ')}`);
   if (seen.light.size !== 1) bad.push(`the light half's trio differs by scheme: ${[...seen.light].join(' | ')}`);
+  // ...and the design language names that warning and error for every
+  // theme, never a pair the page does not draw (B1160: each theme in the
+  // record carried its own).
+  {
+    const { readFileSync } = await import('node:fs');
+    const { dirname, join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const doc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'design-language.md'), 'utf8');
+    const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
+    const [, warn, err] = ([...seen.dark][0] || '').split(' ');
+    const said = [...doc.matchAll(/\| `--(warn|bad)` \| `(#[0-9a-fA-F]{6})` \|/g)].map(m => [m[1], m[2], rgb(m[2])]);
+    const off = said.filter(([k, , v]) => v !== (k === 'warn' ? warn : err));
+    if (!said.length) bad.push('the design language names no --warn or --bad');
+    if (off.length) bad.push(`the design language names a ${[...new Set(off.map(([k, h]) => `${k} ${h}`))].join(', ')} the page does not draw`);
+  }
   ok(bad.length === 0, `one trio on all ${SCHEMES.length} schemes in each half, and a warning's band its own wash with its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
 });
 

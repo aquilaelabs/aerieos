@@ -18,8 +18,8 @@ Color comes only from these tokens, named once in the stylesheet. The app starts
 | `--dim` | `#b2c2db` | secondary text and field labels |
 | `--line` | `#455e89` | hairlines and borders, 1px |
 | `--accent` | `#00c1fd` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d29922` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#f07178` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#37a5fb` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -46,8 +46,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#adc6ca` | secondary text and field labels |
 | `--line` | `#3f646e` | hairlines and borders, 1px |
 | `--accent` | `#00d3e4` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d7ab4c` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ef6a63` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#eb69df` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -74,8 +74,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#c0c0c8` | secondary text and field labels |
 | `--line` | `#5c5c69` | hairlines and borders, 1px |
 | `--accent` | `#ff6a6b` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d9a441` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ff6b6b` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#00e2cd` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -102,8 +102,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#d0bdac` | secondary text and field labels |
 | `--line` | `#705940` | hairlines and borders, 1px |
 | `--accent` | `#ff7f08` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#e8bb50` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ef5f52` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#00dee8` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -130,8 +130,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#b4c4cb` | secondary text and field labels |
 | `--line` | `#486175` | hairlines and borders, 1px |
 | `--accent` | `#00cffb` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d3ab52` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ee6a68` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#a685ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -158,8 +158,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#b6c6b9` | secondary text and field labels |
 | `--line` | `#496552` | hairlines and borders, 1px |
 | `--accent` | `#00de7e` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d6ad4e` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#e8695f` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#ad87ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -186,8 +186,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#bfbce0` | secondary text and field labels |
 | `--line` | `#585886` | hairlines and borders, 1px |
 | `--accent` | `#a386ff` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#e0b24d` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#f2637b` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#00e5b2` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -214,8 +214,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#b4c3d2` | secondary text and field labels |
 | `--line` | `#50606e` | hairlines and borders, 1px |
 | `--accent` | `#f6a900` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#e0913a` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ff5f45` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#3da5f9` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -268,8 +268,8 @@ This scheme squares all three corner tokens in its dark half; its light half is 
 | `--dim` | `#cdb8d7` | secondary text and field labels |
 | `--line` | `#6d507d` | hairlines and borders, 1px |
 | `--accent` | `#da6cef` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#dfae52` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ee6183` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#2de78d` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -296,8 +296,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#cfbcb7` | secondary text and field labels |
 | `--line` | `#755450` | hairlines and borders, 1px |
 | `--accent` | `#ff6738` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d9a441` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#e8544a` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#35e3b9` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -324,8 +324,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#cebfa6` | secondary text and field labels |
 | `--line` | `#6b5b3f` | hairlines and borders, 1px |
 | `--accent` | `#ebb000` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#e3c069` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#e0705f` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#00e2ce` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
@@ -352,8 +352,8 @@ Its light half, the same tokens under the mode switch:
 | `--dim` | `#bac2cb` | secondary text and field labels |
 | `--line` | `#525f6f` | hairlines and borders, 1px |
 | `--accent` | `#569aff` | the one color that means this is the one: the active tab, the primary button, a link |
-| `--warn` | `#d9a441` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
-| `--bad` | `#ef6f6c` | an error, a destructive verb |
+| `--warn` | `#fbbf24` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
+| `--bad` | `#ff6b79` | an error, a destructive verb |
 | `--note` | `#97dd24` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
