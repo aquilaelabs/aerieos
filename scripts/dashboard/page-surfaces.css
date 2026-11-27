@@ -1176,10 +1176,6 @@ body.firstrun #panes{display:none}
    nothing more; a warning or an error is a line on the page; a ? opens its
    words as a line under its label (.helptext). What a `title` said is kept
    for a screen reader by untitle() (page-tabs.js), never drawn. */
-/* A checkbox and its sentence on one line, and the sentence clickable with it:
-   a tick box three words from its label is a target nobody hits on a phone. */
-.modal label.row-label{display:flex;align-items:center;gap:8px;cursor:pointer}
-.modal label.row-label input{width:auto;margin:0;flex:0 0 auto}
 /* A box picked among several in the dialog a project's People opens on a
    person's roles (the operator, 17 Oct): the box and its name side by side. */
 #ramodal .upick{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}
@@ -2990,8 +2986,4 @@ body.booting .panes.dockup .pane.dock{animation:none}
 .fx .cve{display:inline-block;font:var(--f-pill);padding:3px 7px;
   border-radius:99px;border:var(--hair) solid var(--red2-edge);color:var(--bad);
   text-decoration:none;margin:0 4px 4px 0}
-/* Wrapping, not a fixed grid: four fields with their units overran the
-   dialog's box at a desk and cut the last one off (B644). */
-.vmcaps{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
-.vmcap>input{width:6em}
 }

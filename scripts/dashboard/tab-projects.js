@@ -969,14 +969,66 @@ let pGen = 0;
 
 let pFetch = null;                       // this open's /api/pubkeys, parsed
 
-// The four gates on the dialog (roadmap #27), the same table the settings
-// dialog draws from, and auto on every open: what a session may enter is
-// asked once here so it is a choice made rather than a default found later.
-const P_GATE_IDS = {roadmap: "pGateRoadmap", bugs: "pGateBugs", rules: "pGateRules", settings: "pGateSettings",
-                    design: "pGateDesign", wiki: "pGateWiki"};
-const pGateNow = () => Object.fromEntries(
-  Object.entries(P_GATE_IDS).map(([k, id]) => [k, $(id).value || "auto"]));
-// What a new project starts on (the operator, 1 Oct). Auto where what a
+// ---- its form ----
+// New space is one form over the dialog's own foot (R301): where it comes
+// from; its name beside the version a fresh tree starts at (the first commit,
+// then VERSION at this number, as the Artifacts tab gives a first version, the
+// operator 25 Sep; blank means neither); its node beside an archive to start
+// from (unpacked before git init, uploaded on Create so a change of mind costs
+// nothing, picked with a button of ours since the browser's own wears its
+// skin); what Agents may starts on, said in a line; a clone's address, its
+// host (a hostname does not say what runs on it, so the row reads the address
+// back and asks only for a server nobody has answered for), whether to push
+// (granted once and never revoked: one space per repository, since two copies
+// pushing to one remote is how a branch races itself), how a link
+// authenticates, a token for this repository alone (written in git's
+// credential-store format under /config, named for the space and referenced
+// from its .git/config alone) or a deploy key the agent holds (its public
+// half shown to add on the host, the private half unreadable); and the brief
+// a space started from nothing hands its first session (brief.py), hidden once
+// an archive is picked, an archive being the start. Each cell keeps the id a
+// mode shows or hides it by (pDraw).
+function pDrawForm(){
+  const at = document.querySelector('#pmodal [data-dlgform="space"]');
+  if (!at) return;
+  at.innerHTML = formBox({fields: [
+    `<div class="fcell fwide" id="pSrcField"><span class="lbl" id="pSrcLabel">Source</span>
+      <div class="pseg" role="group" aria-labelledby="pSrcLabel">
+        <button id="pLocal" class="on" type="button">New repository</button>
+        <button id="pClone" type="button">Clone a repository</button></div></div>`,
+    `<div class="fcell fwide"><div class="fgrid pair">${
+      formField("pName", "Name", `<input id="pName" maxlength="100" autocomplete="off" spellcheck="false" placeholder="e.g. my-app">
+        <div class="hint" id="pNameHint"></div><div class="hint" id="pNamePreview" hidden></div>`, {attrs: `id="pNameField"`})}${
+      formField("pVersion", "Starting version", `<input id="pVersion" value="0.1.0" maxlength="40" autocomplete="off" spellcheck="false" placeholder="0.1.0" inputmode="decimal">`,
+        {attrs: `id="pVersionField"`, hint: "Committed as the space's first version. Leave it blank to commit nothing yet."})}</div></div>`,
+    `<div class="fcell fwide"><div class="fgrid pair">${
+      formField("pNode", "Node", `<select id="pNode"></select>`, {hidden: true, attrs: `id="pNodeField"`, hint: "Builds, tests, CI and Claude sessions run there."})}${
+      formField("pArchive", "Start from an archive", `<input id="pArchive" type="file" hidden accept=".zip,.tar,.tgz,.tar.gz,.tbz2,.tar.bz2,.txz,.tar.xz,application/zip,application/gzip,application/x-tar">
+        <div class="filepick ctlline"><button type="button" id="pArchivePick">Choose an archive</button><span class="dim" id="pArchiveName">none picked</span></div>`,
+        {help: "optional: zip or tar, unpacked into the new repository; a single top-level folder is dropped", attrs: `id="pArchiveField"`,
+         hint: "zip or tar; a single top-level folder is dropped."})}</div></div>`,
+    `<div class="fcell fwide" id="pGateField" hidden><span class="lbl">Agents may</span>
+      <div class="sub dim">The defaults: auto for its notebook, its build and test fields and reports to AerieOS; ask for its container, a signed build, a release and its keys. Each is changed on the space's Settings.</div></div>`,
+    formField("pUrl", "Repository", `<input id="pUrl" autocomplete="off" spellcheck="false" placeholder="git@github.com:owner/repo.git" data-ph-short="repository URL"><div class="hint" id="pUrlHint"></div>`,
+      {wide: true, hidden: true, attrs: `id="pUrlField"`}),
+    formField("pForge", "Host", `<select id="pForge"></select><div class="hint" id="pForgeHint"></div>`, {help: "what the server runs", hidden: true, attrs: `id="pForgeField"`}),
+    `<div class="fcell fwide" id="pPushField" hidden><label class="ndcap"><input type="checkbox" id="pPush"> I want to push to this repository</label>
+      <div class="hint" id="pPushHint"></div></div>`,
+    `<div class="fcell fwide" id="pLinkAuthField" hidden><span class="lbl" id="pLinkAuthLabel">Authentication</span>
+      <div class="pseg" role="group" aria-labelledby="pLinkAuthLabel">
+        <button id="pLinkKey" type="button" class="on">Deploy key</button>
+        <button id="pLinkToken" type="button">Access token</button></div></div>`,
+    formField("pToken", "Access token", `<input id="pToken" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_… or github_pat_…">
+      <a class="link whichperms" href="/#/help/git-hosts" target="_blank" rel="noopener">Which permissions?</a><div class="hint" id="pTokenHint"></div>`,
+      {help: "optional: a token for this repository alone, kept on the controller; a session can push with it but not read it", wide: true, hidden: true, attrs: `id="pTokenField"`}),
+    formField("pKey", "Deploy key", `<select id="pKey"></select><div class="hint" id="pKeyHint"></div>
+      <div id="pPubWrap" hidden><div id="pPub" tabindex="0" aria-label="the deploy key's public half"></div><button id="pCopy" type="button">Copy public key</button></div>`,
+      {wide: true, hidden: true, attrs: `id="pKeyField"`}),
+    formField("pAbout", "Brief", `<textarea id="pAbout" spellcheck="false" placeholder="What you want built, and anything the first session should know."></textarea>`,
+      {wide: true, attrs: `id="pAboutField"`, hint: "The first Claude session starts on this, and you can change it then."})]});
+}
+
+// What a new space starts on (the operator, 1 Oct). Auto where what a
 // session does lands in the notebook or the settings with its history and
 // is undone in a press: the roadmap, bugs, rules, build and test, the
 // design, the wiki (each page's history is kept), and a report to
@@ -985,23 +1037,14 @@ const pGateNow = () => Object.fromEntries(
 // machine and publishes ports (ask rather than the deny a project has
 // without a choice, so a session can propose a rebuild at all, having no
 // docker of its own), a signed build, which leaves, and a signing key,
-// which is an app's identity for good.
-const P_GATE_DEFAULT = {pGateDocker: "ask", pGateSign: "ask", pGateKeys: "ask", pGateRelease: "ask", pGateReport: "auto"};
-function pFillGates(){
-  for (const id of [...Object.values(P_GATE_IDS), "pGateDocker", "pGateSign", "pGateKeys", "pGateRelease", "pGateReport"]){
-    const el = $(id);
-    if (el.dataset.built !== "1"){
-      // A report has nothing to hold for approval: auto or deny.
-      drawHTML(el, optionList((id === "pGateWiki" ? gateChoices("wiki") : GATE_MODES).filter(([v]) => id !== "pGateReport" || v !== "ask")));
-      el.dataset.built = "1";
-    }
-    el.value = P_GATE_DEFAULT[id] || "auto";
-  }
-}
+// which is an app's identity for good. Not asked in the dialog (R245): sent
+// with the space, said in its one line, and changed on its Settings.
+const P_GATE_START = {gate: {roadmap: "auto", bugs: "auto", rules: "auto", settings: "auto", design: "auto", wiki: "auto"},
+                      devbuild: "ask", sign: "ask", keys: "ask", release: "ask", report: "auto"};
 
 function pOpen(mode){
   const gen = ++pGen;
-  pMode = mode; pKeys = []; pPat = false; pFillGates(); pDraw();
+  pMode = mode; pKeys = []; pPat = false; pDraw();
   $("pName").value = $("pUrl").value = $("pAbout").value = "";
   $("pToken").value = "";
   pAskedHost = "";
@@ -1218,12 +1261,8 @@ async function createProject() {
                                 // A starting version, for a fresh tree only: a
                                 // clone keeps the history it came with.
                                 version: mode === "init" ? $("pVersion").value.trim() : "",
-                                gate: $("pGateField").hidden ? null : pGateNow(),
-                                devbuild: $("pGateField").hidden ? null : ($("pGateDocker").value || "deny"),
-                                sign: $("pGateField").hidden ? null : ($("pGateSign").value || "ask"),
-                                keys: $("pGateField").hidden ? null : ($("pGateKeys").value || "ask"),
-                                release: $("pGateField").hidden ? null : ($("pGateRelease").value || "ask"),
-                                report: $("pGateField").hidden ? null : ($("pGateReport").value || "auto"),
+                                // A repository added to a space takes the space's.
+                                ...($("pGateField").hidden ? {gate: null, devbuild: null, sign: null, keys: null, release: null, report: null} : P_GATE_START),
                                 key: mode === "clone" ? key : "",
                                 forge: mode === "clone" ? forge : "",
                                 token: mode === "clone" ? $("pToken").value.trim() : "",

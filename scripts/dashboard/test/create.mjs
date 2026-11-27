@@ -240,17 +240,14 @@ ok(await page.$eval('#pmodal', el => !el.hidden), 'the dialog opens');
 // ask where it reaches past them (its container, a signed build, a key,
 // a published release: R138).
 await section("The four gates are on the dialog", async () => {
-  const g = await page.$$eval('#pGateField select', s => Object.fromEntries(s.map(x => [x.id, [x.value, x.options.length]])));
-  const want = { pGateRoadmap: 'auto', pGateBugs: 'auto', pGateRules: 'auto', pGateDesign: 'auto', pGateWiki: 'auto', pGateSettings: 'auto',
-                 pGateDocker: 'ask', pGateSign: 'ask', pGateRelease: 'ask', pGateKeys: 'ask', pGateReport: 'auto' };
-  // The wiki's dial has a fourth choice, hidden (2 Oct).
   // The dials are not asked in the dialog any more (R245): they ride the
-  // submit at their defaults, said in one line, and live on the project's
+  // submit at their defaults, said in one line, and live on the space's
   // Settings view.
-  ok(Object.keys(g).length === 11 && Object.entries(want).every(([id, v]) => g[id]?.[0] === v)
-     && g.pGateReport[1] === 2 && g.pGateWiki[1] === 4
-     && Object.entries(g).filter(([id]) => !['pGateReport', 'pGateWiki'].includes(id)).every(([, [, n]]) => n === 3)
-     && await page.$eval('#pGateField', el => !el.hidden && el.querySelector('.prefrow').hidden && /defaults/.test(el.textContent)),
+  const g = await page.evaluate(() => ({ start: P_GATE_START, dials: document.querySelectorAll('#pGateField select').length,
+                                         line: $('pGateField').hidden ? '' : $('pGateField').textContent }));
+  const want = { gate: { roadmap: 'auto', bugs: 'auto', rules: 'auto', settings: 'auto', design: 'auto', wiki: 'auto' },
+                 devbuild: 'ask', sign: 'ask', keys: 'ask', release: 'ask', report: 'auto' };
+  ok(JSON.stringify(g.start) === JSON.stringify(want) && g.dials === 0 && /defaults/.test(g.line),
      `the eleven Claude gates ride a new space at their defaults, said in a line rather than asked (${JSON.stringify(g)})`);
 });
 const idle = () => page.evaluate(() => document.activeElement?.tagName || '');

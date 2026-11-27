@@ -366,8 +366,9 @@ await section("and the space's dialog says under a dial which repository sets it
   await settled(page);
   const apart = await page.evaluate(async () => {
     const H = { 'Content-Type': 'application/json' };
-    const said = $('rnGateReport').closest('label')?.nextElementSibling?.classList.contains('rnapart')
-      ? $('rnGateReport').closest('label').nextElementSibling.textContent : '';
+    // Under the dial, in its cell (formField).
+    const line = $('rnGateReport').nextElementSibling;
+    const said = line?.classList.contains('rnapart') ? line.textContent : '';
     const others = document.querySelectorAll('#rnmodal .rnapart').length;
     await fetch('/api/prefs', { method: 'POST', headers: H, body: JSON.stringify({ project: 'alpha', scope: 'repository', report: 'inherit' }) });
     $('rnmodal').hidden = true;

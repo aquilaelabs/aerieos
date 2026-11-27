@@ -55,16 +55,15 @@ function nbPermsView({$, nb, project, root}){
     const pick = k => k in draft ? draft[k] : saved[k];
     const opts = (k, modes) => optionList(rnDialChoices(p, `gitpol.${k}`, modes.map(m => [m, m]), GITPOL_DEFAULT[k]), pick(k));
     const dirty = Object.keys(draft).length > 0;
-    const body = `<div class="row stack2 gpolicy"><div class="grow">
-        <div class="prefrow ctlrow">
-          <label class="pick">Push its branches <select data-gitpol="push"${locked ? " disabled" : ""}>${opts("push", ["allow", "deny"])}</select></label>
-          <label class="pick">Push to its main branch <select data-gitpol="main"${locked ? " disabled" : ""}>${opts("main", ["allow", "deny"])}</select></label>
-          <label class="pick">Hold a push that looks sensitive<span class="help" data-help="a push whose added lines look like a token, key, password, email or IP address waits until a person reads it and approves it" tabindex="0">?</span> <select data-gitpol="scan"${locked ? " disabled" : ""}>${opts("scan", ["hold", "off"])}</select></label>
-        </div>
-        <div class="actbar">
-          <span class="state">${locked ? "this space is locked: its owner changes these" : `its own branches, one at a time ${helpIcon("Applies to pushes only. Tags, deletions and remote-only branches stay yours; commits and merges here are always allowed.")}`}</span>
-          <button type="button" class="permGitApply"${dirty && !locked ? "" : " disabled"}>Apply</button>
-        </div></div></div>`;
+    // One form (R301), as Agents may beside it is: its three dials, Apply at
+    // the foot.
+    const body = `<div class="row stack2 gpolicy"><div class="grow">${formBox({fields: [
+        formField("permPush", "Push its branches", `<select id="permPush" data-gitpol="push"${locked ? " disabled" : ""}>${opts("push", ["allow", "deny"])}</select>`),
+        formField("permMain", "Push to its main branch", `<select id="permMain" data-gitpol="main"${locked ? " disabled" : ""}>${opts("main", ["allow", "deny"])}</select>`),
+        formField("permScan", "Hold a push that looks sensitive", `<select id="permScan" data-gitpol="scan"${locked ? " disabled" : ""}>${opts("scan", ["hold", "off"])}</select>`,
+          {help: "a push whose added lines look like a token, key, password, email or IP address waits until a person reads it and approves it"})],
+        state: `<span class="state">${locked ? "this space is locked: its owner changes these" : `its own branches, one at a time ${helpIcon("Applies to pushes only. Tags, deletions and remote-only branches stay yours; commits and merges here are always allowed.")}`}</span>`,
+        foot: [`<button type="button" class="permGitApply"${dirty && !locked ? "" : " disabled"}>Apply</button>`]})}</div></div>`;
     const html = docSection("permissions", "push", "Pushing", `${pol.push || "allow"} · ${pol.main || "deny"}${pol.scan === "off" ? " · unheld" : ""}`, body);
     // Patched (R244): a pick not yet applied stays, and a read that brings
     // nothing new writes nothing.

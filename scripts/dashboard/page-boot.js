@@ -47,10 +47,11 @@ function bootMarkup(){
   // a password manager leaves alone (B495), every title turned into words and
   // every data-style applied: the markup the page loads with, here, and what a
   // draw writes later, by that draw. The space dialog's forms are part of
-  // that markup, drawn first, and so are the bug report's, the first
-  // session's and a container's three (New container, Send to Docker, Copy
-  // or move).
+  // that markup, drawn first, and so are New space's, the bug report's, the
+  // first session's and a container's three (New container, Send to Docker,
+  // Copy or move).
   rnDrawForms();
+  pDrawForm();
   reportDrawForm();
   briefDrawForm();
   dockerDrawForms();

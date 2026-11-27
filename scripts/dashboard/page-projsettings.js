@@ -608,7 +608,8 @@ function rnFillReads(){
 // and what it holds (R223, the operator, 7 Nov: the space's settings are the
 // whole picture); nothing elsewhere.
 function rnDialApart(el, p, f, modes){
-  const at = el?.closest("label") || el;
+  // Under the dial, in its cell.
+  const at = el;
   if (!at) return;
   let line = at.nextElementSibling?.classList.contains("rnapart") ? at.nextElementSibling : null;
   const gate = f.startsWith("gate.") ? f.slice(5) : "";
@@ -744,13 +745,13 @@ function rnFillPrefsRest(p){
   fieldDial("pc", GATE_MODES);
   pick("rnGateVersion", Object.entries(POLICY_LABEL), p?.version_policy || "locked");
   // docker-write's to change (the grant, R137 step 4), so not offered otherwise.
-  fieldDial("devbuild", GATE_MODES).closest("label").hidden = state?.can?.["docker-write"] === false;
+  fieldDial("devbuild", GATE_MODES).closest(".fcell").hidden = state?.can?.["docker-write"] === false;
   // ...and its VMs' (R91), the VMs area's to change, deny unless set.
-  fieldDial("makevms", GATE_MODES).closest("label").hidden = state?.can?.["vms-write"] === false;
+  fieldDial("makevms", GATE_MODES).closest(".fcell").hidden = state?.can?.["vms-write"] === false;
   // ...and its deploys (R281 step 6), Deploy Write's to hand a session.
-  fieldDial("kube", GATE_MODES).closest("label").hidden = state?.can?.deploy === false;
+  fieldDial("kube", GATE_MODES).closest(".fcell").hidden = state?.can?.deploy === false;
   fieldDial("discord", GATE_MODES);
-  fieldDial("installpacks", GATE_MODES).closest("label").hidden = state?.can?.curate === false;
+  fieldDial("installpacks", GATE_MODES).closest(".fcell").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
   // What its VMs may hold, only where it may make VMs at all (R223).
   // ...sliding in and out as the dial moves, and put where it belongs as
@@ -796,7 +797,7 @@ function rnDrawPrefs(){
 
 // ---- the dialog's forms, drawn at load ----------------------------------
 
-// Six sections of the dialog are forms (R301), written here rather than in
+// Seven sections of the dialog are forms (R301), written here rather than in
 // index.html so each is formBox: its Save bar is the form's foot (rnBars puts
 // its verbs there) and ends where its fields end, as a row of a field's own
 // buttons does (no .ctlrow cap in a form). Drawn once by bootMarkup, before
@@ -807,6 +808,8 @@ const RN_STATE = `<span class="state"></span>`;
 const RN_SHOWN = ":scope > .body > .field:not([hidden]):not(.rnbarf), :scope > .body > .fbox:not([hidden]) > .fgrid > :not([hidden]), "
   + ":scope > .body > .fbox:not([hidden]) > .fgroup:not([hidden]) > .fgrid > :not([hidden])";
 function rnDrawForms(){
+  // One of Agents may's dials: its words filled in when the space is read.
+  const rnGate = (id, label, help, attrs = "") => formField(id, label, `<select id="${id}"></select>`, {help, attrs});
   const forms = {
     // A repository's name; a space's door has no General, its name being the
     // card's back's (.rngroup's own rule draws a group with nothing shown as
@@ -814,6 +817,83 @@ function rnDrawForms(){
     project: formBox({state: RN_STATE, fields: [
       formField("rnName", "Name", `<input id="rnName" maxlength="100" autocomplete="off" spellcheck="false"><div class="hint" id="rnHint"></div><div class="hint" id="rnPreview" hidden></div>`,
         {attrs: `id="rnNameField"`})]}),
+    // Agents may: everything a session may or may not do on this space, in one
+    // place (the operator, 25 Sep), each dial on its own, asking first, or not
+    // at all, in the groups a person looks for it under (the operator, 22 Oct:
+    // one grid of fifteen read as a heap). What a session ENTERS into the
+    // notebook is creation only: what is already on a list a session may still
+    // tick, note and reword (roadmap #27). A code-less door has no notebook,
+    // no shipping and no test runs (data-rncode). Lent to the Permissions view
+    // (nb-permissions.js lendDials).
+    claude: `<div class="field"><div class="hint" id="rnGateMayLabel">Auto lands it, Ask holds it for your approval, Deny refuses it.</div></div>${
+      formBox({state: RN_STATE, attrs: `id="rnGateField"`, groups: [
+      {head: "The notebook", attrs: "data-rncode", fields: [
+        rnGate("rnGateRoadmap", "Add to roadmap", "new roadmap items from a session"),
+        rnGate("rnGateBugs", "File bugs", "new bug reports from a session"),
+        rnGate("rnGateRules", "Add rules", "new house rules from a session"),
+        rnGate("rnGateDesign", "Add to the design", "the design language and pages saved from a session"),
+        rnGate("rnGateWiki", "Write the wiki", "wiki pages written or removed by a session")]},
+      // The space's container (devbuild: rebuild it, change its env, create it
+      // where there is none, remove it), its VMs (R91), its Kubernetes
+      // environments (R281 step 6; one marked production asks a person
+      // whatever this says), its Discord server (R293; a removal, a permission
+      // changed or members reached asks a person whatever this says): deny by
+      // default. A tool on a session's node (R169 step 5) asks by default: a
+      // toolchain goes into a node's store and a pack joins every node's
+      // catalog, so a person who may curate it answers. A person's lent
+      // Windows PC (R270 step 6) is somebody's own machine: deny by default,
+      // and Ask puts each use in front of the person at it.
+      {head: "Building and running", fields: [
+        rnGate("rnGateSettings", "Fill in build and test", "the build, test and outputs fields from a session", "data-rncode"),
+        rnGate("rnGateDocker", "Run its container", "rebuilding, changing the env of, creating or removing this space's container, from a session"),
+        rnGate("rnGateVms", "Make VMs", "making, starting, stopping, snapshotting and removing this space's VMs, from a session"),
+        rnGate("rnGateKube", "Deploy to Kubernetes", "deploying to and rolling back this space's Kubernetes environments, from a session"),
+        rnGate("rnGateDiscord", "Manage Discord", "applying this space's Discord layout to its server, from a session"),
+        rnGate("rnGatePacks", "Install a tool pack", "installing a toolchain, or a tool pack from the vetted catalog, on a session's node, from a session"),
+        rnGate("rnGatePc", "Use a lent PC", "asking a person's Windows PC to run its lent verbs, from a session")]},
+      // What its VMs may hold in all, whoever makes them (R91 step 7), shown
+      // where it may make VMs at all (rnVmCapsShown).
+      {head: "Its VMs may hold", says: "In all, whoever makes them: a VM that would pass one is refused with the limit named. Each node also keeps 2 GB of memory and 10 GB of disk for itself.",
+       attrs: `id="rnVmCapsRow" data-own-show`, fields: [
+        formField("rnVmCount", "VMs", `<input id="rnVmCount" type="number" min="0" max="64" step="1" inputmode="numeric">`, {short: true}),
+        formField("rnVmCpus", "vCPUs", `<input id="rnVmCpus" type="number" min="0" max="256" step="1" inputmode="numeric">`, {short: true}),
+        formField("rnVmMem", "Memory, GB", `<input id="rnVmMem" type="number" min="0" max="1024" step="1" inputmode="numeric">`, {short: true}),
+        formField("rnVmDisk", "Disk, GB", `<input id="rnVmDisk" type="number" min="0" max="16384" step="1" inputmode="numeric">`, {short: true})]},
+      // Signing with the space's keys, which the session never receives
+      // (aerie sign, R106), a new key or an app mapped to one (R106 step 6: a
+      // new sideload key is an app's identity for good), the tag and the
+      // forge's release (aerie version release, R138), each asking by default
+      // and waiting for the space's owner; and who may move the version,
+      // version.py's policy, the same setting the Artifacts tab's version row
+      // writes (an owner who set every dial here to auto still found the
+      // version locked, report #48, 3 Oct), in its own words, since a policy
+      // says how far, not whether to ask.
+      {head: "Shipping", attrs: "data-rncode", fields: [
+        rnGate("rnGateSign", "Sign a build", "signing an APK or bundle with this space's keys, from a session"),
+        rnGate("rnGateKeys", "Manage signing keys", "making a signing key or mapping an app to one, from a session"),
+        rnGate("rnGateRelease", "Tag and publish a release", "tagging this commit and publishing the release, from a session"),
+        rnGate("rnGateVersion", "Move the version", "moving the space's version, from a session")]},
+      // aerie report sends AerieOS's own problems to its maintainers rather
+      // than this space's tracker: off for the space that is AerieOS.
+      {head: "AerieOS itself", fields: [
+        rnGate("rnGateReport", "Report AerieOS bugs", "reporting problems with AerieOS itself, from a session")]},
+      {head: "While a test runs", attrs: "data-rncode", fields: [
+        formField("rnTestChange", "A change asked for", `<select id="rnTestChange">
+          <option value="wait">waits: the ask in hand is finished and tested first</option>
+          <option value="restart">interrupts any test run for the new ask</option></select>`, {wide: true})]},
+      // The coding agents beside Claude its sessions may run (R95), each
+      // installed and signed in on a node, ticked here to be offered; what
+      // each part is for said where it is (the operator, 31 Oct: "confused
+      // what any of this is for"); how many sessions of one agent each person
+      // may run here at once (R143), each its own tree and branch; and how
+      // each is guarded, reference rather than a setting, folded. The space's
+      // own, lent dead to a repository's view (RN_SPACE_PARTS).
+      {head: "Coding agents", says: "Besides Claude, which always may: one left unticked does not start here.", attrs: `id="rnAgentsField"`, fields: [
+        `<div class="fcell fwide"><div class="lbox" id="rnAgents" role="group" aria-label="the coding agents besides Claude that may start here"></div></div>`,
+        formField("rnAgentDefault", "Start opens", `<select id="rnAgentDefault"></select>`, {hint: "the agent the space's Start agent button opens"}),
+        formField("rnAgentSlots", "Sessions of one agent, each person", `<select id="rnAgentSlots">${optionList([1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => [String(n), String(n)]), "3")}</select>`,
+          {hint: "how many a person may run here at once, each in a worktree of its own"}),
+        `<div class="fcell fwide"><details class="guards chev" data-sect="rn:guards"><summary>How each agent is guarded</summary><div class="hint" id="rnAgentGuards"></div></details></div>`]}]})}`,
     // Yours, not the space's, and last so that is legible from the shape of
     // the dialog: nothing here reaches anybody else's sessions or commits.
     // Kept per uid in claude-prefs.json, applied as launch flags by bb-tty
@@ -1267,7 +1347,11 @@ function rnSpaceMarks(name, door){
     const body = document.querySelector(`details[data-sect="${sect}"] > .body`);
     if (body) body.prepend(band());
   }
-  for (const id of RN_SPACE_PARTS) $(id)?.prepend(band());
+  // ...under a group's own head where it has one.
+  for (const id of RN_SPACE_PARTS){
+    const part = $(id), head = part?.querySelector(":scope > .fgrouphead");
+    if (head) head.after(band()); else part?.prepend(band());
+  }
   rnSpaceRelock();
 }
 
@@ -2141,7 +2225,9 @@ function rnBars(){
     if (wrap !== bar && wrap.parentElement !== body) body.appendChild(wrap);
     // A form's group with nothing on show is not drawn: a repository's own
     // Nodes group, on a space with no node, was a hairline over nothing.
-    for (const g of body.querySelectorAll(":scope > .fbox > .fgroup")) g.hidden = !g.querySelector(":scope > .fgrid > :not([hidden])");
+    // A group none of whose cells shows is not drawn; one its own code shows
+    // and hides (Its VMs may hold, by the Make VMs dial) is left to it.
+    for (const g of body.querySelectorAll(":scope > .fbox > .fgroup:not([data-own-show])")) g.hidden = !g.querySelector(":scope > .fgrid > :not([hidden])");
     if (bar.dataset.busy) continue;
     const {said, start} = rnSectChanges(sect, enc);
     const ask = running && start.length > 0;

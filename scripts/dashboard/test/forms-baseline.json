@@ -1,5 +1,5 @@
 {
- "index.html": 57,
+ "index.html": 14,
  "nb-analysis.js": 2,
  "nb-artifacts.js": 9,
  "nb-bugs.js": 1,
@@ -7,7 +7,7 @@
  "nb-discord.js": 2,
  "nb-git.js": 2,
  "nb-memory.js": 8,
- "nb-permissions.js": 4,
+ "nb-permissions.js": 1,
  "nb-roadmap.js": 6,
  "nb-sessions.js": 2,
  "nb-signing.js": 1,

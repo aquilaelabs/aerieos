@@ -1978,7 +1978,7 @@ await page.click('#rnInviteOnly');
 // ...and Agents may says what each part is for, its guards folded, and no
 // push line of its own: Permissions' Pushing shows and sets that.
 const gp = await page.evaluate(() => ({ push: !!document.getElementById('rnGitPolField'),
-  guards: document.getElementById('rnAgentGuards')?.closest('details')?.open, label: document.getElementById('rnAgentsLabel')?.textContent }));
+  guards: document.getElementById('rnAgentGuards')?.closest('details')?.open, label: document.getElementById('rnAgents')?.closest('.fgroup')?.querySelector('.fgrouphead')?.textContent }));
 ok(!gp.push && gp.guards === false && /Claude, which always may/.test(gp.label || ''),
    `Agents may: no push line, the guards folded, and Claude's place said beside the list (${JSON.stringify(gp)})`);
 await page.click('#rnCancel');
