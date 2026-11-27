@@ -5592,7 +5592,7 @@ usage: aerie capture shot URL... [FILE|DIR] | --emu [PKG] [FILE] | --display :N 
 a page is opened in the first browser installed here unless one is named
 (aerie capture browsers; all takes one picture in each, NAME-BROWSER.png), at
 1280x800 unless a size or a device is (aerie capture devices)
-URLs need their scheme (http:// or https://); with no FILE a page's shot goes
+URLs need their scheme (http://, https:// or file://); with no FILE a page's shot goes
 to dist/shot/ and the emulator's to dist/emu/
 EOT
 }
@@ -5651,7 +5651,7 @@ capture_shot() {
                    # Scheme-tagged, because page.goto needs one anyway: a bare
                    # host:port would produce a blank shot, so it is refused
                    # here where the message can say why.
-                   http://*|https://*) urls+=("$1") ;;
+                   http://*|https://*|file://*) urls+=("$1") ;;
                    *) [ -z "$out" ] || die "two outputs given: ${out} and $1"
                       out="$1" ;;
                esac; shift ;;
