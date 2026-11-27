@@ -77,6 +77,8 @@ const setChange = mode => page.evaluate(async m => (await (await fetch('/api/pre
 await setChange('restart');
 ok(/cuts into whatever test run is going, a suite run in the middle of the work or the gate at its end.*end that run by the pid you started it with.*still yours to fix before the run that lands/s.test((await pre()).text),
    '...and, set the other way, that any run is cut for the new ask and what it had found is still fixed');
+ok(/A question, research or something for the notebook changes nothing a run tests, so the run finishes/.test((await pre()).text),
+   '...a change asked for, and not a question, being what cuts it (the operator, 27 Nov)');
 // The asker's own reply style rides the block (a per-account setting on
 // the project, 25 Sep), and the project's briefing style drops the filler
 // words of every part but the live line: fewer bytes, code and names kept.

@@ -194,11 +194,11 @@ BUILTIN = [
              " `aerie roadmap done`."},
     {"name": "side-quests",
      "text": "A bug your own task caused is fixed as part of the work and never"
-             " filed. One that was there before your task is filed with `aerie bug"
-             " add`, and fixed only when it blocks the work: the smallest fix, in its"
-             " own commit, said in the reply, the bug closed with `aerie bug fix`."
-             " Anything else is filed and left. One level deep: a bug found while"
-             " fixing one of those is filed, not chased."},
+             " filed. One that was there before your task is fixed when it blocks"
+             " the work or sits on a surface or in a file the task already changes:"
+             " in its own commit, said in the reply, filed with `aerie bug add` and"
+             " closed with `aerie bug fix`. Anything else is filed and left. One"
+             " level deep: a bug found while fixing one of those is filed, not chased."},
     {"name": "prove-in-the-app",
      "text": "Tests passing is not done: where the space has a dev instance"
              " (`aerie devapp`) or an app on the emulator, use the change there the way"
