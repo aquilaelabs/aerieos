@@ -644,9 +644,16 @@ elif op == "step":
         to = ident(srest[2])
         pos = srest[3] if len(srest) > 3 and srest[3].isdigit() else None
         behind(item, None, None, None); behind(to, None, None, None); fresh()
-        r = roadmap.step_mv(proj, item, step_index(srest[1]), to, position=pos, by="claude", who=_who); need(r)
-        print(f"moved step {srest[1]} of {R(item)} to {R(to)}, its step {r['step'] + 1}; "
-              f"aerie roadmap show {R(item)}.{srest[1]} still finds it")
+        if to == item:
+            # Within its own item, to the place named (B1181).
+            if pos is None:
+                sys.exit("[builderbot] ERROR: within its own item a step goes to a place: step mv N M N PLACE, or up|down")
+            r = roadmap.step_to(proj, item, step_index(srest[1]), pos, by="claude", who=_who); need(r)
+            print(f"moved step {srest[1]} of {R(item)} to its place {r['step'] + 1}")
+        else:
+            r = roadmap.step_mv(proj, item, step_index(srest[1]), to, position=pos, by="claude", who=_who); need(r)
+            print(f"moved step {srest[1]} of {R(item)} to {R(to)}, its step {r['step'] + 1}; "
+                  f"aerie roadmap show {R(item)}.{srest[1]} still finds it")
     elif sub in ("mv", "move") and len(srest) >= 2 and "." in srest[0]:
         head, _, dot = srest[0].partition(".")
         item, to = ident(head), ident(srest[1])
@@ -668,7 +675,7 @@ elif op == "step":
     else:
         print("usage: aerie roadmap step add <n> \"...\" | step edit <n> <step> \"...\""
               " | step rm <n> <step> [\"why\"] | step mv <n> <step> up|down"
-              " | step mv <n> <step> <to> [<position>]"
+              " | step mv <n> <step> <to> [<position>] (to <n> itself: its own place)"
               " | step done <n> <step> [\"note\"] | step undone <n> <step> [\"why\"]",
               file=sys.stderr)
         sys.exit(1)

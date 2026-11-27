@@ -435,7 +435,8 @@ aerie roadmap target N X.Y.Z             the release one is meant for (`none` cl
                                       sends it back to its item's, and --target lists an item
                                       for any step meant for that release
 aerie roadmap step mv N M TO [POS]       step M of N moved whole to item TO (at POS); N says where
-                                      it went, and `show N.M` finds it by its old number
+                                      it went, and `show N.M` finds it by its old number; TO N itself
+                                      moves it to place POS on its own item
 aerie roadmap split N --into "TITLE" M...   N's steps M... moved to a new item, --into repeated
                                       for each; `fold N INTO M[.K]` makes N a step of M
                                       (its words on step K's details), N leaving the list

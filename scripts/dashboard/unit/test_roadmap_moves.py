@@ -45,6 +45,21 @@ class Moves(unittest.TestCase):
         self.assertIn("was dropped", roadmap.resolve("p", a, 2)["error"])
         self.assertIn("never had a step 9", roadmap.resolve("p", a, 9)["error"])
 
+    def test_a_step_goes_to_a_place_on_its_own_item_in_one_move(self):
+        # B1181: five places took five single moves.
+        a = roadmap.add("p", "A", steps=["one", "two", "three", "four", "five"])["item"]["id"]
+        r = roadmap.step_to("p", a, 4, 1)
+        self.assertEqual((r.get("ok"), r.get("step")), (True, 0), r)
+        self.assertEqual(self.texts(a), ["five", "one", "two", "three", "four"])
+        self.assertEqual(self.row(a)["steps"][0]["sid"], [a, 5], "it keeps its id")
+        self.assertEqual(roadmap.step_to("p", a, 0, 99).get("step"), 4, "a place past the end is the end")
+        self.assertEqual(self.texts(a), ["one", "two", "three", "four", "five"])
+        self.assertIn("not a place", roadmap.step_to("p", a, 0, 0)["error"])
+        roadmap.step_done("p", a, 0)
+        self.assertIn("gone stays where it is", roadmap.step_to("p", a, 3, 1)["error"], "nothing moves past one done")
+        self.assertTrue(roadmap.step_to("p", a, 4, 2).get("ok"))
+        self.assertEqual(self.texts(a), ["one", "five", "two", "three", "four"])
+
     def test_a_step_moved_to_another_item_keeps_everything_and_is_found_by_its_old_number(self):
         a = roadmap.add("p", "A", steps=["one", "two", "three"])["item"]["id"]
         b = roadmap.add("p", "B", steps=["b1"])["item"]["id"]

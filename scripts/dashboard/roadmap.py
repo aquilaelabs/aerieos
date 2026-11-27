@@ -1306,6 +1306,28 @@ def move(project, item_id, step=None, dir=0, by="you", who=""):
     return _edit(project, item_id, change, by, who=who)
 
 
+def step_to(project, item_id, step, position, by="you", who=""):
+    """One step moved to another place on its own item, `position` 1-based
+    (B1181: five places down took five single moves). Steps that have gone
+    stay where they are and nothing moves past one, as move() keeps them."""
+    i, p = _int(step), _int(position)
+    if i is None:
+        return {"error": "not a step"}
+    if p is None or p < 1:
+        return {"error": "not a place: step mv N M N PLACE, its number from 1"}
+
+    def change(row, rows):
+        steps = row.get("steps") or []
+        if not 0 <= i < len(steps):
+            return {"error": "no such step"}
+        j = min(p - 1, len(steps) - 1)
+        if any(gone(s) for s in steps[min(i, j):max(i, j) + 1]):
+            return {"error": "a step that has gone stays where it is, and nothing moves past one"}
+        steps.insert(j, steps.pop(i))
+        return {"ok": True, "step": j}
+    return _edit(project, item_id, change, by, who=who)
+
+
 # ---- steps that move (R168) ------------------------------------------------
 # A step has an id of its own, `sid`: the item it was first written on and
 # its number there, [item, n], with n counted up on the item (`nsteps`) and
