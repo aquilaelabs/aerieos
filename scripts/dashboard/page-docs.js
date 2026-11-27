@@ -1531,10 +1531,13 @@ function wireCharts(root, fmtOf = () => v => `${Math.round(v)}%`){
 // asleep while there is nothing to save, so the bar does not move, and
 // `cls` and `attrs` are the bar's own.
 function saveBar({save, revert, state = "", dead = false, cls = "", attrs = ""}){
-  const off = dead ? " disabled" : "";
   return `<div class="actbar${cls ? " " + cls : ""}"${attrs ? " " + attrs : ""}><span class="state">${state}</span><span class="sp"></span>
-    <button type="button" ${save}${off}>Save</button>
-    <button type="button" class="caution" ${revert}${off}>Revert</button></div>`;
+    ${saveVerbs({save, revert, dead}).join("")}</div>`;
+}
+// ...the same two as a form's foot hands them to formBox.
+function saveVerbs({save, revert, dead = false}){
+  const off = dead ? " disabled" : "";
+  return [`<button type="button" ${save}${off}>Save</button>`, `<button type="button" class="caution" ${revert}${off}>Revert</button>`];
 }
 
 // A dialog's foot in the design's order (a-dialog: the state on the left,

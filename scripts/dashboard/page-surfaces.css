@@ -342,7 +342,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
    and apart from it (the operator, 17 Oct). */
 .rdetail>.rfoot{display:flex;align-items:center;gap:8px;margin-top:var(--row-y);padding-top:var(--row-y);
   border-top:var(--hair) solid var(--line)}
-.rdetail>.setgrid{margin:var(--row-y) 0}
+.rdetail>.fbox{margin:var(--row-y) 0}
 .rprojects{display:flex;flex-direction:column;container-type:inline-size}
 /* A project an account is on, one row (the operator, 26 Oct): its name, its
    roles there beside it, and taking it off at the row's end, never a lone
@@ -363,7 +363,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 /* The account's roles run the width of its pane as the fields over them do
    (the operator, 24 Nov: held to a control's width, its spaces' rows ran a
    long role under the trash); its pickers keep a control's width. */
-.ueaccess.setrow.col,#ueAccess .setrow.col{max-width:none}
+#ueAccess .setrow.col{max-width:none}
 /* A built-in role's line keeps the field gap from the areas over it, where
    it sat on the table's last rule. */
 .rbuiltin{margin-top:var(--field-gap)}

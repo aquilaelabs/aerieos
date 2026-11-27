@@ -42,11 +42,10 @@
  "tab-phone.js": 6,
  "tab-profile.js": 9,
  "tab-projects.js": 1,
- "tab-roles.js": 6,
+ "tab-roles.js": 2,
  "tab-scanners.js": 2,
  "tab-schedules.js": 6,
  "tab-settings.js": 9,
  "tab-storage.js": 31,
- "tab-users.js": 6,
  "tab-vms.js": 19
 }

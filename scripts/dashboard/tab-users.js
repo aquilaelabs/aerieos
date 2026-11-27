@@ -112,8 +112,7 @@ function usersDetail(u){
   if (!usersEdit || usersEdit.for !== u.name) usersEdit = usersEditFrom(u);
   const e = usersEdit, isMe = u.name === usersMeta.me, isOwner = u.role === "owner", ro = usersReadOnly();
   const f = (id, key, label, type = "text", extra = "", help = "") =>
-    `<div class="setcell">${lbl(id, label, help)}<input id="${id}" data-ufield="${key}" type="${type}" value="${esc(e[key] || "")}"
-       autocomplete="off" spellcheck="false" ${extra}${ro ? " disabled" : ""}></div>`;
+    formField(id, label, `<input id="${id}" data-ufield="${key}" type="${type}" value="${esc(e[key] || "")}" autocomplete="off" spellcheck="false" ${extra}${ro ? " disabled" : ""}>`, {help});
   const facts = [agentLogins(u) || "signed in to no agent yet", u.seen ? `seen ${esc(ago(u.seen))}` : "never seen",
                  u.projects?.length ? `on ${u.projects.length} space${u.projects.length === 1 ? "" : "s"}` : "on no space yet"];
   // While the roles are read, their two fields in their places (the
@@ -125,18 +124,18 @@ function usersDetail(u){
   return `<div class="rhead" data-uback><span class="shback" role="img" aria-label="Back to People">\u2039</span><b>${esc(u.name)}</b> <span class="dim">${facts.join(" · ")}</span></div>
     ${u.claude_shared_with?.length ? `<div class="sub warn">the same Claude account as ${u.claude_shared_with.map(esc).join(", ")
       }, allowed only while one person is behind both</div>` : ""}
-    <div class="setgrid">
-      ${isMe ? f("ueName", "name", "Account name", "text", "disabled", "your own account name changes on your Profile, which keeps this browser signed in")
-             : f("ueName", "name", "Account name", "text", "", "what they sign in with. Changing it signs their browsers out")}
-      ${f("ueFull", "full", "Their name")}
-      ${f("ueEmail", "email", "Their email", "email")}
-      ${f("ueGitName", "git_name", "Git name", "text", "", "on their commits. Blank means their name")}
-      ${f("ueGitEmail", "git_email", "Git email", "email", "", "on their commits. Blank means their email")}
-      ${f("uePw", "pw", "New password", "password", 'autocomplete="new-password"', "blank keeps the current one. Set without the old one, which is the way back in for somebody locked out")}
-    </div>
-    <div class="setrow col ueaccess ctlrow">${lbl("", "Roles and spaces", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
-    <div class="sub bad" id="ueErr" hidden></div>
-    ${ro ? "" : saveBar({save: 'id="ueSave"', revert: 'id="ueRevert"', state: usersDirty() ? "unsaved" : "", dead: !usersDirty()})}
+    ${formBox({groups: [{fields: [
+        isMe ? f("ueName", "name", "Account name", "text", "disabled", "your own account name changes on your Profile, which keeps this browser signed in")
+             : f("ueName", "name", "Account name", "text", "", "what they sign in with. Changing it signs their browsers out"),
+        f("ueFull", "full", "Their name"),
+        f("ueEmail", "email", "Their email", "email"),
+        f("ueGitName", "git_name", "Git name", "text", "", "on their commits. Blank means their name"),
+        f("ueGitEmail", "git_email", "Git email", "email", "", "on their commits. Blank means their email"),
+        f("uePw", "pw", "New password", "password", 'autocomplete="new-password"', "blank keeps the current one. Set without the old one, which is the way back in for somebody locked out")]},
+      {head: "Roles and spaces", says: "What this account may do; what each role holds is on the Roles page.",
+       fields: [`<div class="fcell fwide ueaccess"><div id="ueAccess">${access}</div><div class="sub bad" id="ueErr" hidden></div></div>`]}],
+      state: ro ? "" : `<span class="state">${usersDirty() ? "unsaved" : ""}</span>`,
+      foot: ro ? [] : saveVerbs({save: 'id="ueSave"', revert: 'id="ueRevert"', dead: !usersDirty()})})}
     ${u.devices ? `<div class="uedevices"><span class="lbl">Devices${helpIcon("the apps signed in as this account on its machines; Disconnect cuts one off for them, as a lost laptop needs")}</span>${
       profileDevices(u.devices, u.name)}</div>` : ""}
     ${ro ? "" : `<div class="rfoot">${isOwner ? `<span class="sub dim">The owner cannot be deleted: rename it instead.</span>`
@@ -294,19 +293,15 @@ function usersAddOpen(){
     armModal(m);
   }
   // The account beside the person's name, and the password beside itself
-  // typed again: the forms rule's grid (R273).
+  // typed again: one form (R301), the dialog's foot its verbs.
   drawHTML(m, `<div class="box"><h3>Add user</h3>
-    <div class="field"><div class="fgrid">
-      <div class="field">${lbl("uNewName", "Account name")}<input id="uNewName" autocomplete="off"></div>
-      <div class="field">${lbl("uNewFull", "Name", "optional: how they are addressed. Their git name and email are set on their Profile, or here once the account exists")}
-        <input id="uNewFull" autocomplete="off"></div>
-    </div></div>
-    <div class="field"><div class="fgrid">
-      <div class="field">${lbl("uNewPw", "Password", "at least 8 characters. They can change it on their Profile")}
-        <input id="uNewPw" type="password" autocomplete="new-password"></div>
-      <div class="field">${lbl("uNewPw2", "The password again")}<input id="uNewPw2" type="password" autocomplete="new-password"></div>
-    </div></div>
-    <div class="field">${lbl("uNewEmail", "Email", "optional")}<input id="uNewEmail" type="email" autocomplete="off"></div>
+    <div class="field">${formBox({fields: [
+      formField("uNewName", "Account name", `<input id="uNewName" autocomplete="off">`),
+      formField("uNewFull", "Name", `<input id="uNewFull" autocomplete="off">`,
+        {help: "optional: how they are addressed. Their git name and email are set on their Profile, or here once the account exists"}),
+      formField("uNewPw", "Password", `<input id="uNewPw" type="password" autocomplete="new-password">`, {help: "at least 8 characters. They can change it on their Profile"}),
+      formField("uNewPw2", "The password again", `<input id="uNewPw2" type="password" autocomplete="new-password">`),
+      formField("uNewEmail", "Email", `<input id="uNewEmail" type="email" autocomplete="off">`, {help: "optional"})]})}</div>
     <div class="field"><div class="hint">A new account holds no role: give it one beside its account once it is added.</div></div>
     <div class="field" id="uAddWhyF" hidden><div class="hint bad" id="uAddWhy"></div></div>
     ${dlgFoot(`<button type="button" id="uAddCancel">Cancel</button>`, `<button type="button" id="uAdd" class="primary" disabled>Add</button>`)}</div>`);

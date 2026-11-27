@@ -355,21 +355,21 @@ function rolesRoleBody(){
   const why = !ro && (d.areas || []).some(([, , group]) => offOf(group))
     ? `<div class="sub" id="rolesWhyOff">The gray areas are not about one space: only an Everywhere role holds them.</div>` : "";
   const areas = why + tblWrap(ROLE_AREA_COLS, rows, "rareas");
+  // One form (R301): its kind and what it is for on the grid, its areas
+  // and its two-factor tick across it, Save and Revert at the foot.
+  const scopes = `<option value="projects"${r.scope !== "global" ? " selected" : ""}>On a space</option><option value="global"${r.scope === "global" ? " selected" : ""}>Everywhere</option>`;
   return rolesSplit("roles", list, `${pick}
-    <div class="setrow col ctlrow">${lbl("rolesScope", "Kind", "On a space: given per space under People, and holds there. Everywhere: given to the account, holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
-      <select id="rolesScope"${ro ? " disabled" : ""}>
-        <option value="projects"${r.scope !== "global" ? " selected" : ""}>On a space</option>
-        <option value="global"${r.scope === "global" ? " selected" : ""}>Everywhere</option>
-      </select></div>
-    ${ro ? "" : `<div class="setrow col ctlrow">${lbl("rolesNote", "What this role is for")}<input id="rolesNote" value="${esc(r.note)}" autocomplete="off"></div>`}
-    ${areas}
-    ${r.builtin ? `<div class="sub rbuiltin">${esc(r.note)}. Built in, every area to write, and not changed here.</div>`
-      : ""}
-    ${r.fresh ? "" : `<label class="ndcap rtwofactor"><input type="checkbox" id="rolesTf"${
-      d.roles[r.name]?.two_factor ? " checked" : ""}${d.admin ? "" : " disabled"}> Require two-factor sign-in of everybody holding it${
-      helpIcon("each holder without an authenticator app or a passkey is sent to set one up at their next sign-in, and reaches nothing else until they have")}</label>`}
-    ${ro ? "" : `${saveBar({save: 'id="rolesSave"', revert: 'id="rolesRevert"', state: rolesRoleDirty() ? "unsaved" : "", dead: !rolesRoleDirty()})}
-      ${r.fresh ? "" : `<div class="rfoot"><button type="button" class="danger" id="rolesRemove">Remove ${esc(d.roles[r.name]?.label || r.name)}</button></div>`}`}`);
+    ${formBox({fields: [
+      formField("rolesScope", "Kind", `<select id="rolesScope"${ro ? " disabled" : ""}>${scopes}</select>`,
+        {help: "On a space: given per space under People, and holds there. Everywhere: given to the account, holds on every space and is the only kind that reaches the nodes, toolchains and the controller"}),
+      ro ? "" : formField("rolesNote", "What this role is for", `<input id="rolesNote" value="${esc(r.note)}" autocomplete="off">`),
+      `<div class="fcell fwide">${areas}${r.builtin ? `<div class="sub rbuiltin">${esc(r.note)}. Built in, every area to write, and not changed here.</div>` : ""}</div>`,
+      r.fresh ? "" : `<div class="fcell fwide"><label class="ndcap rtwofactor"><input type="checkbox" id="rolesTf"${
+        d.roles[r.name]?.two_factor ? " checked" : ""}${d.admin ? "" : " disabled"}> Require two-factor sign-in of everybody holding it${
+        helpIcon("each holder without an authenticator app or a passkey is sent to set one up at their next sign-in, and reaches nothing else until they have")}</label></div>`],
+      state: ro ? "" : `<span class="state">${rolesRoleDirty() ? "unsaved" : ""}</span>`,
+      foot: ro ? [] : saveVerbs({save: 'id="rolesSave"', revert: 'id="rolesRevert"', dead: !rolesRoleDirty()})})}
+    ${ro || r.fresh ? "" : `<div class="rfoot"><button type="button" class="danger" id="rolesRemove">Remove ${esc(d.roles[r.name]?.label || r.name)}</button></div>`}`);
 }
 
 function rolesRoleDirty(){
@@ -391,11 +391,10 @@ function rolesNewOpen(){
     armModal(m);
   }
   drawHTML(m, `<div class="box"><h3>New role</h3>
-    <div class="field"><div class="fgrid">
-    <div class="field">${lbl("rolesNewName", "Its name")}<input id="rolesNewName" autocomplete="off"></div>
-    <div class="field">${lbl("rolesNewScope", "Kind", "On a space: given per space, and holds there. Everywhere: holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
-      <select id="rolesNewScope"><option value="projects">On a space</option><option value="global">Everywhere</option></select></div>
-    </div></div>
+    <div class="field">${formBox({fields: [
+      formField("rolesNewName", "Its name", `<input id="rolesNewName" autocomplete="off">`),
+      formField("rolesNewScope", "Kind", `<select id="rolesNewScope"><option value="projects">On a space</option><option value="global">Everywhere</option></select>`,
+        {help: "On a space: given per space, and holds there. Everywhere: holds on every space and is the only kind that reaches the nodes, toolchains and the controller"})]})}</div>
     ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`);
   // Make it wakes once a name is typed that no role has (the operator, 18
   // Oct).
