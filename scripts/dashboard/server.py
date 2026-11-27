@@ -214,12 +214,7 @@ def purpose_user(tok, purpose):
 
 
 def token_user(tok):
-    """The account a cookie is for, or None. Fails closed on everything.
-
-    A cookie from before accounts existed has two parts rather than three and
-    simply does not verify, which signs those sessions out once. That is the
-    honest outcome: there is no way to know who they were.
-    """
+    """The account a cookie is for, or None. Fails closed on everything."""
     parts = str(tok or "").split(".")
     if len(parts) != 4:
         return None
@@ -7546,13 +7541,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._who() is not None
 
     def _principal(self):
-        """What the audit rows should say this was: the account's name.
-
-        `operator` was a placeholder from before there were accounts, true of
-        every mutation because there was only ever one person who could make
-        one. Now there can be several, and a log that calls them all the same
-        thing is a log that answers no question worth asking.
-        """
+        """What the audit rows should say this was: the account's name, so a
+        log of several people's changes says whose each was."""
         u = self._who()
         return f"user:{u['name']}" if u else "anonymous"
 

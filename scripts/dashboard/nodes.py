@@ -2273,7 +2273,7 @@ def _c_channel(c, out):
 def channel_said(n):
     """What a node's row says of its channel, a phrase, or "": that it is
     plain http, for a node that says so of itself. Nothing for one over
-    https, nor for one whose agent is from before it said."""
+    https."""
     ch = ((n or {}).get("reported") or {}).get("channel") or {}
     return "over plain http" if ch.get("scheme") == "http" else ""
 
