@@ -5,6 +5,7 @@ its project is linked to first; git's helper answers from it; a token kept
 as a project's own from before goes to the project owner's store (0011);
 purging it, or removing the account, unlinks those projects, each saying
 so until it is given access again."""
+import importlib
 import json
 import os
 import subprocess
@@ -73,10 +74,12 @@ class Store(unittest.TestCase):
         self.assertEqual(got["host"], "192.168.1.16:3000")
         self.assertEqual(accountkeys.forge_of(UID, got["id"])["host"], "192.168.1.16:3000")
         self.assertEqual(accountkeys.forge_line(UID, host="192.168.1.16:3000"), line)
-        # ...and an entry already kept with the colon encoded reads the same.
+        # ...and an entry kept with the colon encoded before 31 Oct reads the
+        # same once migration 0044 has written its host as a remote names it.
         sd = json.loads((self.d / "account-secrets.json").read_text())
         sd[UID]["forges"][got["id"]]["host"] = "192.168.1.16%3a3000"
         (self.d / "account-secrets.json").write_text(json.dumps(sd))
+        importlib.import_module("statemigrations.0044_forges_name_host").run({"state": str(self.d)})
         self.assertIn("192.168.1.16:3000", [f["host"] for f in accountkeys.forges_of(UID)])
         self.assertEqual(accountkeys.link_forge(UID, "192.168.1.16:3000", line, "octo")[0]["id"], got["id"])
 

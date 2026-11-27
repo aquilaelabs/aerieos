@@ -394,8 +394,8 @@ def forget(uid):
 
 
 # ---- the account's key store: the forge tokens it gave -------------------
-# An entry's id names it for good; one written before ids (keyed by its
-# host) keeps its host as its id.
+# An entry's id names it for good, and its host is kept as a remote's URL
+# names it (_bare), beside its sealed token.
 
 def _bare(host):
     """A host as a remote's URL names it: git's credential lines write a
@@ -407,7 +407,7 @@ def _bare(host):
 
 def _entries(uid, sd=None):
     fs = ((sd if sd is not None else _load_secrets()).get(uid) or {}).get("forges") or {}
-    return {fid: dict(f, host=_bare(f.get("host") or fid)) for fid, f in fs.items() if isinstance(f, dict)}
+    return {fid: dict(f, host=str(f.get("host") or "")) for fid, f in fs.items() if isinstance(f, dict)}
 
 
 def forges_of(uid):
@@ -446,7 +446,7 @@ def link_forge(uid, host, line, login):
         for fid, f in _entries(uid, sd).items():
             if f["host"] == host and _open_entry(k, f) == line:
                 return {"ok": True, "id": fid, "host": host, "login": f.get("login", ""), "replaced": []}, 200
-        same = sorted((fid for fid, f in fs.items() if isinstance(f, dict) and _bare(f.get("host", "")) == host
+        same = sorted((fid for fid, f in fs.items() if isinstance(f, dict) and (f.get("host") or "") == host
                        and (f.get("login") or "") == (login or "")), key=lambda i: -int(fs[i].get("at") or 0))
         fid = same[0] if same else secrets.token_hex(6)
         for old in same[1:]:
