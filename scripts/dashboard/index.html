@@ -750,7 +750,7 @@
     <div class="field" id="rnEnvField">
       <label id="rnEnvLabel">Environments<span class="help" data-help="where this space's software goes: each a cluster from the Clusters page, a namespace on it this space alone deploys to, the registry its images are pushed to (left empty, its git host's own, with the deploying person's own token for it; none at all on a k3s cluster this install runs on a node the repository builds on), and when it deploys. Saving one makes its namespace ready, with a deployer that reaches that namespace and nothing else; removing one leaves the namespace on the cluster" tabindex="0">?</span></label>
       <div id="rnEnvRows" role="group" aria-labelledby="rnEnvLabel"></div>
-      <div class="rnreachadd"><button type="button" id="rnEnvAdd">Add environment</button></div>
+      <div class="addbar ctlrow rnreachadd"><button type="button" id="rnEnvAdd">Add environment</button></div>
       <div class="hint" id="rnEnvHint"></div>
     </div>
     <div class="field" id="rnShipField" hidden>

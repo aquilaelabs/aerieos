@@ -1050,7 +1050,7 @@ function rnDrawForms(){
       + `<div class="field" id="rnReachField" hidden>
         <label id="rnReachLabel">Also reaches<span class="help" data-help="other machines a session here may still reach outside its space's network: an address for the whole machine, or address:port for one service, on the nodes you tick. Running sessions get it at once" tabindex="0">?</span></label>
         <div id="rnReachRows" role="group" aria-labelledby="rnReachLabel"></div>
-        <div class="rnreachadd"><button type="button" id="rnReachAdd">Add an address</button></div>
+        <div class="addbar ctlrow rnreachadd"><button type="button" id="rnReachAdd">Add an address</button></div>
         <div class="hint" id="rnReachHint"></div></div>
       <div class="field" id="rnRouterField">
         <label id="rnRouterLabel">Model router<span class="help" data-help="the router its Any model sessions call providers through, and the models it offers them; granted where the router lives, on its node's page, never here" tabindex="0">?</span></label>
