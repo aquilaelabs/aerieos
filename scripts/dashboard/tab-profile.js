@@ -141,51 +141,25 @@ function renderProfileInto(i){
   const sec = (id, title, inner) => docSection("profile", id, title, "",
     `<div class="row stack2"><div class="grow">${inner}</div></div>`);
   patch(d.list, `${head}
-    ${sec("you", "Who you are", `
-        <div class="logset">
-          ${PROFILE_FIELDS.map(([k, label, hint, type]) => `
-            <div class="logdays setrow col ctlrow">
-              ${lbl("pf_" + k, label, hint)}
-              <input id="pf_${k}" type="${type}" data-pf="${k}" value="${esc(val(k))}"
-                     spellcheck="false" autocomplete="off">
-            </div>`).join("")}
-          <div class="logdays setrow col ctlrow">
-            ${lbl("pf_tz", "Your time zone", "the hours of your quiet windows on the bell, and the times every browser of yours shows unless it picks its own in the gear's menu")}
-            <select id="pf_tz" data-pf="tz">${tzOptions(val("tz"), {person: true})}</select>
-          </div>
-          <div class="actbar">
-            <span class="state${profile.git_ready === false ? " warn" : ""}">${
-              profile.git_ready === false
-                ? "no author for commits yet: a session waits for a name and an email here"
-                : `commits are signed ${esc(g.name)} &lt;${esc(g.email)}&gt;`}</span>
-            <button type="button" id="pfSave"${dirty ? "" : " disabled"}>Save</button>
-            <button type="button" id="pfRevert" class="caution"${dirty ? "" : " disabled"}>Revert</button>
-          </div>
-        </div>`)}
+    ${sec("you", "Who you are", formBox({
+      fields: [...PROFILE_FIELDS.map(([k, label, hint, type]) => formField("pf_" + k, label, `<input id="pf_${k}" type="${type}" data-pf="${k}" value="${esc(val(k))}" spellcheck="false" autocomplete="off">`, {help: hint})),
+        formField("pf_tz", "Your time zone", `<select id="pf_tz" data-pf="tz">${tzOptions(val("tz"), {person: true})}</select>`,
+          {help: "the hours of your quiet windows on the bell, and the times every browser of yours shows unless it picks its own in the gear's menu"})],
+      state: `<span class="state${profile.git_ready === false ? " warn" : ""}">${profile.git_ready === false
+        ? "no author for commits yet: a session waits for a name and an email here"
+        : `commits are signed ${esc(g.name)} &lt;${esc(g.email)}&gt;`}</span>`,
+      foot: [`<button type="button" id="pfSave"${dirty ? "" : " disabled"}>Save</button>`,
+        `<button type="button" id="pfRevert" class="caution"${dirty ? "" : " disabled"}>Revert</button>`]}))}
     ${sec("may", "What you may do", `
         ${wm.may.length ? factGrid(wm.may) : `<div class="hint">nothing yet: an administrator gives you a role</div>`}`)}
-    ${sec("password", "Password", `
-        <div class="logset">
-          <div class="logdays setrow col ctlrow">
-            ${lbl("pfCur", "Current password")}
-            <input id="pfCur" type="password" autocomplete="current-password">
-            <div class="notice bad" id="pfCurWhy" hidden></div>
-          </div>
-          <div class="logdays setrow col ctlrow">
-            ${lbl("pfNew", "New password", "at least 8 characters; every browser signed in as you signs out")}
-            <input id="pfNew" type="password" autocomplete="new-password">
-            <div class="notice bad" id="pfNewWhy" hidden></div>
-          </div>
-          <div class="logdays setrow col ctlrow">
-            ${lbl("pfNew2", "New password again")}
-            <input id="pfNew2" type="password" autocomplete="new-password">
-            <div class="notice bad" id="pfNew2Why" hidden></div>
-          </div>
-          <div class="actbar">
-            <span class="state"></span>
-            <button type="button" id="pfPasswd" disabled>Change password</button>
-          </div>
-        </div>`)}
+    ${sec("password", "Password", formBox({
+      // The one in use on a line of its own, the new one and its repeat
+      // side by side under it.
+      groups: [{fields: [formField("pfCur", "Current password", `<input id="pfCur" type="password" autocomplete="current-password"><div class="notice bad" id="pfCurWhy" hidden></div>`)]},
+        {fields: [formField("pfNew", "New password", `<input id="pfNew" type="password" autocomplete="new-password"><div class="notice bad" id="pfNewWhy" hidden></div>`,
+          {help: "at least 8 characters; every browser signed in as you signs out"}),
+        formField("pfNew2", "New password again", `<input id="pfNew2" type="password" autocomplete="new-password"><div class="notice bad" id="pfNew2Why" hidden></div>`)]}],
+      foot: [`<button type="button" id="pfPasswd" disabled>Change password</button>`]}))}
     ${sec("twofactor", "Two-factor sign-in", profileTwoFactor(profile.two_factor || {}, !!profile.two_factor_required))}
     ${keyMineSection()}
     ${profileAgentsSection()}

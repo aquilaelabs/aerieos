@@ -2421,10 +2421,9 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
    under it (formField). Room is the box's to give (its gap), so nothing in a
    form touches the thing above it whatever is put in it. */
 .fbox{display:flex;flex-direction:column;gap:16px;min-width:0;max-width:calc(var(--ctl-w) * 2 + 20px)}
-.fbox>.fgrid{max-width:none}
-.fbox>.fgroup{padding:0 0 16px}
-.fbox>.fgroup:last-of-type{padding-bottom:0}
-.fbox>.fgroup + .fgroup{padding-top:0}
+/* Every grid in the box fills it, a group's too: capped again inside it, a
+   group's fields ended short of the foot on a phone. */
+.fbox .fgrid{max-width:none}
 .fbox>.ffoot{margin:0}
 .fcell{display:flex;flex-direction:column;gap:var(--label-gap);min-width:0}
 .fcell>.hint{margin:0}
@@ -2589,8 +2588,6 @@ button[aria-busy="true"]{opacity:.75}
 .machinetab .ndrow>.grow>.name{display:none}
 /* The controller's own machine (R90): a reference, in the reference's color. */
 .ndrow .name .tag.ndown{color:var(--purple);border-color:var(--purple-edge)}
-.ndnet{display:grid;gap:6px;align-items:center;
-  grid-template-columns:minmax(0,7em) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr)}
 /* The whole of a mount's reason, under its row (B660): the cell at the end
    of the line keeps the state's first words. */
 .ndmount .ndmwhy{white-space:normal;overflow-wrap:anywhere;padding:0 var(--row-x) var(--row-y)}
@@ -2600,9 +2597,6 @@ button[aria-busy="true"]{opacity:.75}
 /* Its margin sits under a dialog field's own for its children, which
    outranks it there. */
 .setgrid{margin:6px 0 2px}
-@media (max-width:600px){
-  .ndnet{grid-template-columns:minmax(0,1fr)}
-}
 
 /* The wiring fold. Its lines wrap rather than scroll: a host path is long, and
    a row that scrolls sideways on a phone hides the half you were reading. */

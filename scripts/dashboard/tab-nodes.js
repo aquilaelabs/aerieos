@@ -1105,17 +1105,18 @@ function nodeSessionsSection(n){
 // Save, which sends what changed and nothing else.
 function nodeSessSettings(n){
   const host = !!n.config?.host_only;
-  const rows = (host ? nodeHostRootRow(n) + nodePortsLocalRow(n)
-    : nodeSessFacts(n) + `<div class="fgroup ndsetgroup"><div class="fgrouphead">Set here<span class="sub">Each a draft until Save below.</span></div>`
-      + nodeRootAsksRow(n) + nodePortsLocalRow(n) + nodeTurnsRow(n) + `</div>`) + nodeRoomRow(n);
+  const set = host ? {fields: [nodeHostRootRow(n), nodePortsLocalRow(n)]}
+    : {head: "Set here", says: "Each a draft until Save below.", fields: [nodeRootAsksRow(n), nodePortsLocalRow(n), nodeTurnsRow(n)]};
   const t = n.turns || {};
   // Sessions, said so: under the test workers' field it read as them (B394).
   const now = host ? "" : `${t.working || 0} session${(t.working || 0) === 1 ? "" : "s"} working now${t.limit ? ` of ${t.limit}` : ""}${t.waiting ? `, ${t.waiting} waiting for a turn` : ""}`;
   const dirty = nodeSessDirty(n);
-  return `<div class="ndsettings">${rows}
-    <div class="actbar sectbar"><span class="state${t.waiting ? " warn" : ""}">${esc(now)}</span><span class="sp"></span>
-      <button type="button" data-nd="sess-save"${dirty ? "" : " disabled"}>Save</button>
-      <button type="button" class="caution" data-nd="sess-revert"${dirty ? "" : " disabled"}>Revert</button></div>
+  // One form (R301): its switches and numbers on the form's grid, its Save
+  // and Revert at the foot, ending where the fields end.
+  return `<div class="ndsettings">${host ? "" : nodeSessFacts(n)}${formBox({groups: [set, nodeRoomGroup(n)],
+    state: `<span class="state${t.waiting ? " warn" : ""}">${esc(now)}</span>`,
+    foot: [`<button type="button" data-nd="sess-save"${dirty ? "" : " disabled"}>Save</button>`,
+      `<button type="button" class="caution" data-nd="sess-revert"${dirty ? "" : " disabled"}>Revert</button>`]})}
   </div>`;
 }
 // Whether a draft in the section differs from what the node has.
@@ -1138,16 +1139,13 @@ const ND_ROOM = [["room_floor_gb", "Disk kept free (GB)", "a build or a test doe
   ["room_mem_pct", "Memory warning (% in use)", "the bell says so when this node's memory has stayed at this share or more for ten minutes", 50, 99],
   ["container_mem_gb", "Container memory (GB, 0 for none)", "the memory a container started here gets when its compose file sets none", 0, 1024]];
 const nodeRoomHas = (n, k) => n.config?.[k] == null ? "" : String(n.config[k]);
-function nodeRoomRow(n){
+function nodeRoomGroup(n){
   const c = nodeDraft(n).draft;
   const inst = k => state?.settings?.[k]?.value ?? {room_floor_gb: 10, room_mem_pct: 92, container_mem_gb: 0}[k];
-  return `<div class="fgroup ndsetgroup"><div class="fgrouphead">Room<span class="sub">Blank is this install's, set in Controller settings.</span></div>
-    <div class="ndnums">${ND_ROOM.map(([k, label, help, lo, hi]) => {
-      const id = `ndRoom-${n.id}-${k}`, v = c[`room.${k}`] ?? nodeRoomHas(n, k);
-      return `<div class="logdays setrow col ctlrow">${lbl(id, `${label}: blank for ${inst(k)}`, help)}
-        <input id="${esc(id)}" data-room="${esc(k)}" type="number" min="${lo}" max="${hi}" step="1" inputmode="numeric"
-          placeholder="${esc(String(inst(k)))}" value="${esc(v)}"></div>`;
-    }).join("")}</div></div>`;
+  return {head: "Room", says: "Blank is this install's, set in Controller settings.", fields: ND_ROOM.map(([k, label, help, lo, hi]) => {
+    const id = `ndRoom-${n.id}-${k}`, v = c[`room.${k}`] ?? nodeRoomHas(n, k);
+    return formField(id, `${label}: blank for ${inst(k)}`, `<input id="${esc(id)}" data-room="${esc(k)}" type="number" min="${lo}" max="${hi}" step="1" inputmode="numeric" placeholder="${esc(String(inst(k)))}" value="${esc(v)}">`, {help});
+  })};
 }
 
 // Its system's own packages (R294 step 13), as its agent counts them once an
@@ -1201,7 +1199,7 @@ function nodeHostRootRow(n){
   if (c.draft.rootAsks === undefined || c.draft.rootFrom !== rootOn){
     c.draft.rootAsks = rootOn; c.draft.rootFrom = rootOn;
   }
-  return `<div class="field">
+  return `<div class="fcell fwide">
     <label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
       let a session of a space that hosts containers here ask for a root command (aerie root run --node ${esc(n.name)}), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
@@ -1225,7 +1223,7 @@ function nodePortsLocalRow(n){
     : on ? `<div class="sub dim">Setting it up: the agent writes docker's daemon.json and restarts docker once.</div>`
     : ip === "127.0.0.1" ? `<div class="sub dim">Off, and docker still binds to 127.0.0.1 until the agent puts it back.</div>`
     : `<div class="sub">Off: a published port binds to every address of this node, the internet's included where the node is on it.</div>`;
-  return `<div class="field">
+  return `<div class="fcell fwide">
     <label class="ndcap"><input type="checkbox" data-k="portslocal" ${c.draft.portsLocal ? "checked" : ""}>
       published ports stay on this node (bound to 127.0.0.1; a compose naming 0.0.0.0:PORT publishes it anyway)</label>
     ${line}
@@ -1276,7 +1274,7 @@ function nodeRootAsksRow(n){
   if (c.draft.rootAsks === undefined || c.draft.rootFrom !== rootOn){
     c.draft.rootAsks = rootOn; c.draft.rootFrom = rootOn;
   }
-  return `<div class="field"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
+  return `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
       let a session ask for a root command (aerie root run), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
     ${nodeRootOffLine(n)}</div>`;
@@ -1303,18 +1301,10 @@ function nodeTurnsRow(n){
   }
   const winp = `ndWorkers-${n.id}`;
   // What 0 means is in each label, where a phone reads it (B459).
-  return `<div class="ndnums"><div class="logdays setrow col ctlrow">
-      ${lbl(inp, "Sessions working at once (0: no limit)", "a prompt past it waits for a turn instead of starting")}
-      <input id="${esc(inp)}" data-k="turns" type="number" min="0" max="64" step="1" inputmode="numeric"
-        value="${esc(c.draft.turnsText)}">
-    </div>
-    <div class="logdays setrow col ctlrow">
-      ${lbl(winp, `Test workers at most (0: every core${n.reported?.cpu ? `, ${n.reported.cpu} here` : ""})`,
-        "the most suites a test run here runs at once; each takes its next suite only while the machine has room, so a busy node runs fewer")}
-      <input id="${esc(winp)}" data-k="workers" type="number" min="0" max="256" step="1" inputmode="numeric"
-        value="${esc(c.draft.workersText)}">
-    </div></div>
-`;
+  return formField(inp, "Sessions working at once (0: no limit)", `<input id="${esc(inp)}" data-k="turns" type="number" min="0" max="64" step="1" inputmode="numeric" value="${esc(c.draft.turnsText)}">`,
+      {help: "a prompt past it waits for a turn instead of starting"})
+    + formField(winp, `Test workers at most (0: every core${n.reported?.cpu ? `, ${n.reported.cpu} here` : ""})`, `<input id="${esc(winp)}" data-k="workers" type="number" min="0" max="256" step="1" inputmode="numeric" value="${esc(c.draft.workersText)}">`,
+      {help: "the most suites a test run here runs at once; each takes its next suite only while the machine has room, so a busy node runs fewer"});
 }
 
 // The node's path mapping (docs/nodes.md §11): what this container's paths
@@ -1742,14 +1732,10 @@ function nodeConfSections(n){
     const r = rep.stores?.[role];
     const now = r ? (r.free_mb === null ? `${r.path}: missing` : `${r.path}, ${
       sgb(r.free_mb)} free`) : "";
-    return `
-    <div class="setrow col ctlrow">
-      ${lbl("", role, STORE_ABOUT[role] || "")}
-      <input data-k="store:${esc(role)}" list="ndStorePlaces" value="${esc(d.stores[role] || "")}" spellcheck="false"
-        autocomplete="off" placeholder="${esc(r?.path || "/var/lib/aerieos/" + role)}">
-      <div class="sub data">${now ? "now " + esc(now) : "not reported"}</div>
-    </div>`;
-  }).join("");
+    const id = `ndStore-${n.id}-${role}`;
+    return formField(id, role, `<input id="${esc(id)}" data-k="store:${esc(role)}" list="ndStorePlaces" value="${esc(d.stores[role] || "")}" spellcheck="false" autocomplete="off" placeholder="${esc(r?.path || "/var/lib/aerieos/" + role)}">`,
+      {help: STORE_ABOUT[role] || "", hint: `<span class="data">${now ? "now " + esc(now) : "not reported"}</span>`});
+  });
   // What a store may sit on, offered: the mounts this node has (the forms rule).
   const storePlaces = `<datalist id="ndStorePlaces">${[...new Set((rep.mounts || []).map(m => m.path).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join("")}</datalist>`;
   const net = rep.network || {};
@@ -1808,28 +1794,24 @@ function nodeConfSections(n){
   const [status, statusCls] = lineFor("network");
   // Save and Revert in the save bar's order (saveBar), Revert putting the
   // fields back to what is saved; Apply after them.
-  const saveBtn = `<button type="button" data-nsave ${c.dirty ? "" : "disabled"}
-      title="save these settings; Apply puts them on the node">Save</button>
-    <button type="button" class="caution" data-nrevert ${c.dirty ? "" : "disabled"}
-      title="put the fields back to what is saved">Revert</button>`;
+  const saveBtn = [`<button type="button" data-nsave ${c.dirty ? "" : "disabled"}
+      title="save these settings; Apply puts them on the node">Save</button>`,
+    `<button type="button" class="caution" data-nrevert ${c.dirty ? "" : "disabled"}
+      title="put the fields back to what is saved">Revert</button>`];
   const storage = `
       <div class="addline"><div class="sub">Shares mounted at boot.${
         d.fromNode ? ` <span class="dim">As the node reports them: a Save on one manages them all from here.</span>` : ""}</div>
       <div class="addbar ctlrow"><button type="button" data-madd${c.mountEdit?.i === -1 || locked ? " disabled" : ""}>Add a mount</button></div></div>
       ${mounts}
-      <div class="sub">Where job data, toolchains, caches and artifacts live.</div>
-      <div class="fgrid ndstores">${stores}</div>${storePlaces}
-      <div class="actbar">
-        <span class="state ndconfstate${(failedFor("storage") || [0, storStatusCls])[1] ? " " + (failedFor("storage") || [0, storStatusCls])[1] : ""}">${
-          esc((failedFor("storage") || [storStatus])[0])}</span>
-        ${saveBtn}
-        <button type="button" data-napply="storage" ${
+      ${formBox({groups: [{head: "Stores", says: "Where job data, toolchains, caches and artifacts live.", fields: stores}],
+        state: `<span class="state ndconfstate${(failedFor("storage") || [0, storStatusCls])[1] ? " " + (failedFor("storage") || [0, storStatusCls])[1] : ""}">${
+          esc((failedFor("storage") || [storStatus])[0])}</span>`,
+        foot: [...saveBtn, `<button type="button" data-napply="storage" ${
           busyNow || c.dirty || stale || locked || !drift?.storage.length ? "disabled" : ""}
           title="${locked ? LOCKED_WHY : stale ? esc(staleWhy(n))
             : !drift ? "nothing is saved to apply"
             : !drift.storage.length ? "the node already has the mounts and stores saved here"
-            : "apply the mounts and stores to the node"}">Apply storage</button>
-      </div>`;
+            : "apply the mounts and stores to the node"}">Apply storage</button>`]})}${storePlaces}`;
   // The four static fields only when static: five boxes of placeholders
   // under a dhcp node were the wall this section used to be on a phone.
   // Which service on the machine the agent would write this into. The
@@ -1856,39 +1838,22 @@ function nodeConfSections(n){
   ], "ndnetfacts");
   const network = `
       <div class="field">${netFacts}</div>
-      <div class="ndnet ctlline${isStatic ? "" : " dhcp"}">
-        <select data-k="net:mode" aria-label="mode">
-          <option value="dhcp" ${isStatic ? "" : "selected"}>dhcp</option>
-          <option value="static" ${isStatic ? "selected" : ""}>static</option>
-        </select>
-        ${isStatic ? `
-        <div class="setrow col ctlrow">${lbl("", "Address", "with its prefix length")}
-        <input data-k="net:address" value="${esc(d.network.address || "")}"
-          spellcheck="false" autocomplete="off" placeholder="10.0.0.12/24" aria-label="address"></div>
-        <div class="setrow col ctlrow">${lbl("", "Gateway")}
-        <input data-k="net:gateway" value="${esc(d.network.gateway || "")}"
-          spellcheck="false" autocomplete="off" placeholder="10.0.0.1" aria-label="gateway"></div>
-        <div class="setrow col ctlrow">${lbl("", "DNS", "comma-separated")}
-        <input data-k="net:dns" value="${esc((d.network.dns || []).join(", "))}"
-          spellcheck="false" autocomplete="off" placeholder="10.0.0.1, 1.1.1.1" aria-label="dns"></div>
-        <div class="setrow col ctlrow">${lbl("", "Interface", "blank means the default route's")}
-        <input data-k="net:interface" value="${esc(d.network.interface || "")}" spellcheck="false"
-          autocomplete="off" placeholder="${esc(net.interface || "eth0")}" aria-label="interface"></div>` : ""}
-        <div class="setrow col ndroutes ctlrow">${lbl("", "Static routes", "one a line: a network with its prefix, via the router that reaches it")}
-        <textarea data-k="net:routes" rows="${Math.max(2, (d.network.routes || []).length + 1)}" spellcheck="false"
-          autocomplete="off" placeholder="10.20.0.0/24 via 192.168.1.1" aria-label="static routes">${
-          esc((d.network.routes || []).map(r => `${r.to} via ${r.via}`).join("\n"))}</textarea></div>
-      </div>
-      <div class="actbar">
-        <span class="state ndconfstate${(failedFor("network") || [0, statusCls])[1] ? " " + (failedFor("network") || [0, statusCls])[1] : ""}">${
-          esc((failedFor("network") || [status])[0])}</span>
-        ${saveBtn}
-        <button type="button" data-napply="network" ${busyNow || c.dirty || stale || locked || !netPend ? "disabled" : ""}
+      ${formBox({fields: [
+        formField(`ndNet-${n.id}-mode`, "Address by", `<select id="ndNet-${esc(n.id)}-mode" data-k="net:mode"><option value="dhcp" ${isStatic ? "" : "selected"}>dhcp</option><option value="static" ${isStatic ? "selected" : ""}>static</option></select>`),
+        ...(isStatic ? [
+          formField(`ndNet-${n.id}-address`, "Address", `<input id="ndNet-${esc(n.id)}-address" data-k="net:address" value="${esc(d.network.address || "")}" spellcheck="false" autocomplete="off" placeholder="10.0.0.12/24">`, {help: "with its prefix length"}),
+          formField(`ndNet-${n.id}-gateway`, "Gateway", `<input id="ndNet-${esc(n.id)}-gateway" data-k="net:gateway" value="${esc(d.network.gateway || "")}" spellcheck="false" autocomplete="off" placeholder="10.0.0.1">`),
+          formField(`ndNet-${n.id}-dns`, "DNS", `<input id="ndNet-${esc(n.id)}-dns" data-k="net:dns" value="${esc((d.network.dns || []).join(", "))}" spellcheck="false" autocomplete="off" placeholder="10.0.0.1, 1.1.1.1">`, {help: "comma-separated"}),
+          formField(`ndNet-${n.id}-interface`, "Interface", `<input id="ndNet-${esc(n.id)}-interface" data-k="net:interface" value="${esc(d.network.interface || "")}" spellcheck="false" autocomplete="off" placeholder="${esc(net.interface || "eth0")}">`, {help: "blank means the default route's"})] : []),
+        formField(`ndNet-${n.id}-routes`, "Static routes", `<textarea id="ndNet-${esc(n.id)}-routes" data-k="net:routes" rows="${Math.max(2, (d.network.routes || []).length + 1)}" spellcheck="false" autocomplete="off" placeholder="10.20.0.0/24 via 192.168.1.1">${esc((d.network.routes || []).map(r => `${r.to} via ${r.via}`).join("\n"))}</textarea>`,
+          {help: "one a line: a network with its prefix, via the router that reaches it", wide: true})],
+        state: `<span class="state ndconfstate${(failedFor("network") || [0, statusCls])[1] ? " " + (failedFor("network") || [0, statusCls])[1] : ""}">${
+          esc((failedFor("network") || [status])[0])}</span>`,
+        foot: [...saveBtn, `<button type="button" data-napply="network" ${busyNow || c.dirty || stale || locked || !netPend ? "disabled" : ""}
           title="${locked ? LOCKED_WHY : stale ? esc(staleWhy(n))
             : !drift ? "nothing is saved to apply"
             : !netPend ? "the node is already on the address saved here"
-            : "re-address the node; it must dial back in within three minutes or it reverts"}">Apply network</button>
-      </div>`;
+            : "re-address the node; it must dial back in within three minutes or it reverts"}">Apply network</button>`]})}`;
   const stStatus = locked ? "locked" : busyNow?.what === "storage" ? "applying"
     : failedFor("storage") ? "apply failed"
     : c.dirty ? "unsaved" : drift?.storage.length ? `${drift.storage.length} to apply`

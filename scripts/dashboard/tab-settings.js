@@ -1298,36 +1298,28 @@ function settingsSections(){
             // left empty it is left alone, and its own tick takes it off.
             if (f.type === "text" || f.type === "secret"){
               const isSet = f.type === "secret" ? !!s.settings[f.key]?.set : !!v;
-              return `<div class="setrow col ctlrow"><label for="${id}">${esc(f.label)}${f.dev ? devMark() : ""}${helpIcon(f.hint)}${
-                  f.type === "secret" ? (isSet ? ` <span class="pill ok">set</span>` : ` <span class="pill">not set</span>`) : src(f.key)}</label>
-                <input id="${id}" type="${f.type === "secret" ? "password" : "text"}" data-set="${f.key}"${
-                  f.type === "secret" ? ' data-secret="1"' : ""} value="${esc(f.type === "secret" ? "" : sdVal(id, v || ""))}"
-                  placeholder="${esc(f.type === "secret" ? (isSet ? "set: paste a new one to replace it" : "paste it") : (f.placeholder || ""))}"
-                  autocomplete="off" spellcheck="false">${
-                  f.type === "secret" && isSet ? `<label class="ndcap"><input type="checkbox" data-clear="${f.key}"> take it off</label>` : ""}
-              </div>`;
+              const tail = `${f.dev ? devMark() : ""}${f.type === "secret" ? (isSet ? ` <span class="pill ok">set</span>` : ` <span class="pill">not set</span>`) : src(f.key)}`;
+              const value = esc(f.type === "secret" ? "" : sdVal(id, v || ""));
+              const ph = esc(f.type === "secret" ? (isSet ? "set: paste a new one to replace it" : "paste it") : (f.placeholder || ""));
+              return formField(id, f.label, `<input id="${id}" type="${f.type === "secret" ? "password" : "text"}" data-set="${f.key}"${f.type === "secret" ? ' data-secret="1"' : ""} value="${value}" placeholder="${ph}" autocomplete="off" spellcheck="false">${
+                f.type === "secret" && isSet ? `<label class="ndcap"><input type="checkbox" data-clear="${f.key}"> take it off</label>` : ""}`, {help: f.hint, tail});
             }
-            // A number is a short field beside its label, held to the
-            // range the server keeps (settings.KEYS) by the browser too.
             // A pick among a few (R158 step 2: the connection's mode).
             if (f.type === "select"){
-              return `<div class="setrow col ctlrow"><label for="${id}">${esc(f.label)}${helpIcon(f.hint)}${src(f.key)}</label>
-                <select id="${id}" data-set="${f.key}">${(f.options || []).map(([val, lab]) =>
-                  `<option value="${esc(val)}"${sdVal(id, v ?? "") === val ? " selected" : ""}>${esc(lab)}</option>`).join("")}</select>
-              </div>`;
+              const opts = (f.options || []).map(([val, lab]) => `<option value="${esc(val)}"${sdVal(id, v ?? "") === val ? " selected" : ""}>${esc(lab)}</option>`).join("");
+              return formField(id, f.label, `<select id="${id}" data-set="${f.key}">${opts}</select>`, {help: f.hint, tail: src(f.key)});
             }
+            // A number, held to the range the server keeps (settings.KEYS)
+            // by the browser too.
             if (f.type === "number"){
               const m = s.meta?.[f.key] || {};
-              return `<div class="setrow col ctlrow"><label for="${id}">${esc(f.label)}${helpIcon(f.hint)}${src(f.key)}</label>
-                <input id="${id}" type="number" inputmode="numeric" data-set="${f.key}" data-num="1"
-                  min="${esc(String(m.min ?? 0))}" max="${esc(String(m.max ?? ""))}" step="1"
-                  value="${esc(String(sdVal(id, v ?? "")))}">
-              </div>`;
+              return formField(id, f.label, `<input id="${id}" type="number" inputmode="numeric" data-set="${f.key}" data-num="1" min="${esc(String(m.min ?? 0))}" max="${esc(String(m.max ?? ""))}" step="1" value="${esc(String(sdVal(id, v ?? "")))}">`,
+                {help: f.hint, tail: src(f.key)});
             }
             // Every other setting is a switch: a checkbox inside its label,
             // the way the Tests bar's are, with what the label cannot say on
-            // the ? (docs/design-language.md, Controls).
-            return `<div class="logdays setrow ctlrow"><label class="ndcap">
+            // the ? (docs/design-language.md, Controls), a line of the grid.
+            return `<div class="fcell fwide"><label class="ndcap">
                 <input id="${id}" type="checkbox" data-set="${f.key}"${sdVal(id, !!v) ? " checked" : ""}> ${esc(f.label)}${f.dev ? devMark() : ""}${helpIcon(f.hint)}</label>${src(f.key)}
               </div>`;
     };
@@ -1340,11 +1332,9 @@ function settingsSections(){
       <div class="grow">
         <div class="logset">
           ${g.intro ? g.intro(s) : ""}
-          ${g.fields.filter(f => (!f.dev || s.settings.offer_unvetted?.value) && (!f.when || f.when(s))).map(field).join("")}
-          <div class="actbar">
-            <span class="state">${g.status ? g.status(s) : "applies at once"}</span>
-            <button type="button" class="setApply" title="save">Apply</button>
-          </div>
+          ${formBox({fields: g.fields.filter(f => (!f.dev || s.settings.offer_unvetted?.value) && (!f.when || f.when(s))).map(field),
+            state: `<span class="state">${g.status ? g.status(s) : "applies at once"}</span>`,
+            foot: [`<button type="button" class="setApply" title="save">Apply</button>`]})}
         </div>
       </div>
     </div>`};

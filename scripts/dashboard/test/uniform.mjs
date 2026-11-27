@@ -3413,7 +3413,7 @@ if (runs('c')) await section("what opens, shuts or arrives moves, and never snap
 // holding two fields or more) is on the form grid. The forms not yet moved
 // onto formBox are named here, and the list only shrinks: a new form written
 // the old way fails at once, and one moved is taken off.
-const FORMS_TO_MOVE = new Set(['nodes:sessions', 'nodes:storage', 'nodes:network', 'rn:project', 'profile:you']);
+const FORMS_TO_MOVE = new Set(['rn:project']);
 if (runs('c')) await section("a form's buttons stand clear of its fields and end where they end", async () => {
   const bad = [], moved = new Set();
   for (const [w, h, tag] of [[393, 852, 'phone'], [1440, 1000, 'desk']]){

@@ -542,10 +542,13 @@ function formBox({fields = [], groups = null, foot = [], state = "", cls = "", a
 }
 // One field of a form: its label over it, a hint under it. `wide` spans the
 // grid's two columns (a path, an address, a file's text), `short` is a
-// number's width; `control` is the input, select or textarea itself.
-function formField(id, label, control, {help = "", hint = "", wide = false, short = false, hidden = false, attrs = ""} = {}){
+// number's width; `control` is the input, select or textarea itself, and
+// `tail` what the label carries after its words (a pill saying where the
+// value comes from).
+function formField(id, label, control, {help = "", hint = "", wide = false, short = false, hidden = false, attrs = "", tail = ""} = {}){
+  const head = tail ? lbl(id, label, help).replace(/<\/label>$/, ` ${tail}</label>`) : lbl(id, label, help);
   return `<div class="fcell${wide ? " fwide" : ""}${short ? " fshort" : ""}"${hidden ? " hidden" : ""}${attrs ? ` ${attrs}` : ""}>${
-    lbl(id, label, help)}${control}${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
+    head}${control}${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
 }
 
 // A section of a document tab (see "sections and action bars" in the

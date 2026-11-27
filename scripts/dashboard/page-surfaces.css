@@ -2427,10 +2427,15 @@ body.firstrun #panes{display:none}
 .stnewpool>.field,.stnewpool>.fgrid,.stnewarray>.field,.stnewarray>.fgrid,.stsnapform>.fgrid{margin-top:14px}
 .fgroup{padding:16px 0;border-bottom:var(--hair) solid var(--line)}
 .fgroup:last-of-type{border-bottom:0}
+/* In a form's box (R301) the box's 16px gap is the room above each group: a
+   group keeps 16px and its hairline under it, and the last none, so the
+   foot stands the box's 16px under the last field. (:last-of-type counted
+   the foot's div, and a hairline stood over every grouped form's foot.) */
+.fbox>.fgroup{padding:0 0 16px}
+.fbox>.fgroup:not(:has(~ .fgroup)){padding-bottom:0;border-bottom:0}
 /* The bar after the last group has the same room under the hairline as a
    group does, never its buttons flush against it. */
 .fgroup + .actbar{margin-top:16px}
-.ndstores{margin-top:8px}
 .fgrouphead{font:var(--f-ui);font-weight:600;color:var(--ink);margin-bottom:12px}
 .fgrouphead .sub{display:block;font-weight:400;margin-top:2px}
 .fgroup>.ndcap{display:flex;margin-top:12px}
@@ -2565,24 +2570,18 @@ body.firstrun #panes{display:none}
 @media(max-width:600px){ .ndact{flex-wrap:wrap} .ndact>.acts{width:100%;justify-content:flex-end}
 }
 /* Its Sessions section (the operator, 18 Oct): the facts, its settings as
-   one group over its Save and Revert, then its actions. */
+   one form (R301), then its actions. The facts and the form keep the
+   bands' inset (the operator, 22 Oct: on a phone the switches ran to the
+   edge under the inset facts). */
 .ndsettings{display:flex;flex-direction:column;gap:2px;margin-top:6px;border-top:var(--hair) solid var(--line);padding-top:6px}
-/* The bands' own inset kept: only their height is tightened (the
-   operator, 22 Oct: on a phone the switches ran to the edge under the inset
-   facts). */
-.ndsettings>.field,.ndsettings>.ndsetgroup>.field{padding:2px var(--row-x);margin:0}
-/* A node's Sessions settings as a group of their own: its heading at the
-   fields' inset, its switches set as close as the section's own. */
-.ndsettings>.ndsetgroup>.fgrouphead{padding:0 var(--row-x)}
-.ndsettings>.field>.ndcap,.ndsettings>.ndsetgroup>.field>.ndcap{min-height:var(--tap)}
-.ndsettings>.field>.sub,.ndsettings>.ndsetgroup>.field>.sub{margin-top:2px}
-/* ...its two numbers side by side, a phone stacking them. */
-.ndsettings>.logdays.setrow.col{display:inline-flex;width:auto}
-.ndsettings .ndnums{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:8px;padding:0 var(--row-x)}
-.ndsettings>.actbar{padding:0 var(--row-x)}
+.ndsettings>.field{padding:2px var(--row-x);margin:0}
+.ndsettings>.fbox{padding:6px var(--row-x) 0}
+/* A switch is one line of the grid, its words beside its tick. */
+.fcell>.ndcap{display:flex;min-height:var(--tap)}
+.fcell>.ndcap + .sub{margin-top:-4px}
 /* A mouse needs no 38px box around a 16px tick, which spread the switches
    a blank line apart; a finger keeps the tap height. */
-@media(pointer:fine){ .ndsettings>.field>.ndcap>input[type=checkbox],.ndsettings>.ndsetgroup>.field>.ndcap>input[type=checkbox]{min-height:0;margin-block:0}
+@media(pointer:fine){ .fcell>.ndcap{min-height:0} .fcell>.ndcap>input[type=checkbox]{min-height:0;margin-block:0}
 }
 .ndactions{display:flex;flex-direction:column;gap:6px;margin-top:8px;border-top:var(--hair) solid var(--line);padding-top:6px}
 /* A node's mounts are records (the record-lists rule): a row read-only in
@@ -2610,8 +2609,6 @@ body.firstrun #panes{display:none}
 .ndpfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);column-gap:var(--row-x);row-gap:var(--field-gap);min-width:0}
 .ndpfields>.setrow.col{margin:0;min-width:0;max-width:none}
 @media (max-width:600px){ .ndpfields{grid-template-columns:minmax(0,1fr)} }
-/* Static routes take the network's whole width, in either mode. */
-.ndnet .ndroutes{grid-column:1 / -1}
 .ndmstate.warn,.ndmwhy.warn{color:var(--warn)} .ndmstate.bad,.ndmwhy.bad{color:var(--bad)}
 .ndconfstate.note{color:var(--note)}
 /* A ROW'S SETTINGS are a grid of labeled cells with ONE Apply at its foot
