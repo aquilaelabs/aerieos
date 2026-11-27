@@ -6747,7 +6747,7 @@ esac
 # the record it takes, and capture and sign their own usage.
 case "${1:-}:${2:-}" in
     design:save) ;;
-    forge:*|design:*|tests:*|k8s:*|discord:*|devapp:*|jobs:*|map:*|vm:*|container:*|node:*|ci-log:*)
+    forge:*|design:*|tests:*|k8s:*|discord:*|devapp:*|jobs:*|map:*|vm:*|container:*|node:*|ci-log:*|dashboard:*)
         for _a in "${@:2}"; do
             case "$_a" in -h|--help) verb_help "$1" && exit 0 ;; esac
         done ;;

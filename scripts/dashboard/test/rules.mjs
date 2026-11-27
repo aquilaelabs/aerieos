@@ -322,6 +322,13 @@ await section("B536: every verb's -h is its entries in the reference, exit 0, ne
   const said = ['devapp', 'container', 'capture', 'jobs'].map(v => [v, ...help(v)]);
   ok(said.every(([v, st, out]) => st === 0 && new RegExp(`^aerie ${v}\\b`).test(out) && !/ERROR/.test(out)),
      `bb VERB -h prints that verb's entries from the reference and exits 0 (${said.map(([v, st]) => v + ':' + st).join(' ')})`);
+  // ...and after a subcommand whose words are never free text: aerie
+  // dashboard test -h looked for a suite called -h (B1185).
+  let dt;
+  try { dt = [0, execFileSync(BB, ['dashboard', 'test', '-h'], { env: ENV, stdio: 'pipe' }).toString()]; }
+  catch (e) { dt = [e.status, String(e.stdout) + String(e.stderr)]; }
+  ok(dt[0] === 0 && /^aerie dashboard/m.test(dt[1]) && !/no suite called/.test(dt[1]),
+     `aerie dashboard test -h is the verb's help, not a suite's name (${dt[0]})`);
 });
 ok(/No em dashes/.test(bb('list')) && /agent-compat/.test(bb('list')),
    'aerie rules lists what is in effect');
