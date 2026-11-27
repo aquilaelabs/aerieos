@@ -59,7 +59,6 @@
 - A space of several repositories showed its first repository's id in its settings as the space's; and on a phone a section's chip over the settings opened that section while the one open before stayed open (381ebc6)
 - A space's settings name every section in the bar over them, People, Nodes, Discord and Running sessions included, which had no chip because they show once their reads land (85b5aa5)
 - Sessions' aerie verbs: capture shot photographs a file:// page; changelog add asked from a worktree the controller cannot see is refused instead of written into the space's own directory; a push or a signing from a node waits while the node's copy is still catching up, and a refused push says to run it again rather than naming a page only a person can open; map find lists a page's variable beside a function of the same name (415d244, 3ceccb5, 929fb3e, bacefa1, fe05ed5)
-- An address naming no page of its group, such as #/build/entry, opens the group's first page instead of leaving the page that was on show (30cca22)
 
 ### Security
 
