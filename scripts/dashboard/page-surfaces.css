@@ -2555,6 +2555,12 @@ body.firstrun #panes{display:none}
 .ndsettings>.fbox{padding:6px var(--row-x) 0}
 /* A switch is one line of the grid, its words beside its tick. */
 .fcell>.ndcap{display:flex;min-height:var(--tap)}
+/* A VM's CPU threads, a tick for each core's pair, wrapped with room
+   between them. */
+.vmcpus{display:flex;flex-wrap:wrap;gap:0 18px}
+/* A tick that qualifies the field above it (a shared folder's read-only)
+   sits in its cell, under it. */
+.fcell>:is(input,select,textarea)+.ndcap{margin-top:8px}
 .fcell>.ndcap + .sub{margin-top:-4px}
 /* A mouse needs no 38px box around a 16px tick, which spread the switches
    a blank line apart; a finger keeps the tap height. */

@@ -393,51 +393,44 @@ function openNewVm(forProject = ""){
       <optgroup label="Installers on this node">${optionList(isos.map(i => ["iso:" + i.name, `${i.name} (${i.mb} MB)`]))}
         <option value="iso-add">Add an ISO…</option></optgroup>`;
   };
+  // One form over the dialog's own foot: what the VM is and where, an ISO to
+  // fetch or upload when From asks for one, its size three across, who logs
+  // in (a cloud image's), and its firmware (an installer's).
   drawHTML(m, `<div class="box"><h3>New VM</h3>
-    <div class="field"><div class="fgrid">
-      <div class="setrow col ctlrow">${lbl("vmName", "Name")}<input id="vmName" maxlength="31" autocomplete="off" spellcheck="false" placeholder="db"></div>
-      <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a space, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, p === "machine" ? vmOwner(p) : dmOwnerSaid(p)]), forProject)}</select></div>
-    </div></div>
-    <div class="field"><div class="fgrid">
-      <div class="setrow col ctlrow">${lbl("vmNode", "Node", "a node with VM host installed")}<select id="vmNode">${optionList(hosts.map(h => [h.id, h.name]))}</select></div>
-      <div class="setrow col ctlrow">${lbl("vmOs", "From", "a publisher's cloud image, checked against its checksums and set up by cloud-init; or an installer's ISO on the node, which you install on the VM's Screen yourself, the way Windows or your own system goes on")}
-        <select id="vmOs">${fromOptions(hosts[0]?.id || "")}</select></div>
-    </div></div>
-    <div id="vmIsoAdd" hidden>
-      <div class="field">${lbl("vmIsoUrl", "The ISO's address", "an https link to the installer's .iso")}
-        <input id="vmIsoUrl" type="url" spellcheck="false" autocomplete="off" placeholder="https://releases.ubuntu.com/…/ubuntu-26.04-live-server-amd64.iso" data-ph-short="ISO address"></div>
-      <div class="field">${lbl("vmIsoSum", "Its SHA-256", "from the publisher's SHA256SUMS: the ISO is kept only when it matches")}
-        <input id="vmIsoSum" spellcheck="false" autocomplete="off" maxlength="64" placeholder="64 hex digits"></div>
-      <div class="field"><div class="actbar"><button type="button" id="vmIsoGo">Fetch it onto the node</button></div></div>
-      <div class="field">${lbl("vmIsoFile", "Or upload one", "an .iso from this computer, sent through the controller to the node and checked there")}
-        <input id="vmIsoFile" type="file" accept=".iso"></div>
-      <div class="field"><div class="actbar"><button type="button" id="vmIsoUp" disabled>Upload it to the node</button></div></div>
-    </div>
-    <div class="field"><div class="fgrid three">
-      <div class="setrow col ctlrow">${lbl("vmCpu", "vCPUs")}<input id="vmCpu" type="number" min="1" max="64" value="2"></div>
-      <div class="setrow col ctlrow">${lbl("vmMem", "Memory, GB")}<input id="vmMem" type="number" min="1" max="256" value="2"></div>
-      <div class="setrow col ctlrow">${lbl("vmDisk", "Disk, GB")}<input id="vmDisk" type="number" min="2" max="4096" value="20"></div>
-    </div></div>
-    <div id="vmCloud">
-      <div class="field">${lbl("vmKey", "SSH public key", "who may log in: yours, as in ~/.ssh/id_ed25519.pub. The account is builder (admin on a VM made a node), with sudo")}
-        <textarea id="vmKey" rows="3" spellcheck="false" autocomplete="off" placeholder="ssh-ed25519 AAAA… you@laptop"></textarea></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="vmAgent"> Make it a node: enroll it with an agent at its first boot</label>
-      <div class="hint" id="vmAgentHint" hidden>It joins your LAN as its own machine and appears on the Nodes page once it has booted, a node like any other, marked as a VM on its host; removing the VM retires the node and revokes its credential.</div></div>
-    </div>
-    <div class="field" id="vmFwRow" hidden><div class="fgrid">
-      <div class="setrow col ctlrow">${lbl("vmFw", "Firmware", "UEFI for most current installers (Windows 11 also wants the TPM, under More); BIOS for an older one")}
-        <select id="vmFw">${optionList([["uefi", "UEFI"], ["bios", "BIOS"]], "uefi")}</select></div>
-    </div></div>
+    <div class="field">${formBox({fields: [
+      formField("vmName", "Name", `<input id="vmName" maxlength="31" autocomplete="off" spellcheck="false" placeholder="db">`),
+      formField("vmProject", "Belongs to", `<select id="vmProject">${optionList(projects.map(p => [p, p === "machine" ? vmOwner(p) : dmOwnerSaid(p)]), forProject)}</select>`, {help: "a space, whose sessions reach it; or this machine's own, an administrator's alone"}),
+      formField("vmNode", "Node", `<select id="vmNode">${optionList(hosts.map(h => [h.id, h.name]))}</select>`, {help: "a node with VM host installed"}),
+      formField("vmOs", "From", `<select id="vmOs">${fromOptions(hosts[0]?.id || "")}</select>`,
+        {help: "a publisher's cloud image, checked against its checksums and set up by cloud-init; or an installer's ISO on the node, which you install on the VM's Screen yourself, the way Windows or your own system goes on"}),
+      `<div class="fcell fwide" id="vmIsoAdd" hidden><div class="fgrid">${[
+        formField("vmIsoUrl", "The ISO's address", `<input id="vmIsoUrl" type="url" spellcheck="false" autocomplete="off" placeholder="https://releases.ubuntu.com/…/ubuntu-26.04-live-server-amd64.iso" data-ph-short="ISO address">`, {help: "an https link to the installer's .iso", wide: true}),
+        formField("vmIsoSum", "Its SHA-256", `<input id="vmIsoSum" spellcheck="false" autocomplete="off" maxlength="64" placeholder="64 hex digits">`,
+          {help: "from the publisher's SHA256SUMS: the ISO is kept only when it matches", wide: true}),
+        `<div class="fcell fwide"><div class="actbar"><button type="button" id="vmIsoGo">Fetch it onto the node</button></div></div>`,
+        formField("vmIsoFile", "Or upload one", `<input id="vmIsoFile" type="file" accept=".iso">`,
+          {help: "an .iso from this computer, sent through the controller to the node and checked there", wide: true}),
+        `<div class="fcell fwide"><div class="actbar"><button type="button" id="vmIsoUp" disabled>Upload it to the node</button></div></div>`].join("")}</div></div>`,
+      `<div class="fcell fwide"><div class="fgrid three">${[
+        formField("vmCpu", "vCPUs", `<input id="vmCpu" type="number" min="1" max="64" value="2">`),
+        formField("vmMem", "Memory, GB", `<input id="vmMem" type="number" min="1" max="256" value="2">`),
+        formField("vmDisk", "Disk, GB", `<input id="vmDisk" type="number" min="2" max="4096" value="20">`)].join("")}</div></div>`,
+      `<div class="fcell fwide" id="vmCloud"><div class="fgrid">${[
+        formField("vmKey", "SSH public key", `<textarea id="vmKey" rows="3" spellcheck="false" autocomplete="off" placeholder="ssh-ed25519 AAAA… you@laptop"></textarea>`,
+          {help: "who may log in: yours, as in ~/.ssh/id_ed25519.pub. The account is builder (admin on a VM made a node), with sudo", wide: true}),
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="vmAgent"> Make it a node: enroll it with an agent at its first boot</label>
+          <div class="hint" id="vmAgentHint" hidden>It joins your LAN as its own machine and appears on the Nodes page once it has booted, a node like any other, marked as a VM on its host; removing the VM retires the node and revokes its credential.</div></div>`].join("")}</div></div>`,
+      formField("vmFw", "Firmware", `<select id="vmFw">${optionList([["uefi", "UEFI"], ["bios", "BIOS"]], "uefi")}</select>`,
+        {help: "UEFI for most current installers (Windows 11 also wants the TPM, under More); BIOS for an older one", hidden: true, attrs: `id="vmFwRow"`})]})}</div>
     <details class="vmmore chev"><summary>More: disks, network, screen password, hardware</summary>
-      <div class="field">${lbl("vmDisks", "Further disks, GB", "up to three more, each its own virtio disk (vdb, vdc, vdd), comma-separated: 100, 500")}
-        <input id="vmDisks" spellcheck="false" autocomplete="off" placeholder="none"></div>
-      <div class="field"><div class="fgrid">
-        <div class="setrow col ctlrow">${lbl("vmMac", "MAC address", "kept for good, so a DHCP reservation holds; libvirt picks one when empty")}
-          <input id="vmMac" spellcheck="false" autocomplete="off" placeholder="52:54:00:…"></div>
-        <div class="setrow col ctlrow">${lbl("vmPw", "Screen password", "asked when its Screen opens; one to eight characters, VNC's limit")}
-          <input id="vmPw" type="password" maxlength="8" autocomplete="new-password"></div>
-      </div></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="vmAuto"> Starts with its host</label></div>
+      <div class="field">${formBox({fields: [
+        formField("vmDisks", "Further disks, GB", `<input id="vmDisks" spellcheck="false" autocomplete="off" placeholder="none">`,
+          {help: "up to three more, each its own virtio disk (vdb, vdc, vdd), comma-separated: 100, 500", wide: true}),
+        formField("vmMac", "MAC address", `<input id="vmMac" spellcheck="false" autocomplete="off" placeholder="52:54:00:…">`,
+          {help: "kept for good, so a DHCP reservation holds; libvirt picks one when empty"}),
+        formField("vmPw", "Screen password", `<input id="vmPw" type="password" maxlength="8" autocomplete="new-password">`,
+          {help: "asked when its Screen opens; one to eight characters, VNC's limit"}),
+        `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="vmAuto"> Starts with its host</label></div>`]})}</div>
       <div id="vmHwBox"></div>
     </details>
     <div class="field" id="vmWhyF" hidden><div class="hint bad" id="vmWhy"></div></div>
@@ -548,24 +541,22 @@ function vmHwFields(host, hw, admin){
       p.class.startsWith("0x0300") ? ` <button type="button" data-vbios="${esc(p.addr)}" title="read this card's vBIOS, which passing a GPU through may need">Dump vBIOS</button>
         <button type="button" data-vbiosgive="${esc(p.addr)}" title="the card maker's .rom, or one from a collection, used instead of a dump">Give a .rom…</button>` : ""}${
       mine ? `<span class="sub dim">this machine's: Features on its node marks it for a VM</span>` : ""}</label>`; })] : [];
-  return `<div class="field">${lbl("vmHwCpus", "CPU threads", "pin its vCPUs to these host threads, each core's pair together; none ticked leaves the host to schedule it")}
-      <div class="vmcpus" id="vmHwCpus">${cpus || `<span class="sub">the node has not said its CPUs yet</span>`}</div>
-      <label class="ndcap"><input type="checkbox" id="vmHwShareCpus"> Share them with another VM pinned there</label></div>
-    <div class="field"><div class="fgrid">
-      <div class="setrow col ctlrow">${lbl("vmHwMemMax", "Memory ceiling, GB", "it starts with its memory and may balloon up to this; empty for none")}
-        <input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}"></div>
-    </div></div>
-    ${vmNetFields(host, hw, !!hw?.mac)}
-    <div class="field"><label class="ndcap"><input type="checkbox" id="vmHwTpm"${hw?.tpm ? " checked" : ""}${host?.hw?.tpm || hw?.tpm ? "" : " disabled"}> TPM 2.0</label>
-      <div class="hint">${host?.hw?.tpm || hw?.tpm ? "An emulated TPM whose state stays with the VM: Windows 11 will not install without one."
-        : "This node has no software TPM (swtpm) yet: turning VM host on again under its Features installs it."}</div></div>
-    <div class="field"><div class="fgrid">
-      <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space")}
-        <input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}"></div>
-      <label class="ndcap"><input type="checkbox" id="vmHwShareRo"${sh.ro ? " checked" : ""}> read-only</label>
-    </div></div>
-    ${admin ? `<div class="field">${lbl("vmHwDevs", "Devices passed through", "the host's own, given to this VM alone while it runs; a PCI device needs the IOMMU on")}
-      <div id="vmHwDevs">${devs.join("") || `<span class="sub">none on this node</span>`}${host?.hw?.iommu ? "" : `<div class="sub warn">The IOMMU is off on this node, so no PCI device can be passed through.</div>`}</div></div>` : ""}`;
+  return `<div class="field">${formBox({fields: [
+      `<div class="fcell fwide">${lbl("vmHwCpus", "CPU threads", "pin its vCPUs to these host threads, each core's pair together; none ticked leaves the host to schedule it")}
+        <div class="vmcpus" id="vmHwCpus">${cpus || `<span class="sub">the node has not said its CPUs yet</span>`}</div>
+        <label class="ndcap"><input type="checkbox" id="vmHwShareCpus"> Share them with another VM pinned there</label></div>`,
+      // The network's fields on one line with the hint they share under
+      // them, then memory and the shared folder side by side.
+      vmNetFields(host, hw, !!hw?.mac),
+      formField("vmHwMemMax", "Memory ceiling, GB", `<input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}">`, {help: "it starts with its memory and may balloon up to this; empty for none"}),
+      formField("vmHwShare", "Shared folder", `<input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}">
+        <label class="ndcap"><input type="checkbox" id="vmHwShareRo"${sh.ro ? " checked" : ""}> read-only</label>`,
+        {help: "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space"}),
+      `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" id="vmHwTpm"${hw?.tpm ? " checked" : ""}${host?.hw?.tpm || hw?.tpm ? "" : " disabled"}> TPM 2.0</label>
+        <div class="hint">${host?.hw?.tpm || hw?.tpm ? "An emulated TPM whose state stays with the VM: Windows 11 will not install without one."
+        : "This node has no software TPM (swtpm) yet: turning VM host on again under its Features installs it."}</div></div>`,
+      `${admin ? `<div class="fcell fwide">${lbl("vmHwDevs", "Devices passed through", "the host's own, given to this VM alone while it runs; a PCI device needs the IOMMU on")}
+      <div id="vmHwDevs">${devs.join("") || `<span class="sub">none on this node</span>`}${host?.hw?.iommu ? "" : `<div class="sub warn">The IOMMU is off on this node, so no PCI device can be passed through.</div>`}</div></div>` : ""}`]})}</div>`;
 }
 // ---- a VM's network: source, model, MAC (R219 step 4) ----
 // The source is its space's own network, the LAN (the host's br0 on AerieOS,
@@ -591,13 +582,12 @@ function vmNewMac(){
 function vmNetFields(host, hw, made){
   // New VM has its own MAC address field above, so the MAC is the Hardware
   // dialog's alone, for a VM that has one (said once, never twice).
-  return `<div class="field"><div class="fgrid">
-      <label class="pick"><span class="pickw">Network source</span><select id="vmHwNet">${vmNetOptions(host, hw?.net || "project")}</select></label>
-      <label class="pick"><span class="pickw">Network model</span><select id="vmHwModel">${optionList(VM_NET_MODELS, hw?.model || "virtio")}</select></label>
-      ${made ? `<label class="pick"><span class="pickw">Network MAC</span><input id="vmHwMac" spellcheck="false" autocomplete="off" value="${esc(hw?.mac || "")}"></label>
-      <div class="fcellbtn"><button type="button" id="vmHwMacNew">Regenerate MAC</button></div>` : ""}
-    </div>
-    <div class="hint">Its space's network keeps it to its space; the LAN, a bridge or a libvirt network takes it past that, a person's to pick. virtio is fastest; e1000 or rtl8139 for a guest with no virtio driver.${made ? " The MAC stays unless changed, since a router's reservation knows it." : ""}</div></div>`;
+  // Its cells, for the form that holds them (vmHwFields).
+  return formField("vmHwNet", "Network source", `<select id="vmHwNet">${vmNetOptions(host, hw?.net || "project")}</select>`)
+    + formField("vmHwModel", "Network model", `<select id="vmHwModel">${optionList(VM_NET_MODELS, hw?.model || "virtio")}</select>`)
+    + (made ? formField("vmHwMac", "Network MAC", `<input id="vmHwMac" spellcheck="false" autocomplete="off" value="${esc(hw?.mac || "")}">`)
+      + `<div class="fcell fcellbtn"><button type="button" id="vmHwMacNew">Regenerate MAC</button></div>` : "")
+    + `<div class="fcell fwide"><div class="hint">Its space's network keeps it to its space; the LAN, a bridge or a libvirt network takes it past that, a person's to pick. virtio is fastest; e1000 or rtl8139 for a guest with no virtio driver.${made ? " The MAC stays unless changed, since a router's reservation knows it." : ""}</div></div>`;
 }
 function vmHwRead(root){
   const cpus = [...root.querySelectorAll("[data-cpus]:checked")].flatMap(c => c.dataset.cpus.split(",").map(Number));
