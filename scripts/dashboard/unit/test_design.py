@@ -62,44 +62,15 @@ class OtherHalf(unittest.TestCase):
         self.assertNotIn("Its dark half", text, "Day has one palette")
 
 
-class Migration(unittest.TestCase):
-    def test_pre_theme_record_becomes_one_theme(self):
-        got, found = clean({"scheme": "abyss", "colors": {"bg": "#000000"}})
-        self.assertEqual(found, [])
-        self.assertEqual(len(got["themes"]), 1)
-        bg = [c for c in got["themes"][0]["colors"] if c["name"] == "bg"]
-        self.assertEqual(bg[0]["hex"], "#000000")
-
-    def test_language_choices_carry_to_every_theme_lacking_them(self):
-        got, found = clean({"font": "serif", "themes": [
-            {"name": "A", "mode": "dark", "colors": []},
-            {"name": "B", "mode": "light", "colors": [], "font": "mono"}]})
-        self.assertEqual(found, [])
-        self.assertEqual([t["font"] for t in got["themes"]], ["serif", "mono"])
-
-    def test_language_rules_go_to_the_first_theme_only(self):
-        rule = {"name": "radii", "text": "all corners 6px"}
-        got, found = clean({"rules": [rule], "themes": [
-            {"name": "A", "mode": "dark", "colors": []},
-            {"name": "B", "mode": "dark", "colors": []}]})
-        self.assertEqual(found, [])
-        self.assertEqual([r["name"] for r in got["themes"][0]["rules"]], ["radii"])
-        self.assertEqual(got["themes"][1]["rules"], [])
-
-    def test_custom_map_follows_the_rules_to_the_first_theme_only(self):
-        # B386: carried into a theme without the rule, it refused the record.
-        got, found = clean({"corners": "custom", "custom": {"corners": "radii"},
-                            "rules": [{"name": "radii", "text": "6px"}],
-                            "themes": [{"name": "A", "mode": "dark", "colors": []},
-                                       {"name": "B", "mode": "dark", "colors": []}]})
-        self.assertEqual(found, [])
-        self.assertEqual(got["themes"][0]["custom"], {"corners": "radii"})
-        self.assertEqual(got["themes"][1]["custom"], {})
-
-    def test_choices_with_no_theme_get_a_theme_to_hold_them(self):
-        got, _ = clean({"font": "mono"})
-        self.assertEqual(len(got["themes"]), 1)
-        self.assertEqual(got["themes"][0]["font"], "mono")
+class Language(unittest.TestCase):
+    def test_what_is_each_themes_own_is_refused_on_the_language_by_name(self):
+        # Migration 0038 wrote older records with these on their themes; a
+        # save that still sends them is told where they go, never dropped.
+        _, found = clean({"scheme": "abyss", "colors": {"bg": "#000000"}, "font": "serif",
+                          "rules": [{"name": "radii", "text": "6px"}]})
+        self.assertEqual(found, ["colors, scheme, font, rules are each theme's own: put them in a theme under themes"])
+        _, found = clean({"themes": [{"name": "A", "mode": "dark", "colors": [], "rules": "notes"}]})
+        self.assertEqual(found, ["the rules of the theme A are a list of objects with a name and a text, not 'notes'"])
 
     def test_an_empty_language_is_a_language(self):
         got, found = clean({})

@@ -208,7 +208,6 @@ SCHEMES = [
     ("slate", "Slate", {"bg": "#1d222b", "panel": "#2b323e", "line": "#525f6f", "ink": "#eef4fb",
                         "dim": "#bac2cb", "accent": "#569aff", "warn": "#d9a441", "bad": "#ef6f6c", "note": "#97dd24", "good": "#5fd39a"}),
 ]
-SCHEME_KEYS = [k for k, _, _ in SCHEMES]
 
 # What a page is for. On the page rather than the language, because one
 # project can be several products (a web app and its Android companion) in
@@ -267,16 +266,6 @@ MOTION = [
     ("custom", "Custom", "as the design's own rules say"),
 ]
 CHOICES = {"font": FONTS, "corners": CORNERS, "density": DENSITY, "motion": MOTION}
-
-def theme_from(scheme_key, name=""):
-    """A theme filled from a preset scheme: the ten colors, named and
-    explained, in the scheme's hexes, dark or light by its background."""
-    key, label, colors = next((row for row in SCHEMES if row[0] == scheme_key), SCHEMES[0])
-    # The preset's label says "(light)" to tell the pickers apart; a theme
-    # says its mode beside its name, so the name is the bare word.
-    return {"name": name or label.replace(" (light)", ""), "mode": "light" if _luma(colors["bg"]) > 0.5 else "dark",
-            "colors": [{"name": k, "hex": colors[k], "means": means} for k, _, means in TOKENS]}
-
 
 def _other(mode):
     """The mode a theme's second palette is for."""
@@ -388,7 +377,6 @@ def _record(d, project):
     finally:
         if outer is None:
             _collecting.found = None
-    # A page saved before pages had rules of their own reads as one with none.
     pages = [{**p, "rules": p.get("rules") if isinstance(p.get("rules"), list) else []}
              for p in (rec.get("pages") or []) if isinstance(p, dict)]
     return {"language": lang, "pages": pages, "next": int(rec.get("next") or 1),
@@ -497,44 +485,16 @@ def _clean_theme(t, n):
 
 def _clean_language(lang):
     """A language as stored, from whatever arrived: every choice one of the
-    vocabulary's, every color a hex, the notes capped. A record from before
-    themes (one scheme and its ten colors) is read as one theme."""
+    vocabulary's, every color a hex, the notes capped. Colors, choices and
+    rules are each theme's (migration 0038 wrote older records so)."""
     if not isinstance(lang, dict):
         lang = {}
     out = dict(LANGUAGE_DEFAULT)
-    if "themes" not in lang and ("colors" in lang or "scheme" in lang):
-        scheme = str(lang.get("scheme") or "default")
-        base = theme_from(scheme if scheme in SCHEME_KEYS else "default",
-                          "Custom" if scheme not in SCHEME_KEYS else "")
-        colors = lang.get("colors") if isinstance(lang.get("colors"), dict) else {}
-        for c in base["colors"]:
-            c["hex"] = str(colors.get(c["name"]) or c["hex"]).strip().lower()
-        base["colors"] += [m for m in (lang.get("more") or []) if isinstance(m, dict)]
-        lang = {**lang, "themes": [base]}
+    moved = [k for k in ("colors", "scheme", "font", "corners", "density", "motion", "fonts", "custom", "rules") if lang.get(k)]
+    if moved:
+        _bad(f"{', '.join(moved)} {'is a theme' if len(moved) == 1 else 'are each theme'}'s own: put them in a theme under themes")
     raw = lang.get("themes") if isinstance(lang.get("themes"), list) else []
     raw = [dict(t) if isinstance(t, dict) else t for t in raw]
-    # A record from before the choices and the rules were each theme's
-    # (29 Sep) carried them on the language: every theme takes a choice it
-    # has none of its own for, and the language's rules go to the default
-    # theme, ahead of its own. A language that made choices with no theme
-    # yet gets a theme to hold them.
-    carried = {k: lang.get(k) for k in ("font", "corners", "density", "motion", "fonts", "custom") if lang.get(k)}
-    old_rules = lang.get("rules") if isinstance(lang.get("rules"), list) else []
-    if (carried or old_rules) and not raw:
-        raw = [{"name": "Default", "mode": "dark", "colors": []}]
-    for i, t in enumerate(raw):
-        if not isinstance(t, dict):
-            continue
-        for k, v in carried.items():
-            # The custom map names the language's rules, which go to the
-            # first theme: it goes with them and to no other (B386: carried
-            # into a theme without the rules, it refused the whole record).
-            if k == "custom" and i:
-                continue
-            if not t.get(k):
-                t[k] = v
-        if i == 0 and old_rules:
-            t["rules"] = old_rules + (t.get("rules") if isinstance(t.get("rules"), list) else [])
     if len(raw) > THEMES_MAX:
         _bad(f"a language holds at most {THEMES_MAX} themes, and this has {len(raw)}")
         raw = raw[:THEMES_MAX]
@@ -610,9 +570,8 @@ def _clean_rules(raw, whose):
     language, a theme or a page): the operator asked for rules of a theme's
     own and a page's own (28 Sep), since the Nostromo scheme has needs no
     other theme shares."""
-    if isinstance(raw, str):
-        # The notes from before rules: one standing rule, kept whole.
-        raw = [{"name": "design-notes", "text": raw}] if raw.strip() else []
+    if raw not in (None, "") and not isinstance(raw, list):
+        _bad(f"the rules of {whose} are a list of objects with a name and a text, not {str(raw)[:60]!r}")
     raw = raw if isinstance(raw, list) else []
     # A rule that is not an object is refused by what it is, not dropped: a
     # session that sent ["some rule"] found its rules gone with no word
@@ -1468,7 +1427,8 @@ def listing(project):
 # Every preset passes its own validation, so a template or a scheme that
 # drifts from the vocabulary fails at import rather than at the first save.
 for _k, _l, _c in SCHEMES:
-    _clean_language({"scheme": _k, "colors": _c})
+    _clean_language({"themes": [{"name": _l.replace(" (light)", ""), "mode": "light" if _luma(_c["bg"]) > 0.5 else "dark",
+                                 "colors": [{"name": n, "hex": h} for n, h in _c.items()]}]})
 for _t in TEMPLATES:
     _clean_page({"frame": _t["frame"], "template": _t["key"],
                  "blocks": [dict(zip(("kind", "label", "x", "y", "w", "h"), b, strict=True)) for b in _t["blocks"]]}, 1)

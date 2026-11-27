@@ -689,16 +689,17 @@ await section("the design's rules reach a session the way house rules do", async
      `a rule typed in the view saves with its slug name and triggers (${JSON.stringify(now[2]).slice(0, 90)})`);
   const bad = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
     headers: OWNER,
-    body: JSON.stringify({ project: P, action: 'save', language: { ...(await api(`/api/design?project=${P}`)).language, rules: [{ name: 'empty' }] }, pages: [] }) });
-  // (Sent the old way, on the language: carried into the default theme on the way in.)
+    body: JSON.stringify({ project: P, action: 'save', language: await (async () => { const l = (await api(`/api/design?project=${P}`)).language;
+      return { ...l, themes: [{ ...l.themes[0], rules: [{ name: 'empty' }] }, ...l.themes.slice(1)] }; })(), pages: [] }) });
   ok(bad.status === 400 && /the rule empty says nothing/.test((await bad.json()).error || ''), 'a rule with no text is refused by name');
   // B342: a bare string is refused rather than dropped, a color may carry
   // its alpha, every problem is reported at once, and the schema is printed.
   const cur = (await api(`/api/design?project=${P}`)).language;
   const multi = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
     headers: OWNER,
-    body: JSON.stringify({ project: P, action: 'save', language: { ...cur, scope: 'x'.repeat(130), rules: ['a bare string', ...cur.themes[0].rules],
-      themes: [{ ...cur.themes[0], colors: [{ name: 'glass', hex: '#1e232be0', means: 'a pane' }, { name: 'bad', hex: 'blue', means: '' }] }, ...cur.themes.slice(1)] },
+    body: JSON.stringify({ project: P, action: 'save', language: { ...cur, scope: 'x'.repeat(130),
+      themes: [{ ...cur.themes[0], rules: ['a bare string', ...cur.themes[0].rules],
+                 colors: [{ name: 'glass', hex: '#1e232be0', means: 'a pane' }, { name: 'bad', hex: 'blue', means: '' }] }, ...cur.themes.slice(1)] },
       pages: [{ name: 'p', platform: 'web', frame: 'desktop', template: 'blank', blocks: [{ kind: 'card', label: 'y'.repeat(130), x: 0, y: 0, w: 2, h: 2 }] }] }) });
   const mj = await multi.json();
   ok(multi.status === 400 && Array.isArray(mj.problems) && mj.problems.length >= 4
@@ -993,30 +994,6 @@ await saved();
 const gone = await api(`/api/design?project=${P}`);
 ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language.themes[0].colors[0].hex === '#172136',
    'Remove page and Save take the page out, and the language goes back to one theme filled from Default');
-// A record saved under the build before the choices were each theme's,
-// with a custom map naming the language's rules and a second theme with
-// no rules: read strictly it took every aerie design verb down (B386, two
-// reports). It reads, the map lands on the first theme with the rules,
-// the second theme keeps its choice with no rule named, and the schema
-// prints whatever the store holds.
-await section("A record saved under the build before the choices were each theme's", async () => {
-  const store = `${DIR}/state/designs.json`;
-  const all = existsSync(store) ? JSON.parse(readFileSync(store, 'utf8')) : {};
-  all.beta = { language: { themes: [{ name: 'Dark', mode: 'dark', colors: [], rules: [{ name: 'differences', text: 'x' }] }, { name: 'Light', mode: 'light', colors: [] }],
-                           corners: 'custom', motion: 'custom', custom: { corners: 'shape', motion: 'motion' },
-                           rules: [{ name: 'shape', text: 'radii 6px' }, { name: 'motion', text: 'none' }] }, pages: [], next: 1, at: 5 };
-  writeFileSync(store, JSON.stringify(all));
-  const old = await api('/api/design?project=beta');
-  const [dark, light] = old.language?.themes || [];
-  ok(old.status === 200 && dark?.custom?.corners === 'shape' && dark.rules.map(r => r.name).join() === 'shape,motion,differences'
-     && light?.corners === 'custom' && JSON.stringify(light.custom) === '{}' && light.rules.length === 0,
-     `a record from before the choices were each theme's reads: the custom map and the rules go to the first theme, the second keeps its choice with no rule named (${old.status} ${(old.error || '').slice(0, 80)})`);
-  ok(/^The record aerie design save takes/.test((await api('/api/design?project=beta&show=schema')).text || '')
-     && /Dark \(dark\)/.test((await api('/api/design?project=beta&show=list')).text || ''),
-     'aerie design schema and list answer over it');
-  delete all.beta;
-  writeFileSync(store, JSON.stringify(all));
-});
 // A project read-only to you reads its design with nothing to press that
 // would change it: the editing buttons are not drawn, the fields are there
 // to read, dead (B293). Read-only the way the view reads it (its project's
