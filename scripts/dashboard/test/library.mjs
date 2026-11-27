@@ -25,6 +25,18 @@ await page.waitForFunction(() => lib && !lib.nonode && Array.isArray(lib.rows), 
 // ...pushed by the draw that follows the read, so waited for.
 ok(await page.waitForFunction(() => location.hash === '#/build/library/' + encodeURIComponent(libNode), null, { timeout: 10000 }).then(() => true, () => false),
    `the address names the page and its node (${await page.evaluate(() => location.hash)})`);
+// An address naming no page of the group (#/build/entry, an entry's page with
+// no entry) opens the group's first page on its node, never a node called
+// that, and never leaves the page that was on show (B1175: the CI runner's).
+{
+  const keep = await page.evaluate(() => libNode);
+  await page.evaluate(() => { location.hash = '#/build/runner'; });
+  await page.waitForFunction(() => document.querySelector('.pane .doc.on .runnertab'), null, { timeout: 15000 }).catch(() => {});
+  await page.evaluate(() => { location.hash = '#/build/entry'; });
+  const landed = await page.waitForFunction(k => document.querySelector('.pane .doc.on .librarytab') && libNode === k
+    && !document.querySelector('.pane .doc.on .runnertab'), keep, { timeout: 15000 }).then(() => true, () => false);
+  ok(landed, `#/build/entry lands on the Library on its own node, not the page before nor a node called entry (${await page.evaluate(() => `${location.hash} ${libNode}`)})`);
+}
 // Every row the Library has for the node, asked for whole (no view): what
 // the checks count against, since the page holds a page of it at most.
 const whole = () => page.evaluate(async () => (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || []);

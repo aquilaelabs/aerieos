@@ -429,8 +429,12 @@ function openRoute(hash){
   const kind = railTool(g, named ? a : "");
   if (!kind) return false;
   railWant = g.key;
-  // The node the address names, set before the page draws (R256 step 3).
-  const node = multi && named ? b : a;
+  // The node the address names, set before the page draws (R256 step 3). In
+  // a group of several pages a node only ever follows a page's name: a word
+  // that names no page of the group (#/build/entry) is neither, and the group
+  // opens on its first page; taken as a node it left the page on show drawn
+  // (B1175).
+  const node = multi ? (named ? b : "") : a;
   if (node && NODE_SET[kind]) NODE_SET[kind](decodeURIComponent(node));
   if (kind === "library"){
     const was = libAddr();
