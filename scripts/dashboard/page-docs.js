@@ -519,6 +519,35 @@ function docSurface(i, kind){
            setFoot(html){ slot(foot, html); } };
 }
 
+// ---- a form (R301) ----------------------------------------------------------
+// Every form is this one part, as every page is docSurface (the operator, 27
+// Nov: a form's buttons touched the field above them and hung past its edge,
+// pointed out many times; a site builder's form block owns its own insides).
+// The part owns what a page used to arrange for itself: the fields on the
+// grid (.fgrid), their room, and the foot, 16px under the last field with the
+// primary at the right. The box is what is capped, never a field alone, so the
+// foot ends where the fields end at every width. A page hands it fields
+// (formField) and verbs, never layout; lint refuses a field written outside it.
+//   fields: formField strings, or groups: [{head, says, fields}], each a .fgroup
+//   foot: the verbs' button strings, the primary last; state: a .state before them
+function formBox({fields = [], groups = null, foot = [], state = "", cls = "", attrs = ""} = {}){
+  const grid = fs => `<div class="fgrid">${fs.filter(Boolean).join("")}</div>`;
+  const body = groups
+    ? groups.map(g => `<div class="fgroup">${g.head ? `<div class="fgrouphead">${esc(g.head)}${
+        g.says ? `<span class="sub dim">${esc(g.says)}</span>` : ""}</div>` : ""}${grid(g.fields || [])}</div>`).join("")
+    : grid(fields);
+  const verbs = foot.filter(Boolean);
+  return `<div class="fbox${cls ? ` ${cls}` : ""}"${attrs ? ` ${attrs}` : ""}>${body}${verbs.length || state
+    ? `<div class="actbar ffoot">${state}<span class="sp"></span>${verbs.join("")}</div>` : ""}</div>`;
+}
+// One field of a form: its label over it, a hint under it. `wide` spans the
+// grid's two columns (a path, an address, a file's text), `short` is a
+// number's width; `control` is the input, select or textarea itself.
+function formField(id, label, control, {help = "", hint = "", wide = false, short = false, hidden = false, attrs = ""} = {}){
+  return `<div class="fcell${wide ? " fwide" : ""}${short ? " fshort" : ""}"${hidden ? " hidden" : ""}${attrs ? ` ${attrs}` : ""}>${
+    lbl(id, label, help)}${control}${hint ? `<div class="hint">${hint}</div>` : ""}</div>`;
+}
+
 // A section of a document tab (see "sections and action bars" in the
 // stylesheet): a fold with a title, a one-line status on the right, and the
 // controls inside. `kind:id` is what its open state is kept under, for this

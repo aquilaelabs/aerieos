@@ -66,7 +66,32 @@ class Verdicts(unittest.TestCase):
     def test_every_check_is_one_the_dispatcher_knows(self):
         self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "pinned", "channels", "shipped",
                                               "formats", "packs", "unraid", "changelog", "dupes", "releasekey",
-                                              "releasesigners", "selectors"})
+                                              "releasesigners", "selectors", "forms"})
+
+    def test_a_field_written_outside_formField_only_ever_gets_rarer(self):
+        # R301: a form is formBox and formField; the fields page code writes
+        # outside them are counted per file against a baseline that only falls.
+        os.makedirs(os.path.join(self.d, "scripts", "dashboard", "test"))
+        self.put("scripts/dashboard/test/forms-baseline.json", '{"tab-x.js": 1}\n')
+        self.put("scripts/dashboard/tab-x.js",
+                 'const a = `<input id="n" type="text">`;\n'
+                 'const b = formField("m", "Name", `<input id="m" type="text">`);\n'
+                 'const c = `<input type="checkbox"><input type=\\"search\\"><input type="file" hidden>`;\n')
+        rc, said = self.run_check("forms")
+        self.assertEqual(rc, 0, "a formField line, a tick, a search and a file picker are not counted: " + said)
+        self.put("scripts/dashboard/tab-x.js", 'const a = `<input id="n"><textarea id="t"></textarea>`;\n')
+        rc, said = self.run_check("forms")
+        self.assertEqual(rc, 1, said)
+        self.assertIn("tab-x.js: 2 fields written outside formField, 1 before", said)
+        self.put("scripts/dashboard/tab-x.js", "const none = 1;\n")
+        rc, said = self.run_check("forms")
+        self.assertEqual(rc, 1, "a count that fell is written down, so it cannot rise back: " + said)
+        self.assertIn("lower it to 0", said)
+        self.put("scripts/dashboard/tab-y.js", 'const y = `<select id="s"></select>`;\n')
+        self.put("scripts/dashboard/test/forms-baseline.json", "{}\n")
+        rc, said = self.run_check("forms")
+        self.assertEqual(rc, 1, "a file the baseline does not name may write none: " + said)
+        self.assertIn("tab-y.js: 1 fields written outside formField, 0 before", said)
 
     def test_a_has_inside_a_has_is_refused_and_one_beside_another_is_not(self):
         # R278: a browser drops a rule whose selector nests :has(), every

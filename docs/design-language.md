@@ -663,15 +663,15 @@ otherwise), and `saidOf(el)` reads them back for a suite. A destructive button (
 
 ### forms
 
-Applies to: scripts/dashboard/index.html, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; form, field, label, pulldown, select, input
+Applies to: scripts/dashboard/index.html, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; field, foot, form, formbox, formfield, input, label, pulldown, select
 
-One way to lay out fields, on every page, measured by uniform.mjs's forms check (the operator, 4 Nov: fields crammed together, each page its own way).
+One way to lay out fields, on every page: every form is one part, `formBox`, as every page is `docSurface` (the operator, 4 Nov: fields crammed together, each page its own way; 27 Nov: buttons touching their fields and hanging past them). A page hands it fields and verbs and never lays a form out itself; `aerie lint` counts the fields page code writes outside `formField` and lets the count fall, never rise, and uniform.mjs measures every form by where things are.
 
-**A label sits over its field**, 4px above it, never beside it: `.lbl` or `.pickw`. A picker in a band or an action bar sits beside what it filters and is not a form's field (`.docbarrow`, `.histbar`, `.actbar`, `.phead`).
+**A label sits over its field**, 4px above it, never beside it (`formField` draws it). A picker in a band or an action bar sits beside what it filters and is not a form's field (`.docbarrow`, `.histbar`, `.actbar`, `.phead`).
 
-**Fields go in `.fgrid`**: two equal columns at a desk, one on a phone, 14px down and 20px across, each filling its cell. `.fwide` spans both, for a path or an address. `.fshort` is a number's width. Fields never touch, and a form never sizes one field by hand.
+**Fields go on the part's grid**: two equal columns at a desk, one on a phone, 14px down and 20px across, each filling its cell; `wide` spans both, for a path or an address, `short` is a number's width. The part's box is what is capped, never a field alone.
 
-**A long form is `.fgroup`s**, one concern each: a head in the UI voice with a line of dim words under it (`.fgrouphead`), a hairline and 16px between groups, and the same 16px under the last hairline before the action bar. A tick is a line of its own. A hint goes under what it explains. Save is at the foot on the right, as everywhere.
+**The foot is 16px under the last field and ends where the fields end**, at every width, the primary at the right. A long form is groups (`.fgroup`), one concern each: a head in the UI voice with a line of dim words under it (`.fgrouphead`), a hairline and 16px between groups. A tick is a line of its own. A hint goes under what it explains.
 
 **The control fits the answer.** A known set of answers is a pulldown, never typed: a time zone, a pool, a security level, a person's access. A choice of two to four short answers that should all stay in view is the segmented control (`.pseg`). Yes or no is a tick. An answer with likely values that may be something else is a field with suggestions (a `datalist`): a path, a store. Only what nobody can list is a plain text field: a name, an address, a token. What depends on another answer stays hidden until that answer asks for it.
 

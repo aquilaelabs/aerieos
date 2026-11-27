@@ -592,7 +592,53 @@ def selectors():
     return 1 if bad else 0
 
 
-CHECKS = {"runner": runner, "selectors": selectors, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
+FORMS_BASELINE = pathlib.Path("scripts/dashboard/test/forms-baseline.json")
+_FIELD = re.compile(r"<(input|textarea|select)\b([^>]*)", re.I)
+# What is not a form's field: a tick, a choice of one, a file picker behind a
+# press, a search over a list, and what is never on show.
+_NOT_A_FIELD = re.compile(r'type=\\?["\'](checkbox|radio|hidden|file|search|range|color)', re.I)
+
+
+def _raw_fields(text):
+    """The fields a page file writes itself: every input, textarea and select
+    not on a line that hands it to formField, which is where a form's control
+    is written (R301)."""
+    n = 0
+    for line in text.splitlines():
+        if "formField(" in line:
+            continue
+        n += sum(1 for m in _FIELD.finditer(line) if not _NOT_A_FIELD.search(m.group(2)))
+    return n
+
+
+def forms():
+    """A form is formBox and formField (R301, the operator 27 Nov: a form's
+    buttons touched its field and hung past it, pointed out many times): the
+    part owns the form's layout, so a page cannot write one its own way. The
+    fields page code writes outside it are counted per file against
+    test/forms-baseline.json, and a count only falls: a new form written by
+    hand fails here, and a form moved onto the part lowers its file's number."""
+    import json
+    base = json.loads(FORMS_BASELINE.read_text(encoding="utf-8")) if FORMS_BASELINE.exists() else {}
+    files = sorted([*pathlib.Path("scripts/dashboard").glob("tab-*.js"), *pathlib.Path("scripts/dashboard").glob("nb-*.js"),
+                    *pathlib.Path("scripts/dashboard").glob("page-*.js"), pathlib.Path("scripts/dashboard/index.html")])
+    bad = []
+    for f in files:
+        if not f.exists():
+            continue
+        n, was = _raw_fields(f.read_text(encoding="utf-8", errors="replace")), int(base.get(f.name, 0))
+        if n > was:
+            bad.append(f"{f}: {n} fields written outside formField, {was} before: a form is formBox and formField (R301)")
+        elif n < was:
+            bad.append(f"{f}: {n} fields written outside formField, {was} in {FORMS_BASELINE}: lower it to {n}, so it stays down")
+    for b in bad:
+        print(f"  [FAIL] {b}")
+    if not bad:
+        print(f"  [ok]   no page writes a form's field outside formField past {FORMS_BASELINE.name}")
+    return 1 if bad else 0
+
+
+CHECKS = {"runner": runner, "selectors": selectors, "forms": forms, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
           "changelog": changelog, "dupes": dupes, "releasekey": releasekey, "releasesigners": releasesigners}
 

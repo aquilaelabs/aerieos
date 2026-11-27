@@ -356,7 +356,7 @@ scripts/
                                  what a run measured it costing
     notify.py                    getting a line into a running session, and knowing it landed
     signin.py                    each agent's sign-in and sign-out on one node, as jobs there
-    test/                        its Playwright suite: `aerie dashboard test`, isolated; catalog-apps.json in it is the two Docker apps its world offers, kept as from a made-up catalog since none is shipped; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
+    test/                        its Playwright suite: `aerie dashboard test`, isolated; catalog-apps.json in it is the two Docker apps its world offers, kept as from a made-up catalog since none is shipped; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79); forms-baseline.json in it counts, per page file, the fields written outside formField, a number `aerie lint` lets fall and never rise (R301)
     unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it; sdkstore.py is a store and a catalog of made-up rows for the installer's)
     roottier/                    the root tier: what the root agent and the root helpers do in a folder an account controls, with a link planted where root works, seen as root (world.py is what its modules stand on)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs

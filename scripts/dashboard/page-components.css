@@ -2401,7 +2401,8 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
    - .fgroup is one concern: a head in the UI voice, a line of dim words under it,
      a hairline and room between groups;
    - a tick is a line of its own; a hint goes under what it explains;
-   - Save is at the foot on the right.
+   - a form is formBox (page-docs.js): its foot 16px under its fields, ending
+     where they end, the primary at the right.
    A picker in a band or an action bar is beside what it filters, and is not a
    form's field: .docbarrow, .histbar, .actbar and .phead keep theirs inline. */
 .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px;align-items:start;max-width:calc(var(--ctl-w) * 2 + 20px)}
@@ -2413,6 +2414,23 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .fgrid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;max-width:100%;box-sizing:border-box;min-height:var(--ctl)}
 .fgrid>.setrow,.fgrid>label.pick{max-width:none;margin:0}
 @media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)}
+}
+/* A form (formBox, R301): the box is capped and never a field alone, so its
+   foot ends where its fields end at every width, 16px under the last of
+   them, the primary at the right; a field's label is over it and its hint
+   under it (formField). Room is the box's to give (its gap), so nothing in a
+   form touches the thing above it whatever is put in it. */
+.fbox{display:flex;flex-direction:column;gap:16px;min-width:0;max-width:calc(var(--ctl-w) * 2 + 20px)}
+.fbox>.fgrid{max-width:none}
+.fbox>.fgroup{padding:0 0 16px}
+.fbox>.fgroup:last-of-type{padding-bottom:0}
+.fbox>.fgroup + .fgroup{padding-top:0}
+.fbox>.ffoot{margin:0}
+.fcell{display:flex;flex-direction:column;gap:var(--label-gap);min-width:0}
+.fcell>.hint{margin:0}
+.modal .fbox{max-width:none}
+@media(max-width:600px){ .fbox{max-width:min(var(--ctl-w),88%)}
+  .modal .fbox{max-width:none}
 }
 /* A dialog's form is on the same grid (R273, the operator 23 Nov): the
    fields that pair sit side by side at a desk, each a .field of its own in
@@ -2491,7 +2509,9 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 @media(max-width:440px){
   :is(.doctab,.nb) .field.docbarrow>input[type=search]{order:-1;flex:1 1 9rem;min-width:9rem;max-width:none}
 }
-:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.setgrid,.actmenu,.dsrow) *){
+/* A form's box (.fbox, R301) is capped as a whole and its fields fill it, so
+   its foot ends where they do; one field capped alone ended short of it. */
+:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.setgrid,.actmenu,.dsrow,.fbox) *){
   max-width:min(var(--ctl-w),88%)}
 /* A row whose text column holds a field is a row of controls, and its
    action cluster belongs on the field's line: the Phone tab's Connect and

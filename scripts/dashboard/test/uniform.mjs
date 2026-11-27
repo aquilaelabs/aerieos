@@ -581,6 +581,16 @@ async function spanning(){
     const vis = e => e.offsetHeight > 0 && e.getBoundingClientRect().width > 0;
     const out = [];
     const seen = new Set();
+    // A form's box (formBox, R301) is capped as a whole, two columns of
+    // controls at most, and its fields fill it so its foot ends where they
+    // do: judged as one, never field by field.
+    const FORM = Math.min(W * 0.95, cap * 2 + 22);
+    for (const f of box.querySelectorAll('.fbox')){
+      const kids = [...f.querySelectorAll(CTL)].filter(vis);
+      kids.forEach(k => seen.add(k));
+      const w = f.getBoundingClientRect().width;
+      if (kids.length && w > FORM) out.push(`fbox ${Math.round(w)}/${Math.round(W)}`);
+    }
     for (const row of box.querySelectorAll(ROWS)){
       // The document bar is a band, not a control row (filters at the left,
       // the action at the tab's right edge), so its union spans by design.
@@ -2618,11 +2628,11 @@ await section("the document and the framework are one thing", async () => {
   const { fileURLToPath } = await import('node:url');
   const { dirname, join } = await import('node:path');
   const doc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'design-language.md'), 'utf8');
-  const helpers = ['docSurface', 'docSection', 'renderGuarded', 'busy'];
+  const helpers = ['docSurface', 'docSection', 'renderGuarded', 'busy', 'formBox', 'formField'];
   const missing = helpers.filter(h => !doc.includes(h));
   ok(missing.length === 0,
      `the design language names every helper the framework exposes${missing.length ? `; not: ${missing.join(', ')}` : ''}`);
-  const named = [...doc.matchAll(/`(docSurface|docSection|renderGuarded|busy|wireSections)\b/g)].map(m => m[1]);
+  const named = [...doc.matchAll(/`(docSurface|docSection|renderGuarded|busy|wireSections|formBox|formField)\b/g)].map(m => m[1]);
   const unreal = await page.evaluate(ns => ns.filter(n => typeof window[n] !== 'function'), [...new Set(named)]);
   ok(unreal.length === 0,
      `...and every helper the document names is a real function on the page${unreal.length ? `; not: ${unreal.join(', ')}` : ''}`);
@@ -3378,6 +3388,60 @@ if (runs('c')) await section("what opens, shuts or arrives moves, and never snap
     await p.close();
   }
   ok(bad.length === 0, `a section, a roadmap row and a bug's row slide each way, and the bell, the Doctor and a More menu arrive, at a desk and on a phone${bad.length ? `: ${bad.slice(0, 6).join('; ')}` : ''}`);
+});
+
+// A form's foot (R301): measured by where things are, not by their classes,
+// so a form however it was written is held. On every page at a desk and on a
+// phone: a bar's buttons stand 12px or more under the field above them and
+// end where the fields they serve end, and every form (a section or a dialog
+// holding two fields or more) is on the form grid. The forms not yet moved
+// onto formBox are named here, and the list only shrinks: a new form written
+// the old way fails at once, and one moved is taken off.
+const FORMS_TO_MOVE = new Set(['nodes:sessions', 'nodes:storage', 'nodes:network', 'rn:project', 'profile:you']);
+if (runs('c')) await section("a form's buttons stand clear of its fields and end where they end", async () => {
+  const bad = [], moved = new Set();
+  for (const [w, h, tag] of [[393, 852, 'phone'], [1440, 1000, 'desk']]){
+    const p = await newPage(browser, { viewport: { width: w, height: h } });
+    await p.goto(URL); await ready(p);
+    for (const hash of ['#/machines/clusters', '#/machines/nodes', '#/spaces/alpha/settings', '#/settings', '#/controller', '#/machines/storage', '#/people/users']){
+      await p.evaluate(x => { location.hash = x; }, hash); await sleep(1600);
+      const got = await p.evaluate(() => {
+        const out = [];
+        const vis = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && e.checkVisibility(); };
+        const root = document.querySelector('.doc.on') || document.body;
+        const fields = [...root.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]), select, textarea')]
+          .filter(e => vis(e) && !e.closest('.actbar, .docbarrow, .histbar, .phead, .pghead, .tbl, table, .chips, .slot, .xterm, .dmlog'));
+        // Where a form is known by: its section's key, else its field's id.
+        const whose = e => e.closest('details.sect')?.dataset.sect || e.id || e.name || e.tagName.toLowerCase();
+        for (const bar of [...root.querySelectorAll('.actbar, .foot')].filter(vis)){
+          const btns = [...bar.querySelectorAll(':scope > button, :scope > .more > button')].filter(vis);
+          if (!btns.length) continue;
+          const B = { top: Math.min(...btns.map(x => x.getBoundingClientRect().top)), left: Math.min(...btns.map(x => x.getBoundingClientRect().left)),
+                      right: Math.max(...btns.map(x => x.getBoundingClientRect().right)) };
+          const home = bar.closest('details.sect > .body, .modal .box, .fbox, .row, .doctab') || root;
+          const above = fields.filter(f => home.contains(f) && f.getBoundingClientRect().bottom <= B.top + 1);
+          if (!above.length) continue;
+          const last = above.reduce((a, f) => f.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom ? f : a), L = last.getBoundingClientRect();
+          const gap = B.top - L.bottom, fr = Math.max(...above.map(f => f.getBoundingClientRect().right));
+          if (gap < 12 && B.left < L.right && B.right > L.left) out.push([whose(last), `buttons ${Math.round(gap)}px under ${last.id || last.tagName.toLowerCase()}`]);
+          if (B.right - fr > 8 && gap < 80) out.push([whose(last), `buttons end at ${Math.round(B.right)}, past the fields' ${Math.round(fr)}`]);
+        }
+        for (const home of [...root.querySelectorAll('details.sect > .body, .modal:not([hidden]) .box')].filter(vis)){
+          const fs = fields.filter(f => home.contains(f) && !f.closest('details.sect details.sect'));
+          if (fs.length >= 2 && !fs.some(f => f.closest('.fgrid'))) out.push([home.closest('details.sect')?.dataset.sect || 'dialog', `${fs.length} fields off the form grid`]);
+        }
+        return out;
+      });
+      for (const [k, why] of got){
+        if (FORMS_TO_MOVE.has(k)) moved.add(k);
+        else bad.push(`${tag} ${hash} ${k}: ${why}`);
+      }
+    }
+    await p.close();
+  }
+  ok(bad.length === 0, `every form's buttons stand 12px clear of its fields and end where they end, on the form grid, at a desk and on a phone${bad.length ? `: ${[...new Set(bad)].slice(0, 6).join('; ')}` : ''}`);
+  const gone = [...FORMS_TO_MOVE].filter(k => !moved.has(k));
+  ok(gone.length === 0, `...and every form still named as not yet moved is still met, so the list only shrinks${gone.length ? ` (take off: ${gone.join(', ')})` : ''}`);
 });
 
 ok(page.errors.length === 0,

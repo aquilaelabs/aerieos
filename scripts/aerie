@@ -5127,6 +5127,12 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         section "stylesheet selectors a browser reads (no :has() inside :has())"
         python3 "$BB_LIB/lint-checks.py" selectors || rc=1
     fi
+    # A form is formBox and formField, and a field written outside them only
+    # ever gets rarer (R301: a form's buttons kept landing against its fields).
+    if _lint_own_tree && grep -qF '"forms": forms' "$BB_LIB/lint-checks.py"; then
+        section "forms written with formBox (a page's own fields only ever fewer)"
+        python3 "$BB_LIB/lint-checks.py" forms || rc=1
+    fi
     # A name defined twice, where the later silently wins (B733, B734).
     if _lint_own_tree && grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
         section "names defined twice (python functions and methods, the page's scripts)"

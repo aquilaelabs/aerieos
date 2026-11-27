@@ -61,15 +61,18 @@ function clBody(c){
 
 function clAddBody(canCancel){
   return `<div class="field"><div class="hint">A kubeconfig with a token or a client certificate; its current context is the cluster added. One that signs in through a cloud CLI is refused, and says what to give instead.</div></div>
-    <div class="field">
-      <div class="setrow col ctlrow">${lbl("clName", "Name", "what this cluster is called here, as spaces and the bell name it")}
-        <input id="clName" type="text" autocomplete="off" spellcheck="false" value="${esc(clDraft.name)}" placeholder="production"></div>
-      <div class="setrow col ctlrow">${lbl("clText", "Kubeconfig", "pasted, or read from its file; kept sealed on the controller and never shown again")}
-        <textarea id="clText" rows="8" spellcheck="false" autocomplete="off" placeholder="apiVersion: v1&#10;kind: Config&#10;...">${esc(clDraft.text)}</textarea></div>
-      <div class="actbar"><input type="file" id="clFile" hidden accept=".yaml,.yml,.json,.conf,.config,text/plain">
-        <button type="button" id="clPick">Read its file</button><span class="sp"></span>${canCancel ? `<button type="button" class="stop" id="clCancel">Cancel</button>` : ""}
-        <button type="button" class="primary" id="clAdd"${clDraft.name.trim() && clDraft.text.trim() ? "" : " disabled"}>Add cluster</button></div>
-    </div>`;
+    <div class="field">${formBox({
+      fields: [
+        formField("clName", "Name", `<input id="clName" type="text" autocomplete="off" spellcheck="false" value="${esc(clDraft.name)}" placeholder="production">`,
+          {help: "what this cluster is called here, as spaces and the bell name it"}),
+        formField("clText", "Kubeconfig", `<textarea id="clText" rows="8" spellcheck="false" autocomplete="off" placeholder="apiVersion: v1&#10;kind: Config&#10;...">${esc(clDraft.text)}</textarea>`,
+          {help: "pasted, or read from its file; kept sealed on the controller and never shown again", wide: true}),
+      ],
+      foot: [`<input type="file" id="clFile" hidden accept=".yaml,.yml,.json,.conf,.config,text/plain">`,
+        `<button type="button" id="clPick">Read its file</button>`,
+        canCancel ? `<button type="button" class="stop" id="clCancel">Cancel</button>` : "",
+        `<button type="button" class="primary" id="clAdd"${clDraft.name.trim() && clDraft.text.trim() ? "" : " disabled"}>Add cluster</button>`],
+    })}</div>`;
 }
 
 function renderClustersInto(i){
