@@ -38,6 +38,7 @@
 - Placeholders and the green state pills in light themes read at 4.5:1 or more in every theme (1ef1f0b)
 - The bell, the Doctor and the gear take the keyboard's caret in when opened from it and give it back to their button on Escape (a30bc53)
 - A space's own settings no longer open on a General section that held one line; the space's id is a line under the title (381ebc6)
+- A session fixes a bug it meets in a file it is already changing, in its own commit, rather than only filing it; and where a space's setting lets a change asked for interrupt a test run, a question or research no longer does (97291e6)
 
 ### Fixed
 
@@ -55,6 +56,7 @@
 - A space's own git token, kept for its background work, is no longer moved into its owner's key store at a restart (84e4929)
 - A job's row on Jobs tells a screen reader the job and where it stands, then what pressing it does, instead of only that it opens a log (88e710d)
 - A space of several repositories showed its first repository's id in its settings as the space's; and on a phone a section's chip over the settings opened that section while the one open before stayed open (381ebc6)
+- A space's settings name every section in the bar over them, People, Nodes, Discord and Running sessions included, which had no chip because they show once their reads land (85b5aa5)
 
 ### Security
 
