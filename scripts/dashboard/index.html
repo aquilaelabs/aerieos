@@ -717,15 +717,19 @@
 <div id="rnmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="rnTitle">
   <div class="box" data-sects>
     <h3 id="rnTitle">Space settings</h3>
+    <!-- A card's door (R208): the space's id under its name, and a work
+         space's folder. A line of the door's own, not a section: General
+         held nothing else there, its name being the card's back's to change. -->
+    <div class="field" id="rnProjectHead" hidden><div class="hint"></div></div>
     <!-- In sections, each titled and each hiding itself when none of its
          fields is shown (the chain's door shows the remote alone): what
          the project is and who it belongs to, where it runs, what a
          session sees, how it builds, what an agent may
          do, what is yours, and who is in it now (the operator, 1 Oct). -->
+    <!-- A repository's name; a space's door has no General, its name being
+         the card's back's (.rngroup's own rule draws a group with nothing
+         shown as nothing). -->
     <details class="sect rngroup" data-sect="rn:project"><summary><span class="t">General</span></summary><div class="body">
-    <!-- A card's door (R208): the project's id and folder, its name the
-         card's back's to change. -->
-    <div class="field" id="rnProjectHead" hidden><div class="hint"></div></div>
     <div class="field" id="rnNameField">
       <label for="rnName">Name</label>
       <input id="rnName" maxlength="100" autocomplete="off" spellcheck="false">

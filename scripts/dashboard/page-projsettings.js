@@ -200,7 +200,10 @@ function rnLockSettings(p){
       if (locked && !c.disabled){ c.disabled = true; c.dataset.rnlock = "1"; }
       else if (!locked && c.dataset.rnlock){ c.disabled = false; delete c.dataset.rnlock; }
     });
-    if (locked) body.insertAdjacentHTML("afterbegin", `<div class="field rnlocked"><div class="hint">${esc(RN_LOCKED_SAID)}</div></div>`);
+    // Only over something to read: in a section with no field on show (a
+    // space's door has no General) the note alone would bring it back.
+    if (locked && body.querySelector(":scope > .field:not([hidden]):not(.rnbarf)"))
+      body.insertAdjacentHTML("afterbegin", `<div class="field rnlocked"><div class="hint">${esc(RN_LOCKED_SAID)}</div></div>`);
   });
 }
 
@@ -928,10 +931,7 @@ function openSpaceSettings(name, sect = ""){
   renameProject(name, "project");
   if (!sect) return;
   requestAnimationFrame(() => {
-    const d = document.querySelector(`#rnmodal:not([hidden]) details[data-sect="rn:${CSS.escape(sect)}"]`);
-    if (!d) return;
-    if (!d.open){ d.open = true; sectOpen[d.dataset.sect] = true; }
-    d.scrollIntoView({block: "start"});
+    sectGoTo(document.querySelector(`#rnmodal:not([hidden]) details[data-sect="rn:${CSS.escape(sect)}"]`), {smooth: false});
   });
 }
 
@@ -967,10 +967,13 @@ function renameProject(name, mode = "all"){
   // The project's name is renamed on its card's back; the field here
   // renames a repository, which the project's door is not about.
   $("rnNameField").hidden = proj;
-  const ph = $("rnProjectHead");
-  ph.hidden = !proj;
-  ph.firstElementChild.textContent = `${projectName(name)}${p?.pid ? ` is space P${p.pid}` : ""}${
-    p?.work ? `; its folder is /workspace/${name}` : ""}. Its name is changed on its card's back.`;
+  // The space's own id: one of several repositories has an id of its own as
+  // a folder, and that was said as the space's (aerieos read P18, its first
+  // repository's, for P39).
+  // A space's id comes as "P8", a folder's as 8.
+  const ph = $("rnProjectHead"), spid = String(state?.repos?.[reposOf(name)]?.pid || p?.pid || "").replace(/^P?/, "");
+  ph.hidden = !proj || !spid;
+  ph.firstElementChild.textContent = `Space P${spid}${p?.work ? `; its folder is /workspace/${name}` : ""}.`;
   const pn = $("rnProjectNote");
   pn.hidden = !proj;
   pn.firstElementChild.textContent = p?.work

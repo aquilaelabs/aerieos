@@ -817,11 +817,24 @@ function sectJump(g){
   else if (bar.nextElementSibling !== top) top.before(bar);
   bar.querySelectorAll("[data-jump]").forEach(a => a.onclick = e => {
     e.preventDefault();
-    const d = mine[+a.dataset.jump];
-    if (!d) return;
-    if (!d.open){ d.open = true; if (d.dataset.sect) sectOpen[d.dataset.sect] = true; }
-    d.scrollIntoView({block: "start", behavior: "smooth"});
+    sectGoTo(mine[+a.dataset.jump]);
   });
+}
+// A section gone to from outside it (its jump bar's link, a door that names
+// it) opens as a press on its summary does: sliding, and on a phone the one
+// open before sliding shut as it opens (soleOpen); a jump only opened it, so
+// a phone stood two open (the operator, 26 Nov). Brought to the top once the
+// folds have moved, since a scroll at once aimed where it stood before the
+// one above it shut.
+function sectGoTo(d, {smooth = true} = {}){
+  if (!d) return;
+  soleOpen(d);
+  if (!foldOpen(d)) slideDetails(d, true);
+  const g = sectGroup(d);
+  const moving = (g ? sectsOf(g) : [d]).flatMap(o => o.getAnimations().filter(a => a.id === "fold"));
+  const go = () => d.scrollIntoView({block: "start", behavior: smooth && !noMotion() ? "smooth" : "auto"});
+  if (!moving.length) go();
+  else Promise.all(moving.map(a => a.finished.catch(() => {}))).then(go);
 }
 // Every section is open by default at a desk and several stand open there
 // (the operator, 8 Oct: too much was hidden in folds); a long surface has a

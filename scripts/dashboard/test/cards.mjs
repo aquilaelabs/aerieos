@@ -1921,6 +1921,23 @@ await section("Sections, every one open by default at every width, with a jump b
   await phone.evaluate(() => renameProject('alpha'));
   await phone.waitForSelector('#rnmodal:not([hidden])');
   ok(!shut(await folds(phone)), `on a phone every section is open too (${shut(await folds(phone)) || 'none shut'})`);
+  // A chip on the bar opens its section as its heading does, the rest
+  // sliding shut on a phone (the operator, 26 Nov: a jump left the last one
+  // open).
+  const openNow = async () => (await folds(phone)).filter(f => f.shown && f.open).map(f => f.k).join();
+  await phone.$$eval('#rnmodal .sectjump a', as => as.find(a => a.textContent === 'Agents may')?.click());
+  await phone.waitForFunction(() => [...document.querySelectorAll('#rnmodal details.rngroup')]
+    .filter(d => getComputedStyle(d).display !== 'none' && d.open).map(d => d.dataset.sect).join() === 'rn:claude', null, { timeout: 5000 }).catch(() => {});
+  ok(await openNow() === 'rn:claude', `...and a chip on its bar opens that one alone (${await openNow()})`);
+  // A space's own settings have no General: its name is the card's back's,
+  // and its id is a line under the title, the space's and not its first
+  // repository's folder's.
+  await phone.evaluate(() => { closeRename(); openSpaceSettings('alpha'); });
+  await phone.waitForSelector('#rnmodal:not([hidden])');
+  const door = await phone.evaluate(() => ({ general: getComputedStyle(document.querySelector('details[data-sect="rn:project"]')).display,
+    head: $('rnProjectHead').checkVisibility() ? $('rnProjectHead').textContent.trim() : '', want: String(state.repos?.[reposOf('alpha')]?.pid || '') }));
+  ok(door.general === 'none' && door.head === `Space P${door.want.replace(/^P?/, '')}.`,
+     `a space's own settings have no General, the space's id a line under its title (${JSON.stringify(door)})`);
   await phone.close();
 });
 ok(await page.evaluate(() => document.activeElement?.tagName) !== 'INPUT',
