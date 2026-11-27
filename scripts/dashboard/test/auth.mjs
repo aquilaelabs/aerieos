@@ -5,7 +5,7 @@
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
 import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey,
-         asUser, OWNER, asSession, usersPy, mint, section, REPO, aerie } from './lib.mjs';
+         asUser, OWNER, asSession, usersPy, mint, section, REPO, aerie, patience } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -164,10 +164,10 @@ await page2.waitForURL('**/login**');
 await page2.fill('#u', 'test');
 await page2.fill('#p', 'test');
 await page2.click('button[type=submit]');
-await page2.waitForFunction(() => document.getElementById('rail') !== null, { timeout: 20000 });
+await page2.waitForFunction(() => document.getElementById('rail') !== null, null, { timeout: patience(30000) });
 ok(!page2.url().includes('login'), 'the form signs a fresh browser in');
 await page2.reload();
-await page2.waitForFunction(() => document.getElementById('rail') !== null, { timeout: 20000 });
+await page2.waitForFunction(() => document.getElementById('rail') !== null, null, { timeout: patience(30000) });
 ok(true, '...and the cookie survives a reload');
 // The header's sign-out button: drawn to its neighbors' size, and it really
 // ends the session, landing on the login page and staying out.
