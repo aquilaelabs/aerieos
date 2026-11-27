@@ -3141,13 +3141,13 @@ await section("a node's path mapping", async () => {
     const loc = await papi({ action: 'update', id: 'local', fields: { name: 'box' } });
     ok(/not a node to rename/.test(loc.error || ''), 'the controller\'s own row is not renamed');
     await openSection(page, 'nodes:advanced', `.nodestab .ndrow[data-node="${sb.id}"]`);
-    await page.fill(`.nodestab .ndrow[data-node="${sb.id}"] .ndname [data-k="name"]`, 'sandbox-two');
+    await page.fill(`.nodestab .ndrow[data-node="${sb.id}"] .ndnameform [data-k="name"]`, 'sandbox-two');
     // A heartbeat repaints the tab; the name being typed survives it (B176).
     // Repainted once the box that was typed in is no longer the page's.
-    const typedName = await page.$(`.nodestab .ndrow[data-node="${sb.id}"] .ndname [data-k="name"]`);
+    const typedName = await page.$(`.nodestab .ndrow[data-node="${sb.id}"] .ndnameform [data-k="name"]`);
     await page.evaluate(() => loadNodes());
     await page.waitForFunction(e => !e.isConnected, typedName, { timeout: 10000 }).catch(() => {});
-    ok(await page.$eval(`.nodestab .ndrow[data-node="${sb.id}"] .ndname [data-k="name"]`, e => e.value) === 'sandbox-two',
+    ok(await page.$eval(`.nodestab .ndrow[data-node="${sb.id}"] .ndnameform [data-k="name"]`, e => e.value) === 'sandbox-two',
        'a new name being typed survives the repaint a heartbeat brings');
     await page.click(`.nodestab .ndrow[data-node="${sb.id}"] [data-nd="rename"]`);
     await page.waitForFunction(id => nodesList?.find(n => n.id === id)?.name === 'sandbox-two', sb.id, { timeout: 15000 });

@@ -1137,9 +1137,9 @@ async function initWith(val){
 }
 await page.waitForSelector(`${NB} .nbtabs`, { timeout: 20000 });
 await nbGo(page, 'artifacts', NB);
-await page.waitForSelector(`${NB} #verBox .verln`, { timeout: 20000 });
+await page.waitForSelector(`${NB} #verBox .verinit`, { timeout: 20000 });
 const fallback = (await page.$eval(`${NB} #verBox`, e => e.textContent)).replace(/\s+/g, ' ');
-ok(/No version yet/.test(fallback) && /start at/.test(fallback),
+ok(/No version yet/.test(fallback) && /Start at/.test(fallback),
    '...and its tab says so, offering a starting point rather than inventing one');
 ok((await page.$$(`${NB} #verBox [data-verlog]`)).length === 1,
    '...while the changelog stays reachable: entries accrue before a version exists');

@@ -198,9 +198,7 @@ function stickPoolPick(n, s, none = "No pool or array here yet: make one on the 
   // A field of the setup walk's picks (setpicks): its label over it, the
   // control and its one verb on one line, what is said under them.
   if (row) return `<div class="setpick"><label class="pickw" for="stickPool">System pool</label><div class="setpickline">${sel}${go}</div>${under}</div>`;
-  return `<div class="actbar"><label class="pick"><span class="pickw">System pool</span>${sel}</label><span class="sp"></span>
-      ${go}</div>
-      ${under}`;
+  return formBox({fields: [formField("stickPool", "System pool", `${sel}${under}`)], foot: [go]});
 }
 // A pool holding another install's folder (the operator, 8 Nov): never taken,
 // set aside beside it when picked, for a person to delete once sure.
@@ -225,7 +223,9 @@ function stickSection(n){
   ];
   const pick = stickPoolPick(n, s);
   return docSection("nodes", "stick", "Pool and spaces", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool with the secrets and the install key, never on the stick; until one is picked, Docker, the VMs and new spaces wait.</div></div>${projectsFolderField(n, s, admin)}`,
+    // The facts and why a pool, then its two forms: the pool, and the
+    // folder the spaces already sit in.
+    `<div class="field">${factGrid(rows, "stickfacts")}<div class="hint">They write all day, so they live on a pool with the secrets and the install key, never on the stick; until one is picked, Docker, the VMs and new spaces wait.</div></div>${pick}${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 
@@ -250,11 +250,10 @@ function projectsFolderField(n, s, admin, row = false){
       <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button>`;
   // The walk's row: the step's own words say what the folder is for.
   if (row) return `<div class="setpick"><label class="pickw" for="projFolder">Spaces folder</label><div class="setpickline">${input}${acts}</div>${why ? `<div class="sub dim">${esc(why)}</div>` : ""}</div>`;
-  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Spaces folder</span>${input}</label></div>
-    <div class="actbar"><span class="sp"></span>${acts}</div>
-    ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
-    <div class="hint">Only if the spaces already sit on these disks: the controller works there, and nothing is copied${
-      helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
+  return formBox({fields: [formField("projFolder", "Spaces folder", `${input}${why ? `<div class="sub dim">${esc(why)}</div>` : ""}`,
+    {wide: true, hint: `Only if the spaces already sit on these disks: the controller works there, and nothing is copied${
+      helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}`})],
+    foot: [acts]});
 }
 function wireStick(root){
   root.querySelectorAll("[data-projfolder]").forEach(pb => pb.onclick = () => pressing(pb, async () => {

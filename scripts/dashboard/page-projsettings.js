@@ -1017,6 +1017,67 @@ function rnDrawForms(){
          attrs: `id="rnRelTableF"`})]})
       + `<div class="field" id="rnRelFilesF"><label>What each file is for</label><div id="rnRelFiles"></div>
         <div class="hint">A name may hold @VER@ for the version and * for anything. A repository holding docs/release-notes/downloads.md uses that file in place of this list.</div></div>`,
+    // Who the space belongs to and who joins it (membership.py): its owner
+    // and Invite only are the form, staged until Save; who is on it, the
+    // invitations and Invite act on the press, so they sit under its foot.
+    // Filled by rnDrawPeople.
+    people: formBox({state: RN_STATE, attrs: `id="rnPeopleField" hidden`, fields: [
+      formField("rnOwner", "Space owner", `<select id="rnOwner"></select><div class="hint" id="rnOwnerSays" hidden></div>
+        <label class="ndcap"><input type="checkbox" id="rnInviteOnly"> Invite only</label>`,
+        {help: "who the space belongs to; offering it to somebody else makes them its owner once they accept from their bell. Invite only means people join by accepting an invitation, and its owner decides that"})]})
+      + `<div class="field" id="rnPeopleWho" hidden>
+        <label id="rnPeopleLabel">People<span class="help" data-help="who is on it and who is invited. Any administrator can add people, themselves included; a role on this space puts somebody on it, and the Roles page sets who holds which" tabindex="0">?</span></label>
+        <div id="rnPeople" role="group" aria-labelledby="rnPeopleLabel"></div></div>`,
+    // What sessions reach: the spaces a session here may read (prefs.reads:
+    // their trees bound read-only into its view on a node, their notebooks
+    // answering aerie from inside them, every write refused; the operator's
+    // to name, never a session's) and the places on its node it is shown
+    // (prefs.sees: a share mounted on the node is out of a session's view
+    // unless it is named here) are the form. Under its foot, the addresses
+    // a session may still reach outside its space's network (prefs.reaches,
+    // the operator, 7 Oct: records, each saved on its own press, applied
+    // without a restart), and the model router it may use (R294 step 10:
+    // granted where the router lives, said here).
+    sees: formBox({state: RN_STATE, fields: [
+      `<div class="fcell fwide" id="rnReadsField" hidden>
+        <label id="rnReadsLabel">Reads<span class="help" data-help="other spaces a session here may read, code and notebook alike, and never change" tabindex="0">?</span></label>
+        <div class="lbox" id="rnReads" role="group" aria-labelledby="rnReadsLabel"></div>
+        <div class="hint">A session here reads these spaces, code and notebook, read-only; only a session on that space changes them.</div>
+        <div class="hint" id="rnReadsWhy" hidden>Only AerieOS's owner chooses which other spaces a space's sessions may read.</div></div>`,
+      formField("rnSees", "Also sees", `<input id="rnSees" autocomplete="off" spellcheck="false" placeholder="/mnt/media, /mnt/samples" data-ph-short="folders">`,
+        {help: "a share or a disk mounted on the node that a session here works with, by its path there. A session sees no other; one started after the save sees these",
+         wide: true, hidden: true, attrs: `id="rnSeesField"`})]})
+      + `<div class="field" id="rnReachField" hidden>
+        <label id="rnReachLabel">Also reaches<span class="help" data-help="other machines a session here may still reach outside its space's network: an address for the whole machine, or address:port for one service, on the nodes you tick. Running sessions get it at once" tabindex="0">?</span></label>
+        <div id="rnReachRows" role="group" aria-labelledby="rnReachLabel"></div>
+        <div class="rnreachadd"><button type="button" id="rnReachAdd">Add an address</button></div>
+        <div class="hint" id="rnReachHint"></div></div>
+      <div class="field" id="rnRouterField">
+        <label id="rnRouterLabel">Model router<span class="help" data-help="the router its Any model sessions call providers through, and the models it offers them; granted where the router lives, on its node's page, never here" tabindex="0">?</span></label>
+        <div id="rnRouterSaid" class="sub"></div></div>`,
+    // Which toolchains a session here may use (R77): every one installed on
+    // the space's node, shipped ones on and tool packs off until ticked. One
+    // left off is not on a session's PATH or in its view of the store, and
+    // aerie refuses it by this setting's name. Filled by rnFillTools.
+    tools: formBox({state: RN_STATE, fields: [
+      `<div class="fcell fwide" id="rnToolsField">
+        <label id="rnToolsLabel">Its sessions use<span class="help" data-help="what a session here has on its PATH and in its view of the toolchain store; one left off is not there for it, and aerie says this setting is why. A session started after the save takes it" tabindex="0">?</span></label>
+        <div class="lbox" id="rnTools" role="group" aria-labelledby="rnToolsLabel"></div>
+        <div class="hint" id="rnToolsHint">Shipped toolchains start on and tool packs off: a pack an administrator adds reaches no space until it is ticked here.</div></div>`]}),
+    // The space's tree over FTPS from outside AerieOS (R151, ftp.py), and
+    // in an editor through this controller (R159): on, how long, the port,
+    // and each account's access, staged until Save. Set by an account with
+    // the ftp grant (the owner, until a role names it); anybody else sees
+    // whether it is on and where. Filled by rnDrawFtp.
+    files: formBox({state: RN_STATE, attrs: `id="rnFtpField" hidden`, fields: [
+      `<div class="fcell fwide" id="rnFtpTop">
+        <label id="rnFtpLabel">Over FTP<span class="help" data-help="its tree over FTPS from the space's node, and in VS Code or the Windows companion through this controller; each account signs in with its own AerieOS name and password and gets the access picked below" tabindex="0">?</span></label>
+        <div id="rnFtp" role="group" aria-labelledby="rnFtpLabel"></div></div>`,
+      formField("rnFtpFor", "Keep it on", `<select id="rnFtpFor"></select>`, {hidden: true, attrs: `id="rnFtpForF"`}),
+      formField("rnFtpPort", "Port", `<input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric">`,
+        {help: "the port and the ports after it, which carry the data", hint: `<span id="rnFtpSpan"></span>`, short: true, hidden: true, attrs: `id="rnFtpPortF"`}),
+      `<div class="fcell fwide" id="rnFtpSaid" hidden></div>`,
+      `<div class="fcell fwide rnftppeople" id="rnFtpPeople" role="group" aria-label="each account's file access" hidden></div>`]}),
   };
   for (const [k, html] of Object.entries(forms)){
     const body = document.querySelector(`details[data-sect="rn:${k}"] > .body[data-rnform]`);
@@ -1386,7 +1447,7 @@ let rnPeople = null, rnPeopleDraft = {};
 function rnLoadPeople(name, keep = false){
   if (!keep){
     rnPeople = null; rnPeopleDraft = {};
-    $("rnPeopleField").hidden = true;
+    $("rnPeopleField").hidden = $("rnPeopleWho").hidden = true;
     setHidden($("rnPeopleField").closest("details"), true);
   }
   postJSON("/api/members", {action: "view", project: name})
@@ -1403,19 +1464,22 @@ function rnDrawPeople(){
   const v = rnPeople, d = rnPeopleDraft;
   const owner = d.owner ?? v.owner, only = d.invite_only ?? v.invite_only;
   const invitable = v.accounts.filter(n => !v.members.includes(n) && !v.invites.some(i => i.name === n));
-  $("rnPeopleField").hidden = false;
+  $("rnPeopleField").hidden = $("rnPeopleWho").hidden = false;
   setHidden($("rnPeopleField").closest("details"), false);
+  // The form (rnDrawForms): its owner, offered to another on Save, and
+  // Invite only; read-only to somebody who may not manage it.
+  const o = $("rnOwner"), io = $("rnInviteOnly"), says = $("rnOwnerSays");
+  drawHTML(o, v.may_manage ? optionList(v.accounts, owner) : optionList([[v.owner || "", v.owner || "AerieOS's owner"]], v.owner || ""));
+  // A lock (rnLockSettings) holds them however the account stands.
+  o.disabled = !v.may_manage || !!o.dataset.rnlock;
+  io.disabled = !v.may_manage || !!io.dataset.rnlock;
+  io.checked = !!only;
+  const offering = v.may_manage && !v.bb_owner && d.owner && d.owner !== v.owner;
+  says.hidden = !offering;
+  says.textContent = offering ? `Saving offers it to ${d.owner}, who becomes its owner on accepting from their bell.` : "";
   drawHTML($("rnPeople"), `
-    <div class="setrow col ctlrow">${v.may_manage
-      ? `<label for="rnOwner">Space owner</label>
-         <select id="rnOwner">${optionList(v.accounts, owner)}</select>`
-      : `<span>Space owner: ${esc(v.owner || "AerieOS's owner")}</span>`}</div>
-    ${v.may_manage && !v.bb_owner && d.owner && d.owner !== v.owner
-      ? `<div class="sub">Saving offers it to ${esc(d.owner)}, who becomes its owner on accepting from their bell.</div>` : ""}
     ${v.offer ? `<div class="rninvite">Ownership offered to ${esc(v.offer.name)} <span class="dim">${esc(ago(v.offer.at))}, waiting for them to accept</span>
       ${v.may_manage ? `<button type="button" class="link" data-withdraw="${v.offer.id}">Withdraw</button>` : ""}</div>` : ""}
-    <label class="ndcap"><input type="checkbox" id="rnInviteOnly"${only ? " checked" : ""}${v.may_manage ? "" : " disabled"}>
-      Invite only</label>
     <div class="sub whoson">On it: ${v.members.length ? v.members.map(n => v.may_manage
       ? `<button type="button" class="namelink" data-rnaccess="${esc(n)}" title="what ${esc(n)} holds here and everywhere">${esc(n)}</button>`
       : esc(n)).join(", ") : "nobody yet"}</div>
@@ -1426,16 +1490,14 @@ function rnDrawPeople(){
       formField("rnInviteRole", "As", `<select id="rnInviteRole">${v.roles.map(n => `<option>${esc(n)}</option>`).join("")}</select>`)],
       foot: [`<button type="button" id="rnInviteGo">Invite</button>`]})
       : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`);
-  const o = $("rnOwner");
-  if (o) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
+  if (v.may_manage) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
   // What each person holds (R152): a name opens their roles, which a
   // project's owner gives on the projects they own (the operator, 17 Oct:
   // the Roles page lists roles alone).
   const pn = rnFor;
   $("rnPeople").querySelectorAll("[data-rnaccess]").forEach(x => x.onclick = () =>
     rolesAccessOpen(x.dataset.rnaccess, () => rnLoadPeople(pn, true)));
-  const io = $("rnInviteOnly");
-  if (io && v.may_manage) io.onchange = () => { d.invite_only = io.checked; rnDrawPeople(); };
+  if (v.may_manage) io.onchange = () => { d.invite_only = io.checked; rnDrawPeople(); };
   // An invitation is listed, and a withdrawn one gone, on the press (the
   // operator, 22 Nov): `to` is the list as it will be. A refusal puts it back
   // and says why; the answer is the list as the server has it.
@@ -1499,12 +1561,19 @@ function rnDrawFtp(){
   if (!rnFtp) return;
   const v = rnFtp, d = rnFtpDraft;
   const on = d.on ?? v.on, editor = d.editor ?? v.editor, st = v.status || {}, where = rnFtpWhere(v);
-  const box = $("rnFtp");
+  // The form (rnDrawForms): its top cell says or switches, and the rest
+  // shows for what is switched on.
+  const box = $("rnFtp"), cells = ["rnFtpForF", "rnFtpPortF", "rnFtpSaid", "rnFtpPeople"].map(id => $(id));
+  const show = (forOn, peopleOn) => {
+    cells[0].hidden = cells[1].hidden = !forOn;
+    cells[3].hidden = !peopleOn;
+  };
+  cells[2].hidden = true;
   // Switched off on this install (R81): the sentence, and nothing to set.
   if (featureOff("ftp")){
     $("rnFtpField").hidden = false;
     drawHTML(box, deadWhy(featureOff("ftp")));
-    return;
+    return show(false, false);
   }
   if (!v.may_set){
     $("rnFtpField").hidden = !v.on && !v.editor;
@@ -1512,10 +1581,25 @@ function rnDrawFtp(){
       ${v.editor ? `<div>Open from your own machine: AerieOS for VS Code and the Windows companion.</div>` : ""}
       <div class="hint">Sign in with your AerieOS name and password, if you were given access.
         Who may is set by AerieOS's owner, or a role that grants ftp.</div>`);
-    return;
+    return show(false, false);
   }
   $("rnFtpField").hidden = false;
   const port = d.port ?? v.port;
+  drawHTML(box, `
+    <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this space's files over FTPS</label>
+    <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
+    ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
+    ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}`);
+  show(on, on || editor);
+  const fo = $("rnFtpFor");
+  drawHTML(fo, optionList([
+    ...(v.on && v.until ? [["", `until ${fmtTime(v.until * 1000, {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
+    ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0"))));
+  const pi = $("rnFtpPort");
+  if (pi.value !== String(port)) pi.value = String(port);
+  $("rnFtpSpan").textContent = `and the ${v.span - 1} after it`;
+  const help = $("rnFtpPortF").querySelector(".help");
+  if (help) help.dataset.help = `the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart`;
   // Said as soon as it is ticked, before anything is tried (the operator, 7 Oct).
   const status = on && !v.on && v.missing ? `<div class="hint bad">${esc(v.missing)}</div>`
     : !v.on ? ""
@@ -1523,30 +1607,18 @@ function rnDrawFtp(){
         your AerieOS name and password. The certificate is the node's own, so the client asks to trust it once.</div>`
     : st.why ? `<div class="hint bad">Not running: ${esc(st.why)}</div>`
     : `<div class="hint">Starting on its node.</div>`;
-  drawHTML(box, `
-    <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this space's files over FTPS</label>
-    <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
-    ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
-    ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}
-    ${formBox({attrs: on ? "" : "hidden", fields: [
-    formField("rnFtpFor", "Keep it on", `<select id="rnFtpFor">${optionList([
-        ...(v.on && v.until ? [["", `until ${fmtTime(v.until * 1000, {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
-        ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select>`),
-    formField("rnFtpPort", "Port", `<input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}">`,
-      {help: `the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart`, hint: `and the ${v.span - 1} after it`, short: true})]})}
-    ${status}
-    <div class="rnftppeople"${on || editor ? "" : " hidden"}>${v.people.map(p => {
-      const a = d.access?.[p.uid] ?? p.access;
-      return `<div class="rnftprow"><span class="grow">${esc(p.name)}</span>
-        <select data-ftpuid="${esc(p.uid)}" aria-label="${esc(p.name)}'s file access">${optionList(RN_FTP_ACCESS, a)}</select></div>`;
-    }).join("")}</div>`);
+  cells[2].hidden = !status;
+  drawHTML(cells[2], status);
+  drawHTML(cells[3], v.people.map(p => {
+    const a = d.access?.[p.uid] ?? p.access;
+    return `<div class="rnftprow"><span class="grow">${esc(p.name)}</span>
+      <select data-ftpuid="${esc(p.uid)}" aria-label="${esc(p.name)}'s file access">${optionList(RN_FTP_ACCESS, a)}</select></div>`;
+  }).join(""));
   $("rnFtpOn").onchange = e => { d.on = e.target.checked; rnDrawFtp(); };
   $("rnFtpEditor").onchange = e => { d.editor = e.target.checked; rnDrawFtp(); };
-  const fo = $("rnFtpFor");
-  if (fo) fo.onchange = () => { d.for = fo.value; rnDrawFtp(); };
-  const pi = $("rnFtpPort");
-  if (pi) pi.oninput = () => { d.port = pi.value.trim(); };
-  box.querySelectorAll("[data-ftpuid]").forEach(sel => sel.onchange = () => {
+  fo.onchange = () => { d.for = fo.value; rnDrawFtp(); };
+  pi.oninput = () => { d.port = pi.value.trim(); };
+  cells[3].querySelectorAll("[data-ftpuid]").forEach(sel => sel.onchange = () => {
     d.access = {...(d.access || {}), [sel.dataset.ftpuid]: sel.value};
   });
 }
@@ -1623,16 +1695,15 @@ function rnDrawSnapshots(){
   const days = rnSnap.days || [];
   if (!days.some(d => d.day === rnSnapOpen)) rnSnapOpen = "";
   const when = d => d.at ? fmtTime(d.at * 1000, {dateStyle: "medium", timeStyle: "short"}) : d.day;
-  const form = d => `<div class="snapform">
-      <label class="setrow col ctlrow snapfile"><span class="lbl">A file, from the tree's top</span>
-        <input type="text" data-snapfile placeholder="src/app.js" spellcheck="false" autocomplete="off"></label>
-      <div class="actbar"><button type="button" class="lead" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned
-        ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>
-        <span class="sp"></span>
-        <button type="button" data-snapcancel>Cancel</button>
-        <button type="button" data-snapone disabled>Restore file</button>
-        <button type="button" data-snapall>Restore all</button></div>
-    </div>`;
+  // A day opened under its line (the day stays said): one file to restore,
+  // or all of it, and its pin at the foot's left.
+  const form = d => formBox({cls: "snapform", fields: [formField(`rnSnapFile-${esc(d.day)}`, "A file, from the tree's top",
+      `<input type="text" id="rnSnapFile-${esc(d.day)}" data-snapfile placeholder="src/app.js" spellcheck="false" autocomplete="off">`, {wide: true})],
+    foot: [`<button type="button" class="lead" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned
+        ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>`,
+      `<button type="button" data-snapcancel>Cancel</button>`,
+      `<button type="button" data-snapone disabled>Restore file</button>`,
+      `<button type="button" data-snapall>Restore all</button>`]});
   const row = d => `<div class="row snaprec${rnSnapOpen === d.day ? " open" : ""}" data-day="${esc(d.day)}">${tblLine(SNAP_COLS, [
       `${esc(when(d))}${d.why ? ` <span class="dim">(${esc(d.why.replace(/-/g, " "))})</span>` : ""}`,
       esc(String(d.files)), esc(humanBytes(d.bytes)),

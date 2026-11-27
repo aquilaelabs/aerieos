@@ -1956,12 +1956,13 @@ ok(await page.$eval('#rnTokenField', el => !el.hidden && el.closest('details')?.
 // the space's, so on its own dialog (R223).
 await page.evaluate(() => renameProject('alpha', 'project'));
 await page.waitForSelector('#rnPeopleField:not([hidden]) #rnOwner', { timeout: 10000 });
-// What Invite only allows is the ? help on People now (R244), not prose
-// drawn on every visit; the section itself is the two settings and a facts
-// line.
+// What Invite only allows is the ? help on Space owner, the field it sits
+// under, and who may add people the one on People (R244), not prose drawn
+// on every visit; the section is its form of two settings and a facts line.
 ok(await page.$eval('#rnOwner', s => s.value) === 'test'
    && await page.$('#rnInviteOnly:not([disabled])') !== null
    && /Any administrator can add people/.test(await page.$eval('#rnPeopleLabel .help', e => e.dataset.help))
+   && /Invite only means people join by accepting an invitation/.test(await page.$eval('label[for=rnOwner] .help', e => e.dataset.help))
    && /On it:/.test(await page.$eval('#rnPeople', e => e.textContent)),
    'the gear shows the space\'s owner, to hand on, and Invite only, off, what that allows behind the ? on People');
 await page.click('#rnInviteOnly');
@@ -2324,10 +2325,10 @@ await section("The editor's and the apps' door is on unless a project closed it"
   const editorOn = await page.$eval('#rnFtpEditor', c => c.checked);
   ok(editorOn, '...a space is open to its people\'s editors and apps until its owner closes it (R104)');
   await page.click('#rnFtpEditor');
-  const shut = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.fgrid').hidden,
+  const shut = await page.$eval('#rnFtpField', e => ({ port: e.querySelector('#rnFtpPortF').hidden,
     people: e.querySelector('.rnftppeople').hidden }));
   await page.click('#rnFtpOn');
-  const open = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.fgrid').hidden,
+  const open = await page.$eval('#rnFtpField', e => ({ port: e.querySelector('#rnFtpPortF').hidden,
     people: e.querySelectorAll('.rnftprow').length, noNode: /no node to run on/.test(e.textContent),
     value: e.querySelector('#rnFtpPort').value }));
   ok(shut.port && shut.people && !open.port && open.people >= 1 && open.noNode && open.value === '2121',
@@ -2335,8 +2336,8 @@ await section("The editor's and the apps' door is on unless a project closed it"
   const err = await sectSave(page, 'files');
   ok(/no node to run its file access on/.test(err) && !await page.$eval('#rnmodal', e => e.hidden),
      `...and Save refuses turning it on with no node, in the dialog (${err.slice(0, 70)})`);
-  const uid = await page.$eval('#rnFtp [data-ftpuid]', s => s.dataset.ftpuid);
-  await page.selectOption(`#rnFtp [data-ftpuid="${uid}"]`, 'rw');
+  const uid = await page.$eval('#rnFtpField [data-ftpuid]', s => s.dataset.ftpuid);
+  await page.selectOption(`#rnFtpField [data-ftpuid="${uid}"]`, 'rw');
   const draft = await page.evaluate(() => rnFtpChange());
   ok(draft?.on === true && draft.port === 2121 && draft.access?.[uid] === 'rw',
      `...and what Save sends is the switch, the port and the access picked (${JSON.stringify(draft)})`);
@@ -2348,7 +2349,7 @@ await section("The editor's and the apps' door is on unless a project closed it"
   // port, and FTPS left off.
   await page.click('#rnFtpOn');
   await page.click('#rnFtpEditor');
-  const ed = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.fgrid').hidden,
+  const ed = await page.$eval('#rnFtpField', e => ({ port: e.querySelector('#rnFtpPortF').hidden,
     people: e.querySelector('.rnftppeople').hidden, noNode: /no node to run on/.test(e.textContent) }));
   const edDraft = await page.evaluate(() => rnFtpChange());
   ok(ed.port && !ed.people && !ed.noNode && edDraft?.editor !== false && !edDraft?.on,

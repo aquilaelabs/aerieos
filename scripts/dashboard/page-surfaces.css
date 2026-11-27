@@ -827,7 +827,7 @@ body.firstrun #panes{display:none}
 #rnTestField .setrow{align-items:center;flex-wrap:nowrap}
 #rnTestField .setrow .hint{flex:1 1 auto;min-width:0}
 /* File access (R151): one row per account, its name and its access. */
-.rnftppeople{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.rnftppeople{display:flex;flex-direction:column;gap:6px}
 /* Also reaches: an address per row, its nodes ticked beside it, and its bin. */
 #rnReachRows{display:flex;flex-direction:column;gap:6px}
 /* The Settings tab (tab-settings.js): sections of row bands, which carry
@@ -1145,9 +1145,7 @@ body.firstrun #panes{display:none}
 /* A snapshot's row opened: its line stays, its restore under it, the file's
    field the width of the row and the day's verbs in the bar's order. */
 .snaprecords>.snaprec.open{background:var(--sunk)}
-.snapform{display:flex;flex-direction:column;gap:var(--field-gap);min-width:0;padding:0 var(--row-x) var(--row-y)}
-.snapform>.snapfile{margin:0;max-width:none}
-.snapform>.actbar{margin:0;padding:0}
+.snapform{padding:0 var(--row-x) var(--row-y)}
 /* A pair's line sits on the band's inset, not a row's inset on top of it,
    its delete at the band's right edge where every other one is. */
 .nginxtab .field>.row.ngcert{padding-left:0;padding-right:0}
@@ -1195,8 +1193,6 @@ body.firstrun #panes{display:none}
 /* The one place a version is typed rather than chosen. A bump can preview its
    next value, so it is a button; a starting number is arbitrary and nothing
    can derive it, so it is a field: validated here and again on the server. */
-.verinit{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
-.verinit .vstart{font:var(--f-field);flex:0 0 auto;width:8em}
 /* A `font:` shorthand carries the SIZE with it, and this selector outranks
    the shared phone rule, so this field alone stayed 12px on a phone and iOS
    zoomed into a layout that cannot zoom back. Every other control that sets
@@ -1204,7 +1200,7 @@ body.firstrun #panes{display:none}
    this one had been forgotten, and uniform.mjs caught it. */
 /* A component's own version is a form (R301): its directory and starting
    number on the form's grid, its verbs at the foot. */
-.veradd>.fbox{margin-top:12px}
+.veradd>.fbox,.fbox.verinit{margin-top:12px}
 /* The changelog. pre-wrap keeps the file's own line breaks; it is a document
    someone wrote, not data to reflow. Otherwise it is a history: same padding,
    no well and no border and no height of its own, because it is read in the
@@ -1346,8 +1342,6 @@ body.firstrun #panes{display:none}
 }
 /* The starting-version field lives in a value line, so it lines up with the
    values above it instead of being a full-width bar of its own. */
-.verln .verinit{margin-top:0;flex:1 1 auto}
-.verln .verinit .vstart{width:7em}
 @media(max-width:600px){
   .verln span:first-child{flex:0 0 100%}
   .verln{padding:3px 0}

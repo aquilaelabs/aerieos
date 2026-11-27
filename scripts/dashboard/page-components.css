@@ -2606,7 +2606,6 @@ button[aria-busy="true"]{opacity:.75}
 .ndmount .ndmwhy{white-space:normal;overflow-wrap:anywhere;padding:0 var(--row-x) var(--row-y)}
 /* The name's row is an action bar (its field, then Rename), so it lays out
    like every other bar; the input takes the room before it. */
-.ndname input{flex:1 1 auto;min-width:0}
 
 /* The wiring fold. Its lines wrap rather than scroll: a host path is long, and
    a row that scrolls sideways on a phone hides the half you were reading. */

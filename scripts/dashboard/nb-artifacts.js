@@ -9,6 +9,8 @@
 // (R218, the operator 18 Oct).
 const ART_TITLES = {build: "Build", files: "Files", version: "Version"};
 const artTitle = k => ART_TITLES[k] || k;
+// Each drawn form's own ids (a version box per component), unique while it is out.
+let nbArtFormSeq = 0;
 
 // A staged bump that moves the compatibility window: minor and major do,
 // patch does not, and only where this project owns the window at all.
@@ -791,25 +793,17 @@ function nbArtVerSection(av, v){
           helpIcon("Save writes and commits VERSION. Agent access limits what a session may change.")}</p>
         ${nbArtVerAddFold(project, v)}`}` : `
         ${v.component ? "" : nbArtVerPolicyPicker(v)}
-        <div class="verln"><span>start at</span>
-          <span class="verinit">
-            <input class="vstart" value="0.1.0" size="8" maxlength="20"
-              inputmode="decimal" aria-label="starting version"
-              pattern="[0-9]+\.[0-9]+\.[0-9]+">
-            <button type="button" data-verinit="${esc(v.component || "")}"${state?.can?.version === false ? " disabled" : ""}
-              title="${state?.can?.version === false ? "moving a space's version is not one of your roles' grants" : "write a VERSION file at this number and commit it"}">Set</button>
-          </span></div>
-        <div class="actbar verbtns">
-          <button type="button" data-verask="${esc(v.component || "")}"
-            title="ask the session what the version should be; it proposes and asks first">Send to ${esc(sendAgent(project).name)}</button>
-          <button type="button" data-verlog="${esc(v.component || "")}"
-            title="entries logged before the first version wait here">Changelog${
-            v.unreleased ? ` (${v.unreleased} new)` : ""}</button>
-        </div>
-        <p class="verwhy">No version yet. Setting one writes a
-          <code>VERSION</code> file and commits it${v.unreleased
-            ? `, dating the ${v.unreleased} logged change${
-                v.unreleased === 1 ? "" : "s"} as its first section` : ""}.</p>
+        ${formBox({cls: "verinit", fields: [
+          formField(`verStart${++nbArtFormSeq}`, "Start at", `<input id="verStart${nbArtFormSeq}" class="vstart" value="0.1.0" maxlength="20"
+              inputmode="decimal" pattern="[0-9]+\\.[0-9]+\\.[0-9]+">`,
+            {hint: `No version yet. Setting one writes a <code>VERSION</code> file and commits it${v.unreleased
+              ? `, dating the ${v.unreleased} logged change${v.unreleased === 1 ? "" : "s"} as its first section` : ""}.`})],
+          foot: [`<button type="button" data-verask="${esc(v.component || "")}"
+            title="ask the session what the version should be; it proposes and asks first">Send to ${esc(sendAgent(project).name)}</button>`,
+            `<button type="button" data-verlog="${esc(v.component || "")}"
+            title="entries logged before the first version wait here">Changelog${v.unreleased ? ` (${v.unreleased} new)` : ""}</button>`,
+            `<button type="button" class="primary" data-verinit="${esc(v.component || "")}"${state?.can?.version === false ? " disabled" : ""}
+              title="${state?.can?.version === false ? "moving a space's version is not one of your roles' grants" : "write a VERSION file at this number and commit it"}">Set</button>`]})}
         ${nbArtVerAddFold(project, v)}`);
 
 }
@@ -841,7 +835,7 @@ function nbArtVerAddFold(project, v){
           formField("verAddDir", "Directory", `<select id="verAddDir" class="vdir">${
             v.candidates.map(c => `<option>${esc(c)}</option>`).join("")}</select>`),
           formField("verAddStart", "Starting version", `<input id="verAddStart" class="vstart" value="0.1.0" maxlength="20"
-            inputmode="decimal" pattern="[0-9]+\\.[0-9]+\\.[0-9]+">`, {short: true})],
+            inputmode="decimal" pattern="[0-9]+\\.[0-9]+\\.[0-9]+">`)],
           foot: [`<button type="button" data-verask="@fold"
             title="put the question to this space's session, for this directory">Send to ${esc(sendAgent(project).name)}</button>`,
                  `<button type="button" class="primary" data-veradd>Give it its own version</button>`]})}
@@ -1426,10 +1420,10 @@ function nbArtWireChangelog(av, box){
         // No file yet. The first line can be written here as well as by
         // a session's `aerie changelog add`: the editor used to sit dead
         // until Claude made the file.
-        drawHTML(pane, `<div class="sub">no CHANGELOG.md yet: write the first line, or a session's first entry creates it</div>
-            <div class="actbar"><input id="clFirst" maxlength="300" autocomplete="off"
-              placeholder="what changed for the person using it, in their words" data-ph-short="what changed">
-              <button type="button" class="primary" id="clFirstGo">Create</button></div>`);
+        drawHTML(pane, formBox({fields: [formField("clFirst", "The first line", `<input id="clFirst" maxlength="300" autocomplete="off"
+              placeholder="what changed for the person using it, in their words" data-ph-short="what changed">`,
+            {wide: true, hint: "No CHANGELOG.md yet: this line creates it, or a session's first entry does."})],
+          foot: [`<button type="button" class="primary" id="clFirstGo">Create</button>`]}));
         pane.querySelector("#clFirstGo").onclick = async () => {
           const text = pane.querySelector("#clFirst").value.trim();
           if (!text) return notify("write the line first", true);

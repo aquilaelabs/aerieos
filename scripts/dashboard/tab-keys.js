@@ -244,12 +244,11 @@ function keyMineSection(){
       ? `<div class="notice">Locked: nothing of yours opens until you unlock it, your pushes and pulls wait, and a terminal you open on a node asks for it first.</div>`
       : m.own ? `<div class="hint">Not even this AerieOS's owner opens what is here without ${m.how === "passkey" ? "your passkey" : "the key you keep"}. Forgetting it means signing in to every agent again and giving each space a token again; Purge still works without it.</div>` : ""}
     ${forgesHtml}
-    <div class="actbar"><label class="pick"><span class="pickw">Unlock for</span>
-        <select id="ksFor">${KS_FOR.map(([v, l]) => `<option value="${v}"${v === m.for ? " selected" : ""}>${l}</option>`).join("")}</select></label>
-      ${locked ? `<button type="button" class="primary" id="bKsUnlock">Unlock</button>` : `<button type="button" id="bKsLock">Lock</button>`}
-      ${m.own ? `<button type="button" id="bKsOwnBack"${locked ? " disabled" : ""}>Give the key back</button>`
-              : `${m.has ? `<button type="button" id="bKeyMine">Change key</button>` : ""}<button type="button" id="bKsOwn">Hold the key yourself</button>`}
-      <button type="button" class="danger" id="bKsPurge">Purge</button></div>`;
+    ${formBox({fields: [formField("ksFor", "Unlock for", `<select id="ksFor">${KS_FOR.map(([v, l]) => `<option value="${v}"${v === m.for ? " selected" : ""}>${l}</option>`).join("")}</select>`)],
+      foot: [`<button type="button" class="danger lead" id="bKsPurge">Purge</button>`,
+        m.own ? `<button type="button" id="bKsOwnBack"${locked ? " disabled" : ""}>Give the key back</button>`
+              : `${m.has ? `<button type="button" id="bKeyMine">Change key</button>` : ""}<button type="button" id="bKsOwn">Hold the key yourself</button>`,
+        locked ? `<button type="button" class="primary" id="bKsUnlock">Unlock</button>` : `<button type="button" id="bKsLock">Lock</button>`]})}`;
   const uses = (keyMineUses || []).slice(0, 20);
   const usesHtml = uses.length
     ? tblWrap(KS_USE_COLS, uses.map(u => `<div class="row">${tblLine(KS_USE_COLS, [

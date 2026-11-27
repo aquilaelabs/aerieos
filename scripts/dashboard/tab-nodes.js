@@ -1334,13 +1334,10 @@ function nodeAdvancedSection(n, stale, inflight){
   const act = (title, say, btn, cls = "") => `<div class="ndact${cls ? " " + cls : ""}"><div class="grow"><div class="name">${esc(title)}</div>
       <div class="sub">${say}</div></div><div class="acts actbar">${btn}</div></div>`;
   const body = `
-    <div class="ndname actbar ctlrow">
-      <div class="setrow col grow ctlrow">${lbl("", "Name in AerieOS", "its name in the pickers, on the space cards and as a runner label; its name on the network is under Name and time")}
-      <input data-k="name" value="${esc(c.draft.nameText)}" spellcheck="false" autocomplete="off"
-        maxlength="60" aria-label="node name"></div>
-      <button type="button" data-nd="rename"${!String(c.draft.nameText || "").trim() || String(c.draft.nameText).trim() === n.name ? " disabled" : ""}
-        title="a runner already installed keeps its old label until reinstalled">Rename</button>
-    </div>
+    ${formBox({cls: "ndnameform", fields: [formField(`ndName-${esc(n.id)}`, "Name in AerieOS", `<input id="ndName-${esc(n.id)}" data-k="name" value="${esc(c.draft.nameText)}" spellcheck="false" autocomplete="off"
+        maxlength="60">`, {help: "its name in the pickers, on the space cards and as a runner label; its name on the network is under Name and time"})],
+      foot: [`<button type="button" data-nd="rename"${!String(c.draft.nameText || "").trim() || String(c.draft.nameText).trim() === n.name ? " disabled" : ""}
+        title="a runner already installed keeps its old label until reinstalled">Rename</button>`]})}
     ${nodePathsTable(n, c)}
     <div class="ndacts">
     ${n.kind !== "agent" || !n.config?.host_only ? "" : act("Lock down",
@@ -2960,7 +2957,7 @@ function wireNodesTab(root){
         return;
       }
       if (act === "rename"){
-        const inp = box.querySelector('.ndname [data-k="name"]');
+        const inp = box.querySelector('.ndnameform [data-k="name"]');
         const name = (inp ? inp.value : "").trim();
         const was = nodeNameOf(id, "");
         if (!name || name === was) return notify("type the new name first", true);
@@ -3090,7 +3087,7 @@ function wireNodesTab(root){
     // between typing a new name and pressing Rename put the old one back,
     // and Rename said to type one (B176: nodes.mjs's rename wait timed out
     // on exactly that, now and then).
-    const ni = box.querySelector('.ndname [data-k="name"]');
+    const ni = box.querySelector('.ndnameform [data-k="name"]');
     if (ni){
       ni.oninput = () => { const c = nodeDraft(nodeOf(id)); c.draft.nameText = ni.value;
                            // Rename wakes on a new name (the operator, 18 Oct).

@@ -733,15 +733,7 @@
     <!-- People, a section of its own (R255 step 7): who the project is for
          is not what it is called, and the dialog reads People (who) apart
          from Agents may (what its sessions do). -->
-    <details class="sect rngroup" data-sect="rn:people" hidden><summary><span class="t">People</span></summary><div class="body">
-    <!-- Who the project belongs to and who joins it (membership.py): the
-         owner and Invite only are staged until Save; Invite and Withdraw are
-         actions and act on the press. -->
-    <div class="field" id="rnPeopleField" hidden>
-      <label id="rnPeopleLabel">People<span class="help" data-help="its owner, who is on it, and who is invited. Any administrator can add people, themselves included; invite only means people join by accepting an invitation, and its owner decides that. A role on this space puts somebody on it; the Roles page sets who holds which." tabindex="0">?</span></label>
-      <div id="rnPeople" role="group" aria-labelledby="rnPeopleLabel"></div>
-    </div>
-    </div></details>
+    <details class="sect rngroup" data-sect="rn:people" hidden><summary><span class="t">People</span></summary><div class="body" data-rnform="people"></div></details>
     <details class="sect rngroup" data-sect="rn:claude"><summary><span class="t">Agents may</span></summary><div class="body" data-rnform="claude"></div></details>
     <details class="sect rngroup" data-sect="rn:yours"><summary><span class="t">Just for you</span></summary><div class="body" data-rnform="yours"></div></details>
     <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body" data-rnform="repo"></div></details>
@@ -773,64 +765,9 @@
     <details class="sect rngroup" data-sect="rn:discord" hidden><summary><span class="t">Discord</span></summary><div class="body">
     <div class="field" id="rnDcField"></div>
     </div></details>
-    <details class="sect rngroup" data-sect="rn:sees"><summary><span class="t">What sessions reach</span></summary><div class="body">
-    <!-- The projects a session here may read (prefs.reads): their trees
-         bound read-only into its view on a node, their notebooks answering
-         to bb from inside them, every write refused. The operator's to
-         name, never a session's. -->
-    <div class="field" id="rnReadsField" hidden>
-      <label id="rnReadsLabel">Reads<span class="help" data-help="other spaces a session here may read, code and notebook alike, and never change" tabindex="0">?</span></label>
-      <div class="lbox" id="rnReads" role="group" aria-labelledby="rnReadsLabel"></div>
-      <div class="hint">A session here reads these spaces, code and notebook, read-only; only a session on that space changes them.</div>
-      <div class="hint" id="rnReadsWhy" hidden>Only AerieOS's owner chooses which other spaces a space's sessions may read.</div>
-    </div>
-    <!-- The places on its node a session here is shown (prefs.sees). A
-         session's view is built from what it is given, so a share mounted
-         on the node is out of it unless it is named here. Whoever may set
-         the project's node may name one. -->
-    <div class="field" id="rnSeesField" hidden>
-      <label for="rnSees">Also sees<span class="help" data-help="a share or a disk mounted on the node that a session here works with, by its path there. A session sees no other; one started after the save sees these" tabindex="0">?</span></label>
-      <input id="rnSees" autocomplete="off" spellcheck="false" placeholder="/mnt/media, /mnt/samples" data-ph-short="folders">
-    </div>
-    <!-- Addresses a session here may still reach where its node keeps each
-         session to its own project's network (prefs.reaches, the operator,
-         7 Oct): a machine, or one port on it, without making the project
-         read another. An administrator's; applied without a restart. -->
-    <div class="field" id="rnReachField" hidden>
-      <label id="rnReachLabel">Also reaches<span class="help" data-help="other machines a session here may still reach outside its space's network: an address for the whole machine, or address:port for one service, on the nodes you tick. Running sessions get it at once" tabindex="0">?</span></label>
-      <div id="rnReachRows" role="group" aria-labelledby="rnReachLabel"></div>
-      <div class="rnreachadd"><button type="button" id="rnReachAdd">Add an address</button></div>
-      <div class="hint" id="rnReachHint"></div>
-    </div>
-    <!-- The model routers this space may use (R294 step 10): granted where
-         the router lives, on its node's page, or on Roles; said here, so a
-         space says everything it may reach, and changed there. -->
-    <div class="field" id="rnRouterField">
-      <label id="rnRouterLabel">Model router<span class="help" data-help="the router its Any model sessions call providers through, and the models it offers them; granted where the router lives, on its node's page, never here" tabindex="0">?</span></label>
-      <div id="rnRouterSaid" class="sub"></div>
-    </div>
-    </div></details>
-    <!-- Which toolchains a session here may use (R77): every one installed
-         on the project's node, shipped ones on and tool packs off until
-         ticked. A toolchain left off is not on a session's PATH or in its
-         view of the store, and bb refuses it by this setting's name. -->
-    <details class="sect rngroup" data-sect="rn:tools"><summary><span class="t">Toolchains</span></summary><div class="body">
-    <div class="field" id="rnToolsField">
-      <label id="rnToolsLabel">Its sessions use<span class="help" data-help="what a session here has on its PATH and in its view of the toolchain store; one left off is not there for it, and aerie says this setting is why. A session started after the save takes it" tabindex="0">?</span></label>
-      <div class="lbox" id="rnTools" role="group" aria-labelledby="rnToolsLabel"></div>
-      <div class="hint" id="rnToolsHint">Shipped toolchains start on and tool packs off: a pack an administrator adds reaches no space until it is ticked here.</div>
-    </div>
-    </div></details>
-    <details class="sect rngroup" data-sect="rn:files"><summary><span class="t">File access</span></summary><div class="body">
-    <!-- The project's tree over FTPS from outside AerieOS (R151, ftp.py):
-         on, the port, and each account's access. Set by an account with the
-         ftp grant (the owner, until a role names it); anybody else sees
-         whether it is on and where. Staged until Save, like the rest. -->
-    <div class="field" id="rnFtpField" hidden>
-      <label id="rnFtpLabel">Over FTP<span class="help" data-help="its tree over FTPS from the space's node, and in VS Code or the Windows companion through this controller; each account signs in with its own AerieOS name and password and gets the access picked below" tabindex="0">?</span></label>
-      <div id="rnFtp" role="group" aria-labelledby="rnFtpLabel"></div>
-    </div>
-    </div></details>
+    <details class="sect rngroup" data-sect="rn:sees"><summary><span class="t">What sessions reach</span></summary><div class="body" data-rnform="sees"></div></details>
+    <details class="sect rngroup" data-sect="rn:tools"><summary><span class="t">Toolchains</span></summary><div class="body" data-rnform="tools"></div></details>
+    <details class="sect rngroup" data-sect="rn:files"><summary><span class="t">File access</span></summary><div class="body" data-rnform="files"></div></details>
     <details class="sect rngroup" data-sect="rn:snapshots"><summary><span class="t">Snapshots</span></summary><div class="body">
     <!-- The days kept of the project's tree (R165), an administrator's:
          restoring the whole tree or one file acts on the press, after a
