@@ -194,7 +194,7 @@ function nbRulesView({$, nb, project}){
             formField("", "Words that raise it", `<input class="rlWords" autocomplete="off" spellcheck="false" placeholder="agent, protocol" value="${esc((r.words || []).join(", "))}" aria-label="words">`,
               {help: "comma-separated. The rule arrives when a session is asked about one"}),
             formField("", "Document", `<input class="rlDoc" autocomplete="off" spellcheck="false" placeholder="docs/design-language.md" data-ph-short="path" value="${esc(r.doc || "")}" aria-label="document">`,
-              {help: "the file in the repo that defines it in full"}),
+              {help: "the file in the repository that defines it in full"}),
             formField("", "Check", `<input class="rlCheck" autocomplete="off" spellcheck="false" placeholder="bash scripts/test.sh" value="${esc(r.check || "")}" aria-label="check">`,
               {help: "the command that verifies it; aerie rules check runs it"}),
             formField("", "Commands it refuses", `<input class="rlRefuse" autocomplete="off" spellcheck="false" placeholder="./gradlew assemble, npm publish" data-ph-short="commands" value="${esc((r.refuse || []).join(", "))}" aria-label="commands it refuses">`,
