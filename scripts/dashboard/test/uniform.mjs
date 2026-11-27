@@ -3423,7 +3423,8 @@ if (runs('c')) await section("a form's buttons stand clear of its fields and end
     // Every page of a split one and every section opened: Controller
     // settings' one-field forms sat on its later pages, folded, and their
     // Apply hung half a box past the field unmeasured.
-    for (const hash of ['#/machines/clusters', '#/machines/nodes', '#/spaces/alpha/settings', '#/settings', '#/controller', '#/machines/storage', '#/people/users', '#/profile']){
+    // Profile is #/settings, the You group's page; Controller settings #/controller.
+    for (const hash of ['#/machines/clusters', '#/machines/nodes', '#/spaces/alpha/settings', '#/settings', '#/controller', '#/machines/storage', '#/people/users']){
       await p.evaluate(x => { location.hash = x; }, hash); await sleep(1600);
       const picks = await p.evaluate(() => [...document.querySelectorAll('.doc.on .ssplit > .snav [data-spick]')].map(e => e.dataset.spick));
       for (const pick of picks.length ? picks : [null]){
