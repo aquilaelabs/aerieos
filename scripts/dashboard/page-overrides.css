@@ -98,7 +98,7 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
    are left out; so is a group header's or a notebook's head, which size
    their own. Here, since the rules that stretched them sit in every layer
    below. uniform.mjs holds every page to it. */
-:is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setrow.col,.prefrow,.phead) select){
+:is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setrow.col,.prefrow,.phead) select){
   flex-grow:0;flex-basis:auto;width:auto;justify-self:start;min-width:min(var(--tap),100%);text-overflow:ellipsis}
 /* The one exception, on a phone: pulldowns that share a line with a row's
    compact buttons (.pickshare: the Library's topic and order beside Cards

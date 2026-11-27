@@ -837,17 +837,14 @@ function nbArtVerAddFold(project, v){
       <details class="veradd chev"${sectAttr("artifacts:veradd:" + project)}><summary>ships something else from here?</summary>
         <p class="verwhy">A directory with its own <code>VERSION</code> file is
           versioned on its own, like an extension beside an app.</p>
-        <div class="verinit">
-          <select class="vdir" aria-label="which directory">${
-            v.candidates.map(c => `<option>${esc(c)}</option>`).join("")}</select>
-          <input class="vstart" value="0.1.0" size="8" maxlength="20"
-            inputmode="decimal" aria-label="starting version"
-            pattern="[0-9]+\.[0-9]+\.[0-9]+">
-          <button type="button" data-veradd>Give it its own version</button>
-          <button type="button" data-verask="@fold"
-            title="put the question to this space's session, for
-this directory">Send to ${esc(sendAgent(project).name)}</button>
-        </div>
+        ${formBox({cls: "veraddform", fields: [
+          formField("verAddDir", "Directory", `<select id="verAddDir" class="vdir">${
+            v.candidates.map(c => `<option>${esc(c)}</option>`).join("")}</select>`),
+          formField("verAddStart", "Starting version", `<input id="verAddStart" class="vstart" value="0.1.0" maxlength="20"
+            inputmode="decimal" pattern="[0-9]+\\.[0-9]+\\.[0-9]+">`, {short: true})],
+          foot: [`<button type="button" data-verask="@fold"
+            title="put the question to this space's session, for this directory">Send to ${esc(sendAgent(project).name)}</button>`,
+                 `<button type="button" class="primary" data-veradd>Give it its own version</button>`]})}
       </details>`;
 }
 
@@ -1039,7 +1036,7 @@ function nbArtWireBump(av, box, all){
 // The starting version typed beside the button, or null, said and focused,
 // when it is not MAJOR.MINOR.PATCH.
 function nbArtVerStart(el){
-  const f = el.closest(".verinit").querySelector(".vstart");
+  const f = el.closest(".verinit, .veraddform").querySelector(".vstart");
   const val = (f.value || "").trim();
   if (!/^\d+\.\d+\.\d+$/.test(val)){
     notify("a version is MAJOR.MINOR.PATCH, like 0.1.0", true);
@@ -1066,7 +1063,7 @@ function nbArtWireInit(av, box){
   if (add) add.onclick = async () => {
     const val = nbArtVerStart(add);
     if (val === null) return;
-    const dir = add.closest(".verinit").querySelector(".vdir").value;
+    const dir = add.closest(".veraddform").querySelector(".vdir").value;
     busy(add, "Adding");
     await nbArtPostVersion(av, {action: "init", value: val, component: dir});
   };
@@ -1088,7 +1085,7 @@ function nbArtWireAsk(av, box){
   const {project} = av;
   box.querySelectorAll("[data-verask]").forEach(b => b.onclick = async () => {
     const comp = b.dataset.verask === "@fold"
-      ? b.closest(".verinit").querySelector(".vdir").value
+      ? b.closest(".veraddform").querySelector(".vdir").value
       : (b.dataset.verask || "");
     if (!await sendSure(project, comp ? `the version question for ${comp}` : "the version question")) return;
     busy(b, "Sending");

@@ -39,13 +39,13 @@ function rnDrawDiscord(){
   } else if (!d.may){
     drawHTML(box, `${lbl}<div class="hint">None connected; a person with this space's settings connects one.</div>`);
   } else {
-    drawHTML(box, `${lbl}<div class="fgrid">
-        <label class="setrow col ctlrow"><span class="lbl">Bot token</span><input id="rnDcToken" type="password" autocomplete="off" spellcheck="false"
-          aria-label="the Discord bot's token"></label>
-        <label class="setrow col ctlrow"><span class="lbl">Server ID</span><input id="rnDcGuild" autocomplete="off" spellcheck="false" inputmode="numeric"
-          placeholder="the one it is in" data-ph-short="its only one" aria-label="the server's ID, where the bot is in several"></label>
-      </div>
-      <div class="actbar"><span class="state" id="rnDcSay"></span><span class="sp"></span><button type="button" class="primary" data-dcconnect>Connect</button></div>`);
+    // One form (R301): the token and the server, Connect at its foot.
+    drawHTML(box, `${lbl}${formBox({fields: [
+        formField("rnDcToken", "Bot token", `<input id="rnDcToken" type="password" autocomplete="off" spellcheck="false">`),
+        formField("rnDcGuild", "Server ID", `<input id="rnDcGuild" autocomplete="off" spellcheck="false" inputmode="numeric"
+          placeholder="the one it is in" data-ph-short="its only one">`, {hint: "only where the bot is in several"})],
+      state: `<span class="state" id="rnDcSay"></span>`,
+      foot: [`<button type="button" class="primary" data-dcconnect>Connect</button>`]})}`);
   }
   box.querySelector("[data-dcopen]")?.addEventListener("click", () => { const n = rnFor; closeRename(); openNotebook(n, "discord"); });
   box.querySelector("[data-dcforget]")?.addEventListener("click", async e => {

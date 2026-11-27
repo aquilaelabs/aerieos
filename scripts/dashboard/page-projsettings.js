@@ -1421,10 +1421,10 @@ function rnDrawPeople(){
       : esc(n)).join(", ") : "nobody yet"}</div>
     ${v.invites.map(i => `<div class="rninvite">${esc(i.name)} <span class="dim">invited${i.role ? ` as ${esc(i.role)}` : ""} by ${esc(i.by || "somebody")} ${esc(ago(i.at))}</span>
       <button type="button" class="link" data-withdraw="${i.id}">Withdraw</button></div>`).join("")}
-    ${v.may_invite && invitable.length ? (v.roles || []).length ? `<div class="rninvitebar">
-      <select id="rnInviteWho" aria-label="account to invite">${invitable.map(n => `<option>${esc(n)}</option>`).join("")}</select>
-      <select id="rnInviteRole" aria-label="the role they are invited as">${v.roles.map(n => `<option>${esc(n)}</option>`).join("")}</select>
-      <button type="button" id="rnInviteGo">Invite</button></div>`
+    ${v.may_invite && invitable.length ? (v.roles || []).length ? formBox({cls: "rninvitebar", fields: [
+      formField("rnInviteWho", "Invite", `<select id="rnInviteWho">${invitable.map(n => `<option>${esc(n)}</option>`).join("")}</select>`),
+      formField("rnInviteRole", "As", `<select id="rnInviteRole">${v.roles.map(n => `<option>${esc(n)}</option>`).join("")}</select>`)],
+      foot: [`<button type="button" id="rnInviteGo">Invite</button>`]})
       : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`);
   const o = $("rnOwner");
   if (o) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
@@ -1528,15 +1528,12 @@ function rnDrawFtp(){
     <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
     ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
     ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}
-    <div class="fgrid"${on ? "" : " hidden"}>
-    <div class="setrow col ctlrow"><label for="rnFtpFor">Keep it on</label>
-      <select id="rnFtpFor" aria-label="how long FTP stays on">${optionList([
+    ${formBox({attrs: on ? "" : "hidden", fields: [
+    formField("rnFtpFor", "Keep it on", `<select id="rnFtpFor">${optionList([
         ...(v.on && v.until ? [["", `until ${fmtTime(v.until * 1000, {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
-        ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select></div>
-    <div class="setrow col ctlrow"><label for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
-      <input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}" aria-label="the port its FTP server listens on">
-      <div class="hint">and the ${v.span - 1} after it</div></div>
-    </div>
+        ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select>`),
+    formField("rnFtpPort", "Port", `<input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}">`,
+      {help: `the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart`, hint: `and the ${v.span - 1} after it`, short: true})]})}
     ${status}
     <div class="rnftppeople"${on || editor ? "" : " hidden"}>${v.people.map(p => {
       const a = d.access?.[p.uid] ?? p.access;

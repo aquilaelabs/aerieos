@@ -29,17 +29,14 @@
 // note and Keep in, as a row that opens does (rows-you-open); `editing` is
 // the id of the one whose fields are in.
 function convForm(r){
-  return `<div class="memadd cvform ctlrow" data-cvform="${esc(r.id)}">
-      ${lbl("cvLabel", "Label", "the name this conversation is listed and picked by, in place of its first words")}
-      <input id="cvLabel" class="cvLabel" maxlength="60" autocomplete="off" value="${esc(r.label || "")}" placeholder="${esc((r.first || "what it was about").slice(0, 60))}">
-      ${lbl("cvNote", "Note", "anything to remember about it: where it left off, what to do next")}
-      <textarea id="cvNote" class="cvNote" maxlength="500" rows="3" spellcheck="true">${esc(r.note || "")}</textarea>
-      <label class="ndcap"><input type="checkbox" class="cvKeep"${r.kept ? " checked" : ""}${r.gone ? " disabled" : ""}> Keep a copy on the controller, past its agent's own cleanup</label>
-      ${r.gone ? `<div class="sub">The kept copy is the only one left of it: Delete removes it.</div>` : ""}
-      <div class="actbar">
-        <button type="button" class="stop" data-cvcancel>Cancel</button>
-        <button type="button" class="primary" data-cvsave="${esc(r.id)}">Save</button></div>
-    </div>`;
+  return `<div class="memadd cvform" data-cvform="${esc(r.id)}">${formBox({fields: [
+      formField("cvLabel", "Label", `<input id="cvLabel" class="cvLabel" maxlength="60" autocomplete="off" value="${esc(r.label || "")}" placeholder="${esc((r.first || "what it was about").slice(0, 60))}">`,
+        {help: "the name this conversation is listed and picked by, in place of its first words", wide: true}),
+      formField("cvNote", "Note", `<textarea id="cvNote" class="cvNote" maxlength="500" rows="3" spellcheck="true">${esc(r.note || "")}</textarea>`,
+        {help: "anything to remember about it: where it left off, what to do next", wide: true}),
+      `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" class="cvKeep"${r.kept ? " checked" : ""}${r.gone ? " disabled" : ""}> Keep a copy on the controller, past its agent's own cleanup</label>${
+        r.gone ? `<div class="sub">The kept copy is the only one left of it: Delete removes it.</div>` : ""}</div>`],
+    foot: [`<button type="button" class="stop" data-cvcancel>Cancel</button>`, `<button type="button" class="primary" data-cvsave="${esc(r.id)}">Save</button>`]})}</div>`;
 }
 
 function convRows(project, rows, theirs = false, editing = ""){

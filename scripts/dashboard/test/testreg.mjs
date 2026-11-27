@@ -369,7 +369,7 @@ await section("The same mark from the row", async () => {
   await page.waitForSelector(`${row} .tstEdit`, { timeout: 10000 });
   await page.click(`${row} .tstEdit`);
   await page.waitForSelector(`${row} .tstAccept`, { timeout: 10000 });
-  ok(await page.$eval(`${row} .tstWhy`, e => e.hidden), 'the reason field waits behind the checkbox');
+  ok(await page.$eval(`${row} .tstWhy`, e => e.closest('.fcell').hidden), 'the reason field waits behind the checkbox');
   await page.click(`${row} .tstAccept`);
   await page.fill(`${row} .tstWhy`, 'the boot really takes this long');
   await page.click(`${row} .tstSave`);

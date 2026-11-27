@@ -328,13 +328,12 @@ function nbWikiView({$, nb, project}){
     const ro = projWriteWhy(project);
     const a = ro ? null : nb.wkAdding;
     const add = a
-      ? `<div class="field wkadd">${lbl("wkNewName", "Page name", "Home is the page a wiki opens on; _Sidebar and _Footer frame every page")}
-          <input id="wkNewName" maxlength="200" autocomplete="off" placeholder="${articles().length ? "Getting started" : "Home"}" value="${esc(a.name)}">
-          ${lbl("wkNewText", "Markdown")}
-          <textarea class="wkText" id="wkNewText" spellcheck="true">${esc(a.text)}</textarea>
-          <div class="actbar macts"><span class="state">Create writes the page now</span>
-            <button type="button" class="stop" id="wkNewCancel">Cancel</button>
-            <button type="button" class="primary" id="wkNewSave">Create</button></div></div>`
+      ? `<div class="field wkadd">${formBox({fields: [
+          formField("wkNewName", "Page name", `<input id="wkNewName" maxlength="200" autocomplete="off" placeholder="${articles().length ? "Getting started" : "Home"}" value="${esc(a.name)}">`,
+            {help: "Home is the page a wiki opens on; _Sidebar and _Footer frame every page", wide: true}),
+          formField("wkNewText", "Markdown", `<textarea class="wkText" id="wkNewText" spellcheck="true">${esc(a.text)}</textarea>`, {wide: true})],
+        state: `<span class="state">Create writes the page now</span>`,
+        foot: [`<button type="button" class="stop" id="wkNewCancel">Cancel</button>`, `<button type="button" class="primary" id="wkNewSave">Create</button>`]})}</div>`
       : "";
     const log = !nb.wkLog ? "" : `<div class="field wklog">${(d.history || []).length
         ? (d.history || []).map(h => `<div class="wklogrow"><span class="mono">${esc(h.commit)}</span> ${esc(h.what)} <span class="dim">· ${esc(h.by)} · ${esc(ago(h.at))}</span></div>`).join("")

@@ -614,14 +614,17 @@ function nodeMachineSection(n){
   const why = !n.live ? ND_UNREACHED : "";
   let zones = [];
   try{ zones = Intl.supportedValuesOf("timeZone"); }catch(e){ zones = []; }
+  // One form (R301): its three fields on the grid, Apply at its foot.
+  const off = admin && !why ? "" : " disabled";
   const body = `<div class="field"><div class="sub">What the machine is called on the network, and the time zone its clock, logs and schedules read.</div></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
-    <div class="field"><label class="pick"><span class="pickw">Name</span><input type="text" data-k="machinename" value="${esc(r.hostname || n.name || "")}" maxlength="63" autocomplete="off" spellcheck="false"${admin && !why ? "" : " disabled"}></label></div>
-    <div class="field"><label class="pick"><span class="pickw">Time zone</span><select data-k="machinetz"${admin && !why ? "" : " disabled"}>${
-      optionList([...new Set([r.timezone || "UTC", "UTC", ...zones])].map(z => [z, z]), r.timezone || "UTC")}</select></label></div>
-    <div class="field"><label class="pick"><span class="pickw">Spin down disks</span><select data-k="machinespin"${admin && !why ? "" : " disabled"}>${optionList(SPINDOWN_WORDS, String(r.spindown ?? 0))}</select></label>
-      <div class="hint">Hard disks stop after this long idle, and take a few seconds to answer the next read.</div></div>
-    ${admin && !why ? `<div class="actbar"><span class="sp"></span><button type="button" class="primary" data-nd="machine-apply" disabled>Apply</button></div>` : ""}`;
+    ${formBox({fields: [
+        formField("ndMachName", "Name", `<input id="ndMachName" type="text" data-k="machinename" value="${esc(r.hostname || n.name || "")}" maxlength="63" autocomplete="off" spellcheck="false"${off}>`),
+        formField("ndMachTz", "Time zone", `<select id="ndMachTz" data-k="machinetz"${off}>${
+          optionList([...new Set([r.timezone || "UTC", "UTC", ...zones])].map(z => [z, z]), r.timezone || "UTC")}</select>`),
+        formField("ndMachSpin", "Spin down disks", `<select id="ndMachSpin" data-k="machinespin"${off}>${optionList(SPINDOWN_WORDS, String(r.spindown ?? 0))}</select>`,
+          {hint: "Hard disks stop after this long idle, and take a few seconds to answer the next read."})],
+      foot: [admin && !why ? `<button type="button" class="primary" data-nd="machine-apply" disabled>Apply</button>` : ""]})}`;
   return docSection("nodes", "machine", ndTitle("machine"), [r.hostname || "", r.timezone || "", r.spindown ? `disks spin down after ${r.spindown} min` : ""].filter(Boolean).join(" · "), body);
 }
 // Reporting (R164 step 4): the controller's own machine's CPU, memory,
@@ -2673,36 +2676,29 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
   const vmForm = (made) => {
     document.getElementById("ndTitle").textContent = "New VM";
     boxWidth(!!made);
-    const f = (k, label, help, extra = "") =>
-      `<div class="setrow col ctlrow">${lbl("vm_" + k, label, help)}
-        <input id="vm_${k}" data-vk="${k}" autocomplete="off" spellcheck="false"
-          value="${esc(String(vmDraft[k]))}"${extra}></div>`;
+    const f = (k, label, help, extra = "", o = {}) => formField("vm_" + k, label, `<input id="vm_${k}" data-vk="${k}" autocomplete="off" spellcheck="false" value="${esc(String(vmDraft[k]))}"${extra}>`, {help, ...o});
     const kinds = vmKinds || [{id: "unraid", label: "Unraid", wants: ["uuid", "mac"],
                               mac_prefix: "52:54:00", artifact: "domain XML"}];
     const kind = kinds.find(k => k.id === vmDraft.hv) || kinds[0];
     const takes = k => (kind.wants || []).includes(k);
+    // One form (R301): where it runs and its name, its three sizes across,
+    // then what identifies it; the dialog's foot generates it.
     drawHTML(body, `<div class="field vmform">
         <div class="hint">Pick where it runs; the machine is written the same everywhere.</div>
-        <div class="setrow col ctlrow">${lbl("vm_hv", "Runs on")}
-          <select id="vm_hv" data-vk="hv">${kinds.map(k =>
-            `<option value="${esc(k.id)}"${k.id === kind.id ? " selected" : ""}>${
-              k.dev ? devOpt(esc(k.label)) : esc(k.label)}</option>`).join("")}</select></div>
-        <div class="prefrow ctlrow">
-          ${f("name", "Name", "the machine's name, and the folder its disk goes in")}
-          ${f("cores", "Cores", "", ' type="number" min="1" max="64"')}
-          ${f("memory_gb", "Memory GiB", "", ' type="number" min="1" max="512"')}
-          ${f("disk_gb", "Disk GiB", kind.id === "unraid"
-              ? "set in the hypervisor's own form: the XML only names the file" : "",
-              ' type="number" min="8" max="8192"')}
-          ${takes("vmid") ? f("vmid", "VM id", "Proxmox numbers its machines, 100 and up",
-              ' type="number" min="100"') : ""}
-        </div>
-        ${f("iso", "Installer ISO", "a file you have already put where that manager keeps them. Ubuntu Server is the tested one")}
-        <div class="prefrow ctlrow">
-          ${takes("uuid") ? f("uuid", "UUID",
-              "blank mints one. Made the VM already? Paste the manager's, or its firmware settings are left behind") : ""}
-          ${f("mac", "MAC", `blank mints one in ${kind.mac_prefix}, which is the range this one accepts`)}
-        </div>
+        ${formBox({groups: [
+          {fields: [
+            formField("vm_hv", "Runs on", `<select id="vm_hv" data-vk="hv">${kinds.map(k =>
+              `<option value="${esc(k.id)}"${k.id === kind.id ? " selected" : ""}>${k.dev ? devOpt(esc(k.label)) : esc(k.label)}</option>`).join("")}</select>`),
+            f("name", "Name", "the machine's name, and the folder its disk goes in")]},
+          {grid: "three", fields: [
+            f("cores", "Cores", "", ' type="number" min="1" max="64"', {short: true}),
+            f("memory_gb", "Memory GiB", "", ' type="number" min="1" max="512"', {short: true}),
+            f("disk_gb", "Disk GiB", kind.id === "unraid" ? "set in the hypervisor's own form: the XML only names the file" : "", ' type="number" min="8" max="8192"', {short: true})]},
+          {fields: [
+            takes("vmid") ? f("vmid", "VM id", "Proxmox numbers its machines, 100 and up", ' type="number" min="100"', {short: true}) : "",
+            f("iso", "Installer ISO", "a file you have already put where that manager keeps them. Ubuntu Server is the tested one", "", {wide: true}),
+            takes("uuid") ? f("uuid", "UUID", "blank mints one. Made the VM already? Paste the manager's, or its firmware settings are left behind") : "",
+            f("mac", "MAC", `blank mints one in ${kind.mac_prefix}, which is the range this one accepts`)]}]})}
       </div>
       ${made ? `<div class="field vmmade">
         <div class="hint">${esc(made.label)}: its own${made.uuid && takes("uuid")

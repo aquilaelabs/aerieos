@@ -359,7 +359,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 @container (max-width:36rem){ .rproj{grid-template-columns:minmax(0,1fr) auto} .rproj .upick{grid-column:1 / -1;grid-row:2}
 }
 .rproj .upick label.pick{min-width:0;max-width:100%;overflow-wrap:anywhere}
-.raddon{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:8px}
+.raddon{margin-top:12px}
 /* The account's roles run the width of its pane as the fields over them do
    (the operator, 24 Nov: held to a control's width, its spaces' rows ran a
    long role under the trash); its pickers keep a control's width. */
@@ -367,9 +367,6 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 /* A built-in role's line keeps the field gap from the areas over it, where
    it sat on the table's last rule. */
 .rbuiltin{margin-top:var(--field-gap)}
-.raddon select{width:100%;min-width:0}
-@media (max-width:600px){ .raddon{grid-template-columns:minmax(0,1fr) auto} .raddon>select:first-child{grid-column:1 / -1}
-}
 /* Its groups apart (the operator, 26 Oct): Everywhere roles, Projects and
    what the account can do each start a little below the one before. */
 #ueAccess>.setrow.col+.setrow.col{margin-top:14px}
@@ -459,7 +456,6 @@ body.away #docDot,body.away #docDot.ok,body.away #docDot.warn,body.away #docDot.
 .cvlogs .cvnote{white-space:pre-line;overflow-wrap:anywhere}
 /* The row whose fields are in: the form takes the row. */
 .cvlogs .artrow.cvediting .grow{flex:1 1 100%;min-width:0}
-.cvform input, .cvform textarea{width:100%}
 /* A swatch renders in its own scheme: the tokens above are defined for
    .sw[data-theme=...] as well as for the page, so this is the palette itself
    at 1cm rather than a hand-kept copy of it. */
@@ -827,7 +823,7 @@ body.firstrun #panes{display:none}
 /* A project's people (membership.py): a pending invitation per line, and
    the picker with its Invite. */
 .rninvite{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
-.rninvitebar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.rninvitebar{margin-top:12px}
 #rnTestField .setrow{align-items:center;flex-wrap:nowrap}
 #rnTestField .setrow .hint{flex:1 1 auto;min-width:0}
 /* File access (R151): one row per account, its name and its access. */
@@ -1206,7 +1202,9 @@ body.firstrun #panes{display:none}
    zoomed into a layout that cannot zoom back. Every other control that sets
    its own font says so again here (the chat bar, the code box);
    this one had been forgotten, and uniform.mjs caught it. */
-.verinit .vdir{flex:0 1 auto;min-width:0}
+/* A component's own version is a form (R301): its directory and starting
+   number on the form's grid, its verbs at the foot. */
+.veradd>.fbox{margin-top:12px}
 /* The changelog. pre-wrap keeps the file's own line breaks; it is a document
    someone wrote, not data to reflow. Otherwise it is a history: same padding,
    no well and no border and no height of its own, because it is read in the
@@ -1320,15 +1318,6 @@ body.firstrun #panes{display:none}
 .veradd{margin-top:10px}
 .veradd>summary{color:var(--dim);font:var(--f-note);min-height:var(--tap)}
 @media(hover:hover){ .veradd>summary:hover{color:var(--ink)}
-}
-@media(max-width:600px){
-  /* The component fold's picker and field earn a line each on a phone: a
-     directory name plus a version plus two buttons will not share one. The
-     starting-version line is the exception: a short field and a one-word
-     button fit beside each other at any width, and stacking them turned two
-     controls into two full-width bars. */
-  .veradd .verinit .vstart,.veradd .verinit .vdir{flex:1 1 100%;width:auto}
-  .veradd .verinit button{flex:1 1 100%}
 }
 .verln{display:flex;gap:8px;align-items:baseline;padding:2px 0;flex-wrap:wrap}
 .verln span:first-child{flex:0 0 118px;color:var(--dim);font:var(--f-note)}

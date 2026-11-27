@@ -115,10 +115,10 @@ function rolesAccessFields(name){
   // project with, and the place that makes one is named instead of an
   // empty picker.
   const add = ro ? "" : notOn.length && !off.length ? `<div class="sub dim raddon">No role on a space yet: one made on the ${pageLink("roles", "Roles page")} puts ${esc(p.name)} on a space.</div>`
-    : off.length ? `<div class="raddon ctlrow">
-      <select id="rolesAddProj" aria-label="the space">${optionList(off.map(pn => [pn, projLabel(pn)]), addPn)}</select>
-      <select id="rolesAddRole" aria-label="the role there">${optionList(rolesOnProject(addPn).map(r => [r.name, r.label || r.name]))}</select>
-      <button type="button" id="rolesAddOn"${rolesOnProject(addPn).length ? "" : " disabled"}>Add to space</button></div>` : "";
+    : off.length ? formBox({cls: "raddon", fields: [
+      formField("rolesAddProj", "Space", `<select id="rolesAddProj">${optionList(off.map(pn => [pn, projLabel(pn)]), addPn)}</select>`),
+      formField("rolesAddRole", "Role there", `<select id="rolesAddRole">${optionList(rolesOnProject(addPn).map(r => [r.name, r.label || r.name]))}</select>`)],
+      foot: [`<button type="button" id="rolesAddOn"${rolesOnProject(addPn).length ? "" : " disabled"}>Add to space</button>`]}) : "";
   return `${global}
     <div class="setrow col">${lbl("", d.admin || ro ? "Spaces" : "Your spaces", "a role on a space puts the account on it; taken off, it is not on it")}
       <div class="rprojects">${rows || `<div class="empty">on no space yet</div>`}</div>${add}</div>

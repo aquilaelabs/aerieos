@@ -17,6 +17,7 @@ function nbTestsView({$, nb, project}){
   nb.tests = null;
   nb.testsRev = null;    // the registry's revision as of the last read
   let tstEditing = new Set();   // the rows whose two fields are out
+  let tstFormSeq = 0;           // each drawn editor's own ids, unique while it is out
   nb.tstSuite = ""; nb.tstFlagged = false, nb.tstUndoc = false;
 
   // The run's output, in the project's shell: opened if none is, focused if
@@ -271,28 +272,24 @@ function nbTestsView({$, nb, project}){
         };
         return;
       }
-      drawHTML(body, `${sub}
-        <label>What it protects</label>
-        <textarea class="tstP" spellcheck="false"
-          placeholder="the behavior that breaks if this goes red">${
-            esc(draft ? draft.protects : t.protects)}</textarea>
-        <label>What it exercises<span class="help" data-help="fixtures, stubs, what is real and what is faked" tabindex="0">?</span></label>
-        <textarea class="tstN" spellcheck="false"
-          placeholder="e.g. runs the real server; the database is faked">${
-            esc(draft ? draft.notes : t.notes)}</textarea>
-        ${t.sits_on ? `
-        <label class="ndcap"><input type="checkbox" class="tstAccept"${(draft ? draft.accept : t.accepted) ? " checked" : ""}>
-          this test needs ${t.sits_on}s; stop flagging it</label>
-        <textarea class="tstWhy proseline" rows="1" maxlength="20000" placeholder="why: a real boot, a timeout being proved"
-          ${(draft ? draft.accept : t.accepted) ? "" : "hidden"
-            }>${esc(draft ? draft.why : t.accepted)}</textarea>` : ""}
-        <div class="actbar"><span class="sp"></span>
-          <button type="button" class="stop tstCancel"
-            title="discard what was typed">Cancel</button>
-          <button type="button" class="primary tstSave">Save</button></div>`);
+      // One form (R301): the two sentences, and where it sits on a wait, the
+      // tick with its reason under it; Cancel and Save at its foot.
+      const fid = `tstf${++tstFormSeq}`, accepted = draft ? draft.accept : t.accepted;
+      drawHTML(body, `${sub}${formBox({fields: [
+        formField(`${fid}p`, "What it protects", `<textarea id="${fid}p" class="tstP" spellcheck="false"
+          placeholder="the behavior that breaks if this goes red">${esc(draft ? draft.protects : t.protects)}</textarea>`, {wide: true}),
+        formField(`${fid}n`, "What it exercises", `<textarea id="${fid}n" class="tstN" spellcheck="false"
+          placeholder="e.g. runs the real server; the database is faked">${esc(draft ? draft.notes : t.notes)}</textarea>`,
+          {help: "fixtures, stubs, what is real and what is faked", wide: true}),
+        t.sits_on ? `<div class="fcell fwide"><label class="ndcap"><input type="checkbox" class="tstAccept"${accepted ? " checked" : ""}>
+          this test needs ${t.sits_on}s; stop flagging it</label></div>` : "",
+        t.sits_on ? formField(`${fid}w`, "Why it needs the wait", `<textarea id="${fid}w" class="tstWhy proseline" rows="1" maxlength="20000"
+          placeholder="a real boot, a timeout being proved">${esc(draft ? draft.why : t.accepted)}</textarea>`, {wide: true, hidden: !accepted, cls: "tstwhycell"}) : ""],
+        foot: [`<button type="button" class="stop tstCancel" title="discard what was typed">Cancel</button>`,
+               `<button type="button" class="primary tstSave">Save</button>`]})}`);
       const acc = body.querySelector(".tstAccept");
       // The reason it asks for slides in under the tick, and away with it.
-      if (acc) acc.onchange = () => slideShow(body.querySelector(".tstWhy"), acc.checked);
+      if (acc) acc.onchange = () => slideShow(body.querySelector(".tstwhycell"), acc.checked);
       body.querySelector(".tstCancel").onclick = () => {
         tstEditing.delete(t.key);
         // The fields go before the redraw reads them for a draft.

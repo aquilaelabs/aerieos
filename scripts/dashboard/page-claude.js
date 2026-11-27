@@ -543,10 +543,9 @@ function resumePicker(p, m, dlg, ns, several){
       r.restart ? (r.when ? `ending the one running, resuming the one from ${esc(ago(r.when))} · ` : "ending the one running, resuming its conversation · ")
         : r.sessionId ? `from ${esc(ago(r.when ?? p.last_claude?.when))} · ` : ""}Claude Code${
       several || n.name ? ` on ${esc(n.name || "")}` : ""}${r.restart ? "" : esc(as)}</span></div>
-    <div class="field"><div class="fgrid rmfields">
-      <div class="setrow col ctlrow"><label class="lbl" for="rmModel">Model</label><select id="rmModel" aria-label="model this session starts on">${opts(MODELS, r.model)}</select></div>
-      <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(EFFORTS, r.effort)}</select></div>
-    </div></div>
+    <div class="field">${formBox({cls: "rmfields", fields: [
+      formField("rmModel", "Model", `<select id="rmModel">${opts(MODELS, r.model)}</select>`),
+      formField("rmEffort", "Effort", `<select id="rmEffort">${opts(EFFORTS, r.effort)}</select>`)]})}</div>
     ${dlgFoot(`<button type="button" data-back>Back</button>`,
       `<button type="button" class="${r.restart ? "caution" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
   m.dataset.pick = p.name;
@@ -610,11 +609,11 @@ function rmStartOn(p, a){
   if (!t.models.length && !t.efforts.length) return "";
   const [mk, ek] = rmStartKeys(a.id), cur = p.yours || {};
   const first = claude && resumeModelNow.project === p.name && resumeModelNow.model ? rmLastSaid(resumeModelNow.model) : `${a.name}'s default`;
-  const sel = (id, label, rows, v, def) => `<div class="setrow col ctlrow"><label class="lbl" for="${id}">${label}</label><select id="${id}" data-agent="${
-    esc(a.id)}" aria-label="the ${label.toLowerCase()} a new ${esc(a.name)} session starts on">${optionList([["", def], ...rows], v)}</select></div>`;
+  const sel = (id, label, rows, v, def) => formField(id, label, `<select id="${id}" data-agent="${esc(a.id)}">${optionList([["", def], ...rows], v)}</select>`);
   const warn = a.id === "open" ? routerSays(p, cur[mk] || "") : "";
-  return `<div class="fgrid rmfields rmstarton">${t.models.length ? sel("rmStartModel", "Model", t.models, cur[mk] || "", first) : ""}${
-    t.efforts.length ? sel("rmStartEffort", "Effort", t.efforts, cur[ek] || "", `${a.name}'s default`) : ""}</div>${
+  // Picked, kept at once (no foot): a form's fields all the same (R301).
+  return `${formBox({cls: "rmfields rmstarton", fields: [t.models.length ? sel("rmStartModel", "Model", t.models, cur[mk] || "", first) : "",
+    t.efforts.length ? sel("rmStartEffort", "Effort", t.efforts, cur[ek] || "", `${a.name}'s default`) : ""]})}${
     warn ? `<div class="rmstate warn">${esc(warn)}</div>` : ""}`;
 }
 
@@ -659,10 +658,9 @@ function agentPicker(p, m, dlg, n, several){
       r.restart ? (r.sessionId ? "ending the one running, resuming its conversation · " : "ending the one running · ")
         : r.sessionId && r.when ? `from ${esc(ago(r.when))} · ` : ""}${esc(a.product)}${
       several || n.name ? ` on ${esc(n.name || "")}` : ""}${r.restart ? "" : esc(as)}</span></div>
-    <div class="field"><div class="fgrid rmfields">
-      <div class="setrow col ctlrow"><label class="lbl" for="rmModel">Model</label><select id="rmModel" aria-label="model this session starts on">${opts(t.models, r.model)}</select></div>
-      <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(t.efforts, r.effort)}</select></div>
-    </div></div>
+    <div class="field">${formBox({cls: "rmfields", fields: [
+      formField("rmModel", "Model", `<select id="rmModel">${opts(t.models, r.model)}</select>`),
+      formField("rmEffort", "Effort", `<select id="rmEffort">${opts(t.efforts, r.effort)}</select>`)]})}</div>
     ${dlgFoot(`<button type="button" data-back>Back</button>`,
       `<button type="button" class="${r.restart ? "caution" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
   m.dataset.pick = p.name;
