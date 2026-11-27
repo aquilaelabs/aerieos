@@ -1553,7 +1553,6 @@ body.firstrun #panes{display:none}
 .roadmap .dinfo{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dim);
   font:var(--f-code);border-left:2px solid var(--line);
   padding:3px 0 3px 9px;margin-top:2px}
-.editbox .qd{margin-top:8px}
 /* What the changelog says about an item or a bug (R254 step 4): an entry a
    line, the release it went out in first, in the data voice. */
 /* A log's day, at the head of its first line (R254 step 5): the day, and
@@ -1647,18 +1646,9 @@ body.firstrun #panes{display:none}
 }
 
 /* ---- the Design view (nb-design.js) --------------------------------------
-   A language's choices in labeled controls, its colors as chips beside
-   their hex, and a page's layout as blocks on a frame the finger moves
-   them around. The board's colors are the design's own, painted inline
+   A language's choices in forms, its colors as chips beside their hex, and
+   a page's layout as blocks on a frame the finger moves them around. The board's colors are the design's own, painted inline
    from the language, which is the one place a hex is data and not chrome. */
-.dsrow{display:flex;flex-wrap:wrap;gap:var(--field-gap);align-items:flex-end}
-.dsctl{display:flex;flex-direction:column;gap:var(--label-gap);flex:0 1 auto;min-width:0}
-.dsctl select{width:auto;min-width:9em;max-width:100%}
-.dsctl input[type=number]{width:5.5em}
-/* The row's prose field grows, but only to the width the other tabs give a
-   field (the Profile's, the settings'), so what follows it stays beside it
-   rather than at the far edge of a wide window. */
-.dsctl.grow{flex:1 1 14em;max-width:26em}
 .dsc{display:flex;gap:6px;align-items:center}
 .dschip{width:22px;height:22px;flex:0 0 auto;border-radius:var(--r-small);border:var(--hair) solid var(--line)}
 .dsboard{position:relative;display:grid;gap:4px;padding:6px;box-sizing:border-box;
@@ -1688,9 +1678,6 @@ body.firstrun #panes{display:none}
 /* The theme the section's pulldown shows: fields like any
    tab's, not a box of their own (the operator, 28 Sep). */
 .dstheme{display:flex;flex-direction:column;gap:var(--field-gap)}
-.dscolors{display:flex;flex-direction:column;gap:var(--field-gap)}
-.dscolors .dsctl input{width:9em}
-.dscolors .dsctl .dsc input{width:7.5em}
 .dsblock{position:relative;display:flex;flex-direction:column;gap:2px;padding:5px 7px;min-width:0;min-height:0;
   border:var(--hair) solid;border-radius:var(--r-control);overflow:hidden;cursor:grab;
   transition:outline-color .15s ease}

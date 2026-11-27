@@ -832,7 +832,7 @@ function formsHold(root = '.doc.on'){
   return page.evaluate(root => {
     const out = new Set();
     const say = (e, why) => out.add(`${e.id || e.dataset?.k || e.name || e.getAttribute('aria-label') || e.tagName.toLowerCase()}: ${why}`);
-    const bar = '.actbar,.docbarrow,.histbar,.phead,.pghead,.sectjump,.tbl,table,.ndmline,.bar,.fnote,.wkpick,.dsrow,.addbar,.modal[hidden],[hidden],.skel,.term,.xterm';
+    const bar = '.actbar,.docbarrow,.histbar,.phead,.pghead,.sectjump,.tbl,table,.ndmline,.bar,.fnote,.wkpick,.addbar,.modal[hidden],[hidden],.skel,.term,.xterm';
     const fields = [...document.querySelectorAll(`${root} :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]),select,textarea)`)]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest(bar); });
     for (const e of fields){

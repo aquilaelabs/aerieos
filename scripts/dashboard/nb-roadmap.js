@@ -987,12 +987,14 @@ function nbRmOpenSplit($, nb, row, id){
   const r = nbRmFindRow(nb, id), steps = r?.steps || [];
   const box = document.createElement("div");
   box.className = "dropbox editbox splitbox ctlown";
-  drawHTML(box, `<div class="q">Split R${id}<span>: the ticked steps move to a new item, whole</span></div>
-    <div class="splitsteps">${steps.map((st, i) => `<label><input type="checkbox" value="${i + 1}"> <span class="n">${i + 1}</span> ${esc(st.text.slice(0, 160))}</label>`).join("")}</div>
-    <input class="title" maxlength="4000" autocomplete="off" spellcheck="false" placeholder="the new item's title">
-    <div class="actbar">
-      <button type="button" class="stop">Cancel</button>
-      <button type="button" class="primary">Split</button></div>`);
+  // A form (R301, the operator 27 Nov: a drop box that asks more than one
+  // thing is a form): the steps to move, the new item's title, Cancel and
+  // Split at its foot.
+  drawHTML(box, formBox({fields: [
+    `<div class="fcell fwide"><span class="lbl">Split R${id}: the ticked steps move to a new item, whole</span>
+      <div class="splitsteps">${steps.map((st, i) => `<label><input type="checkbox" value="${i + 1}"> <span class="n">${i + 1}</span> ${esc(st.text.slice(0, 160))}</label>`).join("")}</div></div>`,
+    formField(`rmSplit${id}`, "The new item's title", `<input id="rmSplit${id}" class="title" maxlength="4000" autocomplete="off" spellcheck="false">`, {wide: true})],
+    foot: [`<button type="button" class="stop">Cancel</button>`, `<button type="button" class="primary">Split</button>`]}));
   row.after(box);
   arriveBox(box);
   const shut = () => box.remove();
@@ -1026,18 +1028,19 @@ function nbRmOpenReword($, nb, row, id, step){
   const wasInfo = (step < 0 ? r0?.info : r0?.steps?.[step]?.info) || "";
   const box = document.createElement("div");
   box.className = "dropbox editbox ctlown";
-  drawHTML(box, `<div class="q">${step < 0 ? "Reword it"
-      : `Reword step ${step + 1}`}<span>: Enter saves, shift+Enter is a new line</span></div>
-    <textarea maxlength="4000" spellcheck="false"></textarea>
-    <div class="q qd"><span>Details: the technical half: files, functions, approach</span></div>
-    <textarea class="dta" maxlength="20000" spellcheck="false"
-      placeholder="mostly the agent's to write; empty is fine"></textarea>
-    <div class="q qd"><span>${step < 0 ? "Target: the release it is meant to ship in; empty for none"
-      : `Target: the release this step ships in; empty goes with the item${r0?.target ? ` (${esc(r0.target)})` : ""}`}</span></div>
-    <input class="tgt" maxlength="24" autocomplete="off" spellcheck="false" inputmode="decimal" placeholder="${step < 0 ? "0.6.0" : esc(r0?.target || "0.6.0")}">
-    <div class="actbar">
-      <button type="button" class="stop">Cancel</button>
-      <button type="button" class="primary">Save</button></div>`);
+  // A form (R301, the operator 27 Nov: a drop box that asks more than one
+  // thing is a form): its words, its details and its target, Cancel and
+  // Save at its foot.
+  const k = `rmRw${id}${step < 0 ? "" : `s${step}`}`;
+  drawHTML(box, formBox({fields: [
+    formField(k, step < 0 ? "Reword it" : `Reword step ${step + 1}`, `<textarea id="${k}" maxlength="4000" spellcheck="false"></textarea>`,
+      {wide: true, hint: "Enter saves, shift+Enter is a new line."}),
+    formField(`${k}d`, "Details", `<textarea id="${k}d" class="dta" maxlength="20000" spellcheck="false" placeholder="mostly the agent's to write; empty is fine"></textarea>`,
+      {wide: true, help: "the technical half: files, functions, approach"}),
+    formField(`${k}t`, "Target", `<input id="${k}t" class="tgt" maxlength="24" autocomplete="off" spellcheck="false" inputmode="decimal" placeholder="${step < 0 ? "0.6.0" : esc(r0?.target || "0.6.0")}">`,
+      {short: true, hint: step < 0 ? "The release it is meant to ship in; empty for none."
+        : `The release this step ships in; empty goes with the item${r0?.target ? ` (${esc(r0.target)})` : ""}.`})],
+    foot: [`<button type="button" class="stop">Cancel</button>`, `<button type="button" class="primary">Save</button>`]}));
   row.after(box);
   arriveBox(box);
   const ta = box.querySelector("textarea");

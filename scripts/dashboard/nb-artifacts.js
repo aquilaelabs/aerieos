@@ -891,8 +891,8 @@ function nbArtLoadDrafts(av, force){
           ${(d.undescribed || []).length ? `<div class="hint" data-draftundesc>Publish puts a table of its files over the notes; ${
             esc(d.undescribed.join(", "))} ${d.undescribed.length === 1 ? "is" : "are"} listed by name alone, with nothing said of what ${
             d.undescribed.length === 1 ? "it is" : "they are"} for. Describe them in Settings, Releases.</div>` : ""}
-          <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
-          ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
+          ${formBox({fields: [formField(`verNotes-${d.tag.replace(/[^A-Za-z0-9_-]/g, "_")}`, "Its notes", `<textarea id="verNotes-${esc(d.tag.replace(/[^A-Za-z0-9_-]/g, "_"))}" rows="12"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>`, {wide: true})],
+            foot: may ? [`<button type="button" data-draftsave>Save the notes</button>`, `<button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button>`] : []})}
         </div>`;
     }).join("") + `<div class="hint">Only this repository's people see a draft. Correct its notes, then Publish here, not on the git host, whose form checks none of this: it goes to everyone following its channel.</div>`, {cls: "warn"}));
     wireSections(box);

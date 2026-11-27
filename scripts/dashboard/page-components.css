@@ -2388,11 +2388,9 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
    inside it; a lone control takes the cap itself. No page is named here
    (R218 step 64, the operator 19 Oct: three lists of row kinds had drifted
    apart): a new surface's row is capped by wearing the class. Beside it,
-   the shared parts that size their own contents: an action bar, the
-   settings grid, a menu (a surface of its own whose fields run its width),
-   .ctlown for a box that sizes its own (a reason box), and the Design
-   view's .dsrow, whose pickers stop at their own labeled column (capped at
-   88% of it, a theme's name was cut on a desk). The union of a
+   the shared parts that size their own contents: an action bar, a form
+   (formBox), a menu (a surface of its own whose fields run its width) and
+   .ctlown for a box that sizes its own (a reason box). The union of a
    row's controls is what uniform.mjs measures, against the surface holding
    it. Terminals and logs are not controls and are not here. */
 :is(.doctab,.nb) .ctlrow{
@@ -2523,7 +2521,7 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 }
 /* A form's box (.fbox, R301) is capped as a whole and its fields fill it, so
    its foot ends where they do; one field capped alone ended short of it. */
-:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.actmenu,.dsrow,.fbox) *){
+:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.actmenu,.fbox) *){
   max-width:min(var(--ctl-w),88%)}
 /* A row whose text column holds a field is a row of controls, and its
    action cluster belongs on the field's line: the Phone tab's Connect and

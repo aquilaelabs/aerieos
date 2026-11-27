@@ -1393,11 +1393,11 @@ A page's blocks are painted in the space's own language (`nb-design.js`,
 that space and not chrome of this page; everything around the board (the
 frame's edge, the selection outline, the sizing corner) is the page's
 tokens, and the corner shows on the selected block only, since a tap
-selects a block before anything drags it. Its controls are the framework's:
-choices in labeled selects on a `.dsrow` that lines up at the bottom, the
-row's prose field growing only to the width the other tabs give a field so
-what follows it stays beside it, colors as a chip beside a seven-character
-field, prose in a proseline.
+selects a block before anything drags it. Its editors are forms like every
+other (formBox; the operator, 27 Nov): a theme's fields and choices one form,
+its colors one form with a group a color, a chip beside each seven-character
+hex, a page's fields, a new block and the selected block each a form, prose
+in a proseline.
 
 The Wiki view reads like an encyclopedia (the operator, 2 Oct), not as rows: the pages listed in a
 narrow column (the wiki's own _Sidebar when it has one) beside one article at a time, its title large in

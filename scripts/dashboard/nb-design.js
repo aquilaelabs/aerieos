@@ -176,9 +176,8 @@ function nbDsTouched(ds){
 
 // ---- drawing --------------------------------------------------------------------
 function nbDsOpt(rows, cur, keyed = "key", labeled = "label"){ return optionList((rows || []).map(r => [r[keyed], r[labeled]]), cur); }
-function nbDsCtl(id, text, help, control, grow){
-  return `<div class="dsctl${grow ? " grow" : ""}">${lbl(id, text, help)}${control}</div>`;
-}
+// Its editors are forms like every other (R301; the operator, 27 Nov): each
+// field formField, its label over it.
 
 // What each section shows, kept in range: a removed theme leaves the
 // pulldown on the first one, and a page that is not there the list.
@@ -227,7 +226,7 @@ function nbDsDrawDesign(ds){
 
 // A section's pulldown: which of its things is shown below it.
 function nbDsPick(id, text, rows, cur, help = ""){
-  return nbDsCtl(id, text, help, `<select id="${id}" data-dspick>${nbDsOpt(rows, cur)}</select>`);
+  return formField(id, text, `<select id="${id}" data-dspick>${nbDsOpt(rows, cur)}</select>`, {help: help});
 }
 
 // One of the language's four choices. Its first line is no choice at
@@ -239,14 +238,12 @@ function nbDsChoice(rows, cur){ return `<option value=""${cur ? "" : " selected"
 // A choice that is custom is said by one of the theme's own rules, and
 // names which: its text is what a session reads in the choice's place.
 const DS_CUSTOM = [["font", "Type"], ["corners", "Corners"], ["density", "Space"], ["motion", "Motion"]];
-function nbDsCustomRow(t, i){
+function nbDsCustomCells(t, i){
   const mine = DS_CUSTOM.filter(([k]) => t[k] === "custom");
-  if (!mine.length) return "";
   const rules = (t.rules || []).filter(r => r.name);
   const pickRule = k => optionList([["", "no rule named"], ...rules.map(r => r.name)], (t.custom || {})[k] || "");
-  return `<div class="field"><div class="dsrow">${mine.map(([k, word]) =>
-      nbDsCtl(`dst-${i}-custom-${k}`, `${word}, by the rule`, "which of this theme's rules says it: a session reads that rule where the choice would be",
-          `<select id="dst-${i}-custom-${k}" data-dstcustom="${k}">${pickRule(k)}</select>`)).join("")}</div></div>`;
+  return mine.map(([k, word]) =>
+      formField(`dst-${i}-custom-${k}`, `${word}, by the rule`, `<select id="dst-${i}-custom-${k}" data-dstcustom="${k}">${pickRule(k)}</select>`, {help: "which of this theme's rules says it: a session reads that rule where the choice would be"}));
 }
 
 // The themes: the add bar (blank, a preset, or a copy of a theme here),
@@ -265,16 +262,13 @@ function nbDsThemesSection(ds, t){
   const from = `<option value="" selected>blank</option><optgroup label="a preset">${nbDsOpt(P.schemes, "")}</optgroup>`
     + (themes.length ? `<optgroup label="a copy of">${themes.map((x, i) => `<option value="copy:${i}">${esc(x.name || "unnamed theme")}</option>`).join("")}</optgroup>` : "");
   const body = `
-      <div class="field"><div class="dsrow">
-        ${nbDsCtl("dsThemeFrom", "Add one from", "blank, a preset's ten colors, or a copy of a theme here, choices and rules included", `<select id="dsThemeFrom">${from}</select>`)}
-        <button type="button" id="dsThemeAdd" ${themes.length >= (P.themes_max || 8) ? "disabled" : ""}>Add theme</button>
-      </div></div>
-      <div class="field">${nbDsCtl("dsScope", "Governs",
-            "what the language covers when the space is more than one product: the web app in site/",
-            `<textarea id="dsScope" class="proseline" rows="1" maxlength="120">${esc(L.scope || "")}</textarea>`, true)}</div>
-      ${themes.length ? `<div class="field"><div class="dsrow">
-        ${nbDsPick("dsThemePick", "Theme", rows, String(nb.dsShow.theme), "each a named set of colors, dark or light, with its own type, corners, space, motion and rules; the first is the default, whose choices and rules are the design's")}
-      </div></div>` : ""}
+      <div class="field">${formBox({fields: [
+        formField("dsThemeFrom", "Add one from", `<select id="dsThemeFrom">${from}</select>`, {help: "blank, a preset's ten colors, or a copy of a theme here, choices and rules included"})],
+        foot: [`<button type="button" id="dsThemeAdd" ${themes.length >= (P.themes_max || 8) ? "disabled" : ""}>Add theme</button>`]})}</div>
+      <div class="field">${formBox({fields: [
+        formField("dsScope", "Governs", `<textarea id="dsScope" class="proseline" rows="1" maxlength="120">${esc(L.scope || "")}</textarea>`, {help: "what the language covers when the space is more than one product: the web app in site/", wide: true})]})}</div>
+      ${themes.length ? `<div class="field">${formBox({fields: [
+        nbDsPick("dsThemePick", "Theme", rows, String(nb.dsShow.theme), "each a named set of colors, dark or light, with its own type, corners, space, motion and rules; the first is the default, whose choices and rules are the design's")]})}</div>` : ""}
       ${t ? nbDsThemeBand(ds, t, nb.dsShow.theme, themes.length) : `<div class="field"><div class="hint">No theme yet. Add one, or leave it: a session that builds the space chooses the colors, the type, corners, space and motion, and puts them here.</div></div>`}`;
   return docSection("design", "themes", "Themes", `${themes.length} theme${themes.length === 1 ? "" : "s"}${status ? " · " + status : ""}`,
                     body + nb.sectBar("design:themes"));
@@ -297,22 +291,16 @@ function nbDsRulesList(ds, key, rules){
             <span class="btitle rlNameRO">${esc(r.name || "(unnamed)")}</span>
             <span class="rlkind ${ruleCond(r) ? "cond" : ""}">${ruleCond(r) ? "on its triggers" : "every session"}</span>
           </summary>
-          <div class="body">${ui.editing.has(i) ? `
-            ${lbl("", "Name", "a short name the rule is known by: dialogs, tap-targets")}
-            <input class="rlName" maxlength="40" autocomplete="off" spellcheck="false" placeholder="dialogs" value="${esc(r.name || "")}" aria-label="rule name">
-            ${lbl("", "The rule")}
-            <textarea class="rlText" spellcheck="false" maxlength="20000">${esc(r.text || "")}</textarea>
-            <div class="two">
-              <div>${lbl("", "Files it covers", "paths or globs, comma-separated; the rule arrives when a session edits one")}
-              <input class="rlPaths" autocomplete="off" spellcheck="false" placeholder="src/ui, *.css" value="${esc((r.paths || []).join(", "))}" aria-label="paths"></div>
-              <div>${lbl("", "Words that raise it", "comma-separated; the rule arrives when a session is asked about one")}
-              <input class="rlWords" autocomplete="off" spellcheck="false" placeholder="dialog, modal" value="${esc((r.words || []).join(", "))}" aria-label="words"></div>
-            </div>
-            <div class="actbar macts">
-              <span class="state">${ruleWhen(r)} · the section's Save writes it</span>
-              <button type="button" class="stop rlCancel" title="discard what was typed">Cancel</button>
-              <button type="button" class="danger rlRm">Remove</button>
-            </div>` : `
+          <div class="body">${ui.editing.has(i) ? formBox({fields: [
+            formField("", "Name", `<input class="rlName" maxlength="40" autocomplete="off" spellcheck="false" placeholder="dialogs" value="${esc(r.name || "")}" aria-label="rule name">`,
+              {help: "a short name the rule is known by: dialogs, tap-targets"}),
+            formField("", "The rule", `<textarea class="rlText" spellcheck="false" maxlength="20000" aria-label="the rule">${esc(r.text || "")}</textarea>`, {wide: true}),
+            formField("", "Files it covers", `<input class="rlPaths" autocomplete="off" spellcheck="false" placeholder="src/ui, *.css" value="${esc((r.paths || []).join(", "))}" aria-label="paths">`,
+              {help: "paths or globs, comma-separated; the rule arrives when a session edits one"}),
+            formField("", "Words that raise it", `<input class="rlWords" autocomplete="off" spellcheck="false" placeholder="dialog, modal" value="${esc((r.words || []).join(", "))}" aria-label="words">`,
+              {help: "comma-separated; the rule arrives when a session is asked about one"})],
+            state: `<span class="state">${ruleWhen(r)} · the section's Save writes it</span>`,
+            foot: [`<button type="button" class="danger lead rlRm">Remove</button>`, `<button type="button" class="stop rlCancel" title="discard what was typed">Cancel</button>`]}) : `
             <div class="bfield"><label>rule</label><div class="bval rlBody">${esc(r.text || "")}</div></div>
             ${(r.paths || []).length ? `<div class="bfield rltrig"><label>files</label><div class="bval">${esc((r.paths || []).join(", "))}</div></div>` : ""}
             ${(r.words || []).length ? `<div class="bfield rltrig"><label>words</label><div class="bval">${esc((r.words || []).join(", "))}</div></div>` : ""}
@@ -391,39 +379,33 @@ function nbDsWireRulesList(ds, host){
 function nbDsThemeBand(ds, t, i, n){
   const P = nbDsPresets(ds), C = P.choices || {};
   const modes = (P.modes || ["dark", "light"]).map(m => ({key: m, label: m[0].toUpperCase() + m.slice(1)}));
+  // Its own fields, choices and families one form, Make default and Remove
+  // theme at its foot; its rules; its colors one form, a group a color.
   return `<div class="dstheme" data-dstheme="${i}">
-      <div class="field"><div class="dsrow">
-        ${nbDsCtl(`dst-name-${i}`, "Name", "", `<textarea id="dst-name-${i}" class="proseline" rows="1" maxlength="40" data-dst="name">${esc(t.name)}</textarea>`, true)}
-        ${nbDsCtl(`dst-mode-${i}`, "Mode", "", `<select id="dst-mode-${i}" data-dst="mode">${nbDsOpt(modes, t.mode)}</select>`)}
-        ${nbDsCtl(`dst-from-${i}`, "Fill from", "replace this theme's colors with a preset's ten",
-              `<select id="dst-from-${i}" data-dst="from"><option value="">keep as they are</option>${nbDsOpt(P.schemes, "")}</select>`)}
-      </div></div>
-      <div class="field"><div class="dsrow">
-        ${nbDsCtl(`dst-${i}-font`, "Type", "", `<select id="dst-${i}-font" data-dstchoice="font">${nbDsChoice(C.font, t.font)}</select>`)}
-        ${nbDsCtl(`dst-${i}-corners`, "Corners", "", `<select id="dst-${i}-corners" data-dstchoice="corners">${nbDsChoice(C.corners, t.corners)}</select>`)}
-        ${nbDsCtl(`dst-${i}-density`, "Space", "", `<select id="dst-${i}-density" data-dstchoice="density">${nbDsChoice(C.density, t.density)}</select>`)}
-        ${nbDsCtl(`dst-${i}-motion`, "Motion", "", `<select id="dst-${i}-motion" data-dstchoice="motion">${nbDsChoice(C.motion, t.motion)}</select>`)}
-      </div></div>
-      ${nbDsCustomRow(t, i)}
-      <div class="field">${nbDsCtl(`dst-${i}-fonts`, "Families",
-            "the exact font stacks when the choice above is not enough: Inter for text, JetBrains Mono for code",
-            `<textarea id="dst-${i}-fonts" class="proseline" rows="1" maxlength="200" data-dst="fonts">${esc(t.fonts || "")}</textarea>`, true)}</div>
+      <div class="field">${formBox({fields: [
+        formField(`dst-name-${i}`, "Name", `<textarea id="dst-name-${i}" class="proseline" rows="1" maxlength="40" data-dst="name">${esc(t.name)}</textarea>`, {wide: true}),
+        formField(`dst-mode-${i}`, "Mode", `<select id="dst-mode-${i}" data-dst="mode">${nbDsOpt(modes, t.mode)}</select>`),
+        formField(`dst-from-${i}`, "Fill from", `<select id="dst-from-${i}" data-dst="from"><option value="">keep as they are</option>${nbDsOpt(P.schemes, "")}</select>`, {help: "replace this theme's colors with a preset's ten"}),
+        formField(`dst-${i}-font`, "Type", `<select id="dst-${i}-font" data-dstchoice="font">${nbDsChoice(C.font, t.font)}</select>`),
+        formField(`dst-${i}-corners`, "Corners", `<select id="dst-${i}-corners" data-dstchoice="corners">${nbDsChoice(C.corners, t.corners)}</select>`),
+        formField(`dst-${i}-density`, "Space", `<select id="dst-${i}-density" data-dstchoice="density">${nbDsChoice(C.density, t.density)}</select>`),
+        formField(`dst-${i}-motion`, "Motion", `<select id="dst-${i}-motion" data-dstchoice="motion">${nbDsChoice(C.motion, t.motion)}</select>`),
+        ...nbDsCustomCells(t, i),
+        formField(`dst-${i}-fonts`, "Families", `<textarea id="dst-${i}-fonts" class="proseline" rows="1" maxlength="200" data-dst="fonts">${esc(t.fonts || "")}</textarea>`, {help: "the exact font stacks when the choice above is not enough: Inter for text, JetBrains Mono for code", wide: true})],
+        state: `<span class="state">${i === 0 ? "the default: the app starts on it" : ""}</span>`,
+        foot: [`<button type="button" class="danger lead" data-dstrm title="take this theme out">Remove theme</button>`,
+          i === 0 ? "" : `<button type="button" data-dstdefault title="the app starts on this theme">Make default</button>`]})}</div>
       ${docSection("design", `rules:t${i}`, "Rules", (t.rules || []).length ? `${t.rules.length}` : "none",
         `<div class="hint">${i === 0
           ? "The design's rules: what holds for the whole design and the settings cannot say. A session gets one on the turn it edits a file or is asked about a word the rule names; aerie design show NAME reads one."
           : `What holds for ${esc(t.name.trim() || "this theme")} alone. A session meets one as ${esc(nbDsHolderSlug(t.name))}/NAME.`}</div>` + nbDsRulesList(ds, `t${i}`, t.rules || (t.rules = [])), {open: true})}
-      <div class="field">${lbl("", "Colors", "each a name, a hex and what it is for; a session names them the same in the code")}
-      <div class="dscolors">${(t.colors || []).map((c, j) => `
-        <div class="dsrow" data-dstc="${j}">
-          ${nbDsCtl(`dst-${i}-name-${j}`, "Name", "", `<input id="dst-${i}-name-${j}" data-dsm="name" maxlength="40" autocomplete="off" value="${esc(c.name)}">`)}
-          ${nbDsCtl(`dst-${i}-hex-${j}`, "Hex", "", `<div class="dsc"><span class="dschip" data-style="background:${esc(c.hex)}"></span><input id="dst-${i}-hex-${j}" data-dsm="hex" maxlength="7" spellcheck="false" autocomplete="off" value="${esc(c.hex)}"></div>`)}
-          ${nbDsCtl(`dst-${i}-for-${j}`, "For", "", `<textarea id="dst-${i}-for-${j}" class="proseline" rows="1" maxlength="120" data-dsm="means">${esc(c.means)}</textarea>`, true)}
-          <button type="button" class="danger" data-dstcrm="${j}" title="take this color out">Remove</button>
-        </div>`).join("")}</div></div>
-      <div class="field"><div class="actbar"><span class="state">${i === 0 ? "the default: the app starts on it" : ""}</span>
-        <button type="button" data-dstcadd ${(t.colors || []).length >= (P.colors_max || 40) ? "disabled" : ""}>Add color</button>
-        ${i === 0 ? "" : `<button type="button" data-dstdefault title="the app starts on this theme">Make default</button>`}
-        <button type="button" class="danger" data-dstrm title="take this theme out">Remove theme</button></div></div>
+      <div class="field">${lbl("", "Colors", "each a name, a hex and what it is for; a session names them the same in the code")}${formBox({cls: "dscolors",
+        groups: (t.colors || []).map((c, j) => ({attrs: `data-dstc="${j}"`, fields: [
+          formField(`dst-${i}-name-${j}`, "Name", `<input id="dst-${i}-name-${j}" data-dsm="name" maxlength="40" autocomplete="off" value="${esc(c.name)}">`),
+          formField(`dst-${i}-hex-${j}`, "Hex", `<div class="dsc"><span class="dschip" data-style="background:${esc(c.hex)}"></span><input id="dst-${i}-hex-${j}" data-dsm="hex" maxlength="7" spellcheck="false" autocomplete="off" value="${esc(c.hex)}"></div>`),
+          formField(`dst-${i}-for-${j}`, "For", `<textarea id="dst-${i}-for-${j}" class="proseline" rows="1" maxlength="120" data-dsm="means">${esc(c.means)}</textarea>`),
+          `<div class="fcell fcellbtn"><button type="button" class="danger" data-dstcrm="${j}" title="take this color out">Remove</button></div>`]})),
+        foot: [`<button type="button" data-dstcadd ${(t.colors || []).length >= (P.colors_max || 40) ? "disabled" : ""}>Add color</button>`]})}</div>
       ${nbDsLightHalf(t, i)}
     </div>`;
 }
@@ -437,14 +419,12 @@ function nbDsLightHalf(t, i){
   if (!(t.light || []).length)
     return `<div class="field"><div class="actbar"><span class="state">one palette: the app has no ${other} half of ${esc(t.name.trim() || "this theme")} to switch to</span>
         <button type="button" data-dstladd ${(t.colors || []).length ? "" : "disabled"}>Add a ${other} half</button></div></div>`;
-  return `<div class="field">${lbl("", `The ${other} half`, `the same tokens for ${other} mode; the app's Dark / Light switch picks the half`)}
-      <div class="dscolors">${t.light.map((c, j) => `
-        <div class="dsrow" data-dstl="${j}">
-          ${nbDsCtl(`dstl-${i}-name-${j}`, "Name", "", `<input id="dstl-${i}-name-${j}" data-dslm="name" maxlength="40" autocomplete="off" value="${esc(c.name)}">`)}
-          ${nbDsCtl(`dstl-${i}-hex-${j}`, "Hex", "", `<div class="dsc"><span class="dschip" data-style="background:${esc(c.hex)}"></span><input id="dstl-${i}-hex-${j}" data-dslm="hex" maxlength="7" spellcheck="false" autocomplete="off" value="${esc(c.hex)}"></div>`)}
-        </div>`).join("")}</div></div>
-      <div class="field"><div class="actbar"><span class="state">${t.light.length} of ${(t.colors || []).length} tokens</span>
-        <button type="button" class="danger" data-dstlrm title="take the ${other} half out">Remove the ${other} half</button></div></div>`;
+  return `<div class="field">${lbl("", `The ${other} half`, `the same tokens for ${other} mode; the app's Dark / Light switch picks the half`)}${formBox({
+      groups: t.light.map((c, j) => ({attrs: `data-dstl="${j}"`, fields: [
+        formField(`dstl-${i}-name-${j}`, "Name", `<input id="dstl-${i}-name-${j}" data-dslm="name" maxlength="40" autocomplete="off" value="${esc(c.name)}">`),
+        formField(`dstl-${i}-hex-${j}`, "Hex", `<div class="dsc"><span class="dschip" data-style="background:${esc(c.hex)}"></span><input id="dstl-${i}-hex-${j}" data-dslm="hex" maxlength="7" spellcheck="false" autocomplete="off" value="${esc(c.hex)}"></div>`)]})),
+      state: `<span class="state">${t.light.length} of ${(t.colors || []).length} tokens</span>`,
+      foot: [`<button type="button" class="danger" data-dstlrm title="take the ${other} half out">Remove the ${other} half</button>`]})}</div>`;
 }
 
 // The pages: the add bar (a platform, a template, Add page), a pulldown
@@ -463,12 +443,12 @@ function nbDsPagesSection(ds, p){
   // A new page starts from a template, or as a copy of a page here (its
   // blocks, layouts, rules and notes), blank by default (the operator,
   // 29 Sep).
-  const add = `<div class="field"><div class="addbar ctlrow pickshare" data-add="design">
-        <select id="dsPlatform" aria-label="the platform the new page is for"></select>
-        <select id="dsTemplate" aria-label="the layout the new page starts from"></select>
-        <select id="dsPageFrom" aria-label="a page here to copy, or none"><option value="" selected>not a copy</option>${
-          nb.dsPages.map(x => `<option value="${nbDsKeyOf(x)}">a copy of ${esc(x.name.trim() || "unnamed page")}</option>`).join("")}</select>
-        <button id="dsAdd" class="primary" type="button">Add page</button></div></div>`;
+  const add = `<div class="field" data-add="design">${formBox({fields: [
+        formField("dsPlatform", "Platform", `<select id="dsPlatform"></select>`, {help: "the platform the new page is for"}),
+        formField("dsTemplate", "Template", `<select id="dsTemplate"></select>`, {help: "the layout the new page starts from"}),
+        formField("dsPageFrom", "Or a copy of", `<select id="dsPageFrom"><option value="" selected>not a copy</option>${
+          nb.dsPages.map(x => `<option value="${nbDsKeyOf(x)}">a copy of ${esc(x.name.trim() || "unnamed page")}</option>`).join("")}</select>`, {help: "a page here, its blocks, layouts, rules and notes"})],
+        foot: [`<button id="dsAdd" class="primary" type="button">Add page</button>`]})}</div>`;
   // Every page a row, a press on it opening that page at an address of its
   // own; the page open, a line back to the rows over it and the page.
   const rows = nb.dsPages.map(x => `<div class="row dspagerow" data-dspagego="${nbDsKeyOf(x)}">${tblLine(DS_PAGE_COLS, [
@@ -493,36 +473,26 @@ function nbDsPageBody(ds, p){
   const sel = nb.dsSel[key];
   const b = sel != null ? p.blocks[sel] : null;
   return `<div data-dspage="${key}">
-      <div class="field"><div class="dsrow">
-        ${nbDsCtl(`${key}-name`, "For", "what this page is for: the settings page. Applying it means applying the design there",
-              `<textarea id="${key}-name" class="proseline" rows="1" maxlength="120" data-dsf="name">${esc(p.name)}</textarea>`, true)}
-        ${nbDsCtl(`${key}-key`, "Key", "optional: a short name of the page's own, which its rules are addressed under (settings/save). Without one they go by the whole name",
-              `<textarea id="${key}-key" class="proseline" rows="1" maxlength="24" data-dsf="key">${esc(p.key || "")}</textarea>`)}
-        ${nbDsCtl(`${key}-plat`, "Platform", "", `<select id="${key}-plat" data-dsf="platform">${nbDsOpt(P.platforms, p.platform)}</select>`)}
-        ${nbDsCtl(`${key}-frame`, "Frame", "", `<select id="${key}-frame" data-dsf="frame">${nbDsOpt(frames, p.frame)}</select>`)}
-        ${nbDsCtl(`${key}-rows`, "Rows", "how long the page is: the frame is one screen, and a page with more rows scrolls",
-              `<input id="${key}-rows" type="number" inputmode="numeric" min="${nbDsFrameOf(ds, p.frame).rows}" max="${nbDsRowsMax(ds)}" value="${nbDsGridOf(ds, p).rows}" data-dsf="rows">`)}
-      </div></div>
+      <div class="field">${formBox({fields: [
+        formField(`${key}-name`, "For", `<textarea id="${key}-name" class="proseline" rows="1" maxlength="120" data-dsf="name">${esc(p.name)}</textarea>`, {help: "what this page is for: the settings page. Applying it means applying the design there", wide: true}),
+        formField(`${key}-key`, "Key", `<textarea id="${key}-key" class="proseline" rows="1" maxlength="24" data-dsf="key">${esc(p.key || "")}</textarea>`, {help: "optional: a short name of the page's own, which its rules are addressed under (settings/save). Without one they go by the whole name"}),
+        formField(`${key}-plat`, "Platform", `<select id="${key}-plat" data-dsf="platform">${nbDsOpt(P.platforms, p.platform)}</select>`),
+        formField(`${key}-frame`, "Frame", `<select id="${key}-frame" data-dsf="frame">${nbDsOpt(frames, p.frame)}</select>`),
+        formField(`${key}-rows`, "Rows", `<input id="${key}-rows" type="number" inputmode="numeric" min="${nbDsFrameOf(ds, p.frame).rows}" max="${nbDsRowsMax(ds)}" value="${nbDsGridOf(ds, p).rows}" data-dsf="rows">`, {help: "how long the page is: the frame is one screen, and a page with more rows scrolls"})]})}</div>
       <div class="field">${nbDsBoardHtml(ds, p)}</div>
-      <div class="field"><div class="dsrow">
-        ${nbDsCtl(`${key}-kind`, "Block", "", `<select id="${key}-kind" data-dsf="newkind">${nbDsOpt(P.kinds, "content")}</select>`)}
-        <button type="button" data-dsblockadd title="put a block of this kind on the board">Add block</button>
-      </div></div>
-      ${b ? `<div class="field" data-dsselected><div class="dsrow">
-        ${nbDsCtl(`${key}-bkind`, "Kind", "", `<select id="${key}-bkind" data-dsb="kind">${nbDsOpt(P.kinds, b.kind)}</select>`)}
-        ${nbDsCtl(`${key}-blabel`, "What it's for", "one line a session reads: the account menu, the list of orders",
-              `<textarea id="${key}-blabel" class="proseline" rows="1" maxlength="120" data-dsb="label">${esc(b.label)}</textarea>`, true)}
-        ${nbDsCtl(`${key}-bin`, "Inside", "the block this one is part of and stays within, drawn over it: a card in a list, a cover in a card, a pill in a bar; a block inside another can hold blocks of its own",
-              `<select id="${key}-bin" data-dsb="in"><option value="">none</option>${p.blocks.map((o, j) => j === sel || nbDsDescends(p, j, sel) ? ""
-                : `<option value="${j + 1}"${b.in === j + 1 ? " selected" : ""}>${j + 1}: ${esc(nbDsKindLabel(ds, o.kind))}${o.label ? ": " + esc(o.label.slice(0, 30)) : ""}</option>`).join("")}</select>`)}
-        <button type="button" class="danger" data-dsblockrm>Remove block</button>
-      </div>
-      <div class="hint">Drag a block to move it and its corner to size it; the arrow keys move a focused one, with Shift to size. A later layer draws over an earlier one.</div></div>`
+      <div class="field">${formBox({fields: [formField(`${key}-kind`, "Block", `<select id="${key}-kind" data-dsf="newkind">${nbDsOpt(P.kinds, "content")}</select>`)],
+        foot: [`<button type="button" data-dsblockadd title="put a block of this kind on the board">Add block</button>`]})}</div>
+      ${b ? `<div class="field" data-dsselected>${formBox({fields: [
+        formField(`${key}-bkind`, "Kind", `<select id="${key}-bkind" data-dsb="kind">${nbDsOpt(P.kinds, b.kind)}</select>`),
+        formField(`${key}-blabel`, "What it's for", `<textarea id="${key}-blabel" class="proseline" rows="1" maxlength="120" data-dsb="label">${esc(b.label)}</textarea>`, {help: "one line a session reads: the account menu, the list of orders", wide: true}),
+        formField(`${key}-bin`, "Inside", `<select id="${key}-bin" data-dsb="in"><option value="">none</option>${p.blocks.map((o, j) => j === sel || nbDsDescends(p, j, sel) ? ""
+                : `<option value="${j + 1}"${b.in === j + 1 ? " selected" : ""}>${j + 1}: ${esc(nbDsKindLabel(ds, o.kind))}${o.label ? ": " + esc(o.label.slice(0, 30)) : ""}</option>`).join("")}</select>`, {help: "the block this one is part of and stays within, drawn over it: a card in a list, a cover in a card, a pill in a bar; a block inside another can hold blocks of its own"}),
+        `<div class="fcell fwide"><div class="hint">Drag a block to move it and its corner to size it; the arrow keys move a focused one, with Shift to size. A later layer draws over an earlier one.</div></div>`],
+        foot: [`<button type="button" class="danger" data-dsblockrm>Remove block</button>`]})}</div>`
       : `<div class="field"><div class="hint">${n ? "Tap a block to name what it is for." : "Add a block, or start again from a template with Add page."}</div></div>`}
       ${docSection("design", `rules:${key}`, "Rules", (p.rules || []).length ? `${p.rules.length}` : "none",
         `<div class="hint">What holds for ${esc(p.name.trim() || "this page")} alone. A session meets one as ${esc(p.key || nbDsHolderSlug(p.name || `page-${p.id}`))}/NAME.</div>` + nbDsRulesList(ds, key, p.rules || (p.rules = [])), {open: true})}
-      <div class="field">${nbDsCtl(`${key}-notes`, "Notes", "what the blocks cannot say: what a tap does, where the data comes from",
-            `<textarea id="${key}-notes" rows="3" maxlength="65536" data-dsf="notes">${esc(p.notes)}</textarea>`, true)}</div>
+      <div class="field">${formBox({fields: [formField(`${key}-notes`, "Notes", `<textarea id="${key}-notes" rows="3" maxlength="65536" data-dsf="notes">${esc(p.notes)}</textarea>`, {help: "what the blocks cannot say: what a tap does, where the data comes from", wide: true})]})}</div>
       <div class="field"><div class="actbar"><span class="state"></span>
           <button type="button" class="danger" data-dspagerm title="take this page out; Save makes it final, Revert brings it back">Remove page</button></div></div>
     </div>`;
