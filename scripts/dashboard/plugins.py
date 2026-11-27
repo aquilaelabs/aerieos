@@ -11,10 +11,9 @@ node.
 
 The facts arrive the way a node's logins do: the agent runs `aerie login --list`
 as the session account every few minutes and carries its rows up on the
-heartbeat, each with the plugins that account installed there. An agent too
-old to send them sends rows without the field, which says nothing and changes
-nothing here; a row with the field set to None means the account never
-installed one.
+heartbeat, each with the plugins that account installed there and its coding
+agents' MCP servers; a row with neither means the account has none there, and
+its entry for that node goes.
 
 Kept as {uid: {node id: {"at": when, "plugins": [...]}}} in its own file, and
 written only when what a node says differs from what is stored, since this
@@ -92,6 +91,7 @@ def report(node_id, rows):
                 if not mine:
                     d.pop(uid, None)
                 continue
+            was = mine.get(node_id) or {}
             if was.get("plugins") == got and (was.get("mcp") or {}) == mcp:
                 continue
             mine[node_id] = {"at": int(time.time()), "plugins": got, **({"mcp": mcp} if mcp else {})}
