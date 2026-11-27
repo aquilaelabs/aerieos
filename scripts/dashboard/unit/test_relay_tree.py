@@ -34,8 +34,15 @@ class TreeOf(unittest.TestCase):
         self.assertEqual(bbrelay.tree_of("alpha", str(wt)), (wt.resolve(), True))
 
     def test_any_other_runs_at_home_and_says_it_was_not_the_one_asked(self):
-        for other in ("/tmp/nowhere-the-controller-sees", str(self.ws / "beta"), str(self.ws / ".worktrees" / "beta")):
+        for other in ("/tmp/nowhere-the-controller-sees", str(self.ws / "beta"), str(self.ws / ".worktrees" / "beta"),
+                      "/node/workspace/.worktrees/alpha/u_2"):
             self.assertEqual(bbrelay.tree_of("alpha", other), (self.ws / "alpha", False), other)
+
+    def test_the_space_under_a_nodes_own_root_is_its_synced_copy(self):
+        # A node holding a synced copy names its own path for the space,
+        # which the controller's copy stands for (wssync.mjs).
+        for there in ("/node/workspace/alpha", "/node/workspace/alpha/sub/dir"):
+            self.assertEqual(bbrelay.tree_of("alpha", there), (self.ws / "alpha", True), there)
 
 
 if __name__ == "__main__":

@@ -220,6 +220,14 @@ def tree_of(project, want):
     trees = (WORKSPACE / ".worktrees" / project).resolve()
     if real.is_dir() and (real == mine or mine in real.parents or trees in real.parents):
         return real, True
+    # The space's own folder under a node's root (its synced copy, which the
+    # controller's copy stands for and which syncs back down) is the tree
+    # asked for; a worktree, or anywhere else, is not.
+    parts = Path(want).parts
+    if project in parts:
+        i = len(parts) - 1 - parts[::-1].index(project)
+        if i == 0 or parts[i - 1] != ".worktrees":
+            return home, True
     return home, False
 
 
