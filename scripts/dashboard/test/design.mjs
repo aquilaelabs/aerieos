@@ -729,8 +729,9 @@ await section("the design's rules reach a session the way house rules do", async
     headers: OWNER,
     body: JSON.stringify({ project: P, action: 'save', ...body }) }); return { status: r.status, ...(await r.json()) }; };
   const was = await api(`/api/design?project=${P}`);
-  const faulty = await post({ language: { ...was.language, corners: 'pill', rules: ['a bare rule', ...was.language.themes[0].rules],
-      themes: [{ name: 'A', colors: [{ name: 'bg', hex: 'blue' }, { name: 'bg', hex: '#101010' }] }] },
+  const faulty = await post({ language: { ...was.language,
+      themes: [{ name: 'A', corners: 'pill', rules: ['a bare rule', ...(was.language.themes[0].rules || [])],
+                 colors: [{ name: 'bg', hex: 'blue' }, { name: 'bg', hex: '#101010' }] }] },
     pages: [{ name: 'Home', platform: 'web', frame: 'desktop', blocks: [{ kind: 'slider', x: 0, y: 0, w: 13, h: 1 },
         { kind: 'card', x: 0, y: 1, w: 4, h: 1 }, { kind: 'card', x: 0, y: 1, w: 4, h: 1 }],
       layouts: { phone: [{ x: 0, y: 0, w: 6, h: 1 }], tablet: [],

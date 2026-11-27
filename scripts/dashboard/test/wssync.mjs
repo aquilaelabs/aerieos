@@ -104,7 +104,9 @@ try {
     const relay = args => execFileSync('python3', [`${REPO}/scripts/lib/relay.py`,
       'Basic ' + Buffer.from('test:test').toString('base64'), ...args],
       { cwd: nodes.syncone.ws, encoding: 'utf8', stdio: 'pipe', timeout: 120000,
-        env: { ...process.env, BB_CONTROLLER: URL.replace(/\/$/, ''), BB_RELAY_PROJECT: P,
+        // BB_REPO is the gate's own tree, never the node's copy: passed on,
+        // relay.py would ask from it, which the controller rightly refuses.
+        env: { ...process.env, BB_REPO: '', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_RELAY_PROJECT: P,
                WORKSPACE: `${DIR}/syncone/workspace` } });
     write(`${nodes.syncone.ws}/notes.txt`, 'saved a moment ago\n');
     const t = Date.now();

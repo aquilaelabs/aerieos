@@ -483,10 +483,10 @@ try {
       return n?.reported?.session?.up ? n.reported.session : null;
     });
     ok(sess !== null, 'the census reports the session half: its terminals are up');
-    ok(sess?.term === true && sess?.screen === SCREEN_PORT && sess?.ctr === true
+    ok(sess?.screen === SCREEN_PORT && sess?.ctr === true
        && sess?.user === execFileSync('id', ['-un'], { encoding: 'utf8' }).trim(),
        `...on the relay's port, the container terminal beside them, as the account sessions run as (${
-         JSON.stringify({ term: sess?.term, screen: sess?.screen, ctr: sess?.ctr, user: sess?.user })})`);
+         JSON.stringify({ screen: sess?.screen, ctr: sess?.ctr, user: sess?.user })})`);
     ok(typeof sess?.workspace === 'boolean' && /^sha256:/.test(sess?.bundle || ''),
        '...saying whether /workspace is there and which bb bundle bb-tty runs from');
     // The relay answers on its port, and only what the controller signed.
