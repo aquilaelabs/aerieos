@@ -747,11 +747,7 @@ async function nbRmReallySend($, nb){
   const j = await nbRmPost($, nb, {action: "send", id, step, tell: true, note, session: to});
   unbusy(go, "Send");
   if (!j) { nbRmDrawSendBox($, nb, !!nb.roadmapSession); return; }
-  // Which line stalled matters: a step left in the box is one to press
-  // Enter on, but a `/model` left there has the step still to come, and
-  // sending it now would glue the two together. So the switch says so
-  // (sendOutcome).
-  if (!sendOutcome(j, "step")){
+  if (!sendOutcome(j)){
     nbRmDrawSendBox($, nb, !!nb.roadmapSession);
     return;
   }

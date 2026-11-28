@@ -483,7 +483,7 @@ function nbBugsView({$, nb, project}){
             const j = await postBug({action: "send", id, note: nb.sendNoteText, session: to});
             unbusy(go, "Send");
             if (!j) return;
-            if (!sendOutcome(j, "bug")) return;
+            if (!sendOutcome(j)) return;
             nb.sendNoteText = "";
             nb.shutSendBoxes();
             openSentTo(project, j.session);   // land in the tab it went to
