@@ -181,8 +181,20 @@ await page.waitForSelector(`${NB} #gitDetail .gcommit`, { timeout: 10000 });
 ok(await page.$eval(`${NB} #gitDetail`, e => /Merge feature/.test(e.textContent) && /merge/.test(e.textContent)),
    'picking a commit opens its detail under the list');
 await page.click(`${NB} .grow[data-sha="${feat.sha}"]`);
+// What the detail held when the second pick never drew: which row is lit,
+// whose commit the box says it is, and its words (a pick undone, another
+// row's, or a read that failed all time out the same way).
 await page.waitForFunction(sel => /Feature work/.test(document.querySelector(sel)?.textContent || ''),
-                           `${NB} #gitDetail`, { timeout: 10000 });
+                           `${NB} #gitDetail`, { timeout: 10000 })
+  .catch(async e => {
+    console.log('[git] the second pick never drew: ' + JSON.stringify(await page.evaluate(([nb, want]) => {
+      const box = document.querySelector(`${nb} #gitDetail`);
+      return { want: want.slice(0, 7), lit: [...document.querySelectorAll(`${nb} .grow.on`)].map(r => r.dataset.sha.slice(0, 7)),
+               box: box ? { hidden: box.hidden, sha: (box.dataset.sha || '').slice(0, 7), says: box.textContent.trim().slice(0, 160) } : null,
+               reading: [...readings].filter(([, r]) => r.busy).map(([k]) => k) };
+    }, [NB, feat.sha]).catch(x => String(x))));
+    throw e;
+  });
 ok(await page.$eval(`${NB} #gitDetail`, e => !!e.querySelector('pre.diff .d-add')),
    '...with its diff, and picking another swaps it');
 // The detail sits under the whole history, so on a short window a click has
@@ -1177,7 +1189,10 @@ await section("step 3: the policy, and Send to Claude", async () => {
   const look = () => page.$eval('.nb .nbview[data-view="git"]', el => ({
     file: !!el.querySelector('[data-gitaskfile]'), commit: !!el.querySelector('#gitDetail [data-gitaskcommit]'),
     branch: el.querySelectorAll('[data-gitaskbranch]').length,
-    pol: el.querySelectorAll('[data-gitpol]').length }));
+    pol: el.querySelectorAll('[data-gitpol]').length,
+    // What the detail said when it offered nothing, for a failure under load.
+    ...(el.querySelector('#gitDetail [data-gitaskcommit]') ? {} : { picked: el.querySelectorAll('.grow[data-sha].on').length,
+      detail: (el.querySelector('#gitDetail')?.hidden ? 'hidden: ' : '') + (el.querySelector('#gitDetail')?.textContent || 'no box').replace(/\s+/g, ' ').trim().slice(0, 140) }) }));
   const offered = () => page.waitForFunction(() => {
     const el = document.querySelector('.nb .nbview[data-view="git"]');
     return el && el.querySelector('[data-gitaskfile]') && el.querySelector('#gitDetail [data-gitaskcommit]')

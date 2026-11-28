@@ -249,6 +249,42 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   for (const ev of ["requestfinished", "requestfailed"]) page.on(ev, r => { open.delete(r); lastDone = Date.now(); });
   // For settled() below: what is in flight, and when the last answer came.
   page.inFlight = () => ({ n: inFlight(), lastDone });
+  // What the page held when a wait, or a press that never landed, ran out
+  // of time: printed before the error is thrown on, since a suite that ends
+  // on an uncaught timeout says only what it waited for. `sel` is the
+  // press's own target: how many of it the page has now, and where the page
+  // is, tell a control a redraw took from one that was never drawn.
+  page.timedOut = async (what, sel) => {
+    try {
+      const seen = await page.evaluate(sel => ({
+        tabs: (typeof tabs !== "undefined" ? tabs : []).map(t => t.kind),
+        active: typeof active !== "undefined" ? active : null,
+        // Which tab each pane shows and which view a shown notebook is
+        // on: a wait for something drawn in a panel that is not on
+        // screen times out looking exactly like one that never drew
+        // (B297).
+        panes: (typeof panes !== "undefined" ? panes : []).map(id =>
+          id ? ((typeof tabs !== "undefined" ? tabs : []).find(t => t.id === id)?.kind || "?") + ":" + id : null),
+        nbView: [...document.querySelectorAll(".nbview:not([hidden])")]
+          .filter(v => v.offsetParent !== null).map(v => v.dataset.view),
+        projects: (state?.projects || []).map(p => p.name),
+        sessions: (state?.sessions || []).map(s => s.name),
+        nodes: (state?.node_runners || []).length,
+        // What ready() waits on, which is the most common wait there is:
+        // the doctor dot going ok. A failing check anywhere keeps it red.
+        docDot: (() => { const d = document.getElementById("docDot");
+                         return d ? `${d.hidden ? "hidden " : ""}${d.className}` : "absent"; })(),
+        doctor: (state?.doctor?.checks || [])
+          .filter(c => c.level !== "ok").map(c => `${c.level} ${c.text}`).slice(0, 4),
+        ...(sel ? { at: location.hash, body: document.body.className,
+                    has: (() => { try { return document.querySelectorAll(sel).length; } catch (e) { return "?"; } })(),
+                    open: [...document.querySelectorAll("dialog[open], .modal:not([hidden])")].map(d => d.id).slice(0, 4) } : {}),
+      }), typeof sel === "string" ? sel : null);
+      console.log(`[${what}] timed out; the page at that moment: ` + JSON.stringify(seen));
+    } catch { /* the page may be gone, which is its own answer */ }
+    if (page.errors?.length)
+      console.log(`[${what}] console errors so far: ` + page.errors.slice(-3).join(" | "));
+  };
   for (const m of ["waitForFunction", "waitForSelector"]){
     const real = page[m].bind(page);
     page[m] = async (...args) => {
@@ -321,35 +357,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
         // restarting beside the suite) files that pass alone timed out at
         // ready() and passed four times running minutes later: that one is
         // the box, and the dump shows a page that never finished arriving.
-        if (e && e.name === "TimeoutError"){
-          try {
-            const seen = await page.evaluate(() => ({
-              tabs: (typeof tabs !== "undefined" ? tabs : []).map(t => t.kind),
-              active: typeof active !== "undefined" ? active : null,
-              // Which tab each pane shows and which view a shown notebook is
-              // on: a wait for something drawn in a panel that is not on
-              // screen times out looking exactly like one that never drew
-              // (B297).
-              panes: (typeof panes !== "undefined" ? panes : []).map(id =>
-                id ? ((typeof tabs !== "undefined" ? tabs : []).find(t => t.id === id)?.kind || "?") + ":" + id : null),
-              nbView: [...document.querySelectorAll(".nbview:not([hidden])")]
-                .filter(v => v.offsetParent !== null).map(v => v.dataset.view),
-              projects: (state?.projects || []).map(p => p.name),
-              sessions: (state?.sessions || []).map(s => s.name),
-              nodes: (state?.node_runners || []).length,
-              // What ready() waits on, which is the most common wait there is:
-              // the doctor dot going ok. A failing check anywhere keeps it red.
-              docDot: (() => { const d = document.getElementById("docDot");
-                               return d ? `${d.hidden ? "hidden " : ""}${d.className}` : "absent"; })(),
-              doctor: (state?.doctor?.checks || [])
-                .filter(c => c.level !== "ok").map(c => `${c.level} ${c.text}`).slice(0, 4),
-            }));
-            console.log("[wait] timed out; the page at that moment: "
-                        + JSON.stringify(seen));
-          } catch { /* the page may be gone, which is its own answer */ }
-          if (page.errors?.length)
-            console.log("[wait] console errors so far: " + page.errors.slice(-3).join(" | "));
-        }
+        if (e && e.name === "TimeoutError") await page.timedOut("wait");
         throw e;
       }
     };
@@ -489,7 +497,12 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       const opts = rest[rest.length - 1];
       const hidden = m === 'waitForSelector' && ['hidden', 'detached', 'attached'].includes(opts?.state);
       if (!hidden) await openRnFor(sel, typeof opts?.timeout === 'number' ? opts.timeout : undefined);
-      return real(sel, ...rest);
+      if (m === 'waitForSelector') return real(sel, ...rest);
+      try { return await real(sel, ...rest); }
+      catch (e) {
+        if (e && e.name === 'TimeoutError') await page.timedOut(m, sel);
+        throw e;
+      }
     };
   }
   return page;

@@ -944,9 +944,13 @@ await section("The scheme's other half", async () => {
   await page.waitForFunction(() => !document.documentElement.dataset.theme, null, { timeout: 5000 });
   await page.click('#uiMenu [data-mode="dark"]');
   // Past the crossfade, which a loaded box stretches.
-  await page.waitForFunction(bg => getComputedStyle(document.body).backgroundColor === bg, darkBg, { timeout: 5000 });
-  ok(await page.evaluate(() => document.documentElement.dataset.mode) === undefined && await pageBg() === darkBg,
-     '...and Dark puts it back, carrying no attribute at all');
+  await page.waitForFunction(bg => getComputedStyle(document.body).backgroundColor === bg, darkBg, { timeout: 5000 }).catch(() => {});
+  const backDark = await page.evaluate(() => ({ mode: document.documentElement.dataset.mode, theme: document.documentElement.dataset.theme,
+    kept: localStorage.getItem('bb.mode'), bg: getComputedStyle(document.body).backgroundColor,
+    fading: document.documentElement.classList.contains('theming'), on: document.querySelector('#uiMenu [data-mode].on')?.dataset.mode,
+    menu: !!document.querySelector('#uiMenu [data-mode="dark"]')?.offsetWidth }));
+  ok(backDark.mode === undefined && backDark.bg === darkBg,
+     `...and Dark puts it back, carrying no attribute at all${backDark.mode === undefined && backDark.bg === darkBg ? '' : ` (${JSON.stringify(backDark)}, wanted ${darkBg})`}`);
   ok(swLight !== await page.$eval('#uiMenu .sw[data-theme="moss"]', b => getComputedStyle(b).backgroundColor),
      '...the swatches having shown the light half while it was on');
 });
@@ -3496,6 +3500,8 @@ for (const [addr, reads] of [['#/people/users', ['/api/users', '/api/roles']],
   const twice = got.filter(g => g.n > 1).map(g => g.u);
   if (twice.length) console.log((await page.evaluate(us => window.__asks.filter(a => us.some(u => a.startsWith(u + ' '))), twice)).join('\n'));
   ok(got.every(g => g.n === 1 && g.early),
-     `a reload at ${addr} asks for the page's own data beside the status read, once each (at ${at}; ${got.map(g => `${g.u.replace(/\?.*/, '')} ${g.n}x${g.early ? ' early' : ' late'}`).join(', ')})`);
+     `a reload at ${addr} asks for the page's own data beside the status read, once each (at ${at}; ${got.map(g => `${g.u.replace(/\?.*/, '')} ${g.n}x${g.early ? ' early' : ' late'}`).join(', ')}${
+       // The address not taken: what the page asked on the way, and where it is, for a failure under load.
+       String(at).startsWith(addr) ? '' : `; asked: ${JSON.stringify(page.dialogs.slice(-2))}; now ${await page.evaluate(() => `${location.hash} ${tabOf(panes[0])?.kind}`)}`})`);
 }
 await done(browser);

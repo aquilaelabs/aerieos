@@ -2308,9 +2308,14 @@ await section("A stack of more than one container says whose each port is", asyn
   // nothing of the fold; forgetting what was drawn makes the next draw whole.
   const rewrite = () => { painted.delete(document.querySelector('.dmtab').parentElement); readMoved('docker'); drawPanes(); };
   await page.evaluate(rewrite);
-  ok(await page.waitForFunction(sel => document.querySelectorAll(sel + ' .sect .wire .wgrp').length === 2, DM, { timeout: 15000 })
-       .then(() => true, () => false),
-     '...and an open Ports and mounts keeps its lines when the list redraws');
+  // What the fold was when it did not: open or shut, read or not, and what
+  // the page remembers of it, so a failure under load says which it was.
+  const foldSaid = () => page.evaluate(sel => [...document.querySelectorAll(sel + ' details.sect')].map(d => ({
+    key: d.dataset.sect, open: d.open, done: d.dataset.done || '', slide: d.dataset.slideTo || '', kept: sectOpen[d.dataset.sect],
+    seen: Object.keys(dmWireSeen).length, wire: d.querySelector('.wire')?.textContent.replace(/\s+/g, ' ').trim().slice(0, 60) })), DM).catch(e => String(e));
+  const redrawn = await page.waitForFunction(sel => document.querySelectorAll(sel + ' .sect .wire .wgrp').length === 2, DM, { timeout: 15000 })
+       .then(() => true, () => false);
+  ok(redrawn, `...and an open Ports and mounts keeps its lines when the list redraws${redrawn ? '' : ` (${JSON.stringify(await foldSaid())})`}`);
   // ...and keeps them when the read behind the redraw could not resolve the
   // compose (B12: under a loaded gate the config call ran out, the answer
   // said no ports and no mounts, and the fold said it publishes nothing).
