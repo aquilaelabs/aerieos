@@ -7,10 +7,12 @@ the shapes it takes."""
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
@@ -964,7 +966,7 @@ class Agent(unittest.TestCase):
             with open(os.path.join(vmdir, "disks", "bbvm-web-db.xml")) as f:
                 self.assertIn('device="12"', f.read())
 
-    def test_the_domain_carries_its_marker_and_a_screen_on_the_loopback(self):
+    def test_the_domain_carries_its_marker_and_a_screen_on_a_socket_of_its_own(self):
         x = self.av.domain_xml("bbvm-web-db", "web", 2, 2048, "/v/d.qcow2", "/v/s.iso", "bbvm-n00")
         self.assertIn("<bb:vm xmlns:bb='https://builderbot.dev/vm/1' project='web'/>", x.replace('"', "'"))
         self.assertIn("host-passthrough", x)
@@ -974,9 +976,11 @@ class Agent(unittest.TestCase):
         self.assertIn("<nvram format='qcow2'>/v/d_VARS.fd</nvram>", u, "qcow2, which a UEFI VM's snapshot needs")
         self.assertIn("machine='q35'", u)
         self.assertNotIn("<loader", x)
-        # A screen for the dock (R99), on the loopback alone: the agent's
-        # relay is the only way to it.
-        self.assertIn("<graphics type='vnc' listen='127.0.0.1' autoport='yes'/>", x)
+        # A screen for the dock (R99), on a socket libvirt makes in the
+        # domain's own folder: the agent's relay is the only way to it,
+        # where a loopback port was any account's of the machine to dial.
+        self.assertIn("<graphics type='vnc'><listen type='socket'/></graphics>", x)
+        self.assertNotIn("127.0.0.1", x)
         self.assertIn("discard='unmap'", x)
         i = self.av.domain_xml("bbvm-web-win", "web", 2, 4096, "/v/w.qcow2", "/v/iso/ubuntu.iso", "bbvm-n00",
                                installer=True, extra=["/v/w-d1.qcow2"], mac="52:54:00:12:34:56", vnc_pw="s3cret")
@@ -984,7 +988,7 @@ class Agent(unittest.TestCase):
         self.assertIn("<target dev='vdb' bus='virtio'/><serial>bb", i)
         self.assertIn("-vdb</serial>", i)
         self.assertIn("<mac address='52:54:00:12:34:56'/>", i.replace('"', "'"))
-        self.assertIn("passwd='s3cret'", i.replace('"', "'"))
+        self.assertIn("<graphics type='vnc' passwd='s3cret'><listen type='socket'/></graphics>", i.replace('"', "'"))
         # A VM made a node is on the LAN by the host's own interface, where
         # the controller reaches it (R97's walk: behind the NAT it was not).
         self.assertIn("<source network='bbvm-n00'/>", x.replace('"', "'"))
@@ -1010,6 +1014,79 @@ class Agent(unittest.TestCase):
         self.assertEqual(yaml.safe_load(en)["runcmd"][0][0], "sh")
         self.assertIn(json.dumps(KEY), ud)
 
+    def test_a_screen_on_the_loopback_moves_to_a_socket_at_the_next_start(self):
+        from unittest import mock
+        hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
+        old = ("<domain><name>bbvm-web-db</name><devices><graphics type='vnc' port='-1' autoport='yes' listen='127.0.0.1' passwd='s3cret' keymap='en-us'>"
+               "<listen type='address' address='127.0.0.1'/></graphics><video/></devices></domain>")
+        moved = hw.screen_private(old)
+        g = ET.fromstring(moved).find("devices/graphics")
+        self.assertEqual(dict(g.attrib), {"type": "vnc", "passwd": "s3cret", "keymap": "en-us"}, "the password and the rest are kept")
+        self.assertEqual([dict(x.attrib) for x in g.findall("listen")], [{"type": "socket"}])
+        self.assertIsNone(hw.screen_private(moved), "already there: nothing to define again")
+        # One somebody pointed at the LAN is theirs, and one with no screen has none to move.
+        lan = old.replace("127.0.0.1", "0.0.0.0")
+        self.assertIsNone(hw.screen_private(lan))
+        self.assertIsNone(hw.screen_private("<domain><devices><video/></devices></domain>"))
+        self.assertIsNone(hw.screen_private("not xml"))
+        # ...at the VM's next start, with no USB device kept for it.
+        with tempfile.TemporaryDirectory() as vmdir:
+            os.makedirs(os.path.join(vmdir, "disks"))
+            self.av.VM_DIR = vmdir
+            a = object.__new__(self.agent.Agent)
+            ran = []
+
+            class Job:
+                def say(self, t):
+                    pass
+
+            def run(argv, **kw):
+                ran.append(argv)
+                return subprocess.CompletedProcess(argv, 0, old if "dumpxml" in argv else "", "")
+            with mock.patch.object(self.av.subprocess, "run", side_effect=run):
+                self.assertEqual(a._vm_start(Job(), {}, "bbvm-web-db", {}), ("succeeded", 0))
+            self.assertIn("--security-info", next(x for x in ran if "dumpxml" in x), "read with its password, or the move would drop it")
+            self.assertTrue(any("define" in x for x in ran), ran)
+            with open(os.path.join(vmdir, "disks", "bbvm-web-db.xml")) as f:
+                kept = f.read()
+            self.assertIn('passwd="s3cret"', kept)
+            self.assertIn('<listen type="socket"', kept)
+            # Started again as it is now, nothing is defined a second time.
+            ran.clear()
+            with mock.patch.object(self.av.subprocess, "run", side_effect=lambda argv, **kw: ran.append(argv) or subprocess.CompletedProcess(argv, 0, kept if "dumpxml" in argv else "", "")):
+                self.assertEqual(a._vm_start(Job(), {}, "bbvm-web-db", {}), ("succeeded", 0))
+            self.assertFalse(any("define" in x for x in ran), ran)
+
+    def test_a_running_vm_s_screen_is_found_on_its_socket_or_its_old_port(self):
+        from unittest import mock
+        hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
+        live = ("<domain><devices><graphics type='vnc' socket='/var/lib/libvirt/qemu/domain-3-bbvm-web-db/vnc.sock'>"
+                "<listen type='socket' socket='/var/lib/libvirt/qemu/domain-3-bbvm-web-db/vnc.sock'/></graphics></devices></domain>")
+        self.assertEqual(hw.screen_at(live), ("unix", "/var/lib/libvirt/qemu/domain-3-bbvm-web-db/vnc.sock"))
+        was = "<domain><devices><graphics type='vnc' port='5903' autoport='yes' listen='127.0.0.1'><listen type='address' address='127.0.0.1'/></graphics></devices></domain>"
+        self.assertEqual(hw.screen_at(was), ("tcp", 5903), "one started before the move is reached where it is until its next start")
+        for none in ("<domain><devices/></domain>", "", was.replace("127.0.0.1", "0.0.0.0"), was.replace("5903", "-1"),
+                     "<domain><devices><graphics type='spice' port='5900' listen='127.0.0.1'/></devices></domain>"):
+            self.assertIsNone(hw.screen_at(none), none)
+        # The relay dials what the live XML names: the socket itself.
+        scr = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".screen"]
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "vnc.sock")
+            srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            srv.bind(path)
+            srv.listen(1)
+            self.addCleanup(srv.close)
+            with mock.patch.object(scr, "_run", return_value=live.replace("/var/lib/libvirt/qemu/domain-3-bbvm-web-db/vnc.sock", path)):
+                c = scr.vnc_dial("bbvm-web-db")
+            self.assertEqual(c.family, socket.AF_UNIX)
+            c.close()
+            with mock.patch.object(scr, "_run", return_value=""):
+                self.assertIsNone(scr.vnc_dial("bbvm-web-db"), "not running: no XML, no screen")
+            srv.close()
+            os.unlink(path)
+            with mock.patch.object(scr, "_run", return_value=live.replace("/var/lib/libvirt/qemu/domain-3-bbvm-web-db/vnc.sock", path)):
+                with self.assertRaises(OSError):
+                    scr.vnc_dial("bbvm-web-db")
 
 
 class Record(unittest.TestCase):

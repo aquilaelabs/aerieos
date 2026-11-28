@@ -180,7 +180,7 @@ def vms_now():
         mem = re.match(r"(\d+)", info.get("max memory", ""))
         # Its screen while it runs (R99), and an installer's ISO still in
         # its drive, which the row offers to eject.
-        screen = info.get("state") == "running" and _run(VIRSH + ["domdisplay", name], timeout=10).startswith("vnc://")
+        screen = info.get("state") == "running" and vmhw.screen_at(_run(VIRSH + ["dumpxml", name], timeout=10))
         iso = ""
         for line in _run(VIRSH + ["domblklist", name], timeout=10).splitlines():
             p = line.split(None, 1)
@@ -424,8 +424,10 @@ def domain_xml(name, project, vcpus, mem_mb, disk, seed, network, boot="bios", f
     which a project network behind the host's NAT does not have.
     R99: `installer` boots `seed` (then an installer's ISO) before the disk;
     `extra` are further disks (vdb on); every disk gives freed space back
-    (discard); a screen over VNC on the loopback, with `vnc_pw` when given,
-    for the dock's Screen; `mac` keeps the address a DHCP reservation knows."""
+    (discard); a screen over VNC on a unix socket libvirt makes in the
+    domain's own folder (never a loopback port, which any account of the
+    machine could dial), with `vnc_pw` when given, for the dock's Screen;
+    `mac` keeps the address a DHCP reservation knows."""
     mac_el = f"<mac address={quoteattr(mac)}/>" if mac else ""
     # On the LAN: a port on the host's bridge where it has one (R219), which
     # reaches the host too, else macvtap on the card, which does not.
@@ -461,7 +463,7 @@ def domain_xml(name, project, vcpus, mem_mb, disk, seed, network, boot="bios", f
     <disk type='file' device='disk'><driver name='qemu' type='qcow2' discard='unmap'/><source file={quoteattr(disk)}/><target dev='vda' bus='virtio'/>{serial('vda')}</disk>{disks}
     <disk type='file' device='cdrom'><driver name='qemu' type='raw'/><source file={quoteattr(seed)}/><target dev='sda' bus='sata'/><readonly/></disk>
     {nic}
-    <graphics type='vnc' listen='127.0.0.1' autoport='yes'{pw}/>
+    <graphics type='vnc'{pw}><listen type='socket'/></graphics>
     <video><model type='virtio'/></video>
     <input type='tablet' bus='usb'/>
     <serial type='pty'><target port='0'/></serial>
@@ -1080,10 +1082,14 @@ class VmsMixin:
         # ones after a replug or a reboot (R116): its hostdev pointed at
         # where it is now before the VM starts, by its serial or its port.
         kept = usb_kept(name)
-        if kept and self._vm_exists(name, who):
+        if self._vm_exists(name, who):
             xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                                  check=False, **who).stdout
-            fresh = vmhw.usb_refresh(xml, kept, vmhw.host_hw()["usb"])
+            fresh = vmhw.usb_refresh(xml, kept, vmhw.host_hw()["usb"]) if kept else None
+            # ...and a screen an older agent put on a loopback port goes onto
+            # a socket of libvirt's own, its password kept: from this start
+            # on no other account of the machine can dial it.
+            fresh = vmhw.screen_private(fresh or xml) or fresh
             if fresh:
                 path = os.path.join(VM_DIR, "disks", name + ".xml")
                 with open(path, "w") as f:

@@ -337,6 +337,65 @@ def usb_refresh(xml, kept, usb):
     return ET.tostring(root, encoding="unicode") if moved else None
 
 
+# What a VNC server on this machine alone listens on: any account here can
+# dial it, which is what the socket form below is for.
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def screen_at(xml):
+    """Where a running VM's screen answers, from its live XML: ("unix",
+    path) for the socket libvirt made for it, ("tcp", port) for one still
+    on the loopback port it was started with before this agent, or None
+    for no screen, or one listening anywhere else, which is not AerieOS's
+    to relay."""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError:
+        return None
+    for g in root.findall("devices/graphics"):
+        if g.get("type") != "vnc":
+            continue
+        listens = g.findall("listen")
+        sock = g.get("socket") or next((x.get("socket") for x in listens if x.get("type") == "socket" and x.get("socket")), "")
+        if sock.startswith("/"):
+            return "unix", sock
+        addr = g.get("listen") or next((x.get("address") for x in listens if x.get("type") == "address"), "")
+        port = g.get("port") or ""
+        if addr in _LOOPBACK and port.isdigit() and int(port) > 0:
+            return "tcp", int(port)
+    return None
+
+
+def screen_private(xml):
+    """The domain's VNC screen moved off the loopback, where every account
+    of the machine could dial it and a password was optional, onto a unix
+    socket libvirt makes in the domain's own folder, which root and the
+    emulator's account alone reach: the new XML, or None when nothing
+    moved. Its password and the rest of the element are kept. A screen
+    somebody set to listen on another address is theirs, and stays."""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError:
+        return None
+    moved = False
+    for g in root.findall("devices/graphics"):
+        if g.get("type") != "vnc":
+            continue
+        listens = g.findall("listen")
+        if any(x.get("type") == "socket" for x in listens) or g.get("socket"):
+            continue
+        addr = g.get("listen") or next((x.get("address") for x in listens if x.get("type") == "address"), "")
+        if addr not in _LOOPBACK:
+            continue
+        for k in ("listen", "port", "autoport", "websocket"):
+            g.attrib.pop(k, None)
+        for x in listens:
+            g.remove(x)
+        ET.SubElement(g, "listen", type="socket")
+        moved = True
+    return ET.tostring(root, encoding="unicode") if moved else None
+
+
 def tpm_here():
     """Whether libvirt can give a VM a TPM here: swtpm and its setup tool."""
     return bool(shutil.which("swtpm") and shutil.which("swtpm_setup"))

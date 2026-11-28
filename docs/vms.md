@@ -152,8 +152,10 @@ server, for a person with a shell and VMs Write on its space. Ctrl+]
 leaves it.
 
 **Screen** opens the VM's display in the dock: keyboard, mouse and all,
-drawn by noVNC, which the image carries. Every VM has one, on its host's
-loopback alone; the node's agent relays it on port 7684, the port its
+drawn by noVNC, which the image carries. Every VM has one, on a socket in
+the VM's own folder on its host that only root and the emulator reach (no
+port, so no other account of the machine can dial it; a VM made before
+this moves there at its next start); the node's agent relays it on port 7684, the port its
 terminals come in on too, which it opens to the controller alone, and only for a request the
 controller signed for that VM within the last two minutes. It takes VMs
 Write on the VM's space, since seeing a screen is driving the machine.

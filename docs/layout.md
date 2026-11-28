@@ -371,7 +371,7 @@ scripts/
     vms.py                       the VMs a node runs (R91): the vm job's fixed table of virsh and qemu-img commands, cloud-init, the census of them, and their network's firewall
     vmhw.py                      a VM's hardware beyond size (R100): the host's CPUs and devices, pinning, the balloon, the network, a virtiofs folder, passthrough, the vBIOS dump
     lanbridge.py                 the wired LAN card in a bridge, br0, on AerieOS (R219), so a VM on it reaches its own host; once at a boot, put back without an address
-    screen.py                    the node's one port for the controller's sockets, 7684, signed by the controller: the terminals (term.py) and a VM's screen for the dock (R99), relayed to its VNC on the loopback
+    screen.py                    the node's one port for the controller's sockets, 7684, signed by the controller: the terminals (term.py) and a VM's screen for the dock (R99), relayed to its VNC on the socket libvirt made for it
     relaytls.py                  the relay port's TLS, loaded by both ends: the node's own certificate, the controller's pin on it, the pump between a TLS socket and the plain one each side's code keeps, and a signed request taken once
     term.py                      AerieOS's own terminal (R133): a pty per tab on the screen relay's port, running what its kind runs (rw, ro, ctr), signed by the controller
     toolchains.py                the toolchain store (R19): what is installed, who uses it, a session's environment

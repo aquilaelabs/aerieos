@@ -14,7 +14,6 @@ import base64
 import hashlib
 import hmac
 import os
-import re
 import select
 import socket
 import struct
@@ -22,7 +21,7 @@ import threading
 import time
 import urllib.parse
 
-from . import files, relaytls, term
+from . import files, relaytls, term, vmhw
 from .base import RELAY, SCREEN_PORT, _run, log, log_once
 from .names import VAR
 from .vms import DOMAIN_RE, VIRSH
@@ -58,10 +57,24 @@ def signed(key, domain, when, sig, now=None):
     return abs(now - when) <= SKEW_S and any(hmac.compare_digest(sign(k, domain, when), str(sig or "")) for k in keys)
 
 
-def vnc_port(domain):
-    """The loopback port libvirt gave the VM's VNC, or 0."""
-    m = re.match(r"vnc://127\.0\.0\.1:(\d+)", _run(VIRSH + ["domdisplay", domain], timeout=10).strip())
-    return 5900 + int(m.group(1)) if m else 0
+def vnc_dial(domain):
+    """A connection to the running VM's VNC: its unix socket, which libvirt
+    made in the domain's own folder, or the loopback port of a VM started
+    before its screen was moved there. None for a VM that is not running or
+    has no screen; an OSError where it has one that does not answer."""
+    at = vmhw.screen_at(_run(VIRSH + ["dumpxml", domain], timeout=10))
+    if not at:
+        return None
+    if at[0] == "unix":
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5)
+        try:
+            s.connect(at[1])
+        except OSError:
+            s.close()
+            raise
+        return s
+    return socket.create_connection(("127.0.0.1", at[1]), timeout=5)
 
 
 def _frame(payload, opcode=2):
@@ -191,10 +204,12 @@ def serve_one(conn, key, kinds=None):
         return _refuse(conn, 403, "this request carries no value of its own, so it could be a replay")
     if not relaytls.once(sig):
         return _refuse(conn, 403, "this request was used already")
-    port = vnc_port(domain)
-    if not port:
+    try:
+        vnc = vnc_dial(domain)
+    except OSError:
+        return _refuse(conn, 409, "the VM's screen did not answer")
+    if vnc is None:
         return _refuse(conn, 409, "the VM is not running, or has no screen")
-    vnc = socket.create_connection(("127.0.0.1", port), timeout=5)
     vnc.settimeout(None)
     _accept(conn, hdr)
     frames = _Frames()
