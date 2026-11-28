@@ -76,7 +76,8 @@ def render():
              "before the handler runs (and after `then`, what the handler asks of that person besides), or the",
              "names of everything the handler itself asks: a permission (of the",
              "install, or of the space the request names), `space` for a space the account sees, `unlocked` for",
-             "one not locked against it, `node:` and `instance:` for a permission asked of one node or one",
+             "one not locked against it, `space-owner` for the space's own owner, `node:` and `instance:` for a",
+             "permission asked of one node or one",
              "cluster, `dial:` for a session's ask under the space's Agents may, `own` for the account's own",
              "things, and `seen` or `open` where the handler refuses nobody signed in (`seen`: the answer holds",
              "what the asker may see). A name is everything the handler consults, so a permission read only to",
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         have = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
         if have == text:
-            print(f"  [ok]   docs/api.md is server.py's {text.count(chr(10)) - 17} routes, word for word")
+            print(f"  [ok]   docs/api.md is server.py's {sum(1 for ln in text.splitlines() if ln.startswith(('| GET |', '| POST |')))} routes, word for word")
             sys.exit(0)
         print("  [FAIL] docs/api.md differs from server.py's routes: tools/api-doc.py rewrites it")
         sys.exit(1)

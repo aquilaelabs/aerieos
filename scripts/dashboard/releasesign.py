@@ -92,6 +92,7 @@ from pathlib import Path
 import cilogs
 import forgerelease
 import signing
+from fields import field
 
 STATE = Path("/config")
 WORKSPACE = Path("/workspace")
@@ -938,6 +939,69 @@ def start():
 
 
 # ---- the bell ---------------------------------------------------------------
+
+# The ask queued for the space's owner where the Sign a build dial says ask
+# (phone.ask_release_sign), and whose space it is (membership).
+ask_release_sign = None
+owner_of = None
+owner_name = None
+
+
+def sign_now(project, tag=""):
+    """A release's APKs looked for and signed again now: the Signing view's
+    press, a session's auto dial, and Allow on its ask. `tag` is a release
+    whose signed APK is to be replaced by its own run's, signed again, which
+    only a person's answer starts. (payload, status)."""
+    started = check_soon(project, force=True, again=tag)
+    if tag and not started:
+        # The look going on was not asked for the tag, and would leave it.
+        return {"error": f"a look is already going, so {tag} was not signed again: ask again once it ends"}, 409
+    return {"ok": True, "started": started,
+            "said": (f"looking for {tag}'s own run to sign its APK again" if tag else
+                     "looking for unsigned release APKs to sign" if started else "a look is already going")}, 200
+
+
+def unsignable(project, tag, tag_words):
+    """Why a look for `project`'s unsigned release APKs cannot be asked for,
+    as (payload, status), or None: its workflows hand none over, or `tag`
+    is not a release's tag (said in `tag_words`, the asker's own)."""
+    if not wants(project):
+        return {"error": f"{project}'s workflows hand over no unsigned APK to sign (an artifact named {MARK}TAG)"}, 400
+    if tag and not TAG.fullmatch(tag):
+        return {"error": tag_words}, 400
+    return None
+
+
+def looked(project):
+    """aerie sign status: whether its release APKs can be signed and how
+    the newest went, in the bell's words. Read only, and no secret is in
+    it. (payload, status)."""
+    return {"release": status(project), "attention": attention([project])}, 200
+
+
+def asked(project, req, mode, asker):
+    """A session's aerie sign release, the Signing view's retry, under the
+    Sign a build dial: looked for now where the dial says auto, asked of the
+    space's owner otherwise. With a tag (--again), a release that carries
+    its signed APK has it replaced, which is the owner's answer whatever the
+    dial. (payload, status)."""
+    tag = field(req, "tag")
+    if mode == "auto" and not tag:
+        return sign_now(project)
+    r = ask_release_sign(field(req, "why"), project, owner_of(project), owner_name(project) or "the space's owner",
+                         asker_name=asker, tag=tag)
+    return r, 400 if r.get("error") else 200
+
+
+def signed_now(project, tag):
+    """A person's Look for unsigned APKs now, and with a tag that release's
+    signed APK replaced by its own run's, signed again: a person's press
+    alone, never a look's. (payload, status)."""
+    if (no := unsignable(project, tag, "not a release's tag")):
+        return no
+    got, code = sign_now(project, tag)
+    return got | {"release": status(project)}, code
+
 
 def attention(projects):
     """The bell's rows, kind release-sign: what would keep a release's APK

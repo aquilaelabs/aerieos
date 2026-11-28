@@ -13,6 +13,7 @@ The names:
 
   space             the request names a space this account sees
   unlocked          ...which is not locked against the asker, or read-only
+  space-owner       the asker owns the space the request names
   PERM              a permission asked of the install, or of the space named
                     (controller, settings, docker-write: users.may's names)
   node:PERM         a permission asked of the node the request names
@@ -85,8 +86,10 @@ def table_asks(module, name, dash=DASH):
                 if word:
                     out.append("node:node" if word == "node" else word[len("space:"):] if word.startswith("space:") else word)
         elif isinstance(node.value, ast.Dict):
-            # An action to its row: what a person is asked, then a session's dial.
+            # An action to its row: what a person is asked, then a session's
+            # dial. Several actions sharing a row are written as one (**{...}).
             for row in node.value.values:
+                row = row.value if isinstance(row, ast.DictComp) else row
                 for kw in row.keywords if isinstance(row, ast.Call) else ():
                     if kw.arg in ("ask", "dial") and _literal(kw.value):
                         out.append(("dial:" if kw.arg == "dial" else "") + _literal(kw.value))
@@ -106,8 +109,12 @@ def asks(fn, handlers, depth=2, _seen=None):
             out.append(name)
     # In the order the handler is written, so the first name is the first
     # thing it asks.
-    tables = [n for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id.endswith("_ACTS")]
-    calls = sorted([n for n in ast.walk(fn) if isinstance(n, (ast.Call, ast.For))] + tables[:1], key=lambda n: (n.lineno, n.col_offset))
+    tables = {}
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id.endswith("_ACTS") \
+                and (n.id not in tables or (n.lineno, n.col_offset) < (tables[n.id].lineno, tables[n.id].col_offset)):
+            tables[n.id] = n
+    calls = sorted([n for n in ast.walk(fn) if isinstance(n, (ast.Call, ast.For))] + list(tables.values()), key=lambda n: (n.lineno, n.col_offset))
     for node in calls:
         if isinstance(node, ast.Name):
             # One of server.py's own tables, an action to its row.

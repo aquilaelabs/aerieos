@@ -6,7 +6,8 @@ basic auth). The last column is the route's gate in the route record: what the d
 before the handler runs (and after `then`, what the handler asks of that person besides), or the
 names of everything the handler itself asks: a permission (of the
 install, or of the space the request names), `space` for a space the account sees, `unlocked` for
-one not locked against it, `node:` and `instance:` for a permission asked of one node or one
+one not locked against it, `space-owner` for the space's own owner, `node:` and `instance:` for a
+permission asked of one node or one
 cluster, `dial:` for a session's ask under the space's Agents may, `own` for the account's own
 things, and `seen` or `open` where the handler refuses nobody signed in (`seen`: the answer holds
 what the asker may see). A name is everything the handler consults, so a permission read only to
@@ -190,9 +191,9 @@ listed; an `exact` one takes its path alone. The companion app's own contract is
 | POST | `/api/ci-watch` | exact | `_ci_watch` | POST /api/ci-watch: look at a project's CI now (ciwatch.look), for an account that sees the project; the answer is what it found. | `space` |
 | POST | `/api/devapp` | prefix | `_devapp` | The dev-instance controls: the Containers page's buttons, and `aerie devapp` from a session. | `space`, `admin`, `read`, `docker-write`, `node:configure`, `docker-read`, `work`, `docker-any`, `unlocked`, `node` |
 | POST | `/api/changelog` | prefix | `_changelog` | Write back the Unreleased section a person rearranged: changelog.editor_verb. | a person's own sign-in, never a session's token, held by the dispatcher; then `space`, `unlocked` |
-| POST | `/api/version` | prefix | `_version` | Move a project's version, or change who is allowed to: version.verb, behind the gates here. | `space`, `version`, `dial:release` |
+| POST | `/api/version` | prefix | `_version` | Move a project's version, cut or change a release, read and publish its drafts, or change who may: each action is a row of VERSION_ACTS (a change to a published release one of RELEASE_CHANGES), which says whose it is and | `space`, `version`, `dial:release` |
 | POST | `/api/tls` | prefix | `_tls` | POST /api/tls {action: issue}: a Let's Encrypt certificate for the Connection section's hostname asked for now, by DNS-01 through the Cloudflare API token (nginxproxy's hooks), for an account that changes the controller' | `controller` |
-| POST | `/api/signing` | exact | `_signing` | A project's Android signing keys (signing.verb). | `dial:sign`, `dial:keys`, `space`, `unlocked`, `signing` |
+| POST | `/api/signing` | exact | `_signing` | A project's Android signing keys. | `dial:sign`, `dial:keys`, `space`, `unlocked`, `space-owner`, `signing` |
 | POST | `/api/keys` | exact | `_keys` | POST /api/keys: the install key and everything kept under it for an administrator (status, show, saved, change), and the account's own key for its sign-ins on the nodes (mine, change-mine). | `controller` |
 | POST | `/api/members` | exact | `_members` | A project's owner, whether it is invite only, its people and its invitations, and an invitee's answer (membership.verb). | a person's own sign-in, never a session's token, held by the dispatcher; then `space` |
 | POST | `/api/signing-backup` | exact | `_post_signing_backup` | POST /api/signing-backup: the same, with the project's backup password in the body, never in a URL that lands in a log. | `space`, `signing` |

@@ -4919,32 +4919,6 @@ def _release_withdrawer(project, plan, asker_name="", principal=""):
     return ({"error": said}, 400) if r.get("error") else ({"withdrawn": r, "said": said}, 200)
 
 
-def _keymaker(action, project, args, by=""):
-    """A new generated key or a package's key, for a session's auto dial and
-    for Allow on its ask."""
-    if action == "generate":
-        return signing.generate(project, str(args.get("route") or ""), str(args.get("key") or "default"), by=by)
-    if action == "map":
-        return signing.set_map(project, str(args.get("package") or ""), str(args.get("key") or ""))
-    if action == "rotate":
-        return signing.rotate(project, str(args.get("from") or ""), str(args.get("to") or ""), by=by)
-    return {"error": f"not a key change: {action}"}, 400
-
-
-def _release_signer(project, tag=""):
-    """A release's APKs looked for and signed again now: a
-    session's auto dial, and Allow on its ask. `tag` is a release whose
-    signed APK is to be replaced by its own run's, signed again, which only
-    a person's answer starts."""
-    started = releasesign.check_soon(project, force=True, again=tag)
-    if tag and not started:
-        # The look going on was not asked for the tag, and would leave it.
-        return {"error": f"a look is already going, so {tag} was not signed again: ask again once it ends"}, 409
-    return {"ok": True, "started": started,
-            "said": (f"looking for {tag}'s own run to sign its APK again" if tag else
-                     "looking for unsigned release APKs to sign" if started else "a look is already going")}, 200
-
-
 # What a space's Agents-may dial says at deny (_dialed), by dial: what Claude
 # does not do, and the dial's name in the space's settings.
 DIALS = {"release": ("release it", "Tag and publish a release"),
@@ -4998,6 +4972,47 @@ VERSION_ACTS = {
     "ask": VersionAct(persons=_PANEL_ONLY, run=lambda name, act, req, who, principal, mode: version.verb(name, act, req, who, principal)),
     "": VersionAct(persons=_PANEL_ONLY, ask="version",
                    run=lambda name, act, req, who, principal, mode: version.verb(name, act, req, who, principal)),
+}
+
+# /api/signing's actions, each a row (Handler._signing). A session's:
+# `check`, what is refused before its dial is read; `dial` and `instead`, the
+# Agents may dial its ask goes through and what a person does where it says
+# deny; `run`, the one call, handed the dial's answer. A person's: `ask`,
+# which is `unlocked` (working on the space), `space-owner` (with
+# `owner_does`, what only the owner does), or a permission on the space; and
+# `run`. An action with no row of its own is the last one.
+SigningAct = collections.namedtuple("SigningAct", "check dial instead ask owner_does run", defaults=(None, "", "", "", "", None))
+SIGNING_ELSEWHERE = "a session signs with aerie sign, which never hands it the key; the keys are a person's to manage"
+SIGNING_SESSION_ACTS = {
+    # aerie sign status: read only, under no dial.
+    "release": SigningAct(run=lambda name, act, req, who, principal, mode: releasesign.looked(name)),
+    # aerie sign release: the Signing view's retry, under Sign a build.
+    "release-sign": SigningAct(
+        check=lambda name, req: releasesign.unsignable(name, field(req, "tag"), "--again needs a release's tag after it, as aerie sign status lists them"),
+        dial="sign", instead="; a person presses Look for unsigned APKs now in the Signing view",
+        run=lambda name, act, req, who, principal, mode: releasesign.asked(name, req, mode, _asker(who))),
+    # Manage signing keys: which there are, and a new key, a package's key
+    # or a rotation proposed, under its own dial.
+    **{act: SigningAct(dial="keys", run=lambda name, act, req, who, principal, mode: signing.asked_keys(name, act, req, mode, _asker(who)))
+       for act in ("keys", "generate", "map", "rotate")},
+    # aerie sign: its own space's build, under Sign a build.
+    "": SigningAct(dial="sign", instead="; a person signs from the Artifacts view",
+                   run=lambda name, act, req, who, principal, mode: signing.asked_sign(name, req, mode, _asker(who), principal)),
+}
+SIGNING_PERSON_ACTS = {
+    # Signing a build with a key already kept is working on the space, not
+    # administering it.
+    "sign": SigningAct(ask="unlocked", run=lambda name, act, req, who, principal, mode: signing.start(
+        principal, name, field(req, "file"), field(req, "route"), field(req, "key"))),
+    "backup-password": SigningAct(ask="space-owner", owner_does="sets its backup password",
+                                  run=lambda name, act, req, who, principal, mode: signing.set_backup_password(
+                                      name, str(req.get("current") or ""), str(req.get("new") or ""), by=str(who.get("name") or ""))),
+    # Listing is for whoever sees the space: no secret is in it.
+    "list": SigningAct(run=lambda name, act, req, who, principal, mode: signing.asked(req, who, by=str(who.get("name") or ""))),
+    # Look for the space's unsigned release APKs now, and sign one again.
+    "release-sign": SigningAct(ask="signing", run=lambda name, act, req, who, principal, mode: releasesign.signed_now(name, field(req, "tag"))),
+    # Adding, replacing and removing a key, and its backup: the signing area's.
+    "": SigningAct(ask="signing", run=lambda name, act, req, who, principal, mode: signing.asked(req, who, by=str(who.get("name") or ""))),
 }
 
 # The changes to a published release, by /api/version's action
@@ -6312,7 +6327,7 @@ ROUTES = (
                      "changelog add`, and corrects one with `edit`, `merge`, `split` or `rm`"), needs_repo=True, asks=("space", "unlocked")),
     Route("POST", "prefix", "/api/version", "_version", ("handler", "space", "version", "dial:release"), session=True, needs_repo=True),
     Route("POST", "prefix", "/api/tls", "_tls", ("handler", "controller")),
-    Route("POST", "exact", "/api/signing", "_signing", ("handler", "dial:sign", "dial:keys", "space", "unlocked", "signing"),
+    Route("POST", "exact", "/api/signing", "_signing", ("handler", "dial:sign", "dial:keys", "space", "unlocked", "space-owner", "signing"),
           session=("sign", "keys", "generate", "map", "rotate", "release", "release-sign"),
           instead="a session signs with aerie sign, which never hands it the key; the keys are a person's to manage"),
     Route("POST", "exact", "/api/keys", "_keys", ("handler", "controller")),
@@ -11500,129 +11515,39 @@ class Handler(BaseHTTPRequestHandler):
         return rows
 
     def _signing(self, req):
-        """A project's Android signing keys (signing.verb). A session
-        is refused whatever it asks: it signs with aerie sign, which never hands
-        it the key, and has no reason to learn which keys exist from here.
-        Listing is for whoever sees the project (no secret is in it); adding,
-        replacing and removing a key are an administrator's."""
-        name = field(req, "project")
-        who = self._who() or {}
+        """A project's Android signing keys. Each action is a row: a session's
+        of SIGNING_SESSION_ACTS (it signs with aerie sign, under its dials,
+        and never receives a key, the list's secrets or a backup), a
+        person's of SIGNING_PERSON_ACTS (listing for whoever sees the space,
+        signing a build for whoever works on it, the keys themselves for
+        the signing area, the backup password for the space's owner). This
+        walks the row and makes its one call."""
+        name, act, who = field(req, "project"), field(req, "action"), self._who() or {}
         if who.get("session"):
-            # aerie sign: its own project's build, under its dial (Agents may:
-            # Sign a build). It never receives the key, the list, or a
-            # backup; asking to sign is all a session does here.
-            act = field(req, "action")
-            if self._session_elsewhere(name, "a session signs with aerie sign, which never hands it the key; "
-                                             "the keys are a person's to manage"):
+            if self._session_elsewhere(name, SIGNING_ELSEWHERE):
                 return None
-            owner = membership.owner_of(name)
-            acct = users.account_of(who) or {}
-            if act == "release":
-                # aerie sign status: whether its release APKs can be
-                # signed and how the newest went, in the bell's words. Read
-                # only, and no secret is in it.
-                return self._json({"release": releasesign.status(name),
-                                   "attention": releasesign.attention([name])})
-            if act == "release-sign":
-                # aerie sign release: the Signing view's retry,
-                # under the Sign a build dial.
-                if not releasesign.wants(name):
-                    return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
-                                                f"(an artifact named {releasesign.MARK}TAG)"}, 400)
-                # --again TAG: a release that carries its signed APK has it
-                # replaced, which is the owner's answer whatever the dial.
-                tag = field(req, "tag")
-                if tag and not releasesign.TAG.fullmatch(tag):
-                    return self._json({"error": "--again needs a release's tag after it, as aerie sign status lists them"}, 400)
-                mode = self._dialed(name, "sign", "; a person presses Look for unsigned APKs now in the Signing view")
-                if not mode:
-                    return None
-                if mode == "auto" and not tag:
-                    return self._json(*_release_signer(name))
-                r = phone.ask_release_sign(field(req, "why"), name, owner,
-                                           membership.owner_name(name) or "the space's owner",
-                                           asker_name=str(acct.get("name") or ""), tag=tag)
-                return self._result(r)
-            if act in ("keys", "generate", "map", "rotate"):
-                # Manage signing keys: which keys there are
-                # (names and fingerprints, never a secret), and a new key or
-                # a package's key proposed, under its own dial.
-                kmode = self._dialed(name, "keys")
-                if not kmode:
-                    return None
-                if act == "keys":
-                    return self._json(*signing.listing(name))
-                # Said before anybody is asked to allow a key that could not
-                # be made: no backup password yet.
-                if act == "generate" and (no := signing.needs_lock(name)):
-                    return self._json(*no)
-                args = ({"key": field(req, "key") or "default", "route": field(req, "route")} if act == "generate"
-                        else {"from": field(req, "from"), "to": field(req, "to")} if act == "rotate"
-                        else {"package": field(req, "package"), "key": field(req, "key")})
-                if kmode == "auto":
-                    return self._json(*_keymaker(act, name, args, by="claude"))
-                r = phone.ask_keys(field(req, "why"), name, act, args, owner,
-                                   membership.owner_name(name) or "the space's owner",
-                                   asker_name=str(acct.get("name") or ""))
-                return self._result(r)
-            mode = self._dialed(name, "sign", "; a person signs from the Artifacts view")
+            row = SIGNING_SESSION_ACTS.get(act) or SIGNING_SESSION_ACTS[""]
+            if row.check and (no := row.check(name, req)):
+                return self._json(*no)
+            mode = self._dialed(name, row.dial, row.instead) if row.dial else "auto"
             if not mode:
                 return None
-            file, route, key = field(req, "file"), field(req, "route"), field(req, "key")
-            no = signing.refusal(name, file, route, key)
-            if no:
-                return self._json(*no)
-            if mode == "auto":
-                return self._json(*signing.start(self._principal(), name, file, route, key))
-            r = phone.ask_sign(field(req, "why"), name, file, route, owner,
-                               membership.owner_name(name) or "the space's owner",
-                               asker_name=str(acct.get("name") or ""), principal=self._principal(), key=key)
-            return self._result(r)
+            return self._json(*row.run(name, act, req, who, self._principal(), mode))
         if self._not_project(name):
             return None
-        if field(req, "action") == "sign":
-            # Signing a build with a key already kept is working on the
-            # project, not administering it.
+        row = SIGNING_PERSON_ACTS.get(act) or SIGNING_PERSON_ACTS[""]
+        if row.ask == "unlocked":
             if self._readonly(name):
                 return None
-            return self._json(*signing.start(self._principal(), name, field(req, "file"), field(req, "route"),
-                                             field(req, "key")))
-        if field(req, "action") == "backup-password":
-            # The project's owner's alone, AerieOS's owner included only
-            # when it owns the project: the point is that the dashboard's
-            # accounts are not enough by themselves.
+        elif row.ask == "space-owner":
+            # The space's owner's alone, AerieOS's owner included only when
+            # it owns the space: the dashboard's accounts are not enough by
+            # themselves.
             if users.uid_of(who) != membership.owner_of(name):
-                return self._json({"error": f"only {name}'s owner ({membership.owner_name(name) or 'its owner'}) "
-                                            "sets its backup password"}, 403)
-            return self._json(*signing.set_backup_password(name, str(req.get("current") or ""),
-                                                           str(req.get("new") or ""), by=str(who.get("name") or "")))
-        if field(req, "action") != "list" and self._refused("signing", name):
+                return self._json({"error": f"only {name}'s owner ({membership.owner_name(name) or 'its owner'}) {row.owner_does}"}, 403)
+        elif row.ask and self._refused(row.ask, name):
             return None
-        if field(req, "action") == "release-sign":
-            # Look for the project's unsigned release APKs now, and sign a
-            # failed one again (releasesign.check), on its own thread.
-            if not releasesign.wants(name):
-                return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
-                                            f"(an artifact named {releasesign.MARK}TAG)"}, 400)
-            # With a tag, that release's signed APK is replaced by its own
-            # run's, signed again: a person's press alone, never a look's.
-            tag = field(req, "tag")
-            if tag and not releasesign.TAG.fullmatch(tag):
-                return self._json({"error": "not a release's tag"}, 400)
-            got, status = _release_signer(name, tag)
-            return self._json(got | {"release": releasesign.status(name)}, status)
-        got, status = signing.verb(req, by=str(who.get("name") or ""))
-        # Whether this person may take a backup, so the dialog offers it only
-        # where it would be handed over.
-        # `why`: what keeps this person from changing them, which the
-        # Signing view says in place of the controls it leaves out.
-        if field(req, "action") == "list" and status == 200:
-            got["why"] = users.may(who, "signing", name)
-            got["may_backup"] = not got["why"]
-            got["may_lock"] = users.uid_of(who) == membership.owner_of(name)
-            # Which key signs the releases, and how the last ones went.
-            got["release"] = releasesign.status(name)
-        return self._json(got, status)
+        return self._json(*row.run(name, act, req, who, self._principal(), ""))
 
     def _get_node_busy(self):
         """GET /api/node-busy: whether one of a project's nodes is quiet
@@ -15651,6 +15576,8 @@ def wire():
          unvetted_ok=lambda: bool(settings.get("offer_unvetted")))   # a Mac's provisioner is a dev feature
     # A signing is a job on the project's node, of a build in its dist/.
     give(signing,
+         ask_sign=phone.ask_sign, ask_keys=phone.ask_keys, owner_of=membership.owner_of, owner_name=membership.owner_name,
+         may=users.may, uid_of=users.uid_of, release_status=releasesign.status,
          node_of=lambda name: prefs.get(name)["node"],
          node_refuses=lambda nid: nodes.agent_stale(nodes.node(nid)) if nid and not NODES_DOWN else "",
          job_add=nodes.job_add,
@@ -15667,8 +15594,8 @@ def wire():
          release_editor=_release_editor,
          release_remover=_release_remover,
          release_withdrawer=_release_withdrawer,
-         keymaker=_keymaker,
-         release_signer=_release_signer)
+         keymaker=signing.change,
+         release_signer=releasesign.sign_now)
     give(artifacts, sign_routes=signing.routes_held)
     give(vmtemplate, unvetted_ok=forges.unvetted_ok)   # the same switch
     # The Nodes tab's verbs are nodes.verb's, and these are what they compose
@@ -15700,6 +15627,7 @@ def wire():
     # What each of a release's files is for, over its notes.
     give(forgerelease, files_setting=lambda p: (prefs.get(p).get("files_table", True), prefs.get(p).get("files") or []))
     forgerelease.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
+    give(releasesign, ask_release_sign=phone.ask_release_sign, owner_of=membership.owner_of, owner_name=membership.owner_name)
     releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
                           projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
                                                   if d.is_dir() and not d.name.startswith(".")),

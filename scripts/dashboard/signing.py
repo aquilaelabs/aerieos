@@ -44,6 +44,7 @@ import threading
 import time
 import zipfile
 from pathlib import Path
+from fields import field
 import refusals
 
 ROUTES = ("play", "sideload")
@@ -1198,6 +1199,84 @@ def start(principal, project, rel, route, key=""):
         spec["key"] = key
     r = job_add(principal, {"node": node_of(project)}, "sign", spec, project=project)
     return r, (400 if r.get("error") else 200)
+
+
+def change(action, project, args, by=""):
+    """A new generated key, a package's key or a rotation: a session's auto
+    dial, and Allow on its ask. (payload, status)."""
+    if action == "generate":
+        return generate(project, str(args.get("route") or ""), str(args.get("key") or "default"), by=by)
+    if action == "map":
+        return set_map(project, str(args.get("package") or ""), str(args.get("key") or ""))
+    if action == "rotate":
+        return rotate(project, str(args.get("from") or ""), str(args.get("to") or ""), by=by)
+    return {"error": f"not a key change: {action}"}, 400
+
+
+# What a session's ask and a person's list read besides the keys: the ask
+# queued for the space's owner (phone.ask_sign, ask_keys), whose space it is
+# (membership.owner_of, owner_name), what keeps an account from changing the
+# keys (users.may) and which account asks (users.uid_of), and how the
+# releases' signing went (releasesign.status).
+ask_sign = None
+ask_keys = None
+owner_of = None
+owner_name = None
+may = None
+uid_of = None
+release_status = None
+
+
+def asked_keys(project, act, req, mode, asker):
+    """A session's word on its space's keys, under the Manage signing keys
+    dial (`mode` auto or ask): which keys there are (names and fingerprints,
+    never a secret), or a new key, a package's key or a rotation, made where
+    the dial says auto and proposed to the space's owner otherwise.
+    `asker` is the asking account's name. (payload, status)."""
+    if act == "keys":
+        return listing(project)
+    # Said before anybody is asked to allow a key that could not be made:
+    # no backup password yet.
+    if act == "generate" and (no := needs_lock(project)):
+        return no
+    args = ({"key": field(req, "key") or "default", "route": field(req, "route")} if act == "generate"
+            else {"from": field(req, "from"), "to": field(req, "to")} if act == "rotate"
+            else {"package": field(req, "package"), "key": field(req, "key")})
+    if mode == "auto":
+        return change(act, project, args, by="claude")
+    r = ask_keys(field(req, "why"), project, act, args, owner_of(project), owner_name(project) or "the space's owner", asker_name=asker)
+    return r, 400 if r.get("error") else 200
+
+
+def asked_sign(project, req, mode, asker, principal):
+    """A session's build signed with a key its space keeps, under the Sign
+    a build dial: started where the dial says auto, asked of the space's
+    owner otherwise. It never receives the key. (payload, status)."""
+    file, route, key = field(req, "file"), field(req, "route"), field(req, "key")
+    if (no := refusal(project, file, route, key)):
+        return no
+    if mode == "auto":
+        return start(principal, project, file, route, key)
+    r = ask_sign(field(req, "why"), project, file, route, owner_of(project), owner_name(project) or "the space's owner",
+                 asker_name=asker, principal=principal, key=key)
+    return r, 400 if r.get("error") else 200
+
+
+def asked(req, who, by=""):
+    """A person's action on a space's keys (verb), and for the list what
+    the Signing view draws beside it: `why`, what keeps this person from
+    changing the keys, which the view says in place of the controls it
+    leaves out; whether a backup would be handed over and whether the
+    backup password is theirs to set; and which key signs the releases with
+    how the last ones went. (payload, status)."""
+    got, status = verb(req, by=by)
+    if field(req, "action") == "list" and status == 200:
+        project = field(req, "project")
+        got["why"] = may(who, "signing", project)
+        got["may_backup"] = not got["why"]
+        got["may_lock"] = uid_of(who) == owner_of(project)
+        got["release"] = release_status(project)
+    return got, status
 
 
 def verb(req, by=""):
