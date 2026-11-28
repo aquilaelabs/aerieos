@@ -626,6 +626,83 @@ class Move(unittest.TestCase):
         self.assertIn("not an AerieOS move bundle", why)
 
 
+    def test_a_pull_is_told_which_pack_it_was_handed_and_holds_the_bundle_to_it(self):
+        # Every pack of one move is sealed under the move's one key: an
+        # older pack of it stood in for the newest with nothing to say so.
+        r = move.prepare("user:ann", "https://new.example")
+        token, key = r["token"], move.key_of(r["token"])
+        first = (self.tmp / "config" / "move" / r["bundle"]).read_bytes()
+        again = move.pack_bundle()
+        newest = (self.tmp / "config" / "move" / again["bundle"]).read_bytes()
+        ids = [json.loads(b.split(b"\n", 2)[1])["pack"] for b in (first, newest)]
+        self.assertTrue(all(len(i) == 32 for i in ids) and ids[0] != ids[1], ids)
+        self.assertEqual(move.status().get("bundle"), again["bundle"])
+
+        def pull(body, headers):
+            class Answer:
+                def __init__(self, nonce):
+                    self.headers = {"Content-Length": str(len(body)), **headers(nonce)}
+                    self.left = [body]
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *a):
+                    return False
+
+                def read(self, n=-1):
+                    return self.left.pop() if self.left else b""
+
+            def urlopen(req, **kw):
+                q = move.urllib.parse.parse_qs(move.urllib.parse.urlparse(req.full_url).query)
+                return Answer(q["nonce"][0])
+            with mock.patch.object(move.urllib.request, "urlopen", urlopen):
+                return move.fetch_bundle("https://old.example/", token, str(self.tmp / "pulled"))
+        said = lambda pack: lambda nonce: {"X-Aerie-Pack": pack, "X-Aerie-Pack-Proof": move.pack_proof(key, nonce, pack)}  # noqa: E731
+        # The old controller's own words for a pull are its newest pack's.
+        self.assertEqual(move.pulled_headers({"nonce": "n1"}), said(ids[1])("n1"))
+        self.assertEqual(pull(newest, said(ids[1])), "")
+        # A controller from before packs had an id says none: updated first.
+        self.assertIn("update it, then move again", pull(newest, lambda nonce: {}))
+        # A word that is not the key's, or was made for another pull.
+        self.assertIn("does not verify", pull(newest, lambda nonce: {"X-Aerie-Pack": ids[1], "X-Aerie-Pack-Proof": "0" * 64}))
+        self.assertIn("does not verify", pull(newest, lambda nonce: said(ids[1])("another pull's nonce")))
+        # ...and the older pack of the same move in the newest's place.
+        self.assertIn("not the one the old controller packed for this pull", pull(first, said(ids[1])))
+
+    def test_a_body_under_another_pack_s_details_is_refused(self):
+        # The details and the body are sealed apart under one key: the id in
+        # both is what holds a body to its own details.
+        r = move.prepare("user:ann", "https://new.example")
+        one = (self.tmp / "config" / "move" / r["bundle"]).read_bytes()
+        two = (self.tmp / "config" / "move" / move.pack_bundle()["bundle"]).read_bytes()
+        head, line, _ = one.split(b"\n", 2)
+        body = two.split(b"\n", 2)[2]
+        bad = self.tmp / "spliced.aeriemove"
+        bad.write_bytes(head + b"\n" + line + b"\n" + body)
+        self.assertIn("body is not the one its outer details were written for", self._land(bad, r["token"]).get("error", ""))
+
+    def test_a_bundle_file_from_before_packs_had_an_id_still_lands(self):
+        # A file kept from an earlier build names no pack in its details or
+        # its body, and lands as it did; its id taken off the details of one
+        # that has it, by somebody holding the key, does not.
+        r = move.prepare("user:ann", "https://new.example")
+        with mock.patch.object(move.secrets, "token_hex", return_value=""):
+            old = self.tmp / "config" / "move" / move.pack_bundle()["bundle"]
+        self.assertEqual(json.loads(old.read_bytes().split(b"\n", 2)[1])["pack"], "")
+        kept = self.tmp / "kept.aeriemove"
+        kept.write_bytes(old.read_bytes())
+        with_id = (self.tmp / "config" / "move" / move.pack_bundle()["bundle"]).read_bytes()
+        head, line, body = with_id.split(b"\n", 2)
+        m = json.loads(line)
+        m.pop("pack")
+        m["mac"] = move._manifest_mac(move.key_of(r["token"]), m)
+        bad = self.tmp / "stripped.aeriemove"
+        bad.write_bytes(head + b"\n" + json.dumps(m).encode() + b"\n" + body)
+        self.assertIn("body is not the one its outer details were written for", self._land(bad, r["token"]).get("error", ""))
+        got = self._land(kept, r["token"])
+        self.assertTrue(got.get("ok"), got)
+
     def test_a_pull_sends_the_timed_proof_and_the_one_an_older_controller_reads(self):
         asked = []
 
@@ -648,7 +725,9 @@ class Move(unittest.TestCase):
         token = move.new_token()
         key = move.key_of(token)
         with mock.patch.object(move.urllib.request, "urlopen", urlopen):
-            self.assertEqual(move.fetch_bundle("https://old.example/", token, str(self.tmp / "pulled")), "")
+            # The answer here says no pack, as a controller from before
+            # packs had an id: the pull is made whole and then refused.
+            self.assertIn("update it, then move again", move.fetch_bundle("https://old.example/", token, str(self.tmp / "pulled")))
         q = {k: v[0] for k, v in move.urllib.parse.parse_qs(move.urllib.parse.urlparse(asked[0]).query).items()}
         self.assertEqual(q["hash"], move.token_hash(token))
         self.assertEqual(q["tproof"], move.fetch_proof(key, q["nonce"], int(q["at"])))

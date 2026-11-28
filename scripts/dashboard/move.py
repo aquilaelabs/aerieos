@@ -241,6 +241,14 @@ def fetch_proof(key, nonce, at=None):
     return hmac.new(key, b"fetch\0" + str(nonce).encode() + timed, hashlib.sha256).hexdigest()
 
 
+def pack_proof(key, nonce, pack):
+    """The old controller's word on which pack it hands a pull: the pack's
+    id under the move key with the pull's own nonce. Every pack of one move
+    is sealed under that one key, so without this an older pack of the same
+    move could stand in for the one packed for the pull."""
+    return hmac.new(key, b"pack\0" + str(nonce).encode() + b"\0" + str(pack).encode(), hashlib.sha256).hexdigest()
+
+
 def _key():
     try:
         return base64.b64decode(_load()["key_b64"])
@@ -688,6 +696,11 @@ def _manifest_held(path, key, work):
         m = None
     if not isinstance(m, dict) or not hmac.compare_digest(str(m.get("mac") or ""), _manifest_mac(key, m)):
         return "the bundle's outer details were changed after it was made (its kind, origin or version): nothing here was changed"
+    # Which pack it is, said by the details and sealed in the body: the two
+    # are sealed apart under one key, so the id is what holds a body to its
+    # own details. A bundle from before packs had one carries none in either.
+    if str(m.get("pack") or "") != str(mark.get("pack") or ""):
+        return "the bundle's body is not the one its outer details were written for: nothing here was changed"
     return ""
 
 
@@ -703,8 +716,11 @@ def write_bundle(dest, header, manifest, key, **pack_kw):
     `header`, the manifest line (`manifest(counts)`, a dict, its format
     set here), then the body sealed under `key` a piece at a time. The
     manifest names the body's counts, so its line is a slot of spaces
-    filled in once the body is written. Returns (manifest, counts)."""
+    filled in once the body is written. Each bundle is given an id of its
+    own, in its manifest (`pack`) and sealed in its body's first entry.
+    Returns (manifest, counts)."""
     dest = Path(dest)
+    pack_id = secrets.token_hex(16)
     # The database's log folded into it first, so the copy is not torn.
     with contextlib.suppress(Exception):
         checkpoint()
@@ -713,13 +729,13 @@ def write_bundle(dest, header, manifest, key, **pack_kw):
         out.write(b" " * (MANIFEST_SLOT - 1) + b"\n")
         sealer = _Sealer(out, key)
         with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
-            mark = json.dumps({"mac": True}).encode()
+            mark = json.dumps({"mac": True, "pack": pack_id}).encode()
             info = tarfile.TarInfo(MANIFEST_MARK)
             info.size, info.mtime, info.mode = len(mark), int(time.time()), 0o600
             tar.addfile(info, io.BytesIO(mark))
             counts = _pack_into(tar, **pack_kw)
         sealer.finish()
-        m = dict(manifest(counts), format=FORMAT)
+        m = dict(manifest(counts), format=FORMAT, pack=pack_id)
         m["mac"] = _manifest_mac(key, m)
         line = json.dumps(m).encode()
         if len(line) >= MANIFEST_SLOT:
@@ -935,7 +951,8 @@ def pack_bundle():
         os.replace(tmp, out_dir / name)
         with _lock:
             d = _load()
-            d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"])
+            d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"],
+                     pack=manifest["pack"])
             _save(d)
     except OSError as e:
         tmp.unlink(missing_ok=True)
@@ -1286,6 +1303,16 @@ def serve_fetch(q):
     return str(STATE / "move" / r["bundle"]), "", 200
 
 
+def pulled_headers(q):
+    """What the old controller says beside the bundle it hands a pull: the
+    id of the pack it just made for it, and that id's proof under the
+    pull's nonce (pack_proof)."""
+    pack = str(_load().get("pack") or "")
+    if not pack:
+        return {}
+    return {"X-Aerie-Pack": pack, "X-Aerie-Pack-Proof": pack_proof(_key(), str(q.get("nonce") or "")[:64], pack)}
+
+
 def room_for(size, where):
     """"" when `where` has room for a bundle of `size` bytes and what it
     unpacks to (twice it, and a little), or why not (a stick before a
@@ -1321,6 +1348,7 @@ def fetch_bundle(old_url, token, dest):
             why = room_for(int(r.headers.get("Content-Length") or 0), Path(dest).parent)
             if why:
                 return why
+            pack, said = str(r.headers.get("X-Aerie-Pack") or ""), str(r.headers.get("X-Aerie-Pack-Proof") or "")
             # Never past what an upload may be, nor what room there is: an
             # answer with no length was read without end.
             most = 16 << 30
@@ -1344,6 +1372,17 @@ def fetch_bundle(old_url, token, dest):
         return f"the old controller did not hand the bundle over: {why}"
     except (OSError, ValueError) as e:
         return f"the old controller at {old_url} did not answer: {type(e).__name__}: {e}"
+    # Which pack this is, by the old controller's own word for this pull:
+    # required of a move, so a controller from before packs had an id is
+    # updated first, and a pack made earlier for the same move is not taken
+    # for the one made now.
+    if not pack:
+        return "the old controller is on a build from before a bundle said which pack it is: update it, then move again"
+    if not hmac.compare_digest(said, pack_proof(key, nonce, pack)):
+        return "the old controller's word on which bundle it sent does not verify: nothing here was changed"
+    m = read_manifest(dest)[0]
+    if str((m or {}).get("pack") or "") != pack:
+        return "the bundle that arrived is not the one the old controller packed for this pull: nothing here was changed"
     return ""
 
 

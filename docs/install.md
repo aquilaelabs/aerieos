@@ -466,7 +466,9 @@ container to a machine of its own, and back.
    still runs (the new home pulls the bundle from it, packed at that moment,
    under a proof derived from the token that is good once and for five
    minutes by the old controller's clock, so the two clocks have to agree to
-   within that). The token given on the first page
+   within that; the old controller says in turn which pack it handed over,
+   so an older pack of the same move cannot stand in for it, and one on a
+   build from before that is updated first). The token given on the first page
    is kept for the landing, sealed, so it is not asked for again; where the
    old controller ran on the same machine the step asks for the bundle alone.
    Until the move lands, signing in from

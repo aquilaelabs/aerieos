@@ -14349,14 +14349,16 @@ class Handler(BaseHTTPRequestHandler):
             p, why, st = move.serve_fetch(q)
             if why:
                 return self._json({"error": why}, st)
-            return self._send_bundle(Path(p))
+            return self._send_bundle(Path(p), move.pulled_headers(q))
         return self._json({"error": "no such verb"}, 404)
 
-    def _send_bundle(self, p):
+    def _send_bundle(self, p, also=None):
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Disposition", f'attachment; filename="{p.name}"')
         self.send_header("Content-Length", str(p.stat().st_size))
+        for k, v in (also or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         with open(p, "rb") as f:
             shutil.copyfileobj(f, self.wfile)
