@@ -332,11 +332,11 @@ async function refresh(){
     awayEnd();
     lastOkAt = Date.now();
   }catch(e){
-    // A read the page itself cut short as it goes (a reload, a new
-    // address) is no failure of the poll: Firefox runs this catch on the
-    // way out, where Chromium has stopped the old page's script.
-    // A read held past its limit comes as a TimeoutError, and counts.
-    if (e?.name === "AbortError") return;
+    // A read cut short as the page goes (a reload, a new address) is no
+    // failure of the poll: every engine runs this catch on the way out
+    // (pageGoes). A read held past its limit comes as a TimeoutError, and
+    // counts.
+    if (e?.name === "AbortError" || pageGoing) return;
     pollFails++;
     // Away for a restart: said calmly, and asked again soon (awayCalm).
     if (!answered && awayCalm()) return;
@@ -552,6 +552,19 @@ let leavingOnPurpose = false;
 function leaveOnPurpose(){
   leavingOnPurpose = true;
   setTimeout(() => { leavingOnPurpose = false; }, 3000);
+}
+// The page on its way out, by any road (a reload, another address, the tab
+// shut): the browser cuts what it was still reading, and each read is
+// rejected after beforeunload in every engine, before pagehide in two of
+// them ("Failed to fetch", "NetworkError when attempting to fetch
+// resource.", "Load failed": none of them an AbortError). That is no
+// failure of the poll, and a page whose first read it was said one in the
+// console as it went. Taken back a moment later, for a person the browser
+// asked and who stayed.
+let pageGoing = false;
+function pageGoes(){
+  pageGoing = true;
+  setTimeout(() => { pageGoing = false; }, 3000);
 }
 
 function unsavedHere(){

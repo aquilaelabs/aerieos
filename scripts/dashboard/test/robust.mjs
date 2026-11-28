@@ -314,4 +314,37 @@ ok(/fails on its answer/.test(tripped.title) && /layout boom/.test(tripped.title
      tripped.loading.length ? ': ' + JSON.stringify(tripped.loading.slice(0, 2).map(t => t.slice(0, 60))) : ''})`);
 page.errors = [];
 
+// ---- a page that goes while its first poll is out says no failure ----------
+// The browser cuts what a leaving page was reading, and every engine runs
+// the read's rejection on the way out. A page that had never been answered
+// said a failed poll in the console as it went, which a suite reloading
+// twice in a row met as an error of the page's (cards in WebKit). What the
+// old page said is kept across the reload, since it is gone when asked.
+await section('a page that goes while its first poll is out', async () => {
+  await page.reload(); await ready(page);
+  await page.addInitScript(() => {
+    const real = console.error;
+    console.error = (...a) => {
+      sessionStorage.setItem('__said', (sessionStorage.getItem('__said') || '')
+        + a.map(x => x instanceof Error ? `${x.name}: ${x.message}` : String(x)).join(' ') + ' | ');
+      real(...a);
+    };
+  });
+  // Held until the page has gone, however long the machine takes.
+  let letGo, held = new Promise(r => { letGo = r; });
+  await page.route('**/api/status*', async r => { await held; await r.continue().catch(() => {}); });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => typeof refreshBusy !== 'undefined' && refreshBusy, null, { timeout: 10000 });
+  const out = await page.evaluate(() => { sessionStorage.setItem('__said', ''); return { busy: !!refreshBusy, landed: lastOkAt }; });
+  // The second reload's own first poll is let through once the old page's
+  // has been cut.
+  held = sleep(600).then(() => { letGo(); });
+  await page.reload();
+  await page.unroute('**/api/status*');
+  await ready(page);
+  const said = await page.evaluate(() => sessionStorage.getItem('__said') || '');
+  ok(out.busy && !out.landed && !/refresh:/.test(said) && !page.errors.some(e => /refresh:/.test(e)),
+     `a page reloaded while its first poll is out says no failed poll as it goes (${JSON.stringify(out)}; said "${said.slice(0, 80)}"; ${page.errors.length} console errors)`);
+});
+
 await done(browser);

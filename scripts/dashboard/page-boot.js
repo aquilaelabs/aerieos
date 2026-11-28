@@ -430,6 +430,10 @@ function bootNotebooks(){
   addEventListener("beforeunload", e => {
     if (writesOut > 0 || (!leavingOnPurpose && unsavedHere())){ e.preventDefault(); e.returnValue = ""; }
   });
+  // ...and the poll is told the page is going, before the browser cuts
+  // what it is reading.
+  addEventListener("beforeunload", pageGoes);
+  addEventListener("pagehide", pageGoes);
 }
 
 // ---- a new project's first session ----------------------------------------
