@@ -284,13 +284,23 @@ await section("A shell on this controller is an administrator's, and opens as on
     await p.goto(URL);
     return { ctx, p };
   };
+  // What a terminal's socket said: until the server shuts it, or until what
+  // it drew has stood still for a second and a half (a shell's first screen,
+  // or another's kept one, is whole by then). Never a count of seconds from
+  // the start: under a whole run's load a shell took longer than four to
+  // draw, and the socket was shut on a session not yet made.
   const open = (p, arg) => p.evaluate(arg => new Promise(res => {
     const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/termws?arg=' + encodeURIComponent(arg) + '&cols=80&rows=20');
     ws.binaryType = 'arraybuffer';
-    let seen = '', closed = null;
-    ws.onmessage = e => { seen += new TextDecoder().decode(e.data instanceof ArrayBuffer ? e.data : new Uint8Array()); };
-    ws.onclose = e => { closed = { code: e.code, reason: e.reason }; };
-    setTimeout(() => { try { ws.close(); } catch {} res({ seen, closed }); }, 4000);
+    let seen = '', closed = null, still = 0, over = false;
+    const end = () => { if (over) return; over = true; clearTimeout(still); try { ws.close(); } catch {} res({ seen, closed }); };
+    ws.onmessage = e => {
+      seen += new TextDecoder().decode(e.data instanceof ArrayBuffer ? e.data : new Uint8Array());
+      clearTimeout(still);
+      if (seen.trim()) still = setTimeout(end, 1500);
+    };
+    ws.onclose = e => { closed = { code: e.code, reason: e.reason }; end(); };
+    setTimeout(end, 45000);
   }), arg);
   // ...with a role on alpha that would open a shell there, were it a node's.
   await fetch(`${base}/api/roles`, { method: 'POST', headers: h, body: JSON.stringify({ action: 'set', name: 'termer', scope: 'projects',
@@ -311,7 +321,7 @@ await section("A shell on this controller is an administrator's, and opens as on
     return sessions.split('\n').includes(`${adminUid}~shell-alpha-7`);
   });
   ok(!/own-42-terminal/.test(forged.seen) && sessions.split('\n').includes(`${adminUid}~shell-alpha-7`),
-     `naming another account on a terminal's argument opens one of your own, never theirs (${forged.seen.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)})`);
+     `naming another account on a terminal's argument opens one of your own, never theirs (${forged.seen.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)}${forged.closed ? `; shut ${JSON.stringify(forged.closed)}` : ''})`);
 });
 
 // A terminal closed while a frame of its own is still pending: xterm

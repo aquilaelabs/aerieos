@@ -505,6 +505,32 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       return real(...args);
     };
   }
+  // A press waits for what it presses to arrive. A row a chip's change
+  // brings in waits its turn drawn small (the move's delay, filled
+  // backwards) and then grows into its place, its × a button's half-width
+  // from where it will be. Standing still as it waits, it reads to
+  // Playwright as ready: the press went down on the ×, the row grew under
+  // it, the lift landed beside the ×, and the two made no click, with nothing
+  // said (notices in Firefox, twice in two gates; measured in Chromium and
+  // Firefox with a press held across the move). Nobody presses a row not yet
+  // drawn; a suite does, so it waits out a move of the control or of
+  // anything around it, where the move is one that ends.
+  const arrived = async sel => {
+    if (typeof sel !== 'string') return;
+    const h = await page.$(sel).catch(() => null);
+    if (!h) return;
+    await h.evaluate(async el => {
+      const moving = [];
+      for (let e = el; e && e.getAnimations; e = e.parentElement)
+        for (const a of e.getAnimations()){
+          const t = a.effect?.getComputedTiming?.();
+          if (a.playState !== 'running' || !t || !Number.isFinite(t.endTime)) continue;
+          if (a.effect.getKeyframes().some(k => k.transform && k.transform !== 'none')) moving.push(a.finished.catch(() => {}));
+        }
+      if (moving.length) await Promise.race([Promise.all(moving), new Promise(r => setTimeout(r, 2000))]);
+    }).catch(() => {});
+    await h.dispose().catch(() => {});
+  };
   for (const m of ['fill', 'selectOption', 'click', 'check', 'uncheck', 'type', 'press', 'setChecked', 'waitForSelector']){
     const real = page[m].bind(page);
     page[m] = async (sel, ...rest) => {
@@ -512,6 +538,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       const hidden = m === 'waitForSelector' && ['hidden', 'detached', 'attached'].includes(opts?.state);
       if (!hidden) await openRnFor(sel, typeof opts?.timeout === 'number' ? opts.timeout : undefined);
       if (m === 'waitForSelector') return real(sel, ...rest);
+      if (['click', 'check', 'uncheck', 'setChecked'].includes(m)) await arrived(sel);
       try { return await real(sel, ...rest); }
       catch (e) {
         if (e && e.name === 'TimeoutError') await page.timedOut(m, sel);
