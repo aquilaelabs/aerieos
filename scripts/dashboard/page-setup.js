@@ -37,7 +37,7 @@ function setupNode(){
 // (the status read's bare_metal), never guessed; where the installer made
 // no node of it (--no-node), the step is the container's.
 function setupOwn(){
-  return state?.bare_metal ? (nodesList || []).find(n => n.config?.own && n.state !== "retired") || null : null;
+  return ownMachineHere();
 }
 
 // Where each of the four stands, read from what the page already holds: the

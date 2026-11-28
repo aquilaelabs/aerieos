@@ -1094,7 +1094,7 @@ function pFillNode(){
     const gen = pGen;
     loadNodes().then(() => { if (gen === pGen && !$("pmodal").hidden) pFillNode(); });
   }
-  const pick = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired" && n.state !== "disabled");
+  const pick = primaryNodes();
   const shown = !pInto && PMODES[pMode]?.fields.includes("pNodeField") && pick.length > 0;
   wrap.hidden = !shown;
   if (!shown){ sel.innerHTML = ""; return; }

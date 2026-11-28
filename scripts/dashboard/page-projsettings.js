@@ -219,17 +219,9 @@ function rnLockSettings(p){
 // container restart, then the first press of Settings.
 function rnFillNode(){
     const sel = $("rnNode"), wrap = $("rnNodeField");
-    // A node un-enrolled is out of every picker, by the node list's word or,
-    // where that list is from before the removal, by the project rows' (the
-    // server marks a row whose node was removed).
-    const removed = new Set((state?.projects || []).filter(p => p.node_removed).map(p => p.prefs?.node).filter(Boolean));
-    // A disabled node is kept but not offered, unless
-    // it is this project's already, which the row then says.
-    // ...and a hosting-only node is not offered as the primary:
-    // it holds no code and runs no session, so it is a row under
-    // Also works on, marked Hosting only, and nothing else.
-    const pick = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired"
-      && (n.state !== "disabled" || n.id === rnPrefWas.node) && !removed.has(n.id) && !n.config?.host_only);
+    // A hosting-only node is a row under Also works on, marked Hosting
+    // only, and never the primary (primaryNodes).
+    const pick = primaryNodes(rnPrefWas.node);
     if (nodesList === null){
       const opened = rnFor;
       loadNodes().then(() => { if (opened !== null && rnFor === opened){ rnFillNode(); rnBars(); } });

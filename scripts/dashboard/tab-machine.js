@@ -19,6 +19,13 @@ function openMachineTab(what){
 function ownMachine(){
   return (nodesList || []).find(n => n.config?.own && n.state !== "retired") || null;
 }
+// ...and only where the install's own marker says the controller runs on a
+// machine of its own (the status read's bare_metal), never guessed from a
+// row: what first run waits for and what a group's header says of a
+// controller with no other node.
+function ownMachineHere(){
+  return state?.bare_metal ? ownMachine() : null;
+}
 
 // The own node's row on the Nodes page, as an address.
 function ownNodeAt(){

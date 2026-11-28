@@ -1877,6 +1877,18 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const vps = await napi('/api/v1/nodes', { action: 'enroll', name: 'vps-host', host_only: true });
     const rec = (await napi('/api/v1/nodes')).nodes.find(n => n.id === vps.id);
     ok(vps.ok && rec?.config?.host_only === true, `a node enrolled as hosting only is so from the start (${vps.error || 'ok'})`);
+    // ...and never offered as a space's own node, on New space as in a
+    // space's settings: it holds no code and runs no session.
+    const own = await page.evaluate(async id => {
+      nodesList = null; await loadNodes();
+      openNewProject(); pFillNode();
+      const offered = [...document.querySelectorAll('#pNode option')].map(o => o.value);
+      closeNewProject();
+      return { listed: nodesList.some(n => n.id === id), offered: offered.includes(id), any: offered.filter(Boolean).length,
+               settings: primaryNodes().some(n => n.id === id) };
+    }, vps.id);
+    ok(own.listed && own.any > 0 && !own.offered && !own.settings,
+       `...and New space does not offer it as the space's node, as a space's settings do not (${JSON.stringify(own)})`);
     await napi('/api/v1/nodes', { action: 'retire', id: vps.id });
     // Lock down: one press on a hosting-only node's page, after which
     // the box may take only the job that stops it, and is removed when it ends.

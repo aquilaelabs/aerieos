@@ -714,6 +714,17 @@ function machinesNode(kind){
 function liveAgents(){
   return (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
 }
+// The nodes a space may be given as its own: every machine but the
+// controller's container, never a retired one, one un-enrolled under a space
+// that still names it (the server marks that space's row), or a hosting-only
+// one, which holds no code and runs no session; and a disabled one only
+// where it is the space's already (`own`), which its option then says. New
+// space and a space's settings offer the same list.
+function primaryNodes(own = ""){
+  const removed = new Set((state?.projects || []).filter(p => p.node_removed).map(p => p.prefs?.node).filter(Boolean));
+  return (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired"
+    && (n.state !== "disabled" || n.id === own) && !removed.has(n.id) && !n.config?.host_only);
+}
 // The node a page opens on: the one it shows now (`cur`) while that is among
 // the nodes there are (`have`, each named by `idOf`), else the one this
 // browser kept for it (its record's keep, then the key `also` names), else
@@ -820,7 +831,7 @@ function groupHeader(t, g){
       aria-label="${esc(n.name)} is ${esc(s.word)}: open its page" title="${esc(s.means ? `${s.means}: open its page` : "open its page")}">${esc(s.word)}</button>`;
   // The containers' pages leave the own machine out, so on a machine alone
   // there is no other node to show them for.
-  const ownHere = state?.bare_metal && (nodesList || []).some(x => x.config?.own && x.state !== "retired");
+  const ownHere = !!ownMachineHere();
   const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.config?.own ? `${x.name} (this machine)` : x.name, live: x.live})), cur,
     undefined, {stated: !!pill}) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
   return `<span class="phead mchead">${pick}${pill}<span class="sp"></span></span>`;
