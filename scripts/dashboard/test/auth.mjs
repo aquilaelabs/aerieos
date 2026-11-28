@@ -1919,6 +1919,16 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     ok(t.missing.length === 0,
        `...and every method ${table} names is one the handler has (${t.missing.join(', ') || 'all there'})`);
   }
+  // A GET is matched on its path without the query, as a POST is: a route
+  // that carried its query mark answered 404 for the path alone, where its
+  // handler says what is missing.
+  const noQuery = [];
+  for (const path of ['/api/artifact', '/api/source', '/api/signing-backup']){
+    const r = await bare(path, { headers: OWNER });
+    noQuery.push(`${path} ${r.status}`);
+  }
+  ok(noQuery.every(x => !x.endsWith(' 404')) && (await bare('/api/artifacts?project=alpha', { headers: OWNER })).status === 200,
+     `a route asked for with no query is answered by its own handler, never as no such route (${noQuery.join(', ')})`);
   // A session is refused by the dispatcher on every route its table does
   // not name (R227 step 4): each one asked with a session's token, so a
   // route added tomorrow is closed to a session until somebody names it.

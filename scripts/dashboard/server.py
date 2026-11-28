@@ -6857,11 +6857,10 @@ def _snapshot(who):
 # Every route of the JSON API and everything the dispatcher holds about it,
 # one record a route: a fact about a route is written here and nowhere else,
 # and the tables under the record are read off it. The order is the order
-# routes are matched in, each method's own: a GET against the raw path
-# ("/api/artifact?" is a different route from "/api/artifacts" because the
-# query mark is part of what it matches), a POST against the path without
-# its query. A prefix route takes every path it prefixes, so a longer path
-# sits before a shorter one that would take it; auth.mjs fails on one an
+# routes are matched in, each method's own, a GET and a POST alike against
+# the path without its query. A prefix route takes every path it prefixes,
+# so a longer path sits before a shorter one that would take it
+# ("/api/artifacts" before "/api/artifact"); auth.mjs fails on one an
 # earlier route takes. The doors before these (setup, login, the agent,
 # health, the terminal proxy, the page and its scripts) stay in _get and
 # _post, in front of the credential check (R60).
@@ -6988,12 +6987,12 @@ ROUTES = (
           instead="a session reads and moves its space's version with aerie version", needs_repo=True),
     Route("GET", "prefix", "/api/tls", "_get_tls", "handler"),
     Route("GET", "prefix", "/api/artifacts", "_get_artifacts", "handler", needs_repo=True),
-    Route("GET", "prefix", "/api/artifact?", "_get_artifact", "handler", needs_repo=True),
-    Route("GET", "prefix", "/api/signing-backup?", "_get_signing_backup", "handler"),
+    Route("GET", "prefix", "/api/artifact", "_get_artifact", "handler", needs_repo=True),
+    Route("GET", "prefix", "/api/signing-backup", "_get_signing_backup", "handler"),
     Route("GET", "prefix", "/api/node-busy", "_get_node_busy", "handler", session=True),
     Route("GET", "prefix", "/api/meta", "_get_meta", "handler", session=True),
     Route("GET", "prefix", "/api/welcome", "_get_welcome", "handler"),
-    Route("GET", "prefix", "/api/source?", "_get_source", ("person", "a session has the tree already")),
+    Route("GET", "prefix", "/api/source", "_get_source", ("person", "a session has the tree already")),
     Route("GET", "prefix", "/logs/download", "_get_logs_download", "handler"),
     Route("GET", "prefix", "/api/phone/wait", "_get_phone_wait", "handler"),
     Route("GET", "prefix", "/api/phone", "_get_phone", "handler", session=True),
@@ -9458,7 +9457,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/") and (why := self._get_cross_site()):
             return self._json({"error": why}, 403)
         for how, route, name in GET_ROUTES:
-            if (path == route) if how == "exact" else self.path.startswith(route):
+            if (path == route) if how == "exact" else path.startswith(route):
                 if (why := self._work_refused(route, (self._q()
                                                      .get("project") or [""])[0])):
                     return self._json({"error": why}, 400)

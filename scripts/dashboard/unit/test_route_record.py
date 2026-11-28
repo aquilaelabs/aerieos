@@ -92,6 +92,15 @@ class Record(unittest.TestCase):
                     self.assertFalse(r.how == "prefix" and later.path.startswith(r.path),
                                      f"{method} {later.path} is after {r.path}, which takes it")
 
+    def test_a_route_is_a_path_and_never_its_query(self):
+        # Both methods match the path without its query, so a query mark in
+        # a route's path would never match, and the dispatcher's loop reads
+        # the bare path for a prefix route as it does for an exact one.
+        self.assertEqual([r.path for r in ROUTES if "?" in r.path], [])
+        get = SERVER[SERVER.index("    def _get(self):"):SERVER.index("    def _work_refused(self")]
+        self.assertIn("else path.startswith(route)", get)
+        self.assertNotIn("self.path.startswith(route)", get)
+
     def test_the_tables_are_the_record_s(self):
         for method, name in (("GET", "GET_ROUTES"), ("POST", "POST_ROUTES")):
             self.assertEqual(NOW[name], tuple((r.how, r.path, r.handler) for r in MATCHED if r.method == method))

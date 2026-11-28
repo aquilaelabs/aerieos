@@ -52,10 +52,10 @@ NOT_OURS = {"/api/healthz"}
 
 
 def handlers(path):
-    out = set()
+    out, bare = set(), path.split("?")[0]
     for routes in (GET, POST):
         for how, route, name in routes:
-            if (path.split("?")[0] == route) if how == "exact" else path.startswith(route):
+            if (bare == route) if how == "exact" else bare.startswith(route):
                 out.add(name)
                 break
     return out
