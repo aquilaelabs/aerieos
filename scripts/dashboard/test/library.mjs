@@ -392,6 +392,26 @@ await section("the bar's Check for updates", async () => {
   ok(when.said === !!when.checked, `...and the head says when versions were checked only once the node has a time (${when.checked ? 'said' : 'none yet, not drawn'})`);
 });
 
+// A press on the Library acts on the Library's node, whatever node the
+// store's verbs were last pointed at: the Installed page beside it in a
+// split, on another node, had read last, and Install or Check pressed here
+// went there. The store moves to the page's own node before it asks or
+// sends.
+await section("a press acts on its own page's node", async () => {
+  const sent = [];
+  const see = r => { if (r.method() === 'POST' && r.url().includes('/api/toolchains')) sent.push(JSON.parse(r.postData() || '{}')); };
+  page.on('request', see);
+  const mine = await page.evaluate(() => libNode);
+  await page.evaluate(() => { tcNode = 'n_another'; toolchains = { stub: true }; });
+  await page.click('.doc .librarytab [data-libcheck]');
+  for (let i = 0; i < 150 && !sent.some(b => b.action === 'check'); i++) await sleep(100);
+  await page.waitForFunction(() => lib?.job?.action === 'check' && !lib.job.running, null, { timeout: 60000 });
+  page.off('request', see);
+  const check = sent.find(b => b.action === 'check');
+  ok(!!check && check.node === mine, `Check pressed on the Library goes to the Library's node, not the one the store was last on (${check?.node}, the Library is on ${mine})`);
+  ok(await page.evaluate(m => tcNode === m, mine), '...and the store has moved there');
+});
+
 // ---- Add your own: an app of the person's own (step 3) -----------------------
 // The bar's Add your own opens one dialog for a tool pack or an app; an app
 // is a compose file with the known blanks, looked at before it is kept,

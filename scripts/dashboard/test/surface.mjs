@@ -74,7 +74,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   // A terminal in its own window.
   'popOut', 'reattachTab',
   'pShowKey', 'pSlide', 'paginate', 'pageReach', 'onPress', 'patch', 'patchKey', 'patchSame', 'patchFieldOf', 'patchAttrs', 'patchRecord', 'patchWas', 'patchControl', 'patchNode', 'patchKids', 'patchOwn', 'patchHeld', 'patchInto', 'pressBack', 'drawFresh', 'takeAway', 'giveBack', 'onTyping', 'fieldsBack', 'paintBar', 'paneStack',
-  'phFetch', 'tcAct', 'tcPick', 'packState', 'packMachineState', 'packHeldState', 'packVersionPill', 'packJobErr', 'toolchainsSeen', 'toolchainsFor', 'packDeploy', 'agentUpdate',
+  'phFetch', 'tcAct', 'tcPick', 'packState', 'packMachineState', 'packHeldState', 'packVersionPill', 'packJobErr', 'toolchainsSeen', 'toolchainsFor', 'tcOn', 'packDeploy', 'agentUpdate',
   // The Emulator tab (tab-emulator.js).
   'openEmulator', 'emuPick', 'loadEmulator', 'emuAddRows', 'emuFlavorNow', 'emuTickedHere', 'emuRow', 'renderEmulatorInto', 'emuAct', 'tcTermsLine', 'tcVerifiedLine', 'tcReceiptLines', 'tcHeldLine', 'tcSystemLine', 'tcNeedsLine', 'tcDriverLine', 'tcDriverOption', 'tcToolkitLine', 'nodesReadOnly', 'headerOnly', 'popoutFocus', 'splitSects', 'splitDraw', 'splitAway', 'bootOwn', 'splitMove', 'splitMarks', 'splitOff', 'rnSplit', 'rolesInsts', 'rolesLvlAt', 'rolesSetAll', 'viewSaid', 'pageKey', 'pageLimit', 'rnPrefsOf',
   // The Claude sign-in on a node's row (page-signin.js), and the press that goes to it.

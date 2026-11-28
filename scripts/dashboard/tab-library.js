@@ -689,12 +689,12 @@ function wireLibrary(root){
   const chk = root.querySelector("[data-libcheck]");
   // ...and the vetted catalog read again with it: its index is kept for an
   // hour, so a newer pin showed up to an hour after Check.
-  if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking");
+  if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking"); await tcOn(libNode);
     await Promise.all([tcAct("check"), fetch("/api/catalog?fresh=1").catch(() => null)]); await loadLibrary(); });
   const sd = root.querySelector("[data-libsysdeps]");
   // ...its word Queuing while a job runs, which it waits behind (tcAct says
   // which).
-  if (sd) sd.onclick = () => pressing(sd, async () => { busy(sd, tcBehind() ? "Queuing" : "Installing"); await tcAct("sysdeps"); await loadLibrary(); });
+  if (sd) sd.onclick = () => pressing(sd, async () => { await tcOn(libNode); busy(sd, tcBehind() ? "Queuing" : "Installing"); await tcAct("sysdeps"); await loadLibrary(); });
   const cl = root.querySelector("[data-libclean]");
   if (cl) cl.onclick = async () => {
     // What each one was, said here, where the head said it as a fact.
@@ -754,6 +754,7 @@ async function libAct(b, act, kind, name){
   // job runs on the node it is queued behind it, never refused:
   // the card says so once its questions are answered,
   // behind what, and its toast says it too (tcAct).
+  await tcOn(libNode);
   if (tcBehind()){
     await tcAct("install", [r.name], {now: () => libQueuedNow(kind, name)});
   } else {

@@ -269,6 +269,17 @@ async function toolchainsFor(node){
   if (!toolchains || toolchains.stub || toolchains.nonode || toolchains.error || tcNode !== node) await loadToolchains();
   return toolchains;
 }
+// A press on a page acts on that page's own node. The store's verbs act on
+// tcNode, which each of the Library and Installed sets when it reads; side
+// by side on two nodes, a press on one went to whichever had read last. A
+// press says its page's node first: where that is another node than the
+// store is on, the store moves to it and its rows are read before anything
+// is asked or sent.
+async function tcOn(node){
+  if (!node || node === tcNode) return;
+  tcNode = node; toolchains = null; tcDriverPick = "";
+  await loadToolchains();
+}
 
 // Deploy a service on a node as a written container, or take it off: the
 // build is a job whose row the Containers page has, said when one starts.

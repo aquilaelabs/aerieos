@@ -337,10 +337,10 @@ function wireInstalled(root){
   wireSections(root);
   wireSignin(root);
   root.querySelectorAll("[data-instopen]").forEach(b => b.onclick = () => instOpen(b.dataset.instopen, b.dataset.instat || ""));
-  root.querySelectorAll("[data-tcsys]").forEach(b => b.onclick = async () => { await tcAct("sysdeps", [b.dataset.tcsys]); loadInstalled(); });
-  root.querySelectorAll("[data-tcneed]").forEach(b => b.onclick = async () => { await tcAct("install", [b.dataset.tcneed]); loadInstalled(); });
+  root.querySelectorAll("[data-tcsys]").forEach(b => b.onclick = async () => { await tcOn(instNode); await tcAct("sysdeps", [b.dataset.tcsys]); loadInstalled(); });
+  root.querySelectorAll("[data-tcneed]").forEach(b => b.onclick = async () => { await tcOn(instNode); await tcAct("install", [b.dataset.tcneed]); loadInstalled(); });
   const sd = root.querySelector("[data-instsysdeps]");
-  if (sd) sd.onclick = () => pressing(sd, async () => { busy(sd, "Installing"); await tcAct("sysdeps"); await loadInstalled(); });
+  if (sd) sd.onclick = () => pressing(sd, async () => { busy(sd, "Installing"); await tcOn(instNode); await tcAct("sysdeps"); await loadInstalled(); });
   root.querySelectorAll(".icform").forEach(form => {
     const key = form.dataset.icform, scope = form.dataset.icscope || "node", dk = `${key}|${scope}`;
     const r = (inst?.rows || []).find(x => `${x.kind}:${x.name}` === key);
@@ -412,7 +412,8 @@ async function instAct(b, act, kind, name){
     busy(b, "Updating");
     // The job reads the store's record of this node, not its rows: the
     // stand-in the page's read keeps will do.
-    if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
+    await tcOn(instNode);
+    if (!toolchains || toolchains.nonode || toolchains.error) await loadToolchains();
     await tcAct("install", [r.name]);
     await loadInstalled();
     return;
@@ -441,6 +442,7 @@ async function instAct(b, act, kind, name){
     : `Uninstall ${r.label} from ${where}? The files are deleted; installing it again re-downloads them.`;
   if (!await askYes(ask)) return;
   busy(b, "Removing");
+  await tcOn(instNode);
   await tcAct("remove", [r.name]);
   await loadInstalled();
 }
