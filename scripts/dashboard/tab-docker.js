@@ -1360,7 +1360,7 @@ function loadWire(d){
 async function wireRead(d){
   const [project, instance] = d.closest("[data-inst]").dataset.inst.split("|");
   const box = d.querySelector(".wire");
-  let html;
+  let html, read = false;
   const key = `${project}|${instance}`;
   try{
     const j = await postJSON("/api/devapp", {project, instance, action:"state"});
@@ -1396,11 +1396,16 @@ async function wireRead(d){
           mounts.filter(m => (m.service || "") === sv).map(mountLine).join("")}</div>`).join("")
       : ports.map(portLine).join("") + mounts.map(mountLine).join("");
     html = lines || `<div class="dim li">it publishes nothing and mounts nothing</div>`;
+    read = true;
   }catch(e){
-    html = dmWireSeen[key] && e.message === "kept" ? dmWireSeen[key]
-      : `<div class="dim li bad">could not read it: ${esc(e.message || String(e))}</div>`;
+    // A read that failed says nothing about the wiring, whichever way it
+    // failed (the compose not resolved, the call cut or run out on a busy
+    // controller): what was read before stays, and only a fold with nothing
+    // read yet says it could not. Remembered, the failure's line was what a
+    // redraw then brought back in place of the ports.
+    html = dmWireSeen[key] || `<div class="dim li bad">could not read it: ${esc(e.message || String(e))}</div>`;
   }
-  dmWireSeen[key] = html;
+  if (read) dmWireSeen[key] = html;
   if (!d.isConnected){
     // The manager repainted under it, because every step of a job does that now,
     // and the fold the operator opened is a fresh, closed one with nothing in
