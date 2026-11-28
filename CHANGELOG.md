@@ -82,6 +82,8 @@
 - An install that ships the catalog's freshness key holds the vetted catalog's index to the catalog's weekly statement that it is current, and the Doctor says one a mirror or the network keeps answering after it was replaced (1ee8258)
 - The compose folder is mounted into the controller read-only, so the controller can never rewrite the compose file or the .env the next docker compose up reads (8831f48)
 - The Android app trades your password for a token of its own at sign-in (asking your authenticator's code where you have one) and keeps only the token, which Profile can sign out; at an https address it holds the dashboard to the key it met at sign-in, its terminal included (412aad1)
+- A node's cache of source snapshots is root's own folder, and root follows no link an account left on the way to a job's source: a space named snapshots was handed that cache, where a job could aim root's next download at any file (010e254)
+- The deploy-key helper refuses a key store that is not root's alone, so a folder another account put in its place is never read or written as root (0be8bd9)
 
 ## 0.9.0-dev.6312: 2026-11-25
 
