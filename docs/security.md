@@ -640,6 +640,40 @@ What AerieOS does as root by name (storage, updates, its own tools) goes
 on, and where the machine runs containers, Docker there is still root's:
 the switch closes the free-form command, which is the widest of them.
 
+## The system's own root
+
+On AerieOS the system is an image, and each slot's root is read through
+dm-verity ([image.md](image.md#the-root-is-sealed)): the root's hash tree
+follows it on the slot, and the initrd that boots the slot carries the
+tree's root hash, so that initrd mounts the root it was built beside and no
+other. What this holds:
+
+- A root changed or damaged on the disk is not used. A slot that does not
+  answer to the hash stops the boot, saying so, and a slot on trial after an
+  update falls back by itself; a block that goes bad while the system runs
+  is an I/O error for whatever reads it, the kernel names the block, and
+  the bell says the root is damaged until an update has written the slot
+  again.
+- An update reads every block of the new root against the hash the release's
+  image names before the other slot is touched, and reads the slot back
+  against it before the next boot is pointed there. The image itself is
+  held to the release's signed list and its build attestation first, as
+  before.
+
+What it does not hold, yet or by design:
+
+- The kernel, the initrd and the boot menu on the boot partition are not
+  signed, and nothing in the firmware checks them. Somebody who can write
+  that partition (root on the machine, or the disk in another machine) can
+  replace the initrd, and the hash with it. The seal is against a disk that
+  changed under the system, not against that person.
+- `/etc` and `/usr/local` are the image's with the machine's own changes
+  laid over them from the data partition, which is outside the seal, as it
+  has to be for a setting to last. The machine's own node agent, which
+  runs as root and is updated by its controller, is in `/usr/local`.
+- An install that is not AerieOS (the container, or the installer on a
+  system of your own) has the root that system gives it.
+
 ## The signing keys, and replacing one
 
 What an install takes from outside is checked against a key it already
