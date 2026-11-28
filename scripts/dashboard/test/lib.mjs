@@ -468,6 +468,21 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       await new Promise(r => setTimeout(r, 100));
     }
   };
+  // A dialog put away gives its history entry back a task later
+  // (backRelease), and the going back lands later still: an address gone to
+  // in between is undone by it, and the page is left where the dialog was
+  // opened (cards in WebKit, 28 Nov: a reload at #/people/users found the
+  // page at #/spaces). Nobody types an address that fast; a suite does, so a
+  // navigation waits out a give-back that is on its way.
+  for (const m of ['goto', 'reload']){
+    const real = page[m].bind(page);
+    page[m] = async (...args) => {
+      await page.evaluate(() => new Promise(r => setTimeout(r, 0)))
+        .then(() => page.waitForFunction(() => typeof backGiving === 'undefined' || !backGiving, null, { timeout: 5000 }))
+        .catch(() => {});
+      return real(...args);
+    };
+  }
   for (const m of ['fill', 'selectOption', 'click', 'check', 'uncheck', 'type', 'press', 'setChecked', 'waitForSelector']){
     const real = page[m].bind(page);
     page[m] = async (sel, ...rest) => {
