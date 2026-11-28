@@ -45,7 +45,7 @@ const basic = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).
 // A snapshot unpacked into a world of its own: config/ and workspace/.
 function unpack(ver, tag){
   const w = `${DIR}/upgrade-${ver}-${tag}`;
-  rmSync(w, { recursive: true, force: true });
+  rmSync(w, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(w, { recursive: true });
   execFileSync('tar', ['--no-same-owner', '-xzf', `${SNAPS}/${ver}/config.tar.gz`, '-C', w]);
   return w;

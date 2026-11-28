@@ -529,6 +529,6 @@ await section("Put alpha back as it was found", async () => {
 
 // a file that plants a dist/ tree and a symlink there has to clear them
 // itself, or every later file runs against a project this one changed.
-rmSync(`${DIR}/ws/alpha/dist`, { recursive: true, force: true });
+rmSync(`${DIR}/ws/alpha/dist`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 rmSync(`${DIR}/ws/alpha/secret.txt`, { force: true });
 await done(browser);

@@ -632,7 +632,7 @@ await section("The stamp: a compose whose build args want the commit and the tim
 // the assertion would pass on an empty string.
 await section("and the VERSION it stamps is the identity form, the one", async () => {
   const vrepo = `${DIR}/ws/verstamp`;
-  rmSync(vrepo, { recursive: true, force: true });
+  rmSync(vrepo, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(vrepo, { recursive: true });
   writeFileSync(`${vrepo}/VERSION`, '1.2.3\n');
   const env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t',
@@ -655,7 +655,7 @@ print(json.dumps(m._build_env('verstamp', '')))
   ok(/^1\.2\.3-dev\.\d+\+[0-9a-f]+$/.test(got.BB_BUILD_VERSION || ''),
      `the dev build stamps the identity form, with the + a docker tag cannot carry (${
        got.BB_BUILD_VERSION || 'unstamped'})`);
-  rmSync(vrepo, { recursive: true, force: true });
+  rmSync(vrepo, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 // Waited for, not read once: the manager's Up and Down follow its own
 // listing, a fetch behind the artifacts row's, and under a whole run the
@@ -3932,7 +3932,7 @@ await section("Every compose file in the repository is a row with its own Send",
   await pressIn('.dmtab .row[data-inst="ep.silon|ep-silon-site"] [data-dm="remove"]');
   await page.waitForFunction(() => !document.querySelector('.dmtab .row[data-inst="ep.silon|ep-silon-site"]'),
                              null, { timeout: patience(20000) });
-  rmSync(`${D}/site`, { recursive: true, force: true });
+  rmSync(`${D}/site`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   rmSync(`${D}/docker-compose.prod.yml`, { force: true });
   rmSync(`${D}/docker-compose.override.yml`, { force: true });
   await nudge2();
@@ -4113,7 +4113,7 @@ await section("building an instance from another branch", async () => {
   // The worktree first: git refuses to delete a branch that one has checked
   // out, which is the same protection that makes this design safe at all.
   try { G('worktree', 'remove', '--force', `${DIR}/ws/ep-silon-main-build`); }
-  catch (e) { rmSync(`${DIR}/ws/ep-silon-main-build`, { recursive: true, force: true });
+  catch (e) { rmSync(`${DIR}/ws/ep-silon-main-build`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
               try { G('worktree', 'prune'); } catch (e2) { /* nothing to prune */ } }
   G('branch', '-D', 'sidebranch');
 });
@@ -4499,7 +4499,7 @@ await section("who may rebuild it", async () => {
         await asSession({ project: 'ep.silon', instance: i, action: 'remove' });
       await idle();
       try { G('worktree', 'remove', '--force', `${DIR}/ws/ep-silon-ep-silon-4-build`); }
-      catch (e) { rmSync(`${DIR}/ws/ep-silon-ep-silon-4-build`, { recursive: true, force: true });
+      catch (e) { rmSync(`${DIR}/ws/ep-silon-ep-silon-4-build`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
                   try { G('worktree', 'prune'); } catch (e2) { /* nothing to prune */ } }
       G('branch', '-D', 'sendbranch');
     }
@@ -5248,7 +5248,7 @@ rmSync(`${D}/.env.example`, { force: true });
 rmSync(`${D}/newfile.txt`, { force: true });
 rmSync(`${D}/again.txt`, { force: true });
 rmSync(`${D}/after-interrupt.txt`, { force: true });
-rmSync(`${D}/.git`, { recursive: true, force: true });
+rmSync(`${D}/.git`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 git('init', '-q', '.');
 // ---- removing a written container takes its env (bug #41) -----------------
 // A project's instance keeps its env on Remove, deliberately: the promise is

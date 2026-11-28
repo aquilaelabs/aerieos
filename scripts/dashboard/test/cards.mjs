@@ -442,7 +442,7 @@ await section("`aerie findings sample`", async () => {
 // "nothing here" is a tab somebody has to close by hand.
 await section("Nothing readable in /reports and the way in says so", async () => {
   const keep = readFileSync(`${DIR}/reports/test.sarif`);
-  rmSync(`${DIR}/reports`, { recursive: true, force: true });
+  rmSync(`${DIR}/reports`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   await refreshUntil(page, () => state?.reports_ok === false, { timeout: 20000 });
   ok(/\/reports is not mapped in/.test(await page.evaluate(() => findingsOff())),
      'with no readable report Analysis is off, saying which of the three reasons it is');
@@ -533,8 +533,8 @@ await section("Two projects whose names shorten to one slug are one dev instance
        .issues.find(i => /shorten to/.test(i.text)).level === 'warning'),
      '...as a warning: an error would take them out of findings attribution and '
      + 'off the Claude button, which is a bigger fault than the one being reported');
-  rmSync(`${DIR}/ws/My.App`, { recursive: true, force: true });
-  rmSync(`${DIR}/ws/my-app`, { recursive: true, force: true });
+  rmSync(`${DIR}/ws/My.App`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(`${DIR}/ws/my-app`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   await refreshUntil(page, () => !(state?.projects || []).some(p => p.name === 'my-app'),
                      { timeout: 20000 });
 });
@@ -2110,7 +2110,7 @@ await section("Its Android signing keys", async () => {
   await freePoll(page);
   rmSync(`${wsA}/.github/workflows/r106-apk.yml`, { force: true });
   rmSync(`${wsA}/app/build.gradle.kts`, { force: true });
-  rmSync(sd, { recursive: true, force: true });
+  rmSync(sd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   // Back to the Projects page, where the rest of this file presses.
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.doc .projtab .pcard[data-row="alpha"]', { timeout: 15000 });
@@ -3144,7 +3144,7 @@ await section("a project on several nodes", async () => {
   await (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
     headers: OWNER,
     body: JSON.stringify({ project: 'alpha', model: '', effort: '' }) })).json();
-  rmSync(tdir, { recursive: true, force: true });
+  rmSync(tdir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   // The row planted again in the same evaluation as the read: a poll that
   // was already on its way when the hold went on lands whenever it lands.
   const tab = await page.evaluate(() => {

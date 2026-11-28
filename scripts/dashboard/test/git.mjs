@@ -574,7 +574,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     ok(done_.ok, `...and stops refusing once ${main} here is level with the host again (${
       (done_.out || done_.error || '').trim().slice(0, 40)})`);
     git('branch', '-D', 'levelcheck');
-    rmSync(other, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 
   // B203: a write is not disturbed by the view reading beside it, nor by
@@ -1651,7 +1651,7 @@ await section("the CI watch", async () => {
     // Put back as it was: the commit and the file go, so the look below
     // still finds a beta with no workflows.
     execFileSync('git', ['-C', `${DIR}/ws/beta`, 'reset', '-q', '--hard', 'HEAD~1'], { env: GITENV });
-    rmSync(`${DIR}/ws/beta/.github`, { recursive: true, force: true });
+    rmSync(`${DIR}/ws/beta/.github`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
   await page.click(`${NB} #gitCiLook`);
   await page.waitForFunction(sel => document.querySelector(sel)?.textContent === 'no workflows',

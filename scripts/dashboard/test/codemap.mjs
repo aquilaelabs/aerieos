@@ -387,7 +387,7 @@ await section("the index stays out of git", async () => {
   ok(existsSync(`${plain}/.bb-map/map5.json`) && /not in a git repository/.test(why),
      '...while a tree with no repository still gets its map, and aerie map exclude says why it wrote nothing');
   g(t, 'worktree', 'remove', '--force', `${t}-wt`);
-  for (const d of [t, plain]) rmSync(d, { recursive: true, force: true });
+  for (const d of [t, plain]) rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 await done(null);

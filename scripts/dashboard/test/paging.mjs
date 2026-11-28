@@ -173,8 +173,8 @@ await section("one bucket per notebook, not one for all of them", async () => {
     return rows.length > 0 && !rows.some(r => r.__before); }), null, { timeout: 20000 }).catch(() => {});
   ok(await shown() === opened,
      `...and a short list in another notebook does not turn it back (${await shown()} of ${opened})`);
-  rmSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true, force: true });
-  rmSync(`${DIR}/ws/beta/dist`, { recursive: true, force: true });
+  rmSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(`${DIR}/ws/beta/dist`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 ok((await page.errors).length === 0, 'no console errors from paging');

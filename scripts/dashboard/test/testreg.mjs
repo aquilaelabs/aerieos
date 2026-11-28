@@ -526,7 +526,7 @@ await section("`aerie tests run` is the loop this file's subject was missing", a
 // node was the one verb that could not.
 await section("The bundle a node gets carries bb and its library and none of the", async () => {
   const B = `${DIR}/bundleish`;
-  rmSync(B, { recursive: true, force: true });
+  rmSync(B, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(`${B}/scripts`, { recursive: true });
   cpSync(BB, `${B}/scripts/aerie`);
   cpSync(join(dirname(BB), 'lib'), `${B}/scripts/lib`, { recursive: true });

@@ -715,7 +715,7 @@ sleep 60
       for (const t of [cwt2, clt2]) try { git(['worktree', 'remove', '--force', t]); } catch { /* not made */ }
       // Copilot: no status verb of its own, so the login its config
       // remembers is what says it is signed in.
-      rmSync(join(HOMEDIR, '.copilot'), { recursive: true, force: true });
+      rmSync(join(HOMEDIR, '.copilot'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       const cpRefused = shell(`u:${ownerUid}:copilot:${proj}:b:${boot}`);
       ok(/not signed in to Copilot/.test(cpRefused) && !alive(`copilot-${proj}`),
          'a Copilot session with no GitHub login remembered is refused the same way');
@@ -758,7 +758,7 @@ printf '%s %s' "\${GROK_CLAUDE_HOOKS_ENABLED:-}" "\${GROK_DISABLE_AUTOUPDATER:-}
 sleep 60
 `, { mode: 0o755 });
         tmuxKill(`grok-${proj}`);
-        rmSync(join(HOMEDIR, '.grok'), { recursive: true, force: true });
+        rmSync(join(HOMEDIR, '.grok'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
         const gkRefused = shell(`u:${ownerUid}:grok:${proj}:b:${boot}`);
         ok(/not signed in to Grok/.test(gkRefused) && !alive(`grok-${proj}`),
            'a Grok session with no session token or key is refused the same way');
@@ -865,9 +865,9 @@ sleep 60
           await until(() => alive(`gemini-${proj}`));
           ok(alive(`gemini-${proj}`), '...and switched on, it starts from the store');
           tmuxKill(`gemini-${proj}`);
-          rmSync(sdk, { recursive: true, force: true });
+          rmSync(sdk, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
         }
-        rmSync(join(HOMEDIR, '.gemini'), { recursive: true, force: true });
+        rmSync(join(HOMEDIR, '.gemini'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
         try { git(['worktree', 'remove', '--force', join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-gemini`)]); } catch { /* not made */ }
       }
       tmuxKill(`codex-${proj}`); tmuxKill(`copilot-${proj}`); tmuxKill(`grok-${proj}`);
@@ -1378,7 +1378,7 @@ print(uid)`);
       rmSync(cjf, { force: true });
       mkdirSync(cjf, { recursive: true });
       const cried = runTty();
-      rmSync(cjf, { recursive: true, force: true });
+      rmSync(cjf, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       ok(/could not record .* as trusted/.test(cried)
          && /ask about every command/.test(cried),
          `the launcher says so when it cannot record the tree as trusted (${
@@ -1481,7 +1481,7 @@ print(uid)`);
            JSON.stringify(Object.values(JSON.parse(readFileSync(join(DIR, 'state', 'users.json'), 'utf8')).users || {}).find(u => u.uid === ownerUid)?.projects)}; repos ${
            (() => { try { return readFileSync(join(DIR, 'state', 'project-repos.json'), 'utf8').slice(0, 300); } catch { return 'none'; } })()}; proj ${proj})`);
       tmuxKill(`${ownerUid}~claude-${proj}`);
-      rmSync(join(DIR, 'store'), { recursive: true, force: true });
+      rmSync(join(DIR, 'store'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
     // B157/B163: on a node an account keeps nothing in common with the base
     // home. A link made before this is taken down so the tool makes the
@@ -1497,7 +1497,7 @@ print(uid)`);
       mkdirSync(join(HOMEDIR, '.local', 'bin'), { recursive: true });
       rmSync(join(HOMEDIR, '.local', 'bin', 'claude'), { force: true });
       symlinkSync(join(ah, '.local', 'share', 'claude', 'versions', '9.9.9'), join(HOMEDIR, '.local', 'bin', 'claude'));
-      rmSync(join(ah, '.gradle'), { recursive: true, force: true }); rmSync(join(ah, '.local'), { recursive: true, force: true });
+      rmSync(join(ah, '.gradle'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); rmSync(join(ah, '.local'), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       symlinkSync(join(HOMEDIR, '.gradle'), join(ah, '.gradle'));
       symlinkSync(join(HOMEDIR, '.local'), join(ah, '.local'));
       tmuxKill(`${otherUid}~shell-wtproj-14`);
@@ -1599,7 +1599,7 @@ esac
   ok(/came without a session token/.test(bare) && !alive('ctr-alpha-app-1'),
      `...and on a node opens nothing without the controller's grant (${bare.trim().slice(0, 70)})`);
   tmuxKill('ctr-alpha-app-1');
-  rmSync(dbin, { recursive: true, force: true });
+  rmSync(dbin, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 await done();

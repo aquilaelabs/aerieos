@@ -2566,7 +2566,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
         document.querySelector('.emutab .emlevel')?.textContent || ''), null, { timeout: 15000 });
       ok(true, '...and the tab says so above the picker, naming the image');
       await napi('/api/prefs', { project: 'alpha', node: '' });
-      rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true });
+      rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
 
     // The images at a glance (R216): tiles of how many, the AVDs on them.

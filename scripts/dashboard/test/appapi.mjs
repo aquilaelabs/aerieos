@@ -54,8 +54,8 @@ await section("Where a newer app would be is a SIGNED build when there is one, h
   mkdirSync(`${DIR}/ws/AerieOS/dist`, { recursive: true });
   writeFileSync(`${DIR}/ws/AerieOS/dist/aerieos-app-0.7.0-dev.9999-fffffff-signed.apk`, 'not ours');
   const meta = (await get('/api/meta')).body;
-  rmSync(self, { recursive: true, force: true });
-  rmSync(`${DIR}/ws/AerieOS`, { recursive: true, force: true });
+  rmSync(self, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(`${DIR}/ws/AerieOS`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   ok(meta.apk === signed, `the app is offered the signed build, not a newer unsigned one (${meta.apk})`);
   ok(meta.apk_sha256 === createHash('sha256').update('signed').digest('hex'),
      `...read from the space whose origin is AerieOS's repository, not a folder named AerieOS (${meta.apk_sha256})`);

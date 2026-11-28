@@ -22,7 +22,7 @@ const AUTH = 'Basic ' + Buffer.from(`${OWNER.username}:${OWNER.password}`).toStr
 const H = { Authorization: AUTH, 'Content-Type': 'application/json' };
 
 const w = `${DIR}/keys-own`;
-rmSync(w, { recursive: true, force: true });
+rmSync(w, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 for (const d of ['config/gitcreds', 'workspace', 'home', 'secrets/install-key']) mkdirSync(`${w}/${d}`, { recursive: true });
 const KEYF = `${w}/secrets/install-key/key`;
 const FIRST = 'f'.repeat(64);

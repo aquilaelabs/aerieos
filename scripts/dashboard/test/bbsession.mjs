@@ -90,7 +90,7 @@ const x11 = '/tmp/.X11-unix';
 const madeX11 = !existsSync(x11) && (() => { try { mkdirSync(x11); return true; } catch { return false; } })();
 const got = plan();
 const steps = got.code === 0 ? JSON.parse(got.out) : [];
-if (madeX11) { try { rmSync(x11, { recursive: true, force: true }); } catch { /* left as found */ } }
+if (madeX11) { try { rmSync(x11, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch { /* left as found */ } }
 ok(!existsSync(x11) && !madeX11 ? true
    : steps.some(x => x[0] === 'bind' && x[1] === x11 && x[2] === `${STAGE}/x11`) && steps.some(x => x[0] === 'bind' && x[1] === `${STAGE}/x11` && x[2] === x11),
    'the X server\'s socket directory is staged and bound back into the session\'s own /tmp');
@@ -324,7 +324,7 @@ await section("What Claude Code keeps in /tmp for a conversation outlives a rest
   ok(at > kept.findIndex(x => x[0] === 'tmpfs' && x[1] === '/tmp') && at < kept.length - 1
      && kept[at][1].startsWith(`${STAGE}/cache`) && kept[at][1].endsWith(`/u/${me}/project/alpha/scratch`),
      `the conversation's folder in the space's cache is bound over /tmp/claude-${uid}, after /tmp is made (${JSON.stringify(kept[at] || null)})`);
-  rmSync(scratch, { recursive: true, force: true });
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   symlinkSync(join(ws, 'beta'), scratch);
   ok(!JSON.parse(plan().out).some(x => x[2] === `/tmp/claude-${uid}`),
      '...and a link in its place is not followed: nothing is bound, and /tmp stays as it was');
@@ -342,7 +342,7 @@ await section("What Claude Code keeps in /tmp for a conversation outlives a rest
   ok(home && ra > own.findIndex(x => x[0] === 'bind' && x[1] === `${STAGE}/home`)
      && own[ra][1].endsWith(`/u/${me}/project/alpha/claude-sessions`),
      `the space's own sessions folder is bound over ~/.claude/sessions, after the home (${JSON.stringify(own[ra] || null)})`);
-  rmSync(reg, { recursive: true, force: true });
+  rmSync(reg, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 await section("everything a cover would hide is bound aside before the first cover", async () => {
   const firstCover = steps.findIndex(x => x[0] === 'tmpfs' && x[1] === ws);

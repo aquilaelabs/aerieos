@@ -1422,7 +1422,7 @@ print(json.dumps(sorted(os.listdir(d))))
       // top for verbs that need it and `check` does not: it takes the rules
       // through `aerie rules --json`, which a node relays.
       const nb = `${DIR}/nodebundle`;
-      rmSync(nb, { recursive: true, force: true });
+      rmSync(nb, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       mkdirSync(`${nb}/scripts/dashboard`, { recursive: true });
       copyFileSync(`${REPO}/scripts/aerie`, `${nb}/scripts/aerie`);
       cpSync(`${REPO}/scripts/lib`, `${nb}/scripts/lib`, { recursive: true });
@@ -1957,7 +1957,7 @@ print(json.dumps(sorted(os.listdir(d))))
       // and not the controller) `art` was not empty and the agent said so,
       // correctly. The test asserted the cleanup without arranging for it
       // (B84).
-      rmSync(`${DIR}/pre/a1/a2/art`, { recursive: true, force: true });
+      rmSync(`${DIR}/pre/a1/a2/art`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       mkdirSync(`${DIR}/pre/a1/a2/art`, { recursive: true });
       // ...and the store it goes back to, for the same reason the other way
       // (B754): the first move off the node's default store copied what that
@@ -1965,7 +1965,7 @@ print(json.dumps(sorted(os.listdir(d))))
       // is ever deleted from a store moved off), so on a node whose default
       // store had files (the CI runner's) the move back was refused as a
       // copy into a folder of files, and every apply after it with it.
-      rmSync(`${DIR}/agentartifacts`, { recursive: true, force: true });
+      rmSync(`${DIR}/agentartifacts`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       mkdirSync(`${DIR}/agentartifacts`, { recursive: true });
       await api('/api/v1/nodes', { action: 'config', id: minted.id,
         config: { mounts: [], stores: { artifacts: `${DIR}/agentartifacts` }, network: { mode: 'dhcp' } } });
@@ -2308,8 +2308,8 @@ print(json.dumps(sorted(os.listdir(d))))
              .test(agentLog()),
            `...and the log names the binary, how it died and ALL of what it said: the reason is on its second line (${
               (agentLog().split('\n').find(l => /died on signal/.test(l)) || 'nothing said').slice(-90)})`);
-        rmSync(`${PK}/swift`, { recursive: true, force: true });
-        rmSync(`${PK}/rust`, { recursive: true, force: true });
+        rmSync(`${PK}/swift`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+        rmSync(`${PK}/rust`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       }
       // ...and a job refused on that answer says how old the answer is, and
       // asks the node for a fresh one. The census rides hello every ten
@@ -2454,7 +2454,7 @@ print(json.dumps(sorted(os.listdir(d))))
       if (!hadHead){ git('add', 'VERSION'); git('commit', '-qm', 'v', '--', 'VERSION'); }
       const b = execFileSync('bash', [`${REPO}/scripts/aerie`, 'build'],
         { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: onNode, stdio: 'pipe' });
-      if (!hadGit) rmSync(`${DIR}/ws/alpha/.git`, { recursive: true, force: true });
+      if (!hadGit) rmSync(`${DIR}/ws/alpha/.git`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       else if (!hadHead){ git('update-ref', '-d', 'HEAD'); git('rm', '-q', '--cached', 'VERSION'); }
       if (!hadVersion) rmSync(`${DIR}/ws/alpha/VERSION`, { force: true });
       rmSync(`${DIR}/ws/alpha/dist/app-1.0.apk`, { force: true });
@@ -2644,7 +2644,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
          && /sdkmanager .*--uninstall system-images;android-34;google_apis;x86_64/.test(rf.log),
          `...which runs aerie emu image there, and sdkmanager uninstalls it (${rf?.state}: ${
            (rf?.log || '').slice(-400).replace(/\n/g, ' / ')})`);
-      rmSync(`${PK}/android/cmdline-tools`, { recursive: true, force: true });
+      rmSync(`${PK}/android/cmdline-tools`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
     // A recipe's system packages (the catalog's `system.apt`). This agent is
     // not root and has no sandbox stamp, so it is not the one to install

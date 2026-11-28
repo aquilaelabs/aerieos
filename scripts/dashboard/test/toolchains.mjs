@@ -583,7 +583,7 @@ await section("the two meanings of SDK_ROOT", async () => {
   const nv = (bound, inst, loaded) => {
     rm(`${devd}/driver`, { force: true });
     if (bound){ mkdirSync(`${sysr}/bus/pci/drivers/${bound}`, { recursive: true }); ln(`${sysr}/bus/pci/drivers/${bound}`, `${devd}/driver`); }
-    rm(`${sysr}/module`, { recursive: true, force: true });
+    rm(`${sysr}/module`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     if (loaded){ mkdirSync(`${sysr}/module/nvidia`, { recursive: true }); wf(`${sysr}/module/nvidia/version`, loaded + '\n'); }
     wf(`${fbin}/modinfo`, inst ? `#!/bin/sh\necho ${inst}\n` : '#!/bin/sh\nexit 1\n', { mode: 0o755 });
     return execFileSync('bash', ['-c', `. ${JSON.stringify(LIB)}; . ${JSON.stringify(SDK)}; sdk_nvidia_line`],
@@ -661,7 +661,7 @@ await section("the versions a project pins are cards on its node's Library", asy
   const stray = await api('/api/toolchains', { action: 'install', names: ['android:ndk;1.2.3'], node: sb.id, accept: ["Google's Android SDK terms"] });
   ok(/nothing selected/.test(stray.error || ''), `...and a version nobody pins is still refused (${stray.error})`);
   await api('/api/toolchains', { action: 'abort', node: sb.id });
-  rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true });
+  rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   rmSync(`${DIR}/sandboxdata/census-extra.json`, { force: true });
   await api('/api/prefs', { project: 'alpha', node: '' });
 });

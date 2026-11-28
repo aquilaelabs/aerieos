@@ -1561,7 +1561,7 @@ await section("the Profile tab", async () => {
         const denied = await sign({ action: 'release-sign', why: 'again' });
         if (ask) await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: ask.id }) });
         await bare('/api/prefs', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ project: 'alpha', sign: 'ask' }) });
-        rmSync(`${DIR}/ws/alpha/.github`, { recursive: true, force: true });
+        rmSync(`${DIR}/ws/alpha/.github`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
         ok(none.status === 400 && /no unsigned APK/.test(none.body.error || '')
            && read.status === 200 && read.body.release?.wanted === true && typeof read.body.release.why === 'string'
            && Array.isArray(read.body.attention) && !JSON.stringify(read.body).includes('"pw"')
@@ -1571,7 +1571,7 @@ await section("the Profile tab", async () => {
       }
       await bare('/api/signing', { method: 'POST', headers: ownerAuth,
         body: JSON.stringify({ action: 'backup-password', project: 'alpha', current: 'a-backup-password', new: '' }) });
-      rmSync(`${DIR}/state/signing/alpha`, { recursive: true, force: true });
+      rmSync(`${DIR}/state/signing/alpha`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       // aerie version release (R138): a session asks to tag and publish its
       // own project's release, under its dial. What could not be released is
       // refused before anybody is asked; Ask names the tag and the commit to
@@ -1663,7 +1663,7 @@ await section("the Profile tab", async () => {
           ok(no.status === 403 && /Tag and publish a release/.test(no.body.error || '') && [400, 403].includes(elsewhere.status),
              `...at Deny an edit is refused naming the same setting, and another space's release is never its to edit (${no.status}/${elsewhere.status})`);
         }
-        rmSync(R, { recursive: true, force: true });
+        rmSync(R, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       }
       // ...and how busy a node is (R108), for its own project only.
       const nb = await bare('/api/node-busy?project=beta', { headers: sessAuth });
@@ -1785,7 +1785,7 @@ await section("the Profile tab", async () => {
            `a new owner changes the backup password only with the one it already has (${blind.status}/${told.status})`);
         await post(ownerAuth, '/api/members', { action: 'set', project: 'alpha', owner: 'test' });
         rmSync(`${DIR}/state/signing/alpha/backup-lock.json`, { force: true });
-        rmSync(`${DIR}/state/signing/alpha`, { recursive: true, force: true });
+        rmSync(`${DIR}/state/signing/alpha`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
       }
       const view = await post(ownerAuth, '/api/members', { action: 'view', project: 'gamma' });
       const set = await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: true });

@@ -38,7 +38,7 @@ const bb = (...a) => {
 
 // A project with three commits and a target of 0.4.0. The ordinal is the
 // commit count, so it is knowable rather than guessed at.
-rmSync(ROOT, { recursive: true, force: true });
+rmSync(ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(ROOT, { recursive: true });
 execFileSync('git', ['-C', ROOT, 'init', '-q', '.'], { env });
 writeFileSync(`${ROOT}/a.txt`, 'one');
@@ -123,7 +123,7 @@ ok(r.code === 0 && readFileSync(`${ROOT}/VERSION`, 'utf8').trim() === '0.4.0', '
 // is read by everything after this.
 await section("the release: the second gesture, and the outward-facing one", async () => {
   const R = `${WS}/relproj`;
-  rmSync(R, { recursive: true, force: true });
+  rmSync(R, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(R, { recursive: true });
   execFileSync('git', ['-C', R, 'init', '-q', '.'], { env });
   writeFileSync(`${R}/f`, 'x');
@@ -163,7 +163,7 @@ print(json.dumps(m.release('relproj', **json.loads(${
   rel = relOf({ push: false });
   ok(!rel.ok && /v1\.2\.0 already exists/.test(rel.error || ''),
      `...and what is beside the commit is never read: with VERSION saying 1.3.0 uncommitted, the release is still the commit's 1.2.0 (${rel.error})`);
-  rmSync(R, { recursive: true, force: true });
+  rmSync(R, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // ---- the commit that ships is not always the one you are standing on -------
@@ -179,8 +179,8 @@ print(json.dumps(m.release('relproj', **json.loads(${
 await section("the commit that ships is not always the one you are standing on", async () => {
   const P = `${WS}/shipproj`;
   const REMOTE = `${DIR}/shipproj.git`;
-  rmSync(P, { recursive: true, force: true });
-  rmSync(REMOTE, { recursive: true, force: true });
+  rmSync(P, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(REMOTE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   execFileSync('git', ['init', '-q', '--bare', REMOTE], { env });
   mkdirSync(P, { recursive: true });
   execFileSync('git', ['-C', P, 'init', '-q', '-b', 'main', '.'], { env });
@@ -228,8 +228,8 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
   ok(r.ok && r.tag === 'v2.0.0',
      `...and on the commit the branch is actually at, the release goes through (${
        r.tag || r.error})`);
-  rmSync(P, { recursive: true, force: true });
-  rmSync(REMOTE, { recursive: true, force: true });
+  rmSync(P, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(REMOTE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // ---- start: the first version, and nothing after ---------------------------
@@ -238,7 +238,7 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
 // session write the first VERSION was to hand it the bumping too.
 await section("start: the first version, and nothing after", async () => {
   const S = `${WS}/startpol`;
-  rmSync(S, { recursive: true, force: true });
+  rmSync(S, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(S, { recursive: true });
   execFileSync('git', ['-C', S, 'init', '-q', '.'], { env });
   writeFileSync(`${S}/f`, 'x');
@@ -261,7 +261,7 @@ await section("start: the first version, and nothing after", async () => {
   ok(t.code !== 0 && /first version and no more/.test(t.out)
      && readFileSync(`${S}/VERSION`, 'utf8').trim() === '0.1.0',
      '...and may not move it afterwards, which is the whole point of the policy');
-  rmSync(S, { recursive: true, force: true });
+  rmSync(S, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // ---- the bump commits one path -------------------------------------------
@@ -305,7 +305,7 @@ git('checkout', '-q', '--', 'VERSION');
 // commit only knows tracked paths, so without the add this wrote the file
 // and then failed, leaving it half-mutated.
 const FRESH = `${WS}/fresh-version`;
-rmSync(FRESH, { recursive: true, force: true });
+rmSync(FRESH, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(FRESH, { recursive: true });
 execFileSync('git', ['-C', FRESH, 'init', '-q', '.'], { env });
 writeFileSync(`${FRESH}/f`, 'x');
@@ -320,7 +320,7 @@ try {
 } catch (e) { rf = { out: (e.stdout + '' + e.stderr).toString(), code: e.status }; }
 ok(rf.code === 0 && /0\.1\.0 -> 0\.1\.1/.test(rf.out),
    'a never-committed VERSION can still be bumped and committed');
-rmSync(FRESH, { recursive: true, force: true });
+rmSync(FRESH, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 // ---- degrading honestly --------------------------------------------------
 // A malformed file must not hand back a git-describe string that could end up
@@ -336,7 +336,7 @@ git('checkout', '-q', '--', 'VERSION');
 // its section. Left unreleased they would ride into the next bump and be
 // labeled as changes since a release they are part of.
 const Y = `${WS}/young`;
-rmSync(Y, { recursive: true, force: true });
+rmSync(Y, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(Y, { recursive: true });
 execFileSync('git', ['-C', Y, 'init', '-q', '.'], { env });
 writeFileSync(`${Y}/f`, 'x');
@@ -381,12 +381,12 @@ yb('version', 'init', '0.1.0');
 const born = yb('changelog').out;
 ok(/## 0\.1\.0: \d{4}-\d{2}-\d{2}/.test(born) && !/## Unreleased/.test(born),
    '...and init dates the accrued entries as the first version\u2019s section');
-rmSync(Y, { recursive: true, force: true });
+rmSync(Y, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 // A project that has not adopted this still answers: the point is that every
 // project can be asked, not that every project has opted in.
 const BARE = `${WS}/unversioned`;
-rmSync(BARE, { recursive: true, force: true });
+rmSync(BARE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(BARE, { recursive: true });
 execFileSync('git', ['-C', BARE, 'init', '-q', '.'], { env });
 writeFileSync(`${BARE}/f`, 'x');
@@ -422,8 +422,8 @@ ok(bare('--msi').code !== 0,
    '...but a format that cannot be produced without one refuses');
 ok(/no VERSION file/.test(bare().out), '...and says how to opt in');
 
-rmSync(ROOT, { recursive: true, force: true });
-rmSync(BARE, { recursive: true, force: true });
+rmSync(ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+rmSync(BARE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 // ---- a repo that ships two products --------------------------------------
 // One number cannot state two maturities: an extension at 2.1 beside a new
@@ -431,7 +431,7 @@ rmSync(BARE, { recursive: true, force: true });
 // its ordinal counts only the commits that touched it; otherwise a shipped
 // extension appears to change every time the app beside it is edited.
 const M = `${WS}/two-products`;
-rmSync(M, { recursive: true, force: true });
+rmSync(M, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(`${M}/extension`, { recursive: true });
 mkdirSync(`${M}/app`, { recursive: true });
 execFileSync('git', ['-C', M, 'init', '-q', '.'], { env });
@@ -744,7 +744,7 @@ ok(reopened.indexOf('## Unreleased') !== -1
 // number keeps its section, and a plain bump keeps the one it leaves.
 await section("set renumbers a version nobody released", async () => {
   const R = `${WS}/renumber`;
-  rmSync(R, { recursive: true, force: true });
+  rmSync(R, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(R, { recursive: true });
   execFileSync('git', ['-C', R, 'init', '-q', '.'], { env });
   writeFileSync(`${R}/VERSION`, '0.1.0\n');
@@ -821,14 +821,14 @@ ok(!/deep/.test(mb('--list').out),
 const deep = mb('init', '0.1.0', '--for', 'deep/lib');
 ok(deep.code !== 0 && /one level under/.test(deep.out),
    '...and init refuses to create one there');
-rmSync(M, { recursive: true, force: true });
+rmSync(M, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 // ---- taking a bump back, while it is still nobody's release --------------
 // The code never reverts; the number returns and the changelog section the
 // bump dated dissolves into Unreleased with whatever was logged after, so
 // the next bump dates the whole group as one release.
 const U = `${WS}/rethink`;
-rmSync(U, { recursive: true, force: true });
+rmSync(U, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(U, { recursive: true });
 execFileSync('git', ['-C', U, 'init', '-q', '.'], { env });
 writeFileSync(`${U}/f`, 'x');
@@ -872,14 +872,14 @@ ok(/already returned/.test(ub('version', 'unbump').out),
 const goneVerb = ub('version', 'suggest');
 ok(goneVerb.code !== 0, 'the mechanical estimate is gone, not merely unused');
 
-rmSync(U, { recursive: true, force: true });
+rmSync(U, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 // ---- putting the question to the session ---------------------------------
 // The estimate a function can make is a starting input, not the answer: a
 // session can read the code and be argued with. The prompt has to carry the
 // policy, because what it may do about the answer differs.
 const AK = `${WS}/askme`;
-rmSync(AK, { recursive: true, force: true });
+rmSync(AK, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(AK, { recursive: true });
 execFileSync('git', ['-C', AK, 'init', '-q', '.'], { env });
 writeFileSync(`${AK}/f`, 'x');
@@ -925,7 +925,7 @@ ok(/is at 0\.4\.0: is that still right\?/.test(holds.text)
    'with a version, the ask becomes "is this still right"');
 ok(holds.text.length < 250,
    `...and that one is short too (${holds.text.length} chars)`);
-rmSync(AK, { recursive: true, force: true });
+rmSync(AK, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 // ---- the same module, in the Artifacts tab head --------------------------
 // The display answers "what is this at" and needs no decision. The buttons
@@ -1485,7 +1485,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
 // than on the shared fixture, whose ordinal everything above depends on.
 await section("a repo's own stamps travel with the number", async () => {
   const S = `${WS}/stampproj`;
-  rmSync(S, { recursive: true, force: true });
+  rmSync(S, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   mkdirSync(`${S}/tools`, { recursive: true });
   execFileSync('git', ['-C', S, 'init', '-q', '.'], { env });
   writeFileSync(`${S}/VERSION`, '0.4.0\n');
@@ -1579,7 +1579,7 @@ await section("a repo's own stamps travel with the number", async () => {
     await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ project: 'alpha', node: '' }) });
   });
-  rmSync(S, { recursive: true, force: true });
+  rmSync(S, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // A project with no session says so rather than silently doing nothing.
@@ -1603,8 +1603,8 @@ ok((await page.errors).every(e => /400/.test(e)),
 // with a bare remote, the branch merged the way a pull request merges it.
 await section("where a bump lands", async () => {
   const L = `${WS}/landproj`, REMOTE = `${DIR}/landproj.git`;
-  rmSync(L, { recursive: true, force: true });
-  rmSync(REMOTE, { recursive: true, force: true });
+  rmSync(L, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(REMOTE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   const g = (...a) => execFileSync('git', ['-C', L, ...a], { encoding: 'utf8', env }).trim();
   execFileSync('git', ['init', '-q', '--bare', REMOTE], { env });
   mkdirSync(L, { recursive: true });
@@ -1738,8 +1738,8 @@ await section("where a bump lands", async () => {
   g('checkout', '-q', 'main');
   ok(!/branch\s/.test(lb().out), '...and on main, level with the remote, it says nothing');
   await page.evaluate(() => { tabs.filter(t => t.kind === 'notebook' && t.arg === 'landproj').forEach(t => dropTab(t.id)); });
-  rmSync(L, { recursive: true, force: true });
-  rmSync(REMOTE, { recursive: true, force: true });
+  rmSync(L, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(REMOTE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // The briefing every session is handed. It is read into the prompt of every
@@ -1760,13 +1760,13 @@ await section("The briefing every session is handed", async () => {
 // fresh() removes stray projects but does not reach inside a fixture, so the
 // commits and the VERSION file this planted in alpha and beta have to go;
 // otherwise every later file runs against projects this one changed.
-for (const d of [A, B]) rmSync(`${d}/.git`, { recursive: true, force: true });
+for (const d of [A, B]) rmSync(`${d}/.git`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 rmSync(`${A}/VERSION`, { force: true });
 rmSync(`${A}/a.txt`, { force: true });
 rmSync(`${A}/b.txt`, { force: true });
 rmSync(`${B}/readme.txt`, { force: true });
 rmSync(`${B}/VERSION`, { force: true });
-rmSync(`${B}/sub`, { recursive: true, force: true });
+rmSync(`${B}/sub`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 execFileSync('git', ['-C', A, 'init', '-q', '.'], { env });
 execFileSync('git', ['-C', B, 'init', '-q', '.'], { env });
 execFileSync('git', ['-C', A, 'remote', 'add', 'origin',

@@ -1022,6 +1022,6 @@ await section("A project read-only to you reads its design with nothing to press
   ok(drawn && ro.shown.length === 0 && ro.fields > 0 && !/Write the file/.test(ro.hint),
      `a read-only design draws no press that would change it, its fields there to read (${JSON.stringify({ drawn, ...ro, hint: ro.hint.slice(0, 50) })})`);
 });
-rmSync(`${DIR}/ws/${P}/docs`, { recursive: true, force: true });
+rmSync(`${DIR}/ws/${P}/docs`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
 await done(browser);

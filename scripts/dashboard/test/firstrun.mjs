@@ -151,7 +151,7 @@ await section("a bare-metal install's first run", async () => {
   process.on('exit', () => ctrls.forEach(p => { try { p.kill('SIGKILL'); } catch (e) { /* gone */ } }));
   const controller = async (kind, { noOwner = false } = {}) => {
     const w = `${DIR}/firstrun-${kind}`;
-    rmSync(w, { recursive: true, force: true });
+    rmSync(w, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     for (const d of ['config', 'workspace', 'home']) mkdirSync(`${w}/${d}`, { recursive: true });
     const env = { ...process.env, DASHBOARD_STATE: `${w}/config`, WORKSPACE: `${w}/workspace` };
     // Nobody's yet when asked (a move's destination, R90 step 12).

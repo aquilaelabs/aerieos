@@ -1411,7 +1411,10 @@ await section("A rename that carries a new token in the same save", async () => 
      `renaming with a new token in the same save works, the directory staying put (${r.status}: ${JSON.stringify(r.body).slice(0, 120)})`);
   ok(/^http:\/\/oauth2:gitea0123456789abcdef0123456789abcdef@git\.home\.lan:3000$/.test(line),
      `...and the token is stored for the remote's host, port and scheme (${line.replace(/:[^@]*@/, ':…@')})`);
-  rmSync(`${DIR}/ws/tokrn`, { recursive: true, force: true });
+  // Tried again while the server still writes into the tree it is leaving
+  // (ENOTEMPTY under a gate's load): every recursive removal in the
+  // suites retries the way this one does.
+  rmSync(`${DIR}/ws/tokrn`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   rmSync(`${DIR}/state/gitcreds/tokrn`, { force: true });
 });
 
@@ -1473,7 +1476,7 @@ ok(true, '...into a space of its own, as one deleted before spaces came first');
 
 // Destroying one asks for the name to be typed. A click is not enough for the
 // one control here with nothing behind it.
-rmSync(`${DIR}/ws/oldproj`, { recursive: true, force: true });
+rmSync(`${DIR}/ws/oldproj`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 mkdirSync(`${DIR}/ws/.trash/oldproj`, { recursive: true });
 writeFileSync(`${DIR}/ws/.trash/oldproj/keep.txt`, 'still here\n');
 await page.evaluate(() => drawTrash());

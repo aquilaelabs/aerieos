@@ -156,7 +156,7 @@ await section("The vetted catalog", async () => {
   const after = await page.$eval(G, g => g.textContent.replace(/\s+/g, ' '));
   ok(/does not match|no catalog key/.test(toast) && /No mirror imported/.test(after),
      `a mirror whose index another key signed is refused on Import, said, and nothing is held (${toast})`);
-  rmSync(`${DIR}/mirror-src`, { recursive: true, force: true });
+  rmSync(`${DIR}/mirror-src`, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   rmSync(arc, { force: true });
 });
 // Sections, and a page of settings (the operator, 16 Oct): a list of them
