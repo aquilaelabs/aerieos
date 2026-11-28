@@ -231,9 +231,14 @@ def asked_proof(key, nonce):
     return hmac.new(key, b"asked\0" + str(nonce).encode(), hashlib.sha256).hexdigest()
 
 
-def fetch_proof(key, nonce):
-    """The new controller's right to pull the bundle, once per nonce."""
-    return hmac.new(key, b"fetch\0" + str(nonce).encode(), hashlib.sha256).hexdigest()
+def fetch_proof(key, nonce, at=None):
+    """The new controller's right to pull the bundle, once per nonce, at
+    `at` by its own clock: the old controller holds the time to its own, so
+    a proof read off the wire is worth nothing once its nonce has been
+    forgotten. With no `at`, the form a controller from before proofs
+    carried a time checks, which a pull still sends beside this one."""
+    timed = b"" if at is None else b"\0" + str(int(at)).encode()
+    return hmac.new(key, b"fetch\0" + str(nonce).encode() + timed, hashlib.sha256).hexdigest()
 
 
 def _key():
@@ -1240,11 +1245,14 @@ def tick():
 # ---- the pull (R175 step 5) ------------------------------------------------------
 
 def serve_fetch(q):
-    """GET /api/v1/move/bundle?hash=..&nonce=..&proof=.. on the old
+    """GET /api/v1/move/bundle?hash=..&nonce=..&at=..&tproof=.. on the old
     controller: the new install pulling the bundle with a proof derived
-    from the token (HMAC(key, fetch\0nonce)), the bundle packed fresh for
-    it; a nonce is good once and for NONCE_LIFE. (path, "") or ("", why,
-    status)."""
+    from the token (HMAC(key, fetch\0nonce\0at)), the bundle packed fresh
+    for it. A nonce is good once, and its time has to be within half of
+    NONCE_LIFE of this clock, either way: nonces are remembered for the
+    whole of it, so a proof cannot outlive the memory of its nonce. A pull
+    whose proof carries no time (an install older than this one) is
+    refused. (path, "") or ("", why, status)."""
     d = _load()
     if not armed():
         return "", "no move is prepared here", 404
@@ -1253,9 +1261,16 @@ def serve_fetch(q):
     if str(q.get("hash") or "") != str(d.get("token_hash") or ""):
         return "", "not this controller's move", 403
     nonce = str(q.get("nonce") or "")[:64]
-    if not nonce or not hmac.compare_digest(str(q.get("proof") or ""), fetch_proof(_key(), nonce)):
-        return "", "the proof does not verify", 403
     now = int(time.time())
+    try:
+        at = int(str(q.get("at") or ""))
+    except ValueError:
+        return "", "this pull's proof carries no time, as an install older than this controller sends it: update the install that is pulling, then pull again", 403
+    if not nonce or not hmac.compare_digest(str(q.get("tproof") or ""), fetch_proof(_key(), nonce, at)):
+        return "", "the proof does not verify", 403
+    if abs(now - at) > NONCE_LIFE // 2:
+        return "", (f"the two controllers' clocks differ by about {max(1, abs(now - at) // 60)} minutes, and a pull's proof is good for "
+                    f"{NONCE_LIFE // 120}: set the time on both, then pull again"), 403
     with _lock:
         d = _load()
         used = {k: v for k, v in (d.get("fetch_nonces") or {}).items() if now - int(v) < NONCE_LIFE}
@@ -1295,8 +1310,11 @@ def fetch_bundle(old_url, token, dest):
     if not old_url.startswith(("http://", "https://")):
         return "the old controller's address is where its page is reached, as http:// or https://"
     key = key_of(token)
-    nonce = secrets.token_hex(16)
-    q = urllib.parse.urlencode({"hash": token_hash(token), "nonce": nonce, "proof": fetch_proof(key, nonce)})
+    nonce, at = secrets.token_hex(16), int(time.time())
+    # Both forms of the proof: the timed one a controller of this release
+    # holds a pull to, and the one without, which is all an older one reads.
+    q = urllib.parse.urlencode({"hash": token_hash(token), "nonce": nonce, "proof": fetch_proof(key, nonce),
+                                "at": at, "tproof": fetch_proof(key, nonce, at)})
     req = urllib.request.Request(f"{old_url}/api/v1/move/bundle?{q}", headers={"User-Agent": "AerieOS"})
     try:
         with urllib.request.urlopen(req, timeout=3600, context=_peer_ctx()) as r:

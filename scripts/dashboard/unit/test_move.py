@@ -13,6 +13,7 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -625,6 +626,36 @@ class Move(unittest.TestCase):
         self.assertIn("not an AerieOS move bundle", why)
 
 
+    def test_a_pull_sends_the_timed_proof_and_the_one_an_older_controller_reads(self):
+        asked = []
+
+        class Answer:
+            headers = {"Content-Length": "5"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self, n=-1):
+                self.read = lambda n=-1: b""
+                return b"hello"
+
+        def urlopen(req, **kw):
+            asked.append(req.full_url)
+            return Answer()
+        token = move.new_token()
+        key = move.key_of(token)
+        with mock.patch.object(move.urllib.request, "urlopen", urlopen):
+            self.assertEqual(move.fetch_bundle("https://old.example/", token, str(self.tmp / "pulled")), "")
+        q = {k: v[0] for k, v in move.urllib.parse.parse_qs(move.urllib.parse.urlparse(asked[0]).query).items()}
+        self.assertEqual(q["hash"], move.token_hash(token))
+        self.assertEqual(q["tproof"], move.fetch_proof(key, q["nonce"], int(q["at"])))
+        self.assertEqual(q["proof"], move.fetch_proof(key, q["nonce"]))
+        self.assertNotEqual(q["proof"], q["tproof"])
+        self.assertLess(abs(int(q["at"]) - time.time()), 5)
+
     def test_the_landing_is_told_both_ways_and_the_pull_is_proved(self):
         r = move.prepare("user:ann", "https://new.example")
         token, key = r["token"], move.key_of(r["token"])
@@ -640,7 +671,9 @@ class Move(unittest.TestCase):
         self.assertEqual(move.take_landing({"hash": th, "at": 5, "proof": move.landed_proof(key, 5)})[0]["moved"], True, "told twice is one answer")
         # The pull's proof (R175 step 5): refused after the move, so a
         # fresh old controller is armed for it.
-        self.assertEqual(move.serve_fetch({"hash": th, "nonce": "n1", "proof": move.fetch_proof(key, "n1")})[2], 410)
+        now = int(time.time())
+        pull = lambda nonce, at=now, **kw: move.serve_fetch({"hash": th, "nonce": nonce, "at": at, "tproof": move.fetch_proof(key, nonce, at), **kw})  # noqa: E731
+        self.assertEqual(pull("n1")[2], 410)
         self.configure(self.state, bare=False)
         move.forget("user:ann") if not move.moved_to() else None
         state2 = self.tmp / "config2"
@@ -648,14 +681,27 @@ class Move(unittest.TestCase):
         self.configure(state2, bare=False)
         r = move.prepare("user:ann", "")
         token, key, th = r["token"], move.key_of(r["token"]), move.token_hash(r["token"])
-        self.assertEqual(move.serve_fetch({"hash": th, "nonce": "n1", "proof": "bad"})[2], 403)
-        path, why, st = move.serve_fetch({"hash": th, "nonce": "n1", "proof": move.fetch_proof(key, "n1")})
+        self.assertEqual(move.serve_fetch({"hash": th, "nonce": "n1", "at": now, "tproof": "bad"})[2], 403)
+        # A proof with no time in it, which is all an older install sends,
+        # is refused in a sentence that says what to do; so is a time that
+        # is not now by this clock, and a proof made for another time.
+        got = move.serve_fetch({"hash": th, "nonce": "n0", "proof": move.fetch_proof(key, "n0")})
+        self.assertEqual(got[2], 403)
+        self.assertIn("update the install that is pulling", got[1])
+        for late in (now - move.NONCE_LIFE, now + move.NONCE_LIFE):
+            got = pull("n0", late)
+            self.assertEqual(got[2], 403, late)
+            self.assertIn("clocks differ", got[1])
+        self.assertEqual(move.serve_fetch({"hash": th, "nonce": "n0", "at": now, "tproof": move.fetch_proof(key, "n0", now - 60)})[2], 403)
+        path, why, st = pull("n1")
         self.assertTrue(st == 200 and Path(path).is_file() and Path(path).name == move.status()["bundle"], (path, why))
-        self.assertEqual(move.serve_fetch({"hash": th, "nonce": "n1", "proof": move.fetch_proof(key, "n1")})[2], 403, "a nonce is good once")
+        self.assertEqual(pull("n1")[2], 403, "a nonce is good once")
         self.assertEqual(self.audits[-1][0], "move-bundle-pulled")
+        # ...and its nonce is remembered for as long as its time could pass.
+        self.assertGreaterEqual(move.NONCE_LIFE, 2 * (move.NONCE_LIFE // 2))
         # The bundle is packed fresh: a record written after Prepare is in it.
         (state2 / "later.json").write_text("{}")
-        path, why, st = move.serve_fetch({"hash": th, "nonce": "n2", "proof": move.fetch_proof(key, "n2")})
+        path, why, st = pull("n2")
         m, _ = move.read_manifest(path)
         self.assertEqual(m["counts"]["state"], 3, "the record, the users and the later file")
         # The new side answering the old one's asking (R175 step 4), once

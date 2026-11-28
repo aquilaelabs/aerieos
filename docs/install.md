@@ -464,7 +464,9 @@ container to a machine of its own, and back.
    what the move takes, in order and on that page: on a stick its disks and where
    the spaces go, then the bundle, or the old controller's address while it
    still runs (the new home pulls the bundle from it, packed at that moment,
-   under a proof derived from the token). The token given on the first page
+   under a proof derived from the token that is good once and for five
+   minutes by the old controller's clock, so the two clocks have to agree to
+   within that). The token given on the first page
    is kept for the landing, sealed, so it is not asked for again; where the
    old controller ran on the same machine the step asks for the bundle alone.
    Until the move lands, signing in from
