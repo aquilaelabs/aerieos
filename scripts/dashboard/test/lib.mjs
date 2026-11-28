@@ -416,9 +416,15 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       .then(parts => { const said = parts.join(' '); if (!cutByNet(said)) page.errors[i] = said + at; }).catch(() => {});
   });
   // ...and a name the cut script would have defined, missed right after it.
+  // WebKit's cancel line comes here, not to the console: its source is the
+  // script's, which Playwright raises as a page error, the line cut at its
+  // first colon into a name and a message ("...cannot load http: /127...",
+  // one slash gone), which is the form cutByWebKit reads. Forgiven on the
+  // console alone, it failed cards, sessions, roadmap and mouse under a
+  // gate's load.
   page.on('pageerror', e => {
     const t = String(e);
-    if (cutByNet(t)) return;
+    if (cutByNet(t) || cutByWebKit(t)) return;
     page.errors.push(t);
   });
   page.on('dialog', d => { page.dialogs.push(d.message()); d.accept(); });
