@@ -70,6 +70,7 @@
 - A space's Running sessions row lines up with its section: its End ended 16px short of the section's other controls, and its name stood in from the label over it (1c39f1f)
 - With the Library and Installed side by side on two nodes, a press on one (Install, Remove, Check for updates, system packages) goes to its own page's node: it went to whichever page had read last (b224b83)
 - A node that enrolls, is drained or stops answering while Storage, nginx, Files or another page of its group is on show is said so in the group's header there; its picker and state pill kept the old list until the Nodes page was opened (c98e872)
+- A star, group, lock or color set on a space no longer goes back for a moment, and a group's chip pressed meanwhile no longer returns to All, when the page takes on another browser's tabs or closes an ended session's tab before the save is answered (4d33761)
 
 ### Security
 
