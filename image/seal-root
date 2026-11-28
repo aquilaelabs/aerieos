@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# A root slot sealed: a dm-verity hash tree written after the squashfs's own
+# bytes, in the same file, and the tree's root hash put into the slot's
+# initrd, which opens the slot through it at boot
+# (scripts/local-top/aerieos-os-verity) and refuses a root that is not the
+# one this initrd was built beside. One file is still one slot: whatever
+# copies the root whole (lay-disk, an update, a kept older version, the ISO)
+# carries its tree with it, and a root changed on the disk afterwards is not
+# read: a changed block is an I/O error, and a changed tree does not open.
+#
+#   seal-root SQUASHFS INITRD      prints the root hash
+#
+# The hash rides in the initrd as one more archive on its end (the kernel
+# unpacks each in turn), holding /etc/aerieos-verity: HASH, and BYTES, the
+# slot's length with its tree, which the copy into memory reads. Nothing
+# here needs root. build.sh runs it; the boot test seals a changed root with
+# it to see the change refused.
+set -euo pipefail
+die() { echo "seal-root: $*" >&2; exit 1; }
+[ $# -eq 2 ] || { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+SQ="$1"; INITRD="$2"
+[ -f "$SQ" ] && [ -f "$INITRD" ] || die "no such file: $SQ or $INITRD"
+for t in veritysetup cpio od sha256sum truncate; do command -v "$t" >/dev/null 2>&1 || die "$t is not here (cryptsetup-bin, cpio, coreutils)"; done
+BLOCK=4096
+[ "$(head -c 4 "$SQ")" = hsqs ] || die "$SQ is not a squashfs"
+# The squashfs superblock's bytes_used, at offset 40, little-endian: where
+# its own bytes end. The tree starts at the next block.
+USED="$(od -An -t u8 -j 40 -N 8 "$SQ" | tr -d ' ')"
+OFF=$(( (USED + BLOCK - 1) / BLOCK * BLOCK ))
+SIZE="$(stat -c %s "$SQ")"
+[ "$SIZE" -le "$OFF" ] || die "$SQ is longer than its squashfs ($SIZE bytes against $OFF): sealed already, or not a root as mksquashfs left it"
+truncate -s "$OFF" "$SQ"
+# The salt and the tree's UUID from the squashfs's own superblock, so the
+# same root seals to the same bytes.
+SALT="$(head -c 96 "$SQ" | sha256sum | cut -d' ' -f1)"
+UUID="${SALT:0:8}-${SALT:8:4}-${SALT:12:4}-${SALT:16:4}-${SALT:20:12}"
+SAID="$(veritysetup format "$SQ" "$SQ" --hash-offset="$OFF" --data-blocks=$((OFF / BLOCK)) \
+        --data-block-size="$BLOCK" --hash-block-size="$BLOCK" --hash=sha256 --salt="$SALT" --uuid="$UUID")" \
+    || die "veritysetup format failed"
+HASH="$(printf '%s\n' "$SAID" | sed -n 's/^Root hash:[[:space:]]*//p')"
+printf '%s' "$HASH" | grep -Eq '^[0-9a-f]{64}$' || die "veritysetup gave no root hash"
+# The tree's length is the one everything that copies a slot works out
+# (osimage.py's slot_span): a superblock, then a block for every 128 of the
+# level under it, up to one.
+n=$((OFF / BLOCK)); blocks=1
+while [ "$n" -gt 1 ]; do n=$(( (n + 127) / 128 )); blocks=$((blocks + n)); done
+BYTES="$(stat -c %s "$SQ")"
+[ "$BYTES" -eq $((OFF + blocks * BLOCK)) ] || die "the tree is $((BYTES - OFF)) bytes, not the $((blocks * BLOCK)) a slot's readers work out"
+veritysetup verify "$SQ" "$SQ" "$HASH" --hash-offset="$OFF" >/dev/null 2>&1 || die "the sealed root does not verify against its own hash"
+
+# One more archive on the initrd's end, begun on a 512-byte boundary (the
+# kernel takes an archive that is not compressed only at a multiple of four
+# bytes, and skips the zeros before it).
+W="$(mktemp -d)"
+trap 'rm -rf "$W"' EXIT
+mkdir "$W/etc"
+printf 'HASH=%s\nBYTES=%s\n' "$HASH" "$BYTES" > "$W/etc/aerieos-verity"
+chmod 0644 "$W/etc/aerieos-verity"
+touch -d "@${SOURCE_DATE_EPOCH:-0}" "$W/etc/aerieos-verity"
+truncate -s "$(( ($(stat -c %s "$INITRD") + 511) / 512 * 512 ))" "$INITRD"
+( cd "$W" && printf 'etc/aerieos-verity\n' | cpio -o -H newc -R 0:0 --reproducible --quiet ) >> "$INITRD" \
+    || die "the hash did not go onto the initrd"
+printf '%s\n' "$HASH"

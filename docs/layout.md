@@ -40,6 +40,7 @@ image/                           AerieOS, the appliance image the installed edit
   grub.cfg                       GRUB's menu on the ESP: the two slots, bb_slot from grubenv naming the one to boot
   iso-grub.cfg                   the ISO's menu: the same root run live from the medium, and where a new machine starts; it offers no installer
   lay-disk                       one disk laid out as AerieOS: the partitions, GRUB for both firmwares, slot A and the data partition; build.sh runs it on a loop device, the installer on a person's disk
+  seal-root                      a root slot sealed: its dm-verity tree written after the squashfs in the same file, the tree's root hash put on the end of the initrd that boots it; build.sh runs it, and it needs no root
   ovf.xml                        the OVA's descriptor (the VM disk for VMware and VirtualBox, R160 step 3), its marks filled by build.sh
   build.sh                       the build: mkosi, the squashfs, the disk on a loop device with GRUB for UEFI and BIOS, the stamps
 scripts/

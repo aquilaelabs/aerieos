@@ -44,9 +44,17 @@ case "$slotdev" in PARTUUID=*) dev="/dev/disk/by-partuuid/${slotdev#PARTUUID=}" 
 i=0
 while [ ! -b "$dev" ] && [ "$i" -lt 200 ]; do sleep 0.1; i=$((i + 1)); done
 [ -b "$dev" ] || panic "AerieOS: the slot to load into RAM ($slotdev) is not here"
-# The squashfs superblock's bytes_used, at offset 40, little-endian.
+# The squashfs superblock's bytes_used, at offset 40, little-endian; a
+# sealed slot is longer by its dm-verity tree, and this initrd says by how
+# much (BYTES in /etc/aerieos-verity, image/seal-root), so the copy carries
+# the tree the root is then opened through.
 bytes="$(od -An -t u8 -j 40 -N 8 "$dev" 2>/dev/null | tr -d ' ')"
 case "$bytes" in ''|*[!0-9]*) panic "AerieOS: $dev does not hold a squashfs" ;; esac
+if [ -r /etc/aerieos-verity ]; then
+    while IFS='=' read -r k v; do
+        case "$k:$v" in BYTES:*[!0-9]*|BYTES:) ;; BYTES:*) [ "$v" -gt "$bytes" ] && bytes="$v" ;; esac
+    done < /etc/aerieos-verity
+fi
 mb=$(( (bytes + 1048575) / 1048576 ))
 mkdir -p /run/bbroot
 mount -t tmpfs -o "size=$((mb + 64))m,mode=0700" tmpfs /run/bbroot || panic "AerieOS: no memory for the root slot ($mb MB)"

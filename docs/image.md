@@ -482,6 +482,31 @@ boot came from), `other`, `next [a|b]` (the one GRUB boots next time, which
 is what an update sets once it has written the other slot) and `status`.
 An updated slot's trial and Safe mode are under [Updating](#updating).
 
+### The root is sealed
+
+A slot's root is read through dm-verity. The build writes the root's hash
+tree after the squashfs, in the same file (`image/seal-root`), and puts the
+tree's root hash into the initrd that boots it, as one more archive on the
+initrd's end holding `/etc/aerieos-verity`. At boot the initramfs opens the
+slot through that tree (`scripts/local-top/aerieos-os-verity`) and the
+system's root is `/dev/mapper/aerieroot`: an initrd mounts the one root it
+was built beside. A slot whose tree does not answer to the hash is not
+opened, and the boot stops saying so, where the other slot is on the menu
+(a slot on trial goes back by itself, as any boot that fails does); a block
+changed on the disk afterwards is an I/O error when it is read, never the
+changed bytes. The copy a stick loads into memory and a kept older version's
+file are opened the same way, since each is the slot's file whole, its tree
+with it.
+
+What this holds is the root as built against a disk that changed under it:
+a failing drive, a write that went to the wrong partition, a root edited
+from another system. It is not yet a chain from the firmware: the kernel,
+the initrd and GRUB's menu on the ESP are not signed, so somebody who can
+write the ESP can replace the initrd and its hash with it. `/etc` and
+`/usr/local` are overlays whose changes live on the data partition, outside
+the seal, as they must to be kept. An image built before roots were sealed
+has no tree and no hash, and boots as it always did.
+
 ## Building it
 
 CI builds the image on a hosted runner with a workflow of its own,
@@ -535,8 +560,12 @@ the release carries, against its build attestation (`gh attestation
 verify`, held to the release workflow on a version's tag; an image that
 does not verify, or a machine without `gh`, writes nothing) and against
 the signed list, opens it read-only and takes the root, the kernel, the initrd and
-the stamp out of its `live/` folder as plain files, points the next boot
-back at the slot running now, writes the slot not in use, puts the kernel
+the stamp out of its `live/` folder as plain files, holds the root to its
+dm-verity hash (`live/verity`, which the initrd must carry too: every block
+of the root and of its tree is read, so a root its own initrd would not
+open is never written over the slot there is to fall back to), points the next boot
+back at the slot running now, writes the slot not in use, reads the slot
+back against the same hash, puts the kernel
 beside it on the ESP, and only then names that slot for the next boot, on
 trial, in one write. An update is refused while the slot running now is
 itself on trial, since the other slot is then the only good one, and when

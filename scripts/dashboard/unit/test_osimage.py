@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import agentpkg  # noqa: E402
+import sealedroot  # noqa: E402
 
 
 class Job:
@@ -45,7 +46,7 @@ def sha(data):
 
 # Where image/build.sh puts each piece on the ISO.
 IN_ISO = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
-          "initrd": "live/initrd", "release": "live/release"}
+          "initrd": "live/initrd", "release": "live/release", "verity": "live/verity"}
 
 
 class World:
@@ -101,14 +102,23 @@ class World:
         with open(os.path.join(self.d, "release-signers"), "w") as f:
             f.write(f"aerieos-release {kind} {pub}\n")
 
-    def publish(self, version, bad=False, without=""):
+    def publish(self, version, bad=False, without="", sealed=False, change=None):
         """The release's ISO under rel/vVERSION with its sha256: here a tar
         holding the ISO's live/ folder, which the test's mount unpacks. `bad`
-        makes the sha256 file lie; `without` leaves a piece out."""
+        makes the sha256 file lie; `without` leaves a piece out. `sealed` is
+        an image whose root carries its dm-verity tree (image/seal-root),
+        the hash on the ISO and in the initrd; `change` is handed the pieces
+        to change one after the seal."""
         d = os.path.join(self.d, "rel", "v" + version)
         os.makedirs(d, exist_ok=True)
         files = {"root.squashfs": b"hsqs" + version.encode() * 300, "vmlinuz": b"MZkernel" + version.encode(),
                  "initrd": b"initrd" + version.encode(), "release": f"BUILDERBOT_OS_VERSION={version}\n".encode()}
+        if sealed:
+            root, want = sealedroot.seal(sealedroot.root(version.encode(), blocks=200))
+            files.update({"root.squashfs": root, "verity": (want + "\n").encode(),
+                          "initrd": sealedroot.initrd(want, len(root), b"initrd" + version.encode())})
+            if change:
+                change(files)
         live = os.path.join(self.d, "live-" + version)
         os.makedirs(os.path.join(live, "live"), exist_ok=True)
         for piece, data in files.items():
@@ -192,6 +202,72 @@ class TheAgent(unittest.TestCase):
             uuid = re.search(rf"^{key}=([0-9a-f-]+)", sh, re.M).group(1)
             self.assertEqual(self.av.SLOT_DEV[slot], f"/dev/disk/by-partuuid/{uuid}")
         self.assertEqual(str(self.av.SLOT_MIB), re.search(r"^BB_SIZE_SLOT_MIB=(\d+)", sh, re.M).group(1))
+
+    def test_a_sealed_root_is_held_to_its_hash_before_the_slot_is_written_and_as_it_reads_back(self):
+        w = World(slot="a")
+        _, files = w.publish("0.9.1", sealed=True)
+        state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertLess(text.index("the root is the one its dm-verity hash names"), text.index("slot b reads back as the root its dm-verity hash names"))
+        with open(w.dev["b"], "rb") as f:
+            self.assertEqual(f.read(), files["root.squashfs"], "the root whole, its tree with it")
+        with open(os.path.join(w.esp, "aerieos", "b", "initrd"), "rb") as f:
+            self.assertEqual(f.read(), files["initrd"])
+        self.assertFalse(os.path.exists(os.path.join(w.esp, "aerieos", "b", "verity")), "the hash that boots is the initrd's own")
+        self.assertEqual(open(w.nextf).read().strip(), "b")
+
+    def test_a_sealed_root_that_does_not_answer_to_its_hash_is_never_written(self):
+        def flip(files):
+            b = bytearray(files["root.squashfs"])
+            b[150 * 4096 + 7] ^= 1
+            files["root.squashfs"] = bytes(b)
+
+        def other_hash(files):
+            files["verity"] = b"0" * 64 + b"\n"
+            files["initrd"] = sealedroot.initrd("0" * 64, 1)
+
+        def initrd_of_another(files):
+            files["initrd"] = sealedroot.initrd("1" * 64, 1)
+
+        def no_hash(files):
+            files["verity"] = b"not a hash\n"
+        for change, said in ((flip, "the image's root is not the root its tree was made of"), (other_hash, "answers to another hash"),
+                             (initrd_of_another, "the image's initrd does not carry the root hash the image names"),
+                             (no_hash, "the image's initrd does not carry the root hash the image names")):
+            w = World(slot="a")
+            w.publish("0.9.1", sealed=True, change=change)
+            state, code, text = self.run_update(w, {"release": "v0.9.1"})
+            self.assertEqual((state, code), ("failed", 69), text)
+            self.assertIn(said, text)
+            self.assertIn("nothing written", text)
+            with open(w.dev["b"], "rb") as f:
+                self.assertEqual(f.read(), b"\0" * 4096, "the slot to fall back to is as it was")
+            self.assertFalse(os.path.exists(w.trialf))
+
+    def test_a_slot_that_reads_back_changed_is_not_the_next_boot(self):
+        w = World(slot="a")
+        w.publish("0.9.1", sealed=True)
+        real, calls = self.av.verity_why, []
+
+        def why(path, want):
+            calls.append(path)
+            return real(path, want) if len(calls) == 1 else "is not the root its tree was made of: a block of it was changed or did not write"
+        with mock.patch.object(self.av, "verity_why", side_effect=why):
+            state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 71), text)
+        self.assertEqual(calls[1], w.dev["b"], "the second look is at the slot itself")
+        self.assertIn("slot b as written is not the root its tree was made of", text)
+        self.assertIn("the next boot stays on slot a", text)
+        self.assertEqual(open(w.nextf).read().strip(), "a")
+        self.assertFalse(os.path.exists(w.trialf))
+        self.assertFalse(os.path.exists(os.path.join(w.esp, "aerieos", "b", "vmlinuz")), "no kernel beside a slot that did not take")
+
+    def test_an_image_built_before_roots_were_sealed_is_written_and_said(self):
+        w = World(slot="a")
+        w.publish("0.9.1")
+        state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertIn("0.9.1 was built before roots were sealed", text)
 
     def test_the_census_says_the_image_the_slot_and_the_next(self):
         w = World(slot="b")

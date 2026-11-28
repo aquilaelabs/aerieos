@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the appliance image: the Debian tree by mkosi, pinned
-# to image/SNAPSHOT, sealed as a read-only squashfs and laid into a disk with
+# to image/SNAPSHOT, sealed as a read-only squashfs with its dm-verity tree
+# (image/seal-root) and laid into a disk with
 # two root slots, GRUB for UEFI and BIOS, and a data partition. Root, since
 # mkosi installs packages and the disk is assembled on a loop device.
 #
@@ -12,9 +13,10 @@
 #   aerieos-os-VERSION.qcow2          the same disk for Proxmox, libvirt and other QEMU hosts, which the boot test runs
 #   aerieos-os-VERSION.raw.xz         with --all-disks: the whole disk, for an installed machine or a VM
 #   aerieos-os-VERSION.ova            with --all-disks: the same disk for VMware and VirtualBox (a stream-optimized VMDK with its descriptor)
-#   aerieos-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot
+#   aerieos-os-VERSION.root.squashfs  one root slot with its dm-verity tree, what an update writes into the other slot
 #   aerieos-os-VERSION.vmlinuz        the slot's kernel and initrd, kept on the ESP beside it
-#   aerieos-os-VERSION.initrd
+#   aerieos-os-VERSION.initrd         ...the initrd carrying the tree's root hash, so it mounts this root and no other
+#   aerieos-os-VERSION.verity         that root hash, which an update holds the slot it wrote to
 #   aerieos-os-VERSION.release        the stamp the image carries at /usr/lib/aerieos-os/release
 #   aerieos-os-VERSION.packages       every package in it with its version, for the weekly rebuild's diff
 # A release carries two of them, the ISO and the stick (build-image.yml's
@@ -44,7 +46,7 @@ MKOSI_PIN="${MKOSI_PIN:-25.3}"
 GH_PIN=2.102.0
 GH_SHA256=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
 
-usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "build.sh: $*" >&2; exit 1; }
 say() { printf '\n== %s\n' "$*"; }
 
@@ -174,6 +176,17 @@ for d in dev proc sys run tmp; do
         || die "the root squashfs has no /$d, so the boot would have nowhere to mount it"
 done
 SQ_MIB=$(( ($(stat -c %s "$OUT/$NAME.root.squashfs") + 1048575) / 1048576 ))
+# Sealed: its dm-verity tree after it in the same file, the tree's root hash
+# into the initrd that boots it (image/seal-root), so every copy of the slot
+# made from here on, the disk's, the ISO's and an update's, is the root this
+# initrd opens and a changed one is not.
+need veritysetup "cryptsetup-bin"
+need cpio "cpio"
+say "the root's dm-verity tree"
+bash "$HERE/seal-root" "$OUT/$NAME.root.squashfs" "$OUT/$NAME.initrd" > "$OUT/$NAME.verity"
+grep -Eqx '[0-9a-f]{64}' "$OUT/$NAME.verity" || die "seal-root gave no root hash"
+echo "   root hash $(cat "$OUT/$NAME.verity")"
+SQ_MIB=$(( ($(stat -c %s "$OUT/$NAME.root.squashfs") + 1048575) / 1048576 ))
 [ "$SQ_MIB" -lt "$BB_SIZE_SLOT_MIB" ] || die "the root squashfs is ${SQ_MIB} MiB and a slot holds ${BB_SIZE_SLOT_MIB}: fewer packages, or a bigger slot in image/partitions.sh"
 
 # ---- the disk ---------------------------------------------------------------
@@ -206,6 +219,7 @@ cp "$OUT/$NAME.root.squashfs" "$ISO/live/filesystem.squashfs"
 install -m 0644 "$OUT/$NAME.vmlinuz" "$ISO/live/vmlinuz"
 install -m 0644 "$OUT/$NAME.initrd" "$ISO/live/initrd"
 install -m 0644 "$OUT/$NAME.release" "$ISO/live/release"
+install -m 0644 "$OUT/$NAME.verity" "$ISO/live/verity"
 install -m 0644 "$HERE/iso-grub.cfg" "$ISO/boot/grub/grub.cfg"
 # Its own words kept, and said when it fails: hidden, a failure was one line
 # with no reason (seen in CI, 30 Oct). What follows -- is xorriso's own
@@ -257,7 +271,7 @@ if [ "$ALL_DISKS" = 1 ]; then xz -q -T0 -6 "$RAW"; else rm -f "$RAW"; fi
 xz -q -T0 -6 "$STICK"
 
 # ---- the stamps -------------------------------------------------------------
-( cd "$OUT" && for f in "$NAME.raw.xz" "$NAME.stick.raw.xz" "$NAME.iso" "$NAME.qcow2" "$NAME.ova" "$NAME.root.squashfs" "$NAME.vmlinuz" "$NAME.initrd" "$NAME.release" "$NAME.packages"; do
+( cd "$OUT" && for f in "$NAME.raw.xz" "$NAME.stick.raw.xz" "$NAME.iso" "$NAME.qcow2" "$NAME.ova" "$NAME.root.squashfs" "$NAME.vmlinuz" "$NAME.initrd" "$NAME.verity" "$NAME.release" "$NAME.packages"; do
     [ ! -f "$f" ] || sha256sum "$f" > "$f.sha256"; done )
 say "done"
 for f in "$OUT/$NAME".*; do printf '   %s  %s\n' "$(stat -c %s "$f")" "$(basename "$f")"; done

@@ -1,0 +1,53 @@
+#!/bin/sh
+# The root slot opened through its dm-verity tree before it is mounted: the
+# tree follows the squashfs on the slot (image/seal-root), and its root hash
+# is in this initramfs, at /etc/aerieos-verity, so this initrd mounts the
+# one root it was built beside and no other. A slot whose tree does not
+# answer to that hash is not opened and the boot stops here, saying so; a
+# block of it changed later reads as an I/O error. The slot on the disk,
+# its copy in memory (aerietoram=1) and a kept older version's file are all
+# opened the same way, and the root the boot mounts is /dev/mapper/aerieroot,
+# which this hands on through /conf/param.conf.
+#
+# An initrd with no hash in it (a build before this one, or the ISO booted
+# live, whose root is live-boot's) mounts its root as before.
+PREREQ="aerieos-os-toram"
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+# shellcheck source=/dev/null  # the initramfs's own library
+. /scripts/functions
+[ -r /etc/aerieos-verity ] || exit 0
+hash=""
+while IFS='=' read -r k v; do
+    case "$k" in HASH) hash="$v" ;; esac
+done < /etc/aerieos-verity
+[ -n "$hash" ] || exit 0
+root=""
+read -r cmdline < /proc/cmdline
+for w in $cmdline; do
+    case "$w" in boot=live) exit 0 ;; root=*) root="${w#root=}" ;; esac
+done
+case "$root" in
+    PARTUUID=*) dev="/dev/disk/by-partuuid/${root#PARTUUID=}" ;;
+    /dev/*) dev="$root" ;;
+    *) panic "AerieOS: the boot named no root to verify (root=$root)" ;;
+esac
+i=0
+while [ ! -b "$dev" ] && [ "$i" -lt 200 ]; do sleep 0.1; i=$((i + 1)); done
+[ -b "$dev" ] || panic "AerieOS: the root slot ($root) is not here"
+# The squashfs superblock's bytes_used, at offset 40, little-endian: the
+# tree starts at the next 4096-byte block after it.
+bytes="$(od -An -t u8 -j 40 -N 8 "$dev" 2>/dev/null | tr -d ' ')"
+case "$bytes" in ''|*[!0-9]*) panic "AerieOS: $dev does not hold a squashfs" ;; esac
+off=$(( (bytes + 4095) / 4096 * 4096 ))
+modprobe -q dm_mod 2>/dev/null || true
+modprobe -q dm_verity 2>/dev/null || true
+if ! said="$(veritysetup open "$dev" aerieroot "$dev" "$hash" --hash-offset="$off" 2>&1)"; then
+    echo "<2>AerieOS: the root on $dev is not the one this version was built with: $said" > /dev/kmsg 2>/dev/null || true
+    panic "AerieOS: the root on $dev is not the one this version was built with (its dm-verity tree does not answer to the hash this boot carries): the slot was changed or is damaged. Restart and pick the other slot from the boot menu; an update writes this one again. ($said)"
+fi
+i=0
+while [ ! -b /dev/mapper/aerieroot ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+[ -b /dev/mapper/aerieroot ] || panic "AerieOS: the verified root did not appear at /dev/mapper/aerieroot"
+echo "ROOT=/dev/mapper/aerieroot" >> /conf/param.conf
+echo "<5>AerieOS: the root is verified, dm-verity over $dev" > /dev/kmsg 2>/dev/null || true

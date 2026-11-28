@@ -15,6 +15,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import agentpkg  # noqa: E402
+import sealedroot  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 EXTRA = os.path.join(ROOT, "image", "mkosi.extra")
@@ -84,6 +85,21 @@ class Keeping(unittest.TestCase):
         for word in ('submenu "Older versions" --id older', "--id kept-0.9.1", "aeriekept=0.9.1", ",gpt5)", "/lib/aerieos-os/kept/0.9.1/vmlinuz",
                      "root=/dev/loop0", "panic=15", "export aerie_data"):
             self.assertIn(word, menu)
+
+    def test_a_sealed_root_is_kept_with_its_tree(self):
+        # The kept initrd opens the root through its dm-verity tree as it did
+        # in the slot, so the copy is the squashfs and the tree after it.
+        dev, where = self.w.slot("0.9.2")
+        root, want = sealedroot.seal(sealedroot.root(blocks=140))
+        with open(dev, "wb") as f:
+            f.write(root + b"\xff" * 20000)
+        said = []
+        av.keep_slot(said.append, dev, where, 3)
+        self.assertIn("kept as an older version", "".join(said))
+        kept = os.path.join(av.kept_dir(), "0.9.2", "root.squashfs")
+        with open(kept, "rb") as f:
+            self.assertEqual(f.read(), root, "the root and its tree, and none of the partition after them")
+        self.assertEqual(av.verity_why(kept, want), "")
 
     def test_a_copy_kept_already_is_never_replaced_by_the_slot(self):
         # A slot whose write was cut short still read as its old version, and

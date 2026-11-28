@@ -4,3 +4,6 @@ squashfs
 overlay
 ext4
 loop
+# The root is opened through its dm-verity tree (scripts/local-top/aerieos-os-verity).
+dm_mod
+dm_verity

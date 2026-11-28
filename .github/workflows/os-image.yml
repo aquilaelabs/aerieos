@@ -100,7 +100,7 @@ jobs:
             done
             return 1
           }
-          apt_tools squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils \
+          apt_tools squashfs-tools cryptsetup-bin cpio dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils \
             python3-setuptools python3-setuptools-scm
           # Debian 13's archive keys, newer than the runner's own keyring
           # package, from the same snapshot the image is pinned to.

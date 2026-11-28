@@ -10,6 +10,12 @@ takes the slot, its kernel, its initrd and its release stamp out of the
 ISO's live/ folder, writes the other slot, puts its kernel beside it, names
 it for the next boot, and asks for a restart; nothing running changes until
 then, and the slot that runs now is the one to fall back to.
+
+A root is sealed (image/seal-root): its dm-verity tree follows the squashfs
+in the same file, and the initrd that boots it carries the tree's root
+hash. An update holds the root to that hash before it writes the slot and
+again as the slot reads back, so a slot that would not open at boot is
+never the next boot.
 """
 import contextlib
 import hashlib
@@ -163,10 +169,126 @@ def unlisted(listed, name, digest, tag):
 # Each piece of a slot, and where image/build.sh puts it on the ISO.
 PIECES = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
           "initrd": "live/initrd", "release": "live/release"}
+# ...and the root's dm-verity hash, which an image built before roots were
+# sealed does not have.
+PIECES_SINCE = {"verity": "live/verity"}
 # A release's version by its tag, the v left out or not: a stable one, or a
 # pre-release in PRE_TAG's shape (-dev.N, -rc.N), as the controller and the
 # signature's check take them.
 VER_RE = re.compile(r"v?(\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?)")
+
+
+# ---- a sealed root: the squashfs and its dm-verity tree ----
+# The tree as veritysetup writes it (format 1, sha256, 4096-byte blocks,
+# image/seal-root): a superblock at the first block after the squashfs, then
+# each level of hashes from the top one down to the one over the data, 128
+# hashes to a block. Read here in Python, so an update checks a slot on
+# whatever root it runs from, with or without veritysetup.
+VERITY_BLOCK = 4096
+VERITY_FAN = VERITY_BLOCK // 32
+
+
+def _verity_super(sb):
+    """{data_blocks, salt} for a tree's superblock as seal-root makes one,
+    else None."""
+    if len(sb) < 512 or sb[:8] != b"verity\0\0":
+        return None
+    version, hash_type = int.from_bytes(sb[8:12], "little"), int.from_bytes(sb[12:16], "little")
+    algorithm = sb[32:64].rstrip(b"\0")
+    data_block, hash_block = int.from_bytes(sb[64:68], "little"), int.from_bytes(sb[68:72], "little")
+    salt_size = int.from_bytes(sb[80:82], "little")
+    if (version, hash_type, algorithm, data_block, hash_block) != (1, 1, b"sha256", VERITY_BLOCK, VERITY_BLOCK) or salt_size > 256:
+        return None
+    return {"data_blocks": int.from_bytes(sb[72:80], "little"), "salt": bytes(sb[88:88 + salt_size])}
+
+
+def _verity_levels(data_blocks):
+    """The blocks of each level of the tree, from the one over the data up
+    to the one block at the top."""
+    out, n = [], data_blocks
+    while n > 1:
+        n = -(-n // VERITY_FAN)
+        out.append(n)
+    return out
+
+
+def _sealed(f):
+    """(where the squashfs in the open slot `f` ends, its tree's superblock
+    or None); (0, None) where `f` holds no squashfs."""
+    f.seek(0)
+    head = f.read(48)
+    if len(head) < 48 or head[:4] != b"hsqs":
+        return 0, None
+    used = int.from_bytes(head[40:48], "little")
+    off = -(-used // VERITY_BLOCK) * VERITY_BLOCK
+    f.seek(off)
+    sup = _verity_super(f.read(512))
+    if sup and sup["data_blocks"] * VERITY_BLOCK != off:
+        sup = None
+    return used, sup
+
+
+def slot_span(f):
+    """How many bytes of the open slot `f` (a partition, or a file) its root
+    takes: the squashfs, and the dm-verity tree where one follows it. 0
+    where it holds no squashfs."""
+    used, sup = _sealed(f)
+    if not sup:
+        return used
+    return (sup["data_blocks"] + 1 + sum(_verity_levels(sup["data_blocks"]))) * VERITY_BLOCK
+
+
+def verity_why(path, want):
+    """Why the root at `path` (a slot's partition, or its file) is not the
+    one whose dm-verity root hash is `want`; "" when every block of it and
+    of its tree is."""
+    try:
+        with open(path, "rb") as f:
+            used, sup = _sealed(f)
+            if not used:
+                return "holds no squashfs"
+            if not sup:
+                return "has no dm-verity tree after its squashfs"
+            seed = hashlib.sha256(sup["salt"])
+
+            def digests(of, blocks):
+                out = bytearray()
+                left = blocks
+                while left:
+                    chunk = of.read(min(left, 1024) * VERITY_BLOCK)
+                    if len(chunk) % VERITY_BLOCK or not chunk:
+                        raise OSError("it ends early")
+                    view = memoryview(chunk)
+                    for i in range(0, len(chunk), VERITY_BLOCK):
+                        h = seed.copy()
+                        h.update(view[i:i + VERITY_BLOCK])
+                        out += h.digest()
+                    left -= len(chunk) // VERITY_BLOCK
+                return bytes(out)
+
+            levels = _verity_levels(sup["data_blocks"])
+            # Where each level starts: the top one first after the superblock.
+            at, pos = {}, sup["data_blocks"] + 1
+            for i in reversed(range(len(levels))):
+                at[i] = pos
+                pos += levels[i]
+            f.seek(0)
+            below = digests(f, sup["data_blocks"])
+            for i, blocks in enumerate(levels):
+                f.seek(at[i] * VERITY_BLOCK)
+                stored = f.read(blocks * VERITY_BLOCK)
+                if len(stored) != blocks * VERITY_BLOCK:
+                    raise OSError("it ends before its dm-verity tree does")
+                if stored != below.ljust(blocks * VERITY_BLOCK, b"\0"):
+                    return ("is not the root its tree was made of: a block of it was changed or did not write" if i == 0
+                            else "has a dm-verity tree that does not hold together")
+                f.seek(at[i] * VERITY_BLOCK)
+                below = digests(f, blocks)
+            if below.hex() != want:
+                return "is not the root this image's initrd opens: its dm-verity tree answers to another hash"
+    except OSError as e:
+        return f"could not be read whole: {e}"
+    return ""
 
 
 def os_work():
@@ -421,11 +543,12 @@ def _keep_slot(say, dev, where, keep):
         return
     try:
         with open(dev, "rb") as f:
-            head = f.read(48)
-            if head[:4] != b"hsqs":
+            # The root whole: its dm-verity tree with it, which the kept
+            # initrd opens it through as it did in the slot.
+            used = slot_span(f)
+            if not used:
                 say(f"{ver} is not kept: its slot does not hold a squashfs\n")
                 return
-            used = int.from_bytes(head[40:48], "little")
             _prune_kept(keep - 1, say, spare=ver)
             st = os.statvfs(kept_dir() if os.path.isdir(kept_dir()) else os_work())
             if st.f_bavail * st.f_frsize < used + (1 << 30):
@@ -692,9 +815,11 @@ class OsImageMixin:
             return {}
         files = {}
         try:
-            for piece, inside in PIECES.items():
+            for piece, inside in {**PIECES, **PIECES_SINCE}.items():
                 dest = os.path.join(work, piece)
                 at = os.path.join(mnt, inside)
+                if piece in PIECES_SINCE and not os.path.lexists(at):
+                    continue
                 # A piece is a plain file on the ISO itself, never a link
                 # out of it (one to /dev/zero filled the disk).
                 if os.path.islink(at) or not os.path.isfile(at):
@@ -909,6 +1034,26 @@ class OsImageMixin:
         if size > SLOT_MIB * 1048576:
             say(f"the root image is {size >> 20} MB and a slot holds {SLOT_MIB}: nothing written\n")
             return "failed", 69
+        # A sealed root is held to its dm-verity hash before the other slot
+        # is touched: one its own initrd would not open at boot is not
+        # written over the slot there is to fall back to.
+        sealed = ""
+        if "verity" in files:
+            with open(files["verity"], encoding="utf-8", errors="replace") as f:
+                sealed = f.read(200).strip()
+            with open(files["initrd"], "rb") as f:
+                f.seek(max(0, os.path.getsize(files["initrd"]) - 4096))
+                carried = f"HASH={sealed}\n".encode() in f.read()
+            if not re.fullmatch(r"[0-9a-f]{64}", sealed) or not carried:
+                say("refused: the image's initrd does not carry the root hash the image names, so it would not open its root: nothing written\n")
+                return "failed", 69
+            job.step("checking the root")
+            if why := verity_why(files["root.squashfs"], sealed):
+                say(f"refused: the image's root {why}: nothing written\n")
+                return "failed", 69
+            say("the root is the one its dm-verity hash names\n")
+        else:
+            say(f"{ver} was built before roots were sealed: it is written as it is, with no dm-verity tree to hold it to\n")
         dev = env_or(f"BB_OS_DEV_{other.upper()}", SLOT_DEV[other])
         if not os.path.exists(dev):
             say(f"slot {other}'s partition is not here ({dev}): nothing written\n")
@@ -961,6 +1106,13 @@ class OsImageMixin:
         except OSError as e:
             say(f"slot {other} did not take the image: {e}\n")
             return "failed", 71
+        # ...and read back from the slot: what the disk took is what boots.
+        if sealed:
+            job.step(f"checking slot {other}")
+            if why := verity_why(dev, sealed):
+                say(f"slot {other} as written {why}: the next boot stays on slot {cur}, and an update writes it again\n")
+                return "failed", 71
+            say(f"slot {other} reads back as the root its dm-verity hash names\n")
         esp = env_or("BB_OS_ESP", ESP)
         where = os.path.join(esp, "aerieos", other)
         try:
