@@ -54,7 +54,7 @@ class Runner(unittest.TestCase):
     def test_its_modules_are_found_where_it_looks(self):
         self.assertEqual(runner.TIER, TIER)
         mods = sorted(f for f in os.listdir(TIER) if f.startswith("test_") and f.endswith(".py"))
-        self.assertEqual(mods, ["test_root_file_work.py", "test_root_session.py", "test_root_sync.py"])
+        self.assertEqual(mods, ["test_root_deploy_key.py", "test_root_file_work.py", "test_root_session.py", "test_root_sync.py"])
 
     def test_no_module_skips_itself(self):
         # As root in a container everything a test needs is there, so one

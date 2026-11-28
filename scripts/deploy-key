@@ -59,6 +59,17 @@ case "$kind" in
     *) die "usage: deploy-key [make|store|forget] NAME, or --list, --load, --reseal or --take DIR" ;;
 esac
 install -d -m 0700 "$STORE"
+# The store entered, and what was entered checked: the folder above it is the
+# dashboard's account's, which can rename this one aside and put a folder of
+# its own in its place, and a key written there would be that account's to
+# read. So every path below is under the folder this process stands in, not
+# under a name looked up again, and that folder is this account's alone or
+# nothing is read from it or written to it.
+STORE_AT="$STORE"
+cd -P -- "$STORE" 2>/dev/null || die "the deploy-key store ($STORE_AT) is not a folder that can be entered"
+[ "$(stat -c %u .)" = "$(id -u)" ] && [ $(( 8#$(stat -c %a .) & 8#077 )) -eq 0 ] \
+    || die "the deploy-key store ($STORE_AT) is not root's alone (owner $(stat -c %U .), mode $(stat -c %a .)): it was put there by another account, so no key is read from it or written to it. Move it aside as root and add the keys again."
+STORE="."
 file="$STORE/$name"
 
 # The install key's file and the one before it, as boot left them for root
