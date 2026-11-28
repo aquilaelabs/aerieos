@@ -222,6 +222,10 @@ TABLE = (
 )
 
 _BY_ID = {a.id: a for a in TABLE}
+# The shipped agents' ids in the table's order, for a module that must name
+# them. A program that cannot import this one reads lib/agentids.py or
+# carries its own copy, each held to this by unit/test_agentids.py.
+IDS = tuple(_BY_ID)
 
 # ---- what an agent need not ask about ----------------------------------
 # Every coding agent has a permission check of its own (Claude Code's rules
