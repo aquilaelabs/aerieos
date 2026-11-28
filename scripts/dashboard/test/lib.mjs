@@ -1204,7 +1204,14 @@ export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrow
     const icon = c.querySelector('.lcicon'), name = c.querySelector('.lchead .name'), meta = c.querySelector('.lchead .lcmeta');
     const acts = c.querySelector(':scope > .pcacts');
     if (!icon || !name || !acts) return [`${c.dataset.lrow}: no name or verbs`];
+    // A card with no box, or none for its own lines, is said as that, with
+    // what would say why, where it was measured as a row of zeros.
+    const said = () => `hidden ${c.hidden}, visible ${c.checkVisibility?.()}, class ${c.className}, ${c.getAnimations({ subtree: true }).length} animations, its page ${
+      c.closest('.doc')?.className || 'none'}, ${c.parentElement.querySelectorAll(':scope > .lcard').length} cards, the foot ${
+      c.closest('.libone')?.querySelector('.pagemore')?.textContent.replace(/\s+/g, ' ').trim() || 'none'}`;
+    if (!card.width && !card.height) return [`${c.dataset.lrow}: the card is not laid out (${said()})`];
     const own = [icon, name, meta].filter(e => e && r(e).height).map(r);
+    if (!own.length) return [`${c.dataset.lrow}: its icon, name and pills have no box in a card ${Math.round(card.width)} by ${Math.round(card.height)} (${said()})`];
     const top = Math.min(...own.map(b => b.top)), bottom = Math.max(...own.map(b => b.bottom));
     const a = r(acts), n = r(name), wrong = [];
     const mid = a.top + a.height / 2;

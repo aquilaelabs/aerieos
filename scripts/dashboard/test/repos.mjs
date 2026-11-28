@@ -169,8 +169,17 @@ await section("The old address still opens the page, which says its own address"
   // The delay is the case: the next read of the status is held back past the rename's own answer.
   await page.route('**/api/status*', async r => { held++; await new Promise(z => setTimeout(z, 6000)); r.continue().catch(() => {}); });
   const renameTo = async to => {
+    // What the pencil's press went down on is kept, for the wait's own
+    // question should the box never come.
+    await page.evaluate(c => { window.__prn = { card: c, down: 'no press seen' };
+      addEventListener('pointerdown', e => { window.__prn.down = `${e.target.closest?.('[data-prn]') ? 'the pencil' : (e.target.className?.toString() || e.target.tagName).slice(0, 50)} at ${Math.round(e.clientX)},${Math.round(e.clientY)}`; },
+                       { capture: true, once: true }); }, card);
     await page.click(`${card} .pcback [data-prn]`);
-    await page.waitForSelector(`${card} .askline input`, { timeout: 3000 });
+    await page.waitForSelector(`${card} .askline input`, { timeout: 3000,
+      tell: () => { const c = document.querySelector(window.__prn.card), b = c?.querySelector('.pcback [data-prn]')?.getBoundingClientRect();
+        return { down: window.__prn.down, pencil: b ? `${Math.round(b.left + b.width / 2)},${Math.round(b.top + b.height / 2)}` : 'gone',
+                 boxes: [...document.querySelectorAll('.askline')].map(x => `${x.isConnected ? 'in' : 'out of'} the page under ${x.previousElementSibling?.className || 'nothing'}`),
+                 flipped: c?.classList.contains('flipped'), moving: c?.getAnimations({ subtree: true }).length, turned: [...pjEditing], held: projHeld.size, poll: !!refreshBusy }; } });
     await page.fill(`${card} .askline input`, to);
     await page.press(`${card} .askline input`, 'Enter');
   };
