@@ -794,7 +794,7 @@ elif op in ("history", "log"):
             print(f"{'':>32}approved by the operator")
 else:
     # `aerie bug note` has a twin here under another name; a session reaching
-    # for it met the whole usage line (MediaReducer, 7 Oct).
+    # for it met the whole usage line.
     if op == "note":
         print("[builderbot] ERROR: a roadmap item's notes are its details: "
               "aerie roadmap info N [STEP] TEXT", file=sys.stderr)

@@ -35,16 +35,16 @@ class InUse(unittest.TestCase):
 
     def test_a_process_running_from_it_is_named_with_its_project(self):
         d = os.path.join(self.store, "jdk")
-        p = subprocess.Popen(["sleep", "30"], cwd=d, env={**os.environ, "BB_PROJECT": "Shebang-DevBoard"})
+        p = subprocess.Popen(["sleep", "30"], cwd=d, env={**os.environ, "BB_PROJECT": "Sample-TaskBoard"})
         self.addCleanup(p.kill)
         time.sleep(0.2)
         users = agent.tc_users(d)
         mine = [u for u in users if u["pid"] == p.pid]
         self.assertEqual(len(mine), 1, users)
-        self.assertEqual(mine[0]["project"], "Shebang-DevBoard")
+        self.assertEqual(mine[0]["project"], "Sample-TaskBoard")
         said = agent.tc_users_said("jdk", mine).splitlines()
         # Who, with the pid and the session, on a line of its own...
-        self.assertEqual(said[0], f"  in use by sleep (pid {p.pid}, Shebang-DevBoard's session)")
+        self.assertEqual(said[0], f"  in use by sleep (pid {p.pid}, Sample-TaskBoard's session)")
         # ...and the refusal a page shows: one sentence, no pid, no program.
         self.assertEqual(said[-1], "refused: jdk is in use, so it was left as it is: try again once that has finished")
 

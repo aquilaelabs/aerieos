@@ -180,7 +180,7 @@ def admit(me, req):
                 return None, ({"error": f"{shown(project)} is read-only from a session on "
                                         f"{shown(me['session'])}: {why}"}, 403)
         else:
-            # Said by name (MediaReducer, 7 Oct): "this session's token is
+            # Said by name: "this session's token is
             # for another project" sent a session guessing at spellings, and
             # read the same for a project that does not exist.
             if not project or not (WORKSPACE / project).is_dir():

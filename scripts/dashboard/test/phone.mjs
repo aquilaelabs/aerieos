@@ -292,8 +292,8 @@ page.errors = [];   // the refusals above are 400s on purpose
 // runs adb there. The interesting half is the failure: a signature clash is
 // the one that actually happens, and it has to arrive as a sentence.
 mkdirSync(`${DIR}/ws/alpha/dist/android`, { recursive: true });
-writeFileSync(`${DIR}/ws/alpha/dist/android/streamlift-1.2.apk`, 'x');
-writeFileSync(`${DIR}/ws/alpha/dist/streamlift-1.3-clash.apk`, 'x');
+writeFileSync(`${DIR}/ws/alpha/dist/android/stonelift-1.2.apk`, 'x');
+writeFileSync(`${DIR}/ws/alpha/dist/stonelift-1.3-clash.apk`, 'x');
 const instState = async () => (await api('/api/artifacts?project=alpha')).body.install || {};
 // Polled from here, not through page.waitForFunction with an async predicate:
 // that hands the page a Promise, which is truthy at once, and the wait is no
@@ -303,11 +303,11 @@ const instUntil = async (state) => {
   await until(async () => (st = await instState()).state === state, 25000, 250);
   return st;
 };
-const inst = await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' });
+const inst = await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/android/stonelift-1.2.apk' });
 ok(inst.status === 200 && !inst.body.error, `Install on a space whose node holds a phone starts (${JSON.stringify(inst.body).slice(0, 60)})`);
 const first = await instUntil('done');
 ok(first.state === 'done' && first.error === '', `Install runs on the node and reports no error (${JSON.stringify(first)})`);
-await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/streamlift-1.3-clash.apk' });
+await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/stonelift-1.3-clash.apk' });
 const clash = await instUntil('failed');
 ok(/signed with a different key/.test(clash.error),
    `a signature clash is explained, not passed through as INSTALL_FAILED_UPDATE_INCOMPATIBLE (${JSON.stringify(clash)})`);
@@ -330,7 +330,7 @@ ok(theirSum.phone && !theirSum.mine && theirSum.owner?.name === 'test',
 const theirPush = await api('/api/artifacts', { action: 'push', project: 'alpha', path: 'dist/companion-0.2.0.xpi', apk: 'org.mozilla.firefox_beta' }, other);
 ok(theirPush.status === 400 && /connected by test/.test(theirPush.body.error),
    'a push from another account is refused, naming who connected the phone');
-const theirInst = await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' }, other);
+const theirInst = await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/android/stonelift-1.2.apk' }, other);
 ok(theirInst.status === 400 && /connected by test/.test(theirInst.body.error),
    '...and so is an install');
 const pushed = await api('/api/artifacts', { action: 'push', project: 'alpha', path: 'dist/companion-0.2.0.xpi', apk: 'org.mozilla.firefox_beta' });

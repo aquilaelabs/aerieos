@@ -1641,7 +1641,7 @@ cmd_emu() {
             # Started, then waited for while it lives: up to
             # ANDROID_BOOT_TIMEOUT (600s) for one still booting, since a cold
             # boot of a new level on a busy node ran past the old 180 and was
-            # called failed while it booted on (Shebang-DevBoard, 6 Oct); and
+            # called failed while it booted on; and
             # at once for one that has exited, whose reason is in the log.
             # Room for the phone's data on its first boot, said before the
             # start: the emulator makes the userdata partition then, needs a
@@ -2303,7 +2303,7 @@ cmd_catchup() {
         elif ci_hosted_only "$proj"; then
             # Its workflows name no self-hosted runner, so its jobs run on
             # GitHub's machines, which keep the log on GitHub: saying it is on
-            # the node sent Shebang-DevBoard's session to aerie ci-log for a run
+            # the node sent a session to aerie ci-log for a run
             # it never kept.
             echo "  none here: this space's workflows run on GitHub's own runners,"
             echo "  which keep the logs; 'aerie ci-log --list' asks GitHub for them"
@@ -4105,7 +4105,7 @@ run_here() {
         mkdir -p dist
         # A build's files are named the way the briefing asks for shipped
         # output: the project and its version before the file's own name
-        # (Shebang-DevBoard-0.1.0-dev.9-3bf328e-app-debug.apk), so two builds
+        # (Sample-TaskBoard-0.1.0-dev.9-3bf328e-app-debug.apk), so two builds
         # are two files and the Artifacts tab can say which is which. Named
         # as the file is where the version cannot be read. A session copied
         # every APK by hand to get that name, and never used aerie build.
@@ -5088,6 +5088,12 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         section "comments that cite the notebook (a file's count only ever falls)"
         python3 "$BB_LIB/lint-checks.py" cites || rc=1
     fi
+    # Another project of its maker's is never named here: where a bug was
+    # met is said in words, and a sample takes a made-up name.
+    if _lint_own_tree && grep -qF '"unsaid": unsaid' "$BB_LIB/lint-checks.py"; then
+        section "names this repository does not say"
+        python3 "$BB_LIB/lint-checks.py" unsaid || rc=1
+    fi
     # A name defined twice, where the later silently wins.
     if _lint_own_tree && grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
         section "names defined twice (python functions and methods, the page's scripts)"
@@ -5370,7 +5376,7 @@ find_chromium() {
 # One URL takes an optional file (aerie capture shot URL [FILE]). Several URLs share one
 # browser and land in a directory, each named from its path (/ -> index.png).
 # --full and --scale exist because README screenshots need the whole page at
-# 2x, and capabilities MediaReducer's tools/screenshots grew privately before
+# 2x, and capabilities one space's own screenshot tool grew before
 # this subsumed them; --resize is the downscale that keeps those PNGs
 # repo-sized, done by the same Chromium rather than by imagemagick, which is
 # not on a node; --wait absorbs pages whose async fetches settle after
@@ -5682,9 +5688,9 @@ capture_shot() {
 # because the image's ImageMagick writes ICO but carries no SVG delegate,
 # and Chromium renders any SVG exactly the way a browser tab will show it.
 # The mark itself stays the project's own; this is only the packaging every
-# project would otherwise re-learn. (Generalized from the private tool
-# MediaReducer grew for this, minus its PIL dependency, which the container
-# python does not carry.)
+# project would otherwise re-learn. (Generalized from a tool one space
+# grew for this, minus its PIL dependency, which the container python does
+# not carry.)
 # ---- aerie tool: what a toolchain adds to a session, under its own name -----------
 # `aerie tool TOOL COMMAND...`: a toolchain's commands live under the toolchain's
 # name, so two toolchains may both have a `render` or a `shot` and none can
@@ -6660,8 +6666,8 @@ if [ "${1:-}" = -p ] || [ "${1:-}" = --project ]; then
     for p_var in "${BB_PROJECT_VARS[@]}"; do export "$p_var=$p_dir"; done
     export BB_TREE="$WORKSPACE/$p_dir"
     shift 2
-    # Said rather than answered for this project or for nothing
-    # (MediaReducer, 7 Oct): `aerie -p X status` printed this session's own
+    # Said rather than answered for this project or for nothing:
+    # `aerie -p X status` printed this session's own
     # status, and `aerie -p X map find` said "nothing defines" a function X
     # has, because X was added to the reads after the session started and
     # its tree was not in view.
@@ -6708,7 +6714,7 @@ case "${1:-}:${2:-}" in
         done ;;
 esac
 # ...and `aerie bug add -h` for a notebook verb, whose words after the
-# subcommand are a title: it filed a bug called "-h" (MediaReducer, 7 Oct).
+# subcommand are a title: it filed a bug called "-h".
 case "${1:-}:${3:-}" in
     bug:-h|bug:--help|roadmap:-h|roadmap:--help|rules:-h|rules:--help|changelog:-h|changelog:--help)
         verb_help "$1" && exit 0 ;;

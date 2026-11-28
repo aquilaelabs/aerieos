@@ -4,7 +4,7 @@ controller's credential.
 A self-hosted job keeps its log where `aerie ci-log` reads it; a job on
 GitHub's runners keeps it on GitHub, and the API that hands it out wants a
 token even for a public repository. A session holds no token, so it asked
-the person to paste the failing part (Shebang-DevBoard). The
+the person to paste the failing part. The
 controller does hold one: the project's own (gitcreds) or the shared PAT gh
 answers with, and asks GitHub on the session's behalf. Read only: a run is
 listed and a job's log is read, nothing is re-run or stopped.

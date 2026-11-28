@@ -109,8 +109,8 @@ const gitp = await relay(['git', 'push'], 'beta');
 ok(gitp.status === 403 && /acts on the space's own machines/.test(gitp.error || ''),
    `...as is a verb that acts on beta's machines (${gitp.error})`);
 // A project it does not read is named, with where the reads are set, and a
-// name that is no project says that (MediaReducer, 7 Oct: "this session's
-// token is for another project" read the same for both).
+// name that is no project says that ("this session's token is for another
+// project" read the same for both).
 const unreadR = await relay(['roadmap'], 'gamma');
 ok(unreadR.status === 403 && /alpha does not read gamma: its owner adds it under Reads/.test(unreadR.error || ''),
    `a space the session does not read is refused by name, saying where reads are set (${unreadR.error})`);

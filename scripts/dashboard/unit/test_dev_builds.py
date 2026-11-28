@@ -32,7 +32,7 @@ class DevBuilds(unittest.TestCase):
         return name
 
     def test_the_newest_three_builds_stay_whatever_they_are_named(self):
-        # Shebang-DevBoard's dist/ on 6 Oct: its first builds were -debug,
+        # One space's dist/: its first builds were -debug,
         # its later ones -release, and the old name was "the newest of its
         # kind" for good. A build is its number, so the old names go.
         debug = [self.make(f"P-0.1.0-dev.{n}-abcdef{n}-debug.apk") for n in (54, 60, 63)]

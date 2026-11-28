@@ -2348,7 +2348,7 @@ def is_test(path):
     if ("/test/" in "/" + path or path.startswith("test/")) and path.endswith(".mjs"):
         return not path.endswith("/lib.mjs")
     # ...and any script under tests/, __tests__/ or e2e/ but the helpers
-    # beside them: MediaReducer's tests/e2e/e2e_*.mjs read as page scripts
+    # beside them: a space's tests/e2e/e2e_*.mjs read as page scripts
     if TEST_DIR.search("/" + path) and Path(path).suffix in (".js", ".mjs", ".cjs", ".ts", ".tsx") \
             and not TEST_HELPER.match(Path(path).name):
         return True
@@ -2816,7 +2816,7 @@ def page_functions(idx):
 def _decorated(f, line):
     """Whether the python def at `line` carries a decorator: a framework
     reaches it by registration (Flask's @app.route, @app.before_request), never
-    by a call the map could see (MediaReducer's app.py, 11 Oct)."""
+    by a call the map could see (a Flask app's app.py)."""
     try:
         lines = Path(f).read_text(errors="replace").splitlines()
     except OSError:

@@ -71,46 +71,46 @@ class Move(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
         ws = Path(self.tmp) / "ws"
-        for p in ("MediaReducer-Dev", "MediaReducer", "Bare"):
+        for p in ("MeadowPress-Dev", "MeadowPress", "Bare"):
             (ws / p).mkdir(parents=True)
-        for p in ("MediaReducer-Dev", "MediaReducer"):
+        for p in ("MeadowPress-Dev", "MeadowPress"):
             (ws / p / "docker-compose.yml").write_text("services: {}\n")
-        self.nodes = {"MediaReducer-Dev": ["n1"], "MediaReducer": ["n1"], "Bare": ["n1"], "Far": ["n2"]}
+        self.nodes = {"MeadowPress-Dev": ["n1"], "MeadowPress": ["n1"], "Bare": ["n1"], "Far": ["n2"]}
         devapp.configure(workspace=ws, state=self.tmp, write_json=write_json,
                          project_nodes=lambda p: self.nodes.get(p, []),
                          project_node=lambda p: (self.nodes.get(p) or [""])[0])
         write_json(devapp.FILE, {
-            "MediaReducer-Dev": {"main": {"ref": "claude/aquilaelabs-links", "built_ref": "abc"}},
-            "mediareducer-test-plex": {"main": {"source": "file", "for": "MediaReducer-Dev"}}})
+            "MeadowPress-Dev": {"main": {"ref": "claude/aquilaelabs-links", "built_ref": "abc"}},
+            "meadowpress-test-plex": {"main": {"source": "file", "for": "MeadowPress-Dev"}}})
 
     def test_it_keeps_its_name_env_and_data(self):
-        was = (devapp._pname("MediaReducer-Dev"), devapp.env_path("MediaReducer-Dev"))
-        r = devapp.move_instance("MediaReducer-Dev", "main", "MediaReducer")
+        was = (devapp._pname("MeadowPress-Dev"), devapp.env_path("MeadowPress-Dev"))
+        r = devapp.move_instance("MeadowPress-Dev", "main", "MeadowPress")
         self.assertTrue(r.get("ok"), r)
         self.assertEqual((r["instance"], r["name"], r["dropped_ref"]),
-                         ("mediareducer-dev", "mediareducer-dev", "claude/aquilaelabs-links"))
-        self.assertEqual((devapp._pname("MediaReducer", "mediareducer-dev"),
-                          devapp.env_path("MediaReducer", "mediareducer-dev")), was)
+                         ("meadowpress-dev", "meadowpress-dev", "claude/aquilaelabs-links"))
+        self.assertEqual((devapp._pname("MeadowPress", "meadowpress-dev"),
+                          devapp.env_path("MeadowPress", "meadowpress-dev")), was)
         d = devapp._load()
-        self.assertNotIn("MediaReducer-Dev", d)
-        rec = d["MediaReducer"]["mediareducer-dev"]
+        self.assertNotIn("MeadowPress-Dev", d)
+        rec = d["MeadowPress"]["meadowpress-dev"]
         self.assertEqual(rec.get("node"), "n1", "pinned where its data is")
         self.assertNotIn("ref", rec)
-        self.assertEqual(devapp.owner_of("MediaReducer", "mediareducer-dev"), "MediaReducer")
-        self.assertEqual(devapp.compose_file("MediaReducer", "mediareducer-dev").parent.name, "MediaReducer")
+        self.assertEqual(devapp.owner_of("MeadowPress", "meadowpress-dev"), "MeadowPress")
+        self.assertEqual(devapp.compose_file("MeadowPress", "meadowpress-dev").parent.name, "MeadowPress")
 
     def test_what_it_refuses(self):
-        self.assertIn("space picker", devapp.move_instance("mediareducer-test-plex", "main", "MediaReducer")["error"])
-        self.assertIn("no compose file", devapp.move_instance("MediaReducer-Dev", "main", "Bare")["error"])
-        self.assertIn("another space", devapp.move_instance("MediaReducer-Dev", "main", "MediaReducer-Dev")["error"])
-        self.assertIn("no instance", devapp.move_instance("MediaReducer-Dev", "nope", "MediaReducer")["error"])
+        self.assertIn("space picker", devapp.move_instance("meadowpress-test-plex", "main", "MeadowPress")["error"])
+        self.assertIn("no compose file", devapp.move_instance("MeadowPress-Dev", "main", "Bare")["error"])
+        self.assertIn("another space", devapp.move_instance("MeadowPress-Dev", "main", "MeadowPress-Dev")["error"])
+        self.assertIn("no instance", devapp.move_instance("MeadowPress-Dev", "nope", "MeadowPress")["error"])
         (Path(self.tmp) / "ws" / "Far").mkdir()
         (Path(self.tmp) / "ws" / "Far" / "compose.yml").write_text("services: {}\n")
-        self.assertIn("out of reach", devapp.move_instance("MediaReducer-Dev", "main", "Far")["error"])
+        self.assertIn("out of reach", devapp.move_instance("MeadowPress-Dev", "main", "Far")["error"])
         d = devapp._load()
-        d["MediaReducer"] = {"mediareducer-dev": {}}
+        d["MeadowPress"] = {"meadowpress-dev": {}}
         write_json(devapp.FILE, d)
-        self.assertIn("already has", devapp.move_instance("MediaReducer-Dev", "main", "MediaReducer")["error"])
+        self.assertIn("already has", devapp.move_instance("MeadowPress-Dev", "main", "MeadowPress")["error"])
 
 
 if __name__ == "__main__":

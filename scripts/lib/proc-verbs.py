@@ -5,9 +5,8 @@ This account's processes whose command line holds PATTERN, read from /proc
 and never the ones this call runs under: its own shell, the tool call that
 started it and everything above them. That is the whole difference from
 `pgrep -f` and `pkill -f` run from a tool call, which match the call's own
-shell because the pattern is on its command line (on Turing Lens, 14
-Oct, a cleanup step killed its own run that way, and a wait loop on
-`! pgrep -f` could never end).
+shell because the pattern is on its command line (a cleanup step killed
+its own run that way, and a wait loop on `! pgrep -f` could never end).
 
   aerie proc PATTERN              pid, how long it has run, and its command line
   aerie proc stop PATTERN         SIGTERM to each, SIGKILL to what is left after

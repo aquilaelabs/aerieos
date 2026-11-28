@@ -412,7 +412,7 @@ def start_(project, instance, mode, node, name="", env=None, data="unpack"):
     # builds an image: the build needs the context the file names, which is
     # on the node it was written for and never on a hosting node. Built on
     # arrival instead, BuildKit refused the context on a node with no code
-    # and the move went back with both down (turinglens). One that
+    # and the move went back with both down. One that
     # only pulls images still rebuilds wherever it lands.
     ship = target not in (devapp.nodes_of(owner) or []) and (rec.get("source") != "file" or builds_image(project, instance))
     if mode == "copy":
@@ -454,7 +454,7 @@ def start_(project, instance, mode, node, name="", env=None, data="unpack"):
     # starts it again), one that is down or stopped is left as it is. A
     # `start` on one with no containers (a Down before the move) exited 1
     # and failed the whole job, the data already sent, and the way back
-    # after a failed move left turinglens-registry down at home.
+    # after a failed move left a registry's container down at home.
     with devapp.on_node(old_node):
         was_up = bool(_a()._running(project, instance))
     plan = {"mode": mode, "from": instance, "to": dest, "old": old_node, "new": target,

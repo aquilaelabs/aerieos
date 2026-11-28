@@ -1,4 +1,4 @@
-"""aerie map's C and C++ scanner (report #74 from Shebang-DevBoard): a
+"""aerie map's C and C++ scanner (report #74): a
 function is its header at file, namespace or class level, a type is
 `struct|union|enum|class NAME {` or a typedef's name, a prototype is
 neither and is no call, calls are made inside functions, and a JNI
@@ -28,7 +28,7 @@ static void log_to_logcat(enum ggml_log_level level, const char * text, void * u
 }
 
 JNIEXPORT jlong JNICALL
-Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path) {
+Java_dev_sample_taskboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path) {
     whisper_log_set(log_to_logcat, NULL);
     struct whisper_context * ctx = whisper_init((const char *) "a{b}c");
     for (int i = 0; i < 3; i++) { whisper_free(ctx); }
@@ -67,7 +67,7 @@ class CScanner(unittest.TestCase):
         s = scan(C)
         got = sorted((d["kind"], d["name"]) for d in s.defs)
         self.assertEqual(got, [("class", "ggml_log_level"), ("class", "pair_t"), ("decl", "whisper_full"),
-                               ("def", "Java_dev_shebang_devboard_voice_Whisper_nativeInit"),
+                               ("def", "Java_dev_sample_taskboard_voice_Whisper_nativeInit"),
                                ("def", "log_to_logcat"), ("jni", "nativeInit"), ("macro", "LOG")])
         log = next(d for d in s.defs if d["name"] == "log_to_logcat")
         self.assertEqual((log["line"], log["end"]), (13, 15))
@@ -91,7 +91,7 @@ class CScanner(unittest.TestCase):
         s = scan(C)
         calls = {(c["name"], c["caller"]) for c in s.calls}
         self.assertIn(("__android_log_print", "log_to_logcat"), calls)
-        self.assertIn(("whisper_free", "Java_dev_shebang_devboard_voice_Whisper_nativeInit"), calls)
+        self.assertIn(("whisper_free", "Java_dev_sample_taskboard_voice_Whisper_nativeInit"), calls)
         self.assertNotIn("whisper_full", {c["name"] for c in s.calls}, "a prototype is not a call")
         self.assertNotIn("for", {c["name"] for c in s.calls})
         self.assertNotIn("whisper_init", {c["name"] for c in s.calls if c["caller"] == "(top level)"})
@@ -103,7 +103,7 @@ class CScanner(unittest.TestCase):
     def test_the_jni_method_is_named_by_its_class(self):
         jni = next(d for d in scan(C).defs if d["kind"] == "jni")
         self.assertEqual((jni["name"], jni["parent"], jni["jni"]),
-                         ("nativeInit", "Whisper", "Java_dev_shebang_devboard_voice_Whisper_nativeInit"))
+                         ("nativeInit", "Whisper", "Java_dev_sample_taskboard_voice_Whisper_nativeInit"))
         self.assertEqual(codemap._jni_method("Java_a_b_My_1Class_do_1it"), ("My_Class", "do_it"))
         self.assertIsNone(codemap._jni_method("JavaScript_thing"))
 
@@ -119,7 +119,7 @@ class CScanner(unittest.TestCase):
 
 
 class Followup(unittest.TestCase):
-    """Report #79, Shebang-DevBoard's follow-up on the C scanner."""
+    """Report #79, the follow-up on the C scanner."""
 
     def test_an_ifdef_whose_branches_each_open_a_brace_loses_nothing(self):
         s = scan("int f(int a) {\n#ifdef X\n if (a) {\n#else\n if (!a) {\n#endif\n return 1; }\n return 0; }\n"

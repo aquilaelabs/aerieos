@@ -2,7 +2,7 @@
 alone and answered "nothing on the page is unused" for a python file, which
 hid two dead functions. A python function counts as unused only when its
 name appears nowhere in the tree but its definition, and never when a
-decorator registers it (Flask's routes and hooks, MediaReducer's app.py)."""
+decorator registers it (Flask's routes and hooks in an app.py)."""
 import os
 import shutil
 import sys

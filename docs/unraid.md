@@ -497,7 +497,7 @@ Chromium, Firefox and WebKit are pre-installed with all system deps, shared
 at `/opt/pw-browsers`:
 
 ```bash
-docker exec -it -w /workspace/FreshBoot AerieOS aerie shell
+docker exec -it -w /workspace/FrontPorch AerieOS aerie shell
 npx playwright test                 # a project pinning another version can
 npx playwright install chromium     # add its own browsers to the shared dir
 ```
@@ -571,7 +571,7 @@ if that happens, grab the files off the share before restarting again.
 
 **File ownership.** The container writes as `99:100` (`nobody:users`). If a
 space is owned differently, fix that space once
-(`chown -R 99:100 /mnt/user/projects/FreshBoot`). The container
+(`chown -R 99:100 /mnt/user/projects/FrontPorch`). The container
 never chowns the spaces share itself; that folder is yours, and a container
 quietly changing the ownership of a share because it started is a surprise, not
 a repair. It warns in the log if it cannot write there, and the dashboard names

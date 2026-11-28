@@ -140,8 +140,8 @@ class Release(unittest.TestCase):
 
     def test_a_tag_on_a_merge_carries_the_builds_of_the_same_files(self):
         # The builds were made and signed on the branch tip; the tag went on
-        # the merge commit, another id with the same tree (Shebang-DevBoard's
-        # v0.5.4, released with nothing attached).
+        # the merge commit, another id with the same tree (a v0.5.4
+        # released with nothing attached).
         app = self.tmp / "ws" / "app"
         env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t",
                "GIT_COMMITTER_EMAIL": "t@x"}

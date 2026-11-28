@@ -157,7 +157,7 @@ if argv and argv[0] == "release":
     import waits
     rest = argv[1:]
     # Help is help: `aerie version release -h` was sent on as a release with
-    # no reason (Shebang-DevBoard, 5 Oct), refused only because the tag
+    # no reason, refused only because the tag
     # already existed. Anything but --why and its sentence is refused by name.
     if "-h" in rest or "--help" in rest:
         print('aerie version [--for DIR] release --why "..."   tag this commit, push the tag and publish the\n'

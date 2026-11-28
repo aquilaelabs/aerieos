@@ -11,7 +11,7 @@ spec = importlib.util.spec_from_file_location("capture", os.path.join(HERE, ".."
 capture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(capture)
 
-PKG = "dev.shebang.devboard"
+PKG = "dev.sample.taskboard"
 
 
 class InFront(unittest.TestCase):
@@ -28,7 +28,7 @@ class InFront(unittest.TestCase):
             capture.run = was
 
     def test_its_keyboard_showing_is_in_front(self):
-        ime = f"mCurMethodId={PKG}/.ime.DevBoardIme\n  mInputShown=true\n"
+        ime = f"mCurMethodId={PKG}/.ime.TaskBoardIme\n  mInputShown=true\n"
         self.assertTrue(self.ask(window="mCurrentFocus=null\n", ime=ime))
 
     def test_its_activity_resumed_on_top_is_in_front(self):
@@ -37,7 +37,7 @@ class InFront(unittest.TestCase):
 
     def test_another_app_is_not(self):
         act = "  topResumedActivity=ActivityRecord{1a2b u0 com.android.launcher3/.Launcher t1}\n"
-        ime = f"mCurMethodId={PKG}/.ime.DevBoardIme\n  mInputShown=false\n"
+        ime = f"mCurMethodId={PKG}/.ime.TaskBoardIme\n  mInputShown=false\n"
         self.assertFalse(self.ask(ime=ime, act=act))
 
 

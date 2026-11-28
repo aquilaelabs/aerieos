@@ -27,7 +27,7 @@ class ComposeFiles(unittest.TestCase):
         ws, st = self.tmp / "ws", self.tmp / "state"
         st.mkdir()
         devapp.configure(workspace=ws, state=st, write_json=write_json)
-        p = ws / "Clanker-Detector"
+        p = ws / "Clatter-Detector"
         for rel in ("docker-compose.yml", "docker-compose.prod.yml", "docker-compose.override.yml",
                     "site/compose.yaml", "api/v2/compose.yml", "node_modules/x/compose.yml",
                     "a/b/c/d/compose.yml", ".hidden/compose.yml", "notes.yml",
@@ -45,76 +45,76 @@ class ComposeFiles(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_every_compose_file_is_found_the_roots_own_first(self):
-        self.assertEqual(devapp.compose_files("Clanker-Detector"),
+        self.assertEqual(devapp.compose_files("Clatter-Detector"),
                          ["docker-compose.yml", "docker-compose.prod.yml", "api/v2/compose.yml",
                           "deploy/containers/admin.compose.yml", "site/compose.yaml"])
 
     def test_an_override_a_link_a_skipped_folder_and_too_deep_are_not(self):
-        got = devapp.compose_files("Clanker-Detector")
+        got = devapp.compose_files("Clatter-Detector")
         for no in ("docker-compose.override.yml", "linked-compose.yml", "node_modules/x/compose.yml",
                    "a/b/c/d/compose.yml", ".hidden/compose.yml", "notes.yml"):
             self.assertNotIn(no, got)
 
     def test_a_container_made_from_a_file_in_a_folder_runs_compose_there(self):
-        r = devapp.create_instance("Clanker-Detector", "site", compose="site/compose.yaml")
+        r = devapp.create_instance("Clatter-Detector", "site", compose="site/compose.yaml")
         self.assertTrue(r.get("ok"), r)
-        self.assertEqual(devapp.compose_file("Clanker-Detector", "site"), self.p / "site" / "compose.yaml")
-        argv = devapp._compose("Clanker-Detector", "site", "config")
+        self.assertEqual(devapp.compose_file("Clatter-Detector", "site"), self.p / "site" / "compose.yaml")
+        argv = devapp._compose("Clatter-Detector", "site", "config")
         self.assertEqual(argv[argv.index("--project-directory") + 1], str(self.p / "site"))
-        self.assertEqual(devapp.example_file("Clanker-Detector", "site"), self.p / "site" / ".env.example")
-        r = devapp.create_instance("Clanker-Detector", "api", compose="api/v2/compose.yml")
+        self.assertEqual(devapp.example_file("Clatter-Detector", "site"), self.p / "site" / ".env.example")
+        r = devapp.create_instance("Clatter-Detector", "api", compose="api/v2/compose.yml")
         self.assertTrue(r.get("ok"), r)
-        self.assertFalse(devapp.example_file("Clanker-Detector", "api").is_file(),
+        self.assertFalse(devapp.example_file("Clatter-Detector", "api").is_file(),
                          "a folder with no example of its own does not take the root's")
-        self.assertEqual(devapp.missing_env("Clanker-Detector", "api"), [])
+        self.assertEqual(devapp.missing_env("Clatter-Detector", "api"), [])
         # ...and the project's own container stays on the root's file.
-        argv = devapp._compose("Clanker-Detector", devapp.MAIN, "config")
+        argv = devapp._compose("Clatter-Detector", devapp.MAIN, "config")
         self.assertEqual(argv[argv.index("--project-directory") + 1], str(self.p))
-        self.assertEqual(devapp.compose_file("Clanker-Detector"), self.p / "docker-compose.yml")
+        self.assertEqual(devapp.compose_file("Clatter-Detector"), self.p / "docker-compose.yml")
 
     def test_a_file_that_is_not_one_of_its_compose_files_is_refused(self):
         for bad in ("../other/compose.yml", "notes.yml", "linked-compose.yml"):
-            r = devapp.create_instance("Clanker-Detector", "x", compose=bad)
+            r = devapp.create_instance("Clatter-Detector", "x", compose=bad)
             self.assertIn("has no compose file", r.get("error", ""), bad)
 
     def test_send_offers_the_shown_name_with_the_files_folder_or_variant(self):
-        devapp.label_of = lambda p: "Turing Lens" if p == "Clanker-Detector" else p
-        self.assertEqual(devapp.send_name("Clanker-Detector"), "turing-lens")
-        self.assertEqual(devapp.send_name("Clanker-Detector", "site/compose.yaml"), "turing-lens-site")
-        self.assertEqual(devapp.send_name("Clanker-Detector", "docker-compose.prod.yml"), "turing-lens-prod")
-        self.assertEqual(devapp.send_name("Clanker-Detector", "deploy/containers/admin.compose.yml"), "turing-lens-admin",
+        devapp.label_of = lambda p: "Tundra Lens" if p == "Clatter-Detector" else p
+        self.assertEqual(devapp.send_name("Clatter-Detector"), "tundra-lens")
+        self.assertEqual(devapp.send_name("Clatter-Detector", "site/compose.yaml"), "tundra-lens-site")
+        self.assertEqual(devapp.send_name("Clatter-Detector", "docker-compose.prod.yml"), "tundra-lens-prod")
+        self.assertEqual(devapp.send_name("Clatter-Detector", "deploy/containers/admin.compose.yml"), "tundra-lens-admin",
                          "a file named for its service is named by that alone")
-        devapp.create_instance("Clanker-Detector", "turing-lens-site", compose="site/compose.yaml")
-        self.assertEqual(devapp.send_name("Clanker-Detector", "site/compose.yaml"), "turing-lens-site-2")
+        devapp.create_instance("Clatter-Detector", "tundra-lens-site", compose="site/compose.yaml")
+        self.assertEqual(devapp.send_name("Clatter-Detector", "site/compose.yaml"), "tundra-lens-site-2")
 
     def test_a_project_never_renamed_is_offered_its_own_container_first(self):
         devapp.label_of = lambda p: p
-        self.assertEqual(devapp.send_name("Clanker-Detector"), "Clanker-Detector")
+        self.assertEqual(devapp.send_name("Clatter-Detector"), "Clatter-Detector")
 
 
     def test_a_file_compose_cannot_read_says_what_compose_said(self):
         """The Artifacts row carried "compose cannot read it" and nothing of
-        why (Turing Lens, 10 Oct): compose's own last lines go with it."""
+        why: compose's own last lines go with it."""
         was = devapp._run
         devapp._run = lambda *a, **k: {"code": 15, "out": "noise\nservice \"web\" refers to undefined network front: invalid compose space"}
         try:
-            self.assertIsNone(devapp._config("Clanker-Detector"))
+            self.assertIsNone(devapp._config("Clatter-Detector"))
             self.assertIn("undefined network front", devapp.config_error())
             devapp._run = lambda *a, **k: {"code": 0, "out": "{}"}
-            self.assertEqual(devapp._config("Clanker-Detector"), {})
+            self.assertEqual(devapp._config("Clatter-Detector"), {})
             self.assertEqual(devapp.config_error(), "", "a read that worked clears it")
         finally:
             devapp._run = was
 
     def test_a_variable_the_file_requires_is_a_need_not_a_fault(self):
         """${ADMIN_TOKEN:?...} stops compose before Send has made an env
-        (Turing Lens's deploy/vps, 10 Oct): named as needed, once each."""
+        (a file under deploy/ that asks for a secret): named as needed, once each."""
         f = self.p / "deploy" / "vps" / "compose.yml"
         f.parent.mkdir(parents=True)
         f.write_text("services:\n  r:\n    environment:\n      A: ${ADMIN_TOKEN:?set it}\n"
                      "      B: ${UI_PASSWORD?set}\n      C: ${ADMIN_TOKEN:?again}\n      D: ${OPTIONAL:-x}\n")
         with devapp.composing("deploy/vps/compose.yml"):
-            self.assertEqual(devapp.insisted_vars("Clanker-Detector"), ["ADMIN_TOKEN", "UI_PASSWORD"])
+            self.assertEqual(devapp.insisted_vars("Clatter-Detector"), ["ADMIN_TOKEN", "UI_PASSWORD"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,7 +58,7 @@ def _targets(name):
 
     The second half is what `aerie devapp ls` prints: an instance under its
     compose name, whose containers are named for it and its services
-    (mediareducer-dev-mediareducer-1). Looked up by container name alone, that
+    (meadowpress-dev-meadowpress-1). Looked up by container name alone, that
     name found nothing, and a project's own dev instance was refused to its
     session as not its own, its log with it (reports #4, #6 and #9).
     """
@@ -805,7 +805,7 @@ def session_verb(sess, me, act, name, req, read_only=False):
             break
     # ...or a service of one of the project's own instances, by the name its
     # compose file gives it: `aerie devapp log worker` for the container named
-    # clanker-detector-worker-1 was refused as not the project's (report #97).
+    # clatter-detector-worker-1 was refused as not the project's (report #97).
     # Only a container that is the project's, so a name another project's
     # service shares reaches nothing of theirs.
     if owner != sess:

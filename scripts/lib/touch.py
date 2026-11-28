@@ -10,7 +10,7 @@ Screen pixels, as a screenshot shows them, whichever way the screen is
 turned. `adb shell input tap` costs about 300 ms a call and `input swipe`
 moves at its own pace, so neither can time a glide across letters or tell a
 long-press from a slide: a keyboard session found that out and wrote its
-own sendevent script (Shebang-DevBoard). This one writes the whole
+own sendevent script. This one writes the whole
 gesture as one `adb shell` of sendevent lines with sleeps between them, so
 the device sees the timing the script asked for. --pre holds the finger
 still before it starts moving (a long-press that then slides), --hold keeps
@@ -28,7 +28,7 @@ the guess is wrong.
 A glide keeps its pace. Each move is a sleep and three sendevent processes
 on the device, which on an emulator can cost more than the 10 ms between a
 hand's samples: a 3.6 s stroke ran far longer than it said, and a session
-catching it mid-stroke with a sleep guessed wrong twice (Shebang-DevBoard).
+catching it mid-stroke with a sleep guessed wrong twice.
 So the cost of one move is measured first, with moves that change
 nothing, and the samples are spaced to it; the line printed says how long
 the stroke took on the device, beside how long it was asked to.
@@ -76,7 +76,7 @@ def ensure_root(a):
     boot restores whatever the snapshot held, so a session that once ran
     `adb root` saw every later boot come up root, and the first cold boot
     (the card arriving changed the GPU mode, 1 Oct) broke this verb with
-    "Permission denied" (reports 44 and 45, Shebang-DevBoard). A user build
+    "Permission denied" (reports 44 and 45). A user build
     (a phone, a Play Store image) has no root to give."""
     uid = shell(a, "id", "-u").strip()
     if uid == "0" or not uid.isdigit():
@@ -98,8 +98,8 @@ def ensure_root(a):
 def _order(dev):
     """Devices in the kernel's order, by their number: sorted as text,
     /dev/input/event10 came before event2, and a phone with several
-    virtio multi-touch devices got the one the display ignores (report 43,
-    Shebang-DevBoard, 30 Sep). The first is the one bound to the display."""
+    virtio multi-touch devices got the one the display ignores (report 43).
+    The first is the one bound to the display."""
     m = re.search(r"(\d+)$", dev)
     return (int(m.group(1)) if m else 1 << 30, dev)
 

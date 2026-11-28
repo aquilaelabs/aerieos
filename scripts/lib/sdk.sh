@@ -551,7 +551,7 @@ sdk_names_in() {
 # fails checkDebugAarMetadata before anything compiles; and what the Gradle
 # cache already holds, since a build offline or in a hurry uses that. A
 # session dug through platforms/ and ~/.gradle by hand for these, asked
-# dl.google.com for versions, and hit the ceiling anyway (Shebang-DevBoard).
+# dl.google.com for versions, and hit the ceiling anyway.
 # Read from the directories, never from sdkmanager or Gradle: a
 # status is instant.
 sdk_builds_with() {

@@ -141,7 +141,7 @@ class Certificate(unittest.TestCase):
     def test_two_domains_pairs_stand_side_by_side_and_a_default_from_before_is_read_in(self):
         """A pair is kept under the domain its names say, so two domains'
         pairs stand side by side and the same names again are a renewal
-        (turinglens.com's pair went when another was saved as the
+        (one domain's pair went when another was saved as the
         default); a default kept the older way is made a listed pair (0042)."""
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
                         "-subj", "/CN=*.aquilae.test", "-addext", "subjectAltName=DNS:*.aquilae.test,DNS:aquilae.test",

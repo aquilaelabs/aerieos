@@ -34,8 +34,7 @@ if (ff.status !== 0){
     '-i', 'color=c=navy:size=640x400:rate=10:duration=5',
     '-vf', "drawbox=x=100:y=100:w=300:h=150:color=orange:t=fill:enable='gte(t,2)',drawbox=x=420:y=40:w=150:h=300:color=white:t=fill:enable='gte(t,3.5)'",
     `${S}/cut.mp4`]);
-  // A change the size of a typed letter on a phone screen (Shebang-DevBoard,
-  // 30 Sep): a 20x40 block on 1080x2400 scores about 0.0003, dropped at a
+  // A change the size of a typed letter on a phone screen: a 20x40 block on 1080x2400 scores about 0.0003, dropped at a
   // page's threshold, which then says so and how to look closer; kept at
   // the emulator's.
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi',
@@ -57,8 +56,8 @@ if (ff.status !== 0){
   cap('prune', `${S}/dist`, 'letters', 'letters2');
   // Every frame the recording has, not ten a second of it: a 60fps capture
   // of a 50 ms flash reels the flash; read at --fps 10, as every reel used
-  // to be, it can fall between two looks (Shebang-DevBoard, 1 Oct: the
-  // keyboard's slide could not be seen).
+  // to be, it can fall between two looks (a keyboard's slide could not be
+  // seen).
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi',
     '-i', 'color=c=navy:size=320x240:rate=60:duration=2',
     '-vf', "drawbox=x=40:y=40:w=200:h=150:color=orange:t=fill:enable='between(t,1.02,1.07)'",

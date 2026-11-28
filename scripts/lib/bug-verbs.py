@@ -279,8 +279,8 @@ elif op == "add":
             flags.get("notes") or "") if x)
         here = True
     # The title and the area, not the repro: a project's own bug is often
-    # reproduced with bb (aerie capture reel ...), and two of MediaReducer's
-    # were sent to aerie report for it (7 Oct).
+    # reproduced with bb (aerie capture reel ...), and two of one space's
+    # were sent to aerie report for it.
     said = " ".join([title, str(flags.get("area") or "")])
     # A bug that names AerieOS, filed in another project's tracker, is
     # usually AerieOS's, which is what aerie report is for. Asked before it is

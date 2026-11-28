@@ -119,8 +119,8 @@ esac
 class Pace(unittest.TestCase):
     """A glide takes the time it was asked to on a device where one move
     costs more than the hand's 10 ms between samples, and --mark is made
-    when the finger arrives to be held (Shebang-DevBoard, 5 Oct: a 3.6 s
-    stroke ran long, and a shot timed by a sleep caught the first key)."""
+    when the finger arrives to be held (a 3.6 s stroke ran long, and a shot
+    timed by a sleep caught the first key)."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()

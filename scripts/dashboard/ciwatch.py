@@ -1,7 +1,7 @@
 """A project's CI watched from the day it is linked, on every
 AerieOS and for every project, with nothing set up in the repository.
 
-Shebang-DevBoard's CI had failed for weeks on an action GitHub had moved
+One space's CI had failed for weeks on an action GitHub had moved
 past (setup-android v3 asking for an SDK package Google stopped serving),
 and the move of ubuntu-latest to Ubuntu 26 was seen only because a session
 happened to read a run's annotations. Both were on GitHub to be

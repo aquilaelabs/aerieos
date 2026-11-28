@@ -6,8 +6,8 @@ token under Agents may: Tag and publish a release, every edit its own ask.
 Run where it is typed, never relayed: the notes are a file the session
 wrote (its scratchpad, or stdin), and a relayed verb ran on the
 controller, which sees /workspace and nothing else, so a scratchpad file
-was "No such file or directory" and stdin arrived empty (report 60,
-Shebang-DevBoard). Only the API call goes to the controller.
+was "No such file or directory" and stdin arrived empty (report 60).
+Only the API call goes to the controller.
 
 Arguments: the project, then the words after `aerie version`: [--for DIR]
 release --edit --why "..." [--tag TAG] [--notes FILE|-] [--attach FILE]...

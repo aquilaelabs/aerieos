@@ -398,7 +398,7 @@ sandbox is for. The alternative is to not map it here at all: what AerieOS
 cannot see, it does not check.
 
 **Container names and space names are separate groups.** A space existing
-reserves nothing: a container may be called `mediareducer-dev` while a space
+reserves nothing: a container may be called `meadowpress-dev` while a space
 is too, because they are not the same kind of thing. The one name that cannot
 be reused is another *container's*: two instances resolving to one compose
 space name would be one set of containers, one env file and one data

@@ -461,7 +461,7 @@ class Markup(unittest.TestCase):
 
 class Interpolation(unittest.TestCase):
     """A call inside a Kotlin string template or a Swift interpolation
-    was blanked with the string, so who-calls said nothing called FreshBoot's
+    was blanked with the string, so who-calls said nothing called an app's
     quote, which three lines use."""
 
     def test_kotlin_templates_one_line_and_raw(self):

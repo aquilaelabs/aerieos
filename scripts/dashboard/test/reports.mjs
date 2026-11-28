@@ -83,7 +83,7 @@ const colon = bb(['bug', 'add', 'bb: tests preflight runs every suite', '--sev',
 ok(colon.status !== 0 && bugsNow() === had,
    '...however the verb is written (bb: ..., `aerie`, bb-tty), and the severity is not read as words');
 // A repro that uses bb is how a project's own bug is shown, not a sign it is
-// AerieOS's: two of MediaReducer's were stopped for one (7 Oct).
+// AerieOS's: two of one space's were stopped for one.
 const byRepro = bb(['bug', 'add', 'the dashboard repaints after it loads', '--repro', 'record it with aerie capture reel', '--reproduces', 'once'],
                    { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(byRepro.status === 0 && /filed B\d+/.test(byRepro.stdout) && bugsNow() === had + 1,

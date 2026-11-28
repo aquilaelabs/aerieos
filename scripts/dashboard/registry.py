@@ -123,7 +123,7 @@ def sync():
             for name in sorted(gone - live):
                 # A numbered delete from before ids (X-2) was X.
                 _add(d, name, re.sub(r"-\d+$", "", name), "trashed")["legacy"] = True
-        # A name stored before GitHub's rules held here ("Turing Lens", or a
+        # A name stored before GitHub's rules held here ("Tundra Lens", or a
         # clash numbered "Name (2)") is brought to them once, as it would have
         # been given: numbered if another live project already has it. A
         # repository's name alone: a project's keeps its spaces and
@@ -193,8 +193,8 @@ def labels():
 def clean_name(raw):
     """A shown name by GitHub's rules for a repository's: ASCII letters,
     digits, - _ and. only, each run of anything else one -, as GitHub turns
-    "Turing Lens" into Turing-Lens, at most NAME_MAX, and never. or ..
-    (a rename to "Turing Lens" kept the space)."""
+    "Tundra Lens" into Tundra-Lens, at most NAME_MAX, and never. or ..
+    (a rename to "Tundra Lens" kept the space)."""
     s = re.sub(r"[^A-Za-z0-9._-]+", "-", str(raw or "").strip()).strip("-")
     s = s[:NAME_MAX].strip("-")
     return "" if s in (".", "..") else s

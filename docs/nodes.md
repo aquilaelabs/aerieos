@@ -223,7 +223,7 @@ schema surgery if it does not.
 {
   "id": "j_0192",
   "type": "compose | build | exec | deploy | service",
-  "project": "MediaReducer",
+  "project": "MeadowPress",
   "requested_by": "operator",              // a principal, see §8
   "placement": { "node": "n_7f3a91" },     // or { "select": { "capability": "…",
                                            //      "labels": {…}, "pool": "…" } }

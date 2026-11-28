@@ -5,7 +5,7 @@
 // file, so the folder around it will not go: Gradle failed on "Unable to
 // delete directory .../app/build/test-results/.../binary - .../.nfs0903..."
 // whenever its daemon still held a file there, until the daemon was stopped
-// (Shebang-DevBoard, 6 and 7 Oct). Installed into the project's Gradle home
+// (met on two days running). Installed into the project's Gradle home
 // by bb-tty while the project's settings say so (Build on the node's disk,
 // on by default), and read only when BB_LOCAL_BUILD names the place.
 //
@@ -28,7 +28,7 @@ import java.nio.file.Path
 // Found by reading files, never by running git: Gradle's configuration
 // cache refuses an external process at configuration time, and a `git
 // rev-parse` here failed every build of a project that turns it on
-// (Shebang-DevBoard, report #84, B570). A .git directory is the repository;
+// (report #84, B570). A .git directory is the repository;
 // a .git file is a worktree's, naming its gitdir, whose commondir is where
 // info/exclude lives.
 def excludeLink = { File root, Path link ->

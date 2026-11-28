@@ -556,8 +556,7 @@ await section("the two meanings of SDK_ROOT", async () => {
   // ---- what a build here can use ------------------------------------
   // The newest platform is the compileSdk ceiling and the Gradle cache is
   // what a build has without fetching: read from the directories, said in
-  // one block, so a session does not list platforms/ and ~/.gradle by hand
-  // (Shebang-DevBoard).
+  // one block, so a session does not list platforms/ and ~/.gradle by hand.
   const sdk = `${store}/${scope}/android`, gh = mkdtempSync(`${tmpdir()}/bbgradle-`);
   for (const d of ['platforms/android-35', 'platforms/android-36', 'build-tools/36.0.0']) mkdirSync(`${sdk}/${d}`, { recursive: true });
   for (const d of ['wrapper/dists/gradle-9.7.1-bin', 'caches/modules-2/files-2.1/com.android.tools.build/gradle/9.4.1',

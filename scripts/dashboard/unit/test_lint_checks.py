@@ -66,7 +66,7 @@ class Verdicts(unittest.TestCase):
     def test_every_check_is_one_the_dispatcher_knows(self):
         self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "pinned", "channels", "shipped",
                                               "formats", "packs", "unraid", "changelog", "dupes", "releasekey",
-                                              "releasesigners", "selectors", "forms", "cites"})
+                                              "releasesigners", "selectors", "forms", "cites", "unsaid"})
 
     def test_a_field_written_outside_formField_only_ever_gets_rarer(self):
         # A form is formBox and formField; the fields page code writes
@@ -121,6 +121,25 @@ class Verdicts(unittest.TestCase):
         rc, said = self.run_check("cites")
         self.assertEqual(rc, 1, said)
         self.assertIn("scripts/gone.py is in tools/cites-baseline.json and is no tracked source file", said)
+
+    def test_a_name_the_repository_does_not_say_is_found_however_it_is_joined(self):
+        # Held as hashes, so the check does not say the names either: tried
+        # here with a made-up one. A name of ordinary words is matched only
+        # where they are run together, another across a space too.
+        tight, loose = {checks.said_hash("GardenGnome")}, {checks.said_hash("Velvet Anvil")}
+        lengths = {len("gardengnome"), len("velvetanvil")}
+        found = lambda line: checks.unsaid_in(line, tight, loose, lengths)
+        for line in ("met on GardenGnome, once", "cd /workspace/gardengnome", "dev.garden.gnome_ime", "Garden-Gnome's dist/",
+                     "class GardenGnomeIme", "a Velvet Anvil build", "velvet-anvil-site", "VELVET_ANVIL=1"):
+            self.assertTrue(found(line), line)
+        self.assertEqual(found("met on GardenGnome, once"), ["GardenGnome"])
+        for line in ("a garden gnome on the lawn", "the garden's gnomes", "velvet and anvil", "gardengnomes", ""):
+            self.assertEqual(found(line), [], line)
+        self.put("README.md", "A page of plain words.\n")
+        self.git("add", "-A")
+        rc, said = self.run_check("unsaid")
+        self.assertEqual(rc, 0, said)
+        self.assertIn("no file names another project", said)
 
     def test_a_has_inside_a_has_is_refused_and_one_beside_another_is_not(self):
         # A browser drops a rule whose selector nests :has, every

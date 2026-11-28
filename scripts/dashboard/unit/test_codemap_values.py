@@ -50,7 +50,7 @@ class ValueDecls(unittest.TestCase):
 class ABundleIsNotRead(unittest.TestCase):
     """A name nothing defines was looked for as a page-level let in
     every page script, a one-line bundle the index skips among them, and
-    code_only over Shebang-DevBoard's 290 kB xterm.js took fifty seconds."""
+    code_only over a space's 290 kB xterm.js took fifty seconds."""
 
     def test_a_minified_page_script_is_skipped_at_once(self):
         root = Path(tempfile.mkdtemp())

@@ -10,7 +10,7 @@
 //
 // Each browser runs detached in its own process group, on a debugging port
 // of its own and a profile of its own under ~/.cache/builderbot/browser, and
-// is ended by that group, never by a pattern: Turing Lens built a harness of
+// is ended by that group, never by a pattern: one space built a harness of
 // its own for this, and lost 45 minutes to browsers left from
 // earlier runs holding the port and to a cleanup that matched itself.
 //

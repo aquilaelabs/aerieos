@@ -101,16 +101,16 @@ class Rename(unittest.TestCase):
         self.assertIn("is already aquilaeLabs's container", containers.rename_container("aquilaeLabs", "staging", "main")["error"],
                       "not a name another container answers to")
         self.assertIn("radarr already exists", containers.rename_container("aquilaeLabs", "radarr", "main")["error"])
-        r = containers.rename_container("aquilaeLabs", "Turing Site", "main")
+        r = containers.rename_container("aquilaeLabs", "Tundra Site", "main")
         self.assertTrue(r.get("ok"), r)
         job = self.q.jobs[r["job"]]
-        self.assertEqual(job["spec"]["rename"], {"to": "turing-site", "own": True})
-        self.assertEqual(job["spec"]["plan"][0]["argv"][3:7], ["aquilaelabs", "turing-site", "/d/aquilaeLabs", "/d/turing-site"])
+        self.assertEqual(job["spec"]["rename"], {"to": "tundra-site", "own": True})
+        self.assertEqual(job["spec"]["plan"][0]["argv"][3:7], ["aquilaelabs", "tundra-site", "/d/aquilaeLabs", "/d/tundra-site"])
         self.assertEqual(relocate.rename_done(job, "succeeded"), "")
         rec = devapp._read_rec("aquilaeLabs", "main")
-        self.assertEqual((rec.get("name"), rec.get("compose"), "renaming" in rec), ("turing-site", "site/compose.yml", False))
-        self.assertEqual(devapp._pname("aquilaeLabs", "main"), "turing-site", "the compose name is its own now")
-        self.assertEqual(devapp.row_named("turing-site"), ("aquilaeLabs", "main"), "aerie devapp --container finds it by it")
+        self.assertEqual((rec.get("name"), rec.get("compose"), "renaming" in rec), ("tundra-site", "site/compose.yml", False))
+        self.assertEqual(devapp._pname("aquilaeLabs", "main"), "tundra-site", "the compose name is its own now")
+        self.assertEqual(devapp.row_named("tundra-site"), ("aquilaeLabs", "main"), "aerie devapp --container finds it by it")
         self.assertEqual(devapp.read_env("aquilaeLabs", "main"), "PORT=8080\n", "its env followed the name")
         self.assertEqual(devapp._pname("aquilaeLabs", "staging"), "staging", "the space's other container is untouched")
         # Named back to the project's own default: no name kept.

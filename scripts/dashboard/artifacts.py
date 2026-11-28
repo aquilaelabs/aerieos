@@ -395,17 +395,17 @@ def pin(project, rel, on, by=""):
 # A dev build carries its version in its name the way aerie version --file
 # spells it (0.1.0-dev.17-9e09ad3, -dirty when the tree was), and a session
 # building all day leaves one file per build: seven debug APKs, 133 MB, in
-# one day on Shebang-DevBoard. Of each product (the name before its
-# version: Shebang-DevBoard-, Shebang-Voice-) the files of its newest few
+# one day of one Android space. Of each product (the name before its
+# version: Sample-TaskBoard-, Sample-Voice-) the files of its newest few
 # builds stay, whatever follows the version (the project's "dev builds
 # kept", DEV_KEEP unless it says; 0 keeps them all), and the rest go.
 #
 # It counted by the whole name with the version taken out once, which made
-# a renamed build a new kind: Shebang's first builds were -debug.apk and its
+# a renamed build a new kind: one space's first builds were -debug.apk and its
 # later -release.apk, so the three oldest debug builds were "the newest of
 # their kind" for good (85 MB). A build that has been
 # signed keeps its signed copy only: the unsigned file was the signing's
-# input, and a signed one signs again (350 MB of Shebang's 811). A release
+# input, and a signed one signs again (350 MB of that space's 811). A release
 # (no -dev.N) is never swept, nor a file whose name carries no version:
 # nothing here can tell those are superseded, so the tab says so instead.
 DEV_KEEP = 3

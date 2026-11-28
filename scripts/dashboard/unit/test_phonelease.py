@@ -93,10 +93,10 @@ class Lease(unittest.TestCase):
         r, st = pl.use("app", "start", {"pkg": "com.other.app"})
         self.assertEqual(st, 403)
         self.assertEqual(self.sent, [])
-        pl._add_pkg("n1", "dev.shebang.devboard")
-        r, st = pl.use("app", "start", {"pkg": "dev.shebang.devboard"})
+        pl._add_pkg("n1", "dev.sample.taskboard")
+        r, st = pl.use("app", "start", {"pkg": "dev.sample.taskboard"})
         self.assertEqual(st, 200)
-        self.assertIn("monkey -p dev.shebang.devboard", self.sent[-1][-1])
+        self.assertIn("monkey -p dev.sample.taskboard", self.sent[-1][-1])
 
     def test_a_touch_is_guarded_and_built_from_numbers(self):
         pl.lend("n1", OWNER, "app", 1)
@@ -252,8 +252,8 @@ class Lease(unittest.TestCase):
         # agent fetched the build into the artifacts store, and adb was
         # pointed at /tmp, which only the top-level read fell back to.
         node = {"reported": {"stores": {"artifacts": {"path": "/var/lib/builderbot/artifacts"}}}}
-        self.assertEqual(phone.install_dest(node, "Shebang-DevBoard", "dist/a.apk"),
-                         "/var/lib/builderbot/artifacts/Shebang-DevBoard/a.apk")
+        self.assertEqual(phone.install_dest(node, "Sample-TaskBoard", "dist/a.apk"),
+                         "/var/lib/builderbot/artifacts/Sample-TaskBoard/a.apk")
         self.assertEqual(phone.install_dest({"stores": {"data": {"path": "/d"}}}, "p", "dist/a.apk"), "/d/a.apk")
 
     def test_a_refusal_is_said_before_its_owner_is_asked(self):

@@ -1066,7 +1066,7 @@ function dmOwnerLine(r, key){
 }
 
 // Which project a project's own instance is built from, and Move to put it
-// under another (MediaReducer-Dev's to MediaReducer).
+// under another (MeadowPress-Dev's to MeadowPress).
 // Its containers, env and data stay as they are; a written container has no
 // project behind it and moves with the Project line above.
 const dmMoveDraft = {};

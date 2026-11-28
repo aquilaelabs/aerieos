@@ -45,7 +45,7 @@ from capture import die, ffmpeg, font, from_display, from_emu, from_url, maker, 
 # measured on a 1080x2400 keyboard screen, a typed letter scores
 # about 0.0004, a key's preview bubble 0.0026, a blinking text cursor 0.0001,
 # and a still frame 0.00005. At 0.02 every one of those was dropped, and a
-# reel of eight seconds of typing was one frame (Shebang-DevBoard).
+# reel of eight seconds of typing was one frame.
 # The emulator's is 0.0002: every letter, not the cursor. A page and an X
 # display keep 0.02, where a change is usually a region and a browser's
 # encoder is noisier; --threshold asks for another.
@@ -84,7 +84,7 @@ def recorded_fps(video):
     Under software rendering the emulator manages about 10; on a card,
     several times that. The reel used to look at every recording 10 times
     a second whatever it had, so a 60fps capture of a keyboard's slide was
-    cut back to the 10fps a software one had (Shebang-DevBoard, 1 Oct)."""
+    cut back to the 10fps a software one had."""
     r = run([ffmpeg(), "-hide_banner", "-nostdin", "-i", video, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"])
     err = r.stderr or ""
     frames = re.findall(r"frame=\s*(\d+)", err)

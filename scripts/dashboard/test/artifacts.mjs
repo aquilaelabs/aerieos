@@ -8,11 +8,11 @@ import { execFileSync } from 'node:child_process';
 // alpha ships an APK and an XPI; the XPI is a real zip with a manifest, since
 // pushing one means unpacking it and handing the directory to web-ext.
 mkdirSync(`${DIR}/ws/alpha/dist/android`, { recursive: true });
-writeFileSync(`${DIR}/ws/alpha/dist/android/streamlift-1.2.apk`, 'not-really-an-apk');
+writeFileSync(`${DIR}/ws/alpha/dist/android/stonelift-1.2.apk`, 'not-really-an-apk');
 // What built it, as a job would leave it (docs/nodes.md §6): the tab says so
 // on the row, and the record itself is never listed as an artifact.
 mkdirSync(`${DIR}/ws/alpha/dist/.provenance/android`, { recursive: true });
-writeFileSync(`${DIR}/ws/alpha/dist/.provenance/android/streamlift-1.2.apk.json`, JSON.stringify({
+writeFileSync(`${DIR}/ws/alpha/dist/.provenance/android/stonelift-1.2.apk.json`, JSON.stringify({
   job: 'j_fixture1', node: 'n_fixture', source: { digest: 'sha256:' + 'ab'.repeat(32) },
   sha256: 'cd'.repeat(32), size: 17 }));
 // ...and two shell scripts, which is a product like any other: one named
@@ -229,7 +229,7 @@ await section("alpha-1.2.0-dev.4-abcdef4-debug.apk", async () => {
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', action: 'unpin', path: `dist/${n}` }) })).json()), oldest);
   ok(unpin.ok && unpin.pinned === false, '...and unpinned, it goes like any other build');
 });
-ok(names.includes('streamlift-1.2.apk') && names.includes('companion-0.2.0.xpi'),
+ok(names.includes('stonelift-1.2.apk') && names.includes('companion-0.2.0.xpi'),
    `dist/ is listed, subdirectories included (${names.join(', ')})`);
 ok(await page.$eval('#artBuild', e => !e.hidden && /No node/.test(e.textContent)
      && /Reading and editing the code needs no node/.test(e.textContent)),
@@ -246,7 +246,7 @@ const acts = await page.$$eval('.artrow:not(.job)', rs => rs.map(r => ({
   name: r.querySelector('b')?.textContent,
   install: !!r.querySelector('[data-artinstall]'),
   dl: !!r.querySelector('a.btn') })));
-ok(acts.find(a => a.name === 'streamlift-1.2.apk').install
+ok(acts.find(a => a.name === 'stonelift-1.2.apk').install
    && !acts.find(a => a.name === 'companion-0.2.0.xpi').install,
    'Install is offered for the APK and not for the extension');
 ok(acts.every(a => a.dl), '...and everything can be downloaded');
@@ -337,7 +337,7 @@ await section("a script is a product, and one people read before they run it", a
     view: !!r.querySelector('[data-artview]') })));
   ok(viewable.find(a => a.name === 'setup-1.2.sh').view
      && viewable.find(a => a.name === 'install').view
-     && !viewable.find(a => a.name === 'streamlift-1.2.apk').view
+     && !viewable.find(a => a.name === 'stonelift-1.2.apk').view
      && !viewable.find(a => a.name === 'firmware.bin').view,
      `View is offered on the scripts and on nothing else (${
        viewable.filter(a => a.view).map(a => a.name).join(', ')})`);
@@ -367,8 +367,8 @@ const get = p => page.evaluate(async u => {
   const r = await fetch(u);
   return { status: r.status, disp: r.headers.get('content-disposition') || '' };
 }, p);
-const dl = await get('/api/artifact?project=alpha&path=dist/android/streamlift-1.2.apk');
-ok(dl.status === 200 && dl.disp.includes('streamlift-1.2.apk'),
+const dl = await get('/api/artifact?project=alpha&path=dist/android/stonelift-1.2.apk');
+ok(dl.status === 200 && dl.disp.includes('stonelift-1.2.apk'),
    'the download hands the file over as an attachment');
 ok((await get('/api/artifact?project=alpha&path=dist/../CLAUDE.md')).status === 404,
    'a path that climbs out of dist/ is refused');
@@ -425,7 +425,7 @@ page.errors = [];
 // ---- what the POST refuses -------------------------------------------------
 const post = body => pageCall(page, '/api/artifacts', body);
 for (const [what, body] of [
-  ['pushing the APK, which is not an extension', { action: 'push', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' }],
+  ['pushing the APK, which is not an extension', { action: 'push', project: 'alpha', path: 'dist/android/stonelift-1.2.apk' }],
   ['pushing a path outside dist/', { action: 'push', project: 'alpha', path: '../beta/x.xpi' }],
   ['a space that does not exist', { action: 'push', project: 'nosuch', path: 'dist/a.xpi' }],
   ['an action nobody offers', { action: 'delete', project: 'alpha' }],

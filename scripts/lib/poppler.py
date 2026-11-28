@@ -5,7 +5,7 @@ uses, drawn with PyMuPDF.
 Claude Code reads a PDF by asking `pdfinfo FILE` for its page count and
 `pdftoppm -jpeg -r 100 [-f N] [-l M] FILE PREFIX` for pictures of its pages,
 which it collects as PREFIX-*.jpg. No node carries poppler, so a session
-could not read a PDF it had fetched (Shebang-DevBoard). The
+could not read a PDF it had fetched. The
 documents toolchain installs this under both names, run with its own
 Python, which has PyMuPDF.
 

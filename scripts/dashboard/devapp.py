@@ -1932,8 +1932,8 @@ def project_has_compose(project):
 # docker-compose.prod.yml beside the main one. An override file is left out:
 # compose merges it onto the file beside it, and alone it is half a file.
 # compose.yml, docker-compose.yml, a variant after (compose.prod.yml) or a
-# name before (admin.compose.yml: one file per service, as Turing Lens
-# keeps them under deploy/containers/).
+# name before (admin.compose.yml: one file per service, as a space may
+# keep them under deploy/containers/).
 OVERRIDE_RE = re.compile(r"[A-Za-z0-9_.-]+\.override\.ya?ml")
 COMPOSE_RE = re.compile(r"(?:(?P<pre>[A-Za-z0-9_-]+)\.)?(docker-)?compose(?P<var>\.[A-Za-z0-9_-]+)?\.ya?ml")
 COMPOSE_SKIP = {".git", "node_modules", ".gradle", "__pycache__", ".venv", "venv",
@@ -2212,8 +2212,8 @@ def _pname(project, instance=MAIN):
     given on its record (`name`), and that wins over both rules below.
 
     The PROJECT used to be in here as well, as <project>-<instance>,
-    which for a project called MediaReducer-Dev with an instance named after
-    it read `mediareducer-dev-mediareducer-dev`. The project half only
+    which for a project called MeadowPress-Dev with an instance named after
+    it read `meadowpress-dev-meadowpress-dev`. The project half only
     ever bought uniqueness, and uniqueness is checked directly now
     (taken_pnames) rather than spelled out in every name forever.
 
@@ -2232,7 +2232,7 @@ def name_clash(project, instance=MAIN):
     """Whether this instance's compose name is already a different one's.
 
     Container names and PROJECT names are separate things. A project called
-    MediaReducer-Dev does not reserve `mediareducer-dev` for a container, and
+    MeadowPress-Dev does not reserve `meadowpress-dev` for a container, and
     an earlier version of this checked that it did, which made a name the
     operator had every right to use come back refused. Nothing is reserved in
     advance; a project blocks no name until it actually has an instance.
@@ -2275,8 +2275,8 @@ def env_path(project, instance=MAIN):
 # compose as --env-file, and that fills ${VAR} in the compose text and
 # nothing else. A compose file that reads its settings through env_file came
 # up without them, or not at all with the .env missing: what the operator
-# typed into Send to Docker never reached Is-someone-Listening's container
-# (24 Sep). The copy compose runs points those lines at the instance's env.
+# typed into Send to Docker never reached the container. The copy compose
+# runs points those lines at the instance's env.
 _ENV_KEY = re.compile(r"^(\s*)env_file:\s*(#.*)?$")
 _ENV_ONE = re.compile(r"""^(\s*env_file:\s*)(["']?)(?:\./)?\.env\2(\s*(?:#.*)?)$""")
 _ENV_ITEM = re.compile(r"""^(\s*-\s*(?:path:\s*)?)(["']?)(?:\./)?\.env\2(\s*(?:#.*)?)$""")
@@ -3412,7 +3412,7 @@ def owner_gone(owner):
 
 def move_instance(project, instance, to):
     """Move a project's own instance to project `to`
-    (MediaReducer-Dev's dev container to MediaReducer before the old project
+    (MeadowPress-Dev's dev container to MeadowPress before the old project
     goes). Recorded under `to` as the instance whose compose name is the one
     it already has, so its containers, env file and data directory stay
     exactly where they are; from then on it builds from `to`'s tree and is
@@ -3787,10 +3787,10 @@ label_of = lambda p: p   # noqa: E731
 
 def send_name(project, compose=""):
     """The name a new container of a project gets when nobody typed one:
-    named for what the project is called now (a renamed Clanker-Detector
-    offers turing-lens, not its folder's name: the operator), with
+    named for what the project is called now (a Clatter-Detector renamed
+    Tundra-Lens offers tundra-lens, not its folder's name), with
     the folder or the variant of the compose file it is made from after it
-    (turing-lens-site, turing-lens-prod), so two files are not offered one
+    (tundra-lens-site, tundra-lens-prod), so two files are not offered one
     name. The project's own container while that is free, then -2, -3 and on,
     the first no container here holds. Send to Docker opens on it and `aerie
     devapp new` takes it, so sending again makes another container beside

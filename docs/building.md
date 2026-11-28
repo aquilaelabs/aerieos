@@ -334,7 +334,7 @@ reasons it is (no mount, nothing in it, or nothing in it that parses).
 
 **Dev builds do not pile up.** A build named with `aerie version --file` carries
 its dev version (`0.1.0-dev.17-9e09ad3`). Of each product (the name before
-the version: `Shebang-DevBoard-`, `Shebang-Voice-`) `dist/` keeps every file
+the version: `Sample-TaskBoard-`, `Sample-Voice-`) `dist/` keeps every file
 of its newest few builds, whatever follows the version (the space's
 settings say how many, Dev builds kept: 3 unless changed, and 0 keeps
 everything), and a build that has been signed keeps its signed copy alone,

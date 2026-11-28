@@ -2213,8 +2213,8 @@ ok(JSON.stringify(ij.instances) === JSON.stringify(['main']),
 // The project is no longer spelled into the name. A default instance is
 // named for its project because nobody typed a name for it; a named one is
 // called what it was called, which is the whole of the change. The old
-// scheme rendered MediaReducer-Dev's instance of the same name as
-// mediareducer-dev-mediareducer-dev.
+// scheme rendered MeadowPress-Dev's instance of the same name as
+// meadowpress-dev-meadowpress-dev.
 ok(ij.pnames[0] === 'alpha' && ij.pnames[1] === 'staging',
    'a default instance is named for its space, a named one for itself');
 ok(ij.pnames[2] === 'two-words',

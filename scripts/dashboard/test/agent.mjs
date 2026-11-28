@@ -3362,8 +3362,8 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // project's own .env, which AerieOS never writes. The instance's env
     // went to compose as --env-file only, which fills ${VAR} and nothing
     // else, so what was typed into Send to Docker never reached the
-    // container, and Up failed on the missing file (Is-someone-Listening,
-    // 24 Sep). The copy the node runs names the instance's env instead.
+    // container, and Up failed on the missing file. The copy the node runs
+    // names the instance's env instead.
     {
       writeFileSync(`${DIR}/ws/ep.silon/docker-compose.yml`,
                     'services:\n  app:\n    image: alpine\n    env_file: .env\n');

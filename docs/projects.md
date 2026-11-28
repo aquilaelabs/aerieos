@@ -244,7 +244,7 @@ and everything (the notebook, the containers, the sessions, the agents' own
 transcripts and memories) is keyed by the directory, so a rename moves
 nothing and needs nothing closed first. A name follows GitHub's rules for a
 repository's: letters, digits, `-`, `_` and `.` only, each run of anything
-else one `-`, so "Turing Lens" is shown as Turing-Lens, and the field says
+else one `-`, so "Tundra Lens" is shown as Tundra-Lens, and the field says
 so as it is typed. Two live spaces are never shown under one name: a
 second gets Name-2, whether it was created, cloned or put back from the
 trash. A name ever used gives a new space the next free

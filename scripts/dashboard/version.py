@@ -355,7 +355,7 @@ def target(project, comp=""):
         raw = p.read_text(encoding="utf-8", errors="replace")
     except OSError as e:
         # Every failed read was "not adopted here yet", and the answer then
-        # fell back to git describe: Shebang-DevBoard, whose VERSION says
+        # fell back to git describe: a space whose VERSION says
         # 0.5.5, got v0.5.4-13-g7766f70 from aerie version --file for a minute
         # and filed builds under it, and the next call was right again
         # (the share answered this read with an error the controller's git
@@ -1986,8 +1986,8 @@ def jump(project, value, by="claude", comp="", env=None):
     """Move the target straight to `value`, forward only, and commit it the
     way a bump is. The part it moves is the largest that changes (0.1.0 to
     0.5.0 is a minor), and the policy is asked about that part, so a session
-    allowed minors may go to 0.5.0 in one step rather than four (report #48,
-    Shebang-DevBoard, 3 Oct)."""
+    allowed minors may go to 0.5.0 in one step rather than four (report
+    #48)."""
     value = str(value or "").strip()
     if not TARGET_RE.match(value):
         return {"error": f"a version is MAJOR.MINOR.PATCH, like 0.5.0, not {value[:40]!r}"}

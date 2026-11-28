@@ -1713,7 +1713,7 @@ def probe(project, instance, req, principal):
     """Whether this instance answers on its node's loopback: a TCP
     connect and an HTTP GET of `path` on each of its published ports, or on
     the one `port` names, run there by the node's agent. Read-only, so a
-    session reads it as it reads the state, with no root ask: Turing Lens's
+    session reads it as it reads the state, with no root ask: a session's
     `aerie root run` for exactly this expired unseen after 15 minutes.
     Only the instance's own ports: the node's others are not this caller's
     to scan. (payload, status)."""
@@ -1880,8 +1880,9 @@ def _file_rows(project):
                 cfg = devapp._config(project, devapp.MAIN)
                 # A variable the file requires and nothing has set yet stops
                 # compose before it reads a line, and that is the env's to
-                # set after Send, not a fault (Turing Lens's deploy/vps,
-                # 10 Oct): said as needed, and the rest judged with a stand-in.
+                # set after Send, not a fault (a compose file under deploy/
+                # that asks for a secret): said as needed, and the rest judged
+                # with a stand-in.
                 if cfg is None and "required variable" in devapp.config_error():
                     need = devapp.insisted_vars(project, devapp.MAIN)
                     if need:

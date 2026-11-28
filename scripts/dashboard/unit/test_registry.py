@@ -110,10 +110,10 @@ class Registry(unittest.TestCase):
         self.assertEqual(registry.sync()["projects"]["alpha"]["state"], "live", "moved back: it")
 
     def test_names_follow_githubs_rules_for_a_repository(self):
-        # a rename to "Turing Lens" kept the space
-        self.assertEqual(registry.clean_name("Turing Lens"), "Turing-Lens")
+        # a rename to "Tundra Lens" kept the space
+        self.assertEqual(registry.clean_name("Tundra Lens"), "Tundra-Lens")
         self.assertEqual(registry.clean_name("  My   App\n\x07 "), "My-App")
-        self.assertEqual(registry.clean_name("Clanker-Detector"), "Clanker-Detector")
+        self.assertEqual(registry.clean_name("Clatter-Detector"), "Clatter-Detector")
         self.assertEqual(registry.clean_name("a__b.c"), "a__b.c")
         self.assertEqual(registry.clean_name("café crème!"), "caf-cr-me")
         self.assertEqual(registry.clean_name(".."), "")
@@ -121,17 +121,17 @@ class Registry(unittest.TestCase):
         self.assertEqual(len(registry.clean_name("x" * 200)), registry.NAME_MAX)
         self.assertEqual(registry.NAME_MAX, 100)
         registry.sync()
-        self.assertEqual(registry.set_name("alpha", "Turing Lens")["name"], "Turing-Lens")
+        self.assertEqual(registry.set_name("alpha", "Tundra Lens")["name"], "Tundra-Lens")
 
     def test_a_name_stored_before_the_rule_is_brought_to_it(self):
         registry.sync()
         d = json.loads(registry.FILE.read_text())
-        d["projects"]["alpha"]["name"] = "Turing Lens"
+        d["projects"]["alpha"]["name"] = "Tundra Lens"
         registry.FILE.write_text(json.dumps(d))
         registry._cache.update(mtime=None, data=None)
         registry.sync()
-        self.assertEqual(registry.label("alpha"), "Turing-Lens")
-        self.assertEqual(registry.resolve("Turing-Lens"), "alpha")
+        self.assertEqual(registry.label("alpha"), "Tundra-Lens")
+        self.assertEqual(registry.resolve("Tundra-Lens"), "alpha")
 
 
 if __name__ == "__main__":

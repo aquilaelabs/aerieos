@@ -2497,7 +2497,7 @@ for (const w of [1280, 393]){
   await page.setViewportSize({ width: w, height: 900 });
   const line = await page.evaluate(() => {
     const p = state.projects.find(x => x.name === 'alpha'), key = reposOf('alpha') || 'alpha', was = state.repos[key].name;
-    state.repos[key].name = 'Destiny-2-Armor-Stat-Planner-with-a-longer-name-still'; drawProjects(state.projects);
+    state.repos[key].name = 'Orchard-3-Fruit-Tree-Planner-with-a-longer-name-still'; drawProjects(state.projects);
     const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), back = c.querySelector('.pcback .pcname [data-rn]');
     const name = c.querySelector('.pcback .pcname .name'), cr = c.getBoundingClientRect(), br = back.getBoundingClientRect(), nr = name.getBoundingClientRect();
     const out = { top: Math.round(br.top - cr.top), right: Math.round(cr.right - br.right), wraps: nr.height > 30, beside: nr.right <= br.left,

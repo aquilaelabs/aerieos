@@ -124,8 +124,8 @@ const dur = s =>
 // ---- tabs ------------------------------------------------------------
 
 // What makes two tabs the same tab. For a terminal it is the tmux session,
-// NOT the argument that produced it: "claude:FreshBoot" from the project list
-// and "claude-FreshBoot" from the session list are different strings naming
+// NOT the argument that produced it: "claude:FrontPorch" from the project list
+// and "claude-FrontPorch" from the session list are different strings naming
 // one session, and letting both exist puts two ✕ buttons on it.
 // Everything a tab kind needs, in one place, because it used to be seven and
 // three of them failed SILENTLY: a kind missing from the server's TAB_KINDS

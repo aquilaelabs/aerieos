@@ -692,7 +692,83 @@ def cites():
     return 1 if bad else 0
 
 
-CHECKS = {"runner": runner, "selectors": selectors, "forms": forms, "cites": cites, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
+# Names this repository does not say: other projects of its maker's, which a
+# reader of it cannot follow and which are not its to name. Held as hashes
+# (sha256 of the name in lowercase letters and digits run together, its first
+# sixteen hex digits) so that this check does not say them either; the plain
+# list is in the project's notebook. One set is matched however the name's
+# words are joined but by a space (Name, name, a-name, a.name, a_name), the
+# other across a space too, for a name ordinary words would not make.
+_UNSAID_TIGHT = frozenset((
+    "0930417631d146a6", "18b5c3511317576d", "1c7454ae163a3a77", "380748f177701518", "59b888d269ed5825",
+    "6e87fdb2c1f245a2", "7d6a3ef9b5108a68", "939eaa0641e023c5", "944691f4069f15df", "af07d431bed9b179",
+    "d3014d162f7cad1e", "ec17d0de05966bdc", "fbc4b01f101953ce",
+))
+_UNSAID_LOOSE = frozenset((
+    "54e6c93c5cdce0ba", "59b888d269ed5825", "6e87fdb2c1f245a2", "944691f4069f15df", "f29540481bc5888e",
+))
+_UNSAID_LENGTHS = frozenset((7, 8, 9, 10, 11, 12, 15, 16, 18))
+_UNSAID_PART = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
+_UNSAID_SKIP = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff2", ".zip", ".gz", ".xz", ".jar", ".keystore", ".pdf", ".apk", ".bin")
+
+
+def said_hash(name):
+    """A name as the two sets hold it."""
+    import hashlib
+    return hashlib.sha256("".join(_UNSAID_PART.findall(name)).lower().encode("utf-8")).hexdigest()[:16]
+
+
+def unsaid_in(line, tight=_UNSAID_TIGHT, loose=_UNSAID_LOOSE, lengths=_UNSAID_LENGTHS):
+    """The stretches of a line that say a held name, as the line has them:
+    its words taken apart at capitals, digits and anything that is neither,
+    then one to five in a row tried together."""
+    import hashlib
+    parts = [(m.group(0).lower(), m.start(), m.end()) for m in _UNSAID_PART.finditer(line)]
+    found = []
+    for i in range(len(parts)):
+        joined, close = "", True
+        for j in range(i, min(i + 5, len(parts))):
+            if j > i:
+                gap = line[parts[j - 1][2]:parts[j][1]]
+                if len(gap) > 1 or (gap and gap not in " -_./"):
+                    break
+                close = close and gap != " "
+            joined += parts[j][0]
+            if len(joined) in lengths:
+                digest = hashlib.sha256(joined.encode("utf-8")).hexdigest()[:16]
+                if digest in loose or (close and digest in tight):
+                    found.append(line[parts[i][1]:parts[j][2]])
+    return found
+
+
+def unsaid():
+    """No tracked file names another project of the maker's: where a bug was
+    met is said in words, and a sample takes a made-up name."""
+    import subprocess
+    listed = subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=False).stdout.split("\n")
+    bad = []
+    for f in listed:
+        if not f or f.lower().endswith(_UNSAID_SKIP):
+            continue
+        try:
+            if os.path.getsize(f) > 4_000_000:
+                continue
+            text = pathlib.Path(f).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for n, line in enumerate(text.split("\n"), 1):
+            for words in unsaid_in(line):
+                bad.append(f"{f}:{n}: '{words}' is a name this repository does not say: say what happened in words, or give a sample a made-up name")
+    for b in bad[:40]:
+        print(f"  [FAIL] {b}")
+    if len(bad) > 40:
+        print(f"  [FAIL] ...and {len(bad) - 40} more")
+    if not bad:
+        print("  [ok]   no file names another project of the maker's")
+    return 1 if bad else 0
+
+
+CHECKS = {"runner": runner, "selectors": selectors, "forms": forms, "cites": cites, "unsaid": unsaid, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
           "changelog": changelog, "dupes": dupes, "releasekey": releasekey, "releasesigners": releasesigners}
 

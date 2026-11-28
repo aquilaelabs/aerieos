@@ -1155,7 +1155,7 @@ ok((await page.$$(`${NB} #verBox [data-verinit]`)).length === 1,
 ok((await page.$$(`${NB} #verBox [data-verask]:not([data-verask="@fold"])`)).length === 1,
    '...and offering to put the question to the space\u2019s own session');
 // Two products with different maturities is a state a fresh project can
-// already be in (StreamLift proposed 0.2.0 for the app and 0.1.0 for its
+// already be in (one proposed 0.2.0 for the app and 0.1.0 for its
 // extension while neither file existed), so the component door has to be
 // visible before the root version is, not only after.
 ok(await page.$(`${NB} #verBox .veradd .vdir`) !== null,

@@ -1113,7 +1113,7 @@ def claude_running(node_id, project_nodes, agent="claude"):
 
 # ---- the versions a node's projects pin -----------------------------
 # A store remade at the newest versions only strands a project that pins an
-# older one: Shebang-DevBoard pins NDK 29.0.14206865 and build-tools 36.0.0,
+# older one: one space pins NDK 29.0.14206865 and build-tools 36.0.0,
 # the store held NDK 30 and build-tools 37, and Gradle cannot fetch into a
 # store a session cannot write. The pins are read off the project's
 # Gradle files here, never by running Gradle, and each one is a row of its

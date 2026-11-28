@@ -32,7 +32,7 @@ carries that commit's short id (every build is named so) and is not a
 dirty one, or carries the id of another commit with the same tree. Work
 lands through a pull request, so the tag goes on the merge commit while
 the builds were made, and signed, from the branch tip it merged: the same
-files under another id (Shebang-DevBoard's v0.5.4, 5 Oct, released with
+files under another id (one space's v0.5.4 was released with
 nothing attached). Signed ones are what a release carries when there are any; an
 unsigned or debug build only where nothing signed was built.
 """
