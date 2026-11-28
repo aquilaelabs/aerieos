@@ -959,6 +959,14 @@ function soleOpen(d){
     delete o.dataset.pressed;
     slideDetails(o, false);
   }
+  // One not on show yet (a settings group whose read lands after the press)
+  // comes up shut when it does: left as it was, it stood open beside the one
+  // just opened. Nothing to slide, since nothing of it is drawn.
+  for (const o of g.querySelectorAll("details.sect")){
+    if (o === d || !o.open || sectGroup(o) !== g || getComputedStyle(o).display !== "none") continue;
+    delete o.dataset.pressed;
+    o.open = false;
+  }
 }
 // A section opened by a draw rather than by a hand (Memories, remembered
 // open): it is the one that stays, and on a phone the others shut at once,
