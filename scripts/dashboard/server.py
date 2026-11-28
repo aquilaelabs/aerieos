@@ -6253,7 +6253,7 @@ ROUTES = (
     Route("POST", "prefix", "/api/prefs", "_prefs_post",
           ("person", "a space's settings are the operator's: say what should change in your reply"),
           instead="a space's settings are the operator's: a session reads them with aerie settings", own_write=True,
-          asks=("space", "unlocked", "node:node", "nodes-write", "debug", "docker-write", "curate", "vms-write", "deploy", "settings")),
+          asks=("space", "unlocked", "node:node", "owner", "nodes-write", "debug", "docker-write", "curate", "vms-write", "deploy", "settings")),
     Route("POST", "prefix", "/api/brief", "_brief", ("handler", "space", "unlocked"), session=True, needs_repo=True),
     # The one body that is a document: a project's whole design, which its
     # own limits let run to megabytes (forty pages, sixty rules of twenty
@@ -10083,143 +10083,32 @@ class Handler(BaseHTTPRequestHandler):
 
     def _prefs_post(self, req):
         """POST /api/prefs: a project's settings dialog, saved by
-        prefs.dialog_save behind the gates here."""
+        prefs.dialog_saved once each thing the save would change has been
+        asked for: prefs.SAVE_ASKS says what each change asks and what it
+        refuses, in the order they are asked here."""
         name = field(req, "project")
         # Nobody may change a project they cannot see or have not taken on.
         if self._not_project(name):
             return
-        # The Debug page's grants alone ask the debug grant, below, never
-        # Spaces Write: an administrator grants a space's sessions its
-        # diagnostics without working on it.
-        debug_only = set(req) <= {"project", "diag", "log_from"}
-        if not debug_only and self._readonly(name):
+        # The Debug page's grants alone ask the debug grant, never Spaces
+        # Write: an administrator grants a space's sessions its diagnostics
+        # without working on it.
+        if not prefs.debug_only(req) and self._readonly(name):
             return None
-        # Everything else in this dialog is the project's own; the node is
-        # not, because a node is shared and moving a project onto one
-        # reaches every other project there. Only a CHANGE is asked about:
-        # the dialog sends every field on every save.
-        if ("node" in req or "nodes" in req) and prefs.node_changed(name, req) \
-                and self._refused_nodes([req.get("node") or ""] + (req.get("nodes") if isinstance(req.get("nodes"), list) else [])):
-            return
-        # A hosting-only node holds no project: its code and its sessions are
-        # what the flag keeps off it (nodes.host_only).
-        if ("node" in req or "nodes" in req) and not NODES_DOWN:
-            want = (req.get("nodes") if isinstance(req.get("nodes"), list) else []) + [req.get("node") or ""]
-            host = [(nodes.node(n) or {}).get("name") or n for n in want if n and nodes.host_only(n)]
-            if host:
-                return self._json({"error": f"{', '.join(host)} hosts containers only: no space's code "
-                                            "or sessions go there. Send a container to it from the "
-                                            "Containers page instead"}, 400)
-            # A disabled node is kept but not offered.
-            off = [(nodes.node(n) or {}).get("name") or n for n in want
-                   if n and (nodes.node(n) or {}).get("state") == "disabled"]
-            if off:
-                return self._json({"error": f"{', '.join(off)} is disabled on the Nodes page: Enable it there first"}, 400)
-        # The hosting nodes its containers may also go to (prefs.hosts): a
-        # node is shared, so naming one is for whoever may set the project's
-        # node, and only a hosting-only node is one: a node that holds the
-        # project is in its node set already. Only a change is asked about.
-        if req.get("hosts") is not None and prefs.hosts_changed(name, req.get("hosts")):
-            if self._refused_nodes(req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")):
-                return
-            if not NODES_DOWN:
-                got = req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")
-                bad = [(nodes.node(n) or {}).get("name") or n for n in got
-                       if str(n).strip() and not nodes.host_only(str(n).strip())]
-                if bad:
-                    return self._json({"error": f"{', '.join(bad)} is not a hosting-only node: a node the "
-                                                "space works on takes its containers already, from Nodes in its settings"}, 400)
-        # Which other projects a session here may read is AerieOS's
-        # owner's alone: it hands one project's sessions
-        # another's code and notebook, which no administrator or user grants
-        # on their own say. Only a change is asked about.
-        if req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")) \
-                and (self._who() or {}).get("role") != "owner":
-            return self._json({"error": "which other spaces a space's sessions may read is set by "
-                                        "AerieOS's owner alone"}, 403)
-        # ...and so are the places on it a session here is shown (sees): a
-        # share on a node is every project's there, so naming one is for
-        # whoever may set the node. Only a change is asked about.
-        if req.get("sees") is not None and prefs.sees_changed(name, req.get("sees")) \
-                and self._refused_nodes([(prefs.get(name) or {}).get("node") or ""] + list((prefs.get(name) or {}).get("nodes") or [])):
-            return
-        # ...and the addresses its sessions may still reach where the node
-        # filters their network: a hole in a shared
-        # node's firewall that reaches past the project, so an
-        # administrator's. The node hears it at once, since the sets it
-        # fills are rebuilt live.
-        reach = req.get("reaches") is not None and prefs.reaches_changed(name, req.get("reaches"))
-        if reach and self._refused("nodes-write"):
-            return
-        # The node's own address is not one this opens: a session's traffic
-        # to its own node is judged on the way in, where only the controller
-        # and the resolvers pass, and its containers are reached as its own.
-        if reach and not NODES_DOWN:
-            ids = req.get("nodes") if isinstance(req.get("nodes"), list) else (prefs.get(name) or {}).get("nodes") or []
-            addr_of = {n: str(((nodes.node(n) or {}).get("agent") or {}).get("addr") or "") for n in ids}
-            got = req.get("reaches") if isinstance(req.get("reaches"), list) else str(req.get("reaches")).split(",")
-            for e in (prefs._reach_entry(x) for x in got):
-                on = e["nodes"] or ids
-                own = [n for n in on if addr_of.get(n) and addr_of[n] == e["addr"].split(":")[0]]
-                if own:
-                    name_of = (nodes.node(own[0]) or {}).get("name") or own[0]
-                    return self._json({"error": f"{e['addr']} is {name_of} itself: a session there reaches its "
-                                                "node's containers as its own, and nothing else on its node"}, 400)
-        # ...and what its sessions may read for debugging (the machine logs
-        # of named nodes, the controller's diagnostics): the debug grant's,
-        # per project rather than per node.
-        # Granted only where debug mode can be on at all (DEBUG_MODE=1); a
-        # grant taken off is always allowed.
-        if prefs.debug_changed(name, req) and not settings.debug_available() \
-                and (req.get("diag") is True or req.get("log_from")):
-            return self._json({"error": "the debug options are not available on this controller"}, 403)
-        if prefs.debug_changed(name, req) and self._refused("debug"):
-            return
-        # ...nor is the dial that hands a session this project's container:
-        # it lets a session create one and set its env, which is Docker
-        # configuration, an administrator's (docker-write). Only a CHANGE is
-        # asked about, since the dialog sends every field on every save.
-        if req.get("devbuild") is not None \
-                and str(req.get("devbuild")) != prefs.get(name)["devbuild"] \
-                and self._refused("docker-write"):
-            return
-        # ...and the tool pack dial: adding to the catalog every
-        # node shares is Curate's to hand a session.
-        if req.get("installpacks") is not None and str(req.get("installpacks")) != prefs.get(name)["installpacks"] \
-                and self._refused("curate"):
-            return
-        # ...and the same of the VM dial and the VMs' limits: a VM is a
-        # machine on a node, the VMs area's to hand a session or to raise.
-        if ((req.get("makevms") is not None and str(req.get("makevms")) != prefs.get(name)["makevms"])
-                or (req.get("vm_caps") is not None and req.get("vm_caps") != prefs.get(name)["vm_caps"])) \
-                and self._refused("vms-write", name):
-            return
-        # ...and Deploy to Kubernetes: handing a session the
-        # space's deploys is Deploy Write's.
-        if req.get("kube") is not None and str(req.get("kube")) != prefs.get(name)["kube"] \
-                and self._refused("deploy", name):
-            return
-        # Handing a session the space's Discord server is Space
-        # settings Write, the connection's own.
-        if req.get("discord") is not None and str(req.get("discord")) != prefs.get(name)["discord"] \
-                and self._refused("settings", name):
-            return
-        held = (("node" in req or "nodes" in req) and prefs.node_changed(name, req)) \
-            or (req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")))
-        # Then the rest: the project's own settings are the Project settings area's to
-        # write (the operator: Settings Write only); what is the asker's
-        # own here (prefs.YOURS) is anybody's on the project, and a field
-        # sent with the value it has is no change.
-        if prefs.project_changes(name, req) and self._refused("settings", name):
-            return None
-        got = prefs.dialog_save(name, req, users.uid_of(self._who()))
-        if reach and not got[0].get("error"):
-            net_nudge()
-        # A synced node that now holds this project (or stops) hears it at
-        # once, so its first copy starts and the Claude button follows it.
-        if held and not got[0].get("error") and not NODES_DOWN:
-            wssync.held_changed()
-        return self._json(*got)
+        for ask, changes, on, fits in prefs.SAVE_ASKS:
+            if not changes(name, req):
+                continue
+            if ask == "node":
+                if self._refused_nodes(on(name, req)):
+                    return None
+            elif ask == "owner":
+                if (self._who() or {}).get("role") != "owner":
+                    return self._json({"error": prefs.OWNER_ONLY}, 403)
+            elif ask and (self._refused(ask[len("space:"):], name) if ask.startswith("space:") else self._refused(ask)):
+                return None
+            if fits and (no := fits(name, req)):
+                return self._json(*no)
+        return self._json(*prefs.dialog_saved(name, req, users.uid_of(self._who())))
 
     def _nodes(self, req):
         """The Nodes page's verbs. Thin on purpose: an administrator's, and
@@ -15581,7 +15470,9 @@ def wire():
              nodes.node(prefs.get(name)["node"]) if prefs.get(name)["node"] and not NODES_DOWN else None))
     # The settings dialog's save (prefs.dialog_save).
     prefs.configure_dialog(WORKSPACE=WORKSPACE, pin_instances=devapp.pin_to_current_node,
-                           end_agents=end_agents, net_nudge=net_nudge)
+                           end_agents=end_agents, net_nudge=net_nudge,
+                           node_of=nodes.node, host_only=nodes.host_only, nodes_up=lambda: not NODES_DOWN,
+                           debug_available=settings.debug_available, held_changed=wssync.held_changed)
     mfa.configure(STATE=STATE, seal=signing.seal, unseal=signing.unseal,
                   sealing=lambda: signing.MASTER is not None)
     try:

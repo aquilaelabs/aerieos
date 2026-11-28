@@ -1465,9 +1465,21 @@ WORKSPACE = None
 pin_instances = None
 end_agents = None
 net_nudge = None
+# ...and what its asks and refusals read: a node's row and whether it only
+# hosts (nodes.node, nodes.host_only), whether the node store opened,
+# whether debug mode can be on at all (settings.debug_available), and the
+# synced nodes told that a space's node set moved (wssync.held_changed).
+node_of = None
+host_only = None
+nodes_up = None
+debug_available = None
+held_changed = None
 
 
 def configure_dialog(**parts):
+    unknown = sorted(k for k in parts if k not in globals())
+    if unknown:
+        raise TypeError(f"prefs takes nothing called {', '.join(unknown)}")
     globals().update(parts)
 
 
@@ -1505,6 +1517,190 @@ def project_changes(name, req):
         if not same:
             out.append(k)
     return out
+
+
+# ---- what a save of the dialog asks, and what it refuses ----
+# The dialog sends every field on every save, so what a save asks of the
+# person saving is by what it would CHANGE. Each row of SAVE_ASKS: what is
+# asked, when (the change), of which nodes where it is asked of nodes, and
+# the row's own refusal once the ask has passed. What is asked: "node", the
+# right to place a space on each node named (a node is shared: moving a
+# space onto one reaches every other space there); "owner"; a permission of
+# the install by its name; or one asked of the space, "space:NAME". A row
+# that asks nothing only refuses. server.py's handler walks the rows in this
+# order and adds nothing of its own, and the route record's names for
+# /api/prefs are read off this table (scripts/lib/routegates.py).
+OWNER_ONLY = "which other spaces a space's sessions may read is set by AerieOS's owner alone"
+
+
+def debug_only(req):
+    """A save from the Debug page: its grants and nothing else."""
+    return set(req) <= {"project", "diag", "log_from"}
+
+
+def _nodes_sent(name, req):
+    return "node" in req or "nodes" in req
+
+
+def _nodes_change(name, req):
+    return _nodes_sent(name, req) and node_changed(name, req)
+
+
+def _nodes_named(name, req):
+    return [req.get("node") or ""] + (req.get("nodes") if isinstance(req.get("nodes"), list) else [])
+
+
+def _named(ids):
+    return [(node_of(n) or {}).get("name") or n for n in ids]
+
+
+def _nodes_fit(name, req):
+    # A hosting-only node holds no project: its code and its sessions are
+    # what the flag keeps off it (nodes.host_only).
+    if not nodes_up():
+        return None
+    want = (req.get("nodes") if isinstance(req.get("nodes"), list) else []) + [req.get("node") or ""]
+    host = _named([n for n in want if n and host_only(n)])
+    if host:
+        return {"error": f"{', '.join(host)} hosts containers only: no space's code "
+                         "or sessions go there. Send a container to it from the "
+                         "Containers page instead"}, 400
+    # A disabled node is kept but not offered.
+    off = _named([n for n in want if n and (node_of(n) or {}).get("state") == "disabled"])
+    if off:
+        return {"error": f"{', '.join(off)} is disabled on the Nodes page: Enable it there first"}, 400
+    return None
+
+
+def _hosts_change(name, req):
+    return req.get("hosts") is not None and hosts_changed(name, req.get("hosts"))
+
+
+def _hosts_named(name, req):
+    return req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")
+
+
+def _hosts_fit(name, req):
+    # Only a hosting-only node is one of these: a node that holds the
+    # project is in its node set already.
+    if not nodes_up():
+        return None
+    bad = _named([n for n in _hosts_named(name, req) if str(n).strip() and not host_only(str(n).strip())])
+    if bad:
+        return {"error": f"{', '.join(bad)} is not a hosting-only node: a node the "
+                         "space works on takes its containers already, from Nodes in its settings"}, 400
+    return None
+
+
+def _reads_change(name, req):
+    return req.get("reads") is not None and reads_changed(name, req.get("reads"))
+
+
+def _sees_change(name, req):
+    return req.get("sees") is not None and sees_changed(name, req.get("sees"))
+
+
+def _nodes_now(name, req):
+    cur = get(name) or {}
+    return [cur.get("node") or ""] + list(cur.get("nodes") or [])
+
+
+def _reaches_change(name, req):
+    return req.get("reaches") is not None and reaches_changed(name, req.get("reaches"))
+
+
+def _reaches_fit(name, req):
+    # The node's own address is not one this opens: a session's traffic
+    # to its own node is judged on the way in, where only the controller
+    # and the resolvers pass, and its containers are reached as its own.
+    if not nodes_up():
+        return None
+    ids = req.get("nodes") if isinstance(req.get("nodes"), list) else (get(name) or {}).get("nodes") or []
+    addr_of = {n: str(((node_of(n) or {}).get("agent") or {}).get("addr") or "") for n in ids}
+    got = req.get("reaches") if isinstance(req.get("reaches"), list) else str(req.get("reaches")).split(",")
+    for e in (_reach_entry(x) for x in got):
+        on = e["nodes"] or ids
+        own = [n for n in on if addr_of.get(n) and addr_of[n] == e["addr"].split(":")[0]]
+        if own:
+            return {"error": f"{e['addr']} is {_named(own[:1])[0]} itself: a session there reaches its "
+                             "node's containers as its own, and nothing else on its node"}, 400
+    return None
+
+
+def _debug_fit(name, req):
+    # Granted only where debug mode can be on at all (DEBUG_MODE=1); a
+    # grant taken off is always allowed.
+    if not debug_available() and (req.get("diag") is True or req.get("log_from")):
+        return {"error": "the debug options are not available on this controller"}, 403
+    return None
+
+
+def _dial_change(key):
+    return lambda name, req: req.get(key) is not None and str(req.get(key)) != get(name)[key]
+
+
+def _vm_change(name, req):
+    return _dial_change("makevms")(name, req) or (req.get("vm_caps") is not None and req.get("vm_caps") != get(name)["vm_caps"])
+
+
+def _own_change(name, req):
+    return bool(project_changes(name, req))
+
+
+SAVE_ASKS = (
+    # The nodes it works on: only a change is asked about.
+    ("node", _nodes_change, _nodes_named, None),
+    ("", _nodes_sent, None, _nodes_fit),
+    # The hosting nodes its containers may also go to (hosts): naming one
+    # is for whoever may set the space's node.
+    ("node", _hosts_change, _hosts_named, _hosts_fit),
+    # Which other spaces a session here may read: it hands one space's
+    # sessions another's code and notebook, which no administrator or user
+    # grants on their own say.
+    ("owner", _reads_change, None, None),
+    # The places on its nodes a session here is shown (sees): a share on a
+    # node is every space's there.
+    ("node", _sees_change, _nodes_now, None),
+    # The addresses its sessions may still reach where the node filters
+    # their network: a hole in a shared node's firewall.
+    ("nodes-write", _reaches_change, None, _reaches_fit),
+    # What its sessions may read for debugging (the machine logs of named
+    # nodes, the controller's diagnostics): the debug grant's.
+    ("", debug_changed, None, _debug_fit),
+    ("debug", debug_changed, None, None),
+    # The dial that hands a session this space's container: it lets a
+    # session create one and set its env, which is Docker configuration.
+    ("docker-write", _dial_change("devbuild"), None, None),
+    # The tool pack dial: adding to the catalog every node shares is
+    # Curate's to hand a session.
+    ("curate", _dial_change("installpacks"), None, None),
+    # The VM dial and the VMs' limits: a VM is a machine on a node.
+    ("space:vms-write", _vm_change, None, None),
+    # Deploy to Kubernetes: handing a session the space's deploys.
+    ("space:deploy", _dial_change("kube"), None, None),
+    # Handing a session the space's Discord server: the connection's own.
+    ("space:settings", _dial_change("discord"), None, None),
+    # Then the rest: the space's own settings. What is the asker's own
+    # here (YOURS) is anybody's on the space, and a field sent with the
+    # value it has is no change.
+    ("space:settings", _own_change, None, None),
+)
+
+
+def dialog_saved(name, req, uid):
+    """dialog_save, with what follows a change: the sessions' networks told
+    where the addresses they reach moved, and the synced nodes told at once
+    where the space's node set or what it reads did, so a node that now
+    holds it starts its first copy. What changed is read before the save.
+    (payload, status)."""
+    reach = _reaches_change(name, req)
+    held = _nodes_change(name, req) or _reads_change(name, req)
+    got = dialog_save(name, req, uid)
+    if reach and not got[0].get("error"):
+        net_nudge()
+    if held and not got[0].get("error") and nodes_up():
+        held_changed()
+    return got
 
 
 def dialog_save(name, req, uid):
