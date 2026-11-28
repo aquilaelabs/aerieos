@@ -40,6 +40,7 @@
 - A space's own settings no longer open on a General section that held one line; the space's id is a line under the title (381ebc6)
 - A session fixes a bug it meets in a file it is already changing, in its own commit, rather than only filing it; and where a space's setting lets a change asked for interrupt a test run, a question or research no longer does (97291e6)
 - aerie roadmap step mv moves a step to a place on its own item in one move, where it was refused and took one move per place (af1c7a5)
+- Every form is laid out one way: labels over their fields, two columns at a desk and one on a phone, and its buttons under the fields, ending where the fields end (032968a)
 
 ### Removed
 
