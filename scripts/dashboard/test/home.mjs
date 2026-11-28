@@ -321,12 +321,15 @@ await section("the controller restarts under the page", async () => {
   // Nothing unsaved: the page starts again by itself, and stays drawn as it
   // was until the new run's first read lands (Perch): the reload paints the
   // page's kept copy, inert, where the placeholder's shapes went, and the
-  // first read draws the page in its place. The read is held back here for
-  // three seconds, so the copy can be seen.
+  // first read draws the page in its place. The read that says the run is
+  // new goes through; every one after it, the new page's own, is held until
+  // the copy has been looked at, however long the page took to load (held
+  // for three seconds, a load slower than that had drawn the page already).
   await page.evaluate(() => { window.__sameLoad = true; bootSeen = 'the run before this one'; });
-  let hold = true;
+  let letGo, asked = 0;
+  const looked = new Promise(res => { letGo = res; });
   await page.route('**/api/status*', async r => {
-    if (hold) await new Promise(res => setTimeout(res, 3000));
+    if (asked++) await looked;
     r.continue().catch(() => {});
   });
   const nav = page.waitForNavigation({ timeout: 15000 }).then(() => true, () => false);
@@ -339,9 +342,9 @@ await section("the controller restarts under the page", async () => {
   });
   ok(kept.kept && kept.inert && kept.words > 40 && kept.ids === 0 && !kept.shapes && kept.stored === null,
      `...and stays drawn as it was across it: the kept copy, inert and without ids, where the shapes went, read once (${JSON.stringify(kept)})`);
+  letGo();
   await page.waitForFunction(() => !document.querySelector('#pane0 > .snapback') && document.querySelector('#pane0 > .stack .doc.on'),
                              null, { timeout: 15000 });
-  hold = false;
   await page.unroute('**/api/status*');
   ok(true, '...until the first read draws the page in its place');
   await ready(page);
