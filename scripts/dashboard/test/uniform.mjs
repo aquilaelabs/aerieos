@@ -3448,9 +3448,17 @@ if (runs('c')) await section("a form's buttons stand clear of its fields and end
           const above = fields.filter(f => home.contains(f) && f.getBoundingClientRect().bottom <= B.top + 1);
           if (!above.length) continue;
           const last = above.reduce((a, f) => f.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom ? f : a), L = last.getBoundingClientRect();
-          const gap = B.top - L.bottom, fr = Math.max(...above.map(f => f.getBoundingClientRect().right));
+          const gap = B.top - L.bottom;
           if (gap < 12 && B.left < L.right && B.right > L.left) out.push([whose(last), `buttons ${Math.round(gap)}px under ${last.id || last.tagName.toLowerCase()}`]);
-          if (B.right - fr > 8 && gap < 80) out.push([whose(last), `buttons end at ${Math.round(B.right)}, past the fields' ${Math.round(fr)}`]);
+          // A bar ends where the fields of its own section end: a dialog's
+          // foot under one of its sections (Delete space under File access,
+          // on a phone where the section's form stops short of the box)
+          // ends at the box, and that section's fields end at its own foot.
+          const served = above.filter(f => f.closest('details.sect') === bar.closest('details.sect'));
+          if (!served.length) continue;
+          const own = served.reduce((a, f) => f.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom ? f : a);
+          const fr = Math.max(...served.map(f => f.getBoundingClientRect().right));
+          if (B.right - fr > 8 && B.top - own.getBoundingClientRect().bottom < 80) out.push([whose(own), `buttons end at ${Math.round(B.right)}, past the fields' ${Math.round(fr)}`]);
         }
         for (const home of [...root.querySelectorAll('details.sect > .body, .modal:not([hidden]) .box')].filter(vis)){
           // A dialog of sections is judged section by section, so the dialog

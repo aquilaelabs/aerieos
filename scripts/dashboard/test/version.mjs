@@ -1206,9 +1206,9 @@ await until(async () => {
   // The pane's own words (nb-artifacts.js): "here" was never in them, so
   // this polled the whole ten seconds (twenty under BB_TEST_SLOW) every run
   // and then passed on the line below.
-  return /no CHANGELOG\.md yet/.test(paneText);
+  return /no CHANGELOG\.md yet/i.test(paneText);
 }, 10000, 200);
-ok(/no CHANGELOG\.md yet/.test(paneText),
+ok(/no CHANGELOG\.md yet/i.test(paneText),
    'the changelog pane says how to opt in when there is no file');
 // The flake this suite carried for weeks, as a rule instead. The pane used to
 // live in #verBox and be MOVED into the sheet, so a repaint of that box while
@@ -1221,7 +1221,7 @@ await page.evaluate(() => drawPanes());
 await settled(page, { quiet: 400 });
 const panes = await page.$$eval('.verlogpane', es => es.map(e => ({
   inSheet: !!e.closest('#sheetSlot'), text: e.textContent.slice(0, 40) })));
-ok(panes.length === 1 && panes[0].inSheet && /no CHANGELOG/.test(panes[0].text),
+ok(panes.length === 1 && panes[0].inSheet && /no CHANGELOG/i.test(panes[0].text),
    `...and a repaint under the open sheet leaves exactly one, in the sheet (${
      JSON.stringify(panes)})`);
 // It reads in the same window a history does, and fills it: a document in a
