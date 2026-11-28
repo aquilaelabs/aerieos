@@ -646,8 +646,12 @@ await section("phase 2: the docker manager's picker", async () => {
   // it named a machine the tab was not talking to, in an address. Read
   // BEFORE the reload below, which throws the answer away on purpose.
   await page.waitForFunction(() => (dockerList?.src?.where || '').length > 0, null, { timeout: 10000 }).catch(() => {});
-  ok(await page.evaluate(() => (dockerList?.src?.where || '').length > 0),
-     'the manager\'s own answer says which daemon it is about');
+  {
+    // What the answer was when it named none, for a failure under load.
+    const said = await page.evaluate(() => ({ where: dockerList?.src?.where || '', node: dockerNode, error: dockerList?.error || '',
+      blind: dockerList?.blind, src: dockerList?.src || null, busy: !!readBusy('docker') }));
+    ok(said.where.length > 0, `the manager's own answer says which daemon it is about${said.where ? '' : ` (${JSON.stringify(said)})`}`);
+  }
   ok(await page.evaluate(w => {
        dockerNode = '';                        // as a fresh page would start
        dockerList = null;
@@ -1663,7 +1667,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(await page.$eval(`${ROW} [data-k="rootasks"]`, c => c.checked && /aerie root run --node shed/.test(c.closest('label').textContent)),
        'the hosting-only row carries the root-asks switch, on, naming the verb');
     await page.click(`${ROW} [data-k="rootasks"]`);
+    // The save's own answer is what is waited for: the box reads unticked
+    // from the press, before anything was sent, and an ask made then was
+    // still allowed (under a gate's load).
+    const savedOff = page.waitForResponse(r => r.request().method() === 'POST' && /\/api\/v1\/nodes$/.test(r.url().split('?')[0]), { timeout: 30000 });
     await page.click(`${ROW} [data-nd="sess-save"]`);
+    await savedOff.catch(() => {});
     await page.waitForFunction(sel => document.querySelector(sel + ' [data-k="rootasks"]')?.checked === false, ROW, { timeout: 10000 });
     const off = await rootAsk();
     ok(/root/.test(off.error || '') && !off.ok, `...and off, the ask is refused and told so (${off.error})`);
