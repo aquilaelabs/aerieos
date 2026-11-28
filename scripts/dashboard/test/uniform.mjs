@@ -570,7 +570,12 @@ async function spanning(){
     // The rule's own number as well as the surface: a 700px field on a
     // 1080px tab is inside 90% and outside --ctl-w.
     const cap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-w')) * 16 || 480;
-    const LIM = Math.min(W * 0.9, cap + 2);
+    // On a phone a holder fills its surface to the gutter (R301 step 6, the
+    // operator 28 Nov), the edge a section's presses end on: judged there
+    // against the two gutters, so one running past them still fails.
+    const phone = W <= 600;
+    const gut = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-x')) || 16;
+    const LIM = phone ? W - 2 * gut + 2 : Math.min(W * 0.9, cap + 2);
     const CTL = 'input:not([type=checkbox]):not([type=radio]), select, textarea, button';
     const ROWS = '.actbar, .ctlrow, .fcell > .ctl, .tcnode, .chips';
     // A tab strip is navigation, and the phone rule for one is the opposite
@@ -584,11 +589,15 @@ async function spanning(){
     // A form's box (formBox, R301) is capped as a whole, two columns of
     // controls at most, and its fields fill it so its foot ends where they
     // do: judged as one, never field by field.
-    const FORM = Math.min(W * 0.95, cap * 2 + 22);
+    const FORM = phone ? LIM : Math.min(W * 0.95, cap * 2 + 22);
     for (const f of box.querySelectorAll('.fbox')){
       const kids = [...f.querySelectorAll(CTL)].filter(vis);
       kids.forEach(k => seen.add(k));
-      const w = f.getBoundingClientRect().width;
+      // Inside its padding: a form that carries the band's inset (a node's
+      // settings, a snapshot's restore) spans the band and its fields keep
+      // the gutters.
+      const fs = getComputedStyle(f);
+      const w = f.getBoundingClientRect().width - parseFloat(fs.paddingLeft) - parseFloat(fs.paddingRight);
       if (kids.length && w > FORM) out.push(`fbox ${Math.round(w)}/${Math.round(W)}`);
     }
     for (const row of box.querySelectorAll(ROWS)){
@@ -613,6 +622,10 @@ async function spanning(){
       const r = Math.max(...kids.map(k => k.getBoundingClientRect().right));
       if (r - l > LIM) out.push(`${row.className.split(' ')[0]} ${Math.round(r - l)}/${Math.round(W)}`);
     }
+    // What is left is a control in no holder. Nothing caps one alone (R301
+    // step 6: a form's box, a row of controls or a menu is capped, and its
+    // controls fill it), so one wider than the cap here is a control that
+    // fills its surface and wants a holder: a formBox or a .ctlrow.
     for (const e of box.querySelectorAll(CTL)){
       // `.slot` is a terminal pane, not `.term`: that is the terminal
       // COLUMN, which every document tab is inside, so the exclusion took
@@ -2290,8 +2303,8 @@ await section("A card turns over to its controls on a tween", async () => {
 // The card is on its front again, its turn back over.
 await page.waitForFunction(() => !document.querySelector('.doc.on .pgrid .pcard.flipped'), null, { timeout: 10000 }).catch(() => {});
 await motionOver();
-// The same width rule at phone width, on every tab: the cap is min(--ctl-w,
-// 88%), and 88% is what bites here.
+// The same width rule at phone width, on every tab: a holder fills its
+// surface to the gutter there, and nothing runs past it.
 //
 // A phone starts every fold shut, and a control inside a shut fold has no
 // line to be measured on. Opened the way a person's press leaves them, which
@@ -2309,7 +2322,7 @@ for (const kind of kinds){
   await unfold();
   const S = await spanning();
   ok(!S.err && S.wide.length === 0,
-     `[${kind}] no control or row of controls spans the tab at phone width${
+     `[${kind}] no control or row of controls runs past the gutters at phone width${
        S.err ? ` (${S.err})` : S.wide.length ? `: ${S.wide.join(', ')}` : ''}`);
   await arrived();
   const L = await lineup();

@@ -2381,11 +2381,12 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 /* A section's own explainer line, straight in its body, is the quiet note
    it is everywhere else: the Git view's Branches line read at body size
    (the design pass, 4 Oct). */
-/* A control never spans its container. The cap goes on the ROW where there
-   is one, and every row of controls wears one class for it, .ctlrow (a
-   filter row, a field and its label, a picker row, an add row), so the
-   controls in it stop short together and are not capped a second time
-   inside it; a lone control takes the cap itself. No page is named here
+/* A control never spans its container. The cap goes on what holds it,
+   never on a control alone (R301 step 6), and every row of controls wears
+   one class for it, .ctlrow (a filter row, a field and its label, a picker
+   row, an add row), so the controls in it stop short together on one edge;
+   a control in no holder is as wide as its content, and one that would
+   fill its surface is put in a holder. No page is named here
    (R218 step 64, the operator 19 Oct: three lists of row kinds had drifted
    apart): a new surface's row is capped by wearing the class. Beside it,
    the shared parts that size their own contents: an action bar, a form
@@ -2394,7 +2395,7 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
    row's controls is what uniform.mjs measures, against the surface holding
    it. Terminals and logs are not controls and are not here. */
 :is(.doctab,.nb) .ctlrow{
-  max-width:min(var(--ctl-w),88%)}
+  max-width:var(--ctl-cap)}
 /* FORMS (the design's rule `forms`; uniform.mjs measures it on every page). One
    way to lay out fields, so no page does it its own way:
    - a label sits OVER its field, 4px above it, never beside it (.lbl, .pickw);
@@ -2419,7 +2420,7 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 /* ...and a row of controls in a cell runs the cell's width: the grid holds
    the cap, so its verbs end where the form's fields end. */
 .fgrid .ctlrow{max-width:none}
-@media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)}
+@media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:var(--ctl-cap)}
 }
 /* A form (formBox, R301): the box is capped and never a field alone, so its
    foot ends where its fields end at every width, 16px under the last of
@@ -2439,9 +2440,9 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 /* A form of one field is that field's width, its foot ending under it: in
    two columns a lone number's Apply hung half the box past it. A wide field
    keeps the box, and a dialog's form still fills its band. */
-.fbox:has(>.fgrid):not(:has(>.fgrid>:not([hidden]) ~ :not([hidden]))):not(:has(>.fgrid>.fwide)):not(.modal:not(.inline) *){max-width:min(var(--ctl-w),88%)}
+.fbox:has(>.fgrid):not(:has(>.fgrid>:not([hidden]) ~ :not([hidden]))):not(:has(>.fgrid>.fwide)):not(.modal:not(.inline) *){max-width:var(--ctl-cap)}
 .fbox>.fgrid:not(:has(>:not([hidden]) ~ :not([hidden])))>*{grid-column:1 / -1}
-@media(max-width:600px){ .fbox{max-width:min(var(--ctl-w),88%)}
+@media(max-width:600px){ .fbox{max-width:var(--ctl-cap)}
   .modal:not(.inline) .fbox{max-width:none}
 }
 /* A dialog's form is on the same grid (R273, the operator 23 Nov): the
@@ -2457,7 +2458,7 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick,[hidden]),.fgrid>label.pick:not([hidden]){display:flex;flex-direction:column;align-items:stretch;gap:var(--label-gap)}
 .field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>.pickw,.fgrid>label.pick>.pickw{font:var(--f-ui);color:var(--dim);min-width:0;flex:none}
 .field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>:is(input,select,textarea){width:100%;box-sizing:border-box;min-height:var(--ctl)}
-.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick){max-width:min(var(--ctl-w),88%)}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick){max-width:var(--ctl-cap)}
 .field:not(.docbarrow,.histbar)>label.pick + label.pick,.field:not(.docbarrow,.histbar)>.hint + label.pick{margin-top:14px}
 .field:not(.docbarrow,.histbar)>label.pick + .hint{margin-top:var(--label-gap)}
 /* Fields down a form have room between them: a label belongs to the field under
@@ -2475,12 +2476,12 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
    rows above, its right end fell in the middle of the tab, so Refresh
    floated in space with no edge to sit against, while every other action on
    the page (a row's buttons, a section's status) lines up on the tab's
-   right edge. The controls inside it are still capped one by one.
+   right edge. The controls inside it keep their own widths.
    Three classes deep to outrank the cap above. */
 :is(.doctab,.nb) .field.docbarrow{max-width:none}
-/* ...and because the bar is not capped, the controls in it are, one by one:
-   a search box in a band that spans the tab is exactly the full-width
-   control the rule above forbids everywhere else. */
+/* ...and because a band is not a holder (R301 step 6: what holds controls
+   is capped, never a control alone), the controls in it are capped one by
+   one: a search box in a band that spans the tab would run its width. */
 :is(.doctab,.nb) .field.docbarrow :is(input:not([type=checkbox]):not([type=radio]),select,textarea){
   max-width:min(var(--ctl-w),88%)}
 /* A pulldown straight in the bar is a picker beside what it filters, as a
@@ -2521,10 +2522,6 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 @media(max-width:440px){
   :is(.doctab,.nb) .field.docbarrow>input[type=search]{order:-1;flex:1 1 9rem;min-width:9rem;max-width:none}
 }
-/* A form's box (.fbox, R301) is capped as a whole and its fields fill it, so
-   its foot ends where they do; one field capped alone ended short of it. */
-:is(.doctab,.nb) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):not(:is(.ctlrow,.ctlown,.actbar,.actmenu,.fbox) *){
-  max-width:min(var(--ctl-w),88%)}
 /* A row whose text column holds a field is a row of controls, and its
    action cluster belongs on the field's line: the Phone tab's Connect and
    Pair sit beside one. A row of prose keeps its centered cluster.

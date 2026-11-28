@@ -1624,7 +1624,7 @@ body.firstrun #panes{display:none}
      and the box ending where the search above it ends, both capped as every
      control is (the operator, 22 Oct: two boxes of two widths, one with a
      word beside it, read as a mess). */
-  .wkreader>.wkpick{display:flex;align-items:center;gap:var(--field-gap);margin-bottom:10px;max-width:min(var(--ctl-w),88%)}
+  .wkreader>.wkpick{display:flex;align-items:center;gap:var(--field-gap);margin-bottom:10px;max-width:var(--ctl-cap)}
   .wkreader>.wkpick>.pickw{display:none}
 }
 

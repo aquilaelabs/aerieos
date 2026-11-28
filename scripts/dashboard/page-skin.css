@@ -177,6 +177,13 @@
      a field that runs the whole width of a tab reads as a
      form pretending to be a page (docs/design-language.md, Controls). */
   --ctl-w:30rem;
+  /* What holds controls is capped at (R301 step 6: a form, a row of them, a
+     picker's label; never a control alone): the control width, short of the
+     surface at a desk. On a phone a holder fills its surface to the gutter
+     (the operator, 28 Nov), the edge a section's own presses and a dialog's
+     foot already end on: a cap there put a form 15px inside the Add button
+     under it, and one in a field 28px short of one beside it. */
+  --ctl-cap:min(var(--ctl-w), 88%);
   /* The inset of a band on a document surface: a notebook row, a modal's
      field, a document tab's row, a findings rule. One value, because a band
      retyped by hand is how one tab ends up with four different left edges. */
@@ -230,6 +237,7 @@
   --gold:#d8b25c;   --gold-edge:#4a3c1e;
   --red2:#e0796f;   --red2-edge:#94423d;
 }
+@media(max-width:600px){ :root{--ctl-cap:none} }
 @media(min-resolution:2dppx){ :root{--hair:.5px}
 }
 /* ONE STEP UP AT A DESK (the operator, 13 Oct: "a lot of text looks too
