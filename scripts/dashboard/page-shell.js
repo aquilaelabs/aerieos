@@ -805,6 +805,9 @@ function groupHeader(t, g){
     if (!have.length) return `<span class="phead mchead">${nodePick("", null)}${skv(5, "ndstatesk")}<span class="sp"></span></span>`;
     return `<span class="phead mchead">${nodePick("ndPick", have, machinesNode(t.kind) || have[0].id)}${skv(5, "ndstatesk")}<span class="sp"></span></span>`;
   }
+  // A list from before the nodes last moved (they moved while no page that
+  // draws it was on show) is drawn as it is and read again.
+  if (nodesStale) nodesKnown();
   const live = machinesLive(t.kind);
   const cur = groupNode(g, t.kind);
   const n = live.find(x => x.id === cur);
@@ -821,6 +824,15 @@ function groupHeader(t, g){
   const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.config?.own ? `${x.name} (this machine)` : x.name, live: x.live})), cur,
     undefined, {stated: !!pill}) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
   return `<span class="phead mchead">${pick}${pill}<span class="sp"></span></span>`;
+}
+// Whether a page on show wears a group's header with its node picker: the
+// node list is drawn there, picker and state pill, on every page of such a
+// group, so each of them follows the nodes as the Nodes page does.
+function nodeHeadShown(){
+  return panes.some((id, i) => {
+    const t = (i === 0 || isSplit()) && tabOf(id), g = t && groupOf(t.kind);
+    return !!g && !!GROUP_HEADS[g.key] && !!NODE_PICKED[t.kind];
+  });
 }
 // A node's own page from anywhere: Machines' Nodes on it, the group's
 // picker following (a group header's state pill, the search's node rows).

@@ -39,7 +39,14 @@ const row = await page.evaluate(() => (storageList || []).find(n => n.name === '
 ok(row && row.measured && row.projects.map(p => p.name).join() === 'alpha,beta' && row.projects[0].total === 6400 && !row.other,
    `the tab lists the node with its spaces largest first, every one named for an administrator (${JSON.stringify(row?.projects)})`);
 // One node at a time, picked in the bar like Toolchains.
-await page.waitForFunction(() => [...document.querySelectorAll('.pane .bar select#ndPick option')].some(o => o.textContent === 'diskbox'), null, { timeout: 15000 });
+await page.waitForFunction(() => [...document.querySelectorAll('.pane .bar select#ndPick option')].some(o => o.textContent === 'diskbox'), null, { timeout: 15000,
+  // What the header had instead, what each list held, and which reads were
+  // still out, when the picker never named the node.
+  tell: () => ({ bar: document.querySelector('.pane .bar')?.textContent.replace(/\s+/g, ' ').trim().slice(0, 200),
+    picks: [...document.querySelectorAll('.pane .bar select#ndPick option')].map(o => o.textContent),
+    nodes: nodesList === null ? null : nodesList.map(n => `${n.name} ${n.state} ${n.live}`), said: nodesErr, stale: nodesStale,
+    storage: (storageList || []).map(n => `${n.name} ${n.live}`),
+    out: [...readings].filter(([, r]) => r.busy).map(([k, r]) => `${k} for ${Date.now() - r.at} ms`) }) });
 ok(await page.$eval('.pane .bar label.pick select#ndPick', s => [...s.options].some(o => o.textContent === 'diskbox')),
    'the bar picks the node, as Toolchains does');
 await page.selectOption('.pane .bar #ndPick', minted.id);
@@ -110,6 +117,29 @@ await section("The page measures, and each thing is freed on the page that manag
   if (avd) await api('/api/v1/jobs', { action: 'cancel', id: avd.id });
   const refused = await api('/api/emulator', { action: 'phone-remove', node: minted.id, project: 'alpha', uid: '', name: 'builderbot-35' });
   ok(/running/.test(refused.error || ''), `a running phone is refused by the server too (${refused.error})`);
+});
+// The Machines header is drawn from the node list on every page of the
+// group. Storage reads a list of its own, so nothing on it asked for the
+// nodes again: a node that changed while it was on show kept its old pill
+// and its old line in the picker until the Nodes page was visited.
+await section("The group's header follows the nodes on a page that only wears it", async () => {
+  await page.evaluate(() => openStorageTab());
+  await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
+  await page.selectOption('.pane .bar #ndPick', minted.id);
+  await page.waitForSelector('.pane .bar .ndstate', { timeout: 15000 });
+  const pill = () => page.$eval('.pane .bar .ndstate', b => b.textContent.trim()).catch(() => 'no pill');
+  const says = (re, want) => page.waitForFunction(([src, w]) => new RegExp(src).test(document.querySelector('.pane .bar .ndstate')?.textContent.trim() || '') === w,
+    [re.source, want], { timeout: 15000 }).then(() => true, () => false);
+  await api('/api/v1/nodes', { action: 'drain', id: minted.id });
+  ok(await says(/^draining/, true), `a node drained while Storage is on show reads draining on the header's pill there (${await pill()})`);
+  // ...and one that changed while no page that draws the list was on show
+  // is read again by the header the next time one wears it.
+  await page.evaluate(() => openUsersTab());
+  await page.waitForFunction(() => tabOf(panes[0])?.kind === 'users', null, { timeout: 15000 });
+  await api('/api/v1/nodes', { action: 'online', id: minted.id });
+  const marked = await page.waitForFunction(() => nodesStale, null, { timeout: 15000 }).then(() => true, () => false);
+  await page.evaluate(() => openStorageTab());
+  ok(marked && await says(/^draining/, false), `...and one put back online behind another page reads so when Storage is opened again (${await pill()}, the list marked stale: ${marked})`);
 });
 // The array's parity check: offered where the machine's
 // agent has it, its progress on the running pill, its result a fact.

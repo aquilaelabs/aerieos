@@ -719,10 +719,11 @@ function bootAway(){
   });
   onRev("nodes", () => {
     // The list is drawn by every page with a node picker, not the Nodes page
-    // alone: re-read for the one on show, and when none is, marked stale, so
-    // the next page to read it loads a fresh one rather than a list from
-    // before a node enrolled or retired.
-    if (NODE_READERS.some(shown)) loadNodes();
+    // alone, and by a group's header on every page that wears it: re-read
+    // for the one on show, and when none is, marked stale, so the next page
+    // to read it loads a fresh one rather than a list from before a node
+    // enrolled or retired.
+    if (NODE_READERS.some(shown) || nodeHeadShown()) loadNodes();
     else nodesStale = true;
     // A node's census carries its images: refetched only when they moved.
     if (shown("emulator")) emuOnNodes();

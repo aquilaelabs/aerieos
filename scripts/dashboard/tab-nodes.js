@@ -21,9 +21,12 @@ let ndHistory = {};              // the own machine's reporting per node: {span,
 // ...and stale when the nodes token moved while no page that draws the list
 // was on show (index.html's watch): the next page to read it loads a fresh
 // one, and meanwhile draws the last, so a picker drawn in the same tick as
-// its dialog opened still has its nodes.
+// its dialog opened still has its nodes. A read takes the mark as it starts,
+// so one that was out when the token moved does not take it on landing: its
+// answer may be from before the move.
 let nodesStale = false;
 // The pages that draw the list: a node picker each, or the rows themselves.
+// A page that wears a group's header draws it there too (nodeHeadShown).
 const NODE_READERS = ["nodes", "toolchains", "agents", "library", "entry", "installed", "thing", "emulator", "docker", "projects", "settings", "debug"];
 let nodesErr = "";
 let nodesAgent = null;           // the agent this controller ships: {digest, version}
@@ -68,6 +71,7 @@ function openNodesTab(nid, what){
 // a save drops its node's draft only once nodeAct's own read is in.
 function loadNodes(opts){
   return reading("nodes", async () => {
+    nodesStale = false;
     const j = await getJSON("/api/v1/nodes");
     nodesErr = j.error || "";
     if (!j.error){
@@ -77,7 +81,6 @@ function loadNodes(opts){
       nodesDefault = j.default || "";
       nodesSystems = Array.isArray(j.systems) ? j.systems : [];
     } else nodesList = nodesList || [];
-    nodesStale = false;
   }, opts);
 }
 
