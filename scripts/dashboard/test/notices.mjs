@@ -235,9 +235,13 @@ await section("an ask: answered on the row, its long part in a scrolling box", a
   // (the operator, 24 Nov), while one opened stays open through a redraw.
   const histSel = `.noticestab .ntrow[data-nt="${rec.id}"] details.ntlong`;
   await page.evaluate(s => { const d = document.querySelector(s); d.open = false; }, histSel);
-  await page.evaluate(s => { const d = document.querySelector(s); window.__ntSlid = false;
+  // The fold as the page has it when it is pressed, by what it is and not
+  // by the element found now: the list redrawn in between (a poll's read
+  // landing under a gate's load) made the row anew, and the slide of the
+  // new one was not counted (slid false).
+  await page.evaluate(s => { window.__ntSlid = false;
     const real = Element.prototype.animate;
-    Element.prototype.animate = function(k, o){ if (this === d && Array.isArray(k) && k[0] && 'height' in k[0]) window.__ntSlid = true; return real.call(this, k, o); };
+    Element.prototype.animate = function(k, o){ if (this.matches?.(s) && Array.isArray(k) && k[0] && 'height' in k[0]) window.__ntSlid = true; return real.call(this, k, o); };
     window.__ntUnslide = () => { Element.prototype.animate = real; }; }, histSel);
   await page.click(`${histSel} > summary`);
   const slid = await page.evaluate(() => { window.__ntUnslide(); return window.__ntSlid; });
