@@ -42,6 +42,12 @@ function nbPermsView({$, nb, project, root}){
   // a push with lines that look sensitive waits on the bell for a person
   // or goes without the hold.
   let draft = {};
+  // A pick not applied yet is unsaved work, as the git host's picks under it
+  // are: leaving the view or closing the notebook asks first, and answering
+  // drops it.
+  nb.stage("permissions:push", {
+    count: () => Object.keys(draft).length,
+    revert: () => { if (!Object.keys(draft).length) return; draft = {}; drawPush(); }});
   const GITPOL_DEFAULT = {push: "allow", main: "deny", scan: "hold"};   // prefs.GITPOL_DEFAULT
   function drawPush(){
     const host = view()?.querySelector(".permgit");

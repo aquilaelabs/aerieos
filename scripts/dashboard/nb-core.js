@@ -804,6 +804,7 @@ const NB_UNSAVED = [
   ["settings", () => "settings being edited"],
   ["signing", () => "a staged signing key change"],
   ["artifacts", n => `${n} staged version bump${n === 1 ? "" : "s"}`],
+  ["permissions:push", () => "a staged push policy"],
   ["permissions:githost", () => "a staged git host permission"],
 ];
 function nbCoreSettingsEdited(nb){

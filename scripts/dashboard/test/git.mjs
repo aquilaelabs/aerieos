@@ -1268,6 +1268,22 @@ await section("step 3: the policy, and Send to Claude", async () => {
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-gitpol="push"]', 'deny');
   ok(await page.$eval('.nb .nbview[data-view="permissions"] .permGitApply', b => !b.disabled),
      '...picking a policy wakes Apply and saves nothing yet');
+  // ...and that pick is unsaved work: another view pressed asks first, and a
+  // no leaves the view and the pick as they were. It was dropped with no
+  // word when the notebook's tab closed or the page was left.
+  {
+    page.dialogs.length = 0;
+    page.answers.push(-1);
+    await page.evaluate(() => document.querySelector('.nb .nbtabs [data-v="bugs"]').click());
+    await new Promise(r => setTimeout(r, 600));
+    const stayed = await page.$eval('.nb', el => ({
+      view: [...el.querySelectorAll('.nbview')].find(v => !v.hidden)?.dataset.view,
+      pick: el.querySelector('.nbview[data-view="permissions"] [data-gitpol="push"]')?.value,
+      apply: el.querySelector('.nbview[data-view="permissions"] .permGitApply')?.disabled }));
+    ok(page.dialogs.length === 1 && /a staged push policy would be thrown away/.test(page.dialogs[0])
+       && stayed.view === 'permissions' && stayed.pick === 'deny' && stayed.apply === false,
+       `...a push policy pick not applied yet is asked about before another view is shown, and a no keeps it (${page.dialogs[0]?.slice(0, 70)}; ${JSON.stringify(stayed)})`);
+  }
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-gitpol="push"]', 'allow');
   // On the git host: every ability with what the token says (here
   // never measured: no token) and an Allow or Deny over it, merging at

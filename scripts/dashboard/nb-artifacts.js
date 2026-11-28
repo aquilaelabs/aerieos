@@ -42,8 +42,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     // control here that reaches outside the panel: a misclicked "Major → 1.0.0"
     // used to be a commit before the finger left the button.
     // {component -> part}, "" being the project's own.
-    verPending: {},
-    verPolicyPending: null};   // a picked policy, until Save writes it
+    verPending: {}};
 
   // This notebook's own filter state, so two notebooks in a split do not
   // share a search box's contents.
@@ -662,13 +661,13 @@ function nbArtVerStages(av, all){
   all.forEach(v => {
     const comp = v.component || "";
     nb.stage(`artifacts:version${comp ? ":" + comp : ""}`, {
-      count: () => (comp in av.verPending ? 1 : 0) + (!comp && av.verPolicyPending != null ? 1 : 0),
+      count: () => (comp in av.verPending ? 1 : 0),
       what: () => comp ? `the staged bump of ${comp}` : "the staged version change",
       save: () => nbArtVerCommit(av, comp),
       revert: () => nbArtVerClear(av, comp)});
   });
   nb.stage("artifacts", {
-    count: () => Object.keys(av.verPending).length + (av.verPolicyPending != null ? 1 : 0),
+    count: () => Object.keys(av.verPending).length,
     revert: () => nbArtVerClear(av)});
 }
 
@@ -967,12 +966,11 @@ function nbArtWireUnbump(av, box, all){
   });
 }
 
-// What is staged dropped. With a component, that section's alone (its
-// bump, and for the project's own section its Claude access too); without,
+// What is staged dropped. With a component, that section's alone; without,
 // all of them.
 function nbArtVerClear(av, only){
-  if (only === undefined){ av.verPending = {}; av.verPolicyPending = null; }
-  else { delete av.verPending[only]; if (!only) av.verPolicyPending = null; }
+  if (only === undefined) av.verPending = {};
+  else delete av.verPending[only];
   nbArtDrawVersion(av);
 }
 // What is staged written, one section's or all of them as above: what the
@@ -980,8 +978,7 @@ function nbArtVerClear(av, only){
 // the question was answered no.
 async function nbArtVerCommit(av, only){
   const parts = Object.entries(av.verPending).filter(([comp]) => only === undefined || comp === only);
-  const policy = only === undefined || only === "" ? av.verPolicyPending : null;
-  if (!parts.length && policy == null) return "";
+  if (!parts.length) return "";
   // A window move is the one thing on this tab that reaches other
   // projects: it ends their sessions. Asked here as well as said on the
   // staged line, because the line can be scrolled past and this cannot.
@@ -993,12 +990,7 @@ async function nbArtVerCommit(av, only){
         + `Sessions on ${cost.projects.length} space${cost.projects.length === 1 ? "" : "s"} `
         + `(${cost.projects.join(", ")}) end until each node's agent is updated on the Nodes page.`)) return null;
   for (const [comp] of parts) delete av.verPending[comp];
-  if (policy != null) av.verPolicyPending = null;
   const done = [];
-  if (policy != null){
-    const j = await nbArtPostVersion(av, {action: "policy", policy}, true);
-    if (j && !j.error) done.push(`Agent access: ${POLICY_LABEL[policy] || policy}`);
-  }
   for (const [comp, part] of parts){
     const j = await nbArtPostVersion(av, {action: "bump", part, component: comp},
                                      true);
