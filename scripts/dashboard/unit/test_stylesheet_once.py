@@ -132,6 +132,17 @@ class Once(unittest.TestCase):
                     said.append(f"{name}:{line} {sels[:60]} sets {prop}, and line {again} sets it again for all of them")
         self.assertEqual(said, [])
 
+    def test_no_selector_names_a_class_twice_to_outrank_another(self):
+        # .a.a selects what .a does and only weighs more: the rule it was
+        # written to beat is the one to change (its own selector under the
+        # exception's, as .pickshare's is), or the layer after it.
+        doubled = []
+        for name in SHEETS:
+            with open(os.path.join(DASH, name), encoding="utf-8") as f:
+                for at, sels, _ in ((line, sels, decl) for _, line, sels, decl in rules(f.read())):
+                    doubled += [f"{name}:{at}: {sel}" for sel in sels if re.search(r"\.([A-Za-z0-9_-]+)\.\1(?![A-Za-z0-9_-])", sel)]
+        self.assertEqual(doubled, [])
+
     def test_no_declaration_is_set_again_by_a_later_layer_for_all_it_names(self):
         sheets = {}
         for name in SHEETS:

@@ -102,22 +102,17 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
   flex-grow:0;flex-basis:auto;width:auto;justify-self:start;min-width:min(var(--tap),100%);text-overflow:ellipsis}
 /* The one exception, on a phone: pulldowns that share a line with a row's
    compact buttons (.pickshare: the Library's topic and order beside Cards
-   and Rows, the Design view's platform, template and copy beside Add page)
-   take the line between them, an equal share each, and each fills its
-   share flush to the buttons (Firefox drew each as
+   and Rows) take the line between them, an equal share each, and each
+   fills its share flush to the buttons (Firefox drew each as
    wide as its answers, a gap before the buttons; "make sure that fits
    website wide"), their answers clipped with an ellipsis; the list opens
-   whole. A row that wraps names the least a pulldown takes before it
-   starts a line of its own (--share), so each line it makes is filled the
-   same way. uniform.mjs holds each to filling its share. The rule above's
-   own selector under .pickshare, so it outranks it. */
+   whole. Each is a pulldown in its label (label.pick), the label taking
+   the share and the pulldown filling it. uniform.mjs holds each to filling
+   its share. The rule above's own selector under .pickshare, so it
+   outranks it. */
 @media(max-width:600px){
-  .pickshare>label.pick{flex:1 1 var(--share, 0);min-width:0;max-width:100%}
+  .pickshare>label.pick{flex:1 1 0;min-width:0;max-width:100%}
   .pickshare>label.pick>select:not([multiple],[size]):not(:is(.fgrid,.setrow.col,.prefrow,.phead) select){min-width:100%;max-width:100%}
-  /* A bare one, not in a label: the class twice, so it outranks the rule
-     above here as well. */
-  .pickshare.pickshare>select:not([multiple],[size]):not(:is(.fgrid,.setrow.col,.prefrow,.phead) select){flex:1 1 var(--share, 0);min-width:0;max-width:100%}
   .pickshare>button{flex:none}
-  .pickshare.addbar{flex-wrap:wrap;--share:7rem}
 }
 }
