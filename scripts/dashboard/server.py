@@ -6020,9 +6020,14 @@ def _snapshot(who):
 #   ask's asking and answering, where the outcome a waiting session reads
 #   every second is not (an hour of waiting was 3,600 rows). Asked of
 #   the request's path, whole.
+#
+# asks: on a route the dispatcher gates (the owner's, an administrator's, a
+#   person's), what its handler asks of that person besides: the same names
+#   a handler gate carries, derived the same way and held to the handler by
+#   the same test. Empty where the dispatcher's gate is all there is.
 Route = collections.namedtuple(
-    "Route", "method how path handler gate session instead streamed max_body own_write needs_repo quiet",
-    defaults=(None, False, "", False, None, False, False, False))
+    "Route", "method how path handler gate session instead streamed max_body own_write needs_repo quiet asks",
+    defaults=(None, False, "", False, None, False, False, False, ()))
 ROUTES = (
     Route("GET", "prefix", "/api/revs", "_get_revs", ("handler", "seen")),
     Route("GET", "exact", "/api/live", "_get_live", ("handler", "seen")),
@@ -6030,17 +6035,17 @@ ROUTES = (
     Route("GET", "prefix", "/api/trace", "_get_trace", ("handler", "admin", "debug"), session=True),
     Route("GET", "prefix", "/api/status", "_get_status", ("handler", "seen")),
     Route("GET", "exact", "/api/reset", "_get_reset", ("handler", "controller-read")),
-    Route("GET", "exact", "/api/move", "_get_move", ("admin", "moving the controller is an administrator's")),
+    Route("GET", "exact", "/api/move", "_get_move", ("admin", "moving the controller is an administrator's"), asks=("owner",)),
     Route("GET", "exact", "/api/move-bundle", "_get_move_bundle", ("owner", "the move bundle is its owner's")),
     Route("GET", "exact", "/api/move-backup", "_get_move_backup", ("owner", "the controller's backup is its owner's")),
-    Route("GET", "exact", "/api/backup", "_get_backup", ("admin", "the backup is an administrator's")),
+    Route("GET", "exact", "/api/backup", "_get_backup", ("admin", "the backup is an administrator's"), asks=("owner",)),
     Route("GET", "exact", "/api/backup-file", "_get_backup_file", ("owner", "a backup's download is the owner's")),
     Route("GET", "prefix", "/api/findings", "_get_findings", ("handler", "seen"),
           instead="a session reads its space's findings with aerie findings", needs_repo=True),
     Route("GET", "prefix", "/api/profile", "_profile", ("handler", "own", "admin", "node", "space")),
     Route("GET", "prefix", "/api/transcripts", "_get_transcripts", ("handler", "own", "space"), session=True),
     Route("GET", "prefix", "/api/snapshots", "_get_snapshots", ("person", "a space's snapshots are the operator's"),
-          needs_repo=True),
+          needs_repo=True, asks=("settings", "space")),
     Route("GET", "prefix", "/api/transcript", "_get_transcript", ("handler", "own", "space"), session=True),
     Route("GET", "prefix", "/api/git", "_get_git", ("handler", "space"),
           instead="a session reads its repository with aerie git and git itself", needs_repo=True),
@@ -6059,7 +6064,7 @@ ROUTES = (
     Route("GET", "prefix", "/api/node-busy", "_get_node_busy", ("handler", "space"), session=True),
     Route("GET", "prefix", "/api/meta", "_get_meta", ("handler", "seen"), session=True),
     Route("GET", "prefix", "/api/welcome", "_get_welcome", ("handler", "seen")),
-    Route("GET", "prefix", "/api/source", "_get_source", ("person", "a session has the tree already")),
+    Route("GET", "prefix", "/api/source", "_get_source", ("person", "a session has the tree already"), asks=("space",)),
     Route("GET", "prefix", "/logs/download", "_get_logs_download", ("handler", "controller-read")),
     Route("GET", "prefix", "/api/phone/wait", "_get_phone_wait", ("handler", "admin")),
     Route("GET", "prefix", "/api/phone", "_get_phone", ("handler", "admin", "node", "space"), session=True),
@@ -6070,8 +6075,10 @@ ROUTES = (
     Route("GET", "prefix", "/api/roles", "_get_roles", ("handler", "admin", "space")),
     Route("GET", "prefix", "/api/users", "_get_users", ("handler", "admin", "space")),
     Route("GET", "prefix", "/api/nginx", "_get_nginx", ("handler", "admin", "node:configure", "node:configure-read", "node:nodes-read")),
-    Route("GET", "exact", "/api/scanners", "_get_scanners", ("person", "a node's scanners are a person's")),
-    Route("GET", "exact", "/api/router", "_get_router", ("person", "a node's router is a person's")),
+    Route("GET", "exact", "/api/scanners", "_get_scanners", ("person", "a node's scanners are a person's"),
+          asks=("admin", "node:configure", "node:configure-read", "node:nodes-read", "instance:configure")),
+    Route("GET", "exact", "/api/router", "_get_router", ("person", "a node's router is a person's"),
+          asks=("node:configure", "node:configure-read", "node:nodes-read", "space")),
     Route("GET", "exact", "/api/router-key", "_get_router_key", ("handler", "space", "work"), session=True),
     Route("GET", "prefix", "/api/storage", "_get_storage", ("handler", "admin")),
     Route("GET", "prefix", "/api/history", "_get_history", ("handler", "node:nodes-read")),
@@ -6155,11 +6162,11 @@ ROUTES = (
     Route("POST", "prefix", "/api/project-pin", "_project_pin",
           ("person", "a session pins no spaces: the pins are a person's own")),
     Route("POST", "prefix", "/api/project-group", "_project_group",
-          ("person", "a session has no Spaces page: the groups are a person's own")),
+          ("person", "a session has no Spaces page: the groups are a person's own"), asks=("space",)),
     Route("POST", "prefix", "/api/apps", "_apps", ("handler", "controller")),
     Route("POST", "prefix", "/api/pc", "_pc", ("handler", "seen"), session=True),
     Route("POST", "prefix", "/api/project-color", "_project_color",
-          ("person", "a session has no Spaces page: a space's color is a person's own")),
+          ("person", "a session has no Spaces page: a space's color is a person's own"), asks=("space",)),
     Route("POST", "prefix", "/api/project-auth", "_project_auth", ("handler", "space", "git-auth")),
     Route("POST", "exact", "/api/project-ftp", "_project_ftp", ("handler", "space", "ftp")),
     Route("POST", "prefix", "/api/container", "_container", ("handler", "node:configure", "docker-write", "docker-any", "space")),
@@ -6179,11 +6186,11 @@ ROUTES = (
     Route("POST", "prefix", "/api/layout", "_layout", ("handler", "own")),
     Route("POST", "exact", "/api/bell", "_bell", ("handler", "own")),
     Route("POST", "exact", "/api/notices", "_notices", ("handler", "own")),
-    Route("POST", "exact", "/api/nginx", "_nginx", ("person", "a node's proxy is a person's")),
-    Route("POST", "exact", "/api/scanners", "_scanners", ("person", "a node's scanners are a person's")),
-    Route("POST", "exact", "/api/router", "_router", ("person", "a node's router is a person's")),
+    Route("POST", "exact", "/api/nginx", "_nginx", ("person", "a node's proxy is a person's"), asks=("node:configure",)),
+    Route("POST", "exact", "/api/scanners", "_scanners", ("person", "a node's scanners are a person's"), asks=("node:configure",)),
+    Route("POST", "exact", "/api/router", "_router", ("person", "a node's router is a person's"), asks=("node:configure",)),
     Route("POST", "exact", "/api/library", "_library", ("handler", "node:configure", "admin", "work")),
-    Route("POST", "exact", "/api/images", "_images", ("person", "checking for image updates is a person's")),
+    Route("POST", "exact", "/api/images", "_images", ("person", "checking for image updates is a person's"), asks=("docker-write",)),
     Route("POST", "exact", "/api/storage", "_storage", ("handler", "admin")),
     Route("POST", "exact", "/api/schedules", "_schedules", ("handler", "schedules"),
           instead="schedules are a person's: a session has no say in them"),
@@ -6206,7 +6213,7 @@ ROUTES = (
     Route("POST", "prefix", "/api/profile", "_profile", ("handler", "own", "admin", "node", "space")),
     Route("POST", "prefix", "/api/git", "_git_act", ("handler", "space", "unlocked", "admin"), instead="a session uses aerie git", needs_repo=True),
     Route("POST", "exact", "/api/forge-access", "_forge_access_post",
-          ("person", "an account's: a session reads it with aerie forge whoami"), needs_repo=True),
+          ("person", "an account's: a session reads it with aerie forge whoami"), needs_repo=True, asks=("space", "unlocked")),
     Route("POST", "exact", "/api/forge", "_forge", ("handler", "work", "space", "unlocked"), session=True),
     Route("POST", "prefix", "/api/project-sessions", "_project_sessions", ("handler", "settings", "space")),
     Route("POST", "prefix", "/api/unlink", "_unlink", ("handler", "git-auth")),
@@ -6224,9 +6231,9 @@ ROUTES = (
     Route("POST", "prefix", "/api/emulator", "_emulator", ("handler", "toolchains-write", "node:toolchains-write", "admin", "space")),
     Route("POST", "prefix", "/api/logs", "_logs", ("handler", "controller")),
     Route("POST", "prefix", "/api/idle", "_idle", ("handler", "controller")),
-    Route("POST", "prefix", "/api/paths", "_paths", ("person", "the controller's storage is the operator's")),
+    Route("POST", "prefix", "/api/paths", "_paths", ("person", "the controller's storage is the operator's"), asks=("controller",)),
     Route("POST", "prefix", "/api/snapshots", "_snapshots", ("person", "a space's snapshots are the operator's"),
-          needs_repo=True),
+          needs_repo=True, asks=("settings", "space")),
     Route("POST", "exact", "/api/transcripts", "_transcripts", ("handler", "own", "space"), session=("label", "note", "keep", "unkeep"),
           instead="a conversation is deleted or shared by its person, from the space's Sessions view, "
                   "not by a session"),
@@ -6245,7 +6252,8 @@ ROUTES = (
     # A session is told the gate's own words here, never this hint.
     Route("POST", "prefix", "/api/prefs", "_prefs_post",
           ("person", "a space's settings are the operator's: say what should change in your reply"),
-          instead="a space's settings are the operator's: a session reads them with aerie settings", own_write=True),
+          instead="a space's settings are the operator's: a session reads them with aerie settings", own_write=True,
+          asks=("space", "unlocked", "node:node", "nodes-write", "debug", "docker-write", "curate", "vms-write", "deploy", "settings")),
     Route("POST", "prefix", "/api/brief", "_brief", ("handler", "space", "unlocked"), session=True, needs_repo=True),
     # The one body that is a document: a project's whole design, which its
     # own limits let run to megabytes (forty pages, sixty rules of twenty
@@ -6259,14 +6267,14 @@ ROUTES = (
     Route("POST", "prefix", "/api/devapp", "_devapp", ("handler", "space", "admin", "read", "docker-write", "node:configure", "docker-read", "work", "docker-any", "unlocked", "node"), session=True),
     Route("POST", "prefix", "/api/changelog", "_changelog",
           ("person", "the changelog's arrangement is the operator's: a session writes entries with `aerie "
-                     "changelog add`, and corrects one with `edit`, `merge`, `split` or `rm`"), needs_repo=True),
+                     "changelog add`, and corrects one with `edit`, `merge`, `split` or `rm`"), needs_repo=True, asks=("space", "unlocked")),
     Route("POST", "prefix", "/api/version", "_version", ("handler", "space", "version", "dial:release"), session=True, needs_repo=True),
     Route("POST", "prefix", "/api/tls", "_tls", ("handler", "controller")),
     Route("POST", "exact", "/api/signing", "_signing", ("handler", "dial:sign", "dial:keys", "space", "unlocked", "signing"),
           session=("sign", "keys", "generate", "map", "rotate", "release", "release-sign"),
           instead="a session signs with aerie sign, which never hands it the key; the keys are a person's to manage"),
     Route("POST", "exact", "/api/keys", "_keys", ("handler", "controller")),
-    Route("POST", "exact", "/api/members", "_members", ("person", "who joins a space is a person's decision")),
+    Route("POST", "exact", "/api/members", "_members", ("person", "who joins a space is a person's decision"), asks=("space",)),
     Route("POST", "exact", "/api/signing-backup", "_post_signing_backup", ("handler", "space", "signing")),
     Route("POST", "prefix", "/api/artifacts", "_artifacts", ("handler", "space", "unlocked"),
           instead="a session lets a capture go with aerie capture prune NAME, and a pin is a person's",
@@ -6276,7 +6284,7 @@ ROUTES = (
     Route("POST", "exact", "/api/reports", "_reports", ("handler", "space", "controller", "controller-read", "debug"), session=True),
     # A file saved from a person's editor: files.MAX_READ as base64.
     Route("POST", "exact", "/api/v1/files", "_files",
-          ("person", "a session has its space's tree already: this is a person's editor's"), max_body=28 * 1024 * 1024),
+          ("person", "a session has its space's tree already: this is a person's editor's"), max_body=28 * 1024 * 1024, asks=("space",)),
     Route("POST", "prefix", "/api/phone", "_phone", ("handler", "admin", "node", "space"), session=("ask", "outcome", "use"),
           instead="a session asks; a person answers", quiet=("outcome",)),
     Route("POST", "prefix", "/api/findings", "_findings_log", ("handler", "space"), needs_repo=True),

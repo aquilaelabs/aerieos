@@ -51,23 +51,30 @@ CENTRAL = {"owner": "the owner's alone, held by the dispatcher", "admin": "an ad
            "person": "a person's own sign-in, never a session's token, held by the dispatcher"}
 
 
-def asked(gate):
-    """A route's gate as the page says it: what the dispatcher holds, or the
-    names of what the handler asks (scripts/lib/routegates.py)."""
+def asked(gate, asks=()):
+    """A route's gate as the page says it: what the dispatcher holds, with
+    what the handler asks of that person besides, or the names of what the
+    handler asks (scripts/lib/routegates.py)."""
     if not gate:
         return ""
-    return ", ".join(f"`{n}`" for n in gate[1:]) if gate[0] == "handler" else CENTRAL.get(gate[0], gate[0])
+    if gate[0] == "handler":
+        return ", ".join(f"`{n}`" for n in gate[1:])
+    return CENTRAL.get(gate[0], gate[0]) + ("; then " + ", ".join(f"`{n}`" for n in asks) if asks else "")
 
 
 def render():
     tree = ast.parse(SRC.read_text(encoding="utf-8"))
     fns = handlers(tree)
-    gates = {(m, p): ast.literal_eval(g) if g is not None else None for m, _h, p, _f, g, _el in routegates.routes_of(tree)}
+    gates, more = {}, {}
+    for m, _h, p, _f, g, el in routegates.routes_of(tree):
+        gates[(m, p)] = ast.literal_eval(g) if g is not None else None
+        more[(m, p)] = next((ast.literal_eval(k.value) for k in el.keywords if k.arg == "asks"), ())
     lines = ["# The dashboard's API", "",
              "Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.",
              "Every request carries the account's credential (a session's token, or the person's cookie or",
              "basic auth). The last column is the route's gate in the route record: what the dispatcher holds",
-             "before the handler runs, or the names of everything the handler itself asks: a permission (of the",
+             "before the handler runs (and after `then`, what the handler asks of that person besides), or the",
+             "names of everything the handler itself asks: a permission (of the",
              "install, or of the space the request names), `space` for a space the account sees, `unlocked` for",
              "one not locked against it, `node:` and `instance:` for a permission asked of one node or one",
              "cluster, `dial:` for a session's ask under the space's Agents may, `own` for the account's own",
@@ -81,7 +88,7 @@ def render():
         for how, path, fn in routes(tree, method):
             f = fns.get(fn)
             words = first_sentence(f) if f else "(no handler by that name)"
-            lines.append(f"| {method} | `{path}` | {how} | `{fn}` | {words.replace('|', '\\\\|')} | {asked(gates.get((method, path)))} |")
+            lines.append(f"| {method} | `{path}` | {how} | `{fn}` | {words.replace('|', '\\\\|')} | {asked(gates.get((method, path)), more.get((method, path), ()))} |")
     return "\n".join(lines) + "\n"
 
 

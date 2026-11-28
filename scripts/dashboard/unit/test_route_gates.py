@@ -22,6 +22,9 @@ TREE = ast.parse(SERVER)
 HANDLERS = routegates.handlers_of(TREE)
 ROWS = [(method, how, path, fn, ast.literal_eval(gate) if gate is not None else None)
         for method, how, path, fn, gate, _el in routegates.routes_of(TREE)]
+# What a dispatcher-gated route's handler asks besides (Route's asks).
+MORE = {(method, path): next((ast.literal_eval(k.value) for k in el.keywords if k.arg == "asks"), ())
+        for method, _how, path, _fn, _gate, el in routegates.routes_of(TREE)}
 
 # The routes that refuse nobody who is signed in, each for its reason. A new
 # one is added here by whoever decided it should be so.
@@ -62,6 +65,27 @@ class Record(unittest.TestCase):
             if gate[1:] != asks:
                 wrong.append(f"{method} {path}: the record says {gate[1:]}, {fn} asks {asks}")
         self.assertEqual(wrong, [], "write the handler's asks into its Route (routegates.asks)")
+
+    def test_a_route_the_dispatcher_gates_names_what_its_handler_asks_besides(self):
+        # The owner's, an administrator's or a person's at the dispatcher,
+        # and then the handler's own checks: the record says both. One that
+        # asks nothing more carries no asks at all.
+        wrong, named = [], 0
+        for method, _how, path, fn, gate in ROWS:
+            if not gate:
+                continue
+            said = MORE[(method, path)]
+            if gate[0] == "handler":
+                if said:
+                    wrong.append(f"{method} {path}: a handler gate names its asks in the gate, never in asks as well")
+                continue
+            asks = tuple(routegates.asks(HANDLERS[fn], HANDLERS)) if fn in HANDLERS else ()
+            want = () if asks in (("open",), ("seen",), ("own",)) else asks
+            named += bool(want)
+            if said != want:
+                wrong.append(f"{method} {path}: the record says asks={said}, {fn} asks {want}")
+        self.assertEqual(wrong, [], "write the handler's asks into its Route (routegates.asks)")
+        self.assertGreater(named, 10, "the routes were found")
 
     def test_no_route_is_left_saying_only_that_its_handler_decides(self):
         bare = [f"{m} {p}" for m, _h, p, _f, g in ROWS if g == "handler" or g == ("handler",)]
