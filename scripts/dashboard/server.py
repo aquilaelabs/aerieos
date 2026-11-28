@@ -100,21 +100,8 @@ def _one_server(state, wait=30):
             return f
 
 
-# Only the server itself: a tool or a test that imports this file reads the
-# state beside a running server by design.
-_SERVER_LOCK = _one_server(STATE) if __name__ == "__main__" else None
-# ...and says who it is, beside the lock: the supervisor asks whether the
-# dashboard runs and which process to stop by this pid (scripts/lib/
-# supervise.sh), where it looked for this file's name on any command line.
-if __name__ == "__main__":
-    with contextlib.suppress(OSError):
-        (STATE / ".server.pid.new").write_text(f"{os.getpid()}\n")
-        os.replace(STATE / ".server.pid.new", STATE / ".server.pid")
-# Before anything below writes to it: a /config newer than this build, or
-# older than it migrates from, is refused here in one sentence, a fresh one
-# is stamped, and one about to migrate is copied first (stateversion.py).
+# The state's version: its gate, its stamp and its migrations.
 import stateversion                                              # noqa: E402
-stateversion.gate(STATE)
 
 
 def _session_secret():
@@ -158,9 +145,6 @@ def _session_secret():
         print(f"dashboard: cannot keep the session secret in {STATE} ({e}); "
               "sign-ins will not survive a restart", flush=True)
     return s
-
-
-SECRET = _session_secret()
 
 
 def make_token(u, lid=""):
@@ -565,7 +549,6 @@ LOGIN_HTML = LOGIN_HTML.replace("<!--PRODUCT-->", PRODUCT)
 # operator's own command lists: macros.py (R77).
 
 
-
 # Where Claude Code keeps transcripts: one directory per working directory,
 # with the path's slashes turned into dashes, holding one .jsonl per session.
 CLAUDE_PROJECTS = Path(
@@ -594,11 +577,6 @@ from fields import field                                         # noqa: E402
 import timing                                                    # noqa: E402
 
 
-
-
-
-
-
 # The one implementation, in statefile.py, along with the file lock that makes
 # a read-modify-write safe against the OTHER writer, a `aerie` invocation, which
 # is a different process. Kept as a name here because thirty-odd call sites and
@@ -617,37 +595,16 @@ _state_lock = threading.Lock()
 # Each account's tab strip and panes: layout.py.
 import layout                                                    # noqa: E402
 
-layout.configure(state=STATE, write_json=write_json, lock=_state_lock)
 # ...and what each account has put away from its bell: bellseen.py.
 import bellseen                                                  # noqa: E402
 
-bellseen.configure(state=STATE, write_json=write_json)
 # ...and what the page has said to each account, kept: notices.py (R218 step 6).
 import notices                                                   # noqa: E402
-notices.configure(state=STATE, write_json=write_json)
 # Scheduled scripts (R117): an administrator's cron, kept in the state and
 # never on the share.
 import schedules                                                # noqa: E402
-schedules.configure(state=STATE, write_json=write_json)
 # ...and AerieOS's own docs, read on the Help page: helpdocs.py (R258).
 import helpdocs                                                  # noqa: E402
-
-
-
-
-
-
-
-
-# `aerie toolchains install|update|remove` refuses when CLAUDECODE is set, and the
-# message it prints tells the session to ask the operator to use this page.
-# So this page must never carry that variable, and it can: `aerie dashboard dev`
-# is normally run *by* a session, and the server it starts inherits whatever
-# that session had. One line here, rather than trusting every launcher to
-# remember, because the failure looks like the dashboard refusing to obey the
-# operator and quoting its own name as the workaround.
-os.environ.pop("CLAUDECODE", None)
-os.environ.pop("BB_AGENT", None)     # ...and any coding agent's mark (R95)
 
 
 def run(cmd, cwd=None, timeout=120, env=None, split_err=False, register=None):
@@ -744,7 +701,7 @@ def node_holds(reap=False):
     (nodes.agent_stale, nodes.auto_update). reap: only what ends a running session
     (claudecode.holds)."""
     out = {}
-    if NODES_OK:
+    if NODES_DOWN:
         return out
     for n in nodes.node_list():
         if n["kind"] == "agent" and nodes.agent_gap(n):
@@ -808,7 +765,7 @@ def compat_reap_once():
         if r["code"] == 0:
             ended.append(s["name"])
             print(f"dashboard: compat: ended {s['name']} ({why})", flush=True)
-    if not NODES_OK:
+    if not NODES_DOWN:
         for nid, (nname, sess) in nodes.node_sessions().items():
             for s in sess:
                 real = str(s.get("name") or "")
@@ -1387,7 +1344,7 @@ def _project_columns(who, facts):
     # ...and which of them were un-enrolled: a project left on one keeps it,
     # named, so the person can see where it used to run (the operator, 5 Oct).
     removed_nodes = set()
-    if not NODES_OK:
+    if not NODES_DOWN:
         _t1 = time.monotonic()
         for n in nodes.node_list(all=True):
             node_names[n["id"]] = n["name"]
@@ -1409,7 +1366,7 @@ def _project_columns(who, facts):
         held_nodes = node_holds()
         # ...and the nodes with no Claude Code, whose Start Claude is an
         # Install Claude that opens the node's Toolchains (the operator, 21 Oct).
-        no_claude = {} if NODES_OK else {i: i for i in claudecode.missing_nodes()}
+        no_claude = {} if NODES_DOWN else {i: i for i in claudecode.missing_nodes()}
     _t1 = time.monotonic()
     open_roadmap = roadmap.counts()
     # One batch spans the notebook, so the count the panel shows has to be
@@ -1747,7 +1704,7 @@ def gpu_for(project, node_id=""):
     p = prefs.get(project) or {}
     if p.get("gpu") == "off":
         return "project"
-    if not NODES_OK:
+    if not NODES_DOWN:
         nid = node_id or p.get("node") or ""
         n = nodes.node(nid) if nid else None
         if n and (n.get("config") or {}).get("no_gpu_compute"):
@@ -1765,7 +1722,7 @@ def _resume_held(who, nid, session):
     """The bell's Resume on a session an outage stopped (R251): the line typed
     into that session (notify.tell, which presses Enter only if it echoed),
     for its own account or an administrator, and the row put away."""
-    if NODES_OK:
+    if NODES_DOWN:
         return {"error": "the node store did not open"}, 500
     uid = users.uid_of(who)
     row = next((r for r in _held_rows(who) if r["node_id"] == nid and r["session"] == session), None)
@@ -2209,7 +2166,7 @@ def _attention(who):
                       "when it was made, and this one was left beside it by a bug in 0.8.0"}
               for key, d in repos.leftovers()
               if users.may_see(who, key) and (users.is_admin(who) or membership.may_manage(who, key))]
-    if NODES_OK:
+    if NODES_DOWN:
         return bellseen.filter_rows(users.uid_of(who), signs)
     where = {p: (pr.get("node") or "") for p, pr in prefs.all_projects().items()}
     # The sessions an outage of this controller held come first (R251), for
@@ -2296,7 +2253,7 @@ def gpu_container_why(project, node_id):
     who = gpu_for(project, node_id)
     if who == "project":
         return "this space's settings say the node's GPU is not for it (The node's GPU)"
-    n = nodes.node(node_id) if node_id and not NODES_OK else None
+    n = nodes.node(node_id) if node_id and not NODES_DOWN else None
     if who == "node":
         return f"{n['name'] if n else 'its node'}'s GPU is switched off for sessions and jobs (Nodes page, GPU)"
     return toolchains.container_why(n)
@@ -2429,7 +2386,7 @@ def vm_target(project, name):
     if rec.get("state") != "running":
         return {"where": "refused", "name": name, "why": f"{name} is {rec.get('state')}, and a console opens on a running VM"}
     nid = rec["node"]
-    n = nodes.node(nid) if not NODES_OK else None
+    n = nodes.node(nid) if not NODES_DOWN else None
     if not n:
         return {"where": "refused", "name": name, "why": f"{name}'s node is not on record here"}
     nm = n.get("name") or nid
@@ -2541,7 +2498,7 @@ def session_target(project, claude=False, node="", uid=""):
                "why": "no node to run a coding agent's session on: pick one in the space's settings, or enroll "
                       "one on the Nodes page under Machines"} if claude \
         else {"where": "local"}
-    if not nid or NODES_OK:
+    if not nid or NODES_DOWN:
         return no_node
     with timing.timed("session_target:node"):
         n = nodes.node(nid)
@@ -2655,7 +2612,7 @@ def ctr_target(name, instance):
     14 Oct).
     """
     nid = devapp.instance_node(name, instance) or ""
-    n = nodes.node(nid) if nid and not NODES_OK else None
+    n = nodes.node(nid) if nid and not NODES_DOWN else None
     if not n or n.get("kind") == "local":
         return {"where": "local"}
     nm = n.get("name") or nid
@@ -3015,7 +2972,7 @@ def node_tmux_sessions():
     what a kill has to send back. Nothing on a node is unowned, so an
     unprefixed name there is not a session of anybody's and is dropped.
     """
-    if NODES_OK:
+    if NODES_DOWN:
         return []
     owner = users.uid_of(users.get(users.owner_name() or "")) if users.owner_name() else ""
     rows = []
@@ -3262,7 +3219,7 @@ def turn_scope(project, uid, agent="claude", slot=1):
     project runs on no agent node, so nothing here is the machine a session
     works on. The key is the session's tmux name on the node, which is what
     the heartbeat reports it as."""
-    if NODES_OK:
+    if NODES_DOWN:
         return None
     nid = prefs.get(project)["node"]
     n = nodes.node(nid) if nid else None
@@ -4206,9 +4163,6 @@ def agent_auth(home=""):
 # needs and otherwise knows nothing about this file.
 import toolchains                                                  # noqa: E402
 
-toolchains.configure(run=run, write_json=write_json, state=STATE,
-                     project_nodes=lambda: {p: (pr.get("node") or "") for p, pr in prefs.all_projects().items()},
-                     workspace=WORKSPACE)
 # The tool packs a person added (R77): rows of the same catalog, kept under
 # /config, and carried to the nodes in the bundle beside the shipped one.
 import toolpacks                                                   # noqa: E402
@@ -4216,27 +4170,8 @@ import catalogindex                                              # noqa: E402
 import catalogmirror                                             # noqa: E402
 import library                                                   # noqa: E402
 
-catalogindex.configure(state=STATE, write_json=write_json)
 import catalogrows                                               # noqa: E402
 import packformat                                                # noqa: E402
-catalogrows.configure(state=STATE, write_json=write_json, audit=lambda *a: db.audit(*a))   # db is imported below
-toolpacks.configure(state=STATE, write_json=write_json,
-                    unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
-# The catalog's mirror (R169 step 6): its index when the catalog does not
-# answer, and its bundles for the fetches of what it pins.
-catalogmirror.configure(state=STATE, unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
-catalogindex.mirror_index = catalogmirror.index
-toolpacks.mirror_bundle = catalogmirror.bundle
-# This build's version, for a pack's works_with (R169 step 6).
-toolpacks.running_version = lambda: image_stamp().get("version") or ""
-# ...and for a catalog entry that says the lines it works with: one for
-# another line is not listed.
-library.fits = toolpacks.fits
-# A sideloaded pack's coding agent is offered where this install says so.
-# (Asked for the first time before the settings are loaded, further down.)
-toolpacks.sideload_agents = lambda: bool("settings" in globals() and settings.get("sideload_agents"))
-toolchains.packs_rows = toolpacks.recipes
-toolchains.refresh_packs()
 # The Android system images on each node's store, behind the Emulator tab:
 # kept on the toolchain store without being toolchains (emulator.py).
 import emulator                                                  # noqa: E402
@@ -4247,12 +4182,6 @@ import emulator                                                  # noqa: E402
 # arrived, which is the one thing a permission dialog will not do.
 import notify                                                    # noqa: E402
 
-notify.configure(run=run,
-                 # A session on a node: found by the name the page uses,
-                 # told through its agent (roadmap #24). Resolved at call
-                 # time: the nodes module is imported further down.
-                 on_node=lambda s: next((x for x in node_tmux_sessions() if x["name"] == s), None),
-                 node_tell=lambda *a, **k: nodes.tell_wait(*a, **k))
 
 # ---- signing in ------------------------------------------------------------
 # The flow runs as a job on a NODE, the machine Claude Code is installed on
@@ -4268,24 +4197,18 @@ import signin                                                    # noqa: E402
 # is no environment variable behind it.
 import users                                                     # noqa: E402
 
-users.configure(state=STATE, write_json=write_json)
 
 # Messages between accounts, and what each project's people are doing. Its own
 # module for the same reason nodes and users are: the rules about who may read
 # a conversation belong beside the conversation, not scattered through here.
 import chat                                                     # noqa: E402
-chat.configure(state=STATE, write_json=write_json)
 
 # ---- what each session is changing ------------------------------------------
 # Written by the bb-work-note hook inside a session and read by `aerie work`;
 # the server touches it only for a session on a node, whose hook posts the
 # note here because the node has no /config to write (roadmap #24).
 import overlap                                                   # noqa: E402
-# Notes of the moment, written on every edit a session makes: not waited
-# onto the disk (statefile.write_json's sync).
-overlap.configure(state=STATE, workspace=WORKSPACE, write_json=lambda p, d: write_json(p, d, sync=False))
 import plugins                                                   # noqa: E402
-plugins.configure(state=STATE, write_json=write_json)
 
 
 # ---- the test registry ------------------------------------------------------
@@ -4293,8 +4216,6 @@ plugins.configure(state=STATE, write_json=write_json)
 # timings are parsed out of a run the operator ingests; nothing here runs a
 # suite, and nothing self-reports a duration.
 import testreg                                                   # noqa: E402
-
-testreg.configure(write_json=write_json, state=STATE)
 
 
 # Which PERSON the notebook's logs should name for a change. "you" and
@@ -4321,7 +4242,6 @@ def writer_name():
 # network. The credential half stays here (agent_keys and the ssh aliases are
 # this box's, not any one project's) and is handed over.
 import forges                                                    # noqa: E402
-forges.configure(run=run, state=STATE, write_json=write_json)
 
 import projects                                                  # noqa: E402
 import mapping                                                   # noqa: E402
@@ -4338,20 +4258,6 @@ import codebase                                                  # noqa: E402
 import pending                                                   # noqa: E402
 import settings                                                  # noqa: E402
 
-rules.configure(write_json=write_json, state=STATE, actor=writer_name)
-codebase.configure(workspace=WORKSPACE)
-# The three stores above configure this one too; done here as well so the
-# endpoint works even if none of them has been touched yet this process.
-pending.configure(write_json=write_json, state=STATE)
-# The Settings tab's own store (roadmap R29): the knobs the operator sets from
-# the page rather than the environment. The builder home is where the commit
-# identity lands.
-settings.configure(write_json=write_json, state=STATE)
-settings.forget_runners = lambda: runners.reset()
-# What may be offered: the catalogs gate their unvetted entries on this
-# one switch (roadmap R54, step 6), read live so a save takes at once.
-forges.unvetted_ok = lambda: bool(settings.get("offer_unvetted"))
-
 
 # ---- who else is in the notebook --------------------------------------------
 # The other half of the same question, for a browser rather than a session
@@ -4365,25 +4271,18 @@ import presence                                                  # noqa: E402
 # two helpers it needs, nothing reaching back.
 import bugs                                                      # noqa: E402
 
-bugs.configure(write_json=write_json, state=STATE, tell=notify.tell,
-               tmux_name=tmux_name, workspace=WORKSPACE, actor=writer_name,
-               releases=lambda p: roadmap.releases(p),
-               changelog_refs=lambda p, k, linked=None, commits=None: roadmap.changelog_refs(p, k, linked, commits),
-               changelog_lines=lambda p: roadmap.unreleased_lines(p))
 
 # The notebook's fourth view keeps a log too, and it is the odd one: nothing
 # here writes findings, so the entries are derived by comparing one read of
 # the report against the last.
 import findings                                                  # noqa: E402
 
-findings.configure(write_json=write_json, state=STATE, workspace=WORKSPACE)
 
 # A phone on the end of wireless adb, and pushing an extension to it. Its own
 # file for the usual reason; handed the workspace because what it can push is
 # derived from the projects rather than browsed for.
 import phone                                                     # noqa: E402
 
-phone.configure(write_json=write_json, state=STATE, workspace=WORKSPACE)
 
 # What a project has built, from its dist/ directory: the notebook's fifth
 # view. The convention is the module's docstring; the scratch dir is where an
@@ -4395,86 +4294,32 @@ import workspace                                                 # noqa: E402
 # Each account's git worktree of a project: <this>/<project>/<uid> (common.sh
 # session_dir). The Git view and the Artifacts tab both read them.
 WORKTREES = Path(os.environ.get("BB_WORKTREES") or str(WORKSPACE / ".worktrees"))
-artifacts.configure(workspace=WORKSPACE, worktrees=WORKTREES, state=STATE, write_json=write_json)
-# This process is hardened before any key is loaded (R158 step 6): no
-# core dump, not dumpable, its memory kept from swap where the limit lets it.
 import hardening                                                 # noqa: E402
-HARDENED = hardening.apply()
 import signing                                                   # noqa: E402
 
-signing.configure(state=STATE, project_name=PROJECT_NAME)
-# Keys kept open before the install had an install key, sealed now that it
-# has one (R111 step 2); a key that cannot be opened is left as it is and
-# said on its project's Signing view.
-try:
-    if (_sealed := signing.seal_all()):
-        print(f"dashboard: sealed {_sealed} signing key(s) under the install's key", flush=True)
-except OSError as e:
-    print(f"dashboard: signing keys left as they were, not sealed: {e}", flush=True)
 # ...the projects' git tokens (R135): gitcreds, and git's helper git-credential-bb...
 import gitcreds                                                  # noqa: E402
-gitcreds.configure(state=STATE, seal_fn=signing.seal, unseal_fn=signing.unseal,
-                   sealing_fn=lambda: signing.MASTER is not None)
 # The dashboard's own TLS (R158 step 2): the mode the settings say, the
 # certificate's key sealed under the install key.
 import tls                                                       # noqa: E402
-tls.configure(state=STATE, seal_fn=signing.seal, unseal_fn=signing.unseal,
-              sealing_fn=lambda: signing.MASTER is not None)
 # The page's Content-Security-Policy and what the browser reports against
 # it (R158 step 4, csp.py).
 import csp                                                       # noqa: E402
 import leanpage                                                  # noqa: E402
-csp.configure(state=STATE)
 # Whose terminals were opened on which node (R288 step 7): a node is handed
 # a fresh session token only for a pair this controller gave it.
 import sessionsasked                                             # noqa: E402
-sessionsasked.configure(state=STATE, write_json_fn=write_json)
-try:
-    if (_sealed := gitcreds.seal_all()):
-        print(f"dashboard: sealed {_sealed} git token(s) under the install's key", flush=True)
-except OSError as e:
-    print(f"dashboard: git tokens left as they were, not sealed: {e}", flush=True)
-# ...and the settings' secrets, the tunnel's and Cloudflare's tokens (R135).
-settings.seal, settings.unseal = signing.seal, signing.unseal
-settings.sealing = lambda: signing.MASTER is not None
-try:
-    if (_sealed := settings.seal_all()):
-        print(f"dashboard: sealed {_sealed} setting(s) under the install's key", flush=True)
-except OSError as e:
-    print(f"dashboard: settings' secrets left as they were, not sealed: {e}", flush=True)
 import membership                                                # noqa: E402
 import roles                                                     # noqa: E402
 import registry                                                  # noqa: E402
 import busy                                                      # noqa: E402
-membership.configure(state=STATE, write_json=write_json)
-roles.configure(state=STATE, write_json=write_json)
-registry.configure(state=STATE, workspace=WORKSPACE, write_json=write_json)
 # A project of several repositories (R136): which repositories are in which,
 # and prefs laying a project's settings over its repositories'.
 import repos                                                     # noqa: E402
-repos.configure(state=STATE, write_json=write_json, registry=registry, workspace=WORKSPACE)
-gitview.configure(workspace=WORKSPACE,
-                  worktrees=WORKTREES,
-                  tell=notify.tell, tmux_name=tmux_name, state=STATE,
-                  accounts=account_names,
-                  owner_uid=lambda: users.uid_of(users.get(users.owner_name() or "")),
-                  working=claude_working, owner_name=users.owner_name,
-                  session_open=owner_session_open, sessions=sessions_anywhere,
-                  git_env=lambda me, name: {k: v for k, v in {**projects._git_env(),
-                                                              **users.git_env(me, name)}.items()
-                                            if k != "DASHBOARD_AUTH"},
-                  may_push=projects.may_push, exclude=mapping.exclude,
-                  audit=lambda *row: None if NODES_OK else db.audit(*row),
-                  host_of=forges.host_label, ci_of=lambda n: ciwatch.read(n),
-                  ci_fix=lambda n, where: ciwatch.fix(n, where))
 # Where what grows is kept, as the Settings tab sets it (paths.py): read at
 # use by every module below that keeps one of them, so a change applies to
 # the next write without a restart.
 import paths                                                     # noqa: E402
-paths.configure(state=STATE, workspace=WORKSPACE)
-workspace.configure(workspace=WORKSPACE, state=STATE)
-workspace.packs_json = toolpacks.catalog_json
-workspace.toolchains_json = catalogrows.text
 
 
 def _catalog_rows_refresh(index):
@@ -4518,11 +4363,6 @@ def _catalog_apps_refresh(index):
     threading.Thread(target=run, name="catalog-apps", daemon=True).start()
 
 
-# The coding agents installed packs bring, beside the table's (R169 step 9).
-agents.pack_source = toolpacks.offered_agents
-workspace.packs_files = toolpacks.hosted_files
-
-
 def no_node_advice(name):
     """What a project with no node can still do, said the same way
     everywhere: a session reads and edits regardless (that is what this
@@ -4542,7 +4382,7 @@ def build_state(name):
     """Where this project's compiling happens, for the Artifacts view: its
     node and what that node carries, or the plain fact that it has none and
     what is left when it does not."""
-    if NODES_OK:
+    if NODES_DOWN:
         return {"node": "", "name": "", "why": "", "push": projects.may_push(name)}
     nid = prefs.get(name)["node"]
     n = nodes.node(nid) if nid else None
@@ -4571,10 +4411,6 @@ def artifacts_of(name):
 # card. Same arrangement as toolchains above: its own file, handed what it needs.
 import memory                                                    # noqa: E402
 
-memory.configure(run=run, workspace=WORKSPACE,
-                 claude_projects=CLAUDE_PROJECTS, tmux_name=tmux_name,
-                 write_json=write_json, state=STATE)
-memory.configure_log(write_json=write_json, state=STATE, actor=writer_name)
 
 # ---- the shared to-do list -------------------------------------------------
 # The one surface both sides write: the operator adds an item, a session adds
@@ -4582,16 +4418,6 @@ memory.configure_log(write_json=write_json, state=STATE, actor=writer_name)
 # session it starts, which is the whole reason it is worth having.
 import roadmap                                                   # noqa: E402
 
-roadmap.configure(write_json=write_json, state=STATE, tell=notify.tell,
-               tmux_name=tmux_name, settle=notify.settle, actor=writer_name)
-roadmap.configure_verbs(bugs_mod=bugs)
-# A memory edit marks the list's unsaved flag, and presence names the others
-# and says when a session last read the list; both are the roadmap's.
-memory.mark_unsaved = roadmap.mark_unsaved
-chat.users = users
-presence.account_names = lambda: {u.get("uid"): n for n, u in users.load()["users"].items()
-                                  if u.get("uid")}
-presence.readers = roadmap.readers
 
 # ---- what a session is handed ----------------------------------------------
 # The three above, assembled in the order a session reads them. bb-tty asks
@@ -4611,21 +4437,11 @@ def live_block():
             "what changed since, and this line is from the moment this session started.")
 
 
-preamble.configure(rules_mod=rules, roadmap_mod=roadmap, bugs_mod=bugs, live=live_block)
-# ...and a project of several repositories' (R136): its name, id and
-# repositories, for the part that briefs a session on all of them.
-# Only one of several: since R138 every repository is in a project, and one
-# alone was told it was "a project of 1 repositories".
-preamble.repos_fn = lambda p: ((registry.label(k), registry.pid(k), [(m, registry.label(m)) for m in repos.members(k)])
-                               if (k := repos.project_of(p)) and len(repos.members(k)) > 1 else None)
-preamble.project_fn = lambda p: (registry.label(k), registry.pid(k)) if (k := repos.project_of(p)) else None
-
 # ---- a new project's brief -----------------------------------------------------
 # What its maker wants built, kept out of CLAUDE.md and handed to the first
 # session instead, through a dialog on the first Claude press: brief.py.
 import brief                                                     # noqa: E402
 
-brief.configure(workspace=WORKSPACE, state=STATE, write_json=write_json)
 
 # ---- a project's design language and its pages ------------------------------
 # What the project looks like, kept: colors as tokens, type, shape, space and
@@ -4633,116 +4449,44 @@ brief.configure(workspace=WORKSPACE, state=STATE, write_json=write_json)
 # session is pointed at and docs/design-language.md written from it: design.py.
 import design                                                    # noqa: E402
 
-design.configure(workspace=WORKSPACE, state=STATE, write_json=write_json)
 # The notebook's wiki (R112): a repository of the controller's own per
 # project, pushed with the project's granted rights and nothing the tree says.
 import wiki                                                      # noqa: E402
-wiki.configure(state=STATE, workspace=WORKSPACE, write_json=write_json,
-               push_record_fn=lambda p: projects.load_push().get(p),
-               token_helper_fn=projects.token_helper, parse_fn=forges.parse,
-               config_fn=lambda d: gitrelay.config(d), env_fn=projects._git_env)
 
 # A project's CI on GitHub's own runners (R115): its runs and a failed job's
 # log, read with the controller's credential for a session that has none.
 import cilogs                                                    # noqa: E402
-cilogs.configure(state=STATE, workspace=WORKSPACE, push_record_fn=lambda p: projects.load_push().get(p),
-                 config_fn=lambda d: gitrelay.config(d), parse_fn=forges.parse)
 # ...and watched (R117): once a day per project with workflows, and at once
 # when a project is linked; the Git view, aerie catchup and the bell read it.
 import ciwatch                                                   # noqa: E402
-ciwatch.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
-                  projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
-                                          if d.is_dir() and not d.name.startswith(".")))
 
 # ---- the standing model and effort -----------------------------------------
 # One preference for every send, on its own card; see the module docstring
 # for why it stopped being a question inside each send box.
 import logs                                                      # noqa: E402
 import idle                                                      # noqa: E402
-logs.configure(state=STATE, write_json=write_json)
-logs.diag_report = lambda: diag.report()
-logs.audit = lambda *row: db.audit(*row)
-logs.conversation_text = lambda rid: reports.conversation(rid)
-idle.configure(state=STATE, write_json=write_json,
-               # A changed rule reaches every node on its next poll rather
-               # than its next ten-minute hello.
-               changed=lambda: [nodes.ask_hello(n["id"]) for n in nodes.node_list()
-                                if n.get("kind") == "agent"])
-# On boot, because that is when a generation was just rotated in and the oldest
-# one fell off the end of the policy; then every hour (log_sweep_loop below).
-logs.prune()
 
 import prefs                                                     # noqa: E402
-# Debug and dev options only on a controller started with DEBUG_MODE=1; at a
-# start without it every one of them is put back off, so turning it on
-# again starts from nothing granted (the operator, 12 Oct).
-if not settings.debug_available():
-    try:
-        if settings.reset_debug() | bool(prefs.reset_debug()):
-            print("dashboard: DEBUG_MODE is not 1, so every debug and dev option was turned off", flush=True)
-    except Exception as e:                                # noqa: BLE001 (a start must not fail on this)
-        print(f"dashboard: debug options not reset: {e}", flush=True)
-else:
-    try:
-        if settings.boot_channel():
-            print("dashboard: the boot asked for the dev channel: the dev switch is on and updates follow the pre-releases", flush=True)
-    except Exception as e:                                # noqa: BLE001
-        print(f"dashboard: the boot's channel not taken: {e}", flush=True)
-# The briefing reads a project's own settings for its "While tests run"
-# section (what a change asked for during a run does); prefs is imported
-# after preamble is configured, so it is handed over here.
-preamble.prefs_mod = prefs
-# A project with no repository (R208): its briefing says so, its parts
-# that need a notebook are left out, and its guard refuses git.
-preamble.work_of = repos.is_work
-rules.work_of = repos.is_work
-preamble.label_of = registry.label
-preamble.id_of = registry.pid
-preamble.packs_of = lambda: {n: {"label": (r.get("manifest") or {}).get("label") or n, "guidance": r.get("guidance") or ""}
-                             for n, r in toolpacks.packs().items()}
 
 
 def _project_node_gpu(project):
     """Whether the project's own node reports an NVIDIA card: what decides
     the briefing's GPU section."""
-    if NODES_OK:
+    if NODES_DOWN:
         return False
     nid = (prefs.get(project) or {}).get("node") or ""
     n = nodes.node(nid) if nid else None
     return bool(n and (n.get("reported") or {}).get("gpu_card"))
 
 
-preamble.node_gpu = _project_node_gpu
-
-prefs.configure(write_json=write_json, state=STATE)
-prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos, keys=registry.repos_keys)
-users.home_of = repos.key_of
-roles.label_of = registry.label
-projects.key_of = repos.key_of
-roles.home_of = repos.key_of
-# Said again, now that prefs exists: users.git_identity resolves a per-project
-# override of the commit author, and that override lives in prefs, which is
-# configured after users because the login path must not depend on it.
-users.configure(state=STATE, write_json=write_json, project_prefs=prefs.for_user,
-                # The nodes of an account's projects: what a node grant's
-                # scope "mine" means (R137 step 3).
-                # Its list names projects (R138): each read through its
-                # repositories, whose settings carry the project's node.
-                nodes_of=lambda u: {n for p in (u.get("projects") or []) for r in (repos.members(p) or [p])
-                                    for n in prefs._nodes_of(prefs.get(r) or {})})
-
 # ---- the dev instance ------------------------------------------------------
 # A project's compose app, built and run on the sandbox VM's daemon. The
 # module's docstring carries the security reasoning.
 import devapp                                                    # noqa: E402
-devapp.label_of = registry.label
 import devactions                                                # noqa: E402
 import home                                                      # noqa: E402
 import containers                                                # noqa: E402
 import nasapps                                                   # noqa: E402
-# ...and whether a port an app would publish answers on its node already,
-# asked from here as the node's address (R238 step 3).
-nasapps.configure(state=STATE, write_json=write_json, answers=lambda nid, port: _port_answers(nid, port))
 import nginxproxy                                                # noqa: E402
 import imagecheck                                                # noqa: E402
 import relocate                                                  # noqa: E402
@@ -4757,119 +4501,11 @@ import roothooks                                                 # noqa: E402
 import poolkeys                                                  # noqa: E402
 import packconfig                                                # noqa: E402
 import termws                                                    # noqa: E402
-termws.configure(agent_dir=nodes.AGENT_DIR)
 import tokenkeys                                                 # noqa: E402
-tokenkeys.configure(agent_dir=nodes.AGENT_DIR)
-# Each account's public key on a node, to seal its sign-ins with (R126).
-nodes.token_pubs = lambda nid: tokenkeys.pubs(nid, [u["uid"] for u in users.all_users() if u.get("uid")])
-nodes.token_stale = tokenkeys.under_previous
-nodes.can_seal = lambda: signing.MASTER is not None
 import claudecode                                                # noqa: E402
 import agentcode                                                 # noqa: E402
 import projsessions                                              # noqa: E402
 import turns                                                     # noqa: E402
-
-# The node data plane first, because devapp's job claim asks it which node
-# work belongs to. Guarded: a database that will not open (a corrupt file, a
-# full disk) must degrade to the dashboard this always was, not take down the
-# page that is the operator's way to see what is wrong; nodes.py's readers
-# and audit already no-op when it never came up.
-try:
-    nodes.configure(state=STATE)
-    # The registry answers hello; the catalog is toolchains.py's. Joined here
-    # rather than by one importing the other, which is the same seam every
-    # other module pair uses.
-    nodes.layout_of = toolchains.layout_for_node
-    # ...and the pin of this controller's own TLS key, which a hello names
-    # and an enrollment carries (R267 step 15).
-    nodes.tls_pin = tls.key_pin
-    nodes.tls_reach = tls.node_reach
-    # ...and a toolchain or image job pressed while another writes the
-    # store waits behind it rather than being refused.
-    nodes.store_gate = toolchains.store_gate
-    # The accounts' SMB passwords and a share's names (R164 step 1).
-    nodes.smb_users = users.smb_users
-    nodes.smb_resolve = users.smb_resolve
-    # ...and who a share names, which is whose share password is kept (R243).
-    users.share_named = nodes.smb_named
-    # ...and whether setup has ended, which closes a screen's open login
-    # (R194). A landing cut midway is not an end: its setting came with the
-    # bundle, and the way in is wanted most then.
-    nodes.setup_over = lambda: bool(users.owner_name() and settings.get("setup_done") and not move.cut_landing())
-    # ...and the weeks-long record of the own machine's samples (R164 step 4).
-    history.configure(state=STATE)
-    nodes.history_add = history.add
-    # ...and the other disks and shares it mounts (R162 step 4).
-    extmounts.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                        sealing=lambda: signing.MASTER is not None)
-    nodes.ext_mounts = extmounts.wanted
-    # ...and the backups it copies (R162 step 5), the bell and Home reading their last runs.
-    storebackups.configure(state=STATE, write_json=write_json)
-    roothooks.configure(state=STATE)
-    nodes.store_backups = storebackups.wanted
-    nodes.backup_summary = lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or ""))
-    # ...and its encrypted pools' passphrases (R162 step 3), none in Safe mode.
-    poolkeys.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                       sealing=lambda: signing.MASTER is not None)
-    nodes.pool_keys = lambda unlocked: poolkeys.wanted(unlocked, safe_mode=held.safe_mode())
-    nodes.pool_keys_set = poolkeys.set_key
-    nodes.pool_keys_offer = poolkeys.offer
-    nodes.pool_keys_forget = poolkeys.forget
-    if (_sealed := poolkeys.seal_all()):
-        print(f"dashboard: sealed {_sealed} pool passphrase(s) under the install's key", flush=True)
-    # What each added pack is configured with per node (R172): kept sealed,
-    # handed in the hello with the node's store root.
-    packconfig.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                         sealing=lambda: signing.MASTER is not None,
-                         # A person's own answers (R172 step 5), under their own key.
-                         account_key=lambda uid: accountkeys.key_of(uid), open_with=signing.open_with,
-                         store_root=lambda nid: (lambda st: (st.get("path") or "") + ("/" + st["scope"] if st.get("scope") else ""))(
-                             (((nodes.node(nid) or {}).get("reported") or {}).get("stores") or {}).get("toolchains") or {}))
-    nodes.pack_config = lambda nid: packconfig.for_node(nid, toolpacks.configs())
-    nodes.pack_people = lambda nid: packconfig.for_people(nid, toolpacks.configs())
-    if (_sealed := extmounts.seal_all()):
-        print(f"dashboard: sealed {_sealed} share password(s) under the install's key", flush=True)
-    # ...and the digest of the bb bundle, so a node can tell from hello alone
-    # whether the bb its sessions run is the one this controller ships.
-    nodes.bundle_digest = lambda: workspace.bundle()["digest"]
-    # ...and the list of the files a release ships in it, for the Nodes
-    # page's status: what this install holds, and whether its build signed it.
-    nodes.bundle_files = lambda: (lambda b: (b["files"], b["files_signed"]))(workspace.bundle())
-    nodes.idle_minutes = idle.minutes
-    nodes.session_tokens_for = session_tokens_for
-    # A project born with a starting version commits it the way the
-    # Artifacts tab gives a first version (projects._init).
-    projects.first_version = lambda name, value, env: version.init(name, value, by="operator", env=env)
-    # Each session kept to its own project's network (R79): the setting is
-    # the node's, what each project owns there is devapp's.
-    # ...and the containers' (R178): whether each project's are kept apart
-    # here, and what each compose project may reach, whatever the sessions'
-    # switch says.
-    nodes.session_net_for = lambda nid: (({"on": True, "own": router.with_peers(_with_vmnets(nid, devapp.session_net_own(nid)))}
-                                          if nodes.session_net_on(nid) else {"on": False, "own": {}})
-                                         # Containers kept apart on every node (R178); the agents
-                                         # read ctr_on, so it is still said.
-                                         | {"ctr_on": True, "ctr": devapp.container_net_own(nid),
-                                            # Whether this node's VMs may reach its LAN (R91 step 8).
-                                            "vm_lan": bool(((nodes.node(nid) or {}).get("config") or {}).get("vm_lan"))})
-    NODES_OK = ""
-    # The job logs are the only copy of what a node's job wrote and had no
-    # retention at all until R17 step 1. Swept once here for whatever ended
-    # while this controller was down; a running one sweeps a project as its
-    # own jobs end, which is when it gains a log.
-    # The one log policy (the Logs section's days) reaches the job logs,
-    # and Clear reaches them too.
-    nodes.log_days = logs.days
-    logs.clear_job_logs = nodes.clear_job_logs
-    try:
-        _gone = nodes.prune_job_logs()
-        if _gone:
-            print(f"[dashboard] job logs: dropped {_gone} past the policy", flush=True)
-    except Exception as e:                                # noqa: BLE001
-        print(f"[dashboard] job log sweep skipped: {e}", flush=True)
-except Exception as e:                                    # noqa: BLE001
-    NODES_OK = str(e)
-    print(f"[dashboard] node store unavailable: {e}", flush=True)
 
 
 def net_nudge():
@@ -4888,7 +4524,6 @@ def net_nudge():
 # the list the Runner card draws: runners.py.
 import runners                                                   # noqa: E402
 
-runners.configure(run=run, nodes=None if NODES_OK else nodes)
 
 # The controller's own runner (docs/nodes.md §2, phase 4): the thread that
 # takes compose and local exec jobs off the queue and runs them here. devactions
@@ -4896,70 +4531,14 @@ runners.configure(run=run, nodes=None if NODES_OK else nodes)
 # between the two and neither imports the other.
 import jobs                                                      # noqa: E402
 
-if not NODES_OK:
-    jobs.configure(nodes_module=nodes)
-    toolchains.nodes = nodes
-    toolchains.agentcode = agentcode
-    emulator.nodes = nodes
-    phone.nodes = nodes            # every adb command is a job on a node
-    # A compose action the AGENT ran still has records to write here; this is
-    # where the module that queued it finishes it (roadmap #18).
-    nodes.on_done("compose", devactions.compose_done)
-    for _a in agentcode.tracked():
-        nodes.on_done(_a.update_job, agentcode.update_done)
-# What Allow on a rebuild request actually starts (the Docker row's `ask`).
-# Outside the block above: the ask has nothing to do with the node registry,
-# and a controller without one still has projects whose containers run.
-phone.rebuilder = devactions.rebuild
-phone.container_maker = containers.create_container
-phone.container_free = containers.name_free
-phone.container_builds = containers.build_refusal
-phone.instance_maker = devactions.make_instance
-# What a renamed project is called now, for the name Send offers (R154).
-devapp.label_of = registry.label
-phone.env_writer = lambda project, text, instance: devapp.write_env(project, text, instance or devapp.MAIN)
-phone.ctl_runner = containers.ctl_on
 # ---- what the page may type into a terminal -------------------------------------
 # The tables, the pins, the operator's own lists and the typing itself:
 # macros.py. A node's session is typed into through its agent.
 import macros                                                    # noqa: E402
 
-macros.configure(state=STATE, write_json=write_json, lock=_state_lock, run=run,
-                 tmux_sessions=tmux_sessions, tmux_base=tmux_base,
-                 session_tmux=lambda nid, ops: nodes.session_tmux(nid, ops))
-phone.remover = devactions.remove_instance
-# ...and what the tab's verbs and the asking need about who is asking
-# (phone.verb): the projects an account sees, a project's node and its Run
-# its container dial, a container held to its project's node (R79).
-phone.users = users
-phone.project_names = lambda who: set(project_names(who))
-phone.project_node = lambda p: prefs.get(p)["node"]
-phone.project_hosts = lambda p: prefs.get(p).get("hosts") or []
-phone.dial = lambda p: prefs.get(p)["devbuild"]
-phone.on_project_node = devapp.on_project_node
 # A phone lent to a project (R113): its sessions drive the project's own app.
 import phonelease                                                # noqa: E402
-phonelease.configure(workspace=WORKSPACE, project_node_fn=lambda p: prefs.get(p)["node"],
-                     may_see_fn=users.may_see)
-phone.leasing = phonelease
-phone.run_denied = devapp.RUN_DENIED
-phone.net_nudge = net_nudge
-phone.resolve_artifact = artifacts.resolve
-phone.artifact_list = artifacts_of
-# ...and what the Artifacts tab's read composes (artifacts.tab_view).
-artifacts.listing_of = artifacts_of
-artifacts.account_names = account_names
-artifacts.build_state = build_state
 
-artifacts.instance_states = devactions.row_states
-artifacts.capture_days = lambda name: prefs.get(name)["capture_days"]
-artifacts.dev_keep = lambda name: prefs.get(name)["dev_keep"]
-artifacts.phone_summary = lambda name, uid: phone.summary(
-    prefs.get(name)["node"], uid,
-    nodes.node(prefs.get(name)["node"]) if prefs.get(name)["node"] and not NODES_OK else None)
-# The settings dialog's save (prefs.dialog_save).
-prefs.configure_dialog(WORKSPACE=WORKSPACE, pin_instances=devapp.pin_to_current_node,
-                       end_agents=end_agents, net_nudge=net_nudge)
 
 # ---- the Profile tab -------------------------------------------------------------
 # An account's own settings, read and saved: profiletab.py.
@@ -4967,13 +4546,6 @@ import profiletab                                                # noqa: E402
 # Two-factor sign-in (R127): the authenticator, passkeys and recovery codes.
 import mfa                                                       # noqa: E402
 
-mfa.configure(STATE=STATE, seal=signing.seal, unseal=signing.unseal,
-              sealing=lambda: signing.MASTER is not None)
-try:
-    if (_sealed := mfa.seal_all()):
-        print(f"dashboard: sealed {_sealed} authenticator secret(s) under the install's key", flush=True)
-except OSError as e:
-    print(f"dashboard: authenticator secrets left as they were, not sealed: {e}", flush=True)
 
 # The install key made by the install and changed from the page, and each
 # account's own key for its sign-ins on the nodes (R154): what the nodes
@@ -4988,25 +4560,9 @@ def _node_seals():
     return {n["id"]: (n.get("reported") or {}).get("tokseal") for n in nodes.node_list(all=True)}
 
 
-accountkeys.configure(state=STATE, nodes_under=lambda uid, k: tokenkeys.sealed_under(_node_seals(), k, uid))
-# An unlock that gives up less (R158 step 5): a person's tokens opened per
-# use for the window they pick, each use logged for them, and a store under
-# a key of their own (R157) opened only while they have unlocked it.
-unlocks.configure(state=STATE, key_under_install=accountkeys.key_under_install, open_entry=accountkeys.open_entry_with,
-                  entry_of=accountkeys._entry, own_of=accountkeys.own_of, set_for=accountkeys.set_unlock_for,
-                  live=logins.live, ts=tokenkeys.ts, wipe=hardening.wipe,
-                  run_dir=os.environ.get("BB_HANDOUT_DIR") or "")
-unlocks.clear_all_handouts()
-# Who is signed in now (R159): the rows the cookies name, and a device
-# signed in as the account counts the same way.
-logins.configure(state=STATE, days=SESSION_DAYS,
-                 devices_of=lambda uid: devices.listed({"uid": uid}))
 # The bell's rows sent elsewhere, per person (R149, reach.py): the
 # destinations each keeps on Profile, the mail server from the settings.
 import reach                                                     # noqa: E402
-reach.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                sealing=lambda: signing.MASTER is not None,
-                smtp_settings=lambda: _smtp_settings())
 
 
 def _smtp_settings():
@@ -5020,24 +4576,14 @@ def _smtp_settings():
             "password": pw, "from": settings.get("smtp_from")}
 
 
-
 # A model router on a node (R144 step 1, router.py): LiteLLM with the
 # provider keys, Ollama beside it, a key per allowed project.
 import router                                                    # noqa: E402
-router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                 sealing=lambda: signing.MASTER is not None, node_list=nodes.node_list,
-                 node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
-                 node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
-                 project_names=lambda: list(prefs.all_projects(WORKSPACE)), job_add=nodes.job_add,
-                 job_get=lambda jid: nodes.job(jid, with_log=True),
-                 node_gpu=lambda nid: bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card")),
-                 container_gone=lambda name: not devapp.is_file_source(name))
 # Connected services (R294 step 9, the connections rule): every credential
 # the install holds for an outside service but a person's own, each kind
 # saying what it holds and how one is forgotten, the ledger beside them who
 # added each and when, its last use and its expiry.
 import connections                                               # noqa: E402
-connections.configure(state=STATE, write_json_fn=write_json, audit_fn=lambda by, verb, target, detail: db.audit(by, verb, target, detail))
 # The install's own: the services Controller settings holds a token for.
 CONNECTED_SETTINGS = {"tunnel_token": ("Cloudflare tunnel token", "the tunnel that serves this controller"),
                       "cf_api_token": ("Cloudflare API token", "the tunnel's hostnames and DNS records"),
@@ -5116,41 +4662,19 @@ def _conn_git_forget(ref, by):
     return {"ok": True}
 
 
-connections.kind("setting", "Controller setting", "install", _conn_settings, _conn_setting_forget)
-connections.kind("git", "Space's git token", "space", _conn_git, _conn_git_forget)
-connections.kind("router", "Model router key", "shared", _conn_router, _conn_router_forget)
 # The Kubernetes clusters (R281 step 2): each a connection shared by spaces,
 # its credential sealed under the install key like the router's keys.
 import clusters                                                  # noqa: E402
 import kube                                                      # noqa: E402
-clusters.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-                   sealing=lambda: signing.MASTER is not None, used=lambda cid: connections.used("cluster", cid),
-                   owner_of=kube.owner_of)
 # A space's environments on those clusters (R281 step 3): each a namespace
 # kube.py makes ready with the cluster's credential, labeled with the space's
 # id, which never changes, and this install's mark.
 # k3s on a node (R281 step 1): a service from the Library, added to
 # Clusters with the bootstrap token it was made with.
 import k3s                                                       # noqa: E402
-k3s.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
-              sealing=lambda: signing.MASTER is not None, node_list=nodes.node_list,
-              node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
-              node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
-              nginx_on=lambda nid: bool(nginxproxy.deployed(devapp, nid)), run_wait=nodes.run_wait, clusters=clusters)
-kube.configure(state=STATE, write_json=write_json, clusters=clusters, space_id=registry.pid,
-               space_of_id=lambda sid: registry.resolve(sid) if re.fullmatch(r"P\d+", str(sid or "")) else "")
 # A repository's build sent to one of those environments (R281 step 4): an
 # exec job on a node of its own that runs Docker, its tokens in secret_env.
 import deploys                                                   # noqa: E402
-deploys.configure(remote_url=lambda repo: gitview.remote_url(WORKSPACE / repo), key_of=repos.key_of,
-                  nodes_of=devapp.nodes_of, node=nodes.node, host_only=nodes.host_only, own_machine=nodes.own_machine,
-                  k3s_node_of=k3s.node_of_cluster, k3s_container=k3s.container_name, access=clusters.access,
-                  snapshot_at=workspace.snapshot_at, snapshot_path=workspace.path_for,
-                  token_line=lambda repo, uid: gitcreds.read_line(repo, uid, why="deploy") or "",
-                  job_add=nodes.job_add, job=nodes.job, tree=lambda repo: WORKSPACE / repo,
-                  compose_of=lambda repo: devapp.compose_file(repo), tools_of=toolchains.node_has)
-workspace.own_git = gitview._own
-nodes.on_done("exec:deploy", deploys.done)
 
 
 def _session_deploy(name, act, env, ref, principal, uid, asker, allowed_by=""):
@@ -5165,13 +4689,6 @@ def _session_deploy(name, act, env, ref, principal, uid, asker, allowed_by=""):
                                                                   "commit": r.get("commit"), "job": r.get("job"),
                                                                   **({"allowed_by": allowed_by} if allowed_by else {})})
     return r
-
-
-phone.deployer = _session_deploy
-# A session's Discord apply a person allowed (R293): every change, the ones
-# that ask a person included, since the person read each before Allow.
-phone.discorder = lambda project, text, principal, allowed_by: discord.apply(
-    repos.key_of(project), text, by=principal, allowed=True)
 
 
 def _deploy_on(name, when, refs, uid, asker, by_session):
@@ -5208,26 +4725,9 @@ def _deploy_on(name, when, refs, uid, asker, by_session):
 # always through the environment's own deployer.
 import kubeview                                                  # noqa: E402
 import kubeexec                                                  # noqa: E402
-kubeview.configure(clusters=clusters)
-connections.kind("cluster", "Kubernetes cluster", "shared",
-                 lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
-                           "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
-                 lambda ref, by: clusters.forget(ref))
 # A space's Discord server (R293): its bot's token sealed here, the server
 # built out from the space's layout file. BB_DISCORD_API is the suites' stand-in.
 import discord                                                   # noqa: E402
-discord.configure(state=STATE, write_json_fn=write_json, seal_fn=signing.seal, unseal_fn=signing.unseal,
-                  sealing_fn=lambda: signing.MASTER is not None,
-                  audit_fn=lambda who, verb, target, detail: db.audit(who, verb, target, detail),
-                  api=os.environ.get("BB_DISCORD_API") or None)
-connections.kind("discord", "Discord server", "space",
-                 lambda: [{"ref": k, "name": f"{registry.label(k) or k}: {g}", "sealed": True,
-                           "uses": "builds out and changes the space's Discord server", "go": ["project", k]}
-                          for k, g in discord.spaces()],
-                 lambda ref, by: discord.forget(ref, by))
-gitcreds.on_added = lambda p: connections.added("git", p, by=_acting_name())
-gitcreds.on_gone = lambda p: connections.gone("git", p)
-gitcreds.on_used = lambda p: connections.used("git", p)
 
 
 def _acting_name():
@@ -5237,100 +4737,12 @@ def _acting_name():
     return next((u.get("name") or "" for u in users.all_users() if uid and u.get("uid") == uid), "")
 
 
-# Every module that seals under the install key: one left out kept its
-# secrets under the key before, and lost them when that went (B567).
-installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
-                             accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
-                             poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
-                             clusters.seal_all, k3s.seal_all, discord.seal_all),
-                     nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
-                     if signing.PREVIOUS else 0,
-                     again=STATE / "seal-again")
-installkey.note_made()
-installkey.settle()
-# Every account's own key made at the start that can seal it, a fresh
-# install's first and an upgraded one's first alike, rather than when it is
-# first needed (the operator, 27 Oct); one added later has its own made then.
-for _u in users.all_users():
-    if _u.get("uid"):
-        accountkeys.key_of(_u["uid"])
-
 # An account's conversations with Claude as a download: transcripts.py.
 import transcripts                                               # noqa: E402
 
-transcripts.configure(workspace=WORKSPACE,
-                      root_for=lambda uid: (Path(home_for(uid)) / ".claude" / "projects")
-                      if home_for(uid) else CLAUDE_PROJECTS,
-                      state=STATE, write_json=write_json)
-profiletab.configure(users=users,
-                     claude_email=lambda uid: ", ".join(sorted(
-                         {v["email"] for v in claudegrant.nodes_of(home_for(uid)).values()}, key=str.lower)),
-                     agent_emails=lambda uid: claudegrant.emails_of(home_for(uid)),
-                     plugins_of=plugins.of,
-                     node_names=lambda: {n["id"]: n["name"]
-                                         for n in ([] if NODES_OK else nodes.node_list())},
-                     logs_of=lambda me: transcripts.mine(
-                         users.uid_of(me), project_names(me)),
-                     agent_rows=agents.rows,
-                     node_list=lambda: [] if NODES_OK else nodes.node_list(),
-                     agent_version=lambda n, aid: agentcode.installed(n, aid),
-                     signed_on=lambda uid, aid: claudegrant.nodes_of(home_for(uid), aid),
-                     signin_cannot=lambda n, aid: signin.cannot(n, aid))
-devapp.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
-                 log_dir=logs.log_dir, field=field,
-                 node_for=nodes.node_for if not NODES_OK else None,
-                 # A hosting-only node has no docker address here: the controller
-                 # holds no key to a VPS, and every `docker compose config` and
-                 # data-directory mkdir addressed at it waited out a 30s ssh
-                 # timeout, twice per nginx Save on a hosting node, holding the server
-                 # with it (R85 step 1, the operator, 11 Oct). With no address
-                 # the config check runs the compose plugin here, which parses
-                 # without a daemon, and the directory is the agent's to make.
-                 node_addr=(lambda nid: "" if nodes.host_only(nid) else nodes.ssh_addr_of(nid)) if not NODES_OK else None,
-                 queue=nodes if not NODES_OK else None,
-                 runner=jobs if not NODES_OK else None,
-                 project_node=lambda p: prefs.get(p)["node"],
-                 project_nodes=lambda p: prefs.get(p)["nodes"],
-                 node_paths=nodes.node_paths if not NODES_OK else None,
-                 node_reported=(lambda nid: (nodes.node(nid) or {}).get("reported") or {}) if not NODES_OK else None)
-# The layer on top of it: the compose runner is its, so it is the one that
-# hands jobs.py the function.
-devactions.configure(runner=jobs if not NODES_OK else None)
-home.configure(nodes_mod=nodes, devapp_mod=devapp)
-home.backups_summary = lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or ""))
-devapp.gpu_why = gpu_container_why
-devapp.room_why = lambda nid: nodes.room_short(nid, nodes.room_floor_for(nid)) if nid else ""
-nodes.room_floor_gb = room_floor_gb
-# ...each node's own where its page sets one (R294 step 7).
-devapp.container_mem_gb = lambda nid="": nodes.room_of(nid, "container_mem_gb", settings.get("container_mem_gb"))
-# ...and what its request() needs about who is asking, and who hears.
-devactions.users = users
-devactions.ask_rebuild = phone.ask_rebuild
-devactions.say = chat.event
-devactions.net_nudge = net_nudge
-# ...and the Docker tab's container verbs (containers.py) the same.
-containers.dial = lambda p: prefs.get(p)["devbuild"]
-containers.users = users
-containers.ask_rebuild = phone.ask_rebuild
-containers.net_nudge = net_nudge
-containers.ports_local = nodes.ports_local_on
-containers.ctr_spark = nodes.ctr_spark
-# One nginx per node, from the nginx tab (R171): its records here, the
-# container through containers.py, and the node's own view of its ports.
-imagecheck.configure(state=STATE, write_json=write_json, devapp_module=devapp)
 # The VM manager (R91): its records, the jobs it queues, and what becomes of
 # them; a session's ask through the same machinery a container's goes.
 import vms                                                       # noqa: E402
-
-vms.configure(state=STATE, write_json=write_json, node=nodes.node, node_list=nodes.node_list,
-              job_add=nodes.job_add, audit=db.audit, prefs_get=prefs.get, nodes_rev=nodes.rev,
-              enroll_script=nodes.enroll_script,
-              node_retire=lambda by, nid: nodes.node_state(by, nid, "retired"),
-              node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail, job_get=nodes.job)
-nodes.on_done("vm", vms.vm_done)
-# ...run as an administrator's, since the asks go to the administrators
-# alone and Allow is theirs (R116): a device passed through lands.
-phone.vm_runner = lambda project, req, by: _vm_do(f"session:{project} (allowed by {by})", project, dict(req, _admin=True), True)
 
 
 def _catalog_pin(url, commit, sha256, path=""):
@@ -5368,21 +4780,6 @@ def _catalog_pack(name):
     return catalogindex.named(catalogindex.index(settings.get("catalog_url") or None).get("index"), name)
 
 
-# A session's aerie tool install (toolchains.session_install): the catalog's
-# entry for a name, the packs kept here, the add at the index's pin and the
-# ask on the bell are this file's to hand over.
-toolchains.pack_entry = _catalog_pack
-toolchains.pack_have = toolpacks.packs
-toolchains.pack_add = _pack_from_catalog
-toolchains.pack_ask = phone.ask_pack
-# Allow installs it on the node the ask names, as the person who allowed
-# it, the session named beside them on the job; a pack kept on the way is
-# the session's, allowed by them, as it was. An administrator's Allow, so
-# a pack that needs root may be kept.
-phone.pack_runner = lambda project, held, by: toolchains.session_do(
-    held, f"user:{by} (for session:{project})", pack_by=f"session:{project} (allowed by {by})", may_root=True)
-
-
 def _with_vmnets(nid, own):
     """Each project's own reach on a node, with the network its VMs are on
     there (R91 step 8): its sessions reach those and no other project's."""
@@ -5408,30 +4805,9 @@ def _vm_do(principal, project, req, session):
     return vms.act(principal, project, field(req, "name"), field(req, "action"), dict(req, _session=session))
 
 
-devapp.nginx_routes = lambda nid: nginxproxy.record(nid).get("routes") or []
-nginxproxy.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
-                     node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
-                     taken_ports=devapp.taken_ports)
 # AerieOS's own scanners on each node (R145, scanners.py): deployed and
 # run as compose and scan jobs there, their reports sent up.
 import scanners                                                  # noqa: E402
-scanners.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
-                   node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
-                   project_nodes=lambda: nodes.project_nodes() if nodes.project_nodes else {},
-                   project_names=lambda: list(prefs.all_projects(WORKSPACE)),
-                   job_add=nodes.job_add, job_state=_job_state,
-                   next_after=schedules.next_after, cron_words=schedules.words)
-findings.STATE_REPORTS = scanners.report_files
-# A DNS-01 challenge's record goes through the Cloudflare API token Settings
-# holds (R150).
-nginxproxy.cf_token = lambda: settings.secret("cf_api_token")
-# ...and put on a node the moment it enrolls when the Enroll dialog asked
-# for it (config.nginx), so a box runs the script and nginx appears.
-# The home tunnel the controller runs itself (R176, tunnel.py): from the
-# settings, started at boot below when they say so.
-tunnel.configure(settings_mod=settings, dash_port=PORT)
-nodes.ON_ENROLL.append(lambda nid: nginxproxy.deploy(nid, containers, devactions, devapp)
-                       if ((nodes.node(nid) or {}).get("config") or {}).get("nginx") else None)
 
 # ---- the version ----------------------------------------------------------
 # One identity per project, rendered per target; the module's docstring says
@@ -5449,9 +4825,6 @@ def _changelog_relinked(d, olds, new):
     except (ValueError, IndexError):
         return
     bugs.relink_changelog(project, olds, new)
-
-
-changelog.relinked = _changelog_relinked
 
 
 def _changelog_bugs(project, comp="", groups=None):
@@ -5490,31 +4863,10 @@ def _changelog_bugs(project, comp="", groups=None):
             "fixed": [{"id": b["id"], "title": str(b.get("title") or "")[:200], "commits": b.get("commits") or []}
                       for b in fixed]}
 import claudegrant                                              # noqa: E402
-# The Claude sign-in's verbs are signin.py's; the record of what each node
-# reported is claudegrant.py's.
-signin.nodes = None if NODES_OK else nodes
-signin.mint = users.mint_session
-claudegrant.home_for = home_for
 
 # ---- the node agent's channel -----------------------------------------------------
 # The verbs behind /api/v1/agent/: channel.py.
 import channel                                                   # noqa: E402
-
-channel.configure(home_for=home_for)
-channel.sessions_seen = guards_watch
-channel.unvetted_ok = lambda: bool(settings.get("offer_unvetted"))   # a Mac's provisioner is a dev feature
-# A signing is a job on the project's node, of a build in its dist/ (R106).
-signing.node_of = lambda name: prefs.get(name)["node"]
-signing.node_refuses = lambda nid: nodes.agent_stale(nodes.node(nid)) if nid and not NODES_OK else ""
-signing.job_add = nodes.job_add
-signing.file_path = workspace.file_path
-# What needs a jdk or build-tools is a sign-key job on that node too, waited
-# for (signing._on_node): the controller runs no keytool or apksigner.
-signing.node_get = nodes.node
-signing.job_get = nodes.job
-signing.job_cancel = nodes.job_cancel
-signing.node_tools = toolchains.node_has
-phone.signer = signing.start
 
 
 def _releaser(project, comp, asker_name, principal, dev=False, pre=""):
@@ -5528,15 +4880,12 @@ def _releaser(project, comp, asker_name, principal, dev=False, pre=""):
     return version.verb(project, "release", {"component": comp, "dev": bool(dev), "pre": pre or ""}, who, principal)
 
 
-phone.releaser = _releaser
-
-
 def _release_editor(project, plan, asker_name="", principal=""):
     """An edit of a published release (R139), made here with the project's
     own token, which the session never holds: the notes replaced, the
     files attached that edit_plan() checked."""
     r = forgerelease.edit(project, plan)
-    if not NODES_OK:
+    if not NODES_DOWN:
         db.audit(principal, "version-release-edit", project,
                  {"tag": plan.get("tag"), "notes": plan.get("notes") is not None,
                   "files": [x["name"] for x in plan.get("files") or []], "error": r.get("error") or ""})
@@ -5544,22 +4893,16 @@ def _release_editor(project, plan, asker_name="", principal=""):
     return ({"error": said, "forge": r.get("forge") or ""}, 400) if r.get("error") else ({"edited": r, "said": said}, 200)
 
 
-phone.release_editor = _release_editor
-
-
 def _release_remover(project, plan, asker_name="", principal=""):
     """Files taken off a published release, its own ask (the operator,
     5 Oct), with the project's own token."""
     r = forgerelease.remove(project, plan)
-    if not NODES_OK:
+    if not NODES_DOWN:
         db.audit(principal, "version-release-remove", project,
                  {"tag": plan.get("tag"), "files": [x["name"] for x in plan.get("files") or []],
                   "removed": r.get("removed") or [], "error": r.get("error") or ""})
     said = forgerelease.remove_said(r)
     return ({"error": said}, 400) if r.get("error") else ({"removed": r, "said": said}, 200)
-
-
-phone.release_remover = _release_remover
 
 
 def _release_withdrawer(project, plan, asker_name="", principal=""):
@@ -5569,15 +4912,12 @@ def _release_withdrawer(project, plan, asker_name="", principal=""):
     r = forgerelease.withdraw(project, plan["tag"])
     if r.get("tagged") or not r.get("error"):
         version._git(project, "tag", "-d", plan["tag"])
-    if not NODES_OK:
+    if not NODES_DOWN:
         db.audit(principal, "version-release-withdraw", project,
                  {"tag": plan.get("tag"), "release": bool(r.get("release")), "tagged": bool(r.get("tagged")),
                   "error": r.get("error") or ""})
     said = forgerelease.withdraw_said(r)
     return ({"error": said}, 400) if r.get("error") else ({"withdrawn": r, "said": said}, 200)
-
-
-phone.release_withdrawer = _release_withdrawer
 
 
 def _keymaker(action, project, args, by=""):
@@ -5590,9 +4930,6 @@ def _keymaker(action, project, args, by=""):
     if action == "rotate":
         return signing.rotate(project, str(args.get("from") or ""), str(args.get("to") or ""), by=by)
     return {"error": f"not a key change: {action}"}, 400
-
-
-phone.keymaker = _keymaker
 
 
 def _release_signer(project, tag=""):
@@ -5608,8 +4945,6 @@ def _release_signer(project, tag=""):
             "said": (f"looking for {tag}'s own run to sign its APK again" if tag else
                      "looking for unsigned release APKs to sign" if started else "a look is already going")}, 200
 
-
-phone.release_signer = _release_signer
 
 # What a space's Agents-may dial says at deny (_dialed), by dial: what Claude
 # does not do, and the dial's name in the space's settings.
@@ -5655,48 +4990,15 @@ RELEASE_CHANGES = {
         _release_editor, phone.ask_release_edit, False),
 }
 
-artifacts.sign_routes = signing.routes_held
 import version                                                   # noqa: E402
 import vmtemplate                                                # noqa: E402
-vmtemplate.unvetted_ok = forges.unvetted_ok          # the same switch (R54, step 6)
-# The Nodes tab's verbs are nodes.verb's, and these are what they compose
-# with (a runner's forge and token, a daemon probe, Claude Code's update).
-nodes.configure_verbs(vmtemplate=vmtemplate, forges=forges, devapp=devapp,
-                      runner_store=runners, workspace=workspace,
-                      project_prefs=prefs.get, may_push=projects.may_push,
-                      no_node_advice=no_node_advice, turns_of=node_turns,
-                      working_on=lambda nid: node_turns(nodes.node(nid) or {"id": nid})["working"],
-                      project_names=lambda: sorted(prefs.all_projects()))
 
-version.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
-                  roadmap_mod=roadmap, bugs_mod=bugs, changelog_mod=changelog,
-                  tell_fn=notify.tell, tmux_name_fn=tmux_name,
-                  )
-changelog.component_dir = version._sub
-# Whether what the changelog owes refuses a release or goes out with it said:
-# the repository's Releases setting (R255).
-version.release_gate = lambda p: prefs.get(p).get("release_gate", "refuse")
-# The catalog's newest signed index this controller holds, read fresh where
-# the catalog answers: a release carrying an older config/catalog-floor is
-# refused until the floor moves to it.
-version.catalog_made = lambda: str((catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("generated") or "")
-version.rehearsed = lambda project, sha: forgeaccess.rehearsed(project, sha)   # imported below
-version.owes = lambda project, wants: forgeaccess.owed(project, wants)
 # Release's forge half (R123; Gitea and GitLab, R124): the release beside a pushed tag.
 import forgerelease                                              # noqa: E402
-# What each of a release's files is for, over its notes (R255).
-forgerelease.files_setting = lambda p: (prefs.get(p).get("files_table", True), prefs.get(p).get("files") or [])
 import featuresoff                                               # noqa: E402
-forgerelease.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
 # A release's APK, built unsigned in CI and signed on the project's node with
 # its sideload key (R106): a release made from the panel is looked for at once.
 import releasesign                                               # noqa: E402
-releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
-                      projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
-                                              if d.is_dir() and not d.name.startswith(".")),
-                      # The workflow that signs a release's list of files, started once its APK
-                      # is attached: the dispatch a rehearsal's start makes (forgeaccess, below).
-                      dispatch=lambda project, wf, ref, inputs: forgeaccess.dispatch(project, wf, ref, inputs))
 
 
 # The files a release must carry (R190 step 4), checked as its CI ends, a
@@ -5714,9 +5016,6 @@ def _release_complete(project, tag, files, draft):
                           "text": releasefiles.complete_words(registry.label(project), tag, files, draft)})
 
 
-releasefiles.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json, said_fn=_release_complete)
-
-
 def _release_made(project, tag):
     """A release's tag pushed, dev or stable: its unsigned APK expected for
     signing (releasesign.expect) and its files checked later
@@ -5726,70 +5025,10 @@ def _release_made(project, tag):
     releasefiles.expect(project, tag)
 
 
-# The briefing says what a session may move the version by, with the rest
-# of the project's dials (preamble.dials_line).
-preamble.version_policy = version.policy
-version.configure_verbs(PANEL=version_payload, GIT_ENV=users.git_env, CREDS_ENV=projects._git_env,
-                        MAY_PUSH=projects.may_push, SESSIONS=sessions_anywhere,
-                        FORGE=forgerelease.publish, MADE=_release_made, UNSEALED=releasesign.unstartable,
-                        AUDIT=lambda *row: None if NODES_OK else db.audit(*row))
-
-
-
-# The coding agents on the nodes, Claude Code among them (agentcode.py):
-# what each runs against what is out, and the one way it is updated, which
-# is an administrator's press.
-if not NODES_OK:
-    agentcode.configure(nodes_module=nodes, node_sessions=node_tmux_sessions,
-                        tmux_base=tmux_base, audit=nodes.audit,
-                        catalog_entry=_catalog_official, fetch_pack=toolpacks.fetch)
-
-# Every account's sessions on a project, for its settings dialog, and an
-# administrator ending one (projsessions.py): the rows the Sessions card is
-# made from, and its kill.
-projsessions.configure(sessions=lambda: tmux_sessions() + node_tmux_sessions(),
-                       live_sessions=lambda: tmux_sessions(kept=True) + node_tmux_sessions(),
-                       base=tmux_base, owner=tmux_owner, accounts=account_names,
-                       owner_name=users.owner_name, end=end_session)
-projsessions.BEHIND = session_behind
-
-# The code map, built for a project the moment it exists (mapping.py): the
-# same command a session runs by hand, started in the background by the
-# create paths, and the one thing a Claude session on a new project waits for.
-mapping.configure(workspace=WORKSPACE,
-                  codemap=Path(__file__).resolve().parent.parent / "lib" / "codemap.py")
-# Every project's .bb-map/ out of its git, once, beside the start.
-threading.Thread(target=mapping.exclude_all, daemon=True).start()
-projects.configure(run=run, workspace=WORKSPACE, agent_keys=agent_keys,
-                   gh_authed=gh_authed, ensure_deploy_alias=ensure_deploy_alias,
-                   project_name=PROJECT_NAME,
-                   state=STATE, home=os.environ.get("BUILDER_HOME", str(Path.home())),
-                   write_json=write_json,
-                   after_create=mapping.start)
-# The session network reaches the containers of the projects a project reads.
-devapp.reads_of = prefs.reads_trees
 # What an agent may do on a project's git host (R188): measured with the
 # project's own token here, and the aerie forge relay, which never hands the
 # token to a node.
 import forgeaccess                                               # noqa: E402
-forgeaccess.configure(state=STATE, write_json=write_json, target=projects.forge_target, prefs_get=prefs.get)
-# A space's own token's expiry, as its host says when measured (R294 step 9).
-forgeaccess.on_measured = lambda p, when: connections.expires("git", p, when) if gitcreds.own_line(p) else None
-forgeaccess.wants_of = version.host_wants
-preamble.forge_line = forgeaccess.briefing
-projects.token_changed = forgeaccess.token_changed
-devapp.hosts_of = lambda p: (prefs.get(p) or {}).get("hosts") or []
-devapp.reaches_of = prefs.reaches_on
-# ...and what the create dialog's follow-ups and a space's pin need.
-projects.lock = _state_lock
-projects.take_on = users.take_on
-projects.held = nodes.workspace_held
-projects.set_prefs = lambda name, **kw: prefs.set_prefs(name, workspace=WORKSPACE, **kw)
-projects.brief_writer = brief.write
-# A create that never took, and a project deleted for good, leave no owner,
-# owner role or account entry behind (B93, B95); the first its settings too.
-projects.purged = lambda name: membership.forget_project(name, live=registry.live_dirs())
-projects.unmade = lambda name: (prefs.forget(name), projects.purged(name), repos.forget(name))
 
 # ---- a node's git, relayed --------------------------------------------------
 # Push, fetch, pull and ls-remote from a session on a node, done in a
@@ -5797,15 +5036,6 @@ projects.unmade = lambda name: (prefs.forget(name), projects.purged(name), repos
 # write: gitrelay.py (B148).
 import gitrelay                                                  # noqa: E402
 
-gitrelay.configure(state=STATE, workspace=WORKSPACE,
-                   push_record=lambda p: projects.load_push().get(p),
-                   token_helper=projects.token_helpers, parse_url=forges.parse,
-                   host_of=forges.host_of, git_env=projects._git_env)
-# The modules that keep something that grows read where from paths.py.
-workspace.paths = gitview.paths = logs.paths = gitrelay.paths = paths
-# What a space's environments deploy on a push and on a release (R281 step 6).
-gitrelay.after_push = lambda project, refs, uid: _deploy_on(project, "push", refs, uid, _name_of_uid(uid) if uid else "", True)
-version.RELEASED = lambda project, tag, sha: _deploy_on(project, "release", {tag: sha}, "", "", False)
 
 # ---- the bb relay -----------------------------------------------------------
 # A bb verb from a session on a node, run here (roadmap #24): which verbs
@@ -5813,10 +5043,6 @@ version.RELEASED = lambda project, tag, sha: _deploy_on(project, "release", {tag
 import bbrelay                                                   # noqa: E402
 
 import pushscan                                                  # noqa: E402
-
-pushscan.configure(state=STATE, write_json=write_json)
-bbrelay.configure(users=users, projects=projects, prefs=prefs, gitrelay=gitrelay, registry=registry,
-                  WORKSPACE=WORKSPACE, STATE=STATE, phone=phone, pushscan=pushscan, forgeaccess=forgeaccess)
 
 
 def _push_approved(rec, by):
@@ -5832,21 +5058,10 @@ def _push_approved(rec, by):
                         workflows=forgeaccess.override(project).get("workflows") != "deny")
 
 
-phone.pusher = _push_approved
-# ...and the Git view's Push reads the same way, asking in a confirm.
-gitview.SCAN = lambda project: gitrelay.run(project, str(WORKSPACE / project), "push", [], scan="only")
-gitview.OKAY = pushscan.okay
-
 # ---- a session's hooks, from a node -------------------------------------------
 # The overlap notes, the chat feed, the catch-up and the turn queue, posted by
 # a node's hooks with the session's token (roadmap #24): hooks.py.
 import hooks                                                     # noqa: E402
-
-hooks.configure(users=users, rules=rules, preamble=preamble, overlap=overlap, chat=chat, roadmap=roadmap, pending=pending,
-                turns=turns, nodes=nodes, seen_note=session_seen_note, turn_scope=turn_scope,
-                asking_set=asking_set, asking_clear=asking_clear, asked=projsessions.asked,
-                agent_state=agent_state_set, agent_conv=agent_conv_set, behind=session_behind_of,
-                heard_from=guards_heard)
 
 
 # Written by entrypoint.sh once every startup hook has finished. Named here as
@@ -5902,7 +5117,7 @@ def wait_for_nodes(limit=NODE_WAIT):
     for: one that had been off for a day is not coming back because the
     controller did.
     """
-    if NODES_OK:
+    if NODES_DOWN:
         return
     end = time.time() + limit
     while time.time() < end:
@@ -5980,34 +5195,12 @@ def _container_age():
 
 # ---- aerie doctor, cached for the Doctor card: doctor.py ----------------------
 import doctor                                                    # noqa: E402
-# The Doctor asks each Kubernetes cluster kept again, and says one that does
-# not answer or whose certificate ends soon (R281 step 2).
-doctor.extra = lambda: [*clusters.doctor(), *tls.doctor_lines(settings.get),
-                        *catalogindex.doctor_lines(settings.get("catalog_url") or None)]
 
-doctor.configure(run=run, wait_for_boot=lambda: (wait_for_boot(), wait_for_nodes()),
-                 runner_named=lambda nid, slot: (
-                     (nodes.node(nid) or {}).get("name") or "",
-                     re.sub(r"^[a-z]+://[^/]+/|\.git$|/$", "",
-                            ((nodes.runners_of(nodes.node(nid) or {}).get(slot) or {}).get("url") or ""))))
-# A node dialing in after silence re-asks the doctor now rather than in up
-# to half an hour: after a reboot the card kept saying no node could run a
-# session long after they were all back (the operator, 25 Sep).
-nodes.came_back = lambda nid: threading.Thread(target=doctor.refresh, name="doctor-after-hello",
-                                               daemon=True).start()
-# The Docker tab's first pick is derived from where the projects are bound.
-# A job of a container written for a project is that project's (B321).
-nodes.job_owner = lambda j: devapp.owner_of(j.get("project") or "",
-                                           (j.get("spec") or {}).get("instance") or devapp.MAIN)
-nodes.project_nodes = lambda: {p: (v or {}).get("node") or ""
-                               for p, v in prefs.all_projects(WORKSPACE).items()}
-devapp.all_project_nodes = lambda: {p: (v or {}).get("nodes") or []
-                                    for p, v in prefs.all_projects(WORKSPACE).items()}
 
 def _port_answers(nid, port):
     """True when something on node `nid` accepts a connection on `port`,
     asked at the address it dials in from; None where that is not known."""
-    n = nodes.node(nid) if nid and not NODES_OK else None
+    n = nodes.node(nid) if nid and not NODES_DOWN else None
     addr = ((n or {}).get("agent") or {}).get("addr") or ""
     return ftp._answers(addr, port) if addr else None
 
@@ -6028,24 +5221,13 @@ def _ftp_node(nid):
 # ftp.py's, the server is the node's (bb-ftpd from the ftp toolchain), and a
 # login is relayed by the agent to channel's ftp-auth.
 import ftp                                                       # noqa: E402
-ftp.configure(state=STATE, workspace=WORKSPACE, write_json=write_json, users=users,
-              audit=lambda who, act, target, params: db.audit(who, act, target, params),
-              project_node=lambda p: prefs.get(p)["node"] or "",
-              ask_hello=lambda nid: None if NODES_OK else nodes.ask_hello(nid),
-              node_info=lambda nid: None if NODES_OK else _ftp_node(nid), mfa=mfa)
-ftp.locked_out = projects.locked_out       # a lock makes the files read-only through every door (B263)
-nodes.ftp_for = ftp.for_node
-# The node's nginx container, for its log stream (R182): named only where the nginx tab put one.
-nodes.nginx_for = lambda nid: nginxproxy.container_name(nid) if nginxproxy.deployed(devapp, nid) else ""
 
 # The controller's diagnostics: read-only, for an administrator and, behind
 # the debug switch and a node's tick, an administrator's session (diag.py).
 import diag                                                      # noqa: E402
-devapp.redact = diag.redact       # docker.log carries argvs and output tails
 
 import reports                                                   # noqa: E402
 import files                                                     # noqa: E402
-files.configure(workspace=WORKSPACE, audit=db.audit)
 # A node's projects as a synced copy (R162): the nodes in sync mode a
 # project is bound to, and VS Code's writes reaching them at once.
 import wssync                                                    # noqa: E402
@@ -6053,49 +5235,20 @@ import claudesync                                                # noqa: E402
 
 
 def _sync_bound(project):
-    if NODES_OK:
+    if NODES_DOWN:
         return []
     pr = prefs.get(project)
     synced = nodes.sync_node_ids()
     return [i for i in dict.fromkeys([pr.get("node") or "", *(pr.get("nodes") or [])]) if i and i in synced]
 
 
-wssync.configure(workspace=WORKSPACE, nodes_module=nodes, bound_nodes=_sync_bound,
-                 changed=files._poke, audit_fn=db.audit)
-wssync.configure_projects(lambda: list(prefs.all_projects()))
-wssync.configure_reads(prefs.reads_trees)
 # Each project's daily snapshots (R165): what a node gone wrong through its
 # synced copy is undone from, kept for the days its settings say.
 import snapshots                                                 # noqa: E402
-snapshots.configure(workspace=WORKSPACE, days=lambda p: prefs.get(p)["snapshot_days"],
-                    names=lambda: [p for p in prefs.all_projects() if (WORKSPACE / p).is_dir()],
-                    audit_fn=lambda *row: None if NODES_OK else db.audit(*row))
-files.on_change = wssync.changed
-# A synced node writes the transcripts of the projects it holds and nothing
-# else: bound to it, never one it only reads (B613).
-claudesync.configure(workspace=WORKSPACE, held=lambda nid: wssync.bound_projects(nid))
-reports.configure(write_json=write_json, state=STATE, redact=diag.redact,
-                  build=lambda: image_stamp().get("version") or image_stamp().get("rev") or "")
-# A report says which node its project builds on, and clearing them all is
-# audited like every other mutation.
-reports.node_name = lambda p: ((nodes.node(prefs.get(p)["node"]) or {}).get("name", "")
-                               if prefs.get(p)["node"] and not NODES_OK else "")
-reports.audit = db.audit
-diag.configure(image_stamp=image_stamp, uptime=uptime, doctor_payload=doctor.payload,
-               settings=settings, nodes=nodes, db=db, log_dir=logs.log_dir,
-               plugins=plugins, users=users, reports=reports, state_dir=lambda: STATE, tunnel=tunnel)
 # A person's devices (R272): their tokens, and the door their apps sync a
 # project through as a node does (wssync), as far as the editor's door lets
 # that person (ftp.access_for).
 import devices                                                   # noqa: E402
-devices.configure(users=users.load, access=lambda acct, p: ftp.access_for(acct, p, "editor"),
-                  unlock=lambda uid, key: (unlocks.unlock(uid, unlocks.secret_from_hex(key)) if unlocks.secret_from_hex(key)
-                                           else {"error": "the key is 64 hex characters"}),
-                  projects=lambda acct: project_names(acct),
-                  flags=lambda acct, p: projects.app_flags(p, users.uid_of(acct)))
-profiletab.configure(devices=devices, logins=logins, reach=reach, smtp_set=lambda: bool(settings.get("smtp_host")), mfa=mfa, audit=db.audit,
-                     two_factor_required=lambda u: roles.two_factor_required(u),
-                     smb_shares=lambda uid: None if NODES_OK else nodes.smb_shares_for(uid))
 
 # The apps a person installs, fetched from this controller's release and
 # served from /apps (R272 step 3); which of them are offered is the
@@ -6105,26 +5258,11 @@ import apps                                                      # noqa: E402
 # asked of GitHub a while after the start and daily, on the bell and under
 # Controller settings, applied as the own node's system job.
 import releasecheck                                              # noqa: E402
-releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_metal=lambda: BARE_METAL,
-                       window=lambda: (str(settings.get("update_window") or ""), int(settings.get("update_hour") or 4)),
-                       apply=lambda v: _update_in_window(v),
-                       # The release channel (R179, R193): the one picked, else a dev build
-                       # follows the dev builds; debug mode alone picks a version, and
-                       # sees the drafts with AerieOS's own repository's token.
-                       channel=lambda: settings.channel_picked() or ("dev" if "-dev." in (image_stamp().get("version") or "") else "normal"),
-                       debug=settings.debug_available,
-                       draft_token=lambda: _builderbot_repo_token())
 
 
 # Update checks on one clock (R176, checks.py): each check's cadence a
 # setting, when it last ran read off its own module, and Check now.
 import checks                                                    # noqa: E402
-checks.configure(state=STATE, settings_mod=settings,
-                 last={"images": imagecheck.last_at,
-                       "catalog": lambda: int(toolchains._tc_checked or 0)},
-                 run={**({"release": lambda: (releasecheck.check(), checks.stamp("release"))} if BARE_METAL else {}),
-                      "images": imagecheck.check,
-                      "catalog": lambda: toolchains.start_job("check", [p["name"] for p in toolchains.TOOLCHAINS], auto=True)})
 
 
 def _own_os():
@@ -6173,12 +5311,6 @@ def _draft_update(principal, nid, tag, os_image):
     return {"ok": True, "fetching": True, "said": f"{tag} is a draft: its files are fetched here first, then the update runs from them"}
 
 
-nodes.draft_update = _draft_update
-# What an earlier draft update fetched: the slot has taken it by now.
-shutil.rmtree(Path(STATE) / "os-draft", ignore_errors=True)
-nodes.keep_versions = lambda: int(settings.get("os_keep") or 0)
-
-
 def _update_in_window(version):
     """The update window's press (releasecheck.window_pass): the image on
     AerieOS, the installer elsewhere, queued on the own node under the
@@ -6192,52 +5324,16 @@ def _update_in_window(version):
 # A held start on a bare-metal install (R56 step 9, held.py): read at the
 # start, lifted by Start on This controller, armed for the next restart.
 import held                                                      # noqa: E402
-held.configure(state=STATE, bare_metal=lambda: BARE_METAL, write_json_fn=write_json)
 # A prepared configuration a stick's first boot handed over (R161 step 8,
 # firstboot.py): applied once, here, before anybody can sign in or claim.
 import firstboot                                                 # noqa: E402
 import adoptapps                                                 # noqa: E402
-firstboot.configure(state=STATE, write_json_fn=write_json, users_mod=users, settings_mod=settings, hold_first_fn=held.arm_first)
-adoptapps.configure(state=STATE)
-if BARE_METAL:
-    try:
-        _fb = firstboot.apply()
-        if _fb:
-            print(f"dashboard: a prepared configuration from the stick: {len(_fb['done'])} applied, "
-                  f"{len(_fb['waiting'])} waiting, {len(_fb['failed'])} not applied (the Nodes page says which)", flush=True)
-    except Exception as e:                                # noqa: BLE001 (a start must not fail on this)
-        print(f"dashboard: the stick's prepared configuration was not applied: {e}", flush=True)
-    # The catalog's mirror the stick carries (R169 step 6), handed over by
-    # the boot: imported once per mirror, as Import under Controller settings.
-    _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot", "catalog-mirror.tar.gz")
-    if os.path.isfile(_cm):
-        try:
-            _r = catalogmirror.take_file(_cm, time.time())
-            if not _r.get("same"):
-                print(f"dashboard: the stick's catalog mirror: {_r.get('error') or 'imported, ' + str(_r.get('packs')) + ' entries'}", flush=True)
-        except Exception as e:                            # noqa: BLE001 (a start must not fail on this)
-            print(f"dashboard: the stick's catalog mirror was not imported: {e}", flush=True)
 import backup                                                    # noqa: E402
 # Moving this controller to another home (R90 step 12, move.py): the bundle
 # and its token, the nodes told, the knock answered once restored here.
 # The file explorer (R224, fileexplorer.py): a machine's roots through its agent.
 import fileexplorer                                              # noqa: E402
-fileexplorer.configure(node=lambda nid: nodes.node(nid), host=lambda nid: nodes.route_host(nid), key=lambda nid: nodes.screen_key(nid),
-                       audit=lambda who, what, detail, params: db.audit(who, what, detail, params),
-                       connect=lambda *a, **k: termws.relaytls().connect(*a, **k),
-                       subject=lambda what, nonce: termws.relaytls().subject(what, nonce))
 import move                                                      # noqa: E402
-move.checkpoint = db.checkpoint
-move.unseal = signing.unseal
-move.install_landed_key = lambda key, state_dir: installkey.landed(key, state_dir)
-move.configure(state=STATE, workspace=WORKSPACE, secrets_dir=os.environ.get("BB_SECRETS_DIR", ""), write_json_fn=write_json,
-               seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=stateversion.current,
-               build_version_fn=lambda: image_stamp().get("version") or "",
-               install_key_fn=lambda: signing.MASTER or b"", store_paths_fn=lambda: {k: str(paths.of(k)) for k in paths.KINDS},
-               page_url_fn=_page_url, node_ids_fn=lambda: [n["id"] for n in nodes.node_list() if n.get("kind") == "agent" and n.get("state") != "retired"],
-               bare_metal_fn=lambda: BARE_METAL,
-               node_name_fn=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
-               audit_fn=lambda who, what, detail: db.audit(who, what, "", detail))
 
 
 def _move_loop():
@@ -6272,17 +5368,6 @@ def _backup_dirs():
     return _own_pool_mounts() + other
 
 
-# The configuration backed up onto the machine's pools and found again at a
-# first run (R161 step 4, backup.py): the move's bundle under a password's key.
-backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
-                 password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_backup_dirs,
-                 version_fn=lambda: image_stamp().get("version") or "", state_version_fn=stateversion.current, write_json_fn=write_json,
-                 host_fn=lambda: socket.gethostname())
-nodes.move_for_node = move.for_node
-nodes.move_here = move.node_here
-nodes.move_armed = move.armed
-
-
 # The id this machine's system pool is marked with (B939), in the state so a
 # backup or a move carries it: a stick that died is restored onto a new one,
 # whose own id differs, and the old pool is this controller's all the same.
@@ -6302,9 +5387,6 @@ def _install_id_seen(iid):
             os.replace(p.with_name("install-id.new"), p)
 
 
-nodes.install_id_seen = _install_id_seen
-
-
 def _place_deploy_keys(folder):
     """A moved controller's deploy keys kept by the root helper, which alone
     writes where this home keeps its own (B966): what to say of it."""
@@ -6318,30 +5400,9 @@ def _place_deploy_keys(folder):
             f"; {loaded} loaded now, the rest at the controller's next start (Restart under Controller settings)"))
 
 
-move.place_deploy_keys = _place_deploy_keys
-nodes.install_id_kept = _install_id_kept
-# ...a node enrolled at the home tunnel's public hostname kept on it, with no
-# pin (the hostname's certificate is the tunnel's): the tunnel's settings
-# came with the bundle, so the hostname reaches this controller now. Any
-# other node keeps the address it knocked at, which reached this controller,
-# and pins the certificate it met there (B936): the page's public name may
-# be the tunnel's, whose edge never serves this controller's certificate.
-move.tunnel_host = lambda nid: nodes.tunnel_host(nodes.node(nid) or {})
-channel.moved_answer = lambda nid: ({"answer": move.answer_for(nid), "url": move.node_url(nid, ""), "pin": ""} if move.tunnel_host(nid)
-                                    else {"answer": move.answer_for(nid), "url": "", "pin": ""})
-apps.configure(state=STATE, version=lambda: image_stamp().get("version") or "",
-               setting=settings.get, write_json=write_json, audit=db.audit,
-               container=lambda: not BARE_METAL, registry_digest=imagecheck.remote_digest)
-apps.unvetted_ok = channel.unvetted_ok      # the Windows companion and the VS Code extension are dev features
-devices.configure_apps(apps)
-
 # A person's PC lent to a project (R270 step 6): the companion lends a
 # table of verbs, a session asks with aerie pc under Agents may: Use a lent PC.
 import pcwork                                                    # noqa: E402
-pcwork.configure(workspace=WORKSPACE, mode_fn=lambda p: (prefs.get(p) or {}).get("pc") or "deny",
-                 notify_fn=lambda uid, text, level: notices.act(uid, {"action": "add", "text": text,
-                                                                      "level": level, "kind": "said"}))
-devices.configure_pc(pcwork)
 
 
 # ---- revisions -------------------------------------------------------------
@@ -6462,13 +5523,13 @@ def _revisions(who=None, projects=None):
         "emulator": str(emulator._choices["reads"]),
         # Node and job data never joins the status payload (docs/nodes.md
         # §13): the views that show it watch this and fetch their own.
-        "nodes": 0 if NODES_OK else nodes.rev(),
+        "nodes": 0 if NODES_DOWN else nodes.rev(),
         # ...and a heartbeat's numbers alone, which the Nodes page draws and
         # nothing else does (R218 step 10).
-        "nodes.sample": 0 if NODES_OK else nodes.sample_rev(),
+        "nodes.sample": 0 if NODES_DOWN else nodes.sample_rev(),
         # ...and a node's containers changing by themselves or by a shell:
         # the Containers page re-reads on it.
-        "containers": 0 if NODES_OK else nodes.ctr_rev(),
+        "containers": 0 if NODES_DOWN else nodes.ctr_rev(),
         # The chat between accounts, bumped on every message (R218 step 10):
         # an open chat re-reads on it rather than every four seconds.
         "chat": chat.rev(),
@@ -6487,7 +5548,7 @@ def _revisions(who=None, projects=None):
         # A release's APK being looked for and signed (R106): the Signing
         # view follows a look to its end, and the bell's row goes with it.
         "releasesign": releasesign.rev(),
-        "jobs": 0 if NODES_OK else nodes.jobs_rev(),
+        "jobs": 0 if NODES_DOWN else nodes.jobs_rev(),
         # Who has a session where, and whether it is working: the project
         # rows fetch /api/live when this moves.
         "live": projsessions.live_token(),
@@ -6638,7 +5699,7 @@ def _snapshot(who):
         "bell_hidden": bell_hidden,
         # Claude Code per node against the latest known, for the Nodes
         # tab's section.
-        "claude_code": _tpart("status:claude_code", lambda: {} if NODES_OK else _claude_code_for(who, ps)),
+        "claude_code": _tpart("status:claude_code", lambda: {} if NODES_DOWN else _claude_code_for(who, ps)),
 
         # Whether there is a daemon behind any of the Docker controls, and if
         # not, the sentence saying why. Memoised in devapp, because answering
@@ -6762,7 +5823,7 @@ def _snapshot(who):
         # action (roadmap #27).
         # Whether any node has what the Emulator tab needs, and why not: the
         # Tools card ghosts its button on this.
-        "emulator": {"ready": False, "why": "the node store did not open"} if NODES_OK
+        "emulator": {"ready": False, "why": "the node store did not open"} if NODES_DOWN
                     else emulator.ready(),
         "can": {name: not users.may(who, name) for name in
                 ("terminal", "terminal-any", "docker-write", "vms-write", "deploy", "toolchains-write", "curate", "configure", "git-auth", "admin",
@@ -7282,7 +6343,6 @@ def route_gate(name, me, action=None):
     return ""
 
 
-
 # The mark a Finish of the setup leaves under the state, never taken off: a
 # move lands only on a controller never finished (Handler._move_land), and
 # the setup_done setting alone could be turned back (B720).
@@ -7633,7 +6693,7 @@ class Handler(BaseHTTPRequestHandler):
         """The reply of every route that needs the node store when it did
         not open: one sentence with the reason, and 500. Twelve handlers
         each worded it, one of them with a 200."""
-        return self._json({"error": "the node store did not open: " + NODES_OK}, 500)
+        return self._json({"error": "the node store did not open: " + NODES_DOWN}, 500)
 
     def _result(self, r, bad=400):
         """A module's {ok} or {error} answer as the reply: `bad` when it
@@ -9286,10 +8346,10 @@ class Handler(BaseHTTPRequestHandler):
         (nodes.tunnel_refuses, R161): by the socket's own address, and
         through a tunnel from home (R170) by the hostname the node was
         enrolled at, or an edge's own headers, which only narrow their writer."""
-        if NODES_OK:
+        if NODES_DOWN:
             return False
         host = self.headers.get("Host", "")
-        own = settings.get("tunnel_host") if not NODES_OK else ""
+        own = settings.get("tunnel_host") if not NODES_DOWN else ""
         peer = self.client_address[0] if self.client_address else ""
         why = nodes.tunnel_refuses(peer, self.path.partition("?")[0], host=host,
                                    # Cloudflare's own mark on what came through the
@@ -9373,8 +8433,8 @@ class Handler(BaseHTTPRequestHandler):
             # Open, like the agent door: a monitor asks this without the
             # operator's credential, and it says alive-and-the-store-answers
             # with two counts, nothing that names a machine (docs/nodes.md §9).
-            body, code = ((jobs.healthz() if not NODES_OK
-                           else ({"ok": False, "error": NODES_OK}, 503)))
+            body, code = ((jobs.healthz() if not NODES_DOWN
+                           else ({"ok": False, "error": NODES_DOWN}, 503)))
             return self._json(body, code)
         if not self._authed():
             return self._deny()
@@ -9387,8 +8447,8 @@ class Handler(BaseHTTPRequestHandler):
         if not path.startswith("/api/") and (self._who() or {}).get("session"):
             return self._json({"error": SESSION_NOT_THE_PAGE}, 403)
         if path == "/metrics":
-            if NODES_OK:
-                return self._json({"error": NODES_OK}, 503)
+            if NODES_DOWN:
+                return self._json({"error": NODES_DOWN}, 503)
             # Every node's figures: the Nodes page's, Nodes Read (R277, the
             # audit of 24 Nov: anybody signed in read them).
             if self._refused("nodes-read"):
@@ -9733,7 +8793,7 @@ class Handler(BaseHTTPRequestHandler):
         # it was built (R131): what aerie status says beside the controller's.
         agent = {}
         nid = self._q().get("node", [""])[0]
-        if nid and (self._who() or {}).get("session") and not NODES_OK:
+        if nid and (self._who() or {}).get("session") and not NODES_DOWN:
             ag = (nodes.node(nid) or {}).get("agent") or {}
             agent = {"version": str(ag.get("version") or ""), "built": str(ag.get("built") or "")}
         return self._json({"api": APP_API, "version": image_stamp().get("version") or "",
@@ -9823,7 +8883,7 @@ class Handler(BaseHTTPRequestHandler):
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why:
             return self._json({"error": why, "toolchains": []})
-        if nid and nid != "local" and not NODES_OK:
+        if nid and nid != "local" and not NODES_DOWN:
             return self._json(toolchains.payload_for_node(nid))
         return self._json(toolchains.payload())
 
@@ -9836,7 +8896,7 @@ class Handler(BaseHTTPRequestHandler):
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why or not nid or nid == "local":
             return self._json({"error": why or "which node?", "rows": []})
-        n = nodes.node(nid) if not NODES_OK else None
+        n = nodes.node(nid) if not NODES_DOWN else None
         if not n:
             return self._json({"error": "no such node", "rows": []}, 404)
         out = {"node": nid, "name": n.get("name") or nid, "live": bool(n.get("live")), "rows": agentcode.rows(n)}
@@ -9859,7 +8919,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_emulator(self):
         """GET /api/emulator?node=ID: that node's system images, what could be
         added, and the image job there. The same node scope as Toolchains."""
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0])
@@ -9979,13 +9039,13 @@ class Handler(BaseHTTPRequestHandler):
                            # a node area, each runner (NODE_ID/SLOT) for the
                            # CI runner's.
                            "instance_areas": sorted(roles.INSTANCE_AREAS),
-                           "nodes": [] if NODES_OK or not can["admin"] else
+                           "nodes": [] if NODES_DOWN or not can["admin"] else
                            [{"id": n["id"], "name": n["name"]} for n in nodes.node_list()
                             if n.get("kind") != "local" and n.get("state") != "retired"],
                            # ...and each cluster for Clusters (R281).
                            "clusters": [] if not can["admin"] else
                            [{"id": c["id"], "name": c["name"]} for c in clusters.listing()["clusters"]],
-                           "runners": [] if NODES_OK or not can["admin"] else
+                           "runners": [] if NODES_DOWN or not can["admin"] else
                            # Named by what it serves: its registered name is
                            # its node's, which the line already says.
                            [{"id": f"{r['id']}/{r['slot']}", "node": r["node"],
@@ -9998,7 +9058,7 @@ class Handler(BaseHTTPRequestHandler):
         # The versioned surface starts here (docs/nodes.md §3): new
         # endpoints land under /api/v1 with their shapes written down;
         # the unversioned paths above migrate later, never both at once.
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         # Without Nodes Read the tab is not offered (R152 step 3), and this
         # answers with the nodes of the person's own projects alone, which a
@@ -10023,7 +9083,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         if users.may(me, "admin"):
             return self._json({"error": "an administrator downloads these, in a browser"}, 403)
-        own = nodes.node(_own_node_id() or "") if BARE_METAL and not NODES_OK else None
+        own = nodes.node(_own_node_id() or "") if BARE_METAL and not NODES_DOWN else None
         if not own:
             return self._json({"error": "the old system's containers are read on the controller's own machine (a bare-metal install)"}, 404)
         got = adoptapps.export_zip(firstboot.kept_config(), (own.get("reported") or {}).get("adopted") or {})
@@ -10039,7 +9099,7 @@ class Handler(BaseHTTPRequestHandler):
         that reads the Nodes area."""
         me = self._who()
         rows, names = [], {}
-        if not NODES_OK:
+        if not NODES_DOWN:
             mine = None if users.may(me, "admin") == "" \
                 else set(project_names(me))
             if mine is not None and self._area_read_why("jobs"):
@@ -10047,7 +9107,7 @@ class Handler(BaseHTTPRequestHandler):
             with timing.timed("home:jobs"):
                 got, _ = nodes.jobs_view("", {"n": ["500"]}, mine, hidden=self._jobs_hidden())
             rows, names = got.get("jobs") or [], got.get("nodes") or {}
-        machines = not NODES_OK and not self._area_read_why("nodes")
+        machines = not NODES_DOWN and not self._area_read_why("nodes")
         light = self._q().get("light", [""])[0] == "1"
         with timing.timed("home:read"):
             got = home.read(rows, names, machines, light)
@@ -10067,7 +9127,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/v1/jobs: nodes.jobs_view, narrowed to the projects this
         account may see unless it administers. A list's rows carry each
         job's spec cut to what names it; ?id= answers one job whole."""
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         q = self._q()
         mine, system = self._jobs_scope()
@@ -10837,7 +9897,7 @@ class Handler(BaseHTTPRequestHandler):
         # a new row shape. (Bug #16's caveat still applies, narrowed: anything
         # holding an account's credential writes as that account, because the
         # server cannot tell the person from the session they started.)
-        if not NODES_OK and not _quiet_post(path, req):
+        if not NODES_DOWN and not _quiet_post(path, req):
             act = path + (":" + str(req["action"])[:40]
                           if isinstance(req.get("action"), str) else "")
             db.audit(self._principal(), act,
@@ -11033,7 +10093,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         # A hosting-only node holds no project: its code and its sessions are
         # what the flag keeps off it (nodes.host_only).
-        if ("node" in req or "nodes" in req) and not NODES_OK:
+        if ("node" in req or "nodes" in req) and not NODES_DOWN:
             want = (req.get("nodes") if isinstance(req.get("nodes"), list) else []) + [req.get("node") or ""]
             host = [(nodes.node(n) or {}).get("name") or n for n in want if n and nodes.host_only(n)]
             if host:
@@ -11052,7 +10112,7 @@ class Handler(BaseHTTPRequestHandler):
         if req.get("hosts") is not None and prefs.hosts_changed(name, req.get("hosts")):
             if self._refused_nodes(req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")):
                 return
-            if not NODES_OK:
+            if not NODES_DOWN:
                 got = req.get("hosts") if isinstance(req.get("hosts"), list) else str(req.get("hosts")).split(",")
                 bad = [(nodes.node(n) or {}).get("name") or n for n in got
                        if str(n).strip() and not nodes.host_only(str(n).strip())]
@@ -11084,7 +10144,7 @@ class Handler(BaseHTTPRequestHandler):
         # The node's own address is not one this opens: a session's traffic
         # to its own node is judged on the way in, where only the controller
         # and the resolvers pass, and its containers are reached as its own.
-        if reach and not NODES_OK:
+        if reach and not NODES_DOWN:
             ids = req.get("nodes") if isinstance(req.get("nodes"), list) else (prefs.get(name) or {}).get("nodes") or []
             addr_of = {n: str(((nodes.node(n) or {}).get("agent") or {}).get("addr") or "") for n in ids}
             got = req.get("reaches") if isinstance(req.get("reaches"), list) else str(req.get("reaches")).split(",")
@@ -11147,7 +10207,7 @@ class Handler(BaseHTTPRequestHandler):
             net_nudge()
         # A synced node that now holds this project (or stops) hears it at
         # once, so its first copy starts and the Claude button follows it.
-        if held and not got[0].get("error") and not NODES_OK:
+        if held and not got[0].get("error") and not NODES_DOWN:
             wssync.held_changed()
         return self._json(*got)
 
@@ -11161,11 +10221,11 @@ class Handler(BaseHTTPRequestHandler):
         a new one to it on every runner. A runner is a person's to change,
         as the node verbs it used to be gated with are."""
         me, act, nid = self._who() or {}, field(req, "action"), field(req, "id")
-        nname = ((nodes.node(nid) or {}).get("name") or nid) if nid and not NODES_OK else nid
+        nname = ((nodes.node(nid) or {}).get("name") or nid) if nid and not NODES_DOWN else nid
         if act in ("runner", "runner-token", "runner-forget"):
             slot = (nodes.runner_slot(field(req, "url").strip()) if act == "runner-token"
                     else re.sub(r"[^a-z0-9.-]", "", field(req, "slot"))[:60])
-            have = {r["slot"] for r in runners.listing() if r["id"] == nid} if not NODES_OK else set()
+            have = {r["slot"] for r in runners.listing() if r["id"] == nid} if not NODES_DOWN else set()
             why = users.may_instance(me, "runner", f"{nid}/{slot}" if slot in have else "", f"{slot} on {nname}")
         else:
             why = users.may_instance(me, "nodes-write", "" if act in ("add", "vm-xml") else nid, nname)
@@ -11173,10 +10233,10 @@ class Handler(BaseHTTPRequestHandler):
         # revokes and mints anew: asked of that node too (R277, the audit of
         # 24 Nov: asked of `id` alone, a role on one node re-enrolled another).
         if not why and act == "enroll" and (again := field(req, "node")):
-            why = users.may_instance(me, "nodes-write", again, ((nodes.node(again) or {}).get("name") or again) if not NODES_OK else again)
+            why = users.may_instance(me, "nodes-write", again, ((nodes.node(again) or {}).get("name") or again) if not NODES_DOWN else again)
         if why:
             return self._json({"error": why}, 403)
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         # The release check, now (R90 step 5): the newest published release
         # read again, for the Updates section's Check now.
@@ -11218,7 +10278,7 @@ class Handler(BaseHTTPRequestHandler):
         is ended; a running one is flagged and its runner told, and the row
         moves when the runner reports that it stopped, which is when it
         did."""
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         act = field(req, "action")
         if act in ("run", "emu"):
@@ -11471,7 +10531,7 @@ class Handler(BaseHTTPRequestHandler):
         verb means. What stays here is the HTTP: the node's token from the
         Authorization header, a file streamed, a body read, and the
         long-poll's empty answer."""
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         verb = self.path.split("?")[0][len("/api/v1/agent/"):]
         hdr = self.headers.get("Authorization", "")
@@ -11552,7 +10612,7 @@ class Handler(BaseHTTPRequestHandler):
         means): its token from the Authorization header, or for sign-in the
         person's name and password once, which mints that token. What stays
         here is the HTTP, as for the agent's door."""
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         verb = self.path.split("?")[0][len("/api/v1/device/"):]
         q = self._q()
@@ -12080,7 +11140,7 @@ class Handler(BaseHTTPRequestHandler):
         # built on the project's own node and shipped, and the project's
         # sessions are the ones meant to rebuild it.
         # A node named by its name (aerie devapp new --node NAME) is its id here.
-        if act == "new" and req.get("node") and not NODES_OK and not nodes.node(str(req["node"])):
+        if act == "new" and req.get("node") and not NODES_DOWN and not nodes.node(str(req["node"])):
             hit = [n for n in nodes.node_list() if n.get("name") == str(req["node"]) and n.get("state") != "retired"]
             if hit:
                 req["node"] = hit[0]["id"]
@@ -12716,7 +11776,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if self._not_project(name):
             return None
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         pr = prefs.get(name) or {}
         mine = [pr.get("node")] + list(pr.get("nodes") or []) if pr.get("node") else []
@@ -12989,7 +12049,7 @@ class Handler(BaseHTTPRequestHandler):
         nid = field(req, "node")
         limited = roles.nodes_for(me, "newprojects", "write")
         if limited is not None and nid not in limited:
-            names = [n["name"] for n in ([] if NODES_OK else nodes.node_list()) if n["id"] in limited] or limited
+            names = [n["name"] for n in ([] if NODES_DOWN else nodes.node_list()) if n["id"] in limited] or limited
             return self._json({"error": f"a space you make goes on {', '.join(names)}: pick "
                                         + ("that node" if len(names) == 1 else "one of those nodes")}, 403)
         # The token a person gives is kept in their own key store (the
@@ -13444,7 +12504,7 @@ class Handler(BaseHTTPRequestHandler):
             # those (toolchains.session_node).
             pf = prefs.get(sess) or {}
             return self._json(*toolchains.session_install(
-                sess, req, mine=[] if NODES_OK else [pf.get("node") or "", *(pf.get("nodes") or [])],
+                sess, req, mine=[] if NODES_DOWN else [pf.get("node") or "", *(pf.get("nodes") or [])],
                 uid=me.get("seat") or "", mode=pf.get("installpacks") or "ask",
                 asker=me.get("name") or "", shown=roles.shown(sess)))
         if self._refused("curate"):
@@ -13499,7 +12559,7 @@ class Handler(BaseHTTPRequestHandler):
         string this server handed out."""
         if self._refused("toolchains-write"):
             return
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         action, nid = req.get("action"), field(req, "node")
         # ...on that node (R260): a role holding Toolchains on named nodes.
@@ -13549,7 +12609,7 @@ class Handler(BaseHTTPRequestHandler):
         proves, by the same derivation the phone's ask uses, for the same
         reason.
         """
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         who = self._who() or {}
         proj = who.get("session") or field(req, "project")
@@ -13750,7 +12810,7 @@ class Handler(BaseHTTPRequestHandler):
         ns = [{"id": n["id"], "name": "the controller" if n.get("kind") == "local" else n["name"],
                "sandbox": bool((n.get("reported") or {}).get("sandbox")), "state": n.get("state", ""),
                "controller": n.get("kind") == "local"}
-              for n in (nodes.node_list() if not NODES_OK else []) if n.get("kind") in ("agent", "local")]
+              for n in (nodes.node_list() if not NODES_DOWN else []) if n.get("kind") in ("agent", "local")]
         return self._json({"schedules": rows, "nodes": ns, "may": not users.may(who, "schedules")})
 
     def _schedules(self, req):
@@ -14151,7 +13211,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         mine = {r.get("uid") for r in reach.at_rest() if r.get("uid")}
         mine |= {uid for uid in accountkeys._load() if accountkeys.forges_of(uid)}
-        for n in nodes.node_list(all=True) if not NODES_OK else []:
+        for n in nodes.node_list(all=True) if not NODES_DOWN else []:
             mine |= set((((n.get("reported") or {}).get("tokseal") or {}).get("sealed") or {}))
         return self._json(connections.listing() | {"people": len(mine)})
 
@@ -14240,7 +13300,7 @@ class Handler(BaseHTTPRequestHandler):
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why:
             return self._json({"error": why, "rows": []})
-        on_node = bool(nid) and nid != "local" and not NODES_OK
+        on_node = bool(nid) and nid != "local" and not NODES_DOWN
         tc = toolchains.payload_for_node(nid) if on_node else toolchains.payload()
         n = nodes.node(nid) if on_node else None
         may_install = not users.may(who, "toolchains-write")
@@ -14251,7 +13311,7 @@ class Handler(BaseHTTPRequestHandler):
             _catalog_apps_refresh(cat["index"])
         # A newer install recipe the catalog pins for a coding agent is read
         # now, behind the page, so a press on Update finds it (R169 step 13).
-        if may_install and not NODES_OK:
+        if may_install and not NODES_DOWN:
             agentcode.warm()
         # An app's row opens on its compose file (step 2), so it rides along.
         napps = [{**a, "compose": nasapps._all().get(a["id"], {}).get("compose", "")} for a in nasapps.catalog()] if may_apps else []
@@ -14466,7 +13526,7 @@ class Handler(BaseHTTPRequestHandler):
         # lists its places.
         q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0]) if q.get("node") else ("", "")
-        n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_OK else None
+        n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_DOWN else None
         roots = [r for r in fileexplorer.roots(n) if nasapps.PATH_RE.fullmatch(r["path"])] if n else []
         # ...and the model routers a router field can be given a key at (R238
         # step 7), and the names and the node's ports the containers already
@@ -14543,7 +13603,7 @@ class Handler(BaseHTTPRequestHandler):
         the account sees the project and as one line otherwise. Never a
         session's: a session reads its node with aerie node busy."""
         who = self._who() or {}
-        if NODES_OK:
+        if NODES_DOWN:
             return self._nodes_down()
         payload, status = storage.view(nodes.node_list(), who, is_admin=users.is_admin,
                                        nodes_for=roles.nodes_for, may_see=users.may_see,
@@ -16082,9 +15142,955 @@ def _cov_start():
     atexit.register(_cov_write)
 
 
+def give(module, **parts):
+    """Hand `module` what it reads from the rest of the program, by name.
+    Each name is one the module already holds a place for, so a misspelt
+    one stops the start here and never becomes a global nobody reads."""
+    unknown = sorted(k for k in parts if not hasattr(module, k))
+    if unknown:
+        raise TypeError(f"{module.__name__} takes nothing called {', '.join(unknown)}")
+    for name, value in parts.items():
+        setattr(module, name, value)
+
+
+# What wire() sets and the handlers read; nothing reads one before main()
+# has called wire().
+_SERVER_LOCK = None     # the open file whose lock makes this the one server on its state
+SECRET = b""            # the key the session cookie is signed with
+NODES_DOWN = ""         # why the node store did not open; empty when it did
+
+
+def wire():
+    """Everything this program does to become a running controller, in
+    the order it has to happen: the one-server lock, the state gate and
+    its migrations, each module handed what it needs, the stores opened
+    and the leftovers of the last run cleared. main() calls it first;
+    importing this file runs none of it."""
+    global _SERVER_LOCK, SECRET, NODES_DOWN
+    # The one server on this state, held for the process's life.
+    _SERVER_LOCK = _one_server(STATE)
+    # ...and says who it is, beside the lock: the supervisor asks whether the
+    # dashboard runs and which process to stop by this pid (scripts/lib/
+    # supervise.sh), where it looked for this file's name on any command line.
+    with contextlib.suppress(OSError):
+        (STATE / ".server.pid.new").write_text(f"{os.getpid()}\n")
+        os.replace(STATE / ".server.pid.new", STATE / ".server.pid")
+    # Before anything below writes to it: a /config newer than this build, or
+    # older than it migrates from, is refused here in one sentence, a fresh one
+    # is stamped, and one about to migrate is copied first (stateversion.py).
+    stateversion.gate(STATE)
+    SECRET = _session_secret()
+    layout.configure(state=STATE, write_json=write_json, lock=_state_lock)
+    bellseen.configure(state=STATE, write_json=write_json)
+    notices.configure(state=STATE, write_json=write_json)
+    schedules.configure(state=STATE, write_json=write_json)
+    # `aerie toolchains install|update|remove` refuses when CLAUDECODE is set, and the
+    # message it prints tells the session to ask the operator to use this page.
+    # So this page must never carry that variable, and it can: `aerie dashboard dev`
+    # is normally run *by* a session, and the server it starts inherits whatever
+    # that session had. One line here, rather than trusting every launcher to
+    # remember, because the failure looks like the dashboard refusing to obey the
+    # operator and quoting its own name as the workaround.
+    os.environ.pop("CLAUDECODE", None)
+    os.environ.pop("BB_AGENT", None)     # ...and any coding agent's mark (R95)
+    toolchains.configure(run=run, write_json=write_json, state=STATE,
+                         project_nodes=lambda: {p: (pr.get("node") or "") for p, pr in prefs.all_projects().items()},
+                         workspace=WORKSPACE)
+    catalogindex.configure(state=STATE, write_json=write_json)
+    catalogrows.configure(state=STATE, write_json=write_json, audit=lambda *a: db.audit(*a))   # db is imported below
+    toolpacks.configure(state=STATE, write_json=write_json,
+                        unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
+    # The catalog's mirror (R169 step 6): its index when the catalog does not
+    # answer, and its bundles for the fetches of what it pins.
+    catalogmirror.configure(state=STATE, unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
+    give(catalogindex, mirror_index=catalogmirror.index)
+    give(toolpacks,
+         mirror_bundle=catalogmirror.bundle,
+         # This build's version, for a pack's works_with (R169 step 6).
+         running_version=lambda: image_stamp().get("version") or "")
+    # ...and for a catalog entry that says the lines it works with: one for
+    # another line is not listed.
+    give(library, fits=toolpacks.fits)
+    # A sideloaded pack's coding agent is offered where this install says so.
+    # (Asked for the first time before the settings are loaded, further down.)
+    give(toolpacks, sideload_agents=lambda: bool("settings" in globals() and settings.get("sideload_agents")))
+    give(toolchains, packs_rows=toolpacks.recipes)
+    toolchains.refresh_packs()
+    notify.configure(run=run,
+                     # A session on a node: found by the name the page uses,
+                     # told through its agent (roadmap #24). Resolved at call
+                     # time: the nodes module is imported further down.
+                     on_node=lambda s: next((x for x in node_tmux_sessions() if x["name"] == s), None),
+                     node_tell=lambda *a, **k: nodes.tell_wait(*a, **k))
+    users.configure(state=STATE, write_json=write_json)
+    chat.configure(state=STATE, write_json=write_json)
+    # Notes of the moment, written on every edit a session makes: not waited
+    # onto the disk (statefile.write_json's sync).
+    overlap.configure(state=STATE, workspace=WORKSPACE, write_json=lambda p, d: write_json(p, d, sync=False))
+    plugins.configure(state=STATE, write_json=write_json)
+    testreg.configure(write_json=write_json, state=STATE)
+    forges.configure(run=run, state=STATE, write_json=write_json)
+    rules.configure(write_json=write_json, state=STATE, actor=writer_name)
+    codebase.configure(workspace=WORKSPACE)
+    # The three stores above configure this one too; done here as well so the
+    # endpoint works even if none of them has been touched yet this process.
+    pending.configure(write_json=write_json, state=STATE)
+    # The Settings tab's own store (roadmap R29): the knobs the operator sets from
+    # the page rather than the environment. The builder home is where the commit
+    # identity lands.
+    settings.configure(write_json=write_json, state=STATE)
+    give(settings, forget_runners=lambda: runners.reset())
+    # What may be offered: the catalogs gate their unvetted entries on this
+    # one switch (roadmap R54, step 6), read live so a save takes at once.
+    give(forges, unvetted_ok=lambda: bool(settings.get("offer_unvetted")))
+    bugs.configure(write_json=write_json, state=STATE, tell=notify.tell,
+                   tmux_name=tmux_name, workspace=WORKSPACE, actor=writer_name,
+                   releases=lambda p: roadmap.releases(p),
+                   changelog_refs=lambda p, k, linked=None, commits=None: roadmap.changelog_refs(p, k, linked, commits),
+                   changelog_lines=lambda p: roadmap.unreleased_lines(p))
+    findings.configure(write_json=write_json, state=STATE, workspace=WORKSPACE)
+    phone.configure(write_json=write_json, state=STATE, workspace=WORKSPACE)
+    artifacts.configure(workspace=WORKSPACE, worktrees=WORKTREES, state=STATE, write_json=write_json)
+    # This process is hardened before any key is loaded: no core dump, not
+    # dumpable, its memory kept from swap where the limit lets it.
+    hardening.apply()
+    signing.configure(state=STATE, project_name=PROJECT_NAME)
+    # Keys kept open before the install had an install key, sealed now that it
+    # has one (R111 step 2); a key that cannot be opened is left as it is and
+    # said on its project's Signing view.
+    try:
+        if (_sealed := signing.seal_all()):
+            print(f"dashboard: sealed {_sealed} signing key(s) under the install's key", flush=True)
+    except OSError as e:
+        print(f"dashboard: signing keys left as they were, not sealed: {e}", flush=True)
+    gitcreds.configure(state=STATE, seal_fn=signing.seal, unseal_fn=signing.unseal,
+                       sealing_fn=lambda: signing.MASTER is not None)
+    tls.configure(state=STATE, seal_fn=signing.seal, unseal_fn=signing.unseal,
+                  sealing_fn=lambda: signing.MASTER is not None)
+    csp.configure(state=STATE)
+    sessionsasked.configure(state=STATE, write_json_fn=write_json)
+    try:
+        if (_sealed := gitcreds.seal_all()):
+            print(f"dashboard: sealed {_sealed} git token(s) under the install's key", flush=True)
+    except OSError as e:
+        print(f"dashboard: git tokens left as they were, not sealed: {e}", flush=True)
+    # ...and the settings' secrets, the tunnel's and Cloudflare's tokens (R135).
+    give(settings, seal=signing.seal, unseal=signing.unseal, sealing=lambda: signing.MASTER is not None)
+    try:
+        if (_sealed := settings.seal_all()):
+            print(f"dashboard: sealed {_sealed} setting(s) under the install's key", flush=True)
+    except OSError as e:
+        print(f"dashboard: settings' secrets left as they were, not sealed: {e}", flush=True)
+    membership.configure(state=STATE, write_json=write_json)
+    roles.configure(state=STATE, write_json=write_json)
+    registry.configure(state=STATE, workspace=WORKSPACE, write_json=write_json)
+    repos.configure(state=STATE, write_json=write_json, registry=registry, workspace=WORKSPACE)
+    gitview.configure(workspace=WORKSPACE,
+                      worktrees=WORKTREES,
+                      tell=notify.tell, tmux_name=tmux_name, state=STATE,
+                      accounts=account_names,
+                      owner_uid=lambda: users.uid_of(users.get(users.owner_name() or "")),
+                      working=claude_working, owner_name=users.owner_name,
+                      session_open=owner_session_open, sessions=sessions_anywhere,
+                      git_env=lambda me, name: {k: v for k, v in {**projects._git_env(),
+                                                                  **users.git_env(me, name)}.items()
+                                                if k != "DASHBOARD_AUTH"},
+                      may_push=projects.may_push, exclude=mapping.exclude,
+                      audit=lambda *row: None if NODES_DOWN else db.audit(*row),
+                      host_of=forges.host_label, ci_of=lambda n: ciwatch.read(n),
+                      ci_fix=lambda n, where: ciwatch.fix(n, where))
+    paths.configure(state=STATE, workspace=WORKSPACE)
+    workspace.configure(workspace=WORKSPACE, state=STATE)
+    give(workspace,
+         packs_json=toolpacks.catalog_json,
+         toolchains_json=catalogrows.text)
+    # The coding agents installed packs bring, beside the table's (R169 step 9).
+    give(agents, pack_source=toolpacks.offered_agents)
+    give(workspace, packs_files=toolpacks.hosted_files)
+    memory.configure(run=run, workspace=WORKSPACE,
+                     claude_projects=CLAUDE_PROJECTS, tmux_name=tmux_name,
+                     write_json=write_json, state=STATE)
+    memory.configure_log(write_json=write_json, state=STATE, actor=writer_name)
+    roadmap.configure(write_json=write_json, state=STATE, tell=notify.tell,
+                   tmux_name=tmux_name, settle=notify.settle, actor=writer_name)
+    roadmap.configure_verbs(bugs_mod=bugs)
+    # A memory edit marks the list's unsaved flag, and presence names the others
+    # and says when a session last read the list; both are the roadmap's.
+    give(memory, mark_unsaved=roadmap.mark_unsaved)
+    give(chat, users=users)
+    give(presence,
+         account_names=lambda: {u.get("uid"): n for n, u in users.load()["users"].items()
+                                if u.get("uid")},
+         readers=roadmap.readers)
+    preamble.configure(rules_mod=rules, roadmap_mod=roadmap, bugs_mod=bugs, live=live_block)
+    # ...and a project of several repositories' (R136): its name, id and
+    # repositories, for the part that briefs a session on all of them.
+    # Only one of several: since R138 every repository is in a project, and one
+    # alone was told it was "a project of 1 repositories".
+    give(preamble,
+         repos_fn=lambda p: ((registry.label(k), registry.pid(k), [(m, registry.label(m)) for m in repos.members(k)])
+                             if (k := repos.project_of(p)) and len(repos.members(k)) > 1 else None),
+         project_fn=lambda p: (registry.label(k), registry.pid(k)) if (k := repos.project_of(p)) else None)
+    brief.configure(workspace=WORKSPACE, state=STATE, write_json=write_json)
+    design.configure(workspace=WORKSPACE, state=STATE, write_json=write_json)
+    wiki.configure(state=STATE, workspace=WORKSPACE, write_json=write_json,
+                   push_record_fn=lambda p: projects.load_push().get(p),
+                   token_helper_fn=projects.token_helper, parse_fn=forges.parse,
+                   config_fn=lambda d: gitrelay.config(d), env_fn=projects._git_env)
+    cilogs.configure(state=STATE, workspace=WORKSPACE, push_record_fn=lambda p: projects.load_push().get(p),
+                     config_fn=lambda d: gitrelay.config(d), parse_fn=forges.parse)
+    ciwatch.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
+                      projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
+                                              if d.is_dir() and not d.name.startswith(".")))
+    logs.configure(state=STATE, write_json=write_json)
+    give(logs,
+         diag_report=lambda: diag.report(),
+         audit=lambda *row: db.audit(*row),
+         conversation_text=lambda rid: reports.conversation(rid))
+    idle.configure(state=STATE, write_json=write_json,
+                   # A changed rule reaches every node on its next poll rather
+                   # than its next ten-minute hello.
+                   changed=lambda: [nodes.ask_hello(n["id"]) for n in nodes.node_list()
+                                    if n.get("kind") == "agent"])
+    # On boot, because that is when a generation was just rotated in and the oldest
+    # one fell off the end of the policy; then every hour (log_sweep_loop below).
+    logs.prune()
+    # Debug and dev options only on a controller started with DEBUG_MODE=1; at a
+    # start without it every one of them is put back off, so turning it on
+    # again starts from nothing granted (the operator, 12 Oct).
+    if not settings.debug_available():
+        try:
+            if settings.reset_debug() | bool(prefs.reset_debug()):
+                print("dashboard: DEBUG_MODE is not 1, so every debug and dev option was turned off", flush=True)
+        except Exception as e:                                # noqa: BLE001 (a start must not fail on this)
+            print(f"dashboard: debug options not reset: {e}", flush=True)
+    else:
+        try:
+            if settings.boot_channel():
+                print("dashboard: the boot asked for the dev channel: the dev switch is on and updates follow the pre-releases", flush=True)
+        except Exception as e:                                # noqa: BLE001
+            print(f"dashboard: the boot's channel not taken: {e}", flush=True)
+    # The briefing reads a project's own settings for its "While tests run"
+    # section (what a change asked for during a run does); prefs is imported
+    # after preamble is configured, so it is handed over here.
+    give(preamble,
+         prefs_mod=prefs,
+         # A project with no repository (R208): its briefing says so, its parts
+         # that need a notebook are left out, and its guard refuses git.
+         work_of=repos.is_work)
+    give(rules, work_of=repos.is_work)
+    give(preamble,
+         label_of=registry.label,
+         id_of=registry.pid,
+         packs_of=lambda: {n: {"label": (r.get("manifest") or {}).get("label") or n, "guidance": r.get("guidance") or ""}
+                           for n, r in toolpacks.packs().items()},
+         node_gpu=_project_node_gpu)
+    prefs.configure(write_json=write_json, state=STATE)
+    prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos, keys=registry.repos_keys)
+    give(users, home_of=repos.key_of)
+    give(roles, label_of=registry.label)
+    give(projects, key_of=repos.key_of)
+    give(roles, home_of=repos.key_of)
+    # Said again, now that prefs exists: users.git_identity resolves a per-project
+    # override of the commit author, and that override lives in prefs, which is
+    # configured after users because the login path must not depend on it.
+    users.configure(state=STATE, write_json=write_json, project_prefs=prefs.for_user,
+                    # The nodes of an account's projects: what a node grant's
+                    # scope "mine" means (R137 step 3).
+                    # Its list names projects (R138): each read through its
+                    # repositories, whose settings carry the project's node.
+                    nodes_of=lambda u: {n for p in (u.get("projects") or []) for r in (repos.members(p) or [p])
+                                        for n in prefs._nodes_of(prefs.get(r) or {})})
+    give(devapp, label_of=registry.label)
+    # ...and whether a port an app would publish answers on its node already,
+    # asked from here as the node's address (R238 step 3).
+    nasapps.configure(state=STATE, write_json=write_json, answers=lambda nid, port: _port_answers(nid, port))
+    termws.configure(agent_dir=nodes.AGENT_DIR)
+    tokenkeys.configure(agent_dir=nodes.AGENT_DIR)
+    # Each account's public key on a node, to seal its sign-ins with (R126).
+    give(nodes,
+         token_pubs=lambda nid: tokenkeys.pubs(nid, [u["uid"] for u in users.all_users() if u.get("uid")]),
+         token_stale=tokenkeys.under_previous,
+         can_seal=lambda: signing.MASTER is not None)
+    # The node data plane first, because devapp's job claim asks it which node
+    # work belongs to. Guarded: a database that will not open (a corrupt file, a
+    # full disk) must degrade to the dashboard this always was, not take down the
+    # page that is the operator's way to see what is wrong; nodes.py's readers
+    # and audit already no-op when it never came up.
+    try:
+        nodes.configure(state=STATE)
+        NODES_DOWN = ""
+    except Exception as e:                                    # noqa: BLE001
+        NODES_DOWN = str(e)
+        print(f"[dashboard] node store unavailable: {e}", flush=True)
+    # The registry answers hello; the catalog is toolchains.py's. Joined here
+    # rather than by one importing the other, which is the same seam every
+    # other module pair uses.
+    give(nodes,
+         layout_of=toolchains.layout_for_node,
+         # ...and the pin of this controller's own TLS key, which a hello names
+         # and an enrollment carries (R267 step 15).
+         tls_pin=tls.key_pin,
+         tls_reach=tls.node_reach,
+         # ...and a toolchain or image job pressed while another writes the
+         # store waits behind it rather than being refused.
+         store_gate=toolchains.store_gate,
+         # The accounts' SMB passwords and a share's names (R164 step 1).
+         smb_users=users.smb_users,
+         smb_resolve=users.smb_resolve)
+    # ...and who a share names, which is whose share password is kept (R243).
+    give(users, share_named=nodes.smb_named)
+    # ...and whether setup has ended, which closes a screen's open login
+    # (R194). A landing cut midway is not an end: its setting came with the
+    # bundle, and the way in is wanted most then.
+    give(nodes, setup_over=lambda: bool(users.owner_name() and settings.get("setup_done") and not move.cut_landing()))
+    # ...and the weeks-long record of the own machine's samples (R164 step 4).
+    history.configure(state=STATE)
+    give(nodes, history_add=history.add)
+    # ...and the other disks and shares it mounts (R162 step 4).
+    extmounts.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                        sealing=lambda: signing.MASTER is not None)
+    give(nodes, ext_mounts=extmounts.wanted)
+    # ...and the backups it copies (R162 step 5), the bell and Home reading their last runs.
+    storebackups.configure(state=STATE, write_json=write_json)
+    roothooks.configure(state=STATE)
+    give(nodes,
+         store_backups=storebackups.wanted,
+         backup_summary=lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or "")))
+    # ...and its encrypted pools' passphrases (R162 step 3), none in Safe mode.
+    poolkeys.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                       sealing=lambda: signing.MASTER is not None)
+    give(nodes,
+         pool_keys=lambda unlocked: poolkeys.wanted(unlocked, safe_mode=held.safe_mode()),
+         pool_keys_set=poolkeys.set_key,
+         pool_keys_offer=poolkeys.offer,
+         pool_keys_forget=poolkeys.forget)
+    if (_sealed := poolkeys.seal_all()):
+        print(f"dashboard: sealed {_sealed} pool passphrase(s) under the install's key", flush=True)
+    # What each added pack is configured with per node (R172): kept sealed,
+    # handed in the hello with the node's store root.
+    packconfig.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                         sealing=lambda: signing.MASTER is not None,
+                         # A person's own answers (R172 step 5), under their own key.
+                         account_key=lambda uid: accountkeys.key_of(uid), open_with=signing.open_with,
+                         store_root=lambda nid: (lambda st: (st.get("path") or "") + ("/" + st["scope"] if st.get("scope") else ""))(
+                             (((nodes.node(nid) or {}).get("reported") or {}).get("stores") or {}).get("toolchains") or {}))
+    give(nodes,
+         pack_config=lambda nid: packconfig.for_node(nid, toolpacks.configs()),
+         pack_people=lambda nid: packconfig.for_people(nid, toolpacks.configs()))
+    if (_sealed := extmounts.seal_all()):
+        print(f"dashboard: sealed {_sealed} share password(s) under the install's key", flush=True)
+    # ...and the digest of the bb bundle, so a node can tell from hello alone
+    # whether the bb its sessions run is the one this controller ships.
+    give(nodes,
+         bundle_digest=lambda: workspace.bundle()["digest"],
+         # ...and the list of the files a release ships in it, for the Nodes
+         # page's status: what this install holds, and whether its build signed it.
+         bundle_files=lambda: (lambda b: (b["files"], b["files_signed"]))(workspace.bundle()),
+         idle_minutes=idle.minutes,
+         session_tokens_for=session_tokens_for)
+    # A project born with a starting version commits it the way the
+    # Artifacts tab gives a first version (projects._init).
+    give(projects, first_version=lambda name, value, env: version.init(name, value, by="operator", env=env))
+    # Each session kept to its own project's network (R79): the setting is
+    # the node's, what each project owns there is devapp's.
+    # ...and the containers' (R178): whether each project's are kept apart
+    # here, and what each compose project may reach, whatever the sessions'
+    # switch says.
+    give(nodes,
+         session_net_for=lambda nid: (({"on": True, "own": router.with_peers(_with_vmnets(nid, devapp.session_net_own(nid)))}
+                                       if nodes.session_net_on(nid) else {"on": False, "own": {}})
+                                      # Containers kept apart on every node (R178); the agents
+                                      # read ctr_on, so it is still said.
+                                      | {"ctr_on": True, "ctr": devapp.container_net_own(nid),
+                                         # Whether this node's VMs may reach its LAN (R91 step 8).
+                                         "vm_lan": bool(((nodes.node(nid) or {}).get("config") or {}).get("vm_lan"))}),
+         # The job logs are the only copy of what a node's job wrote and had no
+         # retention at all until R17 step 1. Swept once here for whatever ended
+         # while this controller was down; a running one sweeps a project as its
+         # own jobs end, which is when it gains a log.
+         # The one log policy (the Logs section's days) reaches the job logs,
+         # and Clear reaches them too.
+         log_days=logs.days)
+    give(logs, clear_job_logs=nodes.clear_job_logs)
+    try:
+        _gone = nodes.prune_job_logs()
+        if _gone:
+            print(f"[dashboard] job logs: dropped {_gone} past the policy", flush=True)
+    except Exception as e:                                # noqa: BLE001
+        print(f"[dashboard] job log sweep skipped: {e}", flush=True)
+    runners.configure(run=run, nodes=None if NODES_DOWN else nodes)
+    if not NODES_DOWN:
+        jobs.configure(nodes_module=nodes)
+        give(toolchains, nodes=nodes, agentcode=agentcode)
+        give(emulator, nodes=nodes)
+        give(phone, nodes=nodes)       # every adb command is a job on a node
+        # A compose action the AGENT ran still has records to write here; this is
+        # where the module that queued it finishes it (roadmap #18).
+        nodes.on_done("compose", devactions.compose_done)
+        for _a in agentcode.tracked():
+            nodes.on_done(_a.update_job, agentcode.update_done)
+    # What Allow on a rebuild request actually starts (the Docker row's `ask`).
+    # Outside the block above: the ask has nothing to do with the node registry,
+    # and a controller without one still has projects whose containers run.
+    give(phone,
+         rebuilder=devactions.rebuild,
+         container_maker=containers.create_container,
+         container_free=containers.name_free,
+         container_builds=containers.build_refusal,
+         instance_maker=devactions.make_instance)
+    # What a renamed project is called now, for the name Send offers (R154).
+    give(devapp, label_of=registry.label)
+    give(phone,
+         env_writer=lambda project, text, instance: devapp.write_env(project, text, instance or devapp.MAIN),
+         ctl_runner=containers.ctl_on)
+    macros.configure(state=STATE, write_json=write_json, lock=_state_lock, run=run,
+                     tmux_sessions=tmux_sessions, tmux_base=tmux_base,
+                     session_tmux=lambda nid, ops: nodes.session_tmux(nid, ops))
+    give(phone,
+         remover=devactions.remove_instance,
+         # ...and what the tab's verbs and the asking need about who is asking
+         # (phone.verb): the projects an account sees, a project's node and its Run
+         # its container dial, a container held to its project's node (R79).
+         users=users,
+         project_names=lambda who: set(project_names(who)),
+         project_node=lambda p: prefs.get(p)["node"],
+         project_hosts=lambda p: prefs.get(p).get("hosts") or [],
+         dial=lambda p: prefs.get(p)["devbuild"],
+         on_project_node=devapp.on_project_node)
+    phonelease.configure(workspace=WORKSPACE, project_node_fn=lambda p: prefs.get(p)["node"],
+                         may_see_fn=users.may_see)
+    give(phone,
+         leasing=phonelease,
+         run_denied=devapp.RUN_DENIED,
+         net_nudge=net_nudge,
+         resolve_artifact=artifacts.resolve,
+         artifact_list=artifacts_of)
+    # ...and what the Artifacts tab's read composes (artifacts.tab_view).
+    give(artifacts,
+         listing_of=artifacts_of,
+         account_names=account_names,
+         build_state=build_state,
+         instance_states=devactions.row_states,
+         capture_days=lambda name: prefs.get(name)["capture_days"],
+         dev_keep=lambda name: prefs.get(name)["dev_keep"],
+         phone_summary=lambda name, uid: phone.summary(
+             prefs.get(name)["node"], uid,
+             nodes.node(prefs.get(name)["node"]) if prefs.get(name)["node"] and not NODES_DOWN else None))
+    # The settings dialog's save (prefs.dialog_save).
+    prefs.configure_dialog(WORKSPACE=WORKSPACE, pin_instances=devapp.pin_to_current_node,
+                           end_agents=end_agents, net_nudge=net_nudge)
+    mfa.configure(STATE=STATE, seal=signing.seal, unseal=signing.unseal,
+                  sealing=lambda: signing.MASTER is not None)
+    try:
+        if (_sealed := mfa.seal_all()):
+            print(f"dashboard: sealed {_sealed} authenticator secret(s) under the install's key", flush=True)
+    except OSError as e:
+        print(f"dashboard: authenticator secrets left as they were, not sealed: {e}", flush=True)
+    accountkeys.configure(state=STATE, nodes_under=lambda uid, k: tokenkeys.sealed_under(_node_seals(), k, uid))
+    # An unlock that gives up less (R158 step 5): a person's tokens opened per
+    # use for the window they pick, each use logged for them, and a store under
+    # a key of their own (R157) opened only while they have unlocked it.
+    unlocks.configure(state=STATE, key_under_install=accountkeys.key_under_install, open_entry=accountkeys.open_entry_with,
+                      entry_of=accountkeys._entry, own_of=accountkeys.own_of, set_for=accountkeys.set_unlock_for,
+                      live=logins.live, ts=tokenkeys.ts, wipe=hardening.wipe,
+                      run_dir=os.environ.get("BB_HANDOUT_DIR") or "")
+    unlocks.clear_all_handouts()
+    # Who is signed in now (R159): the rows the cookies name, and a device
+    # signed in as the account counts the same way.
+    logins.configure(state=STATE, days=SESSION_DAYS,
+                     devices_of=lambda uid: devices.listed({"uid": uid}))
+    reach.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                    sealing=lambda: signing.MASTER is not None,
+                    smtp_settings=lambda: _smtp_settings())
+    router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                     sealing=lambda: signing.MASTER is not None, node_list=nodes.node_list,
+                     node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
+                     node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
+                     project_names=lambda: list(prefs.all_projects(WORKSPACE)), job_add=nodes.job_add,
+                     job_get=lambda jid: nodes.job(jid, with_log=True),
+                     node_gpu=lambda nid: bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card")),
+                     container_gone=lambda name: not devapp.is_file_source(name))
+    connections.configure(state=STATE, write_json_fn=write_json, audit_fn=lambda by, verb, target, detail: db.audit(by, verb, target, detail))
+    connections.kind("setting", "Controller setting", "install", _conn_settings, _conn_setting_forget)
+    connections.kind("git", "Space's git token", "space", _conn_git, _conn_git_forget)
+    connections.kind("router", "Model router key", "shared", _conn_router, _conn_router_forget)
+    clusters.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                       sealing=lambda: signing.MASTER is not None, used=lambda cid: connections.used("cluster", cid),
+                       owner_of=kube.owner_of)
+    k3s.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=signing.unseal,
+                  sealing=lambda: signing.MASTER is not None, node_list=nodes.node_list,
+                  node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
+                  node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
+                  nginx_on=lambda nid: bool(nginxproxy.deployed(devapp, nid)), run_wait=nodes.run_wait, clusters=clusters)
+    kube.configure(state=STATE, write_json=write_json, clusters=clusters, space_id=registry.pid,
+                   space_of_id=lambda sid: registry.resolve(sid) if re.fullmatch(r"P\d+", str(sid or "")) else "")
+    deploys.configure(remote_url=lambda repo: gitview.remote_url(WORKSPACE / repo), key_of=repos.key_of,
+                      nodes_of=devapp.nodes_of, node=nodes.node, host_only=nodes.host_only, own_machine=nodes.own_machine,
+                      k3s_node_of=k3s.node_of_cluster, k3s_container=k3s.container_name, access=clusters.access,
+                      snapshot_at=workspace.snapshot_at, snapshot_path=workspace.path_for,
+                      token_line=lambda repo, uid: gitcreds.read_line(repo, uid, why="deploy") or "",
+                      job_add=nodes.job_add, job=nodes.job, tree=lambda repo: WORKSPACE / repo,
+                      compose_of=lambda repo: devapp.compose_file(repo), tools_of=toolchains.node_has)
+    give(workspace, own_git=gitview._own)
+    nodes.on_done("exec:deploy", deploys.done)
+    give(phone,
+         deployer=_session_deploy,
+         # A session's Discord apply a person allowed (R293): every change, the ones
+         # that ask a person included, since the person read each before Allow.
+         discorder=lambda project, text, principal, allowed_by: discord.apply(
+             repos.key_of(project), text, by=principal, allowed=True))
+    kubeview.configure(clusters=clusters)
+    connections.kind("cluster", "Kubernetes cluster", "shared",
+                     lambda: [{"ref": c["id"], "name": c["name"], "uses": f"deploys to {c['server']}", "sealed": True,
+                               "go": ["clusters", c["id"]]} for c in clusters.listing()["clusters"]],
+                     lambda ref, by: clusters.forget(ref))
+    discord.configure(state=STATE, write_json_fn=write_json, seal_fn=signing.seal, unseal_fn=signing.unseal,
+                      sealing_fn=lambda: signing.MASTER is not None,
+                      audit_fn=lambda who, verb, target, detail: db.audit(who, verb, target, detail),
+                      api=os.environ.get("BB_DISCORD_API") or None)
+    connections.kind("discord", "Discord server", "space",
+                     lambda: [{"ref": k, "name": f"{registry.label(k) or k}: {g}", "sealed": True,
+                               "uses": "builds out and changes the space's Discord server", "go": ["project", k]}
+                              for k, g in discord.spaces()],
+                     lambda ref, by: discord.forget(ref, by))
+    give(gitcreds,
+         on_added=lambda p: connections.added("git", p, by=_acting_name()),
+         on_gone=lambda p: connections.gone("git", p),
+         on_used=lambda p: connections.used("git", p))
+    # Every module that seals under the install key: one left out kept its
+    # secrets under the key before, and lost them when that went (B567).
+    installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
+                                 accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
+                                 poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all,
+                                 clusters.seal_all, k3s.seal_all, discord.seal_all),
+                         nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
+                         if signing.PREVIOUS else 0,
+                         again=STATE / "seal-again")
+    installkey.note_made()
+    installkey.settle()
+    # Every account's own key made at the start that can seal it, a fresh
+    # install's first and an upgraded one's first alike, rather than when it is
+    # first needed (the operator, 27 Oct); one added later has its own made then.
+    for _u in users.all_users():
+        if _u.get("uid"):
+            accountkeys.key_of(_u["uid"])
+    transcripts.configure(workspace=WORKSPACE,
+                          root_for=lambda uid: (Path(home_for(uid)) / ".claude" / "projects")
+                          if home_for(uid) else CLAUDE_PROJECTS,
+                          state=STATE, write_json=write_json)
+    profiletab.configure(users=users,
+                         claude_email=lambda uid: ", ".join(sorted(
+                             {v["email"] for v in claudegrant.nodes_of(home_for(uid)).values()}, key=str.lower)),
+                         agent_emails=lambda uid: claudegrant.emails_of(home_for(uid)),
+                         plugins_of=plugins.of,
+                         node_names=lambda: {n["id"]: n["name"]
+                                             for n in ([] if NODES_DOWN else nodes.node_list())},
+                         logs_of=lambda me: transcripts.mine(
+                             users.uid_of(me), project_names(me)),
+                         agent_rows=agents.rows,
+                         node_list=lambda: [] if NODES_DOWN else nodes.node_list(),
+                         agent_version=lambda n, aid: agentcode.installed(n, aid),
+                         signed_on=lambda uid, aid: claudegrant.nodes_of(home_for(uid), aid),
+                         signin_cannot=lambda n, aid: signin.cannot(n, aid))
+    devapp.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
+                     log_dir=logs.log_dir, field=field,
+                     node_for=nodes.node_for if not NODES_DOWN else None,
+                     # A hosting-only node has no docker address here: the controller
+                     # holds no key to a VPS, and every `docker compose config` and
+                     # data-directory mkdir addressed at it waited out a 30s ssh
+                     # timeout, twice per nginx Save on a hosting node, holding the server
+                     # with it (R85 step 1, the operator, 11 Oct). With no address
+                     # the config check runs the compose plugin here, which parses
+                     # without a daemon, and the directory is the agent's to make.
+                     node_addr=(lambda nid: "" if nodes.host_only(nid) else nodes.ssh_addr_of(nid)) if not NODES_DOWN else None,
+                     queue=nodes if not NODES_DOWN else None,
+                     runner=jobs if not NODES_DOWN else None,
+                     project_node=lambda p: prefs.get(p)["node"],
+                     project_nodes=lambda p: prefs.get(p)["nodes"],
+                     node_paths=nodes.node_paths if not NODES_DOWN else None,
+                     node_reported=(lambda nid: (nodes.node(nid) or {}).get("reported") or {}) if not NODES_DOWN else None)
+    # The layer on top of it: the compose runner is its, so it is the one that
+    # hands jobs.py the function.
+    devactions.configure(runner=jobs if not NODES_DOWN else None)
+    home.configure(nodes_mod=nodes, devapp_mod=devapp)
+    give(home, backups_summary=lambda rows: storebackups.summary(rows, schedules.scheduled_backups(_own_node_id() or "")))
+    give(devapp,
+         gpu_why=gpu_container_why,
+         room_why=lambda nid: nodes.room_short(nid, nodes.room_floor_for(nid)) if nid else "")
+    give(nodes, room_floor_gb=room_floor_gb)
+    # ...each node's own where its page sets one (R294 step 7).
+    give(devapp, container_mem_gb=lambda nid="": nodes.room_of(nid, "container_mem_gb", settings.get("container_mem_gb")))
+    # ...and what its request() needs about who is asking, and who hears.
+    give(devactions,
+         users=users,
+         ask_rebuild=phone.ask_rebuild,
+         say=chat.event,
+         net_nudge=net_nudge)
+    # ...and the Docker tab's container verbs (containers.py) the same.
+    give(containers,
+         dial=lambda p: prefs.get(p)["devbuild"],
+         users=users,
+         ask_rebuild=phone.ask_rebuild,
+         net_nudge=net_nudge,
+         ports_local=nodes.ports_local_on,
+         ctr_spark=nodes.ctr_spark)
+    # One nginx per node, from the nginx tab (R171): its records here, the
+    # container through containers.py, and the node's own view of its ports.
+    imagecheck.configure(state=STATE, write_json=write_json, devapp_module=devapp)
+    vms.configure(state=STATE, write_json=write_json, node=nodes.node, node_list=nodes.node_list,
+                  job_add=nodes.job_add, audit=db.audit, prefs_get=prefs.get, nodes_rev=nodes.rev,
+                  enroll_script=nodes.enroll_script,
+                  node_retire=lambda by, nid: nodes.node_state(by, nid, "retired"),
+                  node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail, job_get=nodes.job)
+    nodes.on_done("vm", vms.vm_done)
+    # ...run as an administrator's, since the asks go to the administrators
+    # alone and Allow is theirs (R116): a device passed through lands.
+    give(phone, vm_runner=lambda project, req, by: _vm_do(f"session:{project} (allowed by {by})", project, dict(req, _admin=True), True))
+    # A session's aerie tool install (toolchains.session_install): the catalog's
+    # entry for a name, the packs kept here, the add at the index's pin and the
+    # ask on the bell are this file's to hand over.
+    give(toolchains,
+         pack_entry=_catalog_pack,
+         pack_have=toolpacks.packs,
+         pack_add=_pack_from_catalog,
+         pack_ask=phone.ask_pack)
+    # Allow installs it on the node the ask names, as the person who allowed
+    # it, the session named beside them on the job; a pack kept on the way is
+    # the session's, allowed by them, as it was. An administrator's Allow, so
+    # a pack that needs root may be kept.
+    give(phone,
+         pack_runner=lambda project, held, by: toolchains.session_do(
+             held, f"user:{by} (for session:{project})", pack_by=f"session:{project} (allowed by {by})", may_root=True))
+    give(devapp, nginx_routes=lambda nid: nginxproxy.record(nid).get("routes") or [])
+    nginxproxy.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
+                         node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
+                         taken_ports=devapp.taken_ports)
+    scanners.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
+                       node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
+                       project_nodes=lambda: nodes.project_nodes() if nodes.project_nodes else {},
+                       project_names=lambda: list(prefs.all_projects(WORKSPACE)),
+                       job_add=nodes.job_add, job_state=_job_state,
+                       next_after=schedules.next_after, cron_words=schedules.words)
+    give(findings, STATE_REPORTS=scanners.report_files)
+    # A DNS-01 challenge's record goes through the Cloudflare API token Settings
+    # holds (R150).
+    give(nginxproxy, cf_token=lambda: settings.secret("cf_api_token"))
+    # ...and put on a node the moment it enrolls when the Enroll dialog asked
+    # for it (config.nginx), so a box runs the script and nginx appears.
+    # The home tunnel the controller runs itself (R176, tunnel.py): from the
+    # settings, started at boot below when they say so.
+    tunnel.configure(settings_mod=settings, dash_port=PORT)
+    nodes.ON_ENROLL.append(lambda nid: nginxproxy.deploy(nid, containers, devactions, devapp)
+                           if ((nodes.node(nid) or {}).get("config") or {}).get("nginx") else None)
+    give(changelog, relinked=_changelog_relinked)
+    # The Claude sign-in's verbs are signin.py's; the record of what each node
+    # reported is claudegrant.py's.
+    give(signin,
+         nodes=None if NODES_DOWN else nodes,
+         mint=users.mint_session)
+    give(claudegrant, home_for=home_for)
+    channel.configure(home_for=home_for)
+    give(channel,
+         sessions_seen=guards_watch,
+         unvetted_ok=lambda: bool(settings.get("offer_unvetted")))   # a Mac's provisioner is a dev feature
+    # A signing is a job on the project's node, of a build in its dist/ (R106).
+    give(signing,
+         node_of=lambda name: prefs.get(name)["node"],
+         node_refuses=lambda nid: nodes.agent_stale(nodes.node(nid)) if nid and not NODES_DOWN else "",
+         job_add=nodes.job_add,
+         file_path=workspace.file_path,
+         # What needs a jdk or build-tools is a sign-key job on that node too, waited
+         # for (signing._on_node): the controller runs no keytool or apksigner.
+         node_get=nodes.node,
+         job_get=nodes.job,
+         job_cancel=nodes.job_cancel,
+         node_tools=toolchains.node_has)
+    give(phone,
+         signer=signing.start,
+         releaser=_releaser,
+         release_editor=_release_editor,
+         release_remover=_release_remover,
+         release_withdrawer=_release_withdrawer,
+         keymaker=_keymaker,
+         release_signer=_release_signer)
+    give(artifacts, sign_routes=signing.routes_held)
+    give(vmtemplate, unvetted_ok=forges.unvetted_ok)   # the same switch (R54, step 6)
+    # The Nodes tab's verbs are nodes.verb's, and these are what they compose
+    # with (a runner's forge and token, a daemon probe, Claude Code's update).
+    nodes.configure_verbs(vmtemplate=vmtemplate, forges=forges, devapp=devapp,
+                          runner_store=runners, workspace=workspace,
+                          project_prefs=prefs.get, may_push=projects.may_push,
+                          no_node_advice=no_node_advice, turns_of=node_turns,
+                          working_on=lambda nid: node_turns(nodes.node(nid) or {"id": nid})["working"],
+                          project_names=lambda: sorted(prefs.all_projects()))
+    version.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
+                      roadmap_mod=roadmap, bugs_mod=bugs, changelog_mod=changelog,
+                      tell_fn=notify.tell, tmux_name_fn=tmux_name,
+                      )
+    give(changelog, component_dir=version._sub)
+    # Whether what the changelog owes refuses a release or goes out with it said:
+    # the repository's Releases setting (R255).
+    give(version,
+         release_gate=lambda p: prefs.get(p).get("release_gate", "refuse"),
+         # The catalog's newest signed index this controller holds, read fresh where
+         # the catalog answers: a release carrying an older config/catalog-floor is
+         # refused until the floor moves to it.
+         catalog_made=lambda: str((catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("generated") or ""),
+         rehearsed=lambda project, sha: forgeaccess.rehearsed(project, sha),   # imported below
+         owes=lambda project, wants: forgeaccess.owed(project, wants))
+    # What each of a release's files is for, over its notes (R255).
+    give(forgerelease, files_setting=lambda p: (prefs.get(p).get("files_table", True), prefs.get(p).get("files") or []))
+    forgerelease.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
+    releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
+                          projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
+                                                  if d.is_dir() and not d.name.startswith(".")),
+                          # The workflow that signs a release's list of files, started once its APK
+                          # is attached: the dispatch a rehearsal's start makes (forgeaccess, below).
+                          dispatch=lambda project, wf, ref, inputs: forgeaccess.dispatch(project, wf, ref, inputs))
+    releasefiles.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json, said_fn=_release_complete)
+    # The briefing says what a session may move the version by, with the rest
+    # of the project's dials (preamble.dials_line).
+    give(preamble, version_policy=version.policy)
+    version.configure_verbs(PANEL=version_payload, GIT_ENV=users.git_env, CREDS_ENV=projects._git_env,
+                            MAY_PUSH=projects.may_push, SESSIONS=sessions_anywhere,
+                            FORGE=forgerelease.publish, MADE=_release_made, UNSEALED=releasesign.unstartable,
+                            AUDIT=lambda *row: None if NODES_DOWN else db.audit(*row))
+    # The coding agents on the nodes, Claude Code among them (agentcode.py):
+    # what each runs against what is out, and the one way it is updated, which
+    # is an administrator's press.
+    if not NODES_DOWN:
+        agentcode.configure(nodes_module=nodes, node_sessions=node_tmux_sessions,
+                            tmux_base=tmux_base, audit=nodes.audit,
+                            catalog_entry=_catalog_official, fetch_pack=toolpacks.fetch)
+    # Every account's sessions on a project, for its settings dialog, and an
+    # administrator ending one (projsessions.py): the rows the Sessions card is
+    # made from, and its kill.
+    projsessions.configure(sessions=lambda: tmux_sessions() + node_tmux_sessions(),
+                           live_sessions=lambda: tmux_sessions(kept=True) + node_tmux_sessions(),
+                           base=tmux_base, owner=tmux_owner, accounts=account_names,
+                           owner_name=users.owner_name, end=end_session)
+    give(projsessions, BEHIND=session_behind)
+    # The code map, built for a project the moment it exists (mapping.py): the
+    # same command a session runs by hand, started in the background by the
+    # create paths, and the one thing a Claude session on a new project waits for.
+    mapping.configure(workspace=WORKSPACE,
+                      codemap=Path(__file__).resolve().parent.parent / "lib" / "codemap.py")
+    # Every project's .bb-map/ out of its git, once, beside the start.
+    threading.Thread(target=mapping.exclude_all, daemon=True).start()
+    projects.configure(run=run, workspace=WORKSPACE, agent_keys=agent_keys,
+                       gh_authed=gh_authed, ensure_deploy_alias=ensure_deploy_alias,
+                       project_name=PROJECT_NAME,
+                       state=STATE, home=os.environ.get("BUILDER_HOME", str(Path.home())),
+                       write_json=write_json,
+                       after_create=mapping.start)
+    # The session network reaches the containers of the projects a project reads.
+    give(devapp, reads_of=prefs.reads_trees)
+    forgeaccess.configure(state=STATE, write_json=write_json, target=projects.forge_target, prefs_get=prefs.get)
+    # A space's own token's expiry, as its host says when measured (R294 step 9).
+    give(forgeaccess,
+         on_measured=lambda p, when: connections.expires("git", p, when) if gitcreds.own_line(p) else None,
+         wants_of=version.host_wants)
+    give(preamble, forge_line=forgeaccess.briefing)
+    give(projects, token_changed=forgeaccess.token_changed)
+    give(devapp,
+         hosts_of=lambda p: (prefs.get(p) or {}).get("hosts") or [],
+         reaches_of=prefs.reaches_on)
+    # ...and what the create dialog's follow-ups and a space's pin need.
+    give(projects,
+         lock=_state_lock,
+         take_on=users.take_on,
+         held=nodes.workspace_held,
+         set_prefs=lambda name, **kw: prefs.set_prefs(name, workspace=WORKSPACE, **kw),
+         brief_writer=brief.write,
+         # A create that never took, and a project deleted for good, leave no owner,
+         # owner role or account entry behind (B93, B95); the first its settings too.
+         purged=lambda name: membership.forget_project(name, live=registry.live_dirs()),
+         unmade=lambda name: (prefs.forget(name), projects.purged(name), repos.forget(name)))
+    gitrelay.configure(state=STATE, workspace=WORKSPACE,
+                       push_record=lambda p: projects.load_push().get(p),
+                       token_helper=projects.token_helpers, parse_url=forges.parse,
+                       host_of=forges.host_of, git_env=projects._git_env)
+    # The modules that keep something that grows read where from paths.py.
+    for keeper in (workspace, gitview, logs, gitrelay):
+        give(keeper, paths=paths)
+    # What a space's environments deploy on a push and on a release (R281 step 6).
+    give(gitrelay, after_push=lambda project, refs, uid: _deploy_on(project, "push", refs, uid, _name_of_uid(uid) if uid else "", True))
+    give(version, RELEASED=lambda project, tag, sha: _deploy_on(project, "release", {tag: sha}, "", "", False))
+    pushscan.configure(state=STATE, write_json=write_json)
+    bbrelay.configure(users=users, projects=projects, prefs=prefs, gitrelay=gitrelay, registry=registry,
+                      WORKSPACE=WORKSPACE, STATE=STATE, phone=phone, pushscan=pushscan, forgeaccess=forgeaccess)
+    give(phone, pusher=_push_approved)
+    # ...and the Git view's Push reads the same way, asking in a confirm.
+    give(gitview,
+         SCAN=lambda project: gitrelay.run(project, str(WORKSPACE / project), "push", [], scan="only"),
+         OKAY=pushscan.okay)
+    hooks.configure(users=users, rules=rules, preamble=preamble, overlap=overlap, chat=chat, roadmap=roadmap, pending=pending,
+                    turns=turns, nodes=nodes, seen_note=session_seen_note, turn_scope=turn_scope,
+                    asking_set=asking_set, asking_clear=asking_clear, asked=projsessions.asked,
+                    agent_state=agent_state_set, agent_conv=agent_conv_set, behind=session_behind_of,
+                    heard_from=guards_heard)
+    # The Doctor asks each Kubernetes cluster kept again, and says one that does
+    # not answer or whose certificate ends soon (R281 step 2).
+    give(doctor,
+         extra=lambda: [*clusters.doctor(), *tls.doctor_lines(settings.get),
+                        *catalogindex.doctor_lines(settings.get("catalog_url") or None)])
+    doctor.configure(run=run, wait_for_boot=lambda: (wait_for_boot(), wait_for_nodes()),
+                     runner_named=lambda nid, slot: (
+                         (nodes.node(nid) or {}).get("name") or "",
+                         re.sub(r"^[a-z]+://[^/]+/|\.git$|/$", "",
+                                ((nodes.runners_of(nodes.node(nid) or {}).get(slot) or {}).get("url") or ""))))
+    # A node dialing in after silence re-asks the doctor now rather than in up
+    # to half an hour: after a reboot the card kept saying no node could run a
+    # session long after they were all back (the operator, 25 Sep).
+    give(nodes,
+         came_back=lambda nid: threading.Thread(target=doctor.refresh, name="doctor-after-hello",
+                                                daemon=True).start(),
+         # The Docker tab's first pick is derived from where the projects are bound.
+         # A job of a container written for a project is that project's (B321).
+         job_owner=lambda j: devapp.owner_of(j.get("project") or "",
+                                            (j.get("spec") or {}).get("instance") or devapp.MAIN),
+         project_nodes=lambda: {p: (v or {}).get("node") or ""
+                                for p, v in prefs.all_projects(WORKSPACE).items()})
+    give(devapp,
+         all_project_nodes=lambda: {p: (v or {}).get("nodes") or []
+                                    for p, v in prefs.all_projects(WORKSPACE).items()})
+    ftp.configure(state=STATE, workspace=WORKSPACE, write_json=write_json, users=users,
+                  audit=lambda who, act, target, params: db.audit(who, act, target, params),
+                  project_node=lambda p: prefs.get(p)["node"] or "",
+                  ask_hello=lambda nid: None if NODES_DOWN else nodes.ask_hello(nid),
+                  node_info=lambda nid: None if NODES_DOWN else _ftp_node(nid), mfa=mfa)
+    give(ftp, locked_out=projects.locked_out)   # a lock makes the files read-only through every door (B263)
+    give(nodes,
+         ftp_for=ftp.for_node,
+         # The node's nginx container, for its log stream (R182): named only where the nginx tab put one.
+         nginx_for=lambda nid: nginxproxy.container_name(nid) if nginxproxy.deployed(devapp, nid) else "")
+    give(devapp, redact=diag.redact)   # docker.log carries argvs and output tails
+    files.configure(workspace=WORKSPACE, audit=db.audit)
+    wssync.configure(workspace=WORKSPACE, nodes_module=nodes, bound_nodes=_sync_bound,
+                     changed=files._poke, audit_fn=db.audit)
+    wssync.configure_projects(lambda: list(prefs.all_projects()))
+    wssync.configure_reads(prefs.reads_trees)
+    snapshots.configure(workspace=WORKSPACE, days=lambda p: prefs.get(p)["snapshot_days"],
+                        names=lambda: [p for p in prefs.all_projects() if (WORKSPACE / p).is_dir()],
+                        audit_fn=lambda *row: None if NODES_DOWN else db.audit(*row))
+    give(files, on_change=wssync.changed)
+    # A synced node writes the transcripts of the projects it holds and nothing
+    # else: bound to it, never one it only reads (B613).
+    claudesync.configure(workspace=WORKSPACE, held=lambda nid: wssync.bound_projects(nid))
+    reports.configure(write_json=write_json, state=STATE, redact=diag.redact,
+                      build=lambda: image_stamp().get("version") or image_stamp().get("rev") or "")
+    # A report says which node its project builds on, and clearing them all is
+    # audited like every other mutation.
+    give(reports,
+         node_name=lambda p: ((nodes.node(prefs.get(p)["node"]) or {}).get("name", "")
+                              if prefs.get(p)["node"] and not NODES_DOWN else ""),
+         audit=db.audit)
+    diag.configure(image_stamp=image_stamp, uptime=uptime, doctor_payload=doctor.payload,
+                   settings=settings, nodes=nodes, db=db, log_dir=logs.log_dir,
+                   plugins=plugins, users=users, reports=reports, state_dir=lambda: STATE, tunnel=tunnel)
+    devices.configure(users=users.load, access=lambda acct, p: ftp.access_for(acct, p, "editor"),
+                      unlock=lambda uid, key: (unlocks.unlock(uid, unlocks.secret_from_hex(key)) if unlocks.secret_from_hex(key)
+                                               else {"error": "the key is 64 hex characters"}),
+                      projects=lambda acct: project_names(acct),
+                      flags=lambda acct, p: projects.app_flags(p, users.uid_of(acct)))
+    profiletab.configure(devices=devices, logins=logins, reach=reach, smtp_set=lambda: bool(settings.get("smtp_host")), mfa=mfa, audit=db.audit,
+                         two_factor_required=lambda u: roles.two_factor_required(u),
+                         smb_shares=lambda uid: None if NODES_DOWN else nodes.smb_shares_for(uid))
+    releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_metal=lambda: BARE_METAL,
+                           window=lambda: (str(settings.get("update_window") or ""), int(settings.get("update_hour") or 4)),
+                           apply=lambda v: _update_in_window(v),
+                           # The release channel (R179, R193): the one picked, else a dev build
+                           # follows the dev builds; debug mode alone picks a version, and
+                           # sees the drafts with AerieOS's own repository's token.
+                           channel=lambda: settings.channel_picked() or ("dev" if "-dev." in (image_stamp().get("version") or "") else "normal"),
+                           debug=settings.debug_available,
+                           draft_token=lambda: _builderbot_repo_token())
+    checks.configure(state=STATE, settings_mod=settings,
+                     last={"images": imagecheck.last_at,
+                           "catalog": lambda: int(toolchains._tc_checked or 0)},
+                     run={**({"release": lambda: (releasecheck.check(), checks.stamp("release"))} if BARE_METAL else {}),
+                          "images": imagecheck.check,
+                          "catalog": lambda: toolchains.start_job("check", [p["name"] for p in toolchains.TOOLCHAINS], auto=True)})
+    give(nodes, draft_update=_draft_update)
+    # What an earlier draft update fetched: the slot has taken it by now.
+    shutil.rmtree(Path(STATE) / "os-draft", ignore_errors=True)
+    give(nodes, keep_versions=lambda: int(settings.get("os_keep") or 0))
+    held.configure(state=STATE, bare_metal=lambda: BARE_METAL, write_json_fn=write_json)
+    firstboot.configure(state=STATE, write_json_fn=write_json, users_mod=users, settings_mod=settings, hold_first_fn=held.arm_first)
+    adoptapps.configure(state=STATE)
+    if BARE_METAL:
+        try:
+            _fb = firstboot.apply()
+            if _fb:
+                print(f"dashboard: a prepared configuration from the stick: {len(_fb['done'])} applied, "
+                      f"{len(_fb['waiting'])} waiting, {len(_fb['failed'])} not applied (the Nodes page says which)", flush=True)
+        except Exception as e:                                # noqa: BLE001 (a start must not fail on this)
+            print(f"dashboard: the stick's prepared configuration was not applied: {e}", flush=True)
+        # The catalog's mirror the stick carries (R169 step 6), handed over by
+        # the boot: imported once per mirror, as Import under Controller settings.
+        _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot", "catalog-mirror.tar.gz")
+        if os.path.isfile(_cm):
+            try:
+                _r = catalogmirror.take_file(_cm, time.time())
+                if not _r.get("same"):
+                    print(f"dashboard: the stick's catalog mirror: {_r.get('error') or 'imported, ' + str(_r.get('packs')) + ' entries'}", flush=True)
+            except Exception as e:                            # noqa: BLE001 (a start must not fail on this)
+                print(f"dashboard: the stick's catalog mirror was not imported: {e}", flush=True)
+    fileexplorer.configure(node=lambda nid: nodes.node(nid), host=lambda nid: nodes.route_host(nid), key=lambda nid: nodes.screen_key(nid),
+                           audit=lambda who, what, detail, params: db.audit(who, what, detail, params),
+                           connect=lambda *a, **k: termws.relaytls().connect(*a, **k),
+                           subject=lambda what, nonce: termws.relaytls().subject(what, nonce))
+    give(move,
+         checkpoint=db.checkpoint,
+         unseal=signing.unseal,
+         install_landed_key=lambda key, state_dir: installkey.landed(key, state_dir))
+    move.configure(state=STATE, workspace=WORKSPACE, secrets_dir=os.environ.get("BB_SECRETS_DIR", ""), write_json_fn=write_json,
+                   seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=stateversion.current,
+                   build_version_fn=lambda: image_stamp().get("version") or "",
+                   install_key_fn=lambda: signing.MASTER or b"", store_paths_fn=lambda: {k: str(paths.of(k)) for k in paths.KINDS},
+                   page_url_fn=_page_url, node_ids_fn=lambda: [n["id"] for n in nodes.node_list() if n.get("kind") == "agent" and n.get("state") != "retired"],
+                   bare_metal_fn=lambda: BARE_METAL,
+                   node_name_fn=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
+                   audit_fn=lambda who, what, detail: db.audit(who, what, "", detail))
+    # The configuration backed up onto the machine's pools and found again at a
+    # first run (R161 step 4, backup.py): the move's bundle under a password's key.
+    backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
+                     password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_backup_dirs,
+                     version_fn=lambda: image_stamp().get("version") or "", state_version_fn=stateversion.current, write_json_fn=write_json,
+                     host_fn=lambda: socket.gethostname())
+    give(nodes,
+         move_for_node=move.for_node,
+         move_here=move.node_here,
+         move_armed=move.armed,
+         install_id_seen=_install_id_seen)
+    give(move, place_deploy_keys=_place_deploy_keys)
+    give(nodes, install_id_kept=_install_id_kept)
+    # ...a node enrolled at the home tunnel's public hostname kept on it, with no
+    # pin (the hostname's certificate is the tunnel's): the tunnel's settings
+    # came with the bundle, so the hostname reaches this controller now. Any
+    # other node keeps the address it knocked at, which reached this controller,
+    # and pins the certificate it met there (B936): the page's public name may
+    # be the tunnel's, whose edge never serves this controller's certificate.
+    give(move, tunnel_host=lambda nid: nodes.tunnel_host(nodes.node(nid) or {}))
+    give(channel,
+         moved_answer=lambda nid: ({"answer": move.answer_for(nid), "url": move.node_url(nid, ""), "pin": ""} if move.tunnel_host(nid)
+                                   else {"answer": move.answer_for(nid), "url": "", "pin": ""}))
+    apps.configure(state=STATE, version=lambda: image_stamp().get("version") or "",
+                   setting=settings.get, write_json=write_json, audit=db.audit,
+                   container=lambda: not BARE_METAL, registry_digest=imagecheck.remote_digest)
+    give(apps, unvetted_ok=channel.unvetted_ok)   # the Windows companion and the VS Code extension are dev features
+    devices.configure_apps(apps)
+    pcwork.configure(workspace=WORKSPACE, mode_fn=lambda p: (prefs.get(p) or {}).get("pc") or "deny",
+                     notify_fn=lambda uid, text, level: notices.act(uid, {"action": "add", "text": text,
+                                                                          "level": level, "kind": "said"}))
+    devices.configure_pc(pcwork)
+
+
 def main():
     if _COV_OUT:
         _cov_start()
+    wire()
     # No accounts is a normal first boot, not a failure. It used to be one:
     # the owner came from DASHBOARD_AUTH and the dashboard refused to start
     # without it, which put a password in the container's environment, where
@@ -16134,7 +16140,7 @@ def main():
     # Daemons: these loops must die with the server, not hold it open.
     doctor.start()
     idle.start()
-    if not NODES_OK:
+    if not NODES_DOWN:
         agentcode.start()         # each coding agent's first check soon after the start (R95 step 2), then on the toolchains' clock
     # The seed file once, before the first look at the release (R272 step 4).
     try:
@@ -16151,13 +16157,13 @@ def main():
         releasecheck.start()      # a newer release, asked of GitHub a while after the start, then daily
         backup.start()            # a copy of the state onto the pools after every change (R161 step 4)
     artifacts.start()         # every project's dist/ to its newest builds, every few minutes
-    if not NODES_OK:
+    if not NODES_DOWN:
         threading.Thread(target=_room_loop, name="room", daemon=True).start()
         threading.Thread(target=_schedules_loop, name="schedules", daemon=True).start()
         threading.Thread(target=_reach_loop, name="reach", daemon=True).start()
     threading.Thread(target=_move_loop, name="move", daemon=True).start()
     db.start_folding()        # the write-ahead log folded into the database every minute (B654)
-    if not NODES_OK:
+    if not NODES_DOWN:
         with contextlib.suppress(Exception):   # noqa: BLE001 (a sign-in found again is a kindness, never a start that fails)
             signin.resume()       # a sign-in still going on a node is its account's flow again (R227 step 13)
     ciwatch.start()           # a project's CI, once a day (R117)

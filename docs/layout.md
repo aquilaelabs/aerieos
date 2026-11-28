@@ -164,7 +164,7 @@ scripts/
                                  one tab-*.js per document tab, one nb-*.js per notebook view (nb-core.js is the
                                  notebook itself), one page-*.js per part of the page that is neither, all strict,
                                  all pure declarations, served by name from the page's own script tags (R77)
-    server.py                    the routes, the transport and the gates; each handler one call into a module beside it
+    server.py                    the routes, the transport and the gates; each handler one call into a module beside it; wire() joins the modules when the server starts, and importing the file runs nothing
     index.html                   the markup, and the head's script that reads the theme before the first paint
     page-*.css                   the stylesheet, a cascade layer a file (R9): page-skin.css (the tokens, the schemes, bare elements), page-components.css, page-surfaces.css, page-overrides.css
     terminal.html                one terminal on a page of its own: a tab popped out of the dock, and the Android app's session screen (R133)

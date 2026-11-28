@@ -141,7 +141,10 @@ pass before anything is published; `aerie ci-log` reads a run's output.
 - **The dashboard is dependency-free.** `server.py` is stdlib-only and holds
   the routes, the transport and the gates; each handler checks who may ask
   and makes one call into the feature's module beside it, which answers
-  `(payload, status)` and is handed what it needs by `configure()`.
+  `(payload, status)` and is handed what it needs by `configure()`, or by
+  `give()` for a part another module supplies. All of that joining is
+  `wire()`, which `main()` calls first: importing `server.py` runs none of
+  it, and nothing at its top level has an effect (`unit/test_server_wiring.py`).
   `index.html` is the markup; `page-*.css` the stylesheet, a file a cascade
   layer (skin, components, surfaces, overrides); `tab-*.js` one per document
   tab, `nb-*.js` one per notebook view (`nb-core.js` the notebook),
