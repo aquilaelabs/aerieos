@@ -823,3 +823,26 @@ rather than a separate installer program with its own partitioning screens,
 so storage is built once; the console installer stays in the image behind
 the kernel's command line, for a serial line and for the build's check that
 the ISO lays out a blank disk.
+
+**The root is sealed with dm-verity, and the seal's hash rides in the initrd
+(28 Nov 2026).** A slot's root was a squashfs the kernel mounted as it
+found it: a failing disk, a write to the wrong partition or a root edited
+from another system was used without a word. The root's hash tree now
+follows the squashfs in the same file, so one file is still one slot and
+whatever copies a slot whole (the disk's layout, an update, a kept older
+version, the stick's copy in memory) carries the tree with it. The tree's
+root hash is put on the end of the initrd that boots the slot rather than
+on GRUB's command line or in its environment: nothing in the boot menu, the
+slot tool or an update's writes to GRUB had to change; an older agent that
+writes a newer image still writes a sealed slot whole; and when the kernel,
+the initrd and the command line become one signed file, the hash is inside
+the signature with nothing more to do. A block that goes bad while the
+system runs is an I/O error for what reads it, not a panic or a restart: a
+machine that serves files with one bad sector on its system disk keeps
+serving them, says so on the bell, and is put right by an update. An
+update checks the root against the hash itself, in the agent's own code,
+before the other slot is touched and as it reads back, so the check does
+not depend on what the running root happens to carry. What the seal is not
+is a chain from the firmware: that is the signed boot path, which is its
+own piece of work, and [security.md](security.md) says what holds until
+then.
