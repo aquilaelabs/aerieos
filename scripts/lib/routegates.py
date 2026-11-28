@@ -28,10 +28,13 @@ A name is everything the handler consults, so it is no smaller than what it
 refuses on: a handler that reads a permission to draw a dead button names it
 too. What exactly is refused is the handler's docstring and its code.
 
-A handler whose asks are a table in its module (`for ... in prefs.SAVE_ASKS`:
-each row's first word is what a change asks) is read off that table: "node"
-there is the right to place a space on a node, "space:NAME" a permission
-asked of the space, and a row that asks nothing names nothing.
+A handler whose asks are a table is read off the table. One in its module,
+walked row by row (`for ... in prefs.SAVE_ASKS`): each row's first word is
+what a change asks, "node" there the right to place a space on a node,
+"space:NAME" a permission asked of the space, and a row that asks nothing
+names nothing. One of server.py's own, an action to its row (VERSION_ACTS):
+each row's `ask` is a permission a person needs on the space and its `dial`
+the Agents may dial a session's ask goes through.
 """
 import ast
 import os
@@ -74,12 +77,19 @@ def table_asks(module, name, dash=DASH):
         return []
     out = []
     for node in tree.body:
-        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets) \
-                and isinstance(node.value, (ast.Tuple, ast.List)):
+        if not (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets)):
+            continue
+        if isinstance(node.value, (ast.Tuple, ast.List)):
             for row in node.value.elts:
                 word = _literal(row.elts[0]) if isinstance(row, (ast.Tuple, ast.List)) and row.elts else None
                 if word:
                     out.append("node:node" if word == "node" else word[len("space:"):] if word.startswith("space:") else word)
+        elif isinstance(node.value, ast.Dict):
+            # An action to its row: what a person is asked, then a session's dial.
+            for row in node.value.values:
+                for kw in row.keywords if isinstance(row, ast.Call) else ():
+                    if kw.arg in ("ask", "dial") and _literal(kw.value):
+                        out.append(("dial:" if kw.arg == "dial" else "") + _literal(kw.value))
     return out
 
 
@@ -96,8 +106,14 @@ def asks(fn, handlers, depth=2, _seen=None):
             out.append(name)
     # In the order the handler is written, so the first name is the first
     # thing it asks.
-    calls = sorted((n for n in ast.walk(fn) if isinstance(n, (ast.Call, ast.For))), key=lambda n: (n.lineno, n.col_offset))
+    tables = [n for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id.endswith("_ACTS")]
+    calls = sorted([n for n in ast.walk(fn) if isinstance(n, (ast.Call, ast.For))] + tables[:1], key=lambda n: (n.lineno, n.col_offset))
     for node in calls:
+        if isinstance(node, ast.Name):
+            # One of server.py's own tables, an action to its row.
+            for got in table_asks("server", node.id):
+                add(got)
+            continue
         if isinstance(node, ast.For):
             # A walk over a module's table of asks: what the table names.
             it = node.iter

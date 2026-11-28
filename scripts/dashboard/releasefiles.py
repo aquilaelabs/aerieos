@@ -19,6 +19,8 @@ host, which ends its watch.
 
     configure(state=, workspace=, write_json_fn=)
     wanted(project, tag)   the names the release must carry, or []
+    drafts(project)        the drafts waiting, each with what it still lacks
+    draft(project, act, tag, notes)   a draft's notes kept, or the draft published
     expect(project, tag)   a release's tag just pushed: check it as CI ends
     check(project)         check the expected releases that are due
     attention(projects)    the bell's rows
@@ -194,6 +196,36 @@ def missing(project, tag):
     kind, name, ctx = forgerelease._handle(project)
     url, have = forgerelease._files_on(kind, name, ctx, tag)
     return [w for w in wanted(project, tag) if not fnmatch.filter(have, w)], url
+
+
+def drafts(project):
+    """The drafts waiting to be read and published, each with the files it
+    still lacks. No release page to read (no forge, no token) is no drafts,
+    and no error to the page that asks. (payload, status)."""
+    d = forgerelease.drafts(project)
+    if d.get("error"):
+        return {"drafts": [], "why": d["error"]}, 200
+    for x in d["drafts"]:
+        try:
+            x["missing"] = missing(project, x["tag"])[0]
+        except forgerelease.Refused as e:
+            x["missing"], x["missing_error"] = [], str(e)
+    return d, 200
+
+
+def draft(project, act, tag, notes):
+    """A draft's notes kept (release-draft-notes), or the draft published
+    with them (release-publish), the files it still lacks said first. It
+    is the read before anybody else sees the release. (payload, status)."""
+    if act == "release-draft-notes":
+        r = forgerelease.draft_notes(project, tag, notes or "")
+    else:
+        try:
+            miss = missing(project, tag)[0]
+        except forgerelease.Refused as e:
+            return {"error": str(e)}, 400
+        r = forgerelease.publish_draft(project, tag, notes, miss)
+    return r, 400 if r.get("error") else 200
 
 
 def check(project, now=None):

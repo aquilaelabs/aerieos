@@ -2459,6 +2459,64 @@ def configure_verbs(**parts):
     globals().update(parts)
 
 
+# What a release asked for through the API reads besides the plan: whether
+# its Android APK could be signed and whether its draft could start
+# (releasesign.readiness, unstartable), the release made as the Artifacts
+# view makes it and the ask queued for the owner (the server's releaser,
+# phone.ask_release), whose space it is (membership.owner_of, owner_name),
+# and the environment and the right to push a plan is made with
+# (projects._git_env, may_push).
+readiness = None
+unstartable = None
+releaser = None
+ask_release = None
+owner_of = None
+owner_name = None
+git_env = None
+may_push = None
+
+
+def asked_release(name, req, mode, asker, principal):
+    """A release asked for by a session (aerie version release, under the
+    space's Release dial: `mode` is auto or ask), or looked at without
+    being made (mode "dry", aerie version rehearse, which is under no dial
+    since it does nothing): every refusal the release would meet is said
+    before a rehearsal is spent on it or anybody is asked to allow it. Then
+    it is made here with the space's own credentials, which the session
+    never holds, or queued for the owner. `asker` is the asking account's
+    name. (payload, status)."""
+    dry = mode == "dry"
+    comp = field(req, "component") or ""
+    plan = release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True,
+                        pre=field(req, "pre") or "", env=git_env(), may_push=may_push(name))
+    if plan.get("error"):
+        return plan, 400
+    dev = plan["dev"]
+    # Said before the tag, not after it: 0.7.0 was tagged with no sideload
+    # key and its APK never attached.
+    rs = readiness(name, fresh=True)
+    if rs["wanted"] and rs["why"] and not req.get("unsigned") and not dry:
+        return {"error": f"{plan['tag']}'s Android APK could not be signed: {rs['why']}. "
+                         "Put that right first (aerie sign status says when it is), or release "
+                         "with --without-apk and have it signed after with aerie sign release "
+                         "within three days, while CI keeps the unsigned APK",
+                "unsigned": rs["why"]}, 409
+    # What the release itself refuses before the tag, said before a person
+    # is asked to allow one (auto meets it there).
+    if mode != "auto" and (why := unstartable(name)):
+        return {"error": f"{plan['tag']} would stay a draft: {why}, so put it there first"}, 409
+    if dry:
+        # The APK's signing is said, not refused: a release may go without
+        # it (--without-apk) and be signed after.
+        return {"ok": True, **plan, **({"unsigned": rs["why"]} if rs["wanted"] and rs["why"] else {})}, 200
+    if mode == "auto":
+        got, code = releaser(name, comp, asker, principal, dev=dev, pre=plan.get("pre") or "")
+        return ({**got, "channel": plan["channel"]} if isinstance(got, dict) else got), code
+    r = ask_release(field(req, "why"), name, comp, plan, owner_of(name), owner_name(name) or "the space's owner",
+                    asker_name=asker, principal=principal, dev=dev, pre=plan.get("pre") or "")
+    return {**r, "channel": plan["channel"]}, 400 if r.get("error") else 200
+
+
 def verb(name, act, req, who, principal):
     """Move a project's version, or change who is allowed to, from the
     panel, once server.py has let this person at it: bump, release, init,

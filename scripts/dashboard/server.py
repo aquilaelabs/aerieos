@@ -4958,6 +4958,48 @@ DIALS = {"release": ("release it", "Tag and publish a release"),
 # dial set to auto for an account with no Releases Write).
 DIAL_ACTION = {"release": "version", "sign": "signing", "keys": "signing", "kube": "deploy", "discord": "settings"}
 
+# /api/version's actions, each a row (Handler._version): `persons`, what a
+# session is told where the action is a person's alone; `elsewhere`, what a
+# session on another space is told; `ask`, the permission a person at the
+# page needs on the space; `dial` and `instead`, the Agents may dial a
+# session's ask goes through and what a person does where it says deny;
+# `run`, the one call; `audit`, the row written when it answers ok. An
+# action with no row of its own is the last one: the panel's bump, release,
+# init, unbump and policy, a person's with the version area.
+def _asker(who):
+    return str((users.account_of(who) or {}).get("name") or "")
+
+
+VersionAct = collections.namedtuple("VersionAct", "persons elsewhere ask dial instead run audit", defaults=("", "", "", "", "", None, ""))
+_PANEL_ONLY = ("a session moves its version with aerie version bump, under the space's policy, "
+               "and releases with aerie version release")
+VERSION_ACTS = {
+    # aerie version release, and its rehearsal's look (dry): a session's on
+    # its own space under the Release dial, a person's with the version area.
+    "release:asked": VersionAct(
+        elsewhere="a session releases its own space and no other", ask="version", dial="release",
+        instead="; a person cuts it with Release on the Artifacts view",
+        run=lambda name, act, req, who, principal, mode: version.asked_release(name, req, mode, _asker(who), principal)),
+    # The drafts waiting to be read and published, for whoever sees the space.
+    "release-drafts": VersionAct(
+        elsewhere="a session reads its own space's drafts and no other",
+        run=lambda name, act, req, who, principal, mode: releasefiles.drafts(name)),
+    # Reading a draft and publishing it is a person's, whatever the dial.
+    "release-draft-notes": VersionAct(
+        persons="a release is published by a person, once its notes are read: the Artifacts view's Drafts", ask="version",
+        run=lambda name, act, req, who, principal, mode: releasefiles.draft(
+            name, act, field(req, "tag"), req.get("notes") if isinstance(req.get("notes"), str) else None)),
+    "release-publish": VersionAct(
+        persons="a release is published by a person, once its notes are read: the Artifacts view's Drafts", ask="version",
+        run=lambda name, act, req, who, principal, mode: releasefiles.draft(
+            name, act, field(req, "tag"), req.get("notes") if isinstance(req.get("notes"), str) else None),
+        audit="release-publish"),
+    # ask puts the question to the space's own session: anybody's on it.
+    "ask": VersionAct(persons=_PANEL_ONLY, run=lambda name, act, req, who, principal, mode: version.verb(name, act, req, who, principal)),
+    "": VersionAct(persons=_PANEL_ONLY, ask="version",
+                   run=lambda name, act, req, who, principal, mode: version.verb(name, act, req, who, principal)),
+}
+
 # The changes to a published release, by /api/version's action
 # (_release_change). `does` is the word a session on another space is refused
 # with, `newest` whether the newest tag stands for one not named, `instead`
@@ -11154,114 +11196,34 @@ class Handler(BaseHTTPRequestHandler):
             test_cmd=prefs.get(name)["test"] if act == "test" else ""))
 
     def _version(self, req):
-        """Move a project's version, or change who is allowed to:
-        version.verb, behind the gates here.
-
-        A session's bump goes through `aerie version bump`, which asks the same
-        policy and passes `by="claude"`.
-        """
+        """Move a project's version, cut or change a release, read and
+        publish its drafts, or change who may: each action is a row of
+        VERSION_ACTS (a change to a published release one of RELEASE_CHANGES),
+        which says whose it is and what it asks, and this walks the row and
+        makes its one call."""
         if not (name := self._project_asked(req)):
             return
-        act = field(req, "action")
-        # This is the panel's, and `by="operator"` is only true of an
-        # administrator at it. A session moves its version with aerie version
-        # bump, under the project's policy, and never here, where it could
-        # also have loosened that policy; a plain account may ask a session
-        # to bump and no more.
-        who = self._who() or {}
-        if act == "release" and (who.get("session") or req.get("dry") is True):
-            # aerie version release: its own project only, under its
-            # dial. The tag and the forge's release are made here, with the
-            # project's own credentials, which the session never holds.
-            if self._session_elsewhere(name, "a session releases its own space and no other"):
-                return None
-            if not who.get("session") and self._refused("version", name):
-                return None
-            # dry (aerie version rehearse): every refusal the release
-            # would meet, asked before a rehearsal is spent on it; it does
-            # nothing, so it is under no dial.
-            dry = req.get("dry") is True
-            mode = "dry" if dry else self._dialed(name, "release", "; a person cuts it with Release on the Artifacts view")
-            if not mode:
-                return None
-            comp = field(req, "component") or ""
-            plan = version.release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True,
-                                        pre=field(req, "pre") or "", env=projects._git_env(),
-                                        may_push=projects.may_push(name))
-            if plan.get("error"):
-                return self._json(plan, 400)
-            dev = plan["dev"]
-            # Said before the tag, not after it: 0.7.0 was
-            # tagged with no sideload key and its APK never attached.
-            rs = releasesign.readiness(name, fresh=True)
-            if rs["wanted"] and rs["why"] and not req.get("unsigned") and not dry:
-                return self._json({"error": f"{plan['tag']}'s Android APK could not be signed: {rs['why']}. "
-                                            "Put that right first (aerie sign status says when it is), or release "
-                                            "with --without-apk and have it signed after with aerie sign release "
-                                            "within three days, while CI keeps the unsigned APK",
-                                   "unsigned": rs["why"]}, 409)
-            acct = users.account_of(who) or {}
-            # What version.verb refuses before the tag, said before a person
-            # is asked to allow one (auto meets it there).
-            if mode != "auto" and (why := releasesign.unstartable(name)):
-                return self._json({"error": f"{plan['tag']} would stay a draft: {why}, so put it there first"}, 409)
-            if dry:
-                # The APK's signing is said, not refused: a release may go
-                # without it (--without-apk) and be signed after.
-                return self._json({"ok": True, **plan, **({"unsigned": rs["why"]} if rs["wanted"] and rs["why"] else {})})
-            if mode == "auto":
-                got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev,
-                                      pre=plan.get("pre") or "")
-                return self._json({**got, "channel": plan["channel"]} if isinstance(got, dict) else got, code)
-            r = phone.ask_release(field(req, "why"), name, comp, plan, membership.owner_of(name),
-                                  membership.owner_name(name) or "the space's owner",
-                                  asker_name=str(acct.get("name") or ""), principal=self._principal(), dev=dev,
-                                  pre=plan.get("pre") or "")
-            return self._json({**r, "channel": plan["channel"]}, 400 if r.get("error") else 200)
+        act, who = field(req, "action"), self._who() or {}
         if act in RELEASE_CHANGES:
             return self._release_change(act, name, req, who)
-        if act == "release-drafts":
-            # The drafts waiting to be read and published,
-            # each with the files it still lacks.
-            if self._session_elsewhere(name, "a session reads its own space's drafts and no other"):
-                return None
-            d = forgerelease.drafts(name)
-            if d.get("error"):
-                # No release page to read (no forge, no token): no drafts,
-                # which is no error to the page that asks.
-                return self._json({"drafts": [], "why": d["error"]})
-            for x in d["drafts"]:
-                try:
-                    x["missing"] = releasefiles.missing(name, x["tag"])[0]
-                except forgerelease.Refused as e:
-                    x["missing"], x["missing_error"] = [], str(e)
-            return self._json(d)
-        if act in ("release-draft-notes", "release-publish"):
-            # Reading a draft and publishing it is a person's, whatever the
-            # dial: it is the read before anybody else sees the release.
-            if who.get("session"):
-                return self._json({"error": "a release is published by a person, once its notes are read: the Artifacts view's Drafts"}, 403)
-            if self._refused("version", name):
-                return None
-            tag = field(req, "tag")
-            notes = req.get("notes") if isinstance(req.get("notes"), str) else None
-            if act == "release-draft-notes":
-                r = forgerelease.draft_notes(name, tag, notes or "")
-            else:
-                try:
-                    miss = releasefiles.missing(name, tag)[0]
-                except forgerelease.Refused as e:
-                    return self._json({"error": str(e)}, 400)
-                r = forgerelease.publish_draft(name, tag, notes, miss)
-                if r.get("ok"):
-                    db.audit(self._principal(), "release-publish", name, {"tag": tag})
-            return self._result(r)
-        if who.get("session"):
-            return self._json({"error": "a session moves its version with aerie version bump, "
-                                        "under the space's policy, and releases with aerie version release"}, 403)
-        if act != "ask" and self._refused("version", name):
+        session, dry = bool(who.get("session")), req.get("dry") is True
+        row = VERSION_ACTS.get("release:asked" if act == "release" and (session or dry) else act) or VERSION_ACTS[""]
+        if session and row.persons:
+            return self._json({"error": row.persons}, 403)
+        if self._session_elsewhere(name, row.elsewhere):
             return None
-        return self._json(*version.verb(name, act, req, self._who(), self._principal()))
+        if not session and row.ask and self._refused(row.ask, name):
+            return None
+        mode = ""
+        if row.dial:
+            # A look that makes nothing (dry) is under no dial.
+            mode = "dry" if dry else self._dialed(name, row.dial, row.instead)
+            if not mode:
+                return None
+        got, status = row.run(name, act, req, who, self._principal(), mode)
+        if row.audit and isinstance(got, dict) and got.get("ok"):
+            db.audit(self._principal(), row.audit, name, {"tag": field(req, "tag")})
+        return self._json(got, status)
 
     def _release_change(self, act, name, req, who):
         """One of the changes to a published release (RELEASE_CHANGES). A
@@ -15725,6 +15687,9 @@ def wire():
     # Whether what the changelog owes refuses a release or goes out with it said:
     # the repository's Releases setting.
     give(version,
+         readiness=releasesign.readiness, unstartable=releasesign.unstartable, releaser=_releaser,
+         ask_release=phone.ask_release, owner_of=membership.owner_of, owner_name=membership.owner_name,
+         git_env=projects._git_env, may_push=projects.may_push,
          release_gate=lambda p: prefs.get(p).get("release_gate", "refuse"),
          # The catalog's newest signed index this controller holds, read fresh where
          # the catalog answers: a release carrying an older config/catalog-floor is
