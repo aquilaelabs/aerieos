@@ -2782,13 +2782,18 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
   await quietFor(5000);
   await quiet.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !readBusy('home')),
                               null, { timeout: 20000 }).catch(() => {});
-  await quiet.evaluate(() => { window.__f = {}; const f = window.fetch;
+  await quiet.evaluate(() => { window.__f = {}; window.__r0 = { ...revs }; const f = window.fetch;
     window.fetch = (...a) => { const u = String(a[0]).split('?')[0]; window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
   await quietFor(8000);
   const calm = await quiet.evaluate(() => window.__f);
+  // The registry's own token moving in the window is news, not a heartbeat:
+  // a job the walk above started ends late under a gate's load, and
+  // Home is right to read the nodes and the status once for it. Held to the
+  // count only while that token stood still, which is what the rule is about.
+  const news = await quiet.evaluate(() => window.__r0.nodes !== revs.nodes);
   await quiet.close();
-  ok(!calm['/api/v1/nodes'] && !calm['/api/presence'] && (calm['/api/status'] || 0) <= 1 && (calm['/api/revs'] || 0) <= 6,
-     `...and only so often: no node list or presence off their pages, the status poll at most once and the revisions poll at most six times in eight seconds (${JSON.stringify(calm)})`);
+  ok((!calm['/api/v1/nodes'] || (news && calm['/api/v1/nodes'] <= 1)) && !calm['/api/presence'] && (calm['/api/status'] || 0) <= (news ? 2 : 1) && (calm['/api/revs'] || 0) <= 6,
+     `...and only so often: no node list or presence off their pages, the status poll at most once and the revisions poll at most six times in eight seconds (${JSON.stringify(calm)}${news ? '; the nodes token moved' : ''})`);
   for (const kind of Object.keys(DRIVERS)){
     if (kind.startsWith('notebook:')) continue;
     // The last kind's close lands the page on Home, which is an open of its
@@ -3361,6 +3366,13 @@ if (runs('c')) await section("what opens, shuts or arrives moves, and never snap
     const go = async hash => { await p.evaluate(x => { location.hash = x; }, hash); await sleep(1500); };
     const fold = async (name, hash, press, box) => {
       await go(hash);
+      // The page the address names, arrived and at rest, before anything on
+      // it is pressed: under a gate's load its sections were not drawn a
+      // second and a half in, and the press went to what stood there before
+      // it ("did not open or shut").
+      await p.waitForFunction(([x, s]) => location.hash.startsWith(x) && [...document.querySelectorAll('.doc.on ' + s)].some(e => e.checkVisibility()),
+                              [hash, press], { timeout: 20000 }).catch(() => {});
+      await settled(p, { quiet: 300, cap: 8000 });
       await holdPoll(p);
       for (const turn of [1, 2]){
         const fr = await p.evaluate(([press, box]) => new Promise(done => {
@@ -3370,12 +3382,16 @@ if (runs('c')) await section("what opens, shuts or arrives moves, and never snap
           const b = [...document.querySelectorAll(press)].find(e => e.checkVisibility());
           if (!b) return done(null);
           const el = b.closest(box) || b, out = [], t0 = performance.now();
+          // Watched for 670ms from the press itself, not from when it was
+          // asked for: a timer a loaded machine ran late left the fold no
+          // time inside a window counted from the start.
+          let pressed = 0;
           const tick = () => {
             out.push([performance.now() - t0, el.getBoundingClientRect().height, mine(el)]);
-            if (performance.now() - t0 < 700) requestAnimationFrame(tick); else done(out);
+            if (!pressed || performance.now() - pressed < 670) requestAnimationFrame(tick); else done(out);
           };
           requestAnimationFrame(tick);
-          setTimeout(() => b.click(), 30);
+          setTimeout(() => { b.click(); pressed = performance.now(); }, 30);
         }), [press, box]);
         if (!fr){ bad.push(`${tag} ${name}: no ${press} on ${hash}`); break; }
         if (Math.abs(fr[0][1] - fr[fr.length - 1][1]) < 3){ bad.push(`${tag} ${name} press ${turn}: did not open or shut`); continue; }
