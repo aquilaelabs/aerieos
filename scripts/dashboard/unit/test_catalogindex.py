@@ -466,7 +466,7 @@ class Made(unittest.TestCase):
         src = open(version.__file__, encoding="utf-8").read()
         self.assertEqual(src.count("if why := floor_behind(project, comp):"), 2)
         server = open(os.path.join(os.path.dirname(version.__file__), "server.py"), encoding="utf-8").read()
-        self.assertIn("version.catalog_made = lambda: str((catalogindex.index(settings.get(\"catalog_url\") or None)", server)
+        self.assertRegex(server, r"give\(version,\n(?:.*\n){0,12}?\s+catalog_made=lambda: str\(\(catalogindex\.index\(settings\.get\(\"catalog_url\"\) or None\)")
 
 
 class Folders(unittest.TestCase):
