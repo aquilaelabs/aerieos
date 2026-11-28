@@ -14,7 +14,7 @@ import threading
 import time
 from . import release
 from .base import (BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, REFUSED, REFUSED_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR,
-                   dir_at, fs_holds, give_fd, hello_again, log, open_dir, rm_at)
+                   dir_at, fs_holds, give_fd, hello_again, log, open_dir, rm_at, write_at)
 from .stores import dir_bytes, load_state, tc_root
 
 
@@ -142,6 +142,106 @@ def stale_bundles(root, current, oldest=None, named=()):
     return sorted(drop, key=at)
 
 
+# The snapshots this node has fetched, in the cache store: a folder of
+# root's own, under a name no space's cache can have (a space's is its name
+# with everything but letters, digits, dot, dash and underscore replaced). It
+# was `snapshots`, which a space of that name was handed as its cache.
+SNAPSHOTS = "@snapshots"
+# How many snapshots are kept whatever their age, and how long one is kept
+# since a job last used it: a tree's snapshot is asked for again only by a
+# job queued twice on the same commit.
+SNAPSHOTS_KEEP = 6
+SNAPSHOTS_DAYS = 14
+# In a job's folder while its workspace is being built in.
+BUILDING = ".building"
+_SNAPSHOT_RE = re.compile(r"[0-9a-f]{64}\.tar")
+_MOVED = set()
+
+
+def _lexists_at(folder, rel):
+    """Whether something is at `rel` under the folder `folder` is a
+    descriptor on, a link there counted as itself."""
+    try:
+        os.stat(rel, dir_fd=folder, follow_symlinks=False)
+        return True
+    except OSError:
+        return False
+
+
+def _plain_file(folder, name):
+    """The file `name` in the folder `folder` is a descriptor on, open for
+    reading; None when nothing is there, and when what is there is not a
+    plain file (a link, a folder), which is taken away."""
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=folder)
+    except FileNotFoundError:
+        return None
+    except OSError:
+        rm_at(folder, name)
+        return None
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        rm_at(folder, name)
+        return None
+    return os.fdopen(fd, "rb")
+
+
+def _digest_of(f):
+    """The sha256 of the open file `f`, read from its start."""
+    f.seek(0)
+    h = hashlib.sha256()
+    for chunk in iter(lambda: f.read(1 << 20), b""):
+        h.update(chunk)
+    return h.hexdigest()
+
+
+def _snapshots_prune(snaps, keep):
+    """The snapshot cache kept small: the newest SNAPSHOTS_KEEP by last use
+    and none unused for SNAPSHOTS_DAYS, `keep` aside; a fetch an hour old
+    that never finished; and anything that is not a file of the cache's."""
+    now, rows = time.time(), []
+    for n in os.listdir(snaps):
+        try:
+            st = os.stat(n, dir_fd=snaps, follow_symlinks=False)
+        except OSError:
+            continue
+        if not stat.S_ISREG(st.st_mode) or not (n.endswith(".part") or _SNAPSHOT_RE.fullmatch(n)):
+            rm_at(snaps, n)
+        elif n.endswith(".part"):
+            if now - st.st_mtime > 3600:
+                rm_at(snaps, n)
+        elif n != keep:
+            rows.append((st.st_mtime, n))
+    rows.sort(reverse=True)
+    for i, (at, n) in enumerate(rows):
+        if i >= SNAPSHOTS_KEEP - 1 or now - at > SNAPSHOTS_DAYS * 86400:
+            rm_at(snaps, n)
+
+
+def _snapshots_moved(cache):
+    """The snapshots an older agent kept in the cache store's `snapshots`
+    are dropped from it, once a run: that folder is a space's cache where a
+    space has the name, so only the files named as snapshots go, and the
+    folder with them when nothing else is in it."""
+    if cache in _MOVED:
+        return
+    _MOVED.add(cache)
+    with contextlib.suppress(OSError):
+        fd = open_dir(cache)
+        try:
+            old = os.open("snapshots", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            try:
+                for n in os.listdir(old):
+                    if re.fullmatch(r"[0-9a-f]{64}\.tar(\.part)?", n):
+                        with contextlib.suppress(OSError):
+                            os.unlink(n, dir_fd=old)
+            finally:
+                os.close(old)
+            os.rmdir("snapshots", dir_fd=fd)
+        finally:
+            os.close(fd)
+
+
 class WorkspaceMixin:
     """Agent's workspace methods: one of the parts class Agent (agent.py) is made of."""
 
@@ -163,50 +263,171 @@ class WorkspaceMixin:
         """The job's source, on disk: the snapshot by digest, from the
         cache store when this node has fetched it before and from the
         controller otherwise, checked against its digest either way, then
-        unpacked into a directory of the job's own under the data store."""
+        unpacked into a directory of the job's own under the data store.
+
+        Root trusts no name on the way. The cache and the job's folder are
+        reached by descriptor with no link followed, the snapshot is checked
+        and unpacked through the one open file, and it is unpacked as the
+        job's account, so what that account left at a name in a folder of
+        its own leads nowhere it could not already write."""
         stores = self.state.get("stores") or {}
         digest = str(src.get("digest") or "")
         hexd = digest.split(":", 1)[-1]
         if not re.fullmatch(r"[0-9a-f]{64}", hexd):
             job.say(f"refused: not a snapshot digest: {digest!r}\n")
             return None
-        snaps = os.path.join(stores.get("cache") or "/tmp", "snapshots")
-        os.makedirs(snaps, exist_ok=True)
-        tar_path = os.path.join(snaps, hexd + ".tar")
-        if not os.path.isfile(tar_path):
-            job.say(f"fetching snapshot {hexd[:12]}…\n")
-            st, _ = self.ctl.fetch(f"source?digest={hexd}", tar_path)
-            if st != 200:
-                job.say(f"the controller has no snapshot {hexd[:12]} ({st}): the tree "
-                        "has moved on; queue the job again\n")
-                return None
-        h = hashlib.sha256()
-        with open(tar_path, "rb") as f:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                h.update(chunk)
-        if h.hexdigest() != hexd:
-            os.remove(tar_path)
-            job.say("the cached snapshot did not match its digest; dropped it. Queue the job again\n")
+        jid = str(job.job.get("id") or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", jid):
+            job.say(f"refused: not a job's id: {jid!r}\n")
             return None
-        ws = os.path.join(stores.get("data") or "/tmp", "jobs", job.job["id"], "workspace")
-        shutil.rmtree(os.path.dirname(ws), ignore_errors=True)
-        os.makedirs(ws)
-        with tarfile.open(tar_path) as tar:
-            # Python 3.12's filter refuses paths that escape the target;
-            # older interpreters get the members checked by hand.
-            if hasattr(tarfile, "data_filter"):
-                tar.extractall(ws, filter="data")
-            else:
-                for m in tar.getmembers():
-                    if m.name.startswith("/") or ".." in m.name.split("/"):
-                        raise RuntimeError(f"snapshot member escapes the workspace: {m.name}")
-                tar.extractall(ws)
-        if who:
-            for d, _dirs, files in os.walk(os.path.dirname(ws)):
-                for x in [d] + [os.path.join(d, f) for f in files]:
-                    with contextlib.suppress(OSError):
-                        os.lchown(x, who["user"], who["group"])
+        try:
+            tar_file = self._snapshot(job, os.path.realpath(stores.get("cache") or "/tmp"), hexd)
+        except OSError as e:
+            job.say(f"the snapshot cache could not be used: {e.strerror or e}\n")
+            return None
+        if tar_file is None:
+            return None
+        data = os.path.realpath(stores.get("data") or "/tmp")
+        ws = os.path.join(data, "jobs", jid, "workspace")
+        project = str(src.get("project") or "")
+        try:
+            with tar_file:
+                self._job_folder(data, jid, project, who)
+                with fs_holds(who), tarfile.open(fileobj=tar_file) as tar:
+                    # Python 3.12's filter refuses paths that escape the target;
+                    # older interpreters get the members checked by hand.
+                    if hasattr(tarfile, "data_filter"):
+                        tar.extractall(ws, filter="data")
+                    else:
+                        for m in tar.getmembers():
+                            if m.name.startswith("/") or ".." in m.name.split("/"):
+                                raise RuntimeError(f"snapshot member escapes the workspace: {m.name}")
+                        tar.extractall(ws)
+        except (OSError, tarfile.TarError, RuntimeError) as e:
+            # A disk that filled, or a machine that cannot do an account's
+            # file work: said as what it was, and the half of a workspace it
+            # left is taken away rather than kept with nothing to name it.
+            job.say(f"the snapshot could not be unpacked into {ws}: {getattr(e, 'strerror', None) or e}\n")
+            with contextlib.suppress(OSError):
+                jobs = open_dir(os.path.join(data, "jobs"))
+                try:
+                    rm_at(jobs, jid)
+                finally:
+                    os.close(jobs)
+            return None
         return ws
+
+    def _snapshot(self, job, cache, hexd):
+        """The snapshot `hexd` as an open file at its start, its digest
+        checked through that same descriptor; None, said to the job, when
+        the controller does not have it or what arrived was not it. Kept in
+        the cache store's SNAPSHOTS folder, fetched there beside itself
+        under a name of this fetch's own and renamed once it is whole."""
+        # The store's own folder is where this node was told to keep it,
+        # made as it always was; what is under it is reached by descriptor.
+        os.makedirs(cache, exist_ok=True)
+        fd = open_dir(cache)
+        try:
+            snaps = dir_at(fd, SNAPSHOTS, 0o700)
+        finally:
+            os.close(fd)
+        try:
+            with contextlib.suppress(OSError):
+                os.fchmod(snaps, 0o700)
+            _snapshots_moved(cache)
+            name = hexd + ".tar"
+            f = _plain_file(snaps, name)
+            if f is not None and _digest_of(f) != hexd:
+                f.close()
+                f = None
+                with contextlib.suppress(OSError):
+                    os.unlink(name, dir_fd=snaps)
+                job.say("the cached snapshot did not match its digest; dropped it, and fetching it again\n")
+            if f is None:
+                job.say(f"fetching snapshot {hexd[:12]}…\n")
+                part = f"{hexd}.{os.getpid()}.{threading.get_ident()}.part"
+                with contextlib.suppress(OSError):
+                    os.unlink(part, dir_fd=snaps)
+                f = os.fdopen(os.open(part, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=snaps), "w+b")
+                st, why = self.ctl.fetch_into(f"source?digest={hexd}", f)
+                said = ""
+                if st in (404, 410):
+                    said = f"the controller has no snapshot {hexd[:12]} ({st}): the tree has moved on; queue the job again"
+                elif st != 200:
+                    said = f"could not fetch snapshot {hexd[:12]} from the controller ({why or st}); queue the job again"
+                elif _digest_of(f) != hexd:
+                    said = f"what the controller sent as snapshot {hexd[:12]} did not match its digest; queue the job again"
+                if not said:
+                    try:
+                        os.rename(part, name, src_dir_fd=snaps, dst_dir_fd=snaps)
+                    except OSError as e:
+                        said = f"snapshot {hexd[:12]} could not be kept in the cache: {e.strerror or e}"
+                if said:
+                    f.close()
+                    with contextlib.suppress(OSError):
+                        os.unlink(part, dir_fd=snaps)
+                    job.say(said + "\n")
+                    return None
+            # Its last use, which the prune below reads.
+            with contextlib.suppress(OSError):
+                os.utime(f.fileno())
+            _snapshots_prune(snaps, name)
+            f.seek(0)
+            return f
+        finally:
+            os.close(snaps)
+
+    def _job_folder(self, data, jid, project, who):
+        """data/jobs/<job>/workspace, made new and given to the job's
+        account, with whatever was at the job's name taken away first: each
+        folder by its descriptor, never through a link at its name. A job's
+        folder says whose it is and that it is being built in from the
+        start, so one a full disk or an agent's restart leaves half made is
+        told from a failure kept for a look, and goes."""
+        ids = (who["user"], who["group"]) if who else None
+        os.makedirs(data, exist_ok=True)
+        fd = open_dir(data)
+        try:
+            jobs = dir_at(fd, "jobs")
+        finally:
+            os.close(fd)
+        try:
+            self._jobs_sweep(jobs, jid)
+            rm_at(jobs, jid)
+            jobdir = dir_at(jobs, jid)
+            try:
+                write_at(jobdir, "project", project, 0o644)
+                write_at(jobdir, BUILDING, "", 0o644)
+                wsfd = dir_at(jobdir, "workspace")
+                try:
+                    if ids:
+                        give_fd(wsfd, *ids)
+                finally:
+                    os.close(wsfd)
+                if ids:
+                    give_fd(jobdir, *ids)
+            finally:
+                os.close(jobdir)
+        finally:
+            os.close(jobs)
+
+    def _jobs_sweep(self, jobs, mine):
+        """Job folders nothing will come back for: one still marked as being
+        built in whose job is not running here (the disk filled under it, or
+        the agent was restarted), and one with no marker at all that is a day
+        old, which an older agent left the same way."""
+        for other in os.listdir(jobs):
+            if other == mine or other in self.jobs:
+                continue
+            try:
+                st = os.stat(other, dir_fd=jobs, follow_symlinks=False)
+            except OSError:
+                continue
+            if not stat.S_ISDIR(st.st_mode):
+                continue
+            has = lambda n, o=other: _lexists_at(jobs, os.path.join(o, n))  # noqa: E731
+            if has(BUILDING) or (not has("project") and time.time() - st.st_mtime > 86400):
+                rm_at(jobs, other)
 
     def finish_workspace(self, job, ws, spec, state):
         """After the command: on success upload what the outputs globs
@@ -228,22 +449,42 @@ class WorkspaceMixin:
             self.deliver(job, ws, spec.get("outputs") or [])
             shutil.rmtree(jobdir, ignore_errors=True)
             return
-        # Kept: this one. Dropped: any earlier kept failure of the same project.
-        marker = os.path.join(jobdir, "project")
-        with contextlib.suppress(OSError):
-            with open(marker, "w") as f:
-                f.write(project)
+        # Kept: this one, no longer being built in. Dropped: any earlier kept
+        # failure of the same project. The folder is the job account's, so
+        # its marker is written and read by descriptor: written by name, a
+        # link the job left at `project` had root write over what it named.
         jobs_root = os.path.dirname(jobdir)
-        for other in os.listdir(jobs_root) if os.path.isdir(jobs_root) else []:
-            od = os.path.join(jobs_root, other)
-            if od == jobdir or other in self.jobs:
-                continue
+        with contextlib.suppress(OSError):
+            jobs = open_dir(jobs_root)
             try:
-                with open(os.path.join(od, "project")) as f:
-                    if f.read() == project:
-                        shutil.rmtree(od, ignore_errors=True)
-            except OSError:
-                continue
+                mine = os.path.basename(jobdir)
+                with contextlib.suppress(OSError):
+                    fd = os.open(mine, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=jobs)
+                    try:
+                        write_at(fd, "project", project, 0o644)
+                        with contextlib.suppress(OSError):
+                            os.unlink(BUILDING, dir_fd=fd)
+                    finally:
+                        os.close(fd)
+                for other in os.listdir(jobs):
+                    if other == mine or other in self.jobs:
+                        continue
+                    try:
+                        fd = os.open(other, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=jobs)
+                    except OSError:
+                        continue
+                    try:
+                        f = _plain_file(fd, "project") if _lexists_at(fd, "project") else None
+                    finally:
+                        os.close(fd)
+                    if f is None:
+                        continue
+                    with f:
+                        same = f.read(4096).decode("utf-8", "replace") == project
+                    if same:
+                        rm_at(jobs, other)
+            finally:
+                os.close(jobs)
         job.say(f"the workspace is kept at {ws} for a look; the next failure of "
                 f"{project or 'this space'} replaces it\n")
         job.outputs.append({"kind": "workspace", "path": ws})
@@ -338,7 +579,9 @@ class WorkspaceMixin:
         part = f"{tar_path}.{threading.get_ident()}"
         st, digest = self.ctl.fetch("download?what=bundle", part)
         if st != 200:
-            say(f"could not fetch aerie from the controller ({st})\n")
+            # With no answer at all the fetch says why (a full disk, a
+            # connection dropped), which a bare 0 kept to itself.
+            say(f"could not fetch aerie from the controller ({st or digest or 'no answer'})\n")
             return ""
         hexd = digest.split(":", 1)[-1]
         # The bytes are what the header says they are, or nothing here runs

@@ -1012,7 +1012,9 @@ serves it to the agent's `source?digest=` verb. A run (`aerie run`, `aerie build
 queues an exec carrying the digest on the node the space assigns to the
 role in its settings dialog (build, test, ci, emulator: the last two are
 settings for phases 7 and 9). The agent fetches by digest into its cache
-store once, checks it, unpacks it under `<data>/jobs/<id>/workspace`, runs
+store once (a folder of its own there, `@snapshots`, which no space's cache
+can be named, kept to the last few used), checks it, unpacks it as the job's
+account under `<data>/jobs/<id>/workspace`, runs
 there with `BUILDERBOT_WORKSPACE` and a per-space `BUILDERBOT_CACHE`
 under the cache store, uploads what the outputs globs match through the
 `artifact` verb: into the space's `dist/` by basename, with

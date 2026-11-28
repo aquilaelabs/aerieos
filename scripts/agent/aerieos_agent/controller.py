@@ -1,5 +1,6 @@
 """The connection to the controller."""
 import base64
+import contextlib
 import hashlib
 import http.client
 import json
@@ -229,8 +230,11 @@ class Controller:
         except ValueError:
             return r.status, {"error": payload[:200].decode("utf-8", "replace")}
 
-    def fetch(self, path, dest, timeout=600):
-        """GET a large body straight to a file. (status, digest-header).
+    def fetch_into(self, path, f, timeout=600):
+        """GET a large body straight into `f`: an open file, or a callable
+        that opens one, asked only once the controller has answered 200.
+        (status, digest-header), or (0, why) when the controller could not
+        be asked, the file could not be written or the body stopped short.
         The snapshot and the bundle both arrive this way, and neither
         belongs in memory twice."""
         try:
@@ -243,14 +247,40 @@ class Controller:
                 r.read()
                 c.close()
                 return r.status, ""
-            tmp = dest + ".part"
-            with open(tmp, "wb") as f:
-                shutil.copyfileobj(r, f)
+            out = f() if callable(f) else f
+            try:
+                shutil.copyfileobj(r, out)
+            finally:
+                if out is not f:
+                    out.close()
             c.close()
-            os.replace(tmp, dest)
             return 200, (r.getheader("X-Snapshot-Digest") or r.getheader("X-Bundle-Digest") or "")
         except (OSError, http.client.HTTPException) as e:
-            return 0, str(e)
+            return 0, str(e) or type(e).__name__
+
+    def fetch(self, path, dest, timeout=600):
+        """fetch_into() for the file at `dest`: written beside itself and
+        renamed over it once it is whole. What stopped short (a full disk, a
+        connection dropped) leaves nothing behind."""
+        tmp, made = dest + ".part", []
+
+        def part():
+            f = open(tmp, "wb")
+            made.append(tmp)
+            return f
+        st, got = self.fetch_into(path, part, timeout)
+        if st == 200:
+            try:
+                os.replace(tmp, dest)
+                return 200, got
+            except OSError as e:
+                st, got = 0, str(e)
+        # Only the file this fetch made: what it could not open (a link the
+        # folder's account left at the name) is not its to take away.
+        if made:
+            with contextlib.suppress(OSError):
+                os.remove(tmp)
+        return st, got
 
     def upload_pieces(self, path, src, piece, timeout=600, say=None):
         """upload() in pieces of `piece` bytes, each its own request with
