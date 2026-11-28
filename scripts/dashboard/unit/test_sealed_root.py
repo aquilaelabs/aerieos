@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
@@ -151,11 +152,44 @@ class TheRealTool(unittest.TestCase):
         self.assertIn("changed or did not write", av.verity_why(self.sq, want))
 
 
+class WhatTheMachineSays(unittest.TestCase):
+    """The census's two facts: the root is read through its tree, and the
+    kernel has met a block of it that does not verify."""
+    def seal(self, dev=True, status="0 2300512 verity V\n", rc=0):
+        with tempfile.TemporaryDirectory() as d:
+            tool = os.path.join(d, "dmsetup")
+            with open(os.path.join(d, "says"), "w") as f:
+                f.write(status)
+            with open(tool, "w") as f:
+                f.write(f'#!/bin/sh\n[ "$1 $2" = "status aerieroot" ] || exit 9\ncat {d}/says\nexit {rc}\n')
+            os.chmod(tool, 0o755)
+            node = os.path.join(d, "aerieroot")
+            if dev:
+                open(node, "w").close()
+            with mock.patch.dict(os.environ, {"BB_OS_ROOT_DEV": node, "BB_OS_DMSETUP": tool}):
+                return av.root_seal()
+
+    def test_a_root_opened_through_its_tree_is_sealed_and_one_block_gone_wrong_is_damage(self):
+        self.assertEqual(self.seal(), (True, False))
+        self.assertEqual(self.seal(status="0 2300512 verity C\n"), (True, True))
+        self.assertEqual(self.seal(dev=False), (False, False), "a boot of an image built before roots were sealed")
+        self.assertEqual(self.seal(status="", rc=1), (True, False), "no answer from the device mapper is not damage")
+        self.assertEqual(self.seal(status="0 2300512 linear C\n"), (True, False))
+
+    def test_the_census_carries_both_and_never_damage_without_the_seal(self):
+        sys.path.insert(0, os.path.join(HERE, ".."))
+        import nodes
+        got = nodes._census({"os_image": {"version": "0.9.1", "slot": "a", "sealed": True, "damaged": True}})["os_image"]
+        self.assertEqual((got["sealed"], got["damaged"]), (True, True))
+        got = nodes._census({"os_image": {"version": "0.9.1", "slot": "a", "sealed": "yes", "damaged": True}})["os_image"]
+        self.assertEqual((got["sealed"], got["damaged"]), (False, False))
+
+
 class Initramfs(unittest.TestCase):
     """scripts/local-top/aerieos-os-verity, its own lines run with the
     initramfs's library, the hash file, the command line and veritysetup
     stood in for."""
-    def run_it(self, cmdline, conf="HASH=" + "ab" * 32 + "\nBYTES=12288\n", opens=True, used=5000):
+    def run_it(self, cmdline, conf="HASH=" + "ab" * 32 + "\nBYTES=12288\n", opens=True, used=5000, reads=True):
         with tempfile.TemporaryDirectory() as d:
             dev = os.path.join(d, "slot")
             with open(dev, "wb") as f:
@@ -168,7 +202,10 @@ class Initramfs(unittest.TestCase):
                     f.write(conf)
             os.mkdir(os.path.join(d, "bin"))
             with open(os.path.join(d, "bin", "veritysetup"), "w") as f:
-                f.write(f'#!/bin/sh\necho "$*" > {d}/asked\n' + (f"touch {d}/aerieroot\n" if opens else 'echo "Verification of root hash failed."; exit 1\n'))
+                # Opened, the verified root is a file here; one whose first
+                # block does not read is a folder, which dd cannot read.
+                f.write(f'#!/bin/sh\necho "$*" > {d}/asked\n' + ((f"touch {d}/aerieroot\n" if reads else f"mkdir {d}/aerieroot\n") if opens
+                                                                else 'echo "Verification of root hash failed."; exit 1\n'))
             with open(os.path.join(d, "bin", "modprobe"), "w") as f:
                 f.write(f'#!/bin/sh\necho "$*" >> {d}/modules\n')
             for t in ("veritysetup", "modprobe"):
@@ -198,6 +235,14 @@ class Initramfs(unittest.TestCase):
         self.assertIn("is not the one this version was built with", r.stdout)
         self.assertIn("pick the other slot from the boot menu", r.stdout)
         self.assertEqual(got["param.conf"], "", "nothing is mounted in its place")
+
+    def test_a_tree_that_opens_and_whose_first_block_does_not_verify_stops_the_boot_too(self):
+        # The kernel checks a block when it is read: the script reads the
+        # first one, so a slot whose tree is another root's is said here.
+        r, got, _ = self.run_it("root=DEV aerieslot=a", reads=False)
+        self.assertEqual(r.returncode, 9)
+        self.assertIn("its first block does not verify against the hash this boot carries", r.stdout)
+        self.assertEqual(got["param.conf"], "")
 
     def test_an_initrd_with_no_hash_and_the_iso_booted_live_mount_as_before(self):
         for cmdline, conf in (("root=DEV aerieslot=a", None), ("boot=live root=DEV", "HASH=" + "ab" * 32 + "\n"), ("root=DEV", "BYTES=1\n")):
@@ -245,6 +290,21 @@ class Build(unittest.TestCase):
         line = next(ln for ln in w.splitlines() if "apt_tools squashfs-tools" in ln)
         self.assertIn(" cryptsetup-bin ", line)
         self.assertIn(" cpio ", line)
+
+    def test_the_boot_test_holds_each_boot_to_a_verified_root_and_a_changed_slot_to_a_refusal(self):
+        # The words the workflow waits for on the serial line are the ones
+        # the initramfs's script says.
+        w = read(ROOT, ".github", "workflows", "os-image.yml")
+        script = read(EXTRA, "etc", "initramfs-tools", "scripts", "local-top", "aerieos-os-verity")
+        self.assertIn('echo "<5>AerieOS: the root is verified, dm-verity over $dev"', script)
+        self.assertEqual(w.count('grep -aq "AerieOS: the root is verified, dm-verity over'), 3, "the disk's boot, the stick's and the kept version's, and the disk the ISO installed")
+        self.assertEqual(script.count('echo "<2>AerieOS: the root on $dev is not the one this version was built with'), 2,
+                         "on the kernel's log, which the serial line carries: the tree that does not open, and the first block that does not verify")
+        self.assertIn('grep -aq "is not the one this version was built with" "$3"', w)
+        step = w[w.index("- name: A slot changed by one byte is refused"):w.index("- name: Install from the ISO")]
+        self.assertIn('refused "the root\'s first block" 100 ', step)
+        self.assertIn('refused "the tree\'s top level" $(( tree + 4096 + 10 )) ', step)
+        self.assertIn("said=\"booted\"", step, "a changed slot that reaches a dashboard fails the step")
 
     def test_the_readers_block_and_fan_are_the_scripts(self):
         s = read(IMG, "seal-root")

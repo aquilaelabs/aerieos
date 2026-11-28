@@ -3,7 +3,9 @@
 # tree follows the squashfs on the slot (image/seal-root), and its root hash
 # is in this initramfs, at /etc/aerieos-verity, so this initrd mounts the
 # one root it was built beside and no other. A slot whose tree does not
-# answer to that hash is not opened and the boot stops here, saying so; a
+# answer to that hash is not opened and the boot stops here, saying so on
+# the kernel's log as well, which every console carries (the stop's own
+# words go to the last console named alone); a
 # block of it changed later reads as an I/O error. The slot on the disk,
 # its copy in memory (aerietoram=1) and a kept older version's file are all
 # opened the same way, and the root the boot mounts is /dev/mapper/aerieroot,
@@ -49,5 +51,13 @@ fi
 i=0
 while [ ! -b /dev/mapper/aerieroot ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
 [ -b /dev/mapper/aerieroot ] || panic "AerieOS: the verified root did not appear at /dev/mapper/aerieroot"
+# The kernel holds a block to the tree when it is read, not when the tree is
+# opened: the first block read here, through every level from the hash this
+# boot carries down to it, so a tree that is not this root's is said in these
+# words, not as a mount that failed.
+if ! dd if=/dev/mapper/aerieroot of=/dev/null bs=4096 count=1 2>/dev/null; then
+    echo "<2>AerieOS: the root on $dev is not the one this version was built with: its first block does not verify against the hash this boot carries" > /dev/kmsg 2>/dev/null || true
+    panic "AerieOS: the root on $dev is not the one this version was built with (its first block does not verify against the hash this boot carries): the slot was changed or is damaged. Restart and pick the other slot from the boot menu; an update writes this one again."
+fi
 echo "ROOT=/dev/mapper/aerieroot" >> /conf/param.conf
 echo "<5>AerieOS: the root is verified, dm-verity over $dev" > /dev/kmsg 2>/dev/null || true

@@ -317,7 +317,15 @@ jobs:
           said="the dashboard did not answer within ten minutes"
           for i in $(seq 1 120); do
             code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
-            case "$code" in 200|302|303) echo "the dashboard answered $code after $((i * 5)) s"; kill "$(cat qemu.pid)" || true; exit 0 ;; esac
+            case "$code" in
+              200|302|303)
+                echo "the dashboard answered $code after $((i * 5)) s"; kill "$(cat qemu.pid)" || true
+                # ...from a root read through its dm-verity tree, which the
+                # initramfs says once it has opened the slot.
+                grep -aq "AerieOS: the root is verified, dm-verity over" serial.log || {
+                  echo "the dashboard answered, but the root was not opened through its dm-verity tree"; tail -c 3000 serial.log; exit 1; }
+                exit 0 ;;
+            esac
             # A panic is the answer: stop there rather than wait out the ten
             # minutes while the machine reboots into the same one.
             if grep -aq "end Kernel panic" serial.log 2>/dev/null; then said="the kernel panicked after $((i * 5)) s"; break; fi
@@ -377,6 +385,10 @@ jobs:
                     tail -c 3000 "$2"
                     exit 1
                   }
+                  # The copy in memory is the slot's file whole, so it is
+                  # opened through the same tree.
+                  grep -aq "AerieOS: the root is verified, dm-verity over /dev/loop0" "$2" || {
+                    echo "$3: the root in memory was not opened through its dm-verity tree"; tail -c 3000 "$2"; exit 1; }
                   echo "$3: the dashboard answered $code after $((i * 5)) s"; return 0 ;;
               esac
               if grep -aq "end Kernel panic" "$2" 2>/dev/null; then break; fi
@@ -423,6 +435,53 @@ jobs:
           env_set kept.raw aerie_kept_next=kept-test
           boot kept.raw serial-kept.log "aeriekept=kept-test"
           echo "kept and stick booted ($ver)" | tee -a "$GITHUB_STEP_SUMMARY"
+      # A slot changed after it was sealed does not boot: one byte of the
+      # squashfs's first block, and on another copy one byte of the tree's
+      # top level, each a root the initrd's hash no longer answers for. The
+      # boot must stop saying so and never reach a dashboard.
+      - name: A slot changed by one byte is refused
+        shell: bash
+        run: |
+          set -euo pipefail
+          qcow="$(find out -maxdepth 1 -name 'aerieos-os-*.qcow2' | head -1)"
+          sq="$(find out -maxdepth 1 -name 'aerieos-os-*.root.squashfs' | head -1)"
+          kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
+          used="$(od -An -t u8 -j 40 -N 8 "$sq" | tr -d ' ')"
+          tree=$(( (used + 4095) / 4096 * 4096 ))
+          refused() {  # what was changed, the byte's place in the slot, the log
+            local disk="changed.raw" start at
+            qemu-img convert -O raw "$qcow" "$disk"
+            start="$(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "bbroot-a") | .start')"
+            at=$(( start * 512 + $2 ))
+            # One bit of one byte, whatever it held.
+            python3 -c 'import sys; d = open(sys.argv[1], "r+b"); d.seek(int(sys.argv[2])); b = d.read(1); d.seek(int(sys.argv[2])); d.write(bytes([b[0] ^ 1])); d.close()' "$disk" "$at"
+            esp="$disk@@$(( $(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start') * 512 ))"
+            mcopy -n -i "$esp" ::/grub/grubenv grubenv
+            grub-editenv grubenv set aerie_args="console=ttyS0,115200 loglevel=6"
+            mcopy -o -i "$esp" grubenv ::/grub/grubenv
+            # shellcheck disable=SC2086
+            qemu-system-x86_64 $kvm -m 4096 -smp 2 -machine q35 \
+              -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+              -drive file="$disk",format=raw,if=virtio \
+              -netdev user,id=n0,hostfwd=tcp:127.0.0.1:7680-:7680 -device virtio-net-pci,netdev=n0 \
+              -display none -serial file:"$3" -daemonize -pidfile qemu.pid
+            local said=""
+            for _ in $(seq 1 60); do
+              code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
+              case "$code" in 200|302|303) said="booted"; break ;; esac
+              if grep -aq "is not the one this version was built with" "$3" 2>/dev/null; then said="refused"; break; fi
+              sleep 5
+            done
+            kill "$(cat qemu.pid)" || true; sleep 2
+            rm -f "$disk"
+            if [ "$said" != refused ]; then
+              tr -d '\r' < "$3" | sed 's/\x1b\[[0-9;=?]*[A-Za-z]//g' | grep -av '^[[:space:]]*$' | tail -n 80
+              echo "$1 changed by one byte: ${said:-neither a dashboard nor a refusal in five minutes}"; exit 1
+            fi
+            echo "$1 changed by one byte: the boot refused the slot" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+          refused "the root's first block" 100 serial-changed-root.log
+          refused "the tree's top level" $(( tree + 4096 + 10 )) serial-changed-tree.log
       # The ISO installs (B766): started as a machine with one blank disk
       # starts it, the installer told its disk on the kernel's line
       # (aerie_install_to, which asks nothing), and the disk it laid out
@@ -476,6 +535,9 @@ jobs:
             case "$code" in
               200|302|303)
                 kill "$(cat qemu.pid)" || true
+                # The disk the installer laid out carries the root whole, its tree with it.
+                grep -aq "AerieOS: the root is verified, dm-verity over" serial-iso-installed.log || {
+                  echo "the installed disk's root was not opened through its dm-verity tree"; tail -c 3000 serial-iso-installed.log; exit 1; }
                 echo "installed from the ISO: the dashboard answered $code after $((i * 5)) s" | tee -a "$GITHUB_STEP_SUMMARY"
                 exit 0 ;;
             esac

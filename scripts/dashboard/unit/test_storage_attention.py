@@ -32,6 +32,18 @@ class StorageRows(unittest.TestCase):
         self.assertIn("57 °C", got[1]["said"])
         self.assertTrue(all(r["kind"] == "disk" and r["node"] == "nas" for r in got))
 
+    def test_a_root_with_a_block_that_does_not_verify_is_a_row_until_the_slot_is_written_again(self):
+        # AerieOS's own root, read through its dm-verity tree: the kernel
+        # has met a block that is not the one the image was built with.
+        rep = {"os_image": {"version": "0.9.1", "slot": "b", "sealed": True, "damaged": True}}
+        got = self.rows([own(rep)])
+        self.assertEqual([(r["kind"], r["what"], r["bad"], r["key"]) for r in got], [("disk", "root", True, "root:damaged:n1:b:0.9.1")])
+        self.assertEqual(got[0]["said"], "slot b has a block that no longer matches AerieOS 0.9.1 as built: its disk is failing or the slot was changed, "
+                                         "and an update writes it again")
+        for quiet in ({"version": "0.9.1", "slot": "b", "sealed": True, "damaged": False}, {"version": "0.9.1", "slot": "b"}, {}):
+            self.assertEqual(self.rows([own({"os_image": quiet})]), [])
+        self.assertEqual(self.rows([own(rep, own=False)]), [], "another machine's root is not this bell's")
+
     def test_an_array_adopted_writable_and_not_taken_and_a_stick_short_of_room(self):
         # Writable disks with no parity behind them, and
         # the stick's own partition filling, each a row on the bell with

@@ -485,14 +485,16 @@ function attRow(a){
     // spaces); the rest on the Storage page.
     const machine = {untaken: "adopted", stick: "stick"}[a.what];
     const until = a.what === "untaken" ? "until the array is taken over, or released" : a.what === "stick" ? "until the stick has room again"
-      : a.bad ? "until it is replaced or back" : "until it cools";
+      : a.what === "root" ? "until the slot is written again and booted" : a.bad ? "until it is replaced or back" : "until it cools";
     return `<div class="bnote att${a.bad ? " bad" : a.what === "untaken" || a.what === "stick" ? " warn" : ""}">
       <div class="bt">${esc({failing: "A disk is failing", hot: "A disk runs hot", pool: "A pool is not online", array: "An array disk is gone",
-                             untaken: "The array has no parity yet", stick: "The stick is running out of room"}[a.what] || "Storage")} on ${esc(a.node)}</div>
+                             untaken: "The array has no parity yet", stick: "The stick is running out of room",
+                             root: "The system's own root is damaged"}[a.what] || "Storage")} on ${esc(a.node)}</div>
       <div class="bsum">${esc(a.said)}</div>
       <div class="bfoot"><span>${until}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
-          ${machine ? `<a href="#" data-bmachine="${machine}">Nodes page</a>` : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
+          ${machine ? `<a href="#" data-bmachine="${machine}">Nodes page</a>` : a.what === "root" ? `<a href="#" data-bmachine="updates">This controller</a>`
+            : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
   }
   // The controller's own machine's power (R164 step 3): on its UPS
   // battery, the battery low or to be replaced, the UPS silent; and its

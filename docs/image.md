@@ -512,7 +512,11 @@ has no tree and no hash, and boots as it always did.
 CI builds the image on a hosted runner with a workflow of its own,
 `.github/workflows/os-image.yml`, which builds it and then boots the VM
 disk under QEMU until the dashboard answers (`appliance-boot`), and the ISO
-installed onto a blank disk there, which is then booted to its dashboard. The image
+installed onto a blank disk there, which is then booted to its dashboard. Each of
+those boots must say on its serial line that the root was opened through its
+dm-verity tree, and two more disks, one with a byte of the root's first block
+changed and one with a byte of the tree, must stop saying the slot is not the
+one the version was built with and never reach a dashboard. The image
 build calls it on every release tag, from the Actions page's *Run
 workflow* with its *appliance* box ticked, and weekly; a branch push that
 touches the image runs it alone and publishes nothing, so a fix to the

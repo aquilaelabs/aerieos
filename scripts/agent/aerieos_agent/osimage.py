@@ -291,6 +291,25 @@ def verity_why(path, want):
     return ""
 
 
+ROOT_DEV = "/dev/mapper/aerieroot"
+
+
+def root_seal():
+    """(sealed, damaged) for this boot: whether its root is read through its
+    dm-verity tree (the initramfs's scripts/local-top/aerieos-os-verity made
+    /dev/mapper/aerieroot), and whether the kernel has met a block of it
+    that does not verify since (the device mapper's status for the target:
+    V, and C from the first such block until the next boot)."""
+    if not os.path.exists(env_or("BB_OS_ROOT_DEV", ROOT_DEV)):
+        return False, False
+    try:
+        r = subprocess.run([env_or("BB_OS_DMSETUP", "dmsetup"), "status", "aerieroot"], capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return True, False
+    words = r.stdout.split()
+    return True, len(words) >= 4 and words[2] == "verity" and words[3] == "C"
+
+
 def os_work():
     """The folder AerieOS keeps its own in on the data partition: the
     configuration copied before each update, the older versions kept, an
@@ -321,9 +340,11 @@ def release_version(path):
 
 
 def os_release():
-    """{version, snapshot, built, slot, next} on an AerieOS disk, {}
-    anywhere else: the release file the image carries, and the slot tool's
-    reading of this boot and the next."""
+    """{version, snapshot, built, slot, next, trial, fell_back, sealed,
+    damaged} on an AerieOS disk, {} anywhere else: the release file the
+    image carries, the slot tool's reading of this boot and the next, and
+    whether the root is read through its dm-verity tree and has shown a
+    block that does not verify."""
     path = env_or("BB_OS_RELEASE", RELEASE_FILE)
     if not os.path.isfile(path):
         return {}
@@ -362,6 +383,7 @@ def os_release():
             out["fell_back"] = f.read().strip()[:200]
     except OSError:
         out["fell_back"] = ""
+    out["sealed"], out["damaged"] = root_seal()
     return out
 
 

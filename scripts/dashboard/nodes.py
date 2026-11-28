@@ -2098,7 +2098,11 @@ def _c_os_image(c, out):
                      "next": o.get("next") if o.get("next") in ("a", "b") else "",
                      # On trial, and a fallback said.
                      "trial": o.get("trial") is True,
-                     "fell_back": re.sub(r"[^\w .,:;()'-]", "", str(o.get("fell_back") or ""))[:200]}
+                     "fell_back": re.sub(r"[^\w .,:;()'-]", "", str(o.get("fell_back") or ""))[:200],
+                     # The root read through its dm-verity tree, and a block
+                     # of it met since the boot that does not verify.
+                     "sealed": o.get("sealed") is True,
+                     "damaged": o.get("sealed") is True and o.get("damaged") is True}
 
 
 def _c_os_kept(c, out):
@@ -5087,13 +5091,20 @@ def storage_attention():
     storage, from the census on every poll so each leaves
     the moment it stops being true: a disk SMART calls failing (bad), a
     disk at DISK_HOT_C or more, a pool not online (bad), an array slot not
-    mounted (bad). Keyed on what is wrong, so a dismissal holds until it
-    changes."""
+    mounted (bad), and AerieOS's own root with a block that does not verify
+    against its dm-verity tree (bad). Keyed on what is wrong, so a dismissal
+    holds until it changes."""
     out = []
     for n in node_list():
         if n.get("kind") != "agent" or not own_machine(n):
             continue
         rep = n.get("reported") or {}
+        img = rep.get("os_image") if isinstance(rep.get("os_image"), dict) else {}
+        if img.get("damaged"):
+            out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "root", "bad": True,
+                        "key": f"root:damaged:{n['id']}:{img.get('slot') or ''}:{img.get('version') or ''}",
+                        "said": f"slot {img.get('slot') or '?'} has a block that no longer matches AerieOS {img.get('version') or ''} as built: "
+                                "its disk is failing or the slot was changed, and an update writes it again"})
         for d in rep.get("disks") or []:
             sm = d.get("smart") or {}
             who = f"{d.get('model') or 'a disk'} ({d.get('name')}, serial {d.get('serial') or 'none'})"

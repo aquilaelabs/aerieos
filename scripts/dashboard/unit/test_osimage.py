@@ -507,7 +507,7 @@ class TheController(unittest.TestCase):
         got = nodes._census({"os_image": {"version": "0.9.1<b>", "snapshot": "20261020T000000Z", "built": "2026-10-20T00:00:00Z", "slot": "a", "next": "c",
                                           "trial": True, "fell_back": "back on slot a <b>"}})
         self.assertEqual(got["os_image"], {"version": "0.9.1b", "snapshot": "20261020T000000Z", "built": "2026-10-20T00:00:00Z", "slot": "a", "next": "",
-                                           "trial": True, "fell_back": "back on slot a b"})
+                                           "trial": True, "fell_back": "back on slot a b", "sealed": False, "damaged": False})
         self.assertNotIn("os_image", nodes._census({"os_image": {}}))
 
     def test_the_update_window_applies_once_at_its_hour_and_never_by_default(self):
