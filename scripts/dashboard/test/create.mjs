@@ -86,6 +86,15 @@ await section("projects first", async () => {
   // name typed, its title kept to check.
   let asked = null;
   page.answers.push(q => { asked = q; return { index: 0, text: 'Web shop, v2' }; });
+  // The ring is worn for a couple of seconds from the moment the space is
+  // made, and the first-repository dialog is answered before this looks: the
+  // cards that wear it are written down as they do, so a slow walk to the
+  // check does not find it already faded (WebKit under a gate's load).
+  await page.evaluate(() => {
+    window.__ringed = [];
+    new MutationObserver(ms => { for (const m of ms) if (m.target.classList?.contains('pjnew') && m.target.dataset.pkey) window.__ringed.push(m.target.dataset.pkey); })
+      .observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
   await page.click('#bNewProjTab');
   await page.waitForFunction(() => Object.values(state?.repos || {}).some(r => r.name === 'Web shop, v2'), null, { timeout: 15000 });
   ok(asked?.title === 'New space' && JSON.stringify(asked?.choices) === '["Create"]',
@@ -104,12 +113,12 @@ await section("projects first", async () => {
   await page.waitForSelector(card, { timeout: 15000 });
   // The page goes to it, and it wears a ring in the accent that fades
   // (the operator, 26 Oct).
-  await page.waitForSelector(`${card}.pjnew`, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(k => window.__ringed.includes(k), key, { timeout: 5000 }).catch(() => {});
   // The scroll to it is smooth: read once the card is inside the page's box.
   await page.waitForFunction(c => { const el = document.querySelector(c), r = el.getBoundingClientRect(), d = el.closest('.doc').getBoundingClientRect();
     return r.top >= d.top - 1 && r.bottom <= d.bottom + 1; }, card, { timeout: 10000 }).catch(() => {});
   const fresh = await page.$eval(card, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect();
-    return { ring: c.classList.contains('pjnew'), seen: r.top >= d.top - 1 && r.bottom <= d.bottom + 1 }; });
+    return { ring: window.__ringed.includes(c.dataset.pkey), seen: r.top >= d.top - 1 && r.bottom <= d.bottom + 1 }; });
   ok(fresh.ring && fresh.seen, `a new space's card is scrolled into sight and wears the new ring (${JSON.stringify(fresh)})`);
   await page.waitForFunction(c => !document.querySelector(c).classList.contains('pjnew'), card, { timeout: 5000 }).catch(() => {});
   ok(!await page.$eval(card, c => c.classList.contains('pjnew')), '...which goes after a moment');
