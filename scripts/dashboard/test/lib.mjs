@@ -1033,11 +1033,14 @@ export const call = async (path, body, headers = OWNER) => {
 export const api = async (path, body, headers = OWNER) => (await call(path, body, headers)).body;
 // jobEnd(id, { ms, step, headers, base }): a job waited for from outside the
 // page, asked for by its id every `step` ms until it has succeeded, failed
-// or been canceled. Answers its row, or null when `ms` ran out first; the
-// time is the caller's own and is not stretched as until's is. Asked as the
-// owner of this run's server unless `headers` and `base` say who and where.
+// or been canceled. Answers its row, or null when `ms` ran out first.
+// Stretched as every other wait is (patience): a gate that counts coverage
+// runs the server and the agent counted too, and a job that ends in seconds
+// alone passed its unstretched thirty there (agent.mjs's failed build).
+// Asked as the owner of this run's server unless `headers` and
+// `base` say who and where.
 export async function jobEnd(id, { ms = 60000, step = 250, headers = OWNER, base = URL } = {}){
-  const at = `${base.replace(/\/$/, '')}/api/v1/jobs?id=${id}`, end = Date.now() + ms;
+  const at = `${base.replace(/\/$/, '')}/api/v1/jobs?id=${id}`, end = Date.now() + patience(ms);
   while (Date.now() < end){
     const j = await (await fetch(at, { headers })).json().catch(() => null);
     if (j && ['succeeded', 'failed', 'canceled'].includes(j.state)) return j;

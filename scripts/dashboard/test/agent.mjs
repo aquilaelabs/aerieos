@@ -2380,7 +2380,7 @@ print(json.dumps(sorted(os.listdir(d))))
     const bfin = await jobEnd(bad.job, { ms: 30000, step: 200 });
     const kept = bfin?.outputs?.find(o => o.kind === 'workspace');
     ok(bfin && bfin.state === 'failed' && kept && existsSync(kept.path) && /kept at/.test(bfin.log),
-       `a failed build keeps its workspace on the node and says where (${kept?.path})`);
+       `a failed build keeps its workspace on the node and says where (${kept?.path || (bfin ? `${bfin.state}, outputs ${JSON.stringify(bfin.outputs)}` : 'the job had not ended')})`);
     // cache-clear is a job too
     const cc = await api('/api/v1/nodes', { action: 'cache-clear', id: minted.id });
     const cfin = await jobEnd(cc.job, { ms: 30000, step: 200 });
