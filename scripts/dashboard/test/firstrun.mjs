@@ -6,7 +6,7 @@
 // a node and lands on Home, whose Getting started card keeps what is left.
 // The fixture starts with setup done, so it is put back to first run here,
 // as making the owner does, and Finish puts it right again.
-import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll, api, section } from './lib.mjs';
+import { URL, launch, newPage, ok, done, DIR, until, holdNodes, freePoll, api, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, rmSync, openSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -396,8 +396,9 @@ await section("a bare-metal install's first run", async () => {
     await page.route('**/api/v1/jobs?id=j_y', r => r.fulfill({ json: { id: 'j_y', state: 'succeeded' } }));
     // The status poll held while the walk below plants its own state: it
     // waits on calls in between, and a status read landing there redrew the
-    // setup panel from the server's (B1152).
-    await holdPoll(page);
+    // setup panel from the server's; and the nodes' read, which put
+    // the server's node back under the one the walk plants its pool on.
+    await holdNodes(page);
     const fresh = await page.evaluate(async () => {
       const keepFb = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported, keepD = setupDisks.own;
       // What is drawn here is said here: no read from the server lands under it.
@@ -454,8 +455,9 @@ await section("a bare-metal install's first run", async () => {
   // machine's and Controller settings' own controls, read from the machine.
   {
     // The status poll held while the walk plants its own state and waits
-    // between draws: a read landing there redrew it from the server's (B1152).
-    await holdPoll(page);
+    // between draws: a read landing there redrew it from the server's,
+    // the nodes' read as much as the status poll's.
+    await holdNodes(page);
     const walk = await page.evaluate(async () => {
       const keep = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported;
       const panel = () => document.getElementById('setupPanel');
@@ -751,10 +753,9 @@ await section("a bare-metal install's first run", async () => {
     // page (the machine's disks, what it adopted, the first boot's plan)
     // and drawn from that, and a poll landing between the saying and the
     // draw puts the server's own back, which has none of it.
-    await holdPoll(page);
     // ...and the nodes' own re-read with it, which a node's every check-in
     // asks for: it puts back a machine that has adopted nothing.
-    await page.evaluate(() => { if (!window.__heldLoadNodes){ window.__heldLoadNodes = loadNodes; loadNodes = async () => {}; } });
+    await holdNodes(page);
     const ad = await page.evaluate(() => {
       const n = ownMachine();
       n.reported = { ...n.reported, disks: [{ name: 'sdb', by_id: '/dev/disk/by-id/ata-WDC_X_SER111', serial: 'SER111' },
@@ -1003,7 +1004,6 @@ await section("a bare-metal install's first run", async () => {
     const noneHeld = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'release' });
     ok(/xfs, btrfs or zfs/.test(badFs.error || '') && !badFs.job && /nothing is adopted/.test(noneHeld.error || '') && !noneHeld.job,
        `storage-adopt refuses a filesystem it does not take and a Release with nothing adopted, before any job (${badFs.error}; ${noneHeld.error})`);
-    await page.evaluate(() => { if (window.__heldLoadNodes){ loadNodes = window.__heldLoadNodes; window.__heldLoadNodes = null; } });
     await freePoll(page);
   }
   // Name and time (R161 step 3): the own machine's section, Apply asleep

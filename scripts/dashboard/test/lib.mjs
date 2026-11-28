@@ -724,18 +724,37 @@ export async function refreshUntil(page, fn, { timeout = 60000, every = 1000 } =
 // know about this. A poll already out when the hold goes on still lands, so
 // the hold waits for it: landing after the caller planted its rows, it put
 // the server's back over them (B295).
+//
+// Every read already out is waited for too: one asked just before
+// the hold landed after it, under a gate's load where a read takes long
+// enough to straddle, and put the server's back where the caller had planted
+// its own. The revisions poll is left running: a walk that waits on a job
+// reads its end through it (devapp's dead daemon). A walk that plants a node
+// holds the nodes' read as well (holdNodes).
 export const holdPoll = async page => {
   await page.evaluate(() => {
     if (!window.__heldRefresh){ window.__heldRefresh = refresh; refresh = async () => {}; }
   });
-  await page.waitForFunction(() => !refreshBusy, null, { timeout: 30000 });
+  await page.waitForFunction(() => !refreshBusy && ![...readings.values()].some(r => r.busy), null, { timeout: 30000 });
 };
 export const freePoll = page => page.evaluate(() => {
   if (window.__heldRefresh){ refresh = window.__heldRefresh; window.__heldRefresh = null; }
+  if (window.__heldLoadNodes){ loadNodes = window.__heldLoadNodes; window.__heldLoadNodes = null; }
   // The status poll is a chain each read schedules the next of (R218 step
   // 10): a timer that fired into the held no-op scheduled nothing.
   if (typeof statusLater === 'function') statusLater();
 });
+// The hold for a walk that plants a node of its own (its report, its
+// disks): the status poll, and the nodes' read, which the revisions poll
+// asks for whenever a node's heartbeat moves the registry. Held first and
+// the reads out waited for after, so the node the walk then finds in the
+// list is the one its draws read to the end (firstrun's place step put its
+// pool on a node a read then replaced: 17 sightings). freePoll
+// gives both back.
+export const holdNodes = async page => {
+  await page.evaluate(() => { if (!window.__heldLoadNodes){ window.__heldLoadNodes = loadNodes; loadNodes = async () => {}; } });
+  await holdPoll(page);
+};
 
 // One section is open at a time on a tab and in a notebook view (5 and
 // 6 Oct): a check opens the one it works in first, by its key
