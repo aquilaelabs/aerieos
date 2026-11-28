@@ -10969,10 +10969,46 @@ class Handler(BaseHTTPRequestHandler):
 
     def _devapp(self, req):
         """The dev-instance controls: the Containers page's buttons, and `aerie devapp`
-        from a session. Who may press which is decided below, by the verb, by
-        whose the container is and by its project's Run its container."""
+        from a session. Who may press which is the gates below, each a
+        method asked in this order (what the request names, whose it is, what
+        the asker may do to it, where it would land, a session's own node and
+        dial, a locked space, the spaces it names); then the one call, where
+        which verb means what is devactions.py's to say."""
         me = self._who() or {}
         sess = me.get("session") or ""
+        if not (named := self._devapp_named(req, me)):
+            return None
+        name, act = named
+        if self._devapp_whose(me, sess, name, act, req) or self._devapp_may(me, sess, name, act, req) \
+                or self._devapp_lands(me, sess, name, act, req) or self._devapp_session(me, sess, name, act, req) \
+                or self._devapp_locked(me, sess, name, act, req) or self._devapp_targets(me, sess, name, act, req):
+            return None
+        # Which instance of that project. Absent means the one every project
+        # has always had, so a caller that predates instances still works and
+        # a request that names a strange one is answered rather than obeyed:
+        # the name decides a compose project and a data directory, and those
+        # are not places to let an arbitrary string reach.
+        # A request naming no instance means the project's only one, when
+        # it has exactly one: AerieOS's own is called builderbot-dev, and
+        # aerie devapp from a session was answering for a `main` that did not
+        # exist (15 Sep). With several, `main`; bb takes --instance for that.
+        # A NEW one named by nobody takes the name Send would offer: the
+        # project's own while it has none, then one beside it.
+        inst = field(req, "instance") or (devapp.send_name(name, field(req, "compose")) if act == "new"
+                                          else devapp.only_instance(name))
+        # A session at `ask` puts the change in front of a person instead;
+        # devactions.request says which changes those are.
+        return self._json(*devactions.request(
+            name, inst, act, req, me=me, principal=self._principal(),
+            dial=prefs.get(sess)["devbuild"] if sess else "",
+            # The command is the project's own, from its settings.
+            test_cmd=prefs.get(name)["test"] if act == "test" else ""))
+
+    def _devapp_named(self, req, me):
+        """(the space or written container a dev-instance request names, its
+        action), with a container's own name read into the request's space
+        and instance; None, with the refusal written, where it names
+        neither."""
         # Named as the Docker tab lists it, for one that is not the caller's
         # own project's: a container written here, or another project's
         # instance that belongs to this one (aerie devapp --container NAME).
@@ -10980,7 +11016,8 @@ class Handler(BaseHTTPRequestHandler):
         if ctr:
             row = devapp.row_named(ctr)
             if not row:
-                return self._json({"error": f"no container called {ctr} on record here"}, 400)
+                self._json({"error": f"no container called {ctr} on record here"}, 400)
+                return None
             req["project"], req["instance"] = row
         name = field(req, "project")
         # A project, OR a container written here, which is not a project and
@@ -10989,11 +11026,17 @@ class Handler(BaseHTTPRequestHandler):
         # compose call and a data directory either way.
         if name not in set(project_names(me)) \
                 and name not in containers.overview_names():
-            return self._json({"error": f"not a space or container: {name}"}, 400)
+            self._json({"error": f"not a space or container: {name}"}, 400)
+            return None
         act = field(req, "action")
         # The verb onto this request's trace row: a POST keyed by its
         # path alone could not say which devapp action was the slow one.
         self.trace_extra = f"action={act}" if isinstance(act, str) and act.replace("-", "").isalnum() else ""
+        return name, act
+
+    def _devapp_whose(self, me, sess, name, act, req):
+        """True, with the 403 written, where what the request names is not
+        the asker's to reach."""
         # WHOSE IT IS, before anything else is asked: an account that is not
         # an administrator reaches what belongs to its projects, and a
         # session what belongs to its own one. The
@@ -11007,14 +11050,22 @@ class Handler(BaseHTTPRequestHandler):
             # the state and the starter env, never a change.
             reads = {owner} if sess and act in ("state", "starter", "probe") and owner and self._reads(owner) else set()
             if owner not in ({sess} | reads if sess else set(project_names(me))):
-                return self._json({"error": containers.not_ours(devapp.pname(name, want), sess)}, 403)
+                self._json({"error": containers.not_ours(devapp.pname(name, want), sess)}, 403)
+                return True
         # ...and an administrator sees every project's and changes those on
         # their own list; reading one is everybody's.
         elif act not in ("starter", "state", "probe"):
             want = field(req, "instance") or (devapp.send_name(name, field(req, "compose")) if act == "new"
                                               else devapp.only_instance(name))
             if why := self._not_on_list(me, devapp.owner_of(name, want)):
-                return self._json({"error": why}, 403)
+                self._json({"error": why}, 403)
+                return True
+        return False
+
+    def _devapp_may(self, me, sess, name, act, req):
+        """True, with the 403 written, where the asker may not do this
+        action: a session's by the action and what its account holds, a
+        person's by _devapp_refused."""
         # Reading is everybody's; changing what is running is not (roadmap
         # #27). Named, not derived from the verb: an action that should be
         # restricted and is not on this list is a decision somebody has to
@@ -11042,16 +11093,23 @@ class Handler(BaseHTTPRequestHandler):
         if session:
             if act not in ("starter", "state", "probe", "rebuild", "abort", "test") + dialed \
                     and self._refused("docker-write"):
-                return None
+                return True
             # ...and what the dial hands a session, never past its account.
             if act in dialed and self._session_held("docker-write", sess):
-                return None
+                return True
         elif self._devapp_refused(me, name, act, req):
-            return None
+            return True
         # A compose file edited from the Docker tab is a file in the project's
         # tree: a write to the project as well as to its container.
         if act == "compose-set" and self._readonly(name):
-            return None
+            return True
+        return False
+
+    def _devapp_lands(self, me, sess, name, act, req):
+        """True, with the 403 written, where a container would land under a
+        space not on the asker's list or on a node that is not theirs to
+        name; a node named by its name becomes its id in the request."""
+        session = bool(sess)
         # Sending, copying or moving a container, or putting it under another
         # project, names only projects on the asker's own list, for an
         # administrator and the owner as for a user:
@@ -11064,11 +11122,38 @@ class Handler(BaseHTTPRequestHandler):
                 # A project, not a container written here: one of those is
                 # nobody's list to be on.
                 if target and registry.is_project(target) and not users.may_work(me, target):
-                    return self._json({"error": f"{registry.label(target)} is not on your list of spaces: "
-                                                "add it to your own list on the Users page first"}, 403)
+                    self._json({"error": f"{registry.label(target)} is not on your list of spaces: "
+                                         "add it to your own list on the Users page first"}, 403)
+                    return True
         if act == "relocate" and session:
-            return self._json({"error": "copying or moving a container to another node is a person's: "
-                                        "it puts the space's data on another machine"}, 403)
+            self._json({"error": "copying or moving a container to another node is a person's: "
+                                 "it puts the space's data on another machine"}, 403)
+            return True
+        # A node named by its name (aerie devapp new --node NAME) is its id here.
+        if act == "new" and req.get("node") and not NODES_DOWN and not nodes.node(str(req["node"])):
+            hit = [n for n in nodes.node_list() if n.get("name") == str(req["node"]) and n.get("state") != "retired"]
+            if hit:
+                req["node"] = hit[0]["id"]
+        if act == "new" and req.get("ship") is True:
+            # A session may make one there when its project names the node
+            # under Hosts its containers on (prefs.hosts, the operator, 10
+            # Oct), under its Run its container dial below; anywhere else it
+            # is a person's.
+            if session and (name != sess or str(req.get("node") or "") not in (prefs.get(sess).get("hosts") or [])):
+                self._json({"error": "sending a space's container to a node it is not on is a "
+                                     "person's, unless the node is listed under Also works on in the "
+                                     "space's settings (a hosting-only node takes containers alone): "
+                                     "it puts the space's image on another machine"}, 403)
+                return True
+            if not session and self._refused("node", name):
+                return True
+        return False
+
+    def _devapp_session(self, me, sess, name, act, req):
+        """True, with the 403 written, where a session asks about an instance
+        that is not on its own node, or its space's Run its container dial
+        says deny; a session's new container is held to its own space and
+        node in the request."""
         # A SESSION is a further question, and the answer is a per-project
         # dial with the notebook's own three words. Rebuild runs the project's
         # own Dockerfile and brings the container up on the node's daemon: for
@@ -11093,23 +11178,7 @@ class Handler(BaseHTTPRequestHandler):
         # The exception is one SENT there on purpose: its image is
         # built on the project's own node and shipped, and the project's
         # sessions are the ones meant to rebuild it.
-        # A node named by its name (aerie devapp new --node NAME) is its id here.
-        if act == "new" and req.get("node") and not NODES_DOWN and not nodes.node(str(req["node"])):
-            hit = [n for n in nodes.node_list() if n.get("name") == str(req["node"]) and n.get("state") != "retired"]
-            if hit:
-                req["node"] = hit[0]["id"]
-        if act == "new" and req.get("ship") is True:
-            # A session may make one there when its project names the node
-            # under Hosts its containers on (prefs.hosts, the operator, 10
-            # Oct), under its Run its container dial below; anywhere else it
-            # is a person's.
-            if session and (name != sess or str(req.get("node") or "") not in (prefs.get(sess).get("hosts") or [])):
-                return self._json({"error": "sending a space's container to a node it is not on is a "
-                                            "person's, unless the node is listed under Also works on in the "
-                                            "space's settings (a hosting-only node takes containers alone): "
-                                            "it puts the space's image on another machine"}, 403)
-            if not session and self._refused("node", name):
-                return None
+        session = bool(sess)
         if act not in ("starter", "state", "probe") and session:
             on = devapp.instance_node(name, field(req, "instance"))
             mine = devapp.project_daemon(sess)
@@ -11127,11 +11196,12 @@ class Handler(BaseHTTPRequestHandler):
             shipped_there = shipped_there or on in [n for w in (name, sess) for n in
                                                      (devapp.nodes_of(w) or []) + (prefs.get(w).get("hosts") or [])]
             if on and mine and on != mine and not shipped_there:
-                return self._json({"error": "this dev instance is on another node: it stayed "
-                                            "where it was running when this space moved, "
-                                            "and a session works on its own node's. The "
-                                            "operator uses or removes it from the Docker "
-                                            "manager"}, 403)
+                self._json({"error": "this dev instance is on another node: it stayed "
+                                     "where it was running when this space moved, "
+                                     "and a session works on its own node's. The "
+                                     "operator uses or removes it from the Docker "
+                                     "manager"}, 403)
+                return True
         if act not in ("starter", "state", "probe", "test") and session:
             # The dial is the project's (Agents may: Run its container, in its
             # settings) and covers rebuilding its containers, changing their
@@ -11146,11 +11216,13 @@ class Handler(BaseHTTPRequestHandler):
             # own: the gate above let nothing else through.
             mode = prefs.get(sess)["devbuild"]
             if mode == "deny":
-                return self._json({"error": devapp.RUN_DENIED}, 403)
+                self._json({"error": devapp.RUN_DENIED}, 403)
+                return True
             if act == "new":
                 if "owner" in req and field(req, "owner") != name:
-                    return self._json({"error": "a session creates its own space's container, "
-                                                "belonging to its own space"}, 403)
+                    self._json({"error": "a session creates its own space's container, "
+                                         "belonging to its own space"}, 403)
+                    return True
                 req.pop("owner", None)
                 # ...on its own node: the node a session names is dropped,
                 # except for one it ships to, which the hosts gate above has
@@ -11159,16 +11231,27 @@ class Handler(BaseHTTPRequestHandler):
                 # landed, unshipped, on the project's own node.
                 if req.get("ship") is not True:
                     req["node"] = ""
+        return False
+
+    def _devapp_locked(self, me, sess, name, act, req):
+        """True, with the 403 written, where the space, or the one a written
+        container belongs to, is locked against the asker."""
         if act not in ("starter", "state") and name in project_names(me) \
                 and self._readonly(name):
-            return None
+            return True
         # ...and for a container written here, the project it belongs to,
         # for anybody but an administrator: a session of a locked project
         # does not work on its containers either.
         if act not in ("starter", "state") and not users.is_admin(me) \
                 and name not in set(project_names(me)) \
                 and self._readonly(devapp.owner_of(name, field(req, "instance") or devapp.MAIN)):
-            return None
+            return True
+        return False
+
+    def _devapp_targets(self, me, sess, name, act, req):
+        """True, with the refusal written, where the request names another
+        space the asker does not see, or a session asks to move a container
+        between spaces."""
         # `new` is the one action whose instance does not exist yet, which is
         # what it is for; the project it is made for is checked here, where
         # the account is known, and everything else is the module's: which
@@ -11177,38 +11260,22 @@ class Handler(BaseHTTPRequestHandler):
         if act == "new":
             under = field(req, "owner")
             if under and self._not_project(under):
-                return
+                return True
         # Moving one between projects crosses two of them: a person's, and
         # only into a project they can see.
         if act == "move":
             if me.get("session"):
-                return self._json({"error": "moving a container to another space is a person's, "
-                                            "on the Containers page"}, 403)
+                self._json({"error": "moving a container to another space is a person's, "
+                                     "on the Containers page"}, 403)
+                return True
             if field(req, "to") not in set(project_names(me)):
-                return self._json({"error": f"no space called {field(req, 'to')}"}, 400)
+                self._json({"error": f"no space called {field(req, 'to')}"}, 400)
+                return True
         if act == "owner" and field(req, "owner") \
                 and field(req, "owner") not in set(project_names(me)):
-            return self._json({"error": f"no space called {field(req, 'owner')}"}, 400)
-        # Which instance of that project. Absent means the one every project
-        # has always had, so a caller that predates instances still works and
-        # a request that names a strange one is answered rather than obeyed:
-        # the name decides a compose project and a data directory, and those
-        # are not places to let an arbitrary string reach.
-        # A request naming no instance means the project's only one, when
-        # it has exactly one: AerieOS's own is called builderbot-dev, and
-        # aerie devapp from a session was answering for a `main` that did not
-        # exist (15 Sep). With several, `main`; bb takes --instance for that.
-        # A NEW one named by nobody takes the name Send would offer: the
-        # project's own while it has none, then one beside it.
-        inst = field(req, "instance") or (devapp.send_name(name, field(req, "compose")) if act == "new"
-                                          else devapp.only_instance(name))
-        # A session at `ask` puts the change in front of a person instead;
-        # devactions.request says which changes those are.
-        return self._json(*devactions.request(
-            name, inst, act, req, me=me, principal=self._principal(),
-            dial=prefs.get(sess)["devbuild"] if session else "",
-            # The command is the project's own, from its settings.
-            test_cmd=prefs.get(name)["test"] if act == "test" else ""))
+            self._json({"error": f"no space called {field(req, 'owner')}"}, 400)
+            return True
+        return False
 
     def _version(self, req):
         """Move a project's version, cut or change a release, read and
