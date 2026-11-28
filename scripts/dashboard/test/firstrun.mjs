@@ -23,6 +23,12 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
   await page.goto(URL);
   await page.waitForFunction(() => typeof state !== 'undefined' && state?.settings && document.body.classList.contains('firstrun'), null, { timeout: 20000 });
   await page.waitForSelector('#setupPanel .setstep', { timeout: 20000 });
+  // The node step's state is the nodes list's, which the setup page asks
+  // for as it draws. Read before the list had landed, the step said to do,
+  // turned done under the walk, and its Enroll node was gone before the
+  // press that the walk then made on it.
+  await page.waitForFunction(() => nodesList !== null && !readBusy('nodes'), null, { timeout: 20000 });
+  await page.evaluate(() => drawSetup());
 
   // ---- the page, and nothing beside it ---------------------------------------
   const frame = await page.evaluate(() => {
